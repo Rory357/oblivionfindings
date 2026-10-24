@@ -72,7 +72,7 @@ class LiveResponseTabCountsTest extends TestCase
                 ->assertInertia(fn ($page) => $page->where('tabCounts.needs_action', 1)->has('tabCounts.snoozed'));
         }
 
-        $version = app(HandleInertiaRequests::class)->version(request());
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
         $this->actingAs($viewer)
             ->get('/control-room', [
                 'X-Inertia' => 'true',

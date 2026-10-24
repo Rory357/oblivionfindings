@@ -104,7 +104,7 @@ class ControlRoomDeskTest extends TestCase
             ->pluck('control_room_alerts.id')
             ->all();
 
-        $version = app(HandleInertiaRequests::class)->version(request());
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
         $response = $this->actingAs($viewer)
             ->get('/control-room?site_id='.$site->id, [
                 'X-Inertia' => 'true',
@@ -220,7 +220,7 @@ class ControlRoomDeskTest extends TestCase
         });
         app()->forgetInstance(ControlRoomDeskService::class);
 
-        $version = app(HandleInertiaRequests::class)->version(request());
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
         $this->actingAs($viewer)
             ->get('/control-room', [
                 'X-Inertia' => 'true',
