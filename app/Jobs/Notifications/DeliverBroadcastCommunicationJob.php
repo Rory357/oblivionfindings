@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
@@ -42,6 +43,9 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
 
     public int $backoff = 30;
 
+    /** The claim marker on a text being handed to the provider right now. */
+    public const SENDING = 'Sending…';
+
     public function __construct(public int $communicationId)
     {
     }
@@ -67,11 +71,16 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
             return;
         }
 
+        if ($comm->channel === 'sms') {
+            $this->deliverSmsOnce($comm);
+
+            return;
+        }
+
         try {
             match ($comm->channel) {
                 'email' => $this->sendEmail($comm),
                 'in_app' => $this->markInApp($comm),
-                'sms' => $this->sendSms($comm),
                 'push' => $this->sendPush($comm),
                 default => $this->markFailed($comm, 'Unsupported channel: ' . $comm->channel),
             };
@@ -137,6 +146,47 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
         ])->save();
     }
 
+    /**
+     * A text is sent at most once (Stephan, 24 Oct 2026: "make sure a text is
+     * never sent twice"):
+     *  1. The row is claimed (pending → sent, "Sending…") in one conditional
+     *     update before the provider is called, so a duplicate job or a retry
+     *     after a crash can never send it again.
+     *  2. Only a result that says the provider definitely did NOT take it puts
+     *     the row back to pending and retries (3 tries, 30 s apart).
+     *  3. Anything unclear — the provider throwing, a timeout, a server error,
+     *     a failure after it was accepted — stays "Not confirmed" for a person
+     *     to follow up in Delivery problems, and is never retried.
+     */
+    private function deliverSmsOnce(Communication $comm): void
+    {
+        $claimed = Communication::query()
+            ->whereKey($comm->getKey())
+            ->where('status', 'pending')
+            ->update([
+                'status' => 'sent',
+                'status_detail' => self::SENDING,
+                'retry_count' => DB::raw('retry_count + 1'),
+                'updated_at' => now(),
+            ]);
+        if ($claimed !== 1) {
+            return;
+        }
+        $comm->refresh();
+
+        try {
+            $this->sendSms($comm);
+        } catch (BroadcastDeliveryRetry $retry) {
+            throw $retry;
+        } catch (Throwable $e) {
+            Log::warning('Broadcast text outcome unknown; not retried', [
+                'communication_id' => $comm->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->markUnconfirmed($comm, substr($e->getMessage(), 0, 160));
+        }
+    }
+
     private function sendSms(Communication $comm): void
     {
         $phone = $comm->target_phone
@@ -150,15 +200,48 @@ class DeliverBroadcastCommunicationJob implements ShouldQueue
 
         $result = app(SmsProvider::class)->send($phone, (string) $comm->content);
 
-        if (! $result->sent) {
-            $this->markFailed($comm, $result->error ?? 'SMS provider failed to send the message.');
+        if ($result->sent) {
+            $comm->forceFill([
+                'status' => 'delivered',
+                'delivered_at' => now(),
+                'status_detail' => null,
+            ])->save();
+
             return;
         }
 
+        $reason = $result->error ?? 'SMS provider failed to send the message.';
+
+        if ($result->retryable) {
+            if ($this->attempts() < $this->tries) {
+                // The provider took nothing, so the next try can't double-send.
+                $comm->forceFill([
+                    'status' => 'pending',
+                    'status_detail' => 'Not sent yet, trying again: ' . $reason,
+                ])->save();
+
+                throw new BroadcastDeliveryRetry($reason);
+            }
+            $this->markFailed($comm, $reason . ' (tried ' . $this->tries . ' times)');
+
+            return;
+        }
+
+        if ($result->unconfirmed) {
+            $this->markUnconfirmed($comm, $reason);
+
+            return;
+        }
+
+        $this->markFailed($comm, $reason);
+    }
+
+    /** May have gone out: shown as "Not confirmed", never sent again automatically. */
+    private function markUnconfirmed(Communication $comm, string $reason): void
+    {
         $comm->forceFill([
-            'status' => 'delivered',
-            'delivered_at' => now(),
-            'status_detail' => null,
+            'status' => 'sent',
+            'status_detail' => 'Not confirmed: ' . rtrim(trim($reason), '.') . '. It may have gone out, so it was not sent again.',
         ])->save();
     }
 
