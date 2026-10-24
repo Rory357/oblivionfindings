@@ -350,8 +350,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
     {
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
-        // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'incidents.viewAny', 'restraints.view'], 'Dashboard Viewer');
+        // Incident counts need incident read; restraint metrics need restraint read and read of the restraints' clients (kept rules).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'incidents.viewAny', 'restraints.view', 'clients.viewAny'], 'Dashboard Viewer');
         $foreignWorker = $this->siteBoundUser($foreignSite, [], 'Foreign Worker');
 
         HsRiskAssessment::factory()->active()->forSite($visibleSite->id)->create([
