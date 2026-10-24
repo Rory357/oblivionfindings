@@ -79,7 +79,7 @@ class PpeWorkspaceReadPrivacyTest extends PpeReadTestCase
         $this->assertStringNotContainsString('ppe_allocation_attachments', $sql);
         foreach ($queries as $query) {
             if (str_contains(strtolower($query), 'from '.chr(96).'ppe_allocations')) {
-                $this->assertStringNotContainsString('select *', strtolower($query));
+                $this->assertStringNotContainsString('select *', self::withoutExistsProbes($query));
                 $this->assertStringNotContainsString(chr(96).'notes'.chr(96), $query);
                 $this->assertStringNotContainsString(chr(96).'fit_test_result'.chr(96), $query);
             }
@@ -332,7 +332,7 @@ class PpeWorkspaceReadPrivacyTest extends PpeReadTestCase
                 foreach (['content', 'actor_snapshot', 'command', 'idempotency_key', 'user_id'] as $privateColumn) {
                     $this->assertStringNotContainsString(chr(96).$privateColumn.chr(96), strtolower($query));
                 }
-                $this->assertStringNotContainsString('select *', strtolower($query));
+                $this->assertStringNotContainsString('select *', self::withoutExistsProbes($query));
             }
         }
     }
@@ -378,7 +378,7 @@ class PpeWorkspaceReadPrivacyTest extends PpeReadTestCase
                 foreach (['content', 'actor_snapshot', 'command', 'idempotency_key', 'user_id'] as $column) {
                     $this->assertStringNotContainsString(chr(96).$column.chr(96), strtolower($query));
                 }
-                $this->assertStringNotContainsString('select *', strtolower($query));
+                $this->assertStringNotContainsString('select *', self::withoutExistsProbes($query));
             }
         }
         DB::table('ppe_allocations')->where('id', $receipt['source_id'])->update(['source_schema_version' => 0, 'source_revision' => 0]);
@@ -410,7 +410,7 @@ class PpeWorkspaceReadPrivacyTest extends PpeReadTestCase
                 foreach (['content', 'description', 'hazards_addressed', 'standards_reference', 'actor_snapshot', 'command', 'idempotency_key'] as $privateColumn) {
                     $this->assertStringNotContainsString(chr(96).$privateColumn.chr(96), strtolower($query));
                 }
-                $this->assertStringNotContainsString('select *', strtolower($query));
+                $this->assertStringNotContainsString('select *', self::withoutExistsProbes($query));
             }
         }
         DB::table('ppe_types')->where('id', $typeReceipt['root_id'])->update(['name' => 'FORGED-CATALOGUE', 'category' => 'head']);
@@ -429,5 +429,11 @@ class PpeWorkspaceReadPrivacyTest extends PpeReadTestCase
         $this->assertSame('repair_required', app(PpeWorkspaceService::class)->allocation($this->worker, $allocation->id)['catalogue_integrity']);
         $legacy = PpeAllocation::factory()->create(['ppe_inventory_id' => $this->item->id, 'user_id' => $this->worker->id]);
         $this->assertSame('legacy_unknown', app(PpeWorkspaceService::class)->allocation($this->worker, $legacy->id)['catalogue_integrity']);
+    }
+
+    /** An EXISTS probe's 'select *' returns no columns; any real wide select still shows. */
+    private static function withoutExistsProbes(string $query): string
+    {
+        return (string) preg_replace('/exists\s*\(\s*select \*/', 'exists (select 1', strtolower($query));
     }
 }

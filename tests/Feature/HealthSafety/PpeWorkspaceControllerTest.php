@@ -578,6 +578,8 @@ final class PpeWorkspaceControllerTest extends PpeReadTestCase
     private function assertNoOwnPrivateSql(array $queries): void
     {
         foreach ($queries as $sql) {
+            // An EXISTS probe's "select *" returns no columns; any real wide select still shows.
+            $sql = (string) preg_replace('/exists\s*\(\s*select \*/i', 'exists (select 1', $sql);
             $lower = strtolower($sql);
             foreach (['ppe_allocation_attachments', 'ppe_attachments', 'ppe_inspection_attachments', 'ppe_inspections'] as $table) {
                 $this->assertStringNotContainsString($table, $lower);
