@@ -84,7 +84,8 @@ class HealthSafetyDashboardClientPrivacyTest extends TestCase
         $this->viewer->assignedClients()->attach($client->id);
         $this->assertSame([$client->id], array_column($this->dashboard()['clients'], 'id'));
         User::query()->whereKey($this->viewer->id)->update(['approved_at' => null]);
-        $this->assertSame([], $this->dashboard()['clients']);
+        // An account that is no longer approved is signed out by main's approval check before any H&S read.
+        $this->actingAs($this->viewer)->get('/health-safety')->assertRedirect();
     }
 
     public function test_current_hr_and_approved_site_revocation_suppress_picker_without_requiring_first_aid_module_authority(): void
@@ -95,7 +96,9 @@ class HealthSafetyDashboardClientPrivacyTest extends TestCase
         $this->viewer->load('hrEmployeeProfile');
         $this->assertSame([$client->id], array_column($this->dashboard()['clients'], 'id'));
         HrEmployeeProfile::query()->where('user_id', $this->viewer->id)->update(['is_active' => false]);
-        $this->assertSame([], $this->dashboard()['clients']);
+        // H&S data needs current staff (Stephan, 25 Oct): with no current HR profile and no all-Sites authority the
+        // overview is refused rather than opened with an empty picker.
+        $this->actingAs($this->viewer)->get('/health-safety')->assertForbidden();
         // Existing canonical Client + Site bypasses remain valid even without a current HR profile.
         $this->grant('healthSafety.viewAllSites', true);
         $this->grant('clients.viewAny', true);
