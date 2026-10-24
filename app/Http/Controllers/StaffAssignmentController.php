@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\LimitsStaffRecordsToViewerSites;
 use App\Models\Client;
 use App\Models\User;
 use App\Services\NotificationService;
@@ -9,10 +10,13 @@ use Illuminate\Http\Request;
 
 class StaffAssignmentController extends Controller
 {
+    use LimitsStaffRecordsToViewerSites;
+
     public function edit(Request $request, User $user)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('staff.assignments.update'), 403);
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $user->load(['assignedClients:id,first_name,last_name,status']);
 
@@ -31,6 +35,7 @@ class StaffAssignmentController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('staff.assignments.update'), 403);
+        $this->abortUnlessStaffInViewerSites($auth, $user);
 
         $data = $request->validate([
             'client_ids' => ['array'],

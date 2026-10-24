@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\Concerns\LimitsStaffRecordsToViewerSites;
 use App\Models\FleetDriverSession;
 use App\Models\FleetDrivingMetric;
 use App\Models\FleetIncident;
@@ -22,19 +23,19 @@ use Inertia\Inertia;
 
 class StaffController extends Controller
 {
-    /** People with this see staff records at every Site. */
-    private const SITE_BYPASS_PERMISSIONS = ['sites.viewAll'];
+    use LimitsStaffRecordsToViewerSites;
 
     public function index(Request $request)
     {
         $auth = $request->user();
 
-        // Only users with staff.viewAny can list everyone.
+        // staff.viewAny lists the staff in the viewer's own Sites (everyone
+        // with sites.viewAll), always with the viewer's own row.
         abort_unless($auth && $auth->canDo('staff.viewAny'), 403);
 
         $search = trim((string) $request->query('q', ''));
 
-        $users = User::staff()
+        $users = $this->limitStaffListToViewerSites(User::staff(), $auth)
             ->when($search !== '', fn ($q) => $q->where(fn ($subQuery) => $subQuery
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
@@ -347,35 +348,6 @@ class StaffController extends Controller
         ]);
 
         return redirect()->route('staff.show', $user)->with('success', 'Staff updated.');
-    }
-
-    /**
-     * A staff record is open to its owner, to people with sites.viewAll, and
-     * otherwise only to viewers who share a Site with it: the staff member's
-     * HR profile (current or former) has its primary or a secondary Site
-     * among the viewer's Sites. Anyone else gets not found, so a record in
-     * another Site isn't confirmed to exist.
-     */
-    private function abortUnlessStaffInViewerSites(User $viewer, User $staff): void
-    {
-        if ((int) $viewer->id === (int) $staff->id) {
-            return;
-        }
-
-        $siteAccess = app(UserSiteAccessService::class);
-        if ($siteAccess->canBypass($viewer, self::SITE_BYPASS_PERMISSIONS)) {
-            return;
-        }
-
-        $inViewerSites = $siteAccess
-            ->applyHistoricalStaffSiteScope(
-                User::query()->whereKey($staff->id),
-                $viewer,
-                self::SITE_BYPASS_PERMISSIONS,
-            )
-            ->exists();
-
-        abort_unless($inViewerSites, 404);
     }
 
     private function serializeStaffUser(User $user, ?array $staffProfile = null, int $assignedClientsCount = 0): array
