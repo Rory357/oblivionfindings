@@ -39,6 +39,7 @@ import {
 import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
+import { reportPageFor } from './components/report-pages';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
@@ -449,19 +450,11 @@ export default function HealthSafetyDashboard({
                         onClose={() => setLauncherOpen(false)}
                         onWorkflow={(key) => {
                             setLauncherOpen(false);
-                            // First aid has its own bespoke add-client-style wizard on the register
-                            // page (the single record-first-aid experience) — open it there with all
-                            // its props rather than the generic config-driven HsFormWizard.
-                            if (key === 'first_aid') {
-                                router.visit(
-                                    '/health-safety/first-aid/report?return_to=%2Fhealth-safety',
-                                );
-                                return;
-                            }
-                            if (key === 'substance') {
-                                router.visit(
-                                    '/health-safety/substances/create',
-                                );
+                            // First aid, chemicals, restraints, drills, injuries and lone-worker
+                            // sessions open their own drawn report pages (keyed commands).
+                            const reportPage = reportPageFor(key);
+                            if (reportPage) {
+                                router.visit(reportPage);
                                 return;
                             }
                             setActiveWizard(key);
