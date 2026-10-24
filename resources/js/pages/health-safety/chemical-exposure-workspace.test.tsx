@@ -163,7 +163,7 @@ it('opens the inline care review from the current server signal and permission w
     expect(screen.getByRole('button', { name: 'Review submission' })).toBeDisabled(); expect(io.request).not.toHaveBeenCalled();
 });
 it('uses the permanent connected rail and keeps unconfirmed totals separate from a readable zero', () => {
-    io.url = '/health-safety/chemical-exposures/22?section=overview'; const d = detail(); d.reviews.page!.total = null;
+    io.url = '/health-safety/chemical-exposures/22?section=overview'; const d = detail(); d.reviews = { ...d.reviews, page: { ...d.reviews.page!, total: null } };
     render(<ChemicalExposureShow detail={d} return_to="/my-day" chemical_exposure_confirmation={null} />);
     // The rail carries the section totals: unconfirmed (null) shows no count, a readable zero shows 0.
     expect(screen.getByRole('tab', { name: /^Reviews$/ })).toBeInTheDocument(); expect(screen.getByRole('tab', { name: /^Evidence\s*0$/ })).toBeInTheDocument();
