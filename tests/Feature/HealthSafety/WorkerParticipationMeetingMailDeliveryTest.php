@@ -13,19 +13,34 @@ use App\Notifications\HealthSafety\WorkerParticipationMeetingNotice;
 use App\Services\HealthSafety\WorkerParticipationMeetingDeliveryService;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
-use Illuminate\Foundation\Testing\DatabaseMigrations;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 /** Physical claim commits; only the external transport is fake. Native UNRUN; never execute without runtime admission. */
 final class WorkerParticipationMeetingMailDeliveryTest extends TestCase
 {
-    use DatabaseMigrations { runDatabaseMigrations as private runIsolatedDatabaseMigrations; }
+    // Physical commits with the repo's committed-fixture cleanup (snapshot restore), not DatabaseMigrations:
+    // that trait rolls every migration back after each test, and main's broadcast delivery migration refuses
+    // rollback by design ("a separately reviewed archival migration is required").
+    use RefreshDatabase { beginDatabaseTransaction as private beginFixtureTransaction; }
+
+    public function beginDatabaseTransaction(): void
+    {
+        $database = DB::connection()->getDatabaseName();
+        if (! app()->environment('testing') || DB::connection()->getDriverName() !== 'mysql'
+            || $database !== $this->environmentValue('DB_DATABASE')
+            || ! preg_match('/^oblivion_findings_codex_test_[A-Za-z0-9_]+$/D', $database)) {
+            throw new LogicException('Refuse physical fixtures outside the exact isolated runtime database.');
+        }
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+    }
 
     protected function configureIsolatedTestingDatabase(): void
     {
@@ -35,17 +50,6 @@ final class WorkerParticipationMeetingMailDeliveryTest extends TestCase
             throw new LogicException('Physical delivery fixtures require the explicit isolated codex test database.');
         }
         parent::configureIsolatedTestingDatabase();
-    }
-
-    public function runDatabaseMigrations(): void
-    {
-        $database = DB::connection()->getDatabaseName();
-        if (! app()->environment('testing') || DB::connection()->getDriverName() !== 'mysql'
-            || $database !== $this->environmentValue('DB_DATABASE')
-            || ! preg_match('/^oblivion_findings_codex_test_[A-Za-z0-9_]+$/D', $database)) {
-            throw new LogicException('Refuse destructive fixture setup outside the exact isolated runtime database.');
-        }
-        $this->runIsolatedDatabaseMigrations();
     }
 
     private User $manager;
