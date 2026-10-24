@@ -20,6 +20,7 @@ use App\Models\ServiceAgreement;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteMedicalDisclosure;
+use App\Services\Respite\RespiteRestraintReadService;
 use App\Services\Respite\RespiteShiftSync;
 use App\Services\Respite\RespiteStateTransitionService;
 use App\Services\Respite\RespiteStayScope;
@@ -120,6 +121,7 @@ class RespiteStayController extends Controller
             'stay' => $stay,
             'serviceStartReviewUrl' => app(ReferralRespiteReview::class)->url(request()->user(), $stay->client, $stay->booking),
             'supportPreparation' => app(ReferralRespiteReview::class)->preparation(request()->user(), $stay->client, $stay->booking),
+            'restraints' => app(RespiteRestraintReadService::class)->forStay(request()->user(), $stay),
         ]);
     }
 
