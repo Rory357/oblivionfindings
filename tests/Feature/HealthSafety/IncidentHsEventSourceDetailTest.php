@@ -141,8 +141,11 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
     {
         $fixture = $this->source(); $warm = $this->manager->load('roles.permissions', 'permissionOverrides', 'hrEmployeeProfile');
         $this->allow($this->manager, 'incidents.viewAny', false);
-        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture, $warm)->assertNotFound());
-        $this->assertSame([0, 0, 0, 0], [$state->event, $state->incident, $state->attachment, $state->followup]);
+        // Without incident read the H&S event still shows (Stephan, 25 Oct: event yes, incident no), with no incident,
+        // file or follow-up body read, even for the warmed actor.
+        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture, $warm)->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('detail.source', null)->where('detail.linked_access.incident', 'restricted')));
+        $this->assertSame([0, 0, 0], [$state->incident, $state->attachment, $state->followup]);
         $this->allow($this->manager, 'incidents.viewAny', true); $this->detail($fixture, $warm)->assertOk();
     }
 
@@ -305,14 +308,15 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
         $this->assertTrue($state->fired); $this->assertSame(0, $state->followup);
     }
 
-    public function test_unrelated_hse_keeps_ordinary_authority_when_incident_permission_is_withdrawn(): void
+    public function test_incident_linked_hse_stays_readable_without_incident_permission_beside_an_ordinary_one(): void
     {
         $fixture = $this->source();
         $ordinary = HsEvent::factory()->create(['site_id' => $this->site->id]);
         $this->allow($this->manager, 'incidents.viewAny', false);
         $this->within($this->manager, function ($context) use ($fixture, $ordinary): array {
             $query = app(HsEventAccessService::class)->applyReadableScope(HsEvent::query()->whereIn('id', [$fixture['event']->id, $ordinary->id]), $this->manager, $context);
-            $this->assertSame([$ordinary->id], $query->pluck('id')->all());
+            // Option B: the incident-linked event stays readable (restricted) as well as the ordinary one.
+            $this->assertEqualsCanonicalizing([$fixture['event']->id, $ordinary->id], $query->pluck('id')->all());
             return [];
         });
     }
@@ -392,8 +396,8 @@ final class IncidentHsEventSourceDetailTest extends IncidentIndependenceTestCase
     {
         $fixture = $this->source();
         DB::table('users')->where('id', $this->manager->id)->update(['external_clinical_account' => true]);
-        // An external account has no H&S Sites, so the event isn't found (404, the out-of-scope answer); no body is read.
-        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture)->assertNotFound());
+        // An external account isn't current staff, so the H&S read refuses it (403); no body is read.
+        $state = $this->observeBodies($fixture, fn () => $this->detail($fixture)->assertForbidden());
         $this->assertSame([0, 0, 0, 0], [$state->event, $state->incident, $state->attachment, $state->followup]);
     }
 
