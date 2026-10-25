@@ -11,6 +11,7 @@ use App\Services\AuthorizationEvidenceLockService;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
+use App\Support\Database\LockConflictRetry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
@@ -174,7 +175,9 @@ final class HealthSafetyReadContext
 
     public static function within(User $viewer, array $permissionKeys, callable $consumer): mixed
     {
-        return DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($viewer, $permissionKeys, $consumer) {
+        // A page read meeting a save that holds the viewer's evidence rows (no-wait lock, MySQL 3572) is tried again
+        // a moment later instead of failing the page with a 500.
+        return LockConflictRetry::pageRead(fn () => DB::transaction(fn () => CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($viewer, $permissionKeys, $consumer) {
             $permissionKeys = array_values(array_unique($permissionKeys));
             $current = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting($viewer, $permissionKeys);
             $timezone = (string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC');
@@ -200,7 +203,7 @@ final class HealthSafetyReadContext
                 $context->incidentSources = null;
                 $context->siteIds = $context->firstAidSubjects = $context->firstAidEvents = [];
             }
-        }));
+        })));
     }
 
     /** Shared private Linked/CR owners use a frames array; storage alone never establishes admission. */

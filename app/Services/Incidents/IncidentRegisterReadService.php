@@ -16,6 +16,7 @@ use App\Services\UserSiteAccessService;
 use App\Support\Incidents\IncidentOccurrencePeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use App\Support\Database\LockConflictRetry;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
@@ -41,7 +42,8 @@ final class IncidentRegisterReadService
     {
         $viewer = $request->user();
         abort_unless($viewer instanceof User, 403);
-        return DB::transaction(fn () => CurrentAuthorizationReads::within(function ($reads) use ($viewer, $request, $detailConsumer): array {
+        // A save holding the viewer's evidence rows makes this no-wait read fail at once; try again a moment later.
+        return LockConflictRetry::read(fn () => DB::transaction(fn () => CurrentAuthorizationReads::within(function ($reads) use ($viewer, $request, $detailConsumer): array {
             $user = $this->authorization->lockForUserWithoutWaiting($viewer, self::PERMISSIONS);
             $working = clone $request;
             $resolver = $working->getUserResolver();
@@ -52,18 +54,18 @@ final class IncidentRegisterReadService
                 $reads->assertActive();
                 return $result;
             } finally { $working->setUserResolver($resolver); }
-        }));
+        })));
     }
 
     /** Permanent source read, with the existing detail consumer materialised inside current evidence. */
     public function show(Request $request, int $incidentId, callable $existingDetailConsumer): array
     {
-        return $this->consumeSource($request, $incidentId, function ($working, $id, $reads) use ($existingDetailConsumer): array {
+        return LockConflictRetry::read(fn () => $this->consumeSource($request, $incidentId, function ($working, $id, $reads) use ($existingDetailConsumer): array {
             $detail = $existingDetailConsumer($working, $id, $reads);
             abort_if($detail === null, 404);
             if (! is_array($detail)) { throw new LogicException('Incident detail consumer must return a detached detail array.'); }
             return ['viewer_id' => (int) $working->user()->id, 'detail' => $detail];
-        });
+        }));
     }
 
     /** Additional source operations materialise in one current callback; the fourth argument is a lifetime-bound parent query. */
