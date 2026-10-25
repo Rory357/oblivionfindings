@@ -4,11 +4,16 @@ namespace Tests\Feature\HealthSafety;
 
 use App\Models\HazardousSubstance;
 use App\Models\HsEvent;
+use App\Models\Permission;
 use App\Models\Site;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Observers\SubstanceExposureRecordObserver;
+use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -66,6 +71,63 @@ class ChemicalExposureHsEventCreationTest extends TestCase
         $this->assertNull($event->worksafe_decided_by_user_id);
         $this->assertSame(HsEvent::SEVERITY_HIGH, $event->severity);
         $this->assertSame(1, HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->count());
+    }
+
+    /**
+     * Main's WorkSafe path: the classifier's positive is only preliminary, so a hospitalisation exposure lands
+     * undecided, high severity and needing investigation. It can't close until a qualified H&S lead signs the
+     * decision; a signed "notifiable" decision puts it in the WorkSafe pending queue.
+     */
+    public function test_hospitalisation_exposure_awaits_a_signed_worksafe_decision_then_joins_the_worksafe_queue(): void
+    {
+        $this->seed(RbacSeeder::class);
+        $site = Site::factory()->create();
+        $substance = HazardousSubstance::factory()->create();
+        $record = SubstanceExposureRecord::factory()->notifiable()->create([
+            'hazardous_substance_id' => $substance->id, 'site_id' => $site->id,
+        ]);
+
+        $event = HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->sole();
+        $this->assertSame($site->id, (int) $event->site_id);
+        $this->assertSame(HsEvent::SEVERITY_HIGH, $event->severity);
+        $this->assertTrue((bool) $event->investigation_required);
+        $this->assertNull($event->worksafe_notifiable);
+        $this->assertNull($event->worksafe_status);
+        $this->assertFalse($event->hasSignedWorksafeDecision());
+        $this->assertContains('worksafe_decision', array_column(
+            app(HsEventClosureService::class)->readiness($event)->hardBlockers(), 'key'));
+
+        $lead = User::factory()->create(['approved_at' => now()]);
+        $lead->permissionOverrides()->syncWithoutDetaching([
+            Permission::where('key', 'hazards.manage')->sole()->id => ['allowed' => true],
+        ]);
+        app(HsEventService::class)->recordWorksafeDecision($event, true,
+            'Hospitalisation after a chemical exposure is a notifiable illness.', $lead);
+
+        $event->refresh();
+        $this->assertTrue($event->worksafe_notifiable);
+        $this->assertSame(HsEvent::WORKSAFE_PENDING, $event->worksafe_status);
+        $this->assertTrue($event->hasSignedWorksafeDecision());
+        $this->assertSame(1, HsEvent::whereKey($event->id)->where('worksafe_notifiable', true)
+            ->where('worksafe_status', HsEvent::WORKSAFE_PENDING)->count());
+        $this->assertNotContains('worksafe_decision', array_column(
+            app(HsEventClosureService::class)->readiness($event)->hardBlockers(), 'key'));
+    }
+
+    public function test_exposure_hs_event_copies_no_narrative_or_clinical_text(): void
+    {
+        $site = Site::factory()->create();
+        $substance = HazardousSubstance::factory()->create();
+        $record = SubstanceExposureRecord::factory()->notifiable()->create([
+            'hazardous_substance_id' => $substance->id, 'site_id' => $site->id,
+            'circumstances' => 'PRIVATE-CIRCUMSTANCES spill in the laundry',
+            'symptoms' => 'PRIVATE-SYMPTOMS wheezing and sore eyes',
+        ]);
+
+        $event = HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->sole();
+        $stored = json_encode(DB::table('hs_events')->where('id', $event->id)->first(), JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('PRIVATE-', $stored);
+        $this->assertStringNotContainsString('hospitalisation', $stored);
     }
 
     public function test_exposure_observer_leaves_reduced_medical_treatment_input_undecided(): void
