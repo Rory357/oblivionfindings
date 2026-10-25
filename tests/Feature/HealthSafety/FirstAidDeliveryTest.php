@@ -81,7 +81,9 @@ class FirstAidDeliveryTest extends TestCase
         {
             public function __construct() {}
 
-            public function recordEvent(array $data): ?HsEvent
+            // Must match the parent's signature: an incompatible override is a PHP fatal error, which under Pest
+            // ended the whole process with exit 2 and no output.
+            public function recordEvent(array $data, ?\App\Services\Incidents\IncidentResponseJourneyReadContext $responseSource = null): ?HsEvent
             {
                 throw new RuntimeException('Synthetic local review unavailable');
             }

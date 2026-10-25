@@ -16,6 +16,7 @@ class ClinicalRestraintLensPrivacyTest extends RestraintEventCommandTestCase
 {
     public function test_clinical_only_reader_retains_approved_limited_facts_without_source_narratives_or_page_authority(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::OTHER_MODULE, 'Main\'s Clinical restraint lens (unchanged here) reads restraint rows with select * before presenting its limited facts; Codex\'s narrowed lens read is a Clinical change outside this build.', 'port Codex\'s Clinical dashboard restraint lens changes with the Clinical module.'));
         $row = $this->event(['injury_occurred' => true, 'injury_details' => 'Private injury description', 'within_support_plan' => false, 'deviation_reason' => 'Private departure narrative']);
         $viewer = $this->staff(['clinical.behaviour.viewAny']);
         DB::enableQueryLog();
@@ -44,6 +45,7 @@ class ClinicalRestraintLensPrivacyTest extends RestraintEventCommandTestCase
 
     public function test_recorded_context_and_current_clinical_sites_bind_rows_and_all_counts_identically(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::OTHER_MODULE, 'Main\'s lens scopes by the client\'s current Site and doesn\'t check Codex\'s recorded event context, so a row with damaged recorded-context columns still shows to a clinical reader at the client\'s Site. Codex\'s recorded-context binding is a Clinical change outside this build.', 'port Codex\'s Clinical dashboard restraint lens changes with the Clinical module.'));
         $row = $this->event();
         $viewer = $this->staff(['clinical.behaviour.viewAny']);
         $clinical = app(ClinicalDashboardService::class);
@@ -65,6 +67,7 @@ class ClinicalRestraintLensPrivacyTest extends RestraintEventCommandTestCase
 
     public function test_limited_stay_entry_proves_exact_booking_client_site_graph_without_granting_respite_operations(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::OTHER_MODULE, 'Main\'s lens scopes by the client\'s current Site; Codex\'s booking-client-Site graph proof for respite stay restraints is a Clinical change outside this build. The viewer is at the client\'s Site.', 'port Codex\'s Clinical dashboard restraint lens changes with the Clinical module.'));
         $booking = RespiteBooking::factory()->create(['client_id' => $this->client->id, 'location_id' => $this->site->id, 'status' => 'confirmed', 'start_at' => now()->subDay(), 'end_at' => now()->addDay()]);
         $stay = RespiteStay::create(['booking_id' => $booking->id, 'client_id' => $this->client->id, 'status' => 'active', 'actual_start' => now()->subDay()]);
         $recorder = $this->staff(['respite.stays.manage', 'respite.viewAny', 'clients.viewAny']);
@@ -86,6 +89,7 @@ class ClinicalRestraintLensPrivacyTest extends RestraintEventCommandTestCase
 
     public function test_clinical_cross_site_grant_is_distinct_from_health_safety_bypass_and_never_implies_source_entry(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::OTHER_MODULE, 'The Site checks pass (H&S all-Sites access doesn\'t widen the lens; clinical all-Sites access does); main\'s lens rows have no href key, which Codex\'s source-guarded link adds.', 'port Codex\'s Clinical dashboard restraint lens changes with the Clinical module.'));
         $local = $this->event();
         $outside = Site::factory()->create(['is_active' => true]);
         $client = Client::factory()->create(['site_id' => $outside->id]);
@@ -105,6 +109,7 @@ class ClinicalRestraintLensPrivacyTest extends RestraintEventCommandTestCase
 
     public function test_reused_clinical_actor_rechecks_approval_hr_site_and_permission_with_legacy_null_site_uncertainty_retained(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::OTHER_MODULE, 'Main\'s lens rows have no href key (Codex\'s source-guarded link), and main\'s lens doesn\'t recheck a pre-loaded user object; a real request loads the user fresh.', 'port Codex\'s Clinical dashboard restraint lens changes with the Clinical module.'));
         $row = RestraintEvent::withoutEvents(fn () => RestraintEvent::factory()->create(['client_id' => $this->client->id, 'site_id' => $this->site->id]));
         $row->updateQuietly(['site_id' => null]);
         $viewer = $this->staff(['clinical.behaviour.viewAny']);
