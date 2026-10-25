@@ -107,7 +107,8 @@ class HealthSafetyDashboardClientPrivacyTest extends TestCase
         $this->viewer = $this->viewer->fresh();
         $this->assertSame([$client->id], array_column($this->dashboard()['clients'], 'id'));
         $this->site->update(['is_active' => false]);
-        $this->assertSame([], $this->dashboard()['clients']);
+        // With no active Site left the overview is refused (main's Site rule, kept), so no client is listed.
+        $this->actingAs($this->viewer)->get('/health-safety')->assertForbidden();
     }
 
     private function dashboard(string $query = ''): array

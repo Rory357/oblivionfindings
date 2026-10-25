@@ -9,6 +9,7 @@ use App\Services\HealthSafety\PpeCommandService;
 use App\Services\HealthSafety\PpeSiteReadService;
 use App\Services\Sites\Calendar\IcsFeedBuilder;
 use App\Services\Sites\Calendar\Providers\PpeObligationProvider;
+use App\Services\Sites\Calendar\Providers\WorkerParticipationObligationProvider;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use App\Services\Sites\SiteCalendarService;
 use App\Services\Sites\SiteProfileAttentionService;
@@ -30,7 +31,9 @@ final class PpeCalendarConsumerTest extends PpeReadTestCase
     }
     private function aggregator(): SiteCalendarAggregator
     {
-        return new SiteCalendarAggregator(app(SiteCalendarService::class), [new PpeObligationProvider]);
+        // The personal feed also reads participation and refuses if that source drops out of the aggregator, so
+        // the feed's aggregator keeps the participation provider as the real one does; row reads ask for PPE only.
+        return new SiteCalendarAggregator(app(SiteCalendarService::class), [new PpeObligationProvider, new WorkerParticipationObligationProvider]);
     }
     private function start(): Carbon { return Carbon::parse('2026-10-01T00:00:00+13:00'); }
     private function end(): Carbon { return Carbon::parse('2026-10-31T23:59:59+13:00'); }

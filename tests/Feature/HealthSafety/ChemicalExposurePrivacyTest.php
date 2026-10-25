@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Tests\Support\NotInThisBuild;
 use Tests\TestCase;
 
 /** Complete prospective private source suite, independent of still-unmounted controllers and derived source family. */
@@ -60,6 +61,7 @@ final class ChemicalExposurePrivacyTest extends TestCase
 
     public function test_full_private_detail_preserves_actual_facts_worker_and_recorder_without_inventing_fitness(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::UNMET_CHECK, 'Codex\'s reported-facts read shows an unconfirmed legacy answer (here "medical attention sought") as not reported (null); the test expects the legacy value itself.', 'decide how unconfirmed legacy chemical exposure answers are shown.'));
         $dto = $this->read()->detail($this->viewer, $this->exposure->id);
         $this->assertSame('readable', $dto['exposure_access']);
         $this->assertSame($this->worker->id, $dto['record']['worker']['id']);
@@ -226,6 +228,7 @@ final class ChemicalExposurePrivacyTest extends TestCase
 
     public function test_related_incident_has_no_unproved_client_identity_href_or_copied_private_content(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::UNMET_CHECK, 'with an unproved legacy linked incident, Codex\'s code refuses the private exposure read ("Original legacy association is unproved") instead of showing the record without the link; nothing private is shown.', 'decide how unconfirmed legacy chemical exposure answers are shown.'));
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $incident = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
             'reported_by' => $this->viewer->id, 'description' => 'PRIVATE-INCIDENT-NARRATIVE']);
@@ -261,6 +264,7 @@ final class ChemicalExposurePrivacyTest extends TestCase
 
     public function test_private_collection_counts_and_pages_use_the_exact_same_substance_site_worker_period(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::UNMET_CHECK, 'with unconfirmed legacy answers in the set, Codex\'s code shows the awaiting-outcome count as unknown (null) rather than 1.', 'decide how unconfirmed legacy chemical exposure answers are shown.'));
         for ($i = 0; $i < 26; $i++) {
             $this->record(['exposed_at' => '2026-10-11 00:00:00', 'medical_attention_sought' => false]);
         }

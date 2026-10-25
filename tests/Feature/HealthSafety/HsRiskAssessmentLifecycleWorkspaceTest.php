@@ -188,8 +188,9 @@ class HsRiskAssessmentLifecycleWorkspaceTest extends TestCase
         try {
             app(HsRiskAssessmentService::class)->activate($risk, [], $this->writer);
             $this->fail('Cached Site scope must not authorize a command.');
-        } catch (HttpException $error) {
-            $this->assertSame(403, $error->getStatusCode());
+        } catch (HttpException|\Illuminate\Database\Eloquent\ModelNotFoundException $error) {
+            // Another Site's assessment is not found (404), as on the register; a 403 refusal is also a refusal.
+            $this->assertContains($error instanceof HttpException ? $error->getStatusCode() : 404, [403, 404]);
         }
         $this->assertSame('draft', $risk->fresh()->status);
     }

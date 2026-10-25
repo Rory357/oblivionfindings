@@ -231,11 +231,16 @@ it('redacts monitorable Shift GPS until the safety session is activated', functi
             'shift_id' => $shift->id,
             // The start command takes an exact instant with its offset, as the drawn start form sends.
             'expected_end_at' => now()->addHours(2)->toIso8601String(),
+            // Every lone-worker command carries a one-time key, as the drawn start form sends.
+            'idempotency_key' => (string) \Illuminate\Support\Str::uuid(),
         ])
         ->assertRedirect()
         ->assertSessionHasNoErrors();
 
+    // Codex's lone-worker service doesn't copy the Shift's GPS ping into the session (LoneWorkerControllerTest: "without
+    // promoting gps to a planned or current observation"), so the ping stays Shift telemetry. Main copied it; the
+    // choice is with Stephan (25 Oct) and the build carries Codex's until he answers.
     $session = LoneWorkerSession::query()->latest('id')->firstOrFail();
-    expect((float) $session->location_lat)->toBe(-36.8485)
-        ->and((float) $session->location_lng)->toBe(174.7633);
+    expect($session->location_lat)->toBeNull()
+        ->and($session->location_lng)->toBeNull();
 });

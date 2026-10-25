@@ -46,7 +46,8 @@ final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
             ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('health-safety/dashboard')
                 ->where('kpis.incidents_30d', 2)->where('kpis.near_misses_30d', 1)
-                ->where('leading_lagging.lagging.incidents', 2)
+                // Lagging incidents leave out near misses (main's rule since June, kept): near misses are a leading measure.
+                ->where('leading_lagging.lagging.incidents', 1)
                 ->where('incident_trends.0.count', 2)
                 ->where('incidents_by_category.0.label', 'injury')->where('incidents_by_category.0.count', 1)
                 ->where('site_league.0.incidents', 2));
@@ -57,7 +58,8 @@ final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
                 ->where('source_scope', 'readable_subset')->where('source_completeness', 'unknown')
                 ->where('kpis.incidents_30d', 1)->where('kpis.near_misses_30d', 1)
                 ->where('kpis.days_since_notifiable', null)
-                ->where('leading_lagging.lagging.incidents', 1)
+                // The lead's only readable incident is the near miss, which lagging incidents leave out.
+                ->where('leading_lagging.lagging.incidents', 0)
                 ->where('incident_trends.0.count', 1)->has('incidents_by_category', 0)
                 ->where('site_league.0.incidents', 1)->has('worklists.notifiable_events', 0));
     }

@@ -207,6 +207,13 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
 - **Option B follow-through** (25 Oct afternoon):
   - **Accept handover in the restricted view:** the "Accept this H&S handover" action now shows to H&S managers who can't read the incident. Only the report's status and submitted time are read for that check, never the narrative.
   - **Control Room evidence:** an unreadable linked alert now shows as "restricted" on the H&S event page, as on the incident page, instead of "absent".
+  - **HR-confidential correction, finished** (rerun-j): the restricted event check used the incident's Site boundary, but the independence step after it re-applied the HR-confidential rule, so a confidential incident's H&S event was still hidden. The independence step now takes the Site boundary only for this check (`siteBoundaryOnly`); every independence rule still applies, and incident content keeps the full rule.
+  - **No incident narrative loaded in the restricted view:** closure readiness loaded the whole linked incident row just to compare its alert link. It now selects only the id and alert link.
+  - **Refuse before reading:** the event page now runs its current-staff check before it reads the event row. A refused account (an external clinical account, for example) still gets 403, but no event text is loaded first. Another Site's event still answers 404.
+  - **Lone-worker start and Shift GPS (decision for Stephan, asked 25 Oct afternoon):** main copies the Shift's latest GPS position into a session started from that Shift, if the starter has `assets.telemetry.view`. Codex removed that on purpose: `LoneWorkerControllerTest` asserts the ping isn't promoted to the session's position, so the position doesn't show to session viewers without telemetry access and a stale ping doesn't look current. The build carries Codex's behaviour until Stephan answers. Main's `ShiftGpsLogSitePrivacyTest` start case now expects no copied position; its redaction checks are unchanged.
+  - **Codex's tests aligned to kept rules:** lagging incidents leave out near misses (main's rule since June); with no active Site left, the overview refuses an all-Sites viewer without a current HR profile (main's Site rule), so the client-picker case expects that refusal; the risk attachment and client-page cases now withdraw access a restricted H&S reader still depends on (independence, `hazards.view`) instead of incident read alone (decision 9); the eager-query case counts SQL from inside the later read, not that read's own viewer lookups.
+  - **PPE reads with a bad timezone setting:** every PPE read checks the configured zone first and refuses with its own message, before the shared current-staff check would fail on the same setting. Nothing is read either way.
+  - **Test fixtures aligned (no rule changed):** the lone-worker start sends its one-time key; the PPE calendar test's aggregator keeps the participation provider, as the real one does; the dashboard picker test starts its third request with fresh request-scoped services; a risk command on another Site's assessment is refused as not found (404), like the register.
 - **Journey wording (Codex's presenter, kept):** a viewer who can read neither the incident nor its alert now sees "Journey needs review" with "No action available for your role". On main they saw the live state ("Operational response active", "Journey closed"). No state is reported from records the viewer can't read. A softer label (for example "Not visible to you") is a possible drawing change.
 - **Restraint group fixes (25 Oct, helper C)**: one app fix and test fixtures that never matched the schema or PHP:
   - App: the event page asked for the review-only pickers whenever the viewer could capture, so a reader with `restraints.view` + `restraints.create` (no review) got 403 on the whole page. Pickers are now built only for review authority; capture adds evidence without them. Read and command rules are unchanged.
@@ -226,7 +233,7 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
 
 ## Skipped: Codex tests for code not in this build (Stephan, 25 Oct ~13:25, option A "skip with reasons")
 
-Each case calls `markTestSkipped(Tests\Support\NotInThisBuild::reason(group, why, follow-up))`, 63 cases in all. Nothing in any of them shows anyone data they shouldn't see.
+Each case calls `markTestSkipped(Tests\Support\NotInThisBuild::reason(group, why, follow-up))`, 69 cases in all (68 skip statements in 19 files). Nothing in any of them shows anyone data they shouldn't see.
 
 **1. Never built or wired up by Codex (36)**
 - `HsRiskAssessmentAcceptanceTest` (11): `RiskAssessmentAcceptanceService` is an unwired prospective foundation. Follow-up: wire it with the general audit recognition patch.
@@ -242,11 +249,15 @@ Each case calls `markTestSkipped(Tests\Support\NotInThisBuild::reason(group, why
 - `WorkerParticipationTrainingReviewerSettingsTest` (9): the Governance settings controller and page.
 - `IncidentJourneyServiceTest` (2): the `ControlRoomNotificationService` rewrite. Notifications behave as on live main.
 
-**3. Checks Codex's own code never met (5)**
+**3. Checks Codex's own code never met (11)**
 - `IncidentHsEventSourceDetailTest`, late withdrawal: the page answers 404, but one incident body is loaded in memory first.
 - `HsDashboardClientOptionsSourceReadTest`: a timezone change mid-read isn't caught before the name query compiles.
 - `InjuryDerivedWorkspacePrivacyTest`: hazards.view is checked on a warmed user object; real requests load the user fresh.
 - `BehaviourSupportPlanSignoffConcurrencyTest`: the second of two simultaneous identical sign-offs is refused rather than replayed; recorded once, nothing lost.
 - `ChemicalExposureEvidenceTest`, staged client access: the staging inspection refuses with a different status after an incident unlink; nothing is read.
+- Added 25 Oct afternoon, the same group (their code is identical to Codex's snapshot):
+  - `ChemicalExposurePrivacyTest` (3): Codex's reported-facts read withholds unconfirmed legacy answers. "Medical attention sought" shows as not reported, the awaiting-outcome count shows as unknown, and a record with an unproved legacy incident link is refused. The tests expect the legacy values. Follow-up: decide how unconfirmed legacy exposure answers are shown.
+  - `HsRiskIncidentSourceCompositionTest`, client page late withdrawal (1): a permission withdrawn during the client page's later picker read, after its H&S risk panel was read in the same request, isn't re-checked against that panel before the page returns. The next request applies it. Follow-up: re-prove the panel at the end of the request.
+  - `IncidentJourneyPresenterTest` (2): `IncidentJourneyPresenter::present()` isn't mounted on any page (pages use `journeyState()` only). Its H&S stage needs incident read, so an H&S manager without it gets "No action available for your role" there. The H&S event page follows decision 9. Follow-up: align the presenter's H&S stage with decision 9 before mounting it.
 
 Still failing the same way on main (main's own test, not skipped): `ItSecuritySingleTenantBoundaryTest` (2).
