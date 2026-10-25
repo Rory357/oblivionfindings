@@ -188,7 +188,7 @@ class EmergencyDrillService
                     throw ValidationException::withMessages(['hs_corrective_action_id' => 'The required remedy needs independent verification and a positive effectiveness result.']);
                 }
             }
-            $child->forceFill(['status' => 'resolved', 'resolved_at' => now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString(), 'resolution_notes' => $notes, 'resolution_evidence_ids' => array_map('intval', $ids), 'updated_by' => $current->id])->saveQuietly();
+            $child->forceFill(['status' => 'resolved', 'resolved_at' => now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->toDateString(), 'resolution_notes' => $notes, 'resolution_evidence_ids' => array_map('intval', $ids), 'updated_by' => $current->id])->saveQuietly();
 
             return ['finding_id' => $child->id, 'hs_corrective_action_id' => $child->hs_corrective_action_id, 'resolution_evidence_ids' => array_map('intval', $ids), 'note' => $notes, 'finding_snapshot' => $this->findingSnapshot($child)];
         }, 'finding_resolved');

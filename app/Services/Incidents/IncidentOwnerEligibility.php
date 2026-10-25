@@ -48,7 +48,7 @@ final class IncidentOwnerEligibility
         if (! ($reads ? $reads->query($account) : $account)->exists()) {
             return false;
         }
-        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $today = now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->toDateString();
         $profile = HrEmployeeProfile::query()->where('user_id', $user->id)->where('is_active', true)
             ->where(fn ($dates) => $dates->whereNull('start_date')->orWhereDate('start_date', '<=', $today))
             ->where(fn ($dates) => $dates->whereNull('end_date')->orWhereDate('end_date', '>=', $today));

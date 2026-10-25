@@ -763,7 +763,7 @@ class HsAnalyticsService
         }
 
         $inWindow = (clone $approvedQuery)
-            ->whereNotNull('published_review_date')->where('published_review_date', '>=', now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString())
+            ->whereNotNull('published_review_date')->where('published_review_date', '>=', now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->toDateString())
             ->count();
 
         return (int) round($inWindow / $approved * 100);

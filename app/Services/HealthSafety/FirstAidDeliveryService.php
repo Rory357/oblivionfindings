@@ -64,7 +64,7 @@ class FirstAidDeliveryService
     public function stageDueReminders(int $windowDays = 0): int
     {
         $cutoff = now()->addDays(max(0, $windowDays));
-        $day = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $day = now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->toDateString();
         $recipientIds = FirstAidFollowup::query()->whereNull('completed_at')->whereNotNull('assigned_to_user_id')->where('due_at', '<=', $cutoff)->whereHas('record')->distinct()->pluck('assigned_to_user_id');
         $staged = 0;
         foreach ($recipientIds as $id) {

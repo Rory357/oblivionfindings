@@ -44,7 +44,7 @@ final class LoneWorkerSessionScope
     {
         $row = '`'.$query->getModel()->getTable().'`';
         $site = $this->resolvedSiteExpression($query);
-        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $today = now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->toDateString();
         $query->whereRaw("{$site} IS NOT NULL")
             ->whereRaw("EXISTS (SELECT 1 FROM `sites` AS `lw_site` WHERE `lw_site`.`id` = {$site} AND `lw_site`.`is_active` = 1 AND `lw_site`.`archived` = 0 AND `lw_site`.`archived_at` IS NULL AND `lw_site`.`deleted_at` IS NULL)")
             ->whereHas('user')

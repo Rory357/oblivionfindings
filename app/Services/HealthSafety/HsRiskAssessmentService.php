@@ -149,7 +149,7 @@ class HsRiskAssessmentService
                 'approved_at' => now(),
                 'approval_note' => $approval['approver_note'] ?? null,
                 'review_due_at' => $locked->review_due_at?->toDateString()
-                    ?? ($locked->review_frequency_days ? now(config('app.worker_timezone', 'Pacific/Auckland'))->addDays($locked->review_frequency_days)->toDateString() : null),
+                    ?? ($locked->review_frequency_days ? now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->addDays($locked->review_frequency_days)->toDateString() : null),
                 'updated_by' => $current?->id,
             ], $reads, $readContext, $sourceProof);
             $this->audit('risk_assessment.status_changed', $locked, $current, $approval['approver_note'] ?? null, ['from' => 'draft', 'to' => 'active']);
@@ -200,7 +200,7 @@ class HsRiskAssessmentService
                 || $locked->risk_acceptable === null) {
                 throw ValidationException::withMessages(['review_note' => 'Record the prior approval, residual risk and explicit acceptability before completing review.']);
             }
-            $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+            $today = now(\App\Support\Incidents\IncidentOccurrencePeriod::timezone())->toDateString();
             Validator::make($data, [
                 'review_note' => ['required', 'string', 'max:5000'],
                 'review_due_at' => ['required', 'date_format:Y-m-d', 'after:'.$today],
