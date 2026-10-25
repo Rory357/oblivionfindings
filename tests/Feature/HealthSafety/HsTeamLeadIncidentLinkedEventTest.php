@@ -20,8 +20,8 @@ use Tests\TestCase;
 /**
  * Stephan, 25 Oct ("event yes, incident no"): team leads have H&S manage but no incident read. They keep seeing and
  * acting on incident-linked H&S events at their Sites, as on main, with no incident narrative, files or link. Only
- * people who can read the incident see those. The incident's HR-confidential and Site rules still apply, and a
- * handover owner must be someone who can open the event.
+ * people who can read the incident see those. The incident's Site rule still applies, an HR-confidential incident's
+ * content still needs HR case read, and a handover owner must be someone who can open the event.
  */
 final class HsTeamLeadIncidentLinkedEventTest extends TestCase
 {
@@ -99,48 +99,53 @@ final class HsTeamLeadIncidentLinkedEventTest extends TestCase
         $this->assertSame(HsEvent::HANDOVER_AWAITING_ACCEPTANCE, $event->fresh()->handover_status);
     }
 
-    public function test_an_hr_confidential_incidents_event_stays_hidden_without_hr_case_read(): void
+    public function test_an_hr_confidential_incidents_event_shows_but_its_content_stays_closed(): void
     {
+        // As on main: H&S staff see and act on the H&S event of a confidential incident (its WorkSafe work can't go
+        // unseen); the confidential incident's narrative, files and page need HR case read.
         $site = Site::factory()->create(['is_active' => true]);
         $lead = $this->teamLead($site);
-        [, $event] = $this->incidentLinkedEvent($site, $lead, ['is_hr_confidential' => true]);
+        [$incident, $event] = $this->incidentLinkedEvent($site, $lead, ['is_hr_confidential' => true]);
         $this->assertFalse($lead->canDo('hr.cases.view'));
 
         $this->actingAs($lead)->get('/health-safety/events')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('tabCounts.all', 0));
-        $this->actingAs($lead)->get('/health-safety/events/'.$event->id)->assertNotFound();
-        $this->actingAs($lead)
-            ->post("/health-safety/events/{$event->id}/accept-handover", ['acceptance_notes' => 'Hidden from me.'])
-            ->assertNotFound();
+            ->assertInertia(fn (Assert $page) => $page->where('tabCounts.all', 1));
+        $detail = $this->actingAs($lead)->get('/health-safety/events/'.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('detail.source', null)->where('detail.linked_access.incident', 'restricted'));
+        $this->assertStringNotContainsString('PRIVATE-INCIDENT-NARRATIVE', $detail->getContent());
+        $this->actingAs($lead)->get('/incidents?incident='.$incident->id)->assertForbidden();
+        $this->actingAs($lead)->from('/health-safety/events')
+            ->post("/health-safety/events/{$event->id}/accept-handover", ['acceptance_notes' => 'Accepted without the HR narrative.'])
+            ->assertSessionHas('success');
     }
 
     public function test_handover_owners_are_only_people_who_can_open_the_event(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
         $lead = $this->teamLead($site);
-        $manager = $this->teamLead($site);
-        $manager->update(['name' => 'Aroha HR-cleared manager']);
-        foreach (['incidents.viewAny', 'hr.cases.view'] as $key) {
-            $manager->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', $key)->sole()->id => ['allowed' => true]]);
-        }
-        [, $event] = $this->incidentLinkedEvent($site, $manager, ['is_hr_confidential' => true]);
+        // Holds H&S manage but not H&S view, so can't open the event page: never offered or accepted as owner.
+        $manageOnly = User::factory()->create(['approved_at' => now(), 'name' => 'Aroha manage-only']);
+        $manageOnly->permissionOverrides()->syncWithoutDetaching([Permission::query()->where('key', 'hazards.manage')->sole()->id => ['allowed' => true]]);
+        HrEmployeeProfile::factory()->create(['user_id' => $manageOnly->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+            'start_date' => today()->subYear(), 'end_date' => null, 'is_active' => true]);
+        $this->assertFalse($manageOnly->fresh()->canDo('hazards.view'));
+        [, $event] = $this->incidentLinkedEvent($site, $lead);
 
-        // The HR-cleared manager can open the confidential incident's event; the team lead can't, so isn't offered.
-        $this->actingAs($manager->fresh())->get('/health-safety/events/'.$event->id)
+        $this->actingAs($lead)->get('/health-safety/events/'.$event->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('detail.assignable_staff', fn ($staff) => collect($staff)->contains('id', $manager->id)
-                    && ! collect($staff)->contains('id', $lead->id)));
-        $this->actingAs($manager->fresh())->from('/health-safety/events/'.$event->id)
-            ->post("/health-safety/events/{$event->id}/accept-handover", ['owner_user_id' => $lead->id])
+                ->where('detail.assignable_staff', fn ($staff) => collect($staff)->contains('id', $lead->id)
+                    && ! collect($staff)->contains('id', $manageOnly->id)));
+        $this->actingAs($lead)->from('/health-safety/events/'.$event->id)
+            ->post("/health-safety/events/{$event->id}/accept-handover", ['owner_user_id' => $manageOnly->id])
             ->assertSessionHasErrors(['owner_user_id']);
         $this->assertSame(HsEvent::HANDOVER_AWAITING_ACCEPTANCE, $event->fresh()->handover_status);
-
-        $this->actingAs($manager->fresh())->from('/health-safety/events/'.$event->id)
-            ->post("/health-safety/events/{$event->id}/accept-handover", ['owner_user_id' => $manager->id])
+        $this->actingAs($lead)->from('/health-safety/events/'.$event->id)
+            ->post("/health-safety/events/{$event->id}/accept-handover", ['owner_user_id' => $lead->id])
             ->assertSessionHas('success');
-        $this->assertSame($manager->id, (int) $event->fresh()->owner_user_id);
+        $this->assertSame($lead->id, (int) $event->fresh()->owner_user_id);
     }
 
     private function teamLead(Site $site): User

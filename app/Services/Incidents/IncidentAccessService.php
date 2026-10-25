@@ -67,6 +67,16 @@ final class IncidentAccessService
                 ->where('is_hr_confidential', false)->orWhereNull('is_hr_confidential'));
         }
 
+        return $this->applySiteBoundary($query, $viewer, $reads);
+    }
+
+    /**
+     * The incident's Site boundary alone, without the HR-confidential content rule. Only the restricted H&S event
+     * check uses it on its own: the H&S event shows at the viewer's Sites, while the incident itself (and so any
+     * HR-confidential content) still needs applySiteScope().
+     */
+    public function applySiteBoundary(Builder $query, User $viewer, ?CurrentAuthorizationReads $reads = null): Builder
+    {
         // This explicit H&S grant includes historical/unknown-site records for
         // authorised reconciliation. Generic report or Site administration does not.
         if ($this->sites->canAccessAllHealthSafetySites($viewer)) {

@@ -88,7 +88,11 @@ final class HealthSafetyOfficerIncidentReadTest extends IncidentIndependenceTest
         $elsewhere = $this->linkedEvent($this->otherSite);
         $confidential = $this->linkedEvent($this->site, ['is_hr_confidential' => true]);
 
-        $this->assertSame([(int) $own->id], $this->readable($officer, [$own, $elsewhere, $confidential]));
+        // The H&S events at the officer's Site show, including a confidential incident's (as on main); the confidential
+        // incident itself stays closed without HR case read.
+        $this->assertEqualsCanonicalizing([(int) $own->id, (int) $confidential->id], $this->readable($officer, [$own, $elsewhere, $confidential]));
+        $this->assertTrue($this->incidentReadable($officer, $own));
+        $this->assertFalse($this->incidentReadable($officer, $confidential));
     }
 
     public function test_the_all_sites_grant_widens_sites_but_never_the_privacy_rule(): void
@@ -99,19 +103,21 @@ final class HealthSafetyOfficerIncidentReadTest extends IncidentIndependenceTest
         $elsewhere = $this->linkedEvent($this->otherSite);
         $confidential = $this->linkedEvent($this->site, ['is_hr_confidential' => true]);
 
-        $this->assertSame([(int) $own->id, (int) $elsewhere->id], $this->readable($officer, [$own, $elsewhere, $confidential]));
+        $this->assertEqualsCanonicalizing([(int) $own->id, (int) $elsewhere->id, (int) $confidential->id], $this->readable($officer, [$own, $elsewhere, $confidential]));
+        $this->assertTrue($this->incidentReadable($officer, $elsewhere));
+        $this->assertFalse($this->incidentReadable($officer, $confidential));
     }
 
     public function test_without_incident_read_the_officer_still_sees_the_event_but_not_the_incident(): void
     {
-        // Stephan, 25 Oct ("event yes, incident no"): the H&S event shows at the officer's Site; the incident itself,
-        // and an HR-confidential incident's event, stay behind their own rules.
+        // Stephan, 25 Oct ("event yes, incident no"): the H&S events show at the officer's Site, a confidential
+        // incident's included; the incidents themselves stay behind incident read.
         $officer = $this->officer($this->site);
         $this->allow($officer, 'incidents.viewAny', false);
         $own = $this->linkedEvent($this->site);
         $confidential = $this->linkedEvent($this->site, ['is_hr_confidential' => true]);
 
-        $this->assertSame([(int) $own->id], $this->readable($officer, [$own, $confidential]));
+        $this->assertEqualsCanonicalizing([(int) $own->id, (int) $confidential->id], $this->readable($officer, [$own, $confidential]));
         $this->assertFalse($this->incidentReadable($officer, $own));
         $this->allow($officer, 'incidents.viewAny', true);
         $this->assertTrue($this->incidentReadable($officer->fresh(), $own));

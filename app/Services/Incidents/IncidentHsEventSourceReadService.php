@@ -77,8 +77,9 @@ final class IncidentHsEventSourceReadService
         foreach ($identities as $event) {
             // Parents without the viewer-wide authority facts: those are the same in every block and are added once below.
             // Restricted parents (Stephan, 25 Oct, "event yes, incident no"): an incident-linked H&S event is visible to
-            // H&S viewers at its Site without incident read. The incident's HR-confidential, Site and independence
-            // rules and its exact original facts still apply; its content stays behind incidentQueryForEventInReads().
+            // H&S viewers at its Site without incident read, as on main. The incident's Site and independence rules and
+            // its exact original facts still apply; its content (HR-confidential rule included) stays behind
+            // incidentQueryForEventInReads().
             $parent = $this->eventParent($event, $current, $reads, false, true);
             $bindings[] = ['event' => $event, 'parent' => $parent];
         }
@@ -209,10 +210,11 @@ final class IncidentHsEventSourceReadService
         $baseKey = $current->id.'/base'.($restricted ? '/restricted' : '');
         if (isset(($this->rootParents[$reads] ?? [])[$baseKey][$root->id])) { return $this->rootParents[$reads][$baseKey][$root->id]; }
         $access = app(IncidentAccessService::class);
-        // Restricted (H&S event visibility only): the incident's HR-confidential and Site rules without the incident
-        // read permission. The full variant is the canonical incident read, which incident content needs.
+        // Restricted (H&S event visibility only): the incident's Site boundary, without the incident read permission or
+        // the HR-confidential content rule. As on main, H&S staff see the H&S event of a confidential incident (its
+        // WorkSafe work can't go unseen); the incident's content is the full variant, the canonical incident read.
         $query = $restricted
-            ? $reads->query($access->applySiteScope(ClientIncident::query()->whereKey($root->id), $current, $reads))
+            ? $reads->query($access->applySiteBoundary(ClientIncident::query()->whereKey($root->id), $current, $reads))
             : $access->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
         $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read');
         $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
