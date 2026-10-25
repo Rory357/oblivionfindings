@@ -5,6 +5,7 @@
  * states as rings, connected work as a list. Every "doesn't confirm the worker
  * is safe" line keeps the code's wording.
  */
+import { longDuration } from '@/components/control-room/live-response/response-clock';
 import { dateTimeWithYear } from '@/components/incidents/incident-stages';
 import {
     FactRows,
@@ -464,6 +465,7 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
                     : 'No permitted observation available'
             }`,
         });
+    if (d.shift_gps) items.push(shiftGpsItem(d.shift_gps, base));
     items.push({
         key: 'planned',
         time: plan ? sessionClock(plan.recordedAt, base, '') : '',
@@ -507,6 +509,32 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
             </Note>
         </>
     );
+}
+
+/**
+ * The linked Shift's latest GPS ping, shown only to telemetry viewers (the
+ * server sends nothing otherwise), always with its time. An old ping reads
+ * "Old position", as on the Control Room map, and is never shown as current.
+ */
+function shiftGpsItem(
+    gps: NonNullable<SafetySession['shift_gps']>,
+    base: string | null | undefined,
+): LogItem {
+    const ms = Date.now() - new Date(gps.captured_at).getTime();
+    const seen = !Number.isFinite(ms)
+        ? 'time not recorded'
+        : ms < 60_000
+          ? 'last seen just now'
+          : `last seen ${longDuration(ms)} ago`;
+    return {
+        key: 'shift-gps',
+        time: sessionClock(gps.captured_at, base),
+        tone: gps.is_old ? 'warning' : 'success',
+        title: gps.is_old ? 'Old position · Shift GPS' : 'Shift GPS position',
+        sub: `${gps.latitude}, ${gps.longitude} · ${seen}${
+            gps.is_old ? ', so it may not be where the worker is now' : ''
+        }. From the Shift’s own GPS, not a session check-in.`,
+    };
 }
 
 /** The paired tracker read as a ring: collection, panic flag, battery. */

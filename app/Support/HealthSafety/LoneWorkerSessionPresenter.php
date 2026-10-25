@@ -12,6 +12,7 @@ use App\Services\CurrentAuthorizationReads;
 use App\Services\HealthSafety\LoneWorkerCoverageService;
 use App\Services\HealthSafety\LoneWorkerSessionAccessService;
 use App\Services\HealthSafety\LoneWorkerSessionConnectionsService;
+use App\Services\HealthSafety\ShiftGpsAccessService;
 use Illuminate\Support\Carbon;
 
 /** Source observations, accepted requests and independently authorized response facts. */
@@ -62,6 +63,8 @@ final class LoneWorkerSessionPresenter
                 'created_at' => $record->created_at?->toIso8601String(), 'shift' => $connections['shift'], 'can' => $can,
                 'check_ins' => $checkIns, 'legacy_alert_history' => $legacy, 'alerts' => $connections['control_room'],
                 'tracker_state' => $tracker['state'], 'tracker' => $tracker['tracker'], 'source_delivery' => $delivery,
+                // The linked Shift's latest GPS ping, live and with its time, for telemetry viewers only (never copied).
+                'shift_gps' => app(ShiftGpsAccessService::class)->latestPingForSessionViewer($current, $record),
                 'current_episode' => $delivery, 'connections' => $connections,
                 'history' => $this->history($record, $reads, array_column($checkIns, 'id'), array_column($connections['control_room'], 'id')),
                 'href' => LoneWorkerSessionReturn::href($record->id, $returnTo)];

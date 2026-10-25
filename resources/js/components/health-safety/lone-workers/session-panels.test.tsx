@@ -1,5 +1,5 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { SessionHistory, SessionLocation } from './session-panels';
 import type { SafetySession } from './types';
 
@@ -88,4 +88,71 @@ it('uses each historical plan and never backfills the current plan into older ev
     expect(
         screen.queryByText('Current intended place'),
     ).not.toBeInTheDocument();
+});
+
+const gpsSession = (shiftGps: SafetySession['shift_gps']) =>
+    ({
+        started_at: '2026-10-25T01:00:00Z',
+        planned_location: null,
+        tracker_state: 'unavailable',
+        tracker: null,
+        location: null,
+        shift_gps: shiftGps,
+    }) as unknown as SafetySession;
+
+it('shows the linked Shift’s GPS ping with its time to a telemetry viewer', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-25T02:05:00Z'));
+    try {
+        render(
+            <SessionLocation
+                detail={gpsSession({
+                    latitude: -36.8485,
+                    longitude: 174.7633,
+                    captured_at: '2026-10-25T02:00:00Z',
+                    is_old: false,
+                    fresh_minutes: 15,
+                })}
+            />,
+        );
+        expect(screen.getByText('Shift GPS position')).toBeInTheDocument();
+        expect(
+            screen.getByText(/-36\.8485, 174\.7633 · last seen 5 min ago\./),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/Old position/)).not.toBeInTheDocument();
+    } finally {
+        vi.useRealTimers();
+    }
+});
+
+it('marks an old Shift GPS ping as old, never as current', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-25T03:00:00Z'));
+    try {
+        render(
+            <SessionLocation
+                detail={gpsSession({
+                    latitude: -36.8485,
+                    longitude: 174.7633,
+                    captured_at: '2026-10-25T02:00:00Z',
+                    is_old: true,
+                    fresh_minutes: 15,
+                })}
+            />,
+        );
+        expect(screen.getByText('Old position · Shift GPS')).toBeInTheDocument();
+        expect(
+            screen.getByText(
+                /last seen 1 hour ago, so it may not be where the worker is now/,
+            ),
+        ).toBeInTheDocument();
+        expect(screen.queryByText('Shift GPS position')).not.toBeInTheDocument();
+    } finally {
+        vi.useRealTimers();
+    }
+});
+
+it('shows no Shift position when the server sends none', () => {
+    render(<SessionLocation detail={gpsSession(null)} />);
+    expect(screen.queryByText(/Shift GPS/)).not.toBeInTheDocument();
 });

@@ -131,6 +131,18 @@ export type SafetySession = {
         battery_level: number | null;
         panic_active: boolean;
     };
+    /**
+     * The linked Shift's latest GPS ping, read live with its time, for viewers
+     * with telemetry access only (null otherwise). Never the session's own
+     * position; `is_old` once it is older than `fresh_minutes`.
+     */
+    shift_gps?: {
+        latitude: number;
+        longitude: number;
+        captured_at: string;
+        is_old: boolean;
+        fresh_minutes: number;
+    } | null;
     source_delivery: SessionDelivery | null;
     current_episode: SessionDelivery | null;
     connections: {

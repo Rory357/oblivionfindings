@@ -237,10 +237,70 @@ it('redacts monitorable Shift GPS until the safety session is activated', functi
         ->assertRedirect()
         ->assertSessionHasNoErrors();
 
-    // Codex's lone-worker service doesn't copy the Shift's GPS ping into the session (LoneWorkerControllerTest: "without
-    // promoting gps to a planned or current observation"), so the ping stays Shift telemetry. Main copied it; the
-    // choice is with Stephan (25 Oct) and the build carries Codex's until he answers.
+    // Stephan, 25 Oct ("show it, with time, to GPS users"): the Shift's ping is never copied into the session record;
+    // the session page reads it live, with its time, for telemetry viewers.
     $session = LoneWorkerSession::query()->latest('id')->firstOrFail();
     expect($session->location_lat)->toBeNull()
         ->and($session->location_lng)->toBeNull();
+    $gps = $this->getJson(route('health-safety.lone-workers.sessions.show', $session))->assertOk()->json('detail.shift_gps');
+    expect($gps['latitude'])->toBe(-36.8485)
+        ->and($gps['longitude'])->toBe(174.7633)
+        ->and($gps['is_old'])->toBeFalse();
+});
+
+it('shows the linked Shift ping with its time to a telemetry viewer and marks an old ping old', function () {
+    $this->freezeTime();
+    $site = Site::factory()->create();
+    $viewer = shiftGpsSiteUser($site, ['hazards.view', 'assets.telemetry.view']);
+    $worker = shiftGpsSiteUser($site);
+    [$shift] = shiftGpsActiveShift($site, $worker);
+    $session = shiftGpsLiveSession($shift);
+    ShiftGpsLog::query()->create(['shift_id' => $shift->id, 'user_id' => $worker->id, 'event_type' => 'ping',
+        'latitude' => -36.8485, 'longitude' => 174.7633, 'captured_at' => now()->subMinutes(40)]);
+
+    $gps = $this->actingAs($viewer)->getJson(route('health-safety.lone-workers.sessions.show', $session))
+        ->assertOk()->json('detail.shift_gps');
+    expect($gps['latitude'])->toBe(-36.8485)
+        ->and($gps['longitude'])->toBe(174.7633)
+        ->and($gps['captured_at'])->toBe(now()->subMinutes(40)->toIso8601String())
+        ->and($gps['is_old'])->toBeTrue()
+        ->and($gps['fresh_minutes'])->toBe(15);
+
+    ShiftGpsLog::query()->create(['shift_id' => $shift->id, 'user_id' => $worker->id, 'event_type' => 'ping',
+        'latitude' => -36.8501, 'longitude' => 174.7650, 'captured_at' => now()->subMinutes(3)]);
+    $gps = $this->getJson(route('health-safety.lone-workers.sessions.show', $session))->assertOk()->json('detail.shift_gps');
+    expect($gps['latitude'])->toBe(-36.8501)->and($gps['is_old'])->toBeFalse();
+
+    // Nothing is copied: the session record still has no position.
+    expect($session->fresh()->location_lat)->toBeNull()->and($session->fresh()->location_lng)->toBeNull();
+});
+
+it('gives a viewer without telemetry access no Shift position on the session page', function () {
+    $site = Site::factory()->create();
+    $viewer = shiftGpsSiteUser($site, ['hazards.view']);
+    $worker = shiftGpsSiteUser($site);
+    [$shift] = shiftGpsActiveShift($site, $worker);
+    $session = shiftGpsLiveSession($shift);
+    ShiftGpsLog::query()->create(['shift_id' => $shift->id, 'user_id' => $worker->id, 'event_type' => 'ping',
+        'latitude' => -36.8485, 'longitude' => 174.7633, 'captured_at' => now()->subMinutes(5)]);
+
+    $response = $this->actingAs($viewer)->getJson(route('health-safety.lone-workers.sessions.show', $session))->assertOk();
+    expect($response->json('detail.shift_gps'))->toBeNull()
+        ->and($response->getContent())->not->toContain('-36.8485')
+        ->and($response->getContent())->not->toContain('174.7633');
+});
+
+it('shows no Shift position once the session has ended', function () {
+    $site = Site::factory()->create();
+    $viewer = shiftGpsSiteUser($site, ['hazards.view', 'assets.telemetry.view']);
+    $worker = shiftGpsSiteUser($site);
+    [$shift] = shiftGpsActiveShift($site, $worker);
+    $session = shiftGpsLiveSession($shift);
+    ShiftGpsLog::query()->create(['shift_id' => $shift->id, 'user_id' => $worker->id, 'event_type' => 'ping',
+        'latitude' => -36.8485, 'longitude' => 174.7633, 'captured_at' => now()->subMinutes(5)]);
+    LoneWorkerSession::query()->whereKey($session->id)->update(['status' => 'completed', 'ended_at' => now()]);
+
+    $response = $this->actingAs($viewer)->getJson(route('health-safety.lone-workers.sessions.show', $session))->assertOk();
+    expect($response->json('detail.shift_gps'))->toBeNull()
+        ->and($response->getContent())->not->toContain('-36.8485');
 });
