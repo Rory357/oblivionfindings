@@ -23,6 +23,7 @@ final class PpeSiteReadService
     /** The existing hundred-row Site pane, with repairs proved and placed before the display cap. */
     public function profileForSite(User $viewer, int $siteId): array
     {
+        $this->timezone(); // An invalid configured zone is refused before any read, with its own message.
         return $this->access->withCurrentViewer($viewer, function ($current, $reads, $sites) use ($siteId): array {
             $this->access->assertOperation($current, 'view');
             $site = $this->site($siteId, $current, $reads, $sites);
@@ -72,6 +73,7 @@ final class PpeSiteReadService
     public function kpisForViewer(User $viewer, ?array $siteIds = null): array
     {
         $this->validateSites($siteIds);
+        $this->timezone();
 
         return $this->access->withCurrentViewer($viewer, function ($current, $reads, $sites) use ($siteIds): array {
             $this->access->assertOperation($current, 'view');
@@ -141,6 +143,7 @@ final class PpeSiteReadService
         if ($withinDays < 0 || $withinDays > 3650 || $limit < 1 || $limit > 100) {
             throw new LogicException('PPE feed days and display limit must be bounded non-negative days and one to one hundred items.');
         }
+        $this->timezone();
 
         return $this->access->withCurrentViewer($viewer, function ($current, $reads, $sites) use ($requested, $withinDays, $limit): array {
             $this->access->assertOperation($current, 'view');
@@ -204,6 +207,7 @@ final class PpeSiteReadService
     /** Existing Site attention shape, with explicit per-item source integrity. No arbitrary display cap hides repairs. */
     public function attentionForSite(User $viewer, int $siteId): array
     {
+        $this->timezone();
         return $this->access->withCurrentViewer($viewer, function ($current, $reads, $sites) use ($siteId): array {
             $this->access->assertOperation($current, 'view');
             $this->site($siteId, $current, $reads, $sites);
