@@ -69,8 +69,9 @@ final class PpeCommandRelocationTest extends PpeCommandTestCase
         $origin = $version->content['facts']['legacy_origin'];
         $this->assertSame('legacy_unknown', $origin['original_attribution_state']);
         $this->assertSame($before['path'], $origin['path']); $this->assertSame($this->worker->id, $origin['original_metadata']['uploaded_by']);
-        $this->assertSame(['digest' => hash('sha256', 'Actual retained public bytes'), 'size' => strlen('Actual retained public bytes')], $origin['observed_bytes']);
-        $this->assertSame($origin['observed_bytes'], $version->content['facts']['file_evidence']);
+        // MySQL's json column returns these keys in its own order (shorter keys first); the values must match exactly.
+        $this->assertSame(\App\Support\JsonEvidence::canonicalise(['digest' => hash('sha256', 'Actual retained public bytes'), 'size' => strlen('Actual retained public bytes')]), \App\Support\JsonEvidence::canonicalise($origin['observed_bytes']));
+        $this->assertSame(\App\Support\JsonEvidence::canonicalise($origin['observed_bytes']), \App\Support\JsonEvidence::canonicalise($version->content['facts']['file_evidence']));
         $cleanup = PpeEvidenceRelocationCleanup::where('receipt_id', PpeCommandReceipt::where('idempotency_key', $receipt['idempotency_key'])->sole()->id)->sole();
         $projection = $this->service()->relocationCleanupForViewer($this->manager, $cleanup->id);
         $this->assertSame('complete', $projection['public_copy_cleanup']); $this->assertTrue($projection['private_reference_recorded']);
@@ -171,7 +172,8 @@ final class PpeCommandRelocationTest extends PpeCommandTestCase
     public function test_shared_public_path_or_cross_parent_cannot_be_promoted(): void
     {
         [$root, $parent, $file] = $this->fixture(); $other = $this->item();
-        PpeAttachment::create(['ppe_inventory_id' => $other->id, 'disk' => null, 'path' => $file->path, 'original_name' => 'Other retained source']);
+        // ppe_attachments.disk is NOT NULL (default 'public'): the other record shares the same legacy public path.
+        PpeAttachment::create(['ppe_inventory_id' => $other->id, 'disk' => 'public', 'path' => $file->path, 'original_name' => 'Other retained source']);
         $this->validation(fn () => $this->transfer('inventory', $parent, $file, $this->input($root)), 'attachment');
         $this->denial(fn () => $this->transfer('inventory', $other, $file, $this->input($other)), 404);
         $constraint = app(\App\Services\HealthSafety\PpeAccessService::class)->withCurrentViewer($this->manager,
