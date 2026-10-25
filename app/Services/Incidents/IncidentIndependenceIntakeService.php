@@ -183,7 +183,12 @@ final class IncidentIndependenceIntakeService
      * and final SQL remain in this same read lifetime. No private narrative, DTO or transferable token is returned.
      * Direct/copy consumers can use the same method with whereKey(originalIncidentId), before hydrating the source.
      */
-    public function applySourceScopeInReads(Builder $query, User $current, CurrentAuthorizationReads $reads, string $purpose = 'read'): Builder
+    /**
+     * $siteBoundaryOnly: the restricted H&S event check (Stephan, 25 Oct, "event yes, incident no") keeps the
+     * incident's Site boundary and every independence rule here, but not the HR-confidential content rule, so the
+     * H&S event of a confidential incident still shows to H&S at that Site. Its content keeps the full rule.
+     */
+    public function applySourceScopeInReads(Builder $query, User $current, CurrentAuthorizationReads $reads, string $purpose = 'read', bool $siteBoundaryOnly = false): Builder
     {
         $reads->assertActive();
         if (! $query->getModel() instanceof ClientIncident || $query->getQuery()->from !== 'client_incidents'
@@ -191,7 +196,8 @@ final class IncidentIndependenceIntakeService
             || ! in_array($purpose, ['read', 'notification', 'assignment'], true)) {
             throw new LogicException('Independent-handling scope requires the canonical incident source and supported purpose.');
         }
-        $query = app(IncidentAccessService::class)->applySiteScope($query, $current, $reads);
+        $access = app(IncidentAccessService::class);
+        $query = $siteBoundaryOnly ? $access->applySiteBoundary($query, $current, $reads) : $access->applySiteScope($query, $current, $reads);
         $identities = (clone $query)->withoutEagerLoads()->reorder();
         $identities->getQuery()->limit = null; $identities->getQuery()->offset = null;
         $identities->select(array_map(fn ($column) => 'client_incidents.'.$column, self::ROOT_COLUMNS))

@@ -250,6 +250,17 @@ final class HealthSafetyReadContext
     }
 
     /** Union preparation never grants a permission; each consuming operation still checks it. */
+    /**
+     * The current-staff half of consumeViewer(), for a refusal that must come before any record is read. A viewer
+     * with no approved Site gets 404, as the Site scope would answer for any record; otherwise 403.
+     */
+    public function assertCurrentStaff(array $bypassPermissions = UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS): void
+    {
+        $this->assertActive();
+        if ($this->currentStaff) { return; }
+        abort($this->approvedSiteIds($bypassPermissions) === [] ? 404 : 403);
+    }
+
     public function consumeViewer(array $requiredPermissionKeys, callable $operation): mixed
     {
         return $this->consumeSourceViewer($requiredPermissionKeys, function ($current, $reads) use ($operation) {

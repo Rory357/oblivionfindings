@@ -216,7 +216,7 @@ final class IncidentHsEventSourceReadService
         $query = $restricted
             ? $reads->query($access->applySiteBoundary(ClientIncident::query()->whereKey($root->id), $current, $reads))
             : $access->apply(ClientIncident::query()->whereKey($root->id), $current, $reads);
-        $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read');
+        $query = app(IncidentIndependenceIntakeService::class)->applySourceScopeInReads($query, $current, $reads, 'read', siteBoundaryOnly: $restricted);
         $this->exact($query, array_intersect_key($root->getRawOriginal(), array_flip(self::ROOT_META)), 'client_incidents');
         $base = ['query' => $query, 'site_id' => $root->site_id === null ? null : (int) $root->site_id,
             'client_id' => $root->client_id === null ? null : (int) $root->client_id];

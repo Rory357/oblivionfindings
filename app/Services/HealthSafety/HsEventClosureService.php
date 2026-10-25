@@ -673,7 +673,9 @@ final class HsEventClosureService
 
     private function linkedClientIncident(HsEvent $event, bool $lock = false): ?ClientIncident
     {
-        $query = ClientIncident::query();
+        // Readiness and closing locks need only the incident's alert link. The H&S event page also builds readiness
+        // for viewers who can't read the incident (decision 9), so its narrative is never loaded here.
+        $query = ClientIncident::query()->select(['client_incidents.id', 'client_incidents.control_room_alert_id']);
         if ($lock) {
             $query->lockForUpdate();
         }

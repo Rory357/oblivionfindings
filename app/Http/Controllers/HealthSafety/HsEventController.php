@@ -389,6 +389,9 @@ class HsEventController extends Controller
             $request->attributes->remove($attribute);
         }
         $projection = HealthSafetyReadContext::within($request->user(), $this->detailReadPermissionKeys(), function (HealthSafetyReadContext $context) use ($request, $hsEvent): array {
+            // A viewer who isn't current staff is refused before any event row is read, not after. (Site scope still
+            // answers 404 for another Site's event, below.)
+            $context->assertCurrentStaff();
             $event = $this->resolveAccessibleEvent($request, $hsEvent, $context);
             $detail = $context->consumeViewer($this->detailReadPermissionKeys(),
                 fn (User $current): array => $this->buildEventDetail($event, $current, $context));
