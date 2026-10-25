@@ -106,8 +106,9 @@ final class ChemicalExposureWorkspaceControllerTest extends ChemicalExposureComm
         $json->assertJsonPath('detail.record.symptoms', 'Actual protected symptom')->assertJsonPath('detail.command_context.expected_version', 1);
         $json->assertJsonMissingPath('detail.record.original_context'); $json->assertJsonMissingPath('detail.record.source_schema_version');
         $this->privateHeaders($json);
+        // The installed assertInertia reads only view responses, so the X-Inertia JSON is checked directly.
         $this->get(self::BASE.'/'.$root->id, ['X-Inertia' => 'true', 'Accept' => 'text/html, application/xhtml+xml'])->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->component('health-safety/chemical-exposure-show')->where('detail.record.id', $root->id)->etc());
+            ->assertJsonPath('component', 'health-safety/chemical-exposure-show')->assertJsonPath('props.detail.record.id', $root->id);
     }
     public function test_generic_hs_collection_is_truthfully_restricted_and_detail_has_no_self_private_grant(): void
     {
@@ -214,7 +215,8 @@ final class ChemicalExposureWorkspaceControllerTest extends ChemicalExposureComm
     {
         $root = $this->exposure(); $other = $this->exposure();
         $foreign = $this->exposureService()->assignFollowup($other, $this->manager, $this->privateCommand($other,
-            ['assigned_to' => $this->manager->id, 'instruction' => 'PRIVATE-FOREIGN-BOOKMARK-TASK', 'due_at' => '2026-10-13T00:00:00Z']));
+            // Assigned to someone else: the viewer's own sidebar task badge would otherwise load the follow-up itself.
+            ['assigned_to' => $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view'])->id, 'instruction' => 'PRIVATE-FOREIGN-BOOKMARK-TASK', 'due_at' => '2026-10-13T00:00:00Z']));
         $hydrated = false;
         ChemicalExposureFollowup::retrieved(function ($row) use ($foreign, &$hydrated) {
             if ($row->id === $foreign['source_id'] && array_key_exists('instruction', $row->getAttributes())) { $hydrated = true; }

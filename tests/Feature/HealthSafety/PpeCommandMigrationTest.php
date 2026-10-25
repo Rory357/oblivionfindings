@@ -12,7 +12,8 @@ final class PpeCommandMigrationTest extends PpeCommandTestCase
     private function migration(): object { return require database_path('migrations/2026_10_12_200000_create_ppe_command_history.php'); }
     public function test_legacy_fields_and_quantities_are_not_backfilled_or_reinterpreted(): void
     {
-        $item = PpeInventory::factory()->create(['site_id' => $this->site->id, 'quantity' => 8, 'status' => 'maintenance']);
+        // fresh(): a just-created model doesn't hold the columns' database defaults (0) until it's read back.
+        $item = PpeInventory::factory()->create(['site_id' => $this->site->id, 'quantity' => 8, 'status' => 'maintenance'])->fresh();
         $this->assertSame(0, $item->source_schema_version); $this->assertSame(0, $item->source_revision);
         $this->assertSame(8, $item->quantity); $this->assertSame('maintenance', $item->status);
         $this->assertSame('legacy_unknown', $this->sourceState($item));

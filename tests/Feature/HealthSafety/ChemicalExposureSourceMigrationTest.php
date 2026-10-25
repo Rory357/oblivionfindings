@@ -43,8 +43,9 @@ final class ChemicalExposureSourceMigrationTest extends ChemicalExposureCommandT
 
     public function test_legacy_worker_recorder_incident_and_private_report_fields_remain_verbatim_without_backfill(): void
     {
+        // fresh(): a just-created model doesn't hold the columns' database defaults (source_schema_version 0) until read back.
         $row = $this->legacy(['symptoms' => 'Retained reported fact', 'first_aid_given' => 'Retained treatment',
-            'medical_treatment' => 'medical', 'medical_attention_sought' => true, 'exposure_duration' => '5 minutes']);
+            'medical_treatment' => 'medical', 'medical_attention_sought' => true, 'exposure_duration' => '5 minutes'])->fresh();
         $this->assertSame($this->worker->id, $row->user_id); $this->assertSame($this->manager->id, $row->created_by);
         $this->assertSame('Retained reported fact', $row->symptoms); $this->assertSame('Retained treatment', $row->first_aid_given);
         $this->assertSame('medical', $row->medical_treatment); $this->assertTrue($row->medical_attention_sought);

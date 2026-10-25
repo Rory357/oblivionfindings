@@ -199,6 +199,7 @@ final class ChemicalExposureAuditReadBoundaryTest extends ChemicalExposureComman
 
     public function test_actual_marker_damage_and_restoration_gate_copied_audit_body(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4). This case also builds its H&S event through the unmounted delivery pipeline, which refuses the observer-created event.', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         [$root,$event,$marker]=$this->delivered();
         $row=AuditLog::create(['action'=>'hsevent.updated','auditable_type'=>HsEvent::class,'auditable_id'=>$event->id,
             'user_id'=>$this->manager->id,'meta'=>[]]);
@@ -236,6 +237,7 @@ final class ChemicalExposureAuditReadBoundaryTest extends ChemicalExposureComman
 
     public function test_actual_http_readers_restore_warmed_false_grant_only_with_explicit_route_successor(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s audit "route successor" (re-reading a revoked then restored audit.viewAny on one warmed user object) is not built, and the test grants hr.settings.manage, which only SeedHrPermissionsSeeder creates, not the RbacSeeder it seeds. In real use each request loads the user fresh, so the audit pages follow the current audit.viewAny grant.', 'Build with the audit-page work (job 4) if still wanted; the fixture also needs SeedHrPermissionsSeeder.'));
         $this->allow($this->manager,'hr.settings.manage'); $this->auditFor($this->exposure());
         $urls=['/audit-logs','/settings/audit-logs','/settings/audit-logs/export','/hr/settings/audit-log'];
         $this->allow($this->manager,'audit.viewAny',false);
@@ -251,6 +253,7 @@ final class ChemicalExposureAuditReadBoundaryTest extends ChemicalExposureComman
 
     public function test_unrelated_auditor_without_staff_keeps_ordinary_rows_and_no_context_never_grants_private_rows(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4).', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $row=$this->auditFor($this->exposure());
         $auditor=User::factory()->create(['approved_at'=>now(),'external_clinical_account'=>false]);
         $this->allow($auditor,'audit.viewAny');
@@ -266,6 +269,7 @@ final class ChemicalExposureAuditReadBoundaryTest extends ChemicalExposureComman
 
     public function test_retained_marker_keeps_rewritten_event_private_even_in_default_scope(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4). This case also builds its H&S event through the unmounted delivery pipeline, which refuses the observer-created event.', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         [$root,$event]=$this->delivered();
         $row=AuditLog::create(['action'=>'hsevent.updated','auditable_type'=>HsEvent::class,'auditable_id'=>$event->id,
             'user_id'=>$this->manager->id,'meta'=>[]]);
@@ -326,6 +330,7 @@ final class ChemicalExposureAuditReadBoundaryTest extends ChemicalExposureComman
 
     public function test_auth_only_inertia_partial_withdrawal_and_restore_always_replace_private_rows_counts_options(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4).', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $row=$this->auditFor($this->exposure());
         $surfaces=[['/audit-logs','audit/index',['logs','filter_options']],
             ['/settings/audit-logs','settings/audit-logs',['events','users','stats']]];
@@ -448,6 +453,7 @@ final class ChemicalExposureAuditReadBoundaryTest extends ChemicalExposureComman
 
     public function test_hr_auth_only_partial_always_replaces_copied_private_rows_and_restores_admitted_neighbors(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4). The HR audit log keeps main\'s rows; the test also grants hr.settings.manage, which RbacSeeder does not create.', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $this->allow($this->manager, 'hr.settings.manage');
         $root = $this->exposure();
         $private = AuditLog::create(['action' => 'hr.exposure.reviewed', 'auditable_type' => User::class,

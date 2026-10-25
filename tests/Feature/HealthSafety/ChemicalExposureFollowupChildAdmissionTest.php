@@ -137,6 +137,7 @@ final class ChemicalExposureFollowupChildAdmissionTest extends ChemicalExposureT
 
     public function test_actual_notice_admission_refuses_before_child_body_and_preserves_other_real_private_notice(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $viewer, $child, $delivery] = $this->assignedWork(); $notice = $this->deliver($viewer, $delivery);
         [, , $healthy, $healthyDelivery] = $this->assignedWork(null, $viewer); $healthyNotice = $this->deliver($viewer, $healthyDelivery);
         foreach (['version', 'receipt'] as $family) {

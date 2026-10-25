@@ -249,7 +249,8 @@ final class PpeCommandStagingTest extends PpeCommandTestCase
         $references = array_filter($queries, fn ($query) => str_contains($query['query'], 'hr_documents'));
         $this->assertNotEmpty($references);
         foreach ($references as $query) {
-            $this->assertStringNotContainsString('select *', strtolower($query['query']));
+            // An exists(select * ...) probe returns no columns; any other select * would read the document row.
+            $this->assertDoesNotMatchRegularExpression('/(?<!exists\()select \*/', strtolower($query['query']));
             $this->assertStringNotContainsString('title', $query['query']);
         }
         Storage::disk('private')->assertExists($attempt->path); $this->assertNotNull($document->fresh());

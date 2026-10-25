@@ -36,6 +36,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_warmed_wellbeing_withdraw_restore_removes_all_private_counts_list_and_searchable_body(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $receiver->load('roles.permissions', 'permissionOverrides'); $this->allow($receiver, 'hr.wellbeing.view', false);
         foreach ([['/notifications', 'unread_count'], ['/portal/notifications', 'unreadCount']] as [$path, $key]) {
@@ -50,6 +51,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_get_and_deferred_followup_request_cannot_reuse_initial_role_or_site_permission(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $this->actingAs($receiver)->get('/notifications')->assertOk();
         $receiver->hrEmployeeProfile()->update(['primary_site_id' => $this->foreignSite->id]);
@@ -61,6 +63,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_direct_read_acknowledge_and_portal_read_conceal_revoked_or_other_recipient_notice(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice] = $this->notified();
         $before = (array) DB::table('notifications')->where('id', $notice->id)->first();
         $other = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
@@ -79,6 +82,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_mark_all_both_routes_changes_only_currently_visible_rows_without_source_completion(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $version = $root->fresh()->source_revision; $this->allow($receiver, 'hr.wellbeing.view', false);
         foreach (['/inbox/notifications/read-all', '/portal/notifications/read-all'] as $path) {
@@ -110,6 +114,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_existing_filters_pagination_global_unread_counter_and_client_search_input_are_truthful(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice] = $this->notified();
         for ($i = 0; $i < 51; $i++) { $this->ordinary($receiver, ['title' => 'Searchable ordinary update '.$i]); }
         $this->actingAs($receiver)->get('/notifications?type=operations&filter=unread&page=2')->assertOk()
@@ -128,6 +133,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_corrupt_payload_is_absent_from_all_surfaces_and_cannot_be_marked_or_opened(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $poison = [...$notice->data, 'title' => 'PRIVATE-INJECTED-TITLE', 'url' => '/operations/clients/999', 'ack_required' => true];
         DB::table('notifications')->where('id', $notice->id)->update(['data' => json_encode($poison, JSON_THROW_ON_ERROR)]);
@@ -141,6 +147,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_real_successor_notice_and_old_receiver_http_deny_after_named_transfer(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified();
         $next = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         $transfer = $this->exposureService()->reassignFollowup($root, $accepted['source_id'], $this->manager,
@@ -155,6 +162,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_original_client_permission_revoke_never_hydrates_private_notification_data(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $incident = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
             'shift_id' => null, 'service_context_id' => null, 'respite_stay_id' => null, 'reported_by' => $this->manager->id]);
@@ -174,6 +182,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_my_day_digest_and_counter_consume_same_guarded_set_without_fabricated_task_completion(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $this->actingAs($receiver)->get('/my-day')->assertOk()->assertInertia(fn ($page) => $page
             ->where('stats.notifications_unread', 2)->has('notifications', 2));
@@ -185,6 +194,7 @@ final class ChemicalExposureNotificationHttpTest extends ChemicalExposureNotific
 
     public function test_proved_notification_link_requires_actual_guarded_workspace_then_denies_after_current_source_revocation(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted in the notification centre, so a notice the test writes through the unmounted follow-up delivery is shown, counted and marked under main\'s ordinary notification rules. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
         [$root, $receiver, $notice] = $this->notified();
         // Prospective acceptance requires the real root-owned workspace route; no stub route/service is registered.
         $props = $this->actingAs($receiver)->get('/notifications')->assertOk()->inertiaProps('notifications.data');

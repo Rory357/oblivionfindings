@@ -136,6 +136,7 @@ final class ChemicalExposureAuditRecoveryPrivacyTest extends ChemicalExposureCom
 
     public function test_shared_public_chemical_intent_audit_is_not_blanket_classified_as_private_exposure(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4). Its fixture also looks for a catalogue intent recorded as source_type "substance"; this build records "catalogue".', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $catalogue = $this->catalogue();
         $intent = ChemicalCommandIntent::where('source_type', 'substance')->where('command', 'create')->orderByDesc('id')->firstOrFail();
         $row = AuditLog::create(['action' => 'chemical.catalogue.created', 'auditable_type' => ChemicalCommandIntent::class,
@@ -147,6 +148,7 @@ final class ChemicalExposureAuditRecoveryPrivacyTest extends ChemicalExposureCom
 
     public function test_recovery_subject_site_denial_has_no_private_subject_body_hydration(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4).', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         [$root, $file, $stage] = $this->uploaded();
         $row = $this->audit(ChemicalExposureEvidenceStaging::class, $stage->id);
         $this->manager->hrEmployeeProfile()->update(['primary_site_id' => $this->foreignSite->id]);
@@ -164,6 +166,7 @@ final class ChemicalExposureAuditRecoveryPrivacyTest extends ChemicalExposureCom
 
     public function test_actual_destination_marker_audit_uses_current_canonical_private_root_and_marker_proof(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4). This case also builds its H&S event through the unmounted delivery pipeline, which refuses the observer-created event.', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $root = $this->exposure();
         $delivery = ChemicalExposureSourceDelivery::where('exposure_id', $root->id)->where('kind', 'health_safety')->sole();
         app(\App\Services\HealthSafety\ChemicalExposureHsEventDeliveryService::class)->deliver($this->manager, $delivery->id);
@@ -182,6 +185,7 @@ final class ChemicalExposureAuditRecoveryPrivacyTest extends ChemicalExposureCom
 
     public function test_marker_foreign_source_and_unknown_class_never_produce_a_private_audit_body(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4). This case also builds its H&S event through the unmounted delivery pipeline, which refuses the observer-created event.', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $root = $this->exposure();
         $delivery = ChemicalExposureSourceDelivery::where('exposure_id', $root->id)->where('kind', 'health_safety')->sole();
         app(\App\Services\HealthSafety\ChemicalExposureHsEventDeliveryService::class)->deliver($this->manager, $delivery->id);
@@ -221,6 +225,7 @@ final class ChemicalExposureAuditRecoveryPrivacyTest extends ChemicalExposureCom
 
     public function test_old_noop_audit_admits_its_original_site_before_body_after_later_genuine_source_changes(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure audit row-hiding guard (ChemicalExposureAuditAccessService::materialize/scope) is not mounted, by Stephan\'s decision. The audit pages keep main\'s rows for audit.viewAny holders; the exposure symptoms and treatment fields will be hidden for everyone instead (job 4).', 'Job 4 (after the merge): hide exposure symptoms and treatment fields for everyone on the audit pages and CSV; Codex\'s row-hiding guard stays out.'));
         $root = $this->exposure();
         $accepted = $this->exposureService()->correct($root, $this->manager,
             $this->privateCommand($root, ['reason' => 'Observed facts already match']));
