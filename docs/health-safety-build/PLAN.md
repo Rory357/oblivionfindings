@@ -243,6 +243,12 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
   - **The physical lane needs the RBAC-seeded dump** (`full-schema-rbac.sql`): with the plain dump every physical test re-seeds roles and permissions row by row, about 7 minutes a file. The coordinator spotted it; the lane was rerun on the seeded dump.
   - **`FirstAidDeliveryTest` ended PHP silently** (exit 2, no output, empty JUnit), alone or in a lane, and took the rest of its lane with it (this morning's chunk 00 "crash"). Found with PHPUnit's event log: its review-failure case swaps in an `HsEventService` subclass whose `recordEvent(array $data)` drops the second parameter Codex's port added (`?IncidentResponseJourneyReadContext $responseSource = null`). PHP treats that as an incompatible declaration, a fatal error, which under Pest ended the process with no output. The test double now matches the parent's signature; no app code changed.
 
+## Release gate passed (26 Oct, code at `a0eda2e59`, latest main `1f3a1e855` merged in)
+
+- Frontend: tsc clean, lint clean on 356 changed files, build succeeds; vitest 5,699 passed, 4 failing the same way on main.
+- Pest final gate (about 390 files in seven lanes): 5,780 passed. Every failure is now failing the same way on main (5, listed below), skipped with its reason (294), fixed in its test, or a shared-fake-disk artefact that passes alone. Solo reruns of every changed file pass or skip as intended.
+- Browser walkthrough (private database, 1440 px): lone-worker Shift GPS shown with its time to a GPS viewer and withheld from the H&S officer (no position in the data); a chemical exposure recorded through the form creates its H&S event with "Record the WorkSafe decision" and no narrative; the team lead sees and acts on an incident-linked event without incident details (decision 9); registers and Overview load for admin and team lead.
+
 ## Jobs after the H&S merge (each its own tested change, pushed and deploy-checked)
 
 1. **Participation Site checks on every write** (Stephan, option A "All participation"): committees (create), representatives (add, edit), consultations (add, edit, status, document upload) and meetings. Each write needs the record's Site among the manager's H&S Sites; `healthSafety.viewAllSites` covers every Site; a record with no Site needs all-Sites access. Tests per write type: own Site allowed, other Site refused, all-Sites allowed, Site-less without all-Sites refused.
