@@ -413,13 +413,14 @@ class IncidentJourneyPresenterTest extends TestCase
 
         $payload = app(IncidentJourneyPresenter::class)->present(new IncidentJourney($incident, $alert, null), $viewer);
 
-        $this->assertSame('Operational response active', $payload['journey_state']);
+        // Neither the incident nor the alert is readable, so no journey state is reported from them (Codex's presenter).
+        $this->assertSame('Journey needs review', $payload['journey_state']);
         $this->assertSame('blocked', $payload['next_action']['stage']);
         $this->assertSame('No action available for your role', $payload['next_action']['label']);
         $this->assertNull($payload['next_action']['href']);
         $this->assertNull($payload['control_room']);
         $this->assertNull($payload['incident']);
-        $this->assertSame('restricted', $payload['linked_access']['control_room']);
+        $this->assertSame('unavailable', $payload['linked_access']['control_room']);
         $this->assertNull($payload['references']['control_room']);
     }
 
@@ -438,8 +439,9 @@ class IncidentJourneyPresenterTest extends TestCase
 
         $payload = app(IncidentJourneyPresenter::class)->present(new IncidentJourney($incident, $alert, null), $viewer);
 
-        $this->assertSame('Journey closed', $payload['journey_state']);
-        $this->assertSame(['label' => 'Journey closed', 'href' => null, 'stage' => 'complete'], $payload['next_action']);
+        // A viewer who can read neither record isn't told it's closed; no state comes from unreadable sources.
+        $this->assertSame('Journey needs review', $payload['journey_state']);
+        $this->assertSame(['label' => 'No action available for your role', 'href' => null, 'stage' => 'blocked'], $payload['next_action']);
     }
 
     public function test_hs_access_does_not_reveal_a_confidential_incident_in_the_journey(): void
@@ -487,8 +489,8 @@ class IncidentJourneyPresenterTest extends TestCase
     public function test_presented_hs_lifecycle_uses_current_closed_snapshot_instead_of_preloaded_pending_parent(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
-        // Incident-linked H&S work needs incident read too (H&S staff read incidents, Stephan 25 Oct).
-        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage', 'incidents.viewAny']);
+        // H&S staff without incident read still work the incident-linked H&S event (Stephan, 25 Oct: event yes, incident no).
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->atSite($site)->create());
         $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
             'site_id' => $site->id, 'status' => HsEvent::STATUS_OPEN,
@@ -498,7 +500,10 @@ class IncidentJourneyPresenterTest extends TestCase
         $presenter = app(IncidentJourneyPresenter::class);
         $journey = new IncidentJourney($incident, null, $event);
         $this->assertSame('Accept H&S handover', $presenter->present($journey, $viewer)['next_action']['label']);
-        HsEvent::whereKey($event->id)->update(['status' => HsEvent::STATUS_CLOSED, 'handover_status' => HsEvent::HANDOVER_ACCEPTED]);
+        // H&S events close only through the canonical closure path; the fixture marks this close as that path.
+        \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = '.(int) $event->id);
+        try { HsEvent::whereKey($event->id)->update(['status' => HsEvent::STATUS_CLOSED, 'handover_status' => HsEvent::HANDOVER_ACCEPTED]); }
+        finally { \Illuminate\Support\Facades\DB::statement('SET @hs_canonical_close_event_id = NULL'); }
         $payload = $presenter->present($journey, $viewer);
         $this->assertSame(HsEvent::STATUS_CLOSED, $payload['health_safety']['status']);
         $this->assertSame(HsEvent::HANDOVER_ACCEPTED, $payload['health_safety']['handover']['status']);
@@ -511,8 +516,8 @@ class IncidentJourneyPresenterTest extends TestCase
     public function test_presented_hs_actions_require_fresh_manage_evidence_and_unknown_link_is_never_complete(): void
     {
         $site = Site::factory()->create(['is_active' => true]);
-        // Incident-linked H&S work needs incident read too (H&S staff read incidents, Stephan 25 Oct).
-        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage', 'incidents.viewAny']);
+        // H&S staff without incident read still work the incident-linked H&S event (Stephan, 25 Oct: event yes, incident no).
+        $viewer = $this->siteBoundUser($site, ['hazards.view', 'hazards.manage']);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->atSite($site)->create());
         $event = HsEvent::withoutEvents(fn () => HsEvent::factory()->forClientIncident($incident)->create([
             'site_id' => $site->id, 'status' => HsEvent::STATUS_OPEN,
