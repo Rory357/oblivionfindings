@@ -51,7 +51,7 @@ class RiskAssessmentPresenter
                 $query->whereIn('hs_risk_assessments.id', (clone $originalParent)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...))->select('hs_risk_assessments.id'));
                 $context->reconsumeIncidentPredicate($query, $originalParent);
             }
-            $ra = self::guardEagerQuery($query, $viewer, $context)->firstOrFail();
+            $ra = self::firstOrRefuse(self::guardEagerQuery($query, $viewer, $context), $ra->id);
 
             return [
                 'id' => $ra->id,
@@ -87,7 +87,7 @@ class RiskAssessmentPresenter
             abort_unless($viewer?->canDo('hazards.view'), 403);
             $query = HsRiskAssessment::query()->whereKey($ra->getKey())->with(['assessable', 'hsEvent', 'assessedBy', 'approvedBy', 'creator', 'attachments.uploader']);
             $original = self::guardEagerQuery($query, $viewer, $context);
-            $ra = (clone $original)->firstOrFail();
+            $ra = self::firstOrRefuse(clone $original, $ra->getKey());
             $connections = app(RiskAssessmentWorkspaceConnectionsService::class)->forViewer($ra, $viewer, $returnTo, $context);
             $canManage = $canManage && $viewer->canDo('hazards.manage');
             $draft = $ra->status === HsRiskAssessment::STATUS_DRAFT;
@@ -144,6 +144,12 @@ class RiskAssessmentPresenter
             ]);
 
         });
+    }
+
+    /** firstOrFail() names only the model; the refusal also names the one assessment it withholds. */
+    private static function firstOrRefuse(Builder $query, int|string $id): HsRiskAssessment
+    {
+        return $query->firstOr(static fn () => throw (new \Illuminate\Database\Eloquent\ModelNotFoundException)->setModel(HsRiskAssessment::class, [$id]));
     }
 
     public static function attachment(HsRiskAssessment $ra, HsRiskAssessmentAttachment $a): array
