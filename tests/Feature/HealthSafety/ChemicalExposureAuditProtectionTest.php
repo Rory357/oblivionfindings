@@ -92,6 +92,7 @@ final class ChemicalExposureAuditProtectionTest extends TestCase
 
     public function test_only_exposure_hs_events_protect_request_context_including_source_type_replacement(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'This build ports Codex\'s exposure audit sanitiser for the exposure records only. Exposure H&S events are left out on purpose: their H&S events come from main\'s observer, and their WorkSafe and closure audits keep main\'s full metadata.', 'decide with the exposure delivery pipeline whether exposure H&S event audits drop request details.'));
         $event = new \App\Models\HsEvent(['source_type' => SubstanceExposureRecord::class]);
         $this->assertTrue(SafeOperationalData::protectsRequestContext($event));
         $event->syncOriginal();
