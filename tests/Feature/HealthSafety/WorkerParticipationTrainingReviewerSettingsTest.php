@@ -6,6 +6,7 @@ use App\Domain\Governance\Models\GovernanceSetting;
 use App\Models\Site;
 use App\Services\HealthSafety\WorkerParticipationTrainingReviewerResolver;
 use Inertia\Testing\AssertableInertia;
+use Tests\Support\NotInThisBuild;
 
 /** Actual settings requests; native UNRUN until application admission. */
 final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEventCommandTestCase
@@ -24,6 +25,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_default_assignment_persists_through_the_existing_settings_endpoint(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $this->save(['default_user_id' => $this->reviewerId, 'expected_default_user_id' => null]);
         $this->assertSame($this->reviewerId, $this->configuration()['default_user_id']);
         $this->assertSame($this->reviewerId, app(WorkerParticipationTrainingReviewerResolver::class)->reviewerId($this->site->id));
@@ -39,6 +41,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_explicit_unassigned_and_removing_override_have_distinct_effects(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $this->store(['default_user_id' => $this->reviewerId, 'site_overrides' => []]);
         $this->save(['sites' => [$this->siteChange('unassigned', 'inherit', null)]]);
         $resolver = app(WorkerParticipationTrainingReviewerResolver::class);
@@ -63,6 +66,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_same_field_conflict_refuses_without_losing_another_site_change(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $this->store(['default_user_id' => $this->reviewerId, 'site_overrides' => []]);
         $this->actingAs($this->actor)->put(self::URL, ['training_reviewers_patch' => [
             'default_user_id' => null, 'expected_default_user_id' => null,
@@ -80,6 +84,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_stale_site_expected_value_is_refused_and_duplicate_site_does_not_partially_save(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $this->store(['default_user_id' => null, 'site_overrides' => [(string) $this->site->id => null]]);
         $this->actingAs($this->actor)->put(self::URL, ['training_reviewers_patch' => [
             'sites' => [$this->siteChange('person', 'inherit', null, $this->reviewerId)],
@@ -104,6 +109,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_numeric_string_person_and_hidden_site_changes_are_rejected(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $this->actingAs($this->actor)->put(self::URL, ['training_reviewers_patch' => [
             'default_user_id' => (string) $this->reviewerId, 'expected_default_user_id' => null,
         ]])->assertSessionHasErrors('training_reviewers_patch.default_user_id');
@@ -115,6 +121,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_inactive_staff_wrong_site_or_missing_independent_capability_cannot_be_assigned(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $other = Site::factory()->create(['is_active' => true]);
         $wrongSite = $this->staff(['hazards.view', 'governance.compliance.manage', 'governance.compliance.view'], $other);
         $missingCapability = $this->staff(['hazards.view']);
@@ -130,6 +137,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_scoped_page_omits_hidden_site_and_unavailable_reviewer_name(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $hidden = Site::factory()->create(['is_active' => true]);
         $gone = $this->staff(['hazards.view', 'governance.compliance.manage', 'governance.compliance.view']); $gone->update(['approved_at' => null]);
         $this->store(['default_user_id' => (int) $gone->id, 'site_overrides' => [(string) $hidden->id => $this->reviewerId]]);
@@ -140,6 +148,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_view_permission_does_not_grant_settings_write_or_directory_candidates(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         $this->store(['default_user_id' => $this->reviewerId, 'site_overrides' => [(string) $this->site->id => $this->reviewerId]]);
         $viewer = $this->staff(['governance.settings.view', 'hazards.view']);
         $this->actingAs($viewer)->get(self::URL)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
@@ -153,6 +162,7 @@ final class WorkerParticipationTrainingReviewerSettingsTest extends RestraintEve
 
     public function test_non_person_changes_refuse_a_stale_named_reviewer_field(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Governance settings controller and page, which this build doesn\'t port.', 'port with the Governance settings work.'));
         foreach (['inherit', 'unassigned'] as $mode) {
             $change = $this->siteChange($mode, 'inherit', null);
             $change['reviewer_id'] = $this->reviewerId;

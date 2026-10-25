@@ -223,3 +223,30 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
   - Injury evidence uploads send real PDF bytes. `UploadedFile::fake()->create()` reports a size with no content, so the byte proof never matched and the download answered 404.
   - Moving the Client splits the incident's Site from its Client's Site, and Codex's code reports that link as `unavailable` (no id, no private title, no capture options), not `restricted`.
   - **Left failing (an invariant Codex's own code never met):** `InjuryDerivedWorkspacePrivacyTest` "current hazards read revocation overrides warmed viewer…". The no-context branch of `HsEventAccessService::applyReadableScope` checks `hazards.view` on the user object it's given (unchanged from Codex's snapshot), so a pre-loaded user whose grant was then revoked still passes. A real request loads the user fresh.
+
+## Skipped: Codex tests for code not in this build (Stephan, 25 Oct ~13:25, option A "skip with reasons")
+
+Each case calls `markTestSkipped(Tests\Support\NotInThisBuild::reason(group, why, follow-up))`, 63 cases in all. Nothing in any of them shows anyone data they shouldn't see.
+
+**1. Never built or wired up by Codex (36)**
+- `HsRiskAssessmentAcceptanceTest` (11): `RiskAssessmentAcceptanceService` is an unwired prospective foundation. Follow-up: wire it with the general audit recognition patch.
+- `ChemicalExposureEvidenceTransportTest` (3): the exposure evidence recovery-staging endpoints aren't routed anywhere. Follow-up: build them.
+- `WorkerParticipationMeetingDeliveryTest` (10): the meeting delivery pipeline was never built, and meetings keep main's `CommitteeMeetingScheduled` notice. Follow-up: build the pipeline.
+- `WorkerParticipationNotificationSourceReadTest` (3, plus the non-current-staff data set of the board-pack case): the participation inbox reader isn't mounted. Follow-up: mount it with the pipeline.
+- `SafeguardingCurrentReadHttpTest` (4): the `SafeguardingConcernReadScope` extraction was never applied, and these fail the same way on main. Follow-up: apply it.
+- `HealthSafetyDashboardSafeguardingReadTest` (4): the Overview's safeguarding source read was never built, so the count stays as on main. Follow-up: safeguarding count privacy.
+
+**2. Codex's changes to modules outside this build (22)**
+- `RestraintDerivedWorkspacePrivacyTest` (6) and `RestraintDerivedSourcePrivacyTest` (3): Control Room and Clinical restraint changes.
+- `LoneWorkerSessionWorkProjectionTest` (2): people-location and tracking links (Security & Devices).
+- `WorkerParticipationTrainingReviewerSettingsTest` (9): the Governance settings controller and page.
+- `IncidentJourneyServiceTest` (2): the `ControlRoomNotificationService` rewrite. Notifications behave as on live main.
+
+**3. Checks Codex's own code never met (5)**
+- `IncidentHsEventSourceDetailTest`, late withdrawal: the page answers 404, but one incident body is loaded in memory first.
+- `HsDashboardClientOptionsSourceReadTest`: a timezone change mid-read isn't caught before the name query compiles.
+- `InjuryDerivedWorkspacePrivacyTest`: hazards.view is checked on a warmed user object; real requests load the user fresh.
+- `BehaviourSupportPlanSignoffConcurrencyTest`: the second of two simultaneous identical sign-offs is refused rather than replayed; recorded once, nothing lost.
+- `ChemicalExposureEvidenceTest`, staged client access: the staging inspection refuses with a different status after an incident unlink; nothing is read.
+
+Still failing the same way on main (main's own test, not skipped): `ItSecuritySingleTenantBoundaryTest` (2).

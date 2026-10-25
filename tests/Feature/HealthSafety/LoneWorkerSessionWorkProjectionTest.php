@@ -31,6 +31,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Mockery;
 use ReflectionMethod;
 use Tests\TestCase;
+use Tests\Support\NotInThisBuild;
 
 class LoneWorkerSessionWorkProjectionTest extends TestCase
 {
@@ -148,6 +149,7 @@ class LoneWorkerSessionWorkProjectionTest extends TestCase
 
     public function test_people_location_source_link_preserves_actual_bounded_origin(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s people-location and tracking link changes (Security & Devices), which this build doesn\'t port; main\'s ?session= links still open the session.', 'port with the Security & Devices work.'));
         $record = $this->sessionSource();
         $this->grant($this->manager, 'assets.telemetry.view', true);
         $origin = '/operations/people-locations/people?population=staff&site='.$this->site->id.'&selected=s'.$this->owner->id.'&source='.$record->id;
@@ -159,6 +161,7 @@ class LoneWorkerSessionWorkProjectionTest extends TestCase
 
     public function test_tracking_source_link_reauthorizes_session_and_uses_actual_worker_filter_when_no_session(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s people-location and tracking link changes (Security & Devices), which this build doesn\'t port; main\'s ?session= links still open the session.', 'port with the Security & Devices work.'));
         $record = $this->sessionSource();
         $method = new ReflectionMethod(TrackingWorkspacePresenter::class, 'canonicalHref');
         $presenter = app(TrackingWorkspacePresenter::class);

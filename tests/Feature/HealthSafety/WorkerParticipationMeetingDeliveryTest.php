@@ -26,6 +26,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
+use Tests\Support\NotInThisBuild;
 
 /** Real source, intent and database-channel SQL. Mail physical-commit protocol remains a separate gate. Native UNRUN. */
 final class WorkerParticipationMeetingDeliveryTest extends TestCase
@@ -242,6 +243,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_actual_preference_get_save_read_and_inapp_veto_preserves_other_channel_intent(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         $this->actingAs($this->attendee)->get('/settings/notifications')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('groups', fn ($groups) => in_array(WorkerParticipationMeetingDeliveryService::EVENT_KEY, $groups['Audit & Safety'], true))
             ->where('roleDefaults', fn ($defaults) => $defaults[WorkerParticipationMeetingDeliveryService::EVENT_KEY] ===
@@ -261,6 +263,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_actual_role_defaults_save_read_and_legacy_role_fallback_without_scalar_proof_mismatch(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         $admin = $this->staff('admin'); $role = Role::where('name', 'support_worker')->sole();
         $key = WorkerParticipationMeetingDeliveryService::EVENT_KEY;
         $this->actingAs($admin)->get('/settings/notifications/roles')->assertOk()->assertInertia(fn (Assert $page) => $page
@@ -280,6 +283,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_disabled_role_channel_bits_are_not_projected_as_enabled_and_personal_override_wins(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         $admin = $this->staff('admin'); $role = Role::where('name', 'support_worker')->sole(); $key = WorkerParticipationMeetingDeliveryService::EVENT_KEY;
         $this->actingAs($admin)->put('/settings/notifications/roles', ['matrix' => [$role->id => [$key =>
             ['enabled' => false, 'inapp' => true, 'email' => true, 'push' => true]]]])->assertRedirect();
@@ -295,6 +299,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
     #[DataProvider('routeCreatePaths')]
     public function test_actual_create_route_stages_source_bound_intents_without_inline_transport(string $path): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         // Candidate integration expectation: producer mount is pending the command-transition prerequisite.
         $values = ['scheduled_at' => '2026-02-01T12:30', 'scheduled_timezone' => 'Pacific/Auckland', 'attendees' => [$this->attendee->id]];
         if ($path === 'inline') {
@@ -322,6 +327,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_actual_route_reschedule_addition_and_status_changes_preserve_delivery_trigger_definitions(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         // Entire route workflow, not a substituted source callback. Currently UNRUN/pending producer mount.
         $this->put('/health-safety/worker-participation/meetings/'.$this->meeting->id, ['scheduled_at' => '2026-02-01T12:30',
             'scheduled_timezone' => 'Pacific/Auckland'])->assertRedirect();
@@ -344,6 +350,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_foreign_manager_target_denies_before_full_model_binding_and_source_mutation(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         $foreignSite = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
         $foreignCommittee = HsCommittee::create(['name' => 'Foreign private source', 'site_id' => $foreignSite->id, 'status' => 'active',
             'meeting_frequency' => 'monthly', 'established_at' => '2025-01-01', 'members' => []]);
@@ -364,6 +371,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_existing_explicit_wide_manager_without_active_hr_can_schedule_under_original_rule(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         HrEmployeeProfile::where('user_id', $this->manager->id)->delete();
         $this->post('/health-safety/worker-participation/committees/'.$this->meeting->hs_committee_id.'/meetings',
             ['scheduled_at' => '2026-02-01 00:00:00', 'attendees' => [$this->attendee->id]])->assertRedirect();
@@ -386,6 +394,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_actual_conditional_meeting_insert_refuses_late_original_site_withdrawal_and_rolls_back(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         $armed = true; $fired = false;
         DB::connection()->beforeExecuting(function (string $sql) use (&$armed, &$fired): void {
             if ($armed && preg_match('/^insert into `hs_committee_meetings`/i', ltrim($sql))) {
@@ -405,6 +414,7 @@ final class WorkerParticipationMeetingDeliveryTest extends TestCase
 
     public function test_actual_conditional_update_refuses_unrequested_source_fact_tamper_without_audit_or_intents(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the meeting delivery pipeline (WorkerParticipationMeetingCommandContext, staged delivery intents, conditional meeting writes, the meeting_update preference) was never built; meetings keep main\'s CommitteeMeetingScheduled notice.', 'build the meeting delivery pipeline.'));
         $before = $this->meeting->fresh()->getRawOriginal(); $auditCount = DB::table('audit_logs')->count(); $armed = true; $fired = false;
         DB::connection()->beforeExecuting(function (string $sql) use (&$armed, &$fired): void {
             if ($armed && preg_match('/^update `hs_committee_meetings`/i', ltrim($sql))) {

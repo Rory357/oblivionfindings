@@ -18,6 +18,7 @@ use App\Services\Tasks\Providers\HsCorrectiveActionProvider;
 use App\Services\Tasks\Providers\HsInvestigationProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Support\NotInThisBuild;
 
 class RestraintDerivedSourcePrivacyTest extends RestraintEventCommandTestCase
 {
@@ -185,6 +186,7 @@ class RestraintDerivedSourcePrivacyTest extends RestraintEventCommandTestCase
 
     public function test_cr_context_consumes_same_active_current_evidence_and_rejects_foreign_source_tuple(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Control Room source-content and Clinical restraint lens changes, which this build doesn\'t port.', 'port with the Control Room and Clinical work.'));
         $source = $this->event();
         $alert = $this->alert($source);
         $viewer = $this->staff(['restraints.view', 'clients.viewAssigned']);
@@ -200,6 +202,7 @@ class RestraintDerivedSourcePrivacyTest extends RestraintEventCommandTestCase
 
     public function test_limited_clinical_facts_and_permanent_source_entry_preserve_separate_current_authority(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Control Room source-content and Clinical restraint lens changes, which this build doesn\'t port.', 'port with the Control Room and Clinical work.'));
         $source = $this->event(['within_support_plan' => false, 'deviation_reason' => 'Actual deviation']);
         $clinical = app(ClinicalDashboardService::class);
         $denied = $this->staff(['clinical.behaviour.viewAny', 'clients.viewAny']);
@@ -227,6 +230,7 @@ class RestraintDerivedSourcePrivacyTest extends RestraintEventCommandTestCase
 
     public function test_reused_source_hr_and_site_revocation_conceal_all_derived_entries(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s Control Room source-content and Clinical restraint lens changes, which this build doesn\'t port.', 'port with the Control Room and Clinical work.'));
         $source = $this->event();
         $hs = $this->hs($source);
         $alert = $this->alert($source);
