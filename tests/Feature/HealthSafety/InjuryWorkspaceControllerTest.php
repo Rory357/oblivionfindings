@@ -25,6 +25,12 @@ class InjuryWorkspaceControllerTest extends WorkplaceInjurySourceTestCase
         Storage::fake('private');
     }
 
+    /** Real PDF bytes: fake()->create() reports a size with no content, so its stored size never matches its bytes. */
+    private function certificate(): UploadedFile
+    {
+        return UploadedFile::fake()->createWithContent('certificate.pdf', "%PDF-1.4\n% Actual certificate bytes\n");
+    }
+
     public function test_permanent_index_show_and_create_inertia_pages_retain_their_canonical_shapes(): void
     {
         $injury = $this->injury();
@@ -239,7 +245,7 @@ class InjuryWorkspaceControllerTest extends WorkplaceInjurySourceTestCase
     {
         $injury = $this->injury();
         $upload = $this->actingAs($this->manager)->postJson(route('health-safety.injuries.attachments.store', $injury),
-            [...$this->command($injury, ['kind' => 'medical_cert']), 'file' => UploadedFile::fake()->create('certificate.pdf', 10, 'application/pdf')])
+            [...$this->command($injury, ['kind' => 'medical_cert']), 'file' => $this->certificate()])
             ->assertOk()->assertJsonPath('injury_confirmation.command', 'upload_evidence');
         $attachment = WorkplaceInjuryAttachment::findOrFail($upload->json('injury_confirmation.source_id'));
         $this->get(route('health-safety.injuries.attachments.download', [$injury, $attachment]))->assertOk()
@@ -257,7 +263,7 @@ class InjuryWorkspaceControllerTest extends WorkplaceInjurySourceTestCase
     public function test_download_refuses_factual_readers_foreign_children_changed_bytes_and_revoked_medical_read(): void
     {
         $injury = $this->injury();
-        $upload = $this->recovery()->uploadEvidence($injury, $this->manager, UploadedFile::fake()->create('certificate.pdf', 10, 'application/pdf'), $this->command($injury));
+        $upload = $this->recovery()->uploadEvidence($injury, $this->manager, $this->certificate(), $this->command($injury));
         $attachment = WorkplaceInjuryAttachment::findOrFail($upload['source_id']);
         $url = route('health-safety.injuries.attachments.download', [$injury, $attachment]);
         $this->actingAs($this->factual)->get($url)->assertForbidden();

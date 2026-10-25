@@ -211,7 +211,7 @@ class InjuryRegisterPrivacyTest extends InjuryWorkspaceReadTestCase
             'ended' => $viewer->hrEmployeeProfile()->update(['end_date' => now('Pacific/Auckland')->subDay()->toDateString()]),
             'future' => $viewer->hrEmployeeProfile()->update(['start_date' => now('Pacific/Auckland')->addDay()->toDateString()]),
             'unapproved' => $viewer->update(['approved_at' => null]),
-            'external' => $viewer->update(['external_clinical_account' => true]),
+            'external' => $viewer->forceFill(['external_clinical_account' => true])->save(), // not mass-assignable on User
             'client' => $viewer->update(['role' => 'client']),
         };
         $this->denied(fn () => $this->service()->index($viewer), 403);
@@ -537,6 +537,14 @@ class InjuryRegisterPrivacyTest extends InjuryWorkspaceReadTestCase
         $after = $service->index($this->viewer);
         $this->assertNull($after['injuries']['data'][0]['capacity_count']);
         $this->assertSame('repair_required', $after['injuries']['data'][0]['private_count_integrity']['capacity_count']);
+        if ($corruption === 'missing receipt') {
+            // The fixture binds the capacity receipt to the injury's current aggregate revision, so deleting it also
+            // removes the parent's current proof: every private count of that injury is then unavailable.
+            $this->assertNull($after['injuries']['data'][0]['rtw_count']);
+            $this->assertSame('repair_required', $after['injuries']['data'][0]['private_count_integrity']['rtw_count']);
+
+            return;
+        }
         $this->assertSame(0, $after['injuries']['data'][0]['rtw_count']);
         $this->assertSame(0, $after['hero']['attention']['rtw_review_due']);
     }

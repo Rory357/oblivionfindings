@@ -121,7 +121,12 @@ class InjuryWorkspaceEntryPickerTest extends InjuryWorkspaceReadTestCase
         $this->assertSame('Private incident source title', $dto['related_incident']['title']);
         $this->assertContains($incident->id, array_column($service->captureOptions($actor, $this->site->id)['incidents'], 'id'));
         $client->update(['site_id' => Site::factory()->create(['is_active' => true])->id]);
-        $this->assertSame('restricted', $this->detail($actor)['connections']['incident']['access']);
+        // Moving the Client also splits the incident's own Site from its Client's, so the connection is
+        // 'unavailable' (provenance no longer converges), never readable and with no identity.
+        $moved = $this->detail($actor);
+        $this->assertSame('unavailable', $moved['connections']['incident']['access']);
+        $this->assertNull($moved['connections']['incident']['id']);
+        $this->assertStringNotContainsString('Private incident source title', json_encode($moved));
         $this->assertSame([], $service->captureOptions($actor, $this->site->id)['incidents']);
     }
 

@@ -121,7 +121,7 @@ class InjurySourceProjectionPrivacyTest extends InjuryWorkspaceReadTestCase
             'ended' => $viewer->hrEmployeeProfile()->update(['end_date' => now('Pacific/Auckland')->subDay()->toDateString()]),
             'future' => $viewer->hrEmployeeProfile()->update(['start_date' => now('Pacific/Auckland')->addDay()->toDateString()]),
             'unapproved' => $viewer->update(['approved_at' => null]),
-            'external' => $viewer->update(['external_clinical_account' => true]),
+            'external' => $viewer->forceFill(['external_clinical_account' => true])->save(), // not mass-assignable on User
             'client' => $viewer->update(['role' => 'client']),
         };
         $this->assertSame([], (new WorkplaceInjuryProvider)->authorizedTasks($viewer));

@@ -424,7 +424,8 @@ class InjuryDerivedWorkspacePrivacyTest extends InjuryWorkspaceReadTestCase
             $investigation = $this->investigation($event, $marker);
             $investigation->updateQuietly(['status' => HsInvestigation::STATUS_COMPLETED, 'completed_at' => now()]);
             $this->action($event);
-            $this->risk(['hs_event_id' => $event->id, 'assessable_type' => Site::class, 'assessable_id' => $this->site->id, 'risk_description' => $marker]);
+            // The register report lists each assessment's title (not its description), so the marker is the title.
+            $this->risk(['hs_event_id' => $event->id, 'assessable_type' => Site::class, 'assessable_id' => $this->site->id, 'risk_description' => $marker, 'title' => $marker]);
         }
         DB::table('workplace_injuries')->where('id', $injury->id)->update(['source_revision' => 99]);
         $this->getJson(route('health-safety.reports.board-summary'))->assertOk()

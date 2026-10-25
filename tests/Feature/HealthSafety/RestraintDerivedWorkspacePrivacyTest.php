@@ -677,7 +677,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
                 ->where('detail.can.close', true)->where('detail.can.request_closure_exception', true)
                 ->where('detail.can.approve_closure_exception', true)
                 ->where('detail.handover.can_accept', true)
-                ->where('detail.handover.next_action.label', 'Accept this H&S handover')
+                ->where('detail.handover_summary.next_action.label', 'Accept this H&S handover')
                 ->where('detail.assignable_staff', fn ($staff): bool => collect($staff)->contains('id', $viewer->id)));
         }
         $viewer->load('permissionOverrides', 'roles.permissions', 'hrEmployeeProfile');
@@ -692,7 +692,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
                 ->where('detail.can.approve_closure_exception', true)
                 ->where('detail.can.manage_corrective_action_lifecycle', false)
                 ->where('detail.can.verify_corrective_actions', false)
-                ->where('detail.handover.can_accept', false)->where('detail.handover.next_action', null)
+                ->where('detail.handover.can_accept', false)->where('detail.handover_summary.next_action', null)
                 ->where('detail.assignable_staff', [])->where('detail.action_handover.eligible_owners', []));
         }
         foreach (['healthSafety.events.close', 'healthSafety.closureExceptions.request', 'healthSafety.closureExceptions.approve'] as $key) {
@@ -939,7 +939,7 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
         $this->withoutMiddleware(HandleInertiaRequests::class);
         [$viewer, $incident, $event, $localOwner] = $this->ownerChoiceFixture();
         $otherSite = Site::factory()->create(['is_active' => true]);
-        $foreignOwner = $this->staff(['hazards.manage'], $otherSite);
+        $foreignOwner = $this->staff(['hazards.view', 'hazards.manage'], $otherSite);
         $this->assertOwnerEntryParity($viewer, $incident, $event, $localOwner, true);
         $this->assertOwnerEntryParity($viewer, $incident, $event, $foreignOwner, false);
         $this->grant($viewer, 'healthSafety.viewAllSites');
@@ -967,7 +967,8 @@ class RestraintDerivedWorkspacePrivacyTest extends RestraintEventCommandTestCase
             Permission::where('key', 'incidents.viewAny')->sole()->id => ['allowed' => false],
         ]);
         $this->client->supportWorkers()->attach($viewer->id);
-        $owner = $this->staff(['hazards.manage']);
+        // Handover and action owners must be able to open the event (decision 9), so they hold H&S read too.
+        $owner = $this->staff(['hazards.view', 'hazards.manage']);
         $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create([
             'site_id' => $this->site->id, 'client_id' => $this->client->id, 'reported_by' => $viewer->id,
             'hs_event_id' => null, 'control_room_alert_id' => null,

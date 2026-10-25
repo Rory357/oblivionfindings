@@ -50,7 +50,8 @@ final class InjuryMetricSourceReadTest extends WorkplaceInjurySourceTestCase
         $this->assertSame('unknown', $values['source_completeness']);
         $this->assertSame(100.0, $this->kpi()->ltifr(siteId: $this->site->id, viewer: $this->factual));
         $this->assertSame(500.0, $this->kpi()->injurySeverityRate(siteId: $this->site->id, viewer: $this->factual));
-        $this->assertSame(2, $this->kpi()->daysSinceLostTimeInjury($this->site->id, $this->factual));
+        // 2026-10-10 12:00Z to the frozen 2026-10-12 01:00Z is 37 hours: one whole day (main's whole-day count, UTC app clock).
+        $this->assertSame(1, $this->kpi()->daysSinceLostTimeInjury($this->site->id, $this->factual));
         $this->assertStringNotContainsString('Private', json_encode($values, JSON_THROW_ON_ERROR));
     }
 

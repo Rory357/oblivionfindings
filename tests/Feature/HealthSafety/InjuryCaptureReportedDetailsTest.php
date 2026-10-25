@@ -53,7 +53,8 @@ class InjuryCaptureReportedDetailsTest extends WorkplaceInjurySourceTestCase
         $this->assertTrue($service->captureOptions($this->capturer, $this->site->id)['can']['record_reported_details']);
         $other = Site::factory()->create(['is_active' => true]);
         $this->capturer->hrEmployeeProfile()->update(['primary_site_id' => $other->id, 'secondary_site_ids' => []]);
-        $this->denial(fn () => $this->source()->create($this->capturer, $this->createPayload()));
+        // A Site outside the capturer's current Sites is out of scope (404); a missing grant is 403.
+        $this->denial(fn () => $this->source()->create($this->capturer, $this->createPayload()), 404);
         $this->capturer->hrEmployeeProfile()->update(['primary_site_id' => $this->site->id]);
         $this->worker->hrEmployeeProfile()->update(['is_active' => false]);
         $this->denial(fn () => $this->source()->create($this->capturer, $this->createPayload()));
@@ -68,7 +69,7 @@ class InjuryCaptureReportedDetailsTest extends WorkplaceInjurySourceTestCase
         $receipt = $this->source()->update($row, $this->manager, $this->command($row, ['notes' => 'Authorised current medical edit']));
         $this->assertTrue($receipt['accepted']);
         $this->assertSame('Authorised current medical edit', $row->fresh()->notes);
-        $this->invalid(fn () => $this->source()->create($this->capturer,
+        $this->validation(fn () => $this->source()->create($this->capturer,
             $this->createPayload(['record_reported_details' => true])), 'command');
         $this->assertDatabaseCount('workplace_injuries', 1);
         $this->assertDatabaseCount('workplace_injury_command_receipts', 2);
