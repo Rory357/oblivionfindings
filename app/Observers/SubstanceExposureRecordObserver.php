@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Log;
  */
 final class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCommit
 {
+    private const SEVERITY_RANK = [HsEvent::SEVERITY_LOW => 0, HsEvent::SEVERITY_MEDIUM => 1, HsEvent::SEVERITY_HIGH => 2, HsEvent::SEVERITY_CRITICAL => 3];
+
     public function __construct(
         private readonly ChemicalExposureDeliveryService $delivery,
         private readonly HsEventService $hsEventService,
@@ -34,6 +36,42 @@ final class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCo
     public function updated(SubstanceExposureRecord $source): void
     {
         $this->delivery->sourceCommitted($source);
+        $this->raiseHsEventSeverity($source);
+    }
+
+    /**
+     * Interim until the delivery pipeline is finished (job 3): a corrected exposure (say, treatment none → hospitalisation)
+     * raises its open H&S event's severity, and a material escalation marks an investigation required. Severity is never
+     * lowered, the WorkSafe decision is never touched, and a closed event is left as recorded (logged for review).
+     */
+    private function raiseHsEventSeverity(SubstanceExposureRecord $record): void
+    {
+        try {
+            $event = HsEvent::query()
+                ->where('idempotency_key', HsEvent::buildIdempotencyKey(SubstanceExposureRecord::class, $record->getKey(), HsEvent::CATEGORY_EXPOSURE))
+                ->first();
+            if ($event === null) {
+                return;
+            }
+            $severity = $this->severityFor($record);
+            if ((self::SEVERITY_RANK[$severity] ?? 0) <= (self::SEVERITY_RANK[$event->severity] ?? 0)) {
+                return;
+            }
+            if ($event->status === HsEvent::STATUS_CLOSED) {
+                Log::warning('SubstanceExposureRecordObserver: corrected exposure would raise a closed H&S event', [
+                    'substance_exposure_record_id' => $record->id, 'hs_event_id' => $event->id,
+                    'from' => $event->severity, 'to' => $severity,
+                ]);
+
+                return;
+            }
+            $this->hsEventService->syncSeverity($event, $severity);
+        } catch (\Throwable $e) {
+            Log::error('SubstanceExposureRecordObserver: HsEvent severity raise failed', [
+                'substance_exposure_record_id' => $record->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /** Main's exposure H&S event: same source, severity and preliminary WorkSafe trigger. */

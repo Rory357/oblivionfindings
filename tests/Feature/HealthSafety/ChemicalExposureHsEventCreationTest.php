@@ -130,6 +130,55 @@ class ChemicalExposureHsEventCreationTest extends TestCase
         $this->assertStringNotContainsString('hospitalisation', $stored);
     }
 
+    private function exposureWithTreatment(string $treatment): array
+    {
+        $substance = HazardousSubstance::factory()->create();
+        $record = SubstanceExposureRecord::factory()->create(['hazardous_substance_id' => $substance->id,
+            'medical_treatment' => $treatment, 'medical_attention_sought' => $treatment !== 'none']);
+        $event = HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->sole();
+
+        return [$record, $event];
+    }
+
+    /** Interim until job 3: a corrected exposure raises its open H&S event, never lowers it, and leaves a closed one. */
+    public function test_corrected_treatment_raises_the_open_event_and_marks_investigation_required(): void
+    {
+        [$record, $event] = $this->exposureWithTreatment('none');
+        $this->assertSame(HsEvent::SEVERITY_LOW, $event->severity);
+        $this->assertFalse((bool) $event->investigation_required);
+
+        $record->update(['medical_treatment' => 'hospitalisation', 'medical_attention_sought' => true]);
+
+        $event->refresh();
+        $this->assertSame(HsEvent::SEVERITY_HIGH, $event->severity);
+        $this->assertTrue((bool) $event->investigation_required);
+        $this->assertNull($event->worksafe_notifiable);
+        $this->assertSame(1, HsEvent::where('source_type', SubstanceExposureRecord::class)->where('source_id', $record->id)->count());
+    }
+
+    public function test_corrected_treatment_never_lowers_the_event(): void
+    {
+        [$record, $event] = $this->exposureWithTreatment('hospitalisation');
+        $record->update(['medical_treatment' => 'first_aid']);
+
+        $this->assertSame(HsEvent::SEVERITY_HIGH, $event->fresh()->severity);
+        $this->assertTrue((bool) $event->fresh()->investigation_required);
+    }
+
+    public function test_corrected_treatment_leaves_a_closed_event_as_recorded(): void
+    {
+        [$record, $event] = $this->exposureWithTreatment('none');
+        // Fixture only: the closure guard trigger admits this one close, as HsEventClosureService does.
+        DB::statement('SET @hs_canonical_close_event_id = '.(int) $event->id);
+        try { $event->forceFill(['status' => HsEvent::STATUS_CLOSED])->saveQuietly(); }
+        finally { DB::statement('SET @hs_canonical_close_event_id = NULL'); }
+
+        $record->update(['medical_treatment' => 'hospitalisation', 'medical_attention_sought' => true]);
+
+        $this->assertSame(HsEvent::SEVERITY_LOW, $event->fresh()->severity);
+        $this->assertSame(HsEvent::STATUS_CLOSED, $event->fresh()->status);
+    }
+
     public function test_exposure_observer_leaves_reduced_medical_treatment_input_undecided(): void
     {
         $substance = HazardousSubstance::factory()->create();
