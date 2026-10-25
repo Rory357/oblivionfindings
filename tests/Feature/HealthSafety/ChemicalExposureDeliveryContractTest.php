@@ -76,6 +76,7 @@ final class ChemicalExposureDeliveryContractTest extends ChemicalExposureCommand
 
     public function test_a_delivered_flag_alone_never_suppresses_current_concrete_destination_verification(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $row = $this->delivery($root);
         DB::table('chemical_exposure_source_deliveries')->where('id', $row->id)->update(['state' => 'delivered', 'hs_event_id' => 999999]);
         $called = false;

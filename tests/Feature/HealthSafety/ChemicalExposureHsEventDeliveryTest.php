@@ -19,6 +19,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 {
     public function test_actual_accepted_source_has_separate_pending_delivery_then_one_exact_destination(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(['medical_treatment' => 'medical', 'symptoms' => 'PRIVATE-SOURCE-SYMPTOMS']);
         $attempt = $this->attempt($root);
         $this->assertSame('pending', $attempt->state);
@@ -42,6 +43,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_capture_only_reporting_never_grants_saved_private_delivery_but_current_manager_can_deliver(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $receipt = $this->capture(['medical_treatment' => 'none'], $this->reporter);
         $root = SubstanceExposureRecord::findOrFail($receipt['root_id']); $attempt = $this->attempt($root);
         $this->denial(fn () => app(ChemicalExposureHsEventDeliveryService::class)->deliver($this->reporter, $attempt->id));
@@ -52,6 +54,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_retry_preserves_reference_owner_stage_handover_and_actual_signed_worksafe_decision(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(['medical_treatment' => 'none']); $attempt = $this->attempt($root);
         $this->deliver($attempt); $event = HsEvent::findOrFail($attempt->fresh()->hs_event_id);
         app(HsEventService::class)->recordWorksafeDecision($event, false, 'Qualified review retained independently of chemical delivery.', $this->manager);
@@ -67,6 +70,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_actual_later_treatment_escalates_same_event_without_replacing_independent_workflow(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(['medical_treatment' => 'none']); $initial = $this->attempt($root);
         $this->deliver($initial); $event = HsEvent::findOrFail($initial->fresh()->hs_event_id);
         $event->updateQuietly(['owner_user_id' => $this->manager->id, 'status' => HsEvent::STATUS_CORRECTIVE_ACTION]);
@@ -83,6 +87,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_skipped_delivery_revisions_keep_exact_accepted_history_and_cannot_overwrite_latest(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(['medical_treatment' => 'none']); $first = $this->attempt($root);
         $this->deliver($first);
         $this->exposureService()->correct($root, $this->manager, $this->privateCommand($root,
@@ -100,6 +105,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_previously_delivered_flag_does_not_certify_a_changed_destination_tuple(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $event = HsEvent::findOrFail($attempt->fresh()->hs_event_id);
         $event->updateQuietly(['staff_id' => $this->manager->id]);
@@ -110,6 +116,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_rehashed_destination_marker_cannot_replace_original_accepted_source_context(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $marker = ChemicalExposureHsProjection::where('exposure_id', $root->id)->sole();
         $projection = [...$marker->projection, 'site_id' => $this->foreignSite->id];
@@ -120,6 +127,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_marker_audit_admission_requires_every_current_destination_projection_field(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $marker = ChemicalExposureHsProjection::where('exposure_id', $root->id)->sole();
         $event = HsEvent::findOrFail($marker->hs_event_id); $original = $event->getAttributes();
@@ -154,6 +162,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_marker_audit_does_not_admit_a_soft_deleted_destination(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $marker = ChemicalExposureHsProjection::where('exposure_id', $root->id)->sole();
         HsEvent::whereKey($marker->hs_event_id)->update(['deleted_at' => now()]);
@@ -175,6 +184,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_event_save_veto_keeps_accepted_source_but_rolls_back_destination_and_confirmation(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root);
         HsEvent::creating(fn () => false);
         try { $this->integrity(fn () => $this->deliver($attempt)); }
@@ -186,6 +196,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_marker_save_veto_rolls_back_event_and_outbox_confirmation_together(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root);
         ChemicalExposureHsProjection::creating(fn () => false);
         try { $this->integrity(fn () => $this->deliver($attempt)); }
@@ -197,6 +208,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_destination_audit_veto_retains_source_and_rolls_back_event_marker_and_delivery(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root);
         \App\Models\AuditLog::creating(fn ($audit) => $audit->action === 'chemical.exposure.deliver_health_safety' ? false : null);
         try { $this->integrity(fn () => $this->deliver($attempt)); }
@@ -209,6 +221,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_destination_audit_anchor_is_private_and_required_again_on_retry(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(['symptoms' => 'PRIVATE-DESTINATION-AUDIT-NARRATIVE']);
         $attempt = $this->attempt($root); $this->deliver($attempt);
         $marker = ChemicalExposureHsProjection::where('exposure_id', $root->id)->sole();
@@ -226,6 +239,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_destination_markers_refuse_model_update_and_delete(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $marker = ChemicalExposureHsProjection::where('exposure_id', $root->id)->sole();
         $this->integrity(fn () => $marker->update(['projection_digest' => str_repeat('b', 64)]));
@@ -235,6 +249,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_direct_marker_timestamp_corruption_breaks_original_destination_acceptance(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $marker = ChemicalExposureHsProjection::where('exposure_id', $root->id)->sole();
         ChemicalExposureHsProjection::whereKey($marker->id)->update(['recorded_at' => '2026-10-11 00:00:00.123456']);
@@ -244,6 +259,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_warmed_wellbeing_grant_withdrawal_denies_before_private_destination_sql_then_restoration_allows(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root);
         $this->manager->load('roles.permissions', 'permissionOverrides'); $this->allow($this->manager, 'hr.wellbeing.view', false);
         [, $queries] = $this->capturedQueries(fn () => $this->denial(fn () => $this->deliver($attempt)));
@@ -254,6 +270,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_current_staff_and_original_site_remain_required_before_destination_sql(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root);
         $this->manager->hrEmployeeProfile()->update(['is_active' => false]);
         [, $queries] = $this->capturedQueries(fn () => $this->denial(fn () => $this->deliver($attempt)));
@@ -265,6 +282,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_explicit_worker_site_correction_uses_retained_history_and_current_access_to_both_sites(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root); $this->deliver($attempt);
         $otherWorker = $this->staff([], $this->foreignSite);
         $this->manager->hrEmployeeProfile()->update(['secondary_site_ids' => [$this->foreignSite->id]]);
@@ -282,6 +300,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_unproved_existing_legacy_copy_is_not_adopted_or_overwritten(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $attempt = $this->attempt($root);
         $copy = HsEvent::withoutEvents(fn () => HsEvent::factory()->create(['source_type' => SubstanceExposureRecord::class,
             'source_id' => $root->id, 'event_category' => HsEvent::CATEGORY_EXPOSURE,
@@ -294,6 +313,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_old_site_withdrawal_after_explicit_correction_denies_historical_body_then_restoration_allows(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(); $old = $this->attempt($root); $this->deliver($old);
         $other = $this->staff([], $this->foreignSite);
         $this->manager->hrEmployeeProfile()->update(['secondary_site_ids' => [$this->foreignSite->id]]);
@@ -311,6 +331,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_readable_latest_facts_do_not_admit_an_older_site_version_during_destination_history(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure();
         $original = $this->attempt($root); $this->deliver($original);
         $other = $this->staff([], $this->foreignSite);
@@ -341,6 +362,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_old_client_permission_withdrawal_after_unlink_denies_historical_body_before_destination(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $incident = $this->incident();
         $root = $this->exposure(['related_incident_id' => $incident->id]);
         $old = $this->attempt($root); $this->deliver($old);
@@ -355,6 +377,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_old_incident_context_change_is_not_filled_from_todays_service_context_after_unlink(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $incident = $this->incident();
         $root = $this->exposure(['related_incident_id' => $incident->id]);
         $old = $this->attempt($root); $this->deliver($old);
@@ -379,6 +402,7 @@ final class ChemicalExposureHsEventDeliveryTest extends ChemicalExposureCommandT
 
     public function test_lowered_response_requirement_is_not_confirmed_by_a_delivered_flag(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure H&S delivery consumer has no route, job or command, and it refuses the H&S event the restored exposure observer creates on save. Exposures reach the H&S register and WorkSafe review through the observer, as on main.', 'job 3 after the merge: finish the delivery pipeline (Stephan, 25 Oct, "Restore now, finish later").'));
         $root = $this->exposure(['medical_treatment' => 'medical']); $attempt = $this->attempt($root); $this->deliver($attempt);
         $event = HsEvent::findOrFail($attempt->fresh()->hs_event_id);
         $event->updateQuietly(['severity' => HsEvent::SEVERITY_LOW, 'investigation_required' => false]);

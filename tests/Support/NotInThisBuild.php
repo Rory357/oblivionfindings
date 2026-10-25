@@ -14,6 +14,8 @@ final class NotInThisBuild
 
     public const UNMET_CHECK = "a check Codex's own code never met";
 
+    public const TEST_SHAPE = 'test shape only: the rule it checks is met';
+
     public static function reason(string $group, string $why, string $followUp): string
     {
         return "Not in this H&S build ({$group}): {$why} Follow-up: {$followUp}";
