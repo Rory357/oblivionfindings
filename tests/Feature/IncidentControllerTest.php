@@ -248,7 +248,8 @@ class IncidentControllerTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['incidents.create'], $healthSafetyIncidentKeys);
+        // Stephan, 25 Oct (decision 8): H&S officers also read incidents, still limited by Site and privacy rules.
+        $this->assertSame(['incidents.create', 'incidents.viewAny'], $healthSafetyIncidentKeys);
 
         $coordinator = Role::query()->where('name', 'coordinator')->firstOrFail();
         $this->assertTrue($coordinator->permissions()->where('key', 'controlRoom.alerts.create')->exists());
@@ -306,12 +307,12 @@ class IncidentControllerTest extends TestCase
             'updated_by' => $this->admin->id,
         ]);
 
+        // The overview's client picker lists names only to viewers with client read (Codex's privacy rule, kept);
+        // the H&S officer role has none, so the picker is empty and no client name is sent.
         $this->actingAs($officer)
             ->get(route('health-safety.dashboard'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('clients', 1)
-                ->where('clients.0.id', $this->client->id));
+            ->assertInertia(fn ($page) => $page->has('clients', 0));
 
         $this->actingAs($officer)
             ->post('/incidents', $this->reportPayload(['client_id' => $remoteClient->id]))
@@ -339,7 +340,11 @@ class IncidentControllerTest extends TestCase
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
-        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        $officerRole = Role::where('name', 'health_safety_officer')->firstOrFail();
+        $officer->roles()->attach($officerRole);
+        // The officer role reads incidents since decision 8 (25 Oct); this keeps testing that the create permission
+        // alone never widens incident visibility.
+        $officerRole->permissions()->detach($officerRole->permissions()->where('key', 'incidents.viewAny')->firstOrFail());
 
         $this->actingAs($officer)->get('/incidents')->assertForbidden();
         $this->actingAs($officer)->get("/incidents/{$localIncident->id}")->assertForbidden();

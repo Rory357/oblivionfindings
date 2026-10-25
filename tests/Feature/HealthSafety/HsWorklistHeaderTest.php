@@ -13,6 +13,7 @@ use App\Models\Site;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -33,13 +34,19 @@ class HsWorklistHeaderTest extends TestCase
     private function event(Site $site, array $attributes = []): HsEvent
     {
         $client = Client::factory()->create(['site_id' => $site->id]);
-        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create(['client_id' => $client->id, 'site_id' => $site->id]));
+        // A submitted incident and its canonical H&S event (key, category and direct link as the incident journey
+        // records them), so the event shows to H&S at the Site without incident read (decision 9).
+        $incident = ClientIncident::withoutEvents(fn () => ClientIncident::factory()->submitted()->create(['client_id' => $client->id, 'site_id' => $site->id, 'type' => 'injury']));
 
-        return HsEvent::factory()->create([
+        $event = HsEvent::factory()->create([
             'site_id' => $site->id, 'client_id' => $client->id, 'source_type' => ClientIncident::class, 'source_id' => $incident->id,
             'severity' => 'high', 'event_category' => 'incident', 'status' => 'open', 'investigation_required' => true,
-            'occurred_at' => '2026-10-06 12:00:00', ...$attributes,
+            'occurred_at' => '2026-10-06 12:00:00',
+            'idempotency_key' => HsEvent::buildIdempotencyKey(ClientIncident::class, $incident->id, HsEvent::CATEGORY_INCIDENT), ...$attributes,
         ]);
+        DB::table('client_incidents')->where('id', $incident->id)->update(['hs_event_id' => $event->id]);
+
+        return $event;
     }
 
     public function test_review_attention_worklists_match_filtered_counts_and_preserve_site_authority(): void
