@@ -94,7 +94,8 @@ final class BehaviourSupportPlanWorkspaceHttpTest extends BehaviourSupportPlanTe
         $this->getJson($this->url($plan).'/approval')->assertForbidden();
         $input['idempotency_key'] = (string) Str::uuid();
         $response = $this->post(RestraintReturn::REGISTER.'/plans', $input)->assertRedirect()->assertSessionHas('behaviour_support_plan_confirmation.accepted', true);
-        $this->assertStringStartsWith(RestraintReturn::REGISTER.'/report?kind=plan&return_to=', $response->headers->get('Location'));
+        // redirect() makes the relative fallback absolute.
+        $this->assertStringStartsWith(url(RestraintReturn::REGISTER.'/report?kind=plan&return_to='), $response->headers->get('Location'));
         $this->assertStringNotContainsString($input['idempotency_key'], $response->headers->get('Location'));
     }
 
@@ -254,7 +255,8 @@ final class BehaviourSupportPlanWorkspaceHttpTest extends BehaviourSupportPlanTe
         Storage::disk('private')->delete('client_documents/decision.pdf');
         $this->getJson($this->url($plan).'/approval?approval='.$row->id)->assertOk()->assertJsonPath('detail.selected_approval.evidence.0.availability', 'unavailable')->assertJsonPath('detail.selected_approval.evidence.0.href', null);
         $this->grant($this->planSpecialist, 'restraints.view');
-        $this->getJson($this->url($plan))->assertOk()->assertJsonPath('detail.approvals.0.basis', null)->assertJsonPath('detail.approvals.0.evidence', []);
+        // A real request loads the user fresh; the test's reused actor still holds its first request's grants.
+        $this->actingAs($this->planSpecialist->fresh())->getJson($this->url($plan))->assertOk()->assertJsonPath('detail.approvals.0.basis', null)->assertJsonPath('detail.approvals.0.evidence', []);
     }
 
     public function test_event_evidence_requires_its_current_independent_event_read(): void
@@ -308,7 +310,7 @@ final class BehaviourSupportPlanWorkspaceHttpTest extends BehaviourSupportPlanTe
             $this->assertNotContains($hidden, array_column($json['internal_approvers'], 'id'));
         }
         $this->grant($this->planSpecialist, 'restraints.view');
-        $this->getJson($this->url($plan))->assertOk()->assertJsonPath('detail.approval_options', null);
+        $this->actingAs($this->planSpecialist->fresh())->getJson($this->url($plan))->assertOk()->assertJsonPath('detail.approval_options', null);
         $this->policy()->save($this->manager, $this->payload('authorised_reviewer'));
         $this->actingAs($this->planReviewer)->getJson($this->url($plan).'/approval')->assertOk()->assertJsonPath('detail.approval_options.internal_approvers', [['id' => $this->planReviewer->id, 'name' => $this->planReviewer->name]])->assertJsonPath('detail.approval_options.credentials', []);
     }

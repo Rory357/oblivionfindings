@@ -239,7 +239,8 @@ final class ChemicalCatalogueStoragePrivacyTest extends TestCase
         HrEmployeeProfile::where('user_id', $this->viewer->id)->update(['is_active' => true]);
         $this->viewer->update(['approved_at' => null]);
         $this->denied(fn () => $this->read()->index($this->viewer));
-        $this->viewer->update(['approved_at' => now(), 'external_clinical_account' => true]);
+        // The external flag is not mass assignable, so update() would silently drop it and test nothing.
+        $this->viewer->forceFill(['approved_at' => now(), 'external_clinical_account' => true])->save();
         $this->denied(fn () => $this->read()->index($this->viewer));
     }
 

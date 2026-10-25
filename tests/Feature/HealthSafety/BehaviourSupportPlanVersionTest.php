@@ -49,12 +49,14 @@ final class BehaviourSupportPlanVersionTest extends BehaviourSupportPlanTestCase
         $this->assertSame($candidate->content_digest, $published->content_digest);
         $this->assertNull($candidate->approval_id);
         $this->assertSame($receipt['approval_id'], $published->approval_id);
+        // Keep the stored digest: the refused update below still dirties $candidate in memory on the first pass.
+        $digest = $candidate->content_digest;
         foreach ([$candidate, $published] as $version) {
             try {
                 $version->update(['content_digest' => str_repeat('0', 64)]);
                 $this->fail('Immutable content must not change.');
             } catch (LogicException) {
-                $this->assertSame($candidate->content_digest, $version->fresh()->content_digest);
+                $this->assertSame($digest, $version->fresh()->content_digest);
             }
         }
     }

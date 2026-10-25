@@ -12,6 +12,7 @@ use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\NotInThisBuild;
 use Tests\TestCase;
 
 /** Prospective whole HTTP acceptance for the UNAPPLIED Fleet extraction; all checks UNRUN. */
@@ -62,6 +63,7 @@ final class FleetIncidentCurrentReadHttpTest extends TestCase
 
     public function test_actual_register_counts_csv_and_filters_use_exact_rolling_interval(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'The Fleet register (main\'s IncidentController, unchanged here) has no occurred_from/occurred_to window; it exists only in Codex\'s unapplied FleetIncidentReadScope extraction. The foreign-Site row is already withheld.', 'apply the Fleet register extraction.'));
         $lower = $this->incident($this->asset, '2026-10-11 01:00:00', ['description' => 'Lower endpoint admitted']);
         $inside = $this->incident($this->asset, '2026-10-12 00:59:59', ['description' => 'Inside interval admitted']);
         $this->incident($this->asset, '2026-10-11 00:59:59', ['description' => 'Earlier occurrence withheld']);
@@ -99,6 +101,7 @@ final class FleetIncidentCurrentReadHttpTest extends TestCase
 
     public function test_actual_route_refuses_invalid_missing_duplicate_shape_or_reversed_window(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'The Fleet register ignores the occurred_* parameters, as on main; their validation exists only in Codex\'s unapplied FleetIncidentReadScope extraction.', 'apply the Fleet register extraction.'));
         foreach ([['occurred_from' => '2026-10-11 01:00:00', 'occurred_to' => self::WINDOW['occurred_to']],
             ['occurred_from' => self::WINDOW['occurred_from']], ['occurred_from' => [self::WINDOW['occurred_from']], 'occurred_to' => self::WINDOW['occurred_to']],
             ['occurred_from' => self::WINDOW['occurred_to'], 'occurred_to' => self::WINDOW['occurred_from']]] as $bad) {
@@ -115,8 +118,9 @@ final class FleetIncidentCurrentReadHttpTest extends TestCase
         $this->actingAs($this->viewer)->get($this->indexUrl(['incident' => $row->id]))->assertOk()->assertInertia(fn (Assert $page) => $page->where('detail', null));
         $this->asset->update(['site_id' => $this->site->id]);
         $this->actingAs($this->viewer)->get('/fleet-assets/incidents/'.$row->id)->assertRedirect(route('fleet-assets.incidents.index', ['incident' => $row->id]));
-        $this->site->update(['is_active' => false]); $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/'.$row->id)->assertNotFound();
-        $this->site->update(['is_active' => true]); $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/'.$row->id)->assertOk();
+        // A real request loads the user fresh; the reused object keeps its first Site list (UserSiteAccessService keys its cache on the object).
+        $this->site->update(['is_active' => false]); $this->actingAs($this->viewer->fresh())->getJson('/fleet-assets/incidents/'.$row->id)->assertNotFound();
+        $this->site->update(['is_active' => true]); $this->actingAs($this->viewer->fresh())->getJson('/fleet-assets/incidents/'.$row->id)->assertOk();
     }
 
     public function test_actual_read_permission_and_display_flags_withdraw_restore_without_action_grant_fallback(): void
@@ -126,10 +130,11 @@ final class FleetIncidentCurrentReadHttpTest extends TestCase
         $url = '/fleet-assets/incidents/'.$row->id;
         $this->actingAs($this->viewer)->getJson($url)->assertOk()->assertJsonPath('incident.can.manage', true)->assertJsonPath('incident.can.view_hr_assets', true);
         $this->grant('fleet.incidents.manage', false); $this->grant('hr.assets.view', false);
-        $this->actingAs($this->viewer)->getJson($url)->assertOk()->assertJsonPath('incident.can.manage', false)->assertJsonPath('incident.can.view_hr_assets', false);
+        // Each later request acts as a freshly loaded user, as a real request does.
+        $this->actingAs($this->viewer->fresh())->getJson($url)->assertOk()->assertJsonPath('incident.can.manage', false)->assertJsonPath('incident.can.view_hr_assets', false);
         $this->grant('fleet.viewAny', false); $this->grant('assets.viewAny', false); $this->grant('fleet.incidents.manage');
-        $this->actingAs($this->viewer)->getJson($url)->assertForbidden();
-        $this->grant('assets.viewAny'); $this->actingAs($this->viewer)->getJson($url)->assertOk();
+        $this->actingAs($this->viewer->fresh())->getJson($url)->assertForbidden();
+        $this->grant('assets.viewAny'); $this->actingAs($this->viewer->fresh())->getJson($url)->assertOk();
     }
 
     public function test_exact_foreign_filter_and_hs_bypass_do_not_become_fleet_authority(): void
@@ -138,7 +143,7 @@ final class FleetIncidentCurrentReadHttpTest extends TestCase
         $this->actingAs($this->viewer)->get($this->indexUrl(['site_id' => $this->foreignSite->id]))->assertNotFound();
         $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/'.$row->id)->assertNotFound();
         $this->grant('fleet.manage');
-        $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/'.$row->id)->assertOk();
+        $this->actingAs($this->viewer->fresh())->getJson('/fleet-assets/incidents/'.$row->id)->assertOk();
     }
 
     public function test_actual_search_picker_retains_scalar_shape_and_excludes_foreign_or_inactive_people(): void
@@ -146,17 +151,19 @@ final class FleetIncidentCurrentReadHttpTest extends TestCase
         $local = $this->staff($this->site, 'Fleet picker driver'); $this->staff($this->foreignSite, 'Fleet picker foreign');
         $inactive = $this->staff($this->site, 'Fleet picker inactive'); HrEmployeeProfile::where('user_id', $inactive->id)->update(['is_active' => false]);
         $users = $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/options/search?type=users&q=Fleet%20picker')->assertOk()->json('results');
-        $this->assertSame([['id' => $local->id, 'name' => 'Fleet picker driver']], $users);
+        // Rows also carry User's appended avatar fields; the people listed are what this checks.
+        $this->assertSame([['id' => $local->id, 'name' => 'Fleet picker driver']], array_map(fn (array $user): array => ['id' => $user['id'], 'name' => $user['name']], $users));
         $assets = $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/options/search?type=assets&q=Fleet')->assertOk()->json('results');
         $this->assertSame([$this->asset->id], array_column($assets, 'id'));
         $this->assertSame(['id', 'name', 'registration_number', 'category'], array_keys($assets[0]));
         HrEmployeeProfile::where('user_id', $this->viewer->id)->update(['primary_site_id' => $this->foreignSite->id]);
-        $this->actingAs($this->viewer)->getJson('/fleet-assets/incidents/options/search?type=users&q=Fleet%20picker')->assertOk()->assertJsonPath('results.0.name', 'Fleet picker foreign');
+        $this->actingAs($this->viewer->fresh())->getJson('/fleet-assets/incidents/options/search?type=users&q=Fleet%20picker')->assertOk()->assertJsonPath('results.0.name', 'Fleet picker foreign');
     }
 
     public function test_actual_csv_preserves_all_columns_and_existing_formula_injection_guard(): void
     {
-        $this->incident($this->asset, '2026-10-11 12:00:00', ['description' => '=2+2']);
+        // Pinned: Faker addresses can contain a line break, and this test splits the CSV on new lines.
+        $this->incident($this->asset, '2026-10-11 12:00:00', ['description' => '=2+2', 'location' => 'Depot yard']);
         $csv = $this->actingAs($this->viewer)->get($this->indexUrl([...self::WINDOW, 'export' => 'csv']))->assertOk()->streamedContent();
         $lines = array_values(array_filter(explode("\n", trim($csv))));
         $header = str_getcsv($lines[0]); $row = str_getcsv($lines[1]);

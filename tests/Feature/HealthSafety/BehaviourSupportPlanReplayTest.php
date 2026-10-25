@@ -40,7 +40,9 @@ final class BehaviourSupportPlanReplayTest extends BehaviourSupportPlanTestCase
     {
         $plan = $this->makePlan();
         $key = (string) Str::uuid();
-        RestraintCommandReceipt::create(['source_type' => 'event', 'source_id' => 999, 'user_id' => $this->planManager->id, 'command' => 'review', 'idempotency_key' => $key, 'fingerprint' => str_repeat('a', 64), 'audit_log_id' => null, 'accepted_result' => ['accepted' => true], 'created_at' => now()]);
+        // audit_log_id is NOT NULL with a foreign key, so the event receipt needs a real audit row.
+        $audit = AuditLog::create(['user_id' => $this->planManager->id, 'action' => 'restraint_event.review']);
+        RestraintCommandReceipt::create(['source_type' => 'event', 'source_id' => 999, 'user_id' => $this->planManager->id, 'command' => 'review', 'idempotency_key' => $key, 'fingerprint' => str_repeat('a', 64), 'audit_log_id' => $audit->id, 'accepted_result' => ['accepted' => true], 'created_at' => now()]);
         $this->validation(fn () => $this->plans()->update($plan, $this->planManager, $this->command($plan, ['notes' => 'Collision'], $key)), 'idempotency_key');
         $this->validation(fn () => $this->plans()->create($this->planManager, ['client_id' => $this->client->id, 'title' => 'Collision', 'idempotency_key' => $key]), 'idempotency_key');
         $this->assertSame(1, $plan->fresh()->lock_version);
