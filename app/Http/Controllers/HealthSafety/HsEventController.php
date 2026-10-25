@@ -997,11 +997,18 @@ class HsEventController extends Controller
                 ->values()
                 ->all()
             : [];
+        // Restricted view (Stephan, 25 Oct, option B): a viewer who can't read the incident still accepts the handover,
+        // so only the report's state (status and submitted time, no narrative) is read for that check.
+        $reportState = $sourceIncident;
+        if ($reportState === null && $context !== null && $hsEvent->source_type === ClientIncident::class
+            && $hsEvent->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE) {
+            $reportState = $context->query(ClientIncident::query()->whereKey($hsEvent->source_id))->first(['id', 'status', 'submitted_at']);
+        }
         $canAccept = $canManage
             && $hsEvent->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE
             && $hsEvent->source_type === ClientIncident::class
-            && $sourceIncident?->status !== 'draft'
-            && $sourceIncident?->submitted_at !== null;
+            && $reportState?->status !== 'draft'
+            && $reportState?->submitted_at !== null;
         $canDecideWorksafe = $canManage
             && $hsEvent->status !== HsEvent::STATUS_CLOSED
             && in_array($hsEvent->handover_status, [

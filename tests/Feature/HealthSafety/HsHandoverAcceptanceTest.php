@@ -207,10 +207,13 @@ class HsHandoverAcceptanceTest extends TestCase
         ]);
         $controlRoomWorkspace = app(AlertWorkspaceService::class)->build($controlRoomOnly, $alert->id);
         $this->assertSame(HsEvent::HANDOVER_ACCEPTED, data_get($controlRoomWorkspace, 'linked_hs_event.handover.status'));
+        // Main's Control Room workspace keeps its reference and link keys, empty for a viewer without H&S access.
         $this->assertSame([
             'access' => 'restricted',
             'status' => HsEvent::STATUS_OPEN,
             'handover' => ['status' => HsEvent::HANDOVER_ACCEPTED],
+            'reference_number' => null,
+            'href' => null,
         ], $controlRoomWorkspace['linked_hs_event']);
     }
 
