@@ -177,6 +177,9 @@ class FirstAidMetricsPrivacyTest extends TestCase
             $state->armed = false;
             Model::setEventDispatcher($dispatcher);
         }
+        // The change was simulated on this connection inside the refused read's transaction, so that read's
+        // rollback undid it. A real concurrent writer commits independently: replay it before the fresh read.
+        DB::table('first_aid_records')->where('id', $source->id)->update(['treatment_outcome' => 'sent_to_hospital']);
         $recovered = $this->metrics();
         $this->assertSame('readable', $recovered['source_access']);
         $this->assertSame(['treatments' => 1, 'ambulance' => 0, 'hospital' => 1], $recovered['activity']);

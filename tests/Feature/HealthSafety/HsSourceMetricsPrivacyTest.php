@@ -212,7 +212,9 @@ class HsSourceMetricsPrivacyTest extends RestraintEventCommandTestCase
         $this->assertSame(1, $summary['active_plans']);
         $this->assertSame(2, $summary['plans_review_due']);
         $this->assertSame(1, $summary['clients_no_active_bsp']);
-        $this->assertSame(['active' => 1, 'under_review' => 1], array_column($this->breakdowns()['by_plan_status'], 'count', 'label'));
+        // The breakdown orders by count only, so equal counts have no defined order: compare by label.
+        $byStatus = array_column($this->breakdowns()['by_plan_status'], 'count', 'label'); ksort($byStatus);
+        $this->assertSame(['active' => 1, 'under_review' => 1], $byStatus);
     }
 
     public function test_worklist_limit_order_and_zero_limit_are_preserved(): void
@@ -230,7 +232,11 @@ class HsSourceMetricsPrivacyTest extends RestraintEventCommandTestCase
         $expected = [$this->firstAid(), $this->restraints(), $this->worklist(), $this->breakdowns()];
         $viewerReads = 0;
         $dispatcher = User::getEventDispatcher(); User::setEventDispatcher(clone $dispatcher);
-        User::retrieved(function (User $row) use (&$viewerReads): void { if ((int) $row->id === (int) $this->actor->id) { $viewerReads++; } });
+        // A refresh reloads the viewer's evidence. Each restraint metric's authority guard
+        // (RestraintKpiService::sourceQueries) selects only users.id to prove the same one row: that is not a refresh.
+        User::retrieved(function (User $row) use (&$viewerReads): void {
+            if ((int) $row->id === (int) $this->actor->id && array_keys($row->getAttributes()) !== ['id']) { $viewerReads++; }
+        });
         try {
             $result = $this->within(function ($context) use (&$viewerReads): array {
                 $viewerReads = 0; // The one outer actor preparation is legitimate.

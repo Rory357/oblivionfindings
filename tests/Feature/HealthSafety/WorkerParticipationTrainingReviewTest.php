@@ -138,7 +138,9 @@ final class WorkerParticipationTrainingReviewTest extends RestraintEventCommandT
     public function test_future_date_and_stale_version_leave_attestation_and_history_unchanged(): void
     {
         $review = $this->reviews()->syncForViewer($this->actor, $this->representative(4)->id)['review'];
-        $this->invalid(fn () => $this->reviews()->completeForViewer($this->actor, $review['id'], now()->addDay()->toDateString(), 'Future facts', $review['version']), 'attestation');
+        // "Future" is after the NZ civil date the review rule uses; a UTC now()->addDay() is NZ today every NZ morning.
+        $tomorrow = \Carbon\CarbonImmutable::parse(ComplianceObligation::nzToday())->addDay()->toDateString();
+        $this->invalid(fn () => $this->reviews()->completeForViewer($this->actor, $review['id'], $tomorrow, 'Future facts', $review['version']), 'attestation');
         try {
             $this->reviews()->completeForViewer($this->actor, $review['id'], ComplianceObligation::nzToday(), 'Actual review', $review['version'] + 1);
             $this->fail('Stale version must refuse.');
@@ -152,7 +154,8 @@ final class WorkerParticipationTrainingReviewTest extends RestraintEventCommandT
         $representative = $this->representative(2);
         $legacy = app(ComplianceEngineService::class)->createObligation('hswa', 'Historical training', 'Historical claim retained', 'annual', $this->actor,
             obligationCode: 'HSR-TRAINING-'.$representative->id);
-        $before = $legacy->getRawOriginal();
+        // The stored row, not the just-created model (which holds only the assigned attributes in PHP formats).
+        $before = $legacy->fresh()->getRawOriginal();
         $this->reviews()->syncForViewer($this->actor, $representative->id);
         $this->assertSame($before, $legacy->fresh()->getRawOriginal());
         $this->assertFalse(HsTrainingReviewSource::where('compliance_obligation_id', $legacy->id)->exists());

@@ -139,14 +139,15 @@ class FirstAidDerivedReportsPrivacyTest extends TestCase
         $url = '/health-safety/risk-assessments/'.$work['risk']->id;
         $this->actingAs($this->viewer)->get('/health-safety/risk-assessments')->assertOk()->assertInertia(fn ($page) => $page->where('assessments.total', 1)->where('assessments.data.0.id', $control['risk']->id)->where('tabCounts.active', 1));
         $this->getJson($url)->assertForbidden();
-        $this->get($url.'/attachments/'.$attachment->id.'/download')->assertForbidden();
+        // The download refuses an out-of-scope parent as not found (HsRiskAssessmentController::downloadAttachment).
+        $this->get($url.'/attachments/'.$attachment->id.'/download')->assertNotFound();
         $client->supportWorkers()->attach($this->viewer->id);
         $this->getJson($url)->assertOk()->assertJsonPath('detail.id', $work['risk']->id);
         $this->assertSame('Private risk bytes', $this->get($url.'/attachments/'.$attachment->id.'/download')->assertOk()->streamedContent());
         $this->viewer->load('permissionOverrides', 'hrEmployeeProfile', 'assignedClients');
         $client->supportWorkers()->detach($this->viewer->id);
         $this->getJson($url)->assertForbidden();
-        $this->get($url.'/attachments/'.$attachment->id.'/download')->assertForbidden();
+        $this->get($url.'/attachments/'.$attachment->id.'/download')->assertNotFound();
         Storage::disk('private')->assertExists($attachment->path);
     }
 
@@ -160,13 +161,16 @@ class FirstAidDerivedReportsPrivacyTest extends TestCase
         $before = HsRiskAssessment::count();
         $this->denied(fn () => $service->create($data, $this->viewer));
         $this->assertSame($before, HsRiskAssessment::count());
-        $this->actingAs($this->viewer)->post('/health-safety/risk-assessments', ['attach_type' => 'event', 'attach_id' => $event->id, 'title' => $data['title'], 'likelihood' => 2, 'consequence' => 2])->assertForbidden();
+        // The create request refuses an unreadable event as a validation error on attach_id (StoreHsRiskAssessmentRequest).
+        $this->actingAs($this->viewer)->post('/health-safety/risk-assessments', ['attach_type' => 'event', 'attach_id' => $event->id, 'title' => $data['title'], 'likelihood' => 2, 'consequence' => 2])
+            ->assertSessionHasErrors('attach_id');
+        $this->assertSame($before, HsRiskAssessment::count());
         $client->supportWorkers()->attach($this->viewer->id);
         $risk = $service->create($data, $this->viewer);
         $this->assertSame($event->id, $risk->hs_event_id);
         $auditCount = AuditLog::count();
         $client->supportWorkers()->detach($this->viewer->id);
-        $this->denied(fn () => $service->activate($risk, [], $this->viewer));
+        $this->outOfScope(fn () => $service->activate($risk, [], $this->viewer));
         $this->actingAs($this->viewer)->post('/health-safety/risk-assessments/'.$risk->id.'/activate')->assertForbidden();
         $this->put('/health-safety/risk-assessments/'.$risk->id, ['title' => '', 'attach_type' => 'invalid'])->assertForbidden();
         $this->post('/health-safety/risk-assessments/'.$risk->id.'/supersede', ['title' => '', 'attach_type' => 'invalid'])->assertForbidden();
@@ -328,7 +332,7 @@ class FirstAidDerivedReportsPrivacyTest extends TestCase
         $primary->supportWorkers()->detach($this->viewer->id);
         $this->getJson($url)->assertForbidden();
         $this->put($url, $payload)->assertForbidden();
-        $this->denied(fn () => $service->updateDraft($risk, ['assessable_type' => Site::class, 'assessable_id' => $this->site->id,
+        $this->outOfScope(fn () => $service->updateDraft($risk, ['assessable_type' => Site::class, 'assessable_id' => $this->site->id,
             'hs_event_id' => null, 'title' => 'Washed source', 'likelihood' => 2, 'consequence' => 2], $this->viewer));
         $this->assertSame($before, $risk->fresh()->getAttributes());
         $this->assertSame($audits, AuditLog::count());
@@ -376,6 +380,17 @@ class FirstAidDerivedReportsPrivacyTest extends TestCase
             $this->fail('Expected current source denial.');
         } catch (HttpException $error) {
             $this->assertSame(403, $error->getStatusCode());
+        }
+    }
+
+    /** A risk outside the viewer's source scope: the command's own locked lookup answers not found (404), not 403. */
+    private function outOfScope(callable $callback): void
+    {
+        try {
+            $callback();
+            $this->fail('Expected current source denial.');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $error) {
+            $this->assertSame(HsRiskAssessment::class, $error->getModel());
         }
     }
 

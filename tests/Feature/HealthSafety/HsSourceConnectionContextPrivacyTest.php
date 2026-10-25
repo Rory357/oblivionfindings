@@ -129,8 +129,10 @@ class HsSourceConnectionContextPrivacyTest extends TestCase
         $source = $this->source(['treated_person_type' => 'client', 'treated_person_id' => null, 'client_id' => $client->id]);
         $source->forceFill(['related_incident_id' => $incident->id])->saveQuietly();
         $own = $this->treatmentEvent($source);
+        // The producer tuple includes the canonical idempotency key (IncidentJourneyService::canonicalHsTuple).
         $linked = $this->event(['source_type' => ClientIncident::class, 'source_id' => $incident->id, 'client_id' => $client->id,
-            'staff_id' => $incident->reported_by, 'event_category' => HsEvent::CATEGORY_NEAR_MISS]);
+            'staff_id' => $incident->reported_by, 'event_category' => HsEvent::CATEGORY_NEAR_MISS,
+            'idempotency_key' => HsEvent::buildIdempotencyKey(ClientIncident::class, $incident->id, HsEvent::CATEGORY_NEAR_MISS)]);
         $reader = app(FirstAidConnectionsService::class);
         $this->assertEqualsCanonicalizing([$own->id, $linked->id], array_column($reader->forViewer($source, $this->manager)['safety_reviews'], 'id'));
         $this->grant('incidents.viewAny', false);

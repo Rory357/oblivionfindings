@@ -66,9 +66,12 @@ class HsDerivedSourceCandidatePrivacyTest extends TestCase
     {
         [$event, $source] = $this->privateEvent();
         $action = $this->action($event);
+        // The backlog is restraint events for one existing Site client. First Aid's readable-subject preparation
+        // checks every client at the viewer's Sites, so a backlog of new clients would grow the reads by design.
+        $backlogClient = Client::factory()->create(['site_id' => $this->site->id]);
         [$beforeIds, $beforeQueries] = $this->recordQueries(fn () => $this->childIds(HsCorrectiveAction::whereKey($action->id)));
         for ($i = 0; $i < 20; $i++) {
-            $this->privateEvent();
+            $this->privateEvent(null, $backlogClient);
         }
         [$afterIds, $afterQueries] = $this->recordQueries(fn () => $this->childIds(HsCorrectiveAction::whereKey($action->id)));
         $this->assertSame([$action->id], $beforeIds);
@@ -283,10 +286,10 @@ class HsDerivedSourceCandidatePrivacyTest extends TestCase
         $this->assertDatabaseHas('hs_investigations', ['id' => $investigation->id, 'hs_event_id' => $event->id]);
     }
 
-    private function privateEvent(?Site $site = null): array
+    private function privateEvent(?Site $site = null, ?Client $client = null): array
     {
         $site ??= $this->site;
-        $client = Client::factory()->create(['site_id' => $site->id]);
+        $client ??= Client::factory()->create(['site_id' => $site->id]);
         $source = RestraintEvent::factory()->createQuietly(['client_id' => $client->id, 'site_id' => $site->id,
             'created_by' => $this->viewer->id, 'source_schema_version' => 1, 'recorded_client_id' => $client->id,
             'recorded_site_id' => $site->id, 'recorded_stay_id' => null, 'stay_id' => null]);
@@ -341,7 +344,9 @@ class HsDerivedSourceCandidatePrivacyTest extends TestCase
 
     private function sourceQueries(array $queries): array
     {
-        return array_values(array_filter($queries, fn ($row) => preg_match('/\bfrom\s+(?:`[^`]+`\.)?`?restraint_events`?\s/i', $row['query'])));
+        // Source hydrations only: statements whose outer FROM is restraint_events. A client or event read that merely
+        // correlates an EXISTS (select 1 from restraint_events …) probe returns no restraint columns.
+        return array_values(array_filter($queries, fn ($row) => preg_match('/^\s*select\s+(?:(?!\bfrom\b).)*?\bfrom\s+(?:`[^`]+`\.)?`?restraint_events`?\s/is', $row['query'])));
     }
 
     private function grant(string $key, bool $allowed): void

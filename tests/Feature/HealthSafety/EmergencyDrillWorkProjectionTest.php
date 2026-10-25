@@ -130,7 +130,8 @@ class EmergencyDrillWorkProjectionTest extends TestCase
         parse_str(parse_url($href, PHP_URL_QUERY), $query);
         $this->assertSame('findings', $query['section']);
         $this->assertSame((string) $finding->id, $query['finding']);
-        $this->assertSame('/tasks?q=drill&assigned=me', $query['return_to']);
+        // A supported origin comes back unchanged, in its own key order (SafeWorkProcedureReturn, e692a5d90).
+        $this->assertSame('/tasks?assigned=me&q=drill', $query['return_to']);
         $this->get($href)->assertOk()->assertInertia(fn (Assert $page) => $page->where('detail.id', $drill->id));
         $this->post('/tasks/emergency_drill_finding/'.$finding->id.'/assign', ['assignee_id' => $this->staff()->id])->assertStatus(400);
         $this->assertSame($this->worker->id, $finding->refresh()->assigned_to);

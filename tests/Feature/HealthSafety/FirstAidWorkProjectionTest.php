@@ -133,8 +133,10 @@ class FirstAidWorkProjectionTest extends TestCase
         $incident = ClientIncident::factory()->create(['client_id' => $client->id, 'site_id' => $this->site->id]);
         $record = $this->record(['treated_person_type' => 'client', 'client_id' => $client->id, 'related_incident_id' => $incident->id]);
         $own = $this->event($record);
+        $category = $incident->type === 'near_miss' ? HsEvent::CATEGORY_NEAR_MISS : HsEvent::CATEGORY_INCIDENT;
+        // The incident's H&S event carries the canonical producer tuple, including its idempotency key.
         $linked = HsEvent::factory()->create(['source_type' => ClientIncident::class, 'source_id' => $incident->id, 'site_id' => $this->site->id, 'client_id' => $client->id,
-            'staff_id' => $incident->reported_by, 'event_category' => $incident->type === 'near_miss' ? HsEvent::CATEGORY_NEAR_MISS : HsEvent::CATEGORY_INCIDENT]);
+            'staff_id' => $incident->reported_by, 'event_category' => $category, 'idempotency_key' => HsEvent::buildIdempotencyKey(ClientIncident::class, $incident->id, $category)]);
         $this->assertSame([$own->id], array_column($this->connections($record)['safety_reviews'], 'id'));
         $this->grant('incidents.viewAssigned', true);
         $this->assertEqualsCanonicalizing([$own->id, $linked->id], array_column($this->connections($record)['safety_reviews'], 'id'));
