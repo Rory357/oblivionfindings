@@ -17,6 +17,7 @@ use App\Notifications\HealthSafety\CommitteeMeetingScheduled;
 use App\Services\HealthSafety\WorkerParticipationEvidenceReadService;
 use App\Services\HealthSafety\WorkerParticipationRegisterReadService;
 use App\Services\HealthSafety\WorkerParticipationSchedulingNormalizer;
+use App\Services\UserSiteAccessService;
 use App\Support\Incidents\IncidentOccurrencePeriod;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -82,6 +83,7 @@ class WorkerParticipationController extends Controller
 
     public function storeRepresentative(StoreRepresentativeRequest $request): RedirectResponse
     {
+        $this->assertCreatableSite($request, $request->validated('site_id'));
         $rep = HsRepresentative::create(array_merge($request->validated(), [
             'status' => 'active',
             'created_by' => $request->user()->id,
@@ -95,6 +97,7 @@ class WorkerParticipationController extends Controller
 
     public function updateRepresentative(Request $request, HsRepresentative $representative): RedirectResponse
     {
+        $this->assertWritableSite($request, $representative->site_id);
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,inactive,resigned'],
             'work_group' => ['sometimes', 'nullable', 'string', 'max:120'],
@@ -187,6 +190,7 @@ class WorkerParticipationController extends Controller
             'attendees.*' => ['integer', 'exists:users,id'],
         ]);
 
+        $this->assertCreatableSite($request, $validated['site_id']);
         $validated = $this->scheduledValues($validated, $request);
 
         [$committee, $meeting, $attendeeIds] = DB::transaction(function () use ($validated, $request): array {
@@ -225,6 +229,7 @@ class WorkerParticipationController extends Controller
 
     public function storeMeeting(StoreMeetingRequest $request, HsCommittee $committee): RedirectResponse
     {
+        $this->assertWritableSite($request, $committee->site_id);
         $data = $this->scheduledValues($request->validated(), $request);
 
         [$meeting, $attendeeIds] = DB::transaction(function () use ($data, $request, $committee): array {
@@ -248,6 +253,7 @@ class WorkerParticipationController extends Controller
 
     public function updateMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
     {
+        $this->assertWritableMeeting($request, $meeting);
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'scheduled_at' => ['sometimes', 'date'],
@@ -287,6 +293,7 @@ class WorkerParticipationController extends Controller
 
     public function addMeetingAttendees(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
     {
+        $this->assertWritableMeeting($request, $meeting);
         $validated = $request->validate([
             'user_ids' => ['required', 'array', 'min:1'],
             'user_ids.*' => ['integer', 'exists:users,id'],
@@ -305,6 +312,7 @@ class WorkerParticipationController extends Controller
 
     public function completeMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
     {
+        $this->assertWritableMeeting($request, $meeting);
         $validated = $request->validate([
             'minutes' => ['nullable', 'string', 'max:10000'],
             'action_items' => ['nullable', 'array'],
@@ -339,6 +347,7 @@ class WorkerParticipationController extends Controller
 
     public function cancelMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
     {
+        $this->assertWritableMeeting($request, $meeting);
         // No more title-LIKE calendar cleanup — the provider derives entries from
         // the meeting row, so flipping status to cancelled is enough.
         $meeting->update(['status' => 'cancelled']);
@@ -348,6 +357,7 @@ class WorkerParticipationController extends Controller
 
     public function uploadMeetingMinutes(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
     {
+        $this->assertWritableMeeting($request, $meeting);
         $request->validate(['document' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx']]);
 
         $path = $request->file('document')->store("health-safety/meetings/{$meeting->id}", 'private');
@@ -402,6 +412,7 @@ class WorkerParticipationController extends Controller
 
     public function storeConsultation(StoreConsultationRequest $request): RedirectResponse
     {
+        $this->assertCreatableSite($request, $request->validated('site_id'));
         $data = collect($request->validated())->except('document')->all();
 
         $consultation = HsConsultation::create(array_merge($data, [
@@ -426,6 +437,7 @@ class WorkerParticipationController extends Controller
 
     public function updateConsultation(Request $request, HsConsultation $consultation): RedirectResponse
     {
+        $this->assertWritableSite($request, $consultation->site_id);
         // One canonical lifecycle everywhere (reconciles the old narrow
         // open/in_progress/closed drift): open -> feedback_received -> actioned -> closed.
         $validated = $request->validate([
@@ -446,6 +458,7 @@ class WorkerParticipationController extends Controller
 
     public function updateConsultationStatus(Request $request, HsConsultation $consultation): RedirectResponse
     {
+        $this->assertWritableSite($request, $consultation->site_id);
         $validated = $request->validate([
             'status' => ['required', 'string', 'in:open,feedback_received,actioned,closed'],
             'worker_feedback_summary' => ['nullable', 'string', 'max:5000'],
@@ -472,6 +485,7 @@ class WorkerParticipationController extends Controller
 
     public function uploadConsultationDocument(Request $request, HsConsultation $consultation): RedirectResponse
     {
+        $this->assertWritableSite($request, $consultation->site_id);
         $request->validate([
             'document' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xlsx,jpg,png'],
             'type' => ['required', 'string', 'in:document,outcome'],
@@ -502,6 +516,36 @@ class WorkerParticipationController extends Controller
     {
         $values = $request->validate(['site_id' => ['nullable', 'integer', 'min:1']]);
         return app(WorkerParticipationEvidenceReadService::class)->export($request, isset($values['site_id']) ? (int) $values['site_id'] : null);
+    }
+
+    /**
+     * Participation writes follow the register's Site rule: a manager writes only at their own H&S Sites,
+     * healthSafety.viewAllSites covers every Site, and a record with no Site needs that all-Sites access.
+     * Another Site's record answers 404, as it does in the register.
+     */
+    private function assertWritableSite(Request $request, int|string|null $siteId): void
+    {
+        $sites = app(UserSiteAccessService::class);
+        if ($sites->canAccessAllHealthSafetySites($request->user())) {
+            return;
+        }
+        abort_unless($siteId !== null && in_array((int) $siteId, $sites->accessibleHealthSafetySiteIds($request->user()), true), 404);
+    }
+
+    /** A new record must name one of the manager's H&S Sites; all-Sites access keeps any Site, as before. */
+    private function assertCreatableSite(Request $request, int|string|null $siteId): void
+    {
+        $sites = app(UserSiteAccessService::class);
+        if ($sites->canAccessAllHealthSafetySites($request->user())) {
+            return;
+        }
+        $sites->assertCanAccessHealthSafetySiteId($request->user(), $siteId === null ? null : (int) $siteId);
+    }
+
+    /** A meeting belongs to its committee's Site. */
+    private function assertWritableMeeting(Request $request, HsCommitteeMeeting $meeting): void
+    {
+        $this->assertWritableSite($request, HsCommittee::withTrashed()->whereKey($meeting->hs_committee_id)->value('site_id'));
     }
 
     /** Parse native read IDs before hydration, preserving decimal URLs without integer overflow. */
