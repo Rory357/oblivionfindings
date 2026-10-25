@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertPriorityService;
 use App\Services\ControlRoom\AlertWorklistPresenter;
+use App\Services\ControlRoom\RestraintHsReferenceVisibility;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Incidents\IncidentJourneyService;
@@ -89,7 +90,7 @@ class ControlRoomIncidentController extends Controller
                 'playbookRun:id,playbook_id,status,current_step,completed_steps,total_steps',
                 'playbookRun.playbook:id,name',
                 'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,site_id,client_id,title,type,occurred_at',
-                'hsEvent:id,reference_number,control_room_alert_id,handover_status,status,severity,owner_user_id,accepted_by_user_id,accepted_at,site_id,client_id',
+                'hsEvent:id,reference_number,control_room_alert_id,handover_status,status,severity,owner_user_id,accepted_by_user_id,accepted_at,site_id,client_id,source_type',
                 'hsEvent.owner:id,name',
                 'hsEvent.acceptedBy:id,name',
             ])
@@ -166,15 +167,17 @@ class ControlRoomIncidentController extends Controller
         }
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
-            $query->where(function (Builder $searchQuery) use ($search) {
+            $restraintReferences = app(RestraintHsReferenceVisibility::class);
+            $query->where(function (Builder $searchQuery) use ($search, $user, $restraintReferences) {
                 $searchQuery->where('control_room_alerts.reference_number', 'like', "%{$search}%")
                     ->orWhere('control_room_alerts.alert_type', 'like', "%{$search}%")
                     ->orWhere('control_room_alerts.notes', 'like', "%{$search}%")
                     ->orWhereHas('clientIncident', fn (Builder $incident) => $incident
                         ->where('reference_number', 'like', "%{$search}%")
                         ->orWhere('title', 'like', "%{$search}%"))
-                    ->orWhereHas('hsEvent', fn (Builder $event) => $event
-                        ->where('reference_number', 'like', "%{$search}%"));
+                    // A restraint's H&S reference finds its alert only for readers of that restraint.
+                    ->orWhereHas('hsEvent', fn (Builder $event) => $restraintReferences
+                        ->constrainReferenceSearch($event, $user, "%{$search}%"));
             });
         }
 
@@ -246,7 +249,9 @@ class ControlRoomIncidentController extends Controller
         $incident = $alert->clientIncident;
         $event = $alert->hsEvent;
         $canViewIncident = $viewer->canDo('incidents.viewAny') || $viewer->canDo('incidents.viewAssigned');
-        $canViewHealthSafety = $viewer->canDo('hazards.view');
+        // A restraint's H&S event keeps only its workflow state here unless the viewer can read the restraint.
+        $eventVisible = app(RestraintHsReferenceVisibility::class)->canSee($viewer, $event);
+        $canViewHealthSafety = $viewer->canDo('hazards.view') && $eventVisible;
 
         $stage = match (true) {
             $incident === null => 'needs_incident',
@@ -307,13 +312,13 @@ class ControlRoomIncidentController extends Controller
             ] : null,
             'health_safety' => $event ? [
                 'id' => $event->id,
-                'reference_number' => $event->reference_number ?: null,
+                'reference_number' => $eventVisible ? ($event->reference_number ?: null) : null,
                 'status' => $event->status,
                 'severity' => $event->severity,
                 'handover_status' => $event->handover_status,
-                'owner' => $event->owner ? ['id' => $event->owner->id, 'name' => $event->owner->name] : null,
-                'accepted_by' => $event->acceptedBy ? ['id' => $event->acceptedBy->id, 'name' => $event->acceptedBy->name] : null,
-                'accepted_at' => $event->accepted_at?->toIso8601String(),
+                'owner' => $eventVisible && $event->owner ? ['id' => $event->owner->id, 'name' => $event->owner->name] : null,
+                'accepted_by' => $eventVisible && $event->acceptedBy ? ['id' => $event->acceptedBy->id, 'name' => $event->acceptedBy->name] : null,
+                'accepted_at' => $eventVisible ? $event->accepted_at?->toIso8601String() : null,
                 'href' => $canViewHealthSafety ? '/health-safety/events/'.$event->id : null,
             ] : null,
             'stage' => $stage,

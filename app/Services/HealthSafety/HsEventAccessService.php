@@ -167,52 +167,71 @@ final class HsEventAccessService
             ->select(['hs_events.id', 'hs_events.source_id', 'hs_events.client_id', 'hs_events.site_id', 'hs_events.staff_id', 'hs_events.event_category']);
         $candidates = ($context ? $context->query($candidates) : $candidates)->get();
         if ($viewer !== null && $candidates->isNotEmpty()) {
-            $context?->assertViewer($viewer);
-            $access = app(RestraintAccessService::class);
-            try {
-                $consume = function (User $current, CurrentAuthorizationReads $reads, array $sites) use ($access, $candidates): array {
-                    if (! $current->canDo('hazards.view') || ! $current->canDo('restraints.view')) {
-                        return [];
-                    }
-                    $candidates = $reads->query(HsEvent::query())->whereKey($candidates->pluck('id'))
-                        ->select(['id', 'source_id', 'client_id', 'site_id', 'staff_id', 'event_category'])->get();
-                    $sources = $reads->query(RestraintEvent::query())->whereIn('id', $candidates->pluck('source_id'))
-                        ->select(['id', 'client_id', 'site_id', 'stay_id', 'created_by', 'source_schema_version', 'recorded_client_id', 'recorded_site_id', 'recorded_stay_id',
-                            'behaviour_support_plan_id', 'behaviour_support_plan_version_id'])->get()->keyBy('id');
-                    $allowed = [];
-                    foreach ($candidates as $event) {
-                        $source = $sources->get($event->source_id);
-                        if (! $source || $event->event_category !== HsEvent::CATEGORY_RESTRAINT
-                            || (int) $event->client_id !== (int) $source->client_id
-                            || ($event->site_id === null ? null : (int) $event->site_id) !== ($source->site_id === null ? null : (int) $source->site_id)
-                            || ($event->staff_id === null ? null : (int) $event->staff_id) !== ($source->created_by === null ? null : (int) $source->created_by)) {
-                            continue;
-                        }
-                        try {
-                            // Includes recorded and current stay provenance; HsEvent has no stay column.
-                            $access->assertEvent($source, $current, $reads, $sites, 'view');
-                            $allowed[] = (int) $event->id;
-                        } catch (HttpException $error) {
-                            if (! in_array($error->getStatusCode(), [403, 404], true)) {
-                                throw $error;
-                            }
-                        }
-                    }
-
-                    return $allowed;
-                };
-                $ids = $context ? $access->withReadContext($context, $consume) : $access->withCurrentViewer($viewer, $consume);
-            } catch (HttpException $error) {
-                if (! in_array($error->getStatusCode(), [403, 404], true)) {
-                    throw $error;
-                }
-            }
+            $ids = $this->readableRestraintEventIds($viewer, $candidates->pluck('id')->map(fn ($id): int => (int) $id)->all(), $context);
         }
         $query->where(function (Builder $sources) use ($types, $ids): void {
             $sources->whereNull('hs_events.source_type')->orWhereNotIn('hs_events.source_type', $types)->orWhereIn('hs_events.id', $ids);
         });
 
         return $this->applyInjurySourceScope($query, $viewer, $context, $sourceCandidates);
+    }
+
+    /**
+     * Of the given H&S event ids, the restraint-sourced ones whose restraint the viewer may read now: hazards.view and
+     * restraints.view, the event still matching its restraint, and the restraint's own Site, stay and HR rules.
+     *
+     * @param  list<int>  $eventIds
+     * @return list<int>
+     */
+    public function readableRestraintEventIds(User $viewer, array $eventIds, ?HealthSafetyReadContext $context = null): array
+    {
+        if ($eventIds === []) {
+            return [];
+        }
+        $context?->assertViewer($viewer);
+        $types = array_unique([RestraintEvent::class, (new RestraintEvent)->getMorphClass()]);
+        $access = app(RestraintAccessService::class);
+        try {
+            $consume = function (User $current, CurrentAuthorizationReads $reads, array $sites) use ($access, $eventIds, $types): array {
+                if (! $current->canDo('hazards.view') || ! $current->canDo('restraints.view')) {
+                    return [];
+                }
+                $candidates = $reads->query(HsEvent::query())->whereKey($eventIds)->whereIn('source_type', $types)
+                    ->select(['id', 'source_id', 'client_id', 'site_id', 'staff_id', 'event_category'])->get();
+                $sources = $reads->query(RestraintEvent::query())->whereIn('id', $candidates->pluck('source_id'))
+                    ->select(['id', 'client_id', 'site_id', 'stay_id', 'created_by', 'source_schema_version', 'recorded_client_id', 'recorded_site_id', 'recorded_stay_id',
+                        'behaviour_support_plan_id', 'behaviour_support_plan_version_id'])->get()->keyBy('id');
+                $allowed = [];
+                foreach ($candidates as $event) {
+                    $source = $sources->get($event->source_id);
+                    if (! $source || $event->event_category !== HsEvent::CATEGORY_RESTRAINT
+                        || (int) $event->client_id !== (int) $source->client_id
+                        || ($event->site_id === null ? null : (int) $event->site_id) !== ($source->site_id === null ? null : (int) $source->site_id)
+                        || ($event->staff_id === null ? null : (int) $event->staff_id) !== ($source->created_by === null ? null : (int) $source->created_by)) {
+                        continue;
+                    }
+                    try {
+                        // Includes recorded and current stay provenance; HsEvent has no stay column.
+                        $access->assertEvent($source, $current, $reads, $sites, 'view');
+                        $allowed[] = (int) $event->id;
+                    } catch (HttpException $error) {
+                        if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                            throw $error;
+                        }
+                    }
+                }
+
+                return $allowed;
+            };
+
+            return $context ? $access->withReadContext($context, $consume) : $access->withCurrentViewer($viewer, $consume);
+        } catch (HttpException $error) {
+            if (! in_array($error->getStatusCode(), [403, 404], true)) {
+                throw $error;
+            }
+
+            return [];
+        }
     }
 
     /** A governance row cannot grant access to the factual injury that produced it. */
