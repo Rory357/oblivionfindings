@@ -123,6 +123,9 @@ function oblivionCiPestMain(array $arguments): int
         $rosterHash,
     ));
 
+    // A failing batch must not hide the rest of the shard: run every batch,
+    // then fail with the list of batches that failed.
+    $failed = [];
     foreach ($batches as $batchIndex => $batch) {
         fwrite(STDOUT, sprintf(
             "Starting fresh Pest process %d/%d with %d files.\n",
@@ -145,9 +148,19 @@ function oblivionCiPestMain(array $arguments): int
 
         if (! $process->isSuccessful()) {
             fwrite(STDERR, sprintf("CI Pest batch %d failed.\n", $batchIndex + 1));
-
-            return $process->getExitCode() ?? 1;
+            $failed[$batchIndex + 1] = $process->getExitCode() ?: 1;
         }
+    }
+
+    if ($failed !== []) {
+        fwrite(STDERR, sprintf(
+            "CI Pest shard failed: %d of %d batches failed (batches %s).\n",
+            count($failed),
+            count($batches),
+            implode(', ', array_keys($failed)),
+        ));
+
+        return reset($failed);
     }
 
     return 0;
