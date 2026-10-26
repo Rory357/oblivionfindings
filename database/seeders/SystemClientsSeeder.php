@@ -53,26 +53,34 @@ class SystemClientsSeeder extends Seeder
         foreach ($seedClients as $idx => $c) {
             $email = strtolower($c['first_name'] . '.' . $c['last_name']) . '@client.demo.test';
 
-            $client = Client::updateOrCreate(
-                ['email' => $email],
-                [
-                    'site_id' => $site->id,
-                    'service_context_id' => $serviceContext->id,
-                    'nhi_number' => $c['nhi'],
-                    'first_name' => $c['first_name'],
-                    'last_name' => $c['last_name'],
-                    'preferred_name' => $c['first_name'],
-                    'gender' => ['female', 'male'][($idx % 2)],
-                    'status' => 'active',
-                    'phone' => '021 ' . str_pad((string) rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
-                    'address_line_1' => (string) rand(1, 40) . ' Example Road',
-                    'suburb' => 'Auckland Central',
-                    'city' => 'Auckland',
-                    'postcode' => '1010',
-                    'funding_type' => ['NASC', 'ACC', 'Private'][($idx % 3)],
-                    'funding_notes' => 'Seeded for demo/testing.',
-                ]
-            );
+            // Client email is encrypted, so it cannot be a lookup key: a match on it
+            // never found the earlier row, and every re-run added 12 duplicate people.
+            // The NHI is the identity, so a re-run updates (or restores) the same person.
+            $client = Client::withTrashed()
+                ->where('nhi_hash', Client::nhiHash($c['nhi']))
+                ->orderBy('id')
+                ->first() ?? new Client;
+            if ($client->trashed()) {
+                $client->restore();
+            }
+            $client->fill([
+                'email' => $email,
+                'site_id' => $site->id,
+                'service_context_id' => $serviceContext->id,
+                'nhi_number' => $c['nhi'],
+                'first_name' => $c['first_name'],
+                'last_name' => $c['last_name'],
+                'preferred_name' => $c['first_name'],
+                'gender' => ['female', 'male'][($idx % 2)],
+                'status' => 'active',
+                'phone' => '021 ' . str_pad((string) rand(1000000, 9999999), 7, '0', STR_PAD_LEFT),
+                'address_line_1' => (string) rand(1, 40) . ' Example Road',
+                'suburb' => 'Auckland Central',
+                'city' => 'Auckland',
+                'postcode' => '1010',
+                'funding_type' => ['NASC', 'ACC', 'Private'][($idx % 3)],
+                'funding_notes' => 'Seeded for demo/testing.',
+            ])->save();
 
             $clients->push($client);
 
