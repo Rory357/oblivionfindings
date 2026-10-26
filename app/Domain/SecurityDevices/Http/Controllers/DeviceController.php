@@ -203,6 +203,10 @@ class DeviceController extends Controller
         if ($canViewMaintenance) {
             $relations['maintenanceRecords'] = fn ($q) => $q->latest()->limit(10);
         }
+        $relations['configurationSnapshots'] = fn ($q) => $q
+            ->latest('captured_at')
+            ->latest('id')
+            ->limit(12);
         $device->load($relations);
 
         $device->setRelation('assignments', $device->assignments

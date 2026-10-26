@@ -8,6 +8,7 @@ import {
     EvidenceRecords,
     type EvidenceRecordsView,
 } from '@/components/lists/evidence-records';
+import type { MonitorHistoryTarget } from '@/components/security-devices/monitor-history-dialog';
 import { ControlRoomAlertAccessRequired } from '@/components/security-devices/permission-destinations';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { ReviewRow } from '@/components/wizard/shell';
@@ -291,6 +292,7 @@ export function MonitorRecords({
     total,
     onEdit,
     onDeactivate,
+    onViewHistory,
     title = 'Monitor states',
     empty = 'No monitors match these filters',
     description = 'Collection failures are shown as uncertainty, not duplicated device failures.',
@@ -301,6 +303,7 @@ export function MonitorRecords({
     total?: number;
     onEdit?: (row: MonitorRow) => void;
     onDeactivate?: (row: MonitorRow) => void;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
     title?: string;
     description?: string;
     empty?: string;
@@ -351,6 +354,17 @@ export function MonitorRecords({
                         <EntityChip>
                             Reported {monitoringPhrase(r.reported_state)}
                         </EntityChip>
+                    ) : null}
+                    {r.maintenance?.active_window ? (
+                        <StatusBadge variant="warning">
+                            Active maintenance:{' '}
+                            {r.maintenance.active_window.name}
+                        </StatusBadge>
+                    ) : r.maintenance?.upcoming_window ? (
+                        <StatusBadge variant="info">
+                            Upcoming maintenance:{' '}
+                            {r.maintenance.upcoming_window.name}
+                        </StatusBadge>
                     ) : null}
                     {r.latest_observation ? (
                         <p>
@@ -434,6 +448,20 @@ export function MonitorRecords({
                 },
             ]}
             actionsFor={(r) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: Activity,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: r.id,
+                                      monitorName: r.name,
+                                      deviceName: r.device.name,
+                                  }),
+                          },
+                      ]
+                    : []),
                 ownerAction(
                     'Open device profile',
                     deviceHref(r.device.id, r.device.href, owners),
@@ -494,6 +522,14 @@ export function MonitorRecords({
                 ],
                 ['Suppressed until', stamp(r.suppressed_until)],
                 ['Suppression reason', monitoringLabel(r.suppression_reason)],
+                [
+                    'Maintenance window',
+                    r.maintenance?.active_window
+                        ? `Active: ${r.maintenance.active_window.name} (until ${stamp(r.maintenance.active_window.ends_at)})`
+                        : r.maintenance?.upcoming_window
+                          ? `Upcoming: ${r.maintenance.upcoming_window.name} (starts ${stamp(r.maintenance.upcoming_window.starts_at)})`
+                          : 'None active or scheduled in next 24h',
+                ],
                 [
                     'Root cause',
                     r.root_cause
@@ -1114,10 +1150,12 @@ export function TrendRecords({
     rows,
     view,
     owners,
+    onViewHistory,
 }: {
     rows: MonitoringWorkspace['trends'];
     view: MonitoringView;
     owners: MonitoringOwners;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
 }) {
     return (
         <RecordList
@@ -1179,6 +1217,20 @@ export function TrendRecords({
                 },
             ]}
             actionsFor={(r) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: Activity,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: r.monitor_id,
+                                      monitorName: r.monitor_name,
+                                      deviceName: r.device.name,
+                                  }),
+                          },
+                      ]
+                    : []),
                 ownerAction(
                     'Open device profile',
                     deviceHref(r.device.id, r.device.href, owners),

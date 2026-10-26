@@ -1,8 +1,19 @@
 import {
+    ConfigurationDiffDialog,
+    type ConfigurationDiffTarget,
+} from '@/components/security-devices/configuration-diff-dialog';
+import {
+    MonitorHistoryDialog,
+    type MonitorHistoryTarget,
+} from '@/components/security-devices/monitor-history-dialog';
+import {
+    shortHash,
+    snapshotDiffLabel,
+} from '@/components/security-devices/network-evidence-display';
+import {
     ItChangeDestination,
     ItWorkspaceAccessRequired,
 } from '@/components/security-devices/permission-destinations';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -21,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { formatReadableOperationalState } from '@/lib/readable-operational-state';
 import { RestartRequestState } from '@/pages/it/remote-support/restart-request-state';
@@ -37,27 +49,51 @@ import {
     Cpu,
     Download,
     FileClock,
+    FileDiff,
     HardDrive,
+    History,
+    Power,
+    PowerOff,
     RadioTower,
+    RotateCcw,
+    Save,
     Settings2,
     ShieldCheck,
     TicketCheck,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { DeviceProfile } from './device-profile';
+import type {
+    DeviceMaintenanceNotice,
+    DeviceProfile,
+} from './device-profile';
 
-function stateBadgeVariant(
-    state: string | null,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
+function stateStatusVariant(state: string | null): StatusVariant {
     if (
-        ['critical', 'failed', 'offline', 'rejected', 'mismatch'].includes(
-            state ?? '',
-        )
+        [
+            'critical',
+            'failed',
+            'offline',
+            'rejected',
+            'mismatch',
+            'high',
+            'urgent',
+        ].includes(state ?? '')
     ) {
-        return 'destructive';
+        return 'critical';
     }
-    if (['healthy', 'active', 'fresh', 'aligned'].includes(state ?? '')) {
-        return 'default';
+    if (
+        [
+            'healthy',
+            'active',
+            'fresh',
+            'aligned',
+            'available',
+            'reconciled',
+            'completed',
+            'resolved',
+        ].includes(state ?? '')
+    ) {
+        return 'success';
     }
     if (
         [
@@ -71,11 +107,46 @@ function stateBadgeVariant(
             'awaiting_step_up',
             'awaiting_change',
             'blocked',
+            'medium',
+            'open',
+            'in_progress',
         ].includes(state ?? '')
     ) {
-        return 'outline';
+        return 'warning';
     }
-    return 'secondary';
+    if (['ready', 'queued', 'dispatched', 'info'].includes(state ?? '')) {
+        return 'info';
+    }
+    return 'neutral';
+}
+
+function DeviceMaintenancePills({
+    maintenance,
+}: {
+    maintenance?: DeviceMaintenanceNotice;
+}) {
+    if (!maintenance) return null;
+    if (maintenance.activeWindow) {
+        return (
+            <StatusBadge variant="info">
+                In maintenance: {maintenance.activeWindow.name}
+                {maintenance.activeWindow.endsAt
+                    ? ` · until ${formatDateTime(maintenance.activeWindow.endsAt)}`
+                    : ''}
+            </StatusBadge>
+        );
+    }
+    if (maintenance.upcomingWindow) {
+        return (
+            <StatusBadge variant="neutral">
+                Planned maintenance: {maintenance.upcomingWindow.name}
+                {maintenance.upcomingWindow.startsAt
+                    ? ` · starts ${formatDateTime(maintenance.upcomingWindow.startsAt)}`
+                    : ''}
+            </StatusBadge>
+        );
+    }
+    return null;
 }
 
 type ManagementAction = DeviceProfile['management']['actions'][number];
@@ -172,6 +243,11 @@ function DeviceManagementWorkspace({
     );
     const [breakGlassReviewSummary, setBreakGlassReviewSummary] = useState('');
     const deepLinkHandled = useRef(false);
+    const selectedBounceProtectionReason =
+        selectedAction?.key === 'network.port.bounce' && parameters.interface
+            ? (selectedAction.protectedInterfaces?.[parameters.interface] ??
+              null)
+            : null;
 
     const openAction = useCallback(
         (
@@ -556,11 +632,14 @@ function DeviceManagementWorkspace({
                                                                       's request window'}
                                                             </p>
                                                         </div>
-                                                        <Badge
+                                                        <StatusBadge
                                                             variant={
                                                                 action.available
-                                                                    ? 'default'
-                                                                    : 'outline'
+                                                                    ? action.requiresStepUp &&
+                                                                      !management.stepUpCurrent
+                                                                        ? 'warning'
+                                                                        : 'success'
+                                                                    : 'neutral'
                                                             }
                                                         >
                                                             {action.available
@@ -571,7 +650,7 @@ function DeviceManagementWorkspace({
                                                                 : humanise(
                                                                       action.state,
                                                                   )}
-                                                        </Badge>
+                                                        </StatusBadge>
                                                     </div>
                                                     <p className="mt-3 text-sm text-muted-foreground">
                                                         {action.impact}
@@ -736,13 +815,13 @@ function DeviceManagementWorkspace({
                                             )}
                                         </p>
                                     </div>
-                                    <Badge
-                                        variant={stateBadgeVariant(
+                                    <StatusBadge
+                                        variant={stateStatusVariant(
                                             command.status,
                                         )}
                                     >
                                         {humanise(command.status)}
-                                    </Badge>
+                                    </StatusBadge>
                                 </div>
                                 <p className="mt-3 text-sm">{command.reason}</p>
                                 <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
@@ -903,9 +982,9 @@ function DeviceManagementWorkspace({
                                         }`}
                                     >
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="destructive">
+                                            <StatusBadge variant="critical">
                                                 Break glass
-                                            </Badge>
+                                            </StatusBadge>
                                             <span className="font-medium">
                                                 Post-use review{' '}
                                                 {command.breakGlass.reviewedAt
@@ -1128,7 +1207,13 @@ function DeviceManagementWorkspace({
                 open={selectedAction !== null}
                 onOpenChange={(open) => !open && setSelectedAction(null)}
             >
-                <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto">
+                <DialogContent
+                    className="max-h-[calc(100vh-2rem)] overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>{selectedAction?.label}</DialogTitle>
                         <DialogDescription>
@@ -1178,7 +1263,9 @@ function DeviceManagementWorkspace({
                                                 : null,
                                             selectedAction.requiresApproval
                                                 ? 'Independent approval'
-                                                : null,
+                                                : selectedBounceProtectionReason
+                                                  ? 'Independent approval (protected port)'
+                                                  : null,
                                             selectedAction.requiresChange
                                                 ? 'IT Change window'
                                                 : null,
@@ -1226,15 +1313,15 @@ function DeviceManagementWorkspace({
                                 }`}
                             >
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <Badge
+                                    <StatusBadge
                                         variant={
                                             selectedAction?.risk === 'critical'
-                                                ? 'destructive'
-                                                : 'outline'
+                                                ? 'critical'
+                                                : 'warning'
                                         }
                                     >
                                         {humanise(selectedAction?.risk ?? '')}
-                                    </Badge>
+                                    </StatusBadge>
                                     <span className="text-sm font-semibold">
                                         Confirm impact before requesting
                                     </span>
@@ -1375,6 +1462,26 @@ function DeviceManagementWorkspace({
                                 )}
                             </div>
                         ))}
+                        {selectedBounceProtectionReason && !useBreakGlass && (
+                            <div
+                                role="note"
+                                className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-xs"
+                            >
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <StatusBadge variant="warning">
+                                        Independent approval required
+                                    </StatusBadge>
+                                    <span className="font-semibold text-foreground">
+                                        Protected network port
+                                    </span>
+                                </div>
+                                <p className="mt-2 text-muted-foreground">
+                                    {selectedBounceProtectionReason}. Submitting
+                                    this request places it in awaiting approval
+                                    for a second authorised operator.
+                                </p>
+                            </div>
+                        )}
                         {selectedAction?.requiresChange && !useBreakGlass && (
                             <div className="space-y-1.5">
                                 <label
@@ -1582,7 +1689,12 @@ function DeviceManagementWorkspace({
                 open={decisionCommand !== null}
                 onOpenChange={(open) => !open && setDecisionCommand(null)}
             >
-                <DialogContent>
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>Review command request</DialogTitle>
                         <DialogDescription>
@@ -1702,7 +1814,12 @@ function DeviceManagementWorkspace({
                     !open && setBreakGlassReviewCommand(null)
                 }
             >
-                <DialogContent>
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>Post-use break-glass review</DialogTitle>
                         <DialogDescription>
@@ -2021,14 +2138,21 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Activity className="h-4 w-4" /> Native monitoring
-                        summary
-                    </CardTitle>
-                    <CardDescription>
-                        Current retained checks for this device. Missing
-                        evidence is shown honestly as not collected.
-                    </CardDescription>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Activity className="h-4 w-4" /> Native
+                                monitoring summary
+                            </CardTitle>
+                            <CardDescription>
+                                Current retained checks for this device. Missing
+                                evidence is shown honestly as not collected.
+                            </CardDescription>
+                        </div>
+                        <DeviceMaintenancePills
+                            maintenance={profile.health.maintenance}
+                        />
+                    </div>
                 </CardHeader>
                 <CardContent>
                     {monitoring ? (
@@ -2076,7 +2200,16 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
     );
 }
 
-export function DeviceMonitorsSection({ profile }: { profile: DeviceProfile }) {
+export function DeviceMonitorsSection({
+    profile,
+    deviceName,
+}: {
+    profile: DeviceProfile;
+    deviceName?: string;
+}) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
+
     if (profile.monitors.length === 0) {
         return (
             <EmptyState
@@ -2088,56 +2221,98 @@ export function DeviceMonitorsSection({ profile }: { profile: DeviceProfile }) {
         );
     }
 
+    const resolvedDeviceName = deviceName ?? profile.header.identity.name;
+
     return (
-        <div className="grid gap-3 lg:grid-cols-2">
-            {profile.monitors.map((monitor) => (
-                <Card key={monitor.id}>
-                    <CardContent className="space-y-3 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                                <p className="truncate font-semibold">
-                                    {monitor.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {monitor.kindLabel}
-                                    {monitor.affectsAvailability
-                                        ? ' · affects availability'
-                                        : ''}
-                                </p>
+        <>
+            <div className="grid gap-3 lg:grid-cols-2">
+                {profile.monitors.map((monitor) => (
+                    <Card key={monitor.id}>
+                        <CardContent className="space-y-3 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="truncate font-semibold">
+                                        {monitor.name}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {monitor.kindLabel}
+                                        {monitor.affectsAvailability
+                                            ? ' · affects availability'
+                                            : ''}
+                                    </p>
+                                </div>
+                                <StatusBadge
+                                    variant={
+                                        monitor.enabled
+                                            ? stateStatusVariant(monitor.state)
+                                            : 'neutral'
+                                    }
+                                >
+                                    {monitor.enabled
+                                        ? humanise(monitor.state)
+                                        : 'disabled'}
+                                </StatusBadge>
                             </div>
-                            <Badge variant={stateBadgeVariant(monitor.state)}>
-                                {monitor.enabled
-                                    ? humanise(monitor.state)
-                                    : 'disabled'}
-                            </Badge>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                            <Metric
-                                label="Last observation"
-                                value={formatRelative(
-                                    monitor.lastObservationAt,
-                                    Date.now(),
-                                    'Never observed',
-                                )}
+                            <DeviceMaintenancePills
+                                maintenance={monitor.maintenance}
                             />
-                            <Metric
-                                label="Monitoring profile"
-                                value={monitor.profile?.name ?? 'Not assigned'}
-                            />
-                        </div>
-                        {monitor.collector && (
-                            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                                <span>{monitor.collector.name}</span>
-                                <span className="text-muted-foreground">
-                                    Collector{' '}
-                                    {humanise(monitor.collector.status)}
-                                </span>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <Metric
+                                    label="Last observation"
+                                    value={formatRelative(
+                                        monitor.lastObservationAt,
+                                        Date.now(),
+                                        'Never observed',
+                                    )}
+                                />
+                                <Metric
+                                    label="Monitoring profile"
+                                    value={
+                                        monitor.profile?.name ?? 'Not assigned'
+                                    }
+                                />
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
+                            {monitor.collector && (
+                                <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
+                                    <span>{monitor.collector.name}</span>
+                                    <span className="text-muted-foreground">
+                                        Collector{' '}
+                                        {humanise(monitor.collector.status)}
+                                    </span>
+                                </div>
+                            )}
+                            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setHistoryTarget({
+                                            monitorId: monitor.id,
+                                            monitorName: monitor.name,
+                                            deviceName: resolvedDeviceName,
+                                        })
+                                    }
+                                >
+                                    <History
+                                        className="mr-1.5 h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    View history
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+            <MonitorHistoryDialog
+                target={historyTarget}
+                open={historyTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setHistoryTarget(null);
+                }}
+            />
+        </>
     );
 }
 
@@ -2152,9 +2327,14 @@ function formatRate(value: number | null): string {
 
 export function DeviceInterfacesSensorsSection({
     profile,
+    deviceName,
 }: {
     profile: DeviceProfile;
+    deviceName?: string;
 }) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
+
     if (profile.interfacesSensors.length === 0) {
         return (
             <EmptyState
@@ -2166,82 +2346,193 @@ export function DeviceInterfacesSensorsSection({
         );
     }
 
+    const resolvedDeviceName = deviceName ?? profile.header.identity.name;
+
     return (
-        <div className="grid gap-3 xl:grid-cols-2">
-            {profile.interfacesSensors.map((sensor) => (
-                <Card key={sensor.monitorId}>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <CardTitle className="text-base">
-                                    {sensor.name}
-                                </CardTitle>
-                                <CardDescription>
-                                    {humanise(sensor.kind)}
-                                    {sensor.index !== null
-                                        ? ` · interface ${sensor.index}`
-                                        : ''}
-                                </CardDescription>
+        <>
+            <div className="grid gap-3 xl:grid-cols-2">
+                {profile.interfacesSensors.map((sensor) => (
+                    <Card key={sensor.monitorId}>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <CardTitle className="text-base">
+                                        {sensor.name}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {humanise(sensor.kind)}
+                                        {sensor.index !== null
+                                            ? ` · interface ${sensor.index}`
+                                            : ''}
+                                    </CardDescription>
+                                </div>
+                                <StatusBadge
+                                    variant={stateStatusVariant(sensor.state)}
+                                >
+                                    {humanise(sensor.state)}
+                                </StatusBadge>
                             </div>
-                            <Badge variant={stateBadgeVariant(sensor.state)}>
-                                {humanise(sensor.state)}
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        <Metric
-                            label="Reading"
-                            value={
-                                sensor.value === null
-                                    ? 'Not collected'
-                                    : `${sensor.value}${sensor.unit ?? ''}`
-                            }
-                        />
-                        <Metric
-                            label="In / out"
-                            value={`${formatRate(sensor.inBps)} / ${formatRate(sensor.outBps)}`}
-                        />
-                        <Metric
-                            label="Utilisation"
-                            value={`${sensor.inUtilisation ?? '—'}% / ${sensor.outUtilisation ?? '—'}%`}
-                        />
-                        <Metric
-                            label="Link state"
-                            value={
-                                sensor.operationalStatus ??
-                                sensor.adminStatus ??
-                                'Not collected'
-                            }
-                        />
-                        <Metric
-                            label="Errors / discards"
-                            value={`${sensor.errors ?? '—'} / ${sensor.discards ?? '—'}`}
-                        />
-                        <Metric
-                            label="Observed"
-                            value={formatRelative(
-                                sensor.observedAt,
-                                Date.now(),
-                                'Never',
-                            )}
-                        />
-                    </CardContent>
-                </Card>
-            ))}
-        </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                <Metric
+                                    label="Reading"
+                                    value={
+                                        sensor.value === null
+                                            ? 'Not collected'
+                                            : `${sensor.value}${sensor.unit ?? ''}`
+                                    }
+                                />
+                                <Metric
+                                    label="In / out"
+                                    value={`${formatRate(sensor.inBps)} / ${formatRate(sensor.outBps)}`}
+                                />
+                                <Metric
+                                    label="Utilisation"
+                                    value={`${sensor.inUtilisation ?? '—'}% / ${sensor.outUtilisation ?? '—'}%`}
+                                />
+                                <Metric
+                                    label="Link state"
+                                    value={
+                                        sensor.operationalStatus ??
+                                        sensor.adminStatus ??
+                                        'Not collected'
+                                    }
+                                />
+                                <Metric
+                                    label="Errors / discards"
+                                    value={`${sensor.errors ?? '—'} / ${sensor.discards ?? '—'}`}
+                                />
+                                <Metric
+                                    label="Observed"
+                                    value={formatRelative(
+                                        sensor.observedAt,
+                                        Date.now(),
+                                        'Never',
+                                    )}
+                                />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 border-t pt-3">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setHistoryTarget({
+                                            monitorId: sensor.monitorId,
+                                            monitorName: sensor.name,
+                                            deviceName: resolvedDeviceName,
+                                        })
+                                    }
+                                >
+                                    <History
+                                        className="mr-1.5 h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    View history
+                                </Button>
+                                {sensor.portActions?.bounceHref ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        asChild
+                                    >
+                                        <Link
+                                            href={sensor.portActions.bounceHref}
+                                        >
+                                            <RotateCcw
+                                                className="mr-1.5 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Restart port
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                {sensor.portActions?.enableHref ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        asChild
+                                    >
+                                        <Link
+                                            href={sensor.portActions.enableHref}
+                                        >
+                                            <Power
+                                                className="mr-1.5 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Enable port
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                {sensor.portActions?.disableHref ? (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        asChild
+                                    >
+                                        <Link
+                                            href={
+                                                sensor.portActions.disableHref
+                                            }
+                                        >
+                                            <PowerOff
+                                                className="mr-1.5 h-3.5 w-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            Disable port
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+            <MonitorHistoryDialog
+                target={historyTarget}
+                open={historyTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) setHistoryTarget(null);
+                }}
+            />
+        </>
     );
 }
 
 export function DeviceConfigurationSection({
     profile,
+    deviceId,
+    deviceName,
     onEditRegistry,
     onEditServiceDue,
 }: {
     profile: DeviceProfile;
+    deviceId?: number;
+    deviceName?: string;
     onEditRegistry: () => void;
     onEditServiceDue?: () => void;
 }) {
-    const { registry, configuration, firmware } = profile.configuration;
+    const {
+        registry,
+        configuration,
+        firmware,
+        canViewSnapshots,
+        backupActionHref,
+        latestSnapshot,
+        snapshotHistory,
+        snapshotHistoryTruncated,
+    } = profile.configuration;
+    const [diffTarget, setDiffTarget] =
+        useState<ConfigurationDiffTarget | null>(null);
+    const resolvedDeviceId = deviceId ?? profile.header.identity.id;
+    const resolvedDeviceName = deviceName ?? profile.header.identity.name;
+    const previousSnapshots = (snapshotHistory ?? []).slice(1);
+    const showBackupsCard =
+        canViewSnapshots !== undefined ||
+        Boolean(backupActionHref) ||
+        Boolean(latestSnapshot) ||
+        (snapshotHistory?.length ?? 0) > 0;
 
     return (
         <div className="space-y-4">
@@ -2357,9 +2648,11 @@ export function DeviceConfigurationSection({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <Badge variant={stateBadgeVariant(configuration.state)}>
+                        <StatusBadge
+                            variant={stateStatusVariant(configuration.state)}
+                        >
                             {humanise(configuration.state)}
-                        </Badge>
+                        </StatusBadge>
                         <Metric
                             label="Observed hash"
                             value={configuration.observedHash}
@@ -2381,9 +2674,11 @@ export function DeviceConfigurationSection({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        <Badge variant={stateBadgeVariant(firmware.state)}>
+                        <StatusBadge
+                            variant={stateStatusVariant(firmware.state)}
+                        >
                             {humanise(firmware.state)}
-                        </Badge>
+                        </StatusBadge>
                         <Metric
                             label="Current version"
                             value={firmware.currentVersion}
@@ -2399,6 +2694,243 @@ export function DeviceConfigurationSection({
                     </CardContent>
                 </Card>
             </div>
+
+            {showBackupsCard ? (
+                <Card>
+                    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <FileDiff className="h-4 w-4" /> Configuration
+                                backups
+                            </CardTitle>
+                            <CardDescription>
+                                Retained running and structured configuration
+                                snapshots with secrets redacted before storage.
+                            </CardDescription>
+                        </div>
+                        {backupActionHref ? (
+                            <Button size="sm" variant="outline" asChild>
+                                <Link href={backupActionHref}>
+                                    <Save
+                                        className="mr-1.5 h-3.5 w-3.5"
+                                        aria-hidden="true"
+                                    />
+                                    Capture backup
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {canViewSnapshots === false ? (
+                            <p className="text-sm text-muted-foreground">
+                                Configuration snapshot downloads and version
+                                comparisons require IT, maintenance,
+                                integration, or reporting permissions at this
+                                Site.
+                            </p>
+                        ) : !latestSnapshot ? (
+                            <p className="text-sm text-muted-foreground">
+                                No configuration backups have been captured for
+                                this device yet.
+                            </p>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="space-y-3 rounded-lg border p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <StatusBadge variant="success">
+                                                Latest backup
+                                            </StatusBadge>
+                                            <StatusBadge variant="info">
+                                                Secrets redacted
+                                            </StatusBadge>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            {latestSnapshot.compareHref ? (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setDiffTarget({
+                                                            deviceId:
+                                                                resolvedDeviceId,
+                                                            deviceName:
+                                                                resolvedDeviceName,
+                                                            snapshotId:
+                                                                latestSnapshot.id,
+                                                            baselineSnapshotId:
+                                                                latestSnapshot.previousSnapshotId,
+                                                        })
+                                                    }
+                                                >
+                                                    <FileDiff
+                                                        className="mr-1.5 h-3.5 w-3.5"
+                                                        aria-hidden="true"
+                                                    />
+                                                    Compare versions
+                                                </Button>
+                                            ) : null}
+                                            {latestSnapshot.downloadHref ? (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
+                                                >
+                                                    <a
+                                                        href={
+                                                            latestSnapshot.downloadHref
+                                                        }
+                                                    >
+                                                        <Download
+                                                            className="mr-1.5 h-3.5 w-3.5"
+                                                            aria-hidden="true"
+                                                        />
+                                                        Download snapshot
+                                                    </a>
+                                                </Button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                        <Metric
+                                            label="Captured"
+                                            value={formatDateTime(
+                                                latestSnapshot.capturedAt,
+                                                'Not recorded',
+                                            )}
+                                            detail={humanise(
+                                                latestSnapshot.sourceKind,
+                                            )}
+                                        />
+                                        <Metric
+                                            label="Configuration hash"
+                                            value={shortHash(
+                                                latestSnapshot.configurationHash ??
+                                                    latestSnapshot.contentHash,
+                                            )}
+                                        />
+                                        <Metric
+                                            label="Firmware version"
+                                            value={
+                                                latestSnapshot.firmwareVersion
+                                            }
+                                        />
+                                        <Metric
+                                            label="Version comparison"
+                                            value={snapshotDiffLabel(
+                                                latestSnapshot,
+                                            )}
+                                        />
+                                    </div>
+                                </div>
+
+                                {previousSnapshots.length > 0 ? (
+                                    <details className="rounded-lg border p-3">
+                                        <summary className="frontline-focus cursor-pointer text-sm font-medium">
+                                            Previous retained backups (
+                                            {previousSnapshots.length})
+                                        </summary>
+                                        <div className="mt-3 space-y-2">
+                                            {previousSnapshots.map(
+                                                (snapshot) => (
+                                                    <div
+                                                        key={snapshot.id}
+                                                        className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
+                                                    >
+                                                        <div className="min-w-0 space-y-0.5">
+                                                            <p className="text-sm font-medium">
+                                                                {formatDateTime(
+                                                                    snapshot.capturedAt,
+                                                                    `Snapshot #${snapshot.id}`,
+                                                                )}{' '}
+                                                                ·{' '}
+                                                                <span className="font-mono text-xs text-muted-foreground">
+                                                                    {shortHash(
+                                                                        snapshot.configurationHash ??
+                                                                            snapshot.contentHash,
+                                                                    )}
+                                                                </span>
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {snapshotDiffLabel(
+                                                                    snapshot,
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                                            {snapshot.compareHref ? (
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        setDiffTarget(
+                                                                            {
+                                                                                deviceId:
+                                                                                    resolvedDeviceId,
+                                                                                deviceName:
+                                                                                    resolvedDeviceName,
+                                                                                snapshotId:
+                                                                                    snapshot.id,
+                                                                                baselineSnapshotId:
+                                                                                    snapshot.previousSnapshotId,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <FileDiff
+                                                                        className="mr-1.5 h-3.5 w-3.5"
+                                                                        aria-hidden="true"
+                                                                    />
+                                                                    Compare
+                                                                    versions
+                                                                </Button>
+                                                            ) : null}
+                                                            {snapshot.downloadHref ? (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    asChild
+                                                                >
+                                                                    <a
+                                                                        href={
+                                                                            snapshot.downloadHref
+                                                                        }
+                                                                    >
+                                                                        <Download
+                                                                            className="mr-1.5 h-3.5 w-3.5"
+                                                                            aria-hidden="true"
+                                                                        />
+                                                                        Download
+                                                                        snapshot
+                                                                    </a>
+                                                                </Button>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </details>
+                                ) : null}
+
+                                {snapshotHistoryTruncated ? (
+                                    <p className="text-xs text-muted-foreground">
+                                        Showing the 11 most recent snapshots for
+                                        this device.
+                                    </p>
+                                ) : null}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            <ConfigurationDiffDialog
+                target={diffTarget}
+                onClose={() => setDiffTarget(null)}
+            />
         </div>
     );
 }
@@ -2442,18 +2974,22 @@ export function DeviceTicketsSection({ profile }: { profile: DeviceProfile }) {
                                     {ticket.reference}
                                 </span>
                                 {ticket.status ? (
-                                    <Badge
-                                        variant={stateBadgeVariant(
+                                    <StatusBadge
+                                        variant={stateStatusVariant(
                                             ticket.status,
                                         )}
                                     >
                                         {humanise(ticket.status)}
-                                    </Badge>
+                                    </StatusBadge>
                                 ) : null}
                                 {ticket.priority ? (
-                                    <Badge variant="outline">
+                                    <StatusBadge
+                                        variant={stateStatusVariant(
+                                            ticket.priority,
+                                        )}
+                                    >
                                         {humanise(ticket.priority)}
-                                    </Badge>
+                                    </StatusBadge>
                                 ) : null}
                             </div>
                             <p className="mt-1 truncate text-sm font-semibold">

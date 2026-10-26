@@ -14,6 +14,10 @@ import {
     PageHeaderViewToggle,
 } from '@/components/page';
 import {
+    MonitorHistoryDialog,
+    type MonitorHistoryTarget,
+} from '@/components/security-devices/monitor-history-dialog';
+import {
     CapacityRecords,
     CollectionRecords,
     CoverageRecords,
@@ -130,6 +134,24 @@ export type MonitorRow = {
         latency_ms: number | null;
         observed_at: string | null;
     } | null;
+    maintenance?: {
+        active_window: {
+            id: number;
+            name: string;
+            starts_at: string | null;
+            ends_at: string | null;
+            timezone: string;
+            life_safety_protected: boolean;
+        } | null;
+        upcoming_window: {
+            id: number;
+            name: string;
+            starts_at: string | null;
+            ends_at: string | null;
+            timezone: string;
+            life_safety_protected: boolean;
+        } | null;
+    };
 };
 
 export type CollectionPath = {
@@ -413,7 +435,18 @@ export function MonitoringContent({
     view?: MonitoringView;
     owners?: MonitoringOwners;
 }) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
     const shared = { view, owners };
+    const dialog = (
+        <MonitorHistoryDialog
+            target={historyTarget}
+            open={historyTarget !== null}
+            onOpenChange={(open) => {
+                if (!open) setHistoryTarget(null);
+            }}
+        />
+    );
     if (workspace.active_tab === 'findings')
         return (
             <div className="space-y-5">
@@ -431,7 +464,9 @@ export function MonitoringContent({
                     description="Collection-path symptoms are grouped separately."
                     onEdit={onEditMonitor}
                     onDeactivate={onDeactivateMonitor}
+                    onViewHistory={setHistoryTarget}
                 />
+                {dialog}
             </div>
         );
     if (workspace.active_tab === 'coverage')
@@ -531,7 +566,11 @@ export function MonitoringContent({
     if (workspace.active_tab === 'trends')
         return (
             <div className="space-y-5">
-                <TrendRecords {...shared} rows={workspace.trends} />
+                <TrendRecords
+                    {...shared}
+                    rows={workspace.trends}
+                    onViewHistory={setHistoryTarget}
+                />
                 <ReviewCard icon={Gauge} title="Retained history scope">
                     <p className="text-sm text-muted-foreground">
                         {workspace.storage.retention.explanation}
@@ -578,6 +617,7 @@ export function MonitoringContent({
                     view={view}
                     rows={workspace.storage.retention.policies}
                 />
+                {dialog}
             </div>
         );
     if (workspace.active_tab === 'collection')
@@ -627,6 +667,7 @@ export function MonitoringContent({
                 total={workspace.inventory.total}
                 onEdit={onEditMonitor}
                 onDeactivate={onDeactivateMonitor}
+                onViewHistory={setHistoryTarget}
             />
             {workspace.inventory.truncated ? (
                 <p
@@ -640,6 +681,7 @@ export function MonitoringContent({
             ) : null}
             <RuntimeRecords runtime={workspace.runtime} view={view} />
             <QueueRecords view={view} queues={workspace.runtime.queues} />
+            {dialog}
         </div>
     );
 }

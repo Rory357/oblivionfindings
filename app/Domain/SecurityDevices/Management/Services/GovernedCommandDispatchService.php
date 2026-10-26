@@ -19,6 +19,7 @@ use App\Domain\SecurityDevices\Management\Data\CommandExecutionResult;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionRoute;
 use App\Domain\SecurityDevices\Management\Enums\CommandApprovalDecision;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
+use App\Domain\SecurityDevices\Management\Enums\CommandConfirmationMode;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Enums\ManagementLevel;
 use App\Domain\SecurityDevices\Management\Exceptions\CommandDispatchPreconditionException;
@@ -57,6 +58,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         private readonly DeviceCommandContractVerifier $verifier,
         private readonly DeviceCommandAuditService $audit,
         private readonly DeviceCommandBreakGlassService $breakGlass,
+        private readonly ?NetworkDeviceCommandPolicyService $networkPolicy = null,
     ) {}
 
     public function dispatch(DeviceCommandRequest $request, User $triggeredBy): DeviceCommandAttempt
@@ -306,7 +308,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         if ($request->risk !== $capability->risk
             || $request->management_level !== $capability->level
             || $request->confirmation_mode !== $capability->confirmationMode
-            || ($capability->isHighRisk() && $request->impact_acknowledged_at === null)) {
+            || (($capability->isHighRisk() || $capability->confirmationMode !== CommandConfirmationMode::None) && $request->impact_acknowledged_at === null)) {
             throw new CommandDispatchPreconditionException(
                 'risk_policy_changed',
                 'The risk safeguards changed after this request was approved. The request was blocked without execution.',
@@ -415,7 +417,14 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 'The approved parameter policy changed after the request was signed. The request was blocked without execution.',
             );
         }
-        if ($capability->requiresApproval) {
+        $requiresApproval = $capability->requiresApproval
+            || $request->approved_by_user_id !== null
+            || ($request->capability === 'network.port.bounce'
+                && ($this->networkPolicy ?? app(NetworkDeviceCommandPolicyService::class))->requiresIndependentApproval(
+                    $request->device,
+                    (string) ($parameters['interface'] ?? ''),
+                ));
+        if ($requiresApproval) {
             $approver = $request->approvedBy;
             $approverAuthorization = $approver instanceof User
                 ? $this->authorization->evaluate(

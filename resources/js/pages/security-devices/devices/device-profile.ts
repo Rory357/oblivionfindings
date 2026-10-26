@@ -49,6 +49,48 @@ type Capability = {
     reason?: string;
 };
 
+export type DeviceMaintenanceWindowSummary = {
+    id: number;
+    name: string;
+    scopeType: string;
+    startsAt: string | null;
+    endsAt: string | null;
+};
+
+export type DeviceMaintenanceNotice = {
+    activeWindow: DeviceMaintenanceWindowSummary | null;
+    upcomingWindow: DeviceMaintenanceWindowSummary | null;
+};
+
+export type DevicePortActions = {
+    bounceHref: string | null;
+    enableHref: string | null;
+    disableHref: string | null;
+};
+
+export type DeviceConfigurationSnapshot = {
+    id: number;
+    sourceKind: string;
+    source: string;
+    capturedAt: string | null;
+    contentHash: string;
+    configurationHash: string | null;
+    contentSize: number;
+    mimeType: string;
+    firmwareVersion: string | null;
+    storageState: string;
+    previousSnapshotId: number | null;
+    diff: {
+        added: string[];
+        removed: string[];
+        changed: string[];
+        count: number;
+        truncated: boolean;
+    };
+    downloadHref: string | null;
+    compareHref?: string | null;
+};
+
 export type DeviceProfile = {
     cctv?: CctvNavigation;
     header: {
@@ -108,6 +150,7 @@ export type DeviceProfile = {
             attention: number;
             uncertain: number;
         } | null;
+        maintenance?: DeviceMaintenanceNotice;
     };
     monitors: Array<{
         id: number;
@@ -130,6 +173,7 @@ export type DeviceProfile = {
             status: string;
             lastSeenAt: string | null;
         } | null;
+        maintenance?: DeviceMaintenanceNotice;
     }>;
     interfacesSensors: Array<{
         monitorId: number;
@@ -149,8 +193,14 @@ export type DeviceProfile = {
         errors: number | null;
         discards: number | null;
         observedAt: string | null;
+        portActions?: DevicePortActions | null;
     }>;
     configuration: {
+        canViewSnapshots?: boolean;
+        backupActionHref?: string | null;
+        latestSnapshot?: DeviceConfigurationSnapshot | null;
+        snapshotHistory?: DeviceConfigurationSnapshot[];
+        snapshotHistoryTruncated?: boolean;
         registry: {
             manufacturer: string | null;
             model: string | null;
@@ -255,6 +305,7 @@ export type DeviceProfile = {
             requiresChange: boolean;
             allowsBreakGlass: boolean;
             expiresAfterSeconds: number;
+            protectedInterfaces?: Record<string, string | null>;
             parameters: Array<{
                 name: string;
                 label: string;

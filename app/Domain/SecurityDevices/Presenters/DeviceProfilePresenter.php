@@ -5,15 +5,19 @@ namespace App\Domain\SecurityDevices\Presenters;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\Monitoring\Enums\MonitorKind;
+use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommands;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommands;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
+use App\Domain\SecurityDevices\Management\Enums\CommandConfirmationMode;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Enums\ManagementLevel;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
@@ -27,6 +31,7 @@ use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabili
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandBreakGlassService;
 use App\Domain\SecurityDevices\Management\Services\DeviceCommandParameterPolicyService;
 use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorizationService;
+use App\Domain\SecurityDevices\Management\Services\NetworkDeviceCommandPolicyService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -68,6 +73,8 @@ class DeviceProfilePresenter
         private readonly QueclinkConfigurationProfileService $configurationProfiles,
         private readonly UserSiteAccessService $siteAccess,
         private readonly ControlRoomAlertAccessService $controlRoomAccess,
+        private readonly ?ConfigurationSnapshotService $snapshots = null,
+        private readonly ?NetworkDeviceCommandPolicyService $networkCommandPolicy = null,
     ) {}
 
     /** @return array<string, mixed> */
@@ -83,6 +90,14 @@ class DeviceProfilePresenter
             : collect();
         $observations = $canViewMonitoring
             ? $this->latestObservations($monitors->pluck('id'))
+            : collect();
+        try {
+            $canonicalSiteId = $this->siteResolver->resolve((int) $device->id);
+        } catch (UnexpectedValueException) {
+            $canonicalSiteId = null;
+        }
+        $maintenanceWindows = $canViewMonitoring && $canonicalSiteId !== null
+            ? $this->maintenanceWindows($canonicalSiteId)
             : collect();
         $tickets = $canViewIt
             ? $this->tickets($viewer, $device)
@@ -114,14 +129,14 @@ class DeviceProfilePresenter
                 (bool) $management['visible'],
                 count($management['history']),
             ),
-            'health' => $this->health($device, $monitors, $canViewMonitoring),
+            'health' => $this->health($device, $monitors, $canViewMonitoring, $maintenanceWindows, $canonicalSiteId),
             'monitors' => $canViewMonitoring
-                ? $monitors->map(fn (Monitor $monitor): array => $this->monitor($monitor))->values()
+                ? $monitors->map(fn (Monitor $monitor): array => $this->monitor($monitor, $maintenanceWindows, $canonicalSiteId, (int) $device->id))->values()
                 : [],
             'interfacesSensors' => $canViewMonitoring
-                ? $this->interfacesAndSensors($monitors, $observations)
+                ? $this->interfacesAndSensors($monitors, $observations, $viewer, $device, $canonicalSiteId)
                 : [],
-            'configuration' => $this->configuration($device),
+            'configuration' => $this->configuration($device, $viewer, $canonicalSiteId),
             'tickets' => $tickets->values(),
             'controlRoomAlerts' => $controlRoomAlerts->values(),
             'audit' => $audit->values(),
@@ -488,8 +503,13 @@ class DeviceProfilePresenter
     }
 
     /** @return array<string, mixed> */
-    private function health(Device $device, Collection $monitors, bool $canViewMonitoring): array
-    {
+    private function health(
+        Device $device,
+        Collection $monitors,
+        bool $canViewMonitoring,
+        Collection $maintenanceWindows,
+        ?int $canonicalSiteId,
+    ): array {
         $enabled = $monitors->where('is_enabled', true);
 
         return [
@@ -499,6 +519,9 @@ class DeviceProfilePresenter
             'lastSignalAt' => $device->last_signal_at?->toISOString(),
             'batteryLevel' => $device->battery_level,
             'batteryUpdatedAt' => $device->battery_updated_at?->toISOString(),
+            'maintenance' => $canViewMonitoring
+                ? $this->maintenanceFor($maintenanceWindows, $canonicalSiteId, (int) $device->id, null)
+                : null,
             'monitoring' => $canViewMonitoring ? [
                 'enabled' => $enabled->count(),
                 'healthy' => $enabled->filter(fn (Monitor $monitor): bool => $monitor->current_state?->value === 'healthy')->count(),
@@ -509,8 +532,12 @@ class DeviceProfilePresenter
     }
 
     /** @return array<string, mixed> */
-    private function monitor(Monitor $monitor): array
-    {
+    private function monitor(
+        Monitor $monitor,
+        Collection $maintenanceWindows,
+        ?int $canonicalSiteId,
+        int $deviceId,
+    ): array {
         return [
             'id' => $monitor->id,
             'name' => $monitor->name,
@@ -522,6 +549,7 @@ class DeviceProfilePresenter
             'lastObservationAt' => $monitor->last_observation_at?->toISOString(),
             'lastStateChangedAt' => $monitor->last_state_changed_at?->toISOString(),
             'suppressedUntil' => $monitor->suppressed_until?->toISOString(),
+            'maintenance' => $this->maintenanceFor($maintenanceWindows, $canonicalSiteId, $deviceId, (int) $monitor->id),
             'profile' => $monitor->profile ? [
                 'name' => $monitor->profile->name,
                 'intervalSeconds' => $monitor->profile->interval_seconds,
@@ -616,8 +644,28 @@ class DeviceProfilePresenter
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function interfacesAndSensors(Collection $monitors, Collection $observations): array
-    {
+    private function interfacesAndSensors(
+        Collection $monitors,
+        Collection $observations,
+        User $viewer,
+        Device $device,
+        ?int $canonicalSiteId,
+    ): array {
+        $canManageCommands = $viewer->canDo('securityDevices.commands.manage');
+        $canControlCommands = $viewer->canDo('securityDevices.commands.control');
+        $supportsBounce = $canManageCommands
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.port.bounce')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.port.bounce')->available;
+        $supportsEnable = $canManageCommands
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.port.enable')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.port.enable')->available;
+        $supportsDisable = $canControlCommands
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.port.disable')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.port.disable')->available;
+
         return $monitors->filter(function (Monitor $monitor) use ($observations): bool {
             if ($monitor->kind === MonitorKind::SnmpInterface) {
                 return true;
@@ -629,13 +677,24 @@ class DeviceProfilePresenter
                 && is_array($metrics)
                 && collect(['interface_name', 'if_name', 'sensor_name', 'sensor_type'])
                     ->contains(fn (string $key): bool => data_get($metrics, $key) !== null);
-        })->map(function (Monitor $monitor) use ($observations): array {
+        })->map(function (Monitor $monitor) use (
+            $observations,
+            $device,
+            $supportsBounce,
+            $supportsEnable,
+            $supportsDisable,
+        ): array {
             $observation = $observations->get($monitor->id);
             $metrics = is_array($observation?->metrics) ? $observation->metrics : [];
+            $interfaceName = $this->identifierMetric($metrics, ['interface_name', 'if_name']);
+            $displayName = $interfaceName ?: ($this->identifierMetric($metrics, ['sensor_name']) ?: $monitor->name);
+            $isInterface = $monitor->kind === MonitorKind::SnmpInterface || $interfaceName !== null;
+            $portIdentifier = $interfaceName ?: $monitor->name;
+            $encodedInterface = rawurlencode($portIdentifier);
 
             return [
                 'monitorId' => $monitor->id,
-                'name' => $this->identifierMetric($metrics, ['interface_name', 'if_name', 'sensor_name']) ?: $monitor->name,
+                'name' => $displayName,
                 'kind' => $monitor->kind?->value,
                 'state' => $monitor->current_state?->value,
                 'value' => $this->numeric($observation?->value),
@@ -651,12 +710,23 @@ class DeviceProfilePresenter
                 'errors' => $this->boundedIntegerMetric($metrics, ['errors', 'error_count']),
                 'discards' => $this->boundedIntegerMetric($metrics, ['discards', 'discard_count']),
                 'observedAt' => $observation?->observed_at?->toISOString(),
+                'portActions' => $isInterface && ($supportsBounce || $supportsEnable || $supportsDisable) ? [
+                    'bounceHref' => $supportsBounce
+                        ? "/security-devices/devices/{$device->id}?section=management&action=network.port.bounce&command_interface={$encodedInterface}"
+                        : null,
+                    'enableHref' => $supportsEnable
+                        ? "/security-devices/devices/{$device->id}?section=management&action=network.port.enable&command_interface={$encodedInterface}"
+                        : null,
+                    'disableHref' => $supportsDisable
+                        ? "/security-devices/devices/{$device->id}?section=management&action=network.port.disable&command_interface={$encodedInterface}"
+                        : null,
+                ] : null,
             ];
         })->values()->all();
     }
 
     /** @return array<string, mixed> */
-    private function configuration(Device $device): array
+    private function configuration(Device $device, User $viewer, ?int $canonicalSiteId): array
     {
         $observedHash = $this->scalarEvidence($device, [
             'observed.configuration_hash',
@@ -673,8 +743,33 @@ class DeviceProfilePresenter
             'monitoring.firmware.desired_version',
             'firmware.desired_version',
         ]);
+        $snapshotService = $this->snapshots ?? app(ConfigurationSnapshotService::class);
+        $canViewSnapshots = $snapshotService->canViewSnapshots($viewer);
+        $canBackup = $viewer->canDo('securityDevices.commands.manage')
+            && $canonicalSiteId !== null
+            && $this->declaredCommandCapabilities->supports($device, 'network.config.backup')
+            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.config.backup')->available;
+        $loadedSnapshots = $device->relationLoaded('configurationSnapshots')
+            ? $device->configurationSnapshots
+            : $device->configurationSnapshots()->latest('captured_at')->latest('id')->limit(12)->get();
+        $snapshotCandidates = $canonicalSiteId === null
+            ? collect()
+            : $loadedSnapshots
+                ->where('site_id', $canonicalSiteId)
+                ->values();
+        $snapshotHistory = $snapshotCandidates
+            ->take(11)
+            ->map(fn (ConfigurationSnapshot $snapshot): array => $this->configurationSnapshot($device, $snapshot, $canViewSnapshots))
+            ->values();
 
         return [
+            'canViewSnapshots' => $canViewSnapshots,
+            'backupActionHref' => $canBackup
+                ? "/security-devices/devices/{$device->id}?section=management&action=network.config.backup"
+                : null,
+            'latestSnapshot' => $snapshotHistory->first(),
+            'snapshotHistory' => $snapshotHistory->all(),
+            'snapshotHistoryTruncated' => $snapshotCandidates->count() > $snapshotHistory->count(),
             'registry' => [
                 'manufacturer' => $device->manufacturer,
                 'model' => $device->model,
@@ -732,6 +827,99 @@ class DeviceProfilePresenter
                     'monitoring.firmware.observed_at',
                 ]),
             ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function configurationSnapshot(Device $device, ConfigurationSnapshot $snapshot, bool $canViewSnapshots): array
+    {
+        $diff = is_array($snapshot->diff_summary) ? $snapshot->diff_summary : [];
+        $added = collect($diff['added'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $removed = collect($diff['removed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $changed = collect($diff['changed'] ?? [])->filter(fn (mixed $path): bool => is_string($path))->values();
+        $canAccessPayload = $snapshot->storage_state === 'available' && $canViewSnapshots;
+
+        return [
+            'id' => $snapshot->id,
+            'sourceKind' => $snapshot->source_kind,
+            'source' => $snapshot->source,
+            'capturedAt' => $snapshot->captured_at?->toISOString(),
+            'contentHash' => $snapshot->content_hash,
+            'configurationHash' => $snapshot->configuration_hash,
+            'contentSize' => $snapshot->content_size,
+            'mimeType' => $snapshot->mime_type,
+            'firmwareVersion' => $snapshot->firmware_version,
+            'storageState' => $snapshot->storage_state,
+            'previousSnapshotId' => $snapshot->previous_snapshot_id,
+            'diff' => [
+                'added' => $added->all(),
+                'removed' => $removed->all(),
+                'changed' => $changed->all(),
+                'count' => $added->count() + $removed->count() + $changed->count(),
+                'truncated' => (bool) ($diff['truncated'] ?? false),
+            ],
+            'downloadHref' => $canAccessPayload
+                ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}"
+                : null,
+            'compareHref' => $canAccessPayload
+                ? "/security-devices/devices/{$device->id}/configuration-snapshots/{$snapshot->id}/compare"
+                : null,
+        ];
+    }
+
+    /** @return Collection<int, MonitoringMaintenanceWindow> */
+    private function maintenanceWindows(int $siteId): Collection
+    {
+        return MonitoringMaintenanceWindow::query()
+            ->where('status', 'active')
+            ->where('site_id', $siteId)
+            ->where('ends_at', '>', now())
+            ->where('starts_at', '<=', now()->addDays(7))
+            ->orderBy('starts_at')
+            ->limit(100)
+            ->get();
+    }
+
+    /** @return array{activeWindow: array<string, mixed>|null, upcomingWindow: array<string, mixed>|null} */
+    private function maintenanceFor(
+        Collection $windows,
+        ?int $siteId,
+        int $deviceId,
+        ?int $monitorId,
+    ): array {
+        if ($siteId === null || $windows->isEmpty()) {
+            return ['activeWindow' => null, 'upcomingWindow' => null];
+        }
+
+        $now = now();
+        $matching = $windows->filter(function (MonitoringMaintenanceWindow $window) use ($siteId, $deviceId, $monitorId): bool {
+            if ((int) $window->site_id !== $siteId) {
+                return false;
+            }
+            if ($window->monitor_id !== null) {
+                return $monitorId !== null && (int) $window->monitor_id === $monitorId;
+            }
+            if ($window->device_id !== null) {
+                return (int) $window->device_id === $deviceId;
+            }
+
+            return true;
+        });
+
+        $active = $matching->first(fn (MonitoringMaintenanceWindow $w): bool => $w->starts_at !== null && $w->starts_at->lte($now));
+        $upcoming = $matching->first(fn (MonitoringMaintenanceWindow $w): bool => $w->starts_at !== null && $w->starts_at->gt($now));
+
+        $format = static fn (?MonitoringMaintenanceWindow $w): ?array => $w === null ? null : [
+            'id' => $w->id,
+            'name' => $w->name,
+            'scopeType' => $w->monitor_id !== null ? 'monitor' : ($w->device_id !== null ? 'device' : 'site'),
+            'startsAt' => $w->starts_at?->toISOString(),
+            'endsAt' => $w->ends_at?->toISOString(),
+        ];
+
+        return [
+            'activeWindow' => $format($active),
+            'upcomingWindow' => $format($upcoming),
         ];
     }
 
@@ -1019,6 +1207,8 @@ class DeviceProfilePresenter
         $canObserve = $this->managementAuthorization->allowsLevel($viewer, ManagementLevel::Observe);
         $freshness = $this->commandFreshness->inspect($device);
         $compatibleConfigurationProfiles = $this->configurationProfiles->compatibleProfiles($device);
+        $networkPolicy = $this->networkCommandPolicy ?? app(NetworkDeviceCommandPolicyService::class);
+        $knownInterfaces = $networkPolicy->knownInterfaces($device);
         try {
             $siteId = $this->siteResolver->resolve((int) $device->id);
             $assignmentFingerprint = $this->commandAssignments->forDevice($device);
@@ -1029,7 +1219,7 @@ class DeviceProfilePresenter
             $eligibleChanges = collect();
         }
         $actions = $this->declaredCommandCapabilities->forDevice($device)
-            ->map(function (string $key) use ($viewer, $device, $eligibleChanges, $freshness, $siteId, $compatibleConfigurationProfiles): ?array {
+            ->map(function (string $key) use ($viewer, $device, $eligibleChanges, $freshness, $siteId, $compatibleConfigurationProfiles, $networkPolicy, $knownInterfaces): ?array {
                 try {
                     $definition = $this->commandCapabilities->definition($key);
                 } catch (\DomainException) {
@@ -1126,24 +1316,41 @@ class DeviceProfilePresenter
                     'requiresChange' => $definition->requiresChange,
                     'allowsBreakGlass' => $definition->allowsBreakGlass,
                     'expiresAfterSeconds' => $definition->expiresAfterSeconds,
+                    'protectedInterfaces' => $key === 'network.port.bounce'
+                        ? collect($knownInterfaces)
+                            ->where('protected', true)
+                            ->mapWithKeys(fn (array $row): array => [$row['name'] => $row['protectionReason']])
+                            ->all()
+                        : [],
                     'parameters' => collect($definition->parameters)
-                        ->map(function (array $schema, string $name) use ($compatibleConfigurationProfiles): array {
+                        ->map(function (array $schema, string $name) use ($key, $compatibleConfigurationProfiles, $networkPolicy, $knownInterfaces): array {
                             $profileSource = ($schema['source'] ?? null) === 'compatible_configuration_profiles';
+                            $interfaceSource = $name === 'interface' && $networkPolicy->isPortCapability($key) && $knownInterfaces !== [];
 
                             return [
                                 'name' => $name,
-                                'label' => $profileSource ? 'Approved configuration profile' : ($name === 'package_uuid' ? 'Approved software' : Str::headline($name)),
+                                'label' => $profileSource
+                                    ? 'Approved configuration profile'
+                                    : ($name === 'package_uuid'
+                                        ? 'Approved software'
+                                        : ($interfaceSource ? 'Network port' : Str::headline($name))),
                                 'type' => $schema['type'],
                                 'min' => $schema['min'] ?? null,
                                 'max' => $schema['max'] ?? $schema['max_length'] ?? null,
                                 'options' => $profileSource
                                     ? $compatibleConfigurationProfiles->pluck('id')->map(fn (int $id): string => (string) $id)->all()
-                                    : ($schema['enum'] ?? []),
+                                    : ($interfaceSource ? array_keys($knownInterfaces) : ($schema['enum'] ?? [])),
                                 'optionLabels' => $profileSource
                                     ? $compatibleConfigurationProfiles->mapWithKeys(fn ($profile): array => [
                                         (string) $profile->id => $profile->name.' · v'.$profile->version,
                                     ])->all()
-                                    : ($schema['option_labels'] ?? []),
+                                    : ($interfaceSource
+                                        ? collect($knownInterfaces)->mapWithKeys(fn (array $row): array => [
+                                            $row['name'] => $key === 'network.port.bounce'
+                                                ? $row['label']
+                                                : str_replace(' — Independent approval required', '', $row['label']),
+                                        ])->all()
+                                        : ($schema['option_labels'] ?? [])),
                             ];
                         })->values()->all(),
                 ];
@@ -1277,7 +1484,7 @@ class DeviceProfilePresenter
                         && $command->risk === $definition->risk
                         && $command->management_level === $definition->level
                         && $command->confirmation_mode === $definition->confirmationMode
-                        && (! $definition->isHighRisk() || $command->impact_acknowledged_at !== null)
+                        && ((! $definition->isHighRisk() && $definition->confirmationMode === CommandConfirmationMode::None) || $command->impact_acknowledged_at !== null)
                         && $siteId !== null
                         && (int) $command->site_id === $siteId
                         && is_string($assignmentFingerprint)

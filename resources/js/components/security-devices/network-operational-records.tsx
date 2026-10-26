@@ -9,6 +9,7 @@ import {
     type MenuItem,
 } from '@/components/lists';
 import { EvidenceRecords as Records } from '@/components/lists/evidence-records';
+import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
@@ -22,9 +23,16 @@ import {
     Eye,
     FileDiff,
     Gauge,
+    History,
+    Power,
+    PowerOff,
+    RotateCcw,
+    Save,
     Server,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import type { ConfigurationDiffTarget } from './configuration-diff-dialog';
+import type { MonitorHistoryTarget } from './monitor-history-dialog';
 import {
     StateBadge,
     capacityLabel,
@@ -38,6 +46,7 @@ import {
 import type {
     ConfigurationRow,
     ConfigurationSnapshotRow,
+    MaintenanceWindowNotice,
     NetworkDevice,
     NetworkInterface,
     NetworkItWorkspaceData,
@@ -108,6 +117,26 @@ function Facts({ items }: { items: Array<[string, ReactNode]> }) {
 function Hash({ value }: { value: string | null }) {
     return <span title={value ?? undefined}>{shortHash(value)}</span>;
 }
+function MaintenanceBadges({
+    maintenance,
+}: {
+    maintenance?: MaintenanceWindowNotice | null;
+}) {
+    if (!maintenance) return null;
+    return (
+        <>
+            {maintenance.activeWindow ? (
+                <StatusBadge variant="info">
+                    In maintenance: {maintenance.activeWindow.name}
+                </StatusBadge>
+            ) : maintenance.upcomingWindow ? (
+                <StatusBadge variant="neutral">
+                    Maintenance planned: {maintenance.upcomingWindow.name}
+                </StatusBadge>
+            ) : null}
+        </>
+    );
+}
 function MonitoringFacts({ row }: { row: NetworkDevice }) {
     return (
         <>
@@ -122,6 +151,7 @@ function MonitoringFacts({ row }: { row: NetworkDevice }) {
                     {row.monitoring.uncertain} uncertain
                 </StatusBadge>
             ) : null}
+            <MaintenanceBadges maintenance={row.maintenance} />
             {row.wanPath ? <EntityChip>WAN path</EntityChip> : null}
         </>
     );
@@ -345,9 +375,11 @@ function DeviceRecords({
 function InterfaceRecords({
     data,
     view,
+    onViewHistory,
 }: {
     data: NetworkItWorkspaceData;
     view: NetworkRecordsView;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
 }) {
     const rows = data.activeTab.interfaces;
     const gap = data.activeTab.gaps.devicesWithoutInterfaceEvidence;
@@ -463,7 +495,53 @@ function InterfaceRecords({
                 subline: row.deviceName,
             })}
             hrefFor={(row) => row.deviceHref}
-            actionsFor={(row) => [OpenDevice(row.deviceHref)]}
+            actionsFor={(row) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: History,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: row.monitorId,
+                                      monitorName: row.name,
+                                      deviceName: row.deviceName,
+                                  }),
+                          },
+                      ]
+                    : []),
+                ...(row.portActions?.bounceHref
+                    ? [
+                          {
+                              label: 'Restart port',
+                              icon: RotateCcw,
+                              onClick: () =>
+                                  router.visit(row.portActions!.bounceHref!),
+                          },
+                      ]
+                    : []),
+                ...(row.portActions?.enableHref
+                    ? [
+                          {
+                              label: 'Enable port',
+                              icon: Power,
+                              onClick: () =>
+                                  router.visit(row.portActions!.enableHref!),
+                          },
+                      ]
+                    : []),
+                ...(row.portActions?.disableHref
+                    ? [
+                          {
+                              label: 'Disable port',
+                              icon: PowerOff,
+                              onClick: () =>
+                                  router.visit(row.portActions!.disableHref!),
+                          },
+                      ]
+                    : []),
+                OpenDevice(row.deviceHref),
+            ]}
             empty="No interface observations are retained for the current scope."
             gap={
                 gap > 0 ? (
@@ -584,9 +662,11 @@ function InterfaceRecords({
 function ServiceRecords({
     data,
     view,
+    onViewHistory,
 }: {
     data: NetworkItWorkspaceData;
     view: NetworkRecordsView;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
 }) {
     const rows = data.activeTab.services,
         gap = data.activeTab.gaps.devicesWithoutServiceChecks;
@@ -600,6 +680,7 @@ function ServiceRecords({
                 {row.dependentCount} known{' '}
                 {row.dependentCount === 1 ? 'dependant' : 'dependants'}
             </EntityChip>
+            <MaintenanceBadges maintenance={row.maintenance} />
         </>
     );
     const collector = (row: NetworkService) => (
@@ -676,7 +757,23 @@ function ServiceRecords({
                 subline: row.deviceName,
             })}
             hrefFor={(row) => row.deviceHref}
-            actionsFor={(row) => [OpenDevice(row.deviceHref)]}
+            actionsFor={(row) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: History,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: row.id,
+                                      monitorName: row.name,
+                                      deviceName: row.deviceName,
+                                  }),
+                          },
+                      ]
+                    : []),
+                OpenDevice(row.deviceHref),
+            ]}
             empty="No service checks are configured for the current scope."
             gap={
                 gap > 0 ? (
@@ -742,9 +839,11 @@ function ServiceRecords({
 function TrafficRecords({
     data,
     view,
+    onViewHistory,
 }: {
     data: NetworkItWorkspaceData;
     view: NetworkRecordsView;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
 }) {
     const rows = data.activeTab.traffic,
         gap = data.activeTab.gaps.devicesWithoutCapacityEvidence;
@@ -834,7 +933,23 @@ function TrafficRecords({
                 subline: row.deviceName,
             })}
             hrefFor={(row) => row.deviceHref}
-            actionsFor={(row) => [OpenDevice(row.deviceHref)]}
+            actionsFor={(row) => [
+                ...(onViewHistory
+                    ? [
+                          {
+                              label: 'View history',
+                              icon: History,
+                              onClick: () =>
+                                  onViewHistory({
+                                      monitorId: row.monitorId,
+                                      monitorName: row.interface,
+                                      deviceName: row.deviceName,
+                                  }),
+                          },
+                      ]
+                    : []),
+                OpenDevice(row.deviceHref),
+            ]}
             empty="No retained traffic or capacity metrics are available."
             gap={
                 gap > 0 ? (
@@ -914,10 +1029,27 @@ function TrafficRecords({
 }
 function snapshotActions(
     snapshot: ConfigurationSnapshotRow,
+    deviceId: number,
+    deviceName: string,
     deviceHref: string,
+    onCompareSnapshots?: (target: ConfigurationDiffTarget) => void,
 ): MenuItem[] {
     return [
-        OpenDevice(deviceHref),
+        ...(snapshot.compareHref && onCompareSnapshots
+            ? [
+                  {
+                      label: 'Compare versions',
+                      icon: FileDiff,
+                      onClick: () =>
+                          onCompareSnapshots({
+                              deviceId,
+                              deviceName,
+                              snapshotId: snapshot.id,
+                              baselineSnapshotId: snapshot.previousSnapshotId,
+                          }),
+                  },
+              ]
+            : []),
         ...(snapshot.downloadHref
             ? [
                   {
@@ -928,9 +1060,16 @@ function snapshotActions(
                   },
               ]
             : []),
+        OpenDevice(deviceHref),
     ];
 }
-function SnapshotDetails({ row }: { row: ConfigurationRow }) {
+function SnapshotDetails({
+    row,
+    onCompareSnapshots,
+}: {
+    row: ConfigurationRow;
+    onCompareSnapshots?: (target: ConfigurationDiffTarget) => void;
+}) {
     const latest = row.latestSnapshot;
     return (
         <div
@@ -939,9 +1078,21 @@ function SnapshotDetails({ row }: { row: ConfigurationRow }) {
             onContextMenu={(event) => event.stopPropagation()}
         >
             {!latest && !row.snapshotHistory?.length ? (
-                <p className="text-sm text-muted-foreground">
-                    No saved snapshot
-                </p>
+                <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">
+                        No saved snapshot
+                    </p>
+                    {row.backupActionHref ? (
+                        <a
+                            onClick={(event) => event.stopPropagation()}
+                            href={row.backupActionHref}
+                            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <Save className="size-4" />
+                            Capture configuration backup
+                        </a>
+                    ) : null}
+                </div>
             ) : null}
             {latest ? (
                 <ReviewCard icon={FileDiff} title="Latest governed snapshot">
@@ -981,20 +1132,55 @@ function SnapshotDetails({ row }: { row: ConfigurationRow }) {
                         label="Comparison"
                         value={snapshotDiffLabel(latest)}
                     />
-                    {latest.downloadHref ? (
-                        <a
-                            onClick={(event) => event.stopPropagation()}
-                            href={latest.downloadHref}
-                            className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                            <Download className="size-4" />
-                            Download governed snapshot
-                        </a>
-                    ) : (
-                        <p className="text-sm text-muted-foreground">
-                            Download unavailable
-                        </p>
-                    )}
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                        {latest.compareHref && onCompareSnapshots ? (
+                            <Button
+                                type="button"
+                                variant="link"
+                                size="sm"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    onCompareSnapshots({
+                                        deviceId: row.deviceId,
+                                        deviceName: row.deviceName,
+                                        snapshotId: latest.id,
+                                        baselineSnapshotId:
+                                            latest.previousSnapshotId,
+                                    });
+                                }}
+                                className="h-auto gap-1 p-0 text-sm font-medium"
+                            >
+                                <FileDiff className="size-4" />
+                                Compare versions
+                            </Button>
+                        ) : null}
+                        {latest.downloadHref ? (
+                            <a
+                                onClick={(event) => event.stopPropagation()}
+                                href={latest.downloadHref}
+                                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <Download className="size-4" />
+                                Download governed snapshot
+                            </a>
+                        ) : (
+                            <p className="text-sm text-muted-foreground">
+                                {row.canViewSnapshots === false
+                                    ? 'Configuration payload restricted by role'
+                                    : 'Download unavailable'}
+                            </p>
+                        )}
+                        {row.backupActionHref ? (
+                            <a
+                                onClick={(event) => event.stopPropagation()}
+                                href={row.backupActionHref}
+                                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                                <Save className="size-4" />
+                                Capture backup
+                            </a>
+                        ) : null}
+                    </div>
                 </ReviewCard>
             ) : null}
             {(row.snapshotHistory?.length ?? 0) > 1 ? (
@@ -1006,7 +1192,10 @@ function SnapshotDetails({ row }: { row: ConfigurationRow }) {
                     <div className="space-y-3 p-3">
                         <SnapshotHistory
                             rows={row.snapshotHistory!.slice(1)}
+                            deviceId={row.deviceId}
+                            deviceName={row.deviceName}
                             deviceHref={row.deviceHref}
+                            onCompareSnapshots={onCompareSnapshots}
                         />
                     </div>
                 </details>
@@ -1022,10 +1211,16 @@ function SnapshotDetails({ row }: { row: ConfigurationRow }) {
 }
 function SnapshotHistory({
     rows,
+    deviceId,
+    deviceName,
     deviceHref,
+    onCompareSnapshots,
 }: {
     rows: ConfigurationSnapshotRow[];
+    deviceId: number;
+    deviceName: string;
     deviceHref: string;
+    onCompareSnapshots?: (target: ConfigurationDiffTarget) => void;
 }) {
     const context = useEntityContextMenu<ConfigurationSnapshotRow>();
     return (
@@ -1051,7 +1246,13 @@ function SnapshotHistory({
                             stateLabel(row.source)
                         }
                         meridian="neutral"
-                        actions={snapshotActions(row, deviceHref)}
+                        actions={snapshotActions(
+                            row,
+                            deviceId,
+                            deviceName,
+                            deviceHref,
+                            onCompareSnapshots,
+                        )}
                         onContextMenu={(event) => context.open(event, row)}
                         chips={
                             <>
@@ -1087,17 +1288,43 @@ function SnapshotHistory({
                             ) : (
                                 'Capture time unavailable'
                             ),
-                            trailing: row.downloadHref ? (
-                                <a
-                                    onClick={(event) => event.stopPropagation()}
-                                    href={row.downloadHref}
-                                    className="text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                    Download this snapshot
-                                </a>
-                            ) : (
-                                <span className="text-caption">
-                                    Unavailable
+                            trailing: (
+                                <span className="inline-flex flex-wrap items-center gap-3">
+                                    {row.compareHref && onCompareSnapshots ? (
+                                        <Button
+                                            type="button"
+                                            variant="link"
+                                            size="sm"
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onCompareSnapshots({
+                                                    deviceId,
+                                                    deviceName,
+                                                    snapshotId: row.id,
+                                                    baselineSnapshotId:
+                                                        row.previousSnapshotId,
+                                                });
+                                            }}
+                                            className="h-auto p-0 text-sm font-medium"
+                                        >
+                                            Compare versions
+                                        </Button>
+                                    ) : null}
+                                    {row.downloadHref ? (
+                                        <a
+                                            onClick={(event) =>
+                                                event.stopPropagation()
+                                            }
+                                            href={row.downloadHref}
+                                            className="text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                        >
+                                            Download this snapshot
+                                        </a>
+                                    ) : (
+                                        <span className="text-caption">
+                                            Unavailable
+                                        </span>
+                                    )}
                                 </span>
                             ),
                         }}
@@ -1110,7 +1337,13 @@ function SnapshotHistory({
                     y={context.ctx.y}
                     title={'Snapshot #' + context.ctx.record.id}
                     icon={FileDiff}
-                    items={snapshotActions(context.ctx.record, deviceHref)}
+                    items={snapshotActions(
+                        context.ctx.record,
+                        deviceId,
+                        deviceName,
+                        deviceHref,
+                        onCompareSnapshots,
+                    )}
                     onClose={context.close}
                 />
             ) : null}
@@ -1120,9 +1353,11 @@ function SnapshotHistory({
 function ConfigurationRecords({
     data,
     view,
+    onCompareSnapshots,
 }: {
     data: NetworkItWorkspaceData;
     view: NetworkRecordsView;
+    onCompareSnapshots?: (target: ConfigurationDiffTarget) => void;
 }) {
     const rows = data.activeTab.configuration,
         gaps = data.activeTab.gaps;
@@ -1168,7 +1403,22 @@ function ConfigurationRecords({
         </>
     );
     const actions = (row: ConfigurationRow): MenuItem[] => [
-        OpenDevice(row.deviceHref),
+        ...(row.latestSnapshot?.compareHref && onCompareSnapshots
+            ? [
+                  {
+                      label: 'Compare versions',
+                      icon: FileDiff,
+                      onClick: () =>
+                          onCompareSnapshots({
+                              deviceId: row.deviceId,
+                              deviceName: row.deviceName,
+                              snapshotId: row.latestSnapshot!.id,
+                              baselineSnapshotId:
+                                  row.latestSnapshot!.previousSnapshotId,
+                          }),
+                  },
+              ]
+            : []),
         ...(row.latestSnapshot?.downloadHref
             ? [
                   {
@@ -1181,6 +1431,16 @@ function ConfigurationRecords({
                   },
               ]
             : []),
+        ...(row.backupActionHref
+            ? [
+                  {
+                      label: 'Capture backup',
+                      icon: Save,
+                      onClick: () => router.visit(row.backupActionHref!),
+                  },
+              ]
+            : []),
+        OpenDevice(row.deviceHref),
     ];
     return (
         <Records
@@ -1303,7 +1563,12 @@ function ConfigurationRecords({
                     ),
                 },
             })}
-            extraFor={(row) => <SnapshotDetails row={row} />}
+            extraFor={(row) => (
+                <SnapshotDetails
+                    row={row}
+                    onCompareSnapshots={onCompareSnapshots}
+                />
+            )}
             columns={[
                 {
                     key: 'state',
@@ -1329,7 +1594,12 @@ function ConfigurationRecords({
                     key: 'snapshots',
                     label: 'Saved snapshots',
                     width: '2fr',
-                    cell: (row) => <SnapshotDetails row={row} />,
+                    cell: (row) => (
+                        <SnapshotDetails
+                            row={row}
+                            onCompareSnapshots={onCompareSnapshots}
+                        />
+                    ),
                 },
             ]}
             minWidth={1250}
@@ -1339,21 +1609,49 @@ function ConfigurationRecords({
 export function NetworkOperationalRecords({
     data,
     view = 'cards',
+    onViewHistory,
+    onCompareSnapshots,
 }: {
     data: NetworkItWorkspaceData;
     view?: NetworkRecordsView;
+    onViewHistory?: (target: MonitorHistoryTarget) => void;
+    onCompareSnapshots?: (target: ConfigurationDiffTarget) => void;
 }) {
     switch (data.activeTab.key) {
         case 'devices':
             return <DeviceRecords data={data} view={view} />;
         case 'interfaces':
-            return <InterfaceRecords data={data} view={view} />;
+            return (
+                <InterfaceRecords
+                    data={data}
+                    view={view}
+                    onViewHistory={onViewHistory}
+                />
+            );
         case 'services':
-            return <ServiceRecords data={data} view={view} />;
+            return (
+                <ServiceRecords
+                    data={data}
+                    view={view}
+                    onViewHistory={onViewHistory}
+                />
+            );
         case 'traffic-capacity':
-            return <TrafficRecords data={data} view={view} />;
+            return (
+                <TrafficRecords
+                    data={data}
+                    view={view}
+                    onViewHistory={onViewHistory}
+                />
+            );
         case 'configuration-firmware':
-            return <ConfigurationRecords data={data} view={view} />;
+            return (
+                <ConfigurationRecords
+                    data={data}
+                    view={view}
+                    onCompareSnapshots={onCompareSnapshots}
+                />
+            );
         default:
             return null;
     }

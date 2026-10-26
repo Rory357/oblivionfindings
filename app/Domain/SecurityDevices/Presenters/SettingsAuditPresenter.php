@@ -2,12 +2,15 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorDependency;
+use App\Domain\Monitoring\Models\MonitoringAlertRoute;
 use App\Domain\Monitoring\Models\MonitoringCoverageExpectation;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
+use App\Domain\Monitoring\Models\MonitoringThresholdRule;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\MonitoringPolicyRules;
 use App\Domain\Monitoring\Services\MonitoringRuntimeHealthService;
@@ -42,6 +45,8 @@ class SettingsAuditPresenter
         DeviceGroup::class,
         DeviceMaintenanceRecord::class,
         MonitoringProfile::class,
+        MonitoringThresholdRule::class,
+        MonitoringAlertRoute::class,
         MonitoringCoverageExpectation::class,
         MonitorDependency::class,
         MonitoringMaintenanceWindow::class,
@@ -56,6 +61,10 @@ class SettingsAuditPresenter
 
     private const MONITORING_POLICY_ACTIONS = [
         'monitoring.profile.created', 'monitoring.profile.updated', 'monitoring.profile.deactivated',
+        'monitoring.threshold.created', 'monitoring.threshold.updated',
+        'monitoring.threshold.deactivated', 'monitoring.threshold.reactivated',
+        'monitoring.alert_route.created', 'monitoring.alert_route.updated',
+        'monitoring.alert_route.deactivated', 'monitoring.alert_route.reactivated',
         'monitoring.coverage.created', 'monitoring.coverage.updated',
         'monitoring.coverage.deactivated', 'monitoring.coverage.reactivated',
         'monitoring.dependency.created', 'monitoring.dependency.reactivated',
@@ -79,6 +88,13 @@ class SettingsAuditPresenter
         'confidence', 'source', 'monitor_id', 'device_id', 'starts_at', 'ends_at', 'recurrence',
         'recurrence_until', 'timezone', 'policy', 'raw_days', 'hourly_days', 'daily_days',
         'legal_hold', 'data_class', 'privacy_class', 'reason_recorded',
+        'metric_key', 'threshold_direction', 'warning_rising_threshold',
+        'warning_falling_threshold', 'critical_rising_threshold',
+        'critical_falling_threshold', 'warning_notify_in_app',
+        'warning_notify_email', 'warning_open_it_ticket',
+        'critical_notify_in_app', 'critical_notify_email',
+        'critical_open_it_ticket', 'critical_escalate_control_room',
+        'recipient_role',
     ];
 
     public function __construct(
@@ -245,11 +261,15 @@ class SettingsAuditPresenter
                 'catalogs' => [
                     'domains' => [],
                     'capabilities' => [],
+                    'monitor_kinds' => [],
+                    'metric_keys' => [],
                     'data_classes' => [],
                     'privacy_classes' => [],
                     'timezones' => [],
                 ],
                 'profiles' => [],
+                'thresholds' => [],
+                'alert_routes' => [],
                 'coverage' => [],
                 'dependencies' => [],
                 'maintenance' => [],
@@ -301,6 +321,7 @@ class SettingsAuditPresenter
                 ];
             });
         $monitorNames = $monitors->pluck('name', 'id');
+        $monitorIds = $monitors->pluck('id');
 
         return [
             'visible' => $canManage,
@@ -332,6 +353,14 @@ class SettingsAuditPresenter
                     ['value' => 'provider_health', 'label' => 'Provider health', 'monitor_kind' => 'provider'],
                     ['value' => 'collector_health', 'label' => 'Collector health', 'monitor_kind' => 'collector'],
                 ],
+                'monitor_kinds' => array_map(
+                    fn (MonitorKind $kind): array => [
+                        'value' => $kind->value,
+                        'label' => ucfirst(str_replace('_', ' ', $kind->value)),
+                    ],
+                    MonitorKind::cases(),
+                ),
+                'metric_keys' => MonitoringPolicyRules::ALLOWED_METRIC_KEYS,
                 'data_classes' => [
                     'operational', 'tracking_telemetry', 'healthcare_telemetry',
                     'security_telemetry', 'configuration',
@@ -348,13 +377,86 @@ class SettingsAuditPresenter
                     ...$profile->only([
                         'id', 'name', 'description', 'interval_seconds', 'failure_confirmations',
                         'failure_duration_seconds', 'recovery_confirmations', 'recovery_duration_seconds',
-                        'stale_after_seconds', 'rising_threshold', 'falling_threshold',
+                        'stale_after_seconds', 'threshold_direction', 'warning_rising_threshold',
+                        'warning_falling_threshold', 'rising_threshold', 'falling_threshold',
                         'baseline_window_seconds', 'baseline_minimum_samples',
                         'baseline_deviation_multiplier', 'maintenance_policy', 'rollup_policy',
                         'retention_policy_id', 'version', 'is_active',
                     ]),
+                    'threshold_direction' => $profile->threshold_direction ?? 'above',
                     'used_by_count' => (int) $profile->monitors_count,
                     'state' => $profile->is_active ? 'active' : 'inactive',
+                ])->all(),
+            'thresholds' => MonitoringThresholdRule::query()
+                ->with(['site:id,name', 'device:id,name', 'monitor:id,name'])
+                ->where(function ($query) use ($canViewAllSites, $siteIds, $deviceIds, $monitorIds): void {
+                    $query->where('scope_kind', 'application');
+                    if ($canViewAllSites) {
+                        $query->orWhereIn('scope_kind', ['site', 'device', 'monitor']);
+                    } else {
+                        if ($siteIds !== []) {
+                            $query->orWhereIn('site_id', $siteIds);
+                        }
+                        if ($deviceIds->isNotEmpty()) {
+                            $query->orWhereIn('device_id', $deviceIds);
+                        }
+                        if ($monitorIds->isNotEmpty()) {
+                            $query->orWhereIn('monitor_id', $monitorIds);
+                        }
+                    }
+                })
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (MonitoringThresholdRule $row): array => [
+                    ...$row->only([
+                        'id', 'name', 'scope_kind', 'site_id', 'device_id', 'monitor_id',
+                        'device_domain', 'device_category', 'monitor_kind', 'metric_key',
+                        'threshold_direction', 'warning_rising_threshold', 'warning_falling_threshold',
+                        'critical_rising_threshold', 'critical_falling_threshold', 'version', 'is_active',
+                    ]),
+                    'scope_name' => $row->monitor?->name
+                        ?? $row->device?->name
+                        ?? $row->site?->name
+                        ?? 'Application',
+                    'state' => $row->is_active ? 'active' : 'inactive',
+                    'can_manage' => $row->scope_kind !== 'application' || $canViewAllSites,
+                ])->all(),
+            'alert_routes' => MonitoringAlertRoute::query()
+                ->with(['site:id,name', 'device:id,name', 'monitor:id,name'])
+                ->where(function ($query) use ($canViewAllSites, $siteIds, $deviceIds, $monitorIds): void {
+                    $query->where('scope_kind', 'application');
+                    if ($canViewAllSites) {
+                        $query->orWhereIn('scope_kind', ['site', 'device', 'monitor']);
+                    } else {
+                        if ($siteIds !== []) {
+                            $query->orWhereIn('site_id', $siteIds);
+                        }
+                        if ($deviceIds->isNotEmpty()) {
+                            $query->orWhereIn('device_id', $deviceIds);
+                        }
+                        if ($monitorIds->isNotEmpty()) {
+                            $query->orWhereIn('monitor_id', $monitorIds);
+                        }
+                    }
+                })
+                ->orderByDesc('is_active')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (MonitoringAlertRoute $row): array => [
+                    ...$row->only([
+                        'id', 'name', 'scope_kind', 'site_id', 'device_id', 'monitor_id',
+                        'device_domain', 'device_category', 'monitor_kind',
+                        'warning_notify_in_app', 'warning_notify_email', 'warning_open_it_ticket',
+                        'critical_notify_in_app', 'critical_notify_email', 'critical_open_it_ticket',
+                        'critical_escalate_control_room', 'recipient_role', 'version', 'is_active',
+                    ]),
+                    'scope_name' => $row->monitor?->name
+                        ?? $row->device?->name
+                        ?? $row->site?->name
+                        ?? 'Application',
+                    'state' => $row->is_active ? 'active' : 'inactive',
+                    'can_manage' => $row->scope_kind !== 'application' || $canViewAllSites,
                 ])->all(),
             'coverage' => MonitoringCoverageExpectation::query()
                 ->with('site:id,name')
@@ -580,6 +682,16 @@ class SettingsAuditPresenter
                             });
                     })
                     ->orWhere(fn ($q) => $q->where('auditable_type', MonitoringProfile::class)->whereIn('auditable_id', MonitoringProfile::query()->select('id')))
+                    ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitoringThresholdRule::class))->where(function ($scope) use ($siteIds, $visibleDeviceIds): void {
+                        $scope->where(fn ($global) => $global->whereNull('meta->site_id')->whereNull('meta->device_id'))
+                            ->orWhereIn('meta->site_id', $siteIds)
+                            ->orWhereIn('meta->device_id', $visibleDeviceIds);
+                    }))
+                    ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitoringAlertRoute::class))->where(function ($scope) use ($siteIds, $visibleDeviceIds): void {
+                        $scope->where(fn ($global) => $global->whereNull('meta->site_id')->whereNull('meta->device_id'))
+                            ->orWhereIn('meta->site_id', $siteIds)
+                            ->orWhereIn('meta->device_id', $visibleDeviceIds);
+                    }))
                     ->orWhere(fn ($q) => $q->whereIn('auditable_type', $this->typeNames(MonitoringCoverageExpectation::class))->where(function ($scope) use ($siteIds): void {
                         $scope->whereNull('meta->site_id')->orWhereIn('meta->site_id', $siteIds);
                     }))

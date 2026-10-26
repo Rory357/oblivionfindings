@@ -95,6 +95,14 @@ const actionLabels: Record<string, string> = {
     'monitoring.profile.created': 'Monitoring profile created',
     'monitoring.profile.updated': 'Monitoring profile changed',
     'monitoring.profile.deactivated': 'Monitoring profile turned off',
+    'monitoring.threshold.created': 'Threshold rule added',
+    'monitoring.threshold.updated': 'Threshold rule changed',
+    'monitoring.threshold.deactivated': 'Threshold rule turned off',
+    'monitoring.threshold.reactivated': 'Threshold rule turned on',
+    'monitoring.alert_route.created': 'Alert route added',
+    'monitoring.alert_route.updated': 'Alert route changed',
+    'monitoring.alert_route.deactivated': 'Alert route turned off',
+    'monitoring.alert_route.reactivated': 'Alert route turned on',
 };
 /** Plain sentence-case names for settings keys; the keys stay for logic. */
 const settingLabels: Record<string, string> = {
@@ -137,6 +145,8 @@ const settingLabel = (key: string) => settingLabels[key] ?? readableKey(key);
 const recordTypeLabels: Record<string, string> = {
     DeviceAssetLink: 'Device asset link',
     DeviceMaintenanceRecord: 'Maintenance record',
+    MonitoringThresholdRule: 'Threshold rule',
+    MonitoringAlertRoute: 'Alert route',
     MonitoringCoverageExpectation: 'Coverage expectation',
     MonitoringMaintenanceWindow: 'Maintenance window',
     MonitoringRetentionPolicy: 'Retention policy',
@@ -399,6 +409,8 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
     }, []);
     const policyCount =
         workspace.profiles.length +
+        (workspace.thresholds?.length ?? 0) +
+        (workspace.alert_routes?.length ?? 0) +
         workspace.coverage.length +
         workspace.dependencies.length +
         workspace.maintenance.length +

@@ -12,11 +12,13 @@ use App\Domain\Monitoring\Models\MonitorDependency;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
 use App\Domain\Monitoring\Models\MonitoringIncidentEvidenceSnapshot;
+use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CapacityProjectionService;
 use App\Domain\Monitoring\Services\CentralSiteMonitoringReadinessService;
+use App\Domain\Monitoring\Services\EffectiveMonitoringPolicyResolver;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringRecoveryRequestService;
@@ -95,6 +97,13 @@ class MonitoringOperationsPresenter
                 ->get();
         $observations = $this->recentObservations($allMonitors->pluck('id'));
         $correlations = $this->correlations($allMonitors, $sitesByDevice, $viewer);
+        $maintenanceWindows = $accessibleSiteIds === []
+            ? collect()
+            : MonitoringMaintenanceWindow::query()
+                ->where('status', 'active')
+                ->whereIn('site_id', $accessibleSiteIds)
+                ->orderBy('starts_at')
+                ->get();
         $mapped = $allMonitors->map(fn (Monitor $monitor): array => $this->mapMonitor(
             $monitor,
             $sitesByDevice->get($monitor->device_id),
@@ -102,6 +111,7 @@ class MonitoringOperationsPresenter
             $correlations->get($monitor->id),
             $canManageNativeMonitors,
             (int) $viewer->id,
+            $maintenanceWindows,
         ));
         $collectionPaths = $this->collectionPaths($allMonitors, $sitesByDevice);
         $monitorFindings = $mapped
@@ -385,7 +395,7 @@ class MonitoringOperationsPresenter
             ->map(fn (Collection $rows): Collection => $rows->take(10)->values());
     }
 
-    /** @param Collection<int, MonitorObservation> $observations @return array<string, mixed> */
+    /** @param Collection<int, MonitorObservation> $observations @param Collection<int, MonitoringMaintenanceWindow> $maintenanceWindows @return array<string, mixed> */
     private function mapMonitor(
         Monitor $monitor,
         ?Site $site,
@@ -393,6 +403,7 @@ class MonitoringOperationsPresenter
         ?array $correlation,
         bool $canManage,
         int $actorId,
+        Collection $maintenanceWindows,
     ): array {
         $nativeDirect = $monitor->collector_id === null
             && in_array(
@@ -435,6 +446,7 @@ class MonitoringOperationsPresenter
             ] : null,
             'suppressed_until' => $monitor->suppressed_until?->toIso8601String(),
             'suppression_reason' => $monitor->suppression_reason,
+            'maintenance' => $this->maintenanceForMonitor($monitor, $site, $maintenanceWindows),
             'root_cause' => $monitor->rootCauseMonitor ? [
                 'monitor_id' => $monitor->rootCauseMonitor->id,
                 'monitor_name' => $monitor->rootCauseMonitor->name,
@@ -498,6 +510,50 @@ class MonitoringOperationsPresenter
                 'retained_from' => $observations->last()?->observed_at?->toIso8601String(),
                 'retained_to' => $latest?->observed_at?->toIso8601String(),
             ],
+        ];
+    }
+
+    /** @param Collection<int, MonitoringMaintenanceWindow> $windows @return array<string, mixed> */
+    private function maintenanceForMonitor(Monitor $monitor, ?Site $site, Collection $windows): array
+    {
+        if (! $site) {
+            return ['active_window' => null, 'upcoming_window' => null];
+        }
+
+        $now = now();
+        $horizon = $now->copy()->addDays(7);
+        $lifeSafetyProtected = in_array(
+            (string) ($monitor->device?->domain ?? ''),
+            EffectiveMonitoringPolicyResolver::LIFE_SAFETY_DOMAINS,
+            true,
+        );
+        $matching = $windows->filter(function (MonitoringMaintenanceWindow $window) use ($monitor, $site): bool {
+            return (int) $window->site_id === (int) $site->id
+                && ($window->monitor_id === null || (int) $window->monitor_id === (int) $monitor->id)
+                && ($window->device_id === null || (int) $window->device_id === (int) $monitor->device_id);
+        });
+        /** @var MonitoringMaintenanceWindow|null $active */
+        $active = $matching->first(fn (MonitoringMaintenanceWindow $window): bool => $window->isActiveAt($now));
+        /** @var MonitoringMaintenanceWindow|null $upcoming */
+        $upcoming = $matching
+            ->filter(fn (MonitoringMaintenanceWindow $window): bool => $window->starts_at !== null
+                && $window->starts_at->gt($now)
+                && $window->starts_at->lte($horizon))
+            ->sortBy('starts_at')
+            ->first();
+
+        $format = static fn (?MonitoringMaintenanceWindow $window): ?array => $window === null ? null : [
+            'id' => (int) $window->id,
+            'name' => $window->name,
+            'starts_at' => $window->starts_at?->toIso8601String(),
+            'ends_at' => $window->ends_at?->toIso8601String(),
+            'timezone' => $window->timezone,
+            'life_safety_protected' => $lifeSafetyProtected,
+        ];
+
+        return [
+            'active_window' => $format($active),
+            'upcoming_window' => $format($upcoming),
         ];
     }
 
