@@ -2,6 +2,7 @@
 
 namespace App\Domain\SecurityDevices\Services;
 
+use App\Domain\Monitoring\Exceptions\MaintenanceResolutionLimitExceeded;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\MaintenanceHistory;
@@ -27,6 +28,8 @@ final class DeviceGroupMaintenancePreview
     private const RESOLUTION_RECORD_LIMIT = 200;
 
     private const RESOLUTION_BYTE_LIMIT = 262144;
+
+    public const REVISION_SCAN_LIMIT = 1000;
 
     public function __construct(
         private readonly SecurityDevicesAccessService $deviceAccess,
@@ -101,13 +104,16 @@ final class DeviceGroupMaintenancePreview
                         $monitor = $current->query(Monitor::query())->whereKey($values['monitor_id'])->where('device_id', $member->id)->first();
                         abort_unless($monitor, 404, 'unavailable');
                         $this->policyAccess->scope($actor, ['site_id' => $siteId, 'monitor_id' => (int) $monitor->id], $current);
-                        // The 200-record / 256 KB cap is checked on the finished
-                        // resolution: MaintenanceHistory (Monitoring's owner read)
-                        // loads every revision for the Site first. Bounding that read
-                        // earlier would reject Sites whose result is small but whose
-                        // history is long, so it is left to Monitoring; the route is
-                        // throttled instead.
-                        $resolution = $this->history->resolve($monitor, $values['instant']);
+                        // MaintenanceHistory pages window and revision reads in bounded
+                        // chunks and aborts early if scanned revisions exceed
+                        // REVISION_SCAN_LIMIT or matching rules exceed
+                        // RESOLUTION_RECORD_LIMIT, before building an oversized preview.
+                        $resolution = $this->history->resolve(
+                            $monitor,
+                            $values['instant'],
+                            self::REVISION_SCAN_LIMIT,
+                            self::RESOLUTION_RECORD_LIMIT,
+                        );
                         abort_if(count($resolution['matching']) + count($resolution['overridden']) > self::RESOLUTION_RECORD_LIMIT
                             || strlen(json_encode($resolution, JSON_THROW_ON_ERROR)) > self::RESOLUTION_BYTE_LIMIT, 503, 'unavailable');
 
@@ -115,7 +121,7 @@ final class DeviceGroupMaintenancePreview
                             'requested_at' => $values['instant']->format('Y-m-d\TH:i:s.u\Z'), 'resolution' => $resolution];
                     });
             }));
-        } catch (QueryException) {
+        } catch (QueryException|MaintenanceResolutionLimitExceeded) {
             throw new HttpException(503, 'unavailable');
         }
     }

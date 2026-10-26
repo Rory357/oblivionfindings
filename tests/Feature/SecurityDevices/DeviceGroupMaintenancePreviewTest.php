@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceRevision;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitorObservation;
+use App\Domain\Monitoring\Services\MaintenanceConfiguration;
 use App\Domain\Monitoring\Services\MaintenanceHistory;
 use App\Domain\Monitoring\Services\MonitoringPolicyAuthoringService;
 use App\Domain\Monitoring\Services\MonitoringPolicyRules;
@@ -13,6 +14,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
+use App\Domain\SecurityDevices\Services\DeviceGroupMaintenancePreview;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
@@ -374,5 +376,117 @@ final class DeviceGroupMaintenancePreviewTest extends TestCase
         $this->get('/security-devices/device-groups/'.$this->group->id)
             ->assertInertia(fn ($page) => $page->where('can_preview_maintenance', true));
         $this->choices()->assertOk();
+    }
+
+    public function test_preview_pages_site_revisions_in_bounded_queries_across_long_chains(): void
+    {
+        $window = $this->window();
+        $firstRevision = MonitoringMaintenanceRevision::query()->where('window_id', $window->id)->sole();
+        $baseSnapshot = app(MaintenanceHistory::class)->configuration($window->fresh());
+        $targetVersion = (MaintenanceHistory::REVISION_PAGE_SIZE * 2) + 25;
+
+        DB::transaction(function () use ($window, $firstRevision, $baseSnapshot, $targetVersion): void {
+            $previousId = (int) $firstRevision->id;
+            for ($version = 2; $version <= $targetVersion; $version++) {
+                $instant = CarbonImmutable::parse('2026-10-20T08:00:00Z')->addSeconds($version)->format('Y-m-d H:i:s.u');
+                $snapshot = [...$baseSnapshot, 'version' => $version, 'reason' => 'Synthetic revision '.$version];
+                $previousId = (int) DB::table('monitoring_maintenance_revisions')->insertGetId([
+                    'window_id' => (int) $window->id,
+                    'version' => $version,
+                    'site_id' => (int) $this->site->id,
+                    'actor_user_id' => (int) $this->actor->id,
+                    'supersedes_id' => $previousId,
+                    'operation' => 'update',
+                    'change_reason' => 'Synthetic revision '.$version,
+                    'effective_from' => $instant,
+                    'recorded_at' => $instant,
+                    'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR),
+                    'snapshot_hash' => MaintenanceConfiguration::hash($snapshot),
+                ]);
+            }
+            $window->forceFill([
+                'version' => $targetVersion,
+                'reason' => 'Synthetic revision '.$targetVersion,
+                'updated_by_user_id' => $this->actor->id,
+            ])->save();
+        });
+
+        $revisionQueries = [];
+        DB::listen(function ($query) use (&$revisionQueries): void {
+            $lower = strtolower($query->sql);
+            if (str_contains($lower, 'monitoring_maintenance_revisions') && ! str_contains($lower, 'information_schema')) {
+                $revisionQueries[] = $lower;
+            }
+        });
+
+        $expected = app(MaintenanceHistory::class)->resolve($this->monitor->fresh(), CarbonImmutable::parse('2026-10-20T10:00:00Z'));
+        $revisionQueries = [];
+        $response = $this->preview()
+            ->assertOk()
+            ->assertJsonPath('resolution.state', 'applied')
+            ->assertJsonPath('resolution.winner.window_id', $window->id)
+            ->assertJsonPath('resolution.winner.version', $targetVersion);
+        self::assertSame($expected, $response->json('resolution'));
+        self::assertNotEmpty($revisionQueries);
+        foreach ($revisionQueries as $sql) {
+            self::assertStringContainsString('limit ', $sql);
+        }
+        $snapshotPages = array_values(array_filter(
+            $revisionQueries,
+            static fn (string $sql): bool => str_starts_with($sql, 'select * from'),
+        ));
+        self::assertCount(3, $snapshotPages);
+    }
+
+    public function test_preview_aborts_before_hydrating_unbounded_site_revisions_when_scan_limit_is_exceeded(): void
+    {
+        $window = $this->window();
+        $baseSnapshot = app(MaintenanceHistory::class)->configuration($window->fresh());
+        $encodedSnapshot = json_encode($baseSnapshot, JSON_THROW_ON_ERROR);
+        $snapshotHash = MaintenanceConfiguration::hash($baseSnapshot);
+        $extraCount = DeviceGroupMaintenancePreview::REVISION_SCAN_LIMIT;
+
+        $rows = [];
+        for ($version = 2; $version <= $extraCount + 1; $version++) {
+            $rows[] = [
+                'window_id' => (int) $window->id,
+                'version' => $version,
+                'site_id' => (int) $this->site->id,
+                'actor_user_id' => (int) $this->actor->id,
+                'supersedes_id' => null,
+                'operation' => 'update',
+                'change_reason' => 'Synthetic bounded scan test',
+                'effective_from' => '2026-10-20 08:05:00.000000',
+                'recorded_at' => '2026-10-20 08:05:00.000000',
+                'snapshot' => $encodedSnapshot,
+                'snapshot_hash' => $snapshotHash,
+            ];
+            if (count($rows) === 250) {
+                DB::table('monitoring_maintenance_revisions')->insert($rows);
+                $rows = [];
+            }
+        }
+        if ($rows !== []) {
+            DB::table('monitoring_maintenance_revisions')->insert($rows);
+        }
+
+        $revisionQueries = [];
+        DB::listen(function ($query) use (&$revisionQueries): void {
+            $lower = strtolower($query->sql);
+            if (str_contains($lower, 'monitoring_maintenance_revisions') && ! str_contains($lower, 'information_schema')) {
+                $revisionQueries[] = $lower;
+            }
+        });
+
+        $this->preview()
+            ->assertStatus(503)
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertExactJson(['message' => 'unavailable']);
+
+        self::assertNotEmpty($revisionQueries);
+        foreach ($revisionQueries as $sql) {
+            self::assertStringContainsString('limit ', $sql);
+            self::assertStringNotContainsString('select * from', $sql);
+        }
     }
 }
