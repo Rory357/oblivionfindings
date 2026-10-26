@@ -3,6 +3,9 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
+use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Cctv\Models\CctvSource;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -653,5 +656,76 @@ class SecurityWorkspaceTest extends TestCase
             'site_id' => $site->id,
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
+    }
+
+    public function test_status_filter_and_cctv_source_readiness_expose_safe_summary_without_leaking_configuration(): void
+    {
+        $site = Site::factory()->create(['name' => 'Harbour House']);
+        $verifiedCamera = Device::factory()->offline()->create([
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'dome_camera',
+            'name' => 'Offline Verified Camera',
+            'provider' => 'unifi',
+        ]);
+        $unconfiguredCamera = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'bullet_camera',
+            'name' => 'Online Unconfigured Camera',
+            'provider' => 'unifi',
+        ]);
+        $this->assignToSite($verifiedCamera, $site);
+        $this->assignToSite($unconfiguredCamera, $site);
+
+        $collectorHost = Device::factory()->itInfrastructure()->create();
+        $this->assignToSite($collectorHost, $site);
+        $collector = MonitoringCollector::factory()->create([
+            'site_id' => $site->id,
+            'collector_device_id' => $collectorHost->id,
+        ]);
+        $scope = DiscoveryScope::factory()->create([
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'cidrs' => ['10.20.0.0/24'],
+            'port_bounds' => ['tcp' => [7441]],
+        ]);
+        CctvSource::query()->create([
+            'camera_id' => $verifiedCamera->id,
+            'recorder_device_id' => null,
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'discovery_scope_id' => $scope->id,
+            'actor_id' => $this->admin->id,
+            'provider' => 'unifi',
+            'revision' => 1,
+            'enabled' => true,
+            'stream_state' => 'verified',
+            'stream_verified_at' => now(),
+            'fingerprint' => str_repeat('a', 64),
+            'provider_fingerprint' => str_repeat('b', 64),
+            'configuration' => ['rtsp_secret' => 'SECRET-RTSP-SOURCE-SENTINEL'],
+            'verified_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/security?status=offline')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($verifiedCamera): void {
+                $workspace = $page->toArray()['props']['securityWorkspace'];
+                $json = json_encode($workspace, JSON_THROW_ON_ERROR);
+
+                $this->assertSame(2, $workspace['overview']['inventory']['cctv']);
+                $this->assertSame('offline', $workspace['activeTab']['statusFilter']['key']);
+                $this->assertSame(
+                    [$verifiedCamera->id],
+                    collect($workspace['activeTab']['devices'])->pluck('id')->all(),
+                );
+                $this->assertSame(
+                    ['state' => 'verified', 'label' => 'Live source verified'],
+                    $workspace['activeTab']['devices'][0]['cctvSource'],
+                );
+                $this->assertStringNotContainsString('SECRET-RTSP-SOURCE-SENTINEL', $json);
+            });
     }
 }
