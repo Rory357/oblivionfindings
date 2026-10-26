@@ -20,6 +20,7 @@ use App\Domain\SecurityDevices\Endpoints\Http\Middleware\EndpointTransport;
 use App\Domain\SecurityDevices\Http\Controllers\AlertsEventsController;
 use App\Domain\SecurityDevices\Http\Controllers\CategoryPageController;
 use App\Domain\SecurityDevices\Http\Controllers\CollectorInstallationController;
+use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotComparisonController;
 use App\Domain\SecurityDevices\Http\Controllers\ConfigurationSnapshotController;
 use App\Domain\SecurityDevices\Http\Controllers\DashboardController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
@@ -35,15 +36,19 @@ use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
 use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceOperationsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringAlertRouteSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringCollectorLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringCoverageSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringDeadLetterController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringDependencySettingsController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringEffectivePolicyPreviewController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringHistoryController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringMaintenanceSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringOperationsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringProfileSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRetentionSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRuntimeHealthController;
+use App\Domain\SecurityDevices\Http\Controllers\MonitoringThresholdSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\NativeMonitorLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
@@ -298,6 +303,14 @@ Route::middleware([
         ->middleware('permission:securityDevices.devices.view')
         ->name('security-devices.devices.configuration-snapshots.download');
 
+    Route::get(
+        '/devices/{device}/configuration-snapshots/{snapshot}/compare/{baseline?}',
+        ConfigurationSnapshotComparisonController::class,
+    )
+        ->whereNumber(['device', 'snapshot'])
+        ->middleware(['permission:securityDevices.devices.view', 'throttle:30,1'])
+        ->name('security-devices.devices.configuration-snapshots.compare');
+
     // ── Approved grouped-navigation destinations ─────────────────
     // These canonical routes reuse today's production-backed controllers.
     // Later workspace tasks expand their local tabs without changing URLs.
@@ -444,6 +457,14 @@ Route::middleware([
         ->middleware('permission:securityDevices.events.view')
         ->name('security-devices.monitoring');
 
+    Route::get('/monitoring/monitors/{monitor}/history', MonitoringHistoryController::class)
+        ->whereNumber('monitor')
+        ->middleware([
+            'permission:securityDevices.events.view|securityDevices.devices.view',
+            'throttle:60,1',
+        ])
+        ->name('security-devices.monitoring.history');
+
     Route::prefix('/monitoring/native-monitors')
         ->middleware([
             'permission:securityDevices.monitoring.manage',
@@ -547,6 +568,14 @@ Route::middleware([
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');
 
+    Route::get('/settings/monitoring/effective-preview/{monitor}', [MonitoringEffectivePolicyPreviewController::class, 'show'])
+        ->whereNumber('monitor')
+        ->middleware([
+            'permission:securityDevices.monitoring.manage|securityDevices.events.view',
+            'throttle:30,1',
+        ])
+        ->name('security-devices.settings.monitoring.effective-preview');
+
     Route::prefix('/settings/monitoring')
         ->middleware([
             'permission:securityDevices.monitoring.manage',
@@ -561,6 +590,30 @@ Route::middleware([
             Route::post('/profiles/{profile}/deactivate', [MonitoringProfileSettingsController::class, 'deactivate'])
                 ->whereNumber('profile')
                 ->name('security-devices.settings.monitoring.profiles.deactivate');
+
+            Route::post('/thresholds', [MonitoringThresholdSettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.thresholds.store');
+            Route::patch('/thresholds/{thresholdRule}', [MonitoringThresholdSettingsController::class, 'update'])
+                ->whereNumber('thresholdRule')
+                ->name('security-devices.settings.monitoring.thresholds.update');
+            Route::post('/thresholds/{thresholdRule}/deactivate', [MonitoringThresholdSettingsController::class, 'deactivate'])
+                ->whereNumber('thresholdRule')
+                ->name('security-devices.settings.monitoring.thresholds.deactivate');
+            Route::post('/thresholds/{thresholdRule}/reactivate', [MonitoringThresholdSettingsController::class, 'reactivate'])
+                ->whereNumber('thresholdRule')
+                ->name('security-devices.settings.monitoring.thresholds.reactivate');
+
+            Route::post('/alert-routes', [MonitoringAlertRouteSettingsController::class, 'store'])
+                ->name('security-devices.settings.monitoring.alert-routes.store');
+            Route::patch('/alert-routes/{alertRoute}', [MonitoringAlertRouteSettingsController::class, 'update'])
+                ->whereNumber('alertRoute')
+                ->name('security-devices.settings.monitoring.alert-routes.update');
+            Route::post('/alert-routes/{alertRoute}/deactivate', [MonitoringAlertRouteSettingsController::class, 'deactivate'])
+                ->whereNumber('alertRoute')
+                ->name('security-devices.settings.monitoring.alert-routes.deactivate');
+            Route::post('/alert-routes/{alertRoute}/reactivate', [MonitoringAlertRouteSettingsController::class, 'reactivate'])
+                ->whereNumber('alertRoute')
+                ->name('security-devices.settings.monitoring.alert-routes.reactivate');
 
             Route::post('/coverage', [MonitoringCoverageSettingsController::class, 'store'])
                 ->name('security-devices.settings.monitoring.coverage.store');

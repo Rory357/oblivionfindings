@@ -15,7 +15,15 @@ import {
     TicketCheck,
     Wifi,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import {
+    ConfigurationDiffDialog,
+    type ConfigurationDiffTarget,
+} from './configuration-diff-dialog';
+import {
+    MonitorHistoryDialog,
+    type MonitorHistoryTarget,
+} from './monitor-history-dialog';
 import { StateBadge } from './network-evidence-display';
 import {
     NetworkOperationalRecords,
@@ -31,6 +39,25 @@ type NetworkAction = {
     count: number;
     description: string;
     href: string;
+};
+
+export type MaintenanceWindowSummary = {
+    id: number;
+    name: string;
+    scopeType: string;
+    startsAt: string | null;
+    endsAt: string | null;
+};
+
+export type MaintenanceWindowNotice = {
+    activeWindow: MaintenanceWindowSummary | null;
+    upcomingWindow: MaintenanceWindowSummary | null;
+};
+
+export type NetworkPortActions = {
+    bounceHref: string | null;
+    enableHref: string | null;
+    disableHref: string | null;
 };
 
 export type NetworkDevice = {
@@ -50,6 +77,7 @@ export type NetworkDevice = {
     };
     firmwareVersion: string | null;
     monitoring: { enabled: number; attention: number; uncertain: number };
+    maintenance?: MaintenanceWindowNotice | null;
     wanPath: boolean;
 };
 
@@ -73,6 +101,7 @@ export type NetworkInterface = {
     discards: number | null;
     capacityState: string;
     observedAt: string | null;
+    portActions?: NetworkPortActions | null;
 };
 
 export type NetworkService = {
@@ -88,6 +117,7 @@ export type NetworkService = {
     affectsAvailability: boolean;
     lastObservationAt: string | null;
     dependentCount: number;
+    maintenance?: MaintenanceWindowNotice | null;
     collector: {
         name: string;
         status: string;
@@ -131,12 +161,15 @@ export type ConfigurationSnapshotRow = {
         truncated: boolean;
     };
     downloadHref: string | null;
+    compareHref?: string | null;
 };
 
 export type ConfigurationRow = {
     deviceId: number;
     deviceName: string;
     deviceHref: string;
+    canViewSnapshots?: boolean;
+    backupActionHref?: string | null;
     configuration: {
         state: string;
         observedHash: string | null;
@@ -676,15 +709,6 @@ function GapBanner({ text }: { text: string }) {
     );
 }
 
-function Detail({ label, value }: { label: string; value: string }) {
-    return (
-        <dl>
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="font-medium break-words">{value}</dd>
-        </dl>
-    );
-}
-
 export function NetworkItWorkspacePanels({
     data,
     view = 'cards',
@@ -692,6 +716,10 @@ export function NetworkItWorkspacePanels({
     data: NetworkItWorkspaceData;
     view?: NetworkRecordsView;
 }) {
+    const [historyTarget, setHistoryTarget] =
+        useState<MonitorHistoryTarget | null>(null);
+    const [diffTarget, setDiffTarget] =
+        useState<ConfigurationDiffTarget | null>(null);
     const { activeTab } = data;
     if (activeTab.key === 'overview') return <Overview data={data} />;
     return (
@@ -707,8 +735,26 @@ export function NetworkItWorkspacePanels({
                 'traffic-capacity',
                 'configuration-firmware',
             ].includes(activeTab.key) ? (
-                <NetworkOperationalRecords data={data} view={view} />
+                <NetworkOperationalRecords
+                    data={data}
+                    view={view}
+                    onViewHistory={setHistoryTarget}
+                    onCompareSnapshots={setDiffTarget}
+                />
             ) : null}
+            <MonitorHistoryDialog
+                target={historyTarget}
+                open={historyTarget !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setHistoryTarget(null);
+                    }
+                }}
+            />
+            <ConfigurationDiffDialog
+                target={diffTarget}
+                onClose={() => setDiffTarget(null)}
+            />
         </div>
     );
 }

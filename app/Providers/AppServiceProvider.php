@@ -75,6 +75,7 @@ use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommandAdapter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommandAdapter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\DatabaseReleaseFixtureCommandRuntime;
+use App\Domain\SecurityDevices\Management\Adapters\NetworkDeviceCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandRuntime;
@@ -239,6 +240,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->tag([
             UnifiAccessCommandAdapter::class,
             QueclinkTrackingCommandAdapter::class,
+            NetworkDeviceCommandAdapter::class,
             ReleaseFixtureCommandAdapter::class,
             EndpointServiceCommandAdapter::class,
             EndpointRestartCommandAdapter::class,

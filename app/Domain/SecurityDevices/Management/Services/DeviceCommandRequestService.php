@@ -53,6 +53,7 @@ final class DeviceCommandRequestService
         private readonly DeviceCommandAuditService $audit,
         private readonly DeviceCommandBreakGlassService $breakGlass,
         private readonly DeviceCommandIntakeAuditService $intakeAudit,
+        private readonly ?NetworkDeviceCommandPolicyService $networkPolicy = null,
     ) {}
 
     public function request(Device $device, User $actor, CommandRequestInput $input): DeviceCommandRequest
@@ -174,10 +175,10 @@ final class DeviceCommandRequestService
         }
         $now = CarbonImmutable::now('UTC')->startOfSecond();
         $impactAcknowledgedAt = null;
-        if ($capability->isHighRisk()) {
+        if ($capability->isHighRisk() || $capability->confirmationMode !== CommandConfirmationMode::None) {
             if (! $input->impactAcknowledged) {
                 throw ValidationException::withMessages([
-                    'impact_acknowledged' => 'You must acknowledge the stated impact before requesting this high-risk action.',
+                    'impact_acknowledged' => 'You must acknowledge the stated impact before requesting this action.',
                 ]);
             }
             if ($capability->confirmationMode === CommandConfirmationMode::TypeDeviceName
@@ -290,11 +291,13 @@ final class DeviceCommandRequestService
         if ($restartExpiry && $expiresAt->lessThan($restartExpiry)) {
             throw ValidationException::withMessages(['it_change_id' => 'The approved maintenance window must include the complete restart deadline.']);
         }
+        $dynamicRequiresApproval = $this->requiresDynamicApproval($device, $capability, $parameters);
         $status = $this->initialStatus(
             $capability,
             $stepUpConfirmedAt !== null,
             $change !== null,
             $input->breakGlass,
+            $dynamicRequiresApproval,
         );
         $expectedState = match ($capability->key) {
             EndpointScriptContract::CAPABILITY => $scriptBinding ?? throw new \LogicException('Script binding must retain current authority locks.'),
@@ -327,7 +330,7 @@ final class DeviceCommandRequestService
             breakGlassReviewerUserId: $breakGlassReviewer?->id,
             breakGlassReasonHash: $breakGlassReason === null ? null : $this->signer->reasonHash($breakGlassReason),
             assignmentFingerprint: $assignmentFingerprint,
-            confirmationMode: $capability->isHighRisk() ? $capability->confirmationMode->value : null,
+            confirmationMode: $impactAcknowledgedAt !== null ? $capability->confirmationMode->value : null,
             impactAcknowledgedAt: $impactAcknowledgedAt,
             originContext: $input->originContext,
         );
@@ -501,13 +504,14 @@ final class DeviceCommandRequestService
                     true,
                     $locked->it_change_id !== null,
                     $locked->is_break_glass,
+                    $this->requiresDynamicApproval($locked->device, $capability, $locked->encrypted_parameters ?? []),
                 );
                 $locked->save();
                 $this->audit->append($locked, $actor, 'step_up_confirmed', ['status' => $locked->status->value]);
             }
             if ($locked->status === CommandStatus::AwaitingChange
                 && $locked->it_change_id !== null
-                && (! $capability->requiresApproval || $locked->approved_by_user_id !== null)
+                && (! ($capability->requiresApproval || $this->requiresDynamicApproval($locked->device, $capability, $locked->encrypted_parameters ?? [])) || $locked->approved_by_user_id !== null)
                 && $this->changeEligibility->isEligible(
                     (int) $locked->it_change_id,
                     $actor,
@@ -556,11 +560,12 @@ final class DeviceCommandRequestService
         bool $hasRecentStepUp,
         bool $hasEligibleChange,
         bool $isBreakGlass = false,
+        bool $dynamicRequiresApproval = false,
     ): CommandStatus {
         if ($capability->requiresStepUp && ! $hasRecentStepUp) {
             return CommandStatus::AwaitingStepUp;
         }
-        if ($capability->requiresApproval && ! $isBreakGlass) {
+        if (($capability->requiresApproval || $dynamicRequiresApproval) && ! $isBreakGlass) {
             return CommandStatus::AwaitingApproval;
         }
         if ($capability->requiresChange && ! $hasEligibleChange && ! $isBreakGlass) {
@@ -568,5 +573,23 @@ final class DeviceCommandRequestService
         }
 
         return CommandStatus::Ready;
+    }
+
+    /** @param array<string, mixed> $parameters */
+    private function requiresDynamicApproval(
+        Device $device,
+        CommandCapabilityDefinition $capability,
+        array $parameters,
+    ): bool {
+        if ($capability->key !== 'network.port.bounce') {
+            return false;
+        }
+
+        $policy = $this->networkPolicy ?? app(NetworkDeviceCommandPolicyService::class);
+
+        return $policy->requiresIndependentApproval(
+            $device,
+            (string) ($parameters['interface'] ?? ''),
+        );
     }
 }

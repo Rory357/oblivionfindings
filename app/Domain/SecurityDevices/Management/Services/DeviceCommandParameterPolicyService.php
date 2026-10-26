@@ -17,11 +17,20 @@ final class DeviceCommandParameterPolicyService
 {
     public function __construct(
         private readonly QueclinkConfigurationProfileService $queclinkProfiles,
+        private readonly NetworkDeviceCommandPolicyService $networkPolicy,
     ) {}
 
     /** @param array<string, mixed> $parameters */
     public function assertAllowed(Device $device, CommandCapabilityDefinition $capability, array $parameters): void
     {
+        if ($this->networkPolicy->isPortCapability($capability->key)) {
+            $this->networkPolicy->assertInterfaceAllowed(
+                $device,
+                (string) ($parameters['interface'] ?? ''),
+            );
+
+            return;
+        }
         if ($capability->key === EndpointScriptContract::CAPABILITY) {
             try {
                 EndpointScriptRequestParameters::inputs($parameters);

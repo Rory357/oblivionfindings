@@ -143,6 +143,13 @@ $capabilities = [
     'network.port.disable' => array_replace($high('Disable network port', 'network_it', 'interface_admin_state', [
         'interface' => ['type' => 'string', 'max_length' => 80],
     ], ['interface']), ['requires_change' => true]),
+    'network.port.bounce' => array_replace($definition('Restart network port', 'network_it', 'manage', 'medium', false, false, false, false, 300, 'interface_bounce_state', [
+        'interface' => ['type' => 'string', 'max_length' => 80],
+    ], ['interface'], ['active', 'degraded'], 'reconcile_before_retry'), ['confirmation_mode' => 'acknowledge_impact']),
+    'network.config.backup' => array_replace(
+        $definition('Capture configuration backup', 'network_it', 'manage', 'low', false, false, false, false, 300, 'fresh_configuration_snapshot'),
+        ['requires_fresh_observation' => false, 'confirmation_mode' => 'acknowledge_impact'],
+    ),
     'network.firewall_policy.apply' => array_replace($critical('Apply firewall policy', 'network_it', 'configuration_hash_matches', [
         'policy_reference' => ['type' => 'string', 'max_length' => 120],
     ], ['policy_reference'], false), ['requires_change' => true]),
@@ -276,7 +283,7 @@ $authorise(
     sensitivity: 'destructive_endpoint',
 );
 $authorise(
-    ['network.port.enable', 'network.port.disable', 'network.firewall_policy.apply'],
+    ['network.port.enable', 'network.port.disable', 'network.port.bounce', 'network.config.backup', 'network.firewall_policy.apply'],
     ['it_infrastructure'],
     ['network', 'networking'],
 );
@@ -362,6 +369,8 @@ $guidance = [
     'firmware.update' => ['Changes Device software and may temporarily interrupt service.', 'A fresh observation reports the approved firmware version.'],
     'network.port.enable' => ['Restores traffic on the selected interface and may reconnect downstream equipment.', 'A fresh observation reports the interface enabled.'],
     'network.port.disable' => ['Stops traffic on the selected interface and may disconnect downstream equipment.', 'A fresh observation reports the interface disabled.'],
+    'network.port.bounce' => ['Briefly cycles link or PoE on the selected port. Uplinks, trunks, and ports serving security or care devices require independent approval.', 'A fresh observation reports the interface returned to enabled after cycling.'],
+    'network.config.backup' => ['Reads and stores a redacted running configuration snapshot without changing Device settings.', 'A fresh encrypted, secret-redacted configuration snapshot is verified in private storage.'],
     'network.firewall_policy.apply' => ['Changes network security policy and may affect Site connectivity.', 'A fresh configuration hash matches the approved firewall policy.'],
     'access.door.unlock_timed' => ['Temporarily unlocks this exact door for the approved attendance window.', 'The provider confirms the door returns to locked after the bounded window.'],
     'access.door.lock' => ['Locks this exact door and may prevent physical entry or exit.', 'A fresh provider observation confirms the door is locked.'],

@@ -31,6 +31,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -380,7 +381,8 @@ function DeviceShowBody({
     const [installationOpen, setInstallationOpen] = useState(false);
     useEffect(() => {
         const syncSectionFromUrl = () => {
-            const requested = new URLSearchParams(window.location.search).get(
+            const params = new URLSearchParams(window.location.search);
+            const requested = params.get(
                 'section',
             ) as DeviceProfileSectionKey | null;
             if (
@@ -388,6 +390,13 @@ function DeviceShowBody({
                 profile.sections.some((section) => section.key === requested)
             ) {
                 setActiveSection(requested);
+                return;
+            }
+            if (
+                params.get('action') &&
+                profile.sections.some((section) => section.key === 'management')
+            ) {
+                setActiveSection('management');
             }
         };
 
@@ -958,16 +967,24 @@ function DeviceShowBody({
                         </TabsContent>
 
                         <TabsContent value="monitors">
-                            <DeviceMonitorsSection profile={profile} />
+                            <DeviceMonitorsSection
+                                profile={profile}
+                                deviceName={device.name}
+                            />
                         </TabsContent>
 
                         <TabsContent value="interfaces-sensors">
-                            <DeviceInterfacesSensorsSection profile={profile} />
+                            <DeviceInterfacesSensorsSection
+                                profile={profile}
+                                deviceName={device.name}
+                            />
                         </TabsContent>
 
                         <TabsContent value="configuration">
                             <DeviceConfigurationSection
                                 profile={profile}
+                                deviceId={device.id}
+                                deviceName={device.name}
                                 onEditRegistry={editDeviceDialog.openDialog}
                                 onEditServiceDue={() => setServiceDueOpen(true)}
                             />
@@ -1103,7 +1120,12 @@ function DeviceShowBody({
                             </div>
 
                             <Dialog open={linkOpen} onOpenChange={setLinkOpen}>
-                                <DialogContent className="sm:max-w-md">
+                                <DialogContent
+                                    style={{
+                                        maxWidth: 'min(92vw, 480px)',
+                                        width: 'min(92vw, 480px)',
+                                    }}
+                                >
                                     <DialogHeader>
                                         <DialogTitle>Link asset</DialogTitle>
                                         <DialogDescription>
@@ -1303,7 +1325,12 @@ function DeviceShowBody({
                             )}
 
                             <Dialog open={relOpen} onOpenChange={setRelOpen}>
-                                <DialogContent className="sm:max-w-md">
+                                <DialogContent
+                                    style={{
+                                        maxWidth: 'min(92vw, 720px)',
+                                        width: 'min(92vw, 720px)',
+                                    }}
+                                >
                                     <DialogHeader>
                                         <DialogTitle>
                                             Link to another device
@@ -1493,7 +1520,13 @@ function DeviceShowBody({
 
                             {/* Upload dialog */}
                             <Dialog open={docOpen} onOpenChange={setDocOpen}>
-                                <DialogContent className="sm:max-w-md">
+                                <DialogContent
+                                    className="max-h-[90vh] overflow-y-auto"
+                                    style={{
+                                        maxWidth: 'min(92vw, 720px)',
+                                        width: 'min(92vw, 720px)',
+                                    }}
+                                >
                                     <DialogHeader>
                                         <DialogTitle>
                                             Upload document
@@ -1508,19 +1541,35 @@ function DeviceShowBody({
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4">
-                                        <div className="space-y-1">
-                                            <label className="text-sm font-medium">
+                                        <div className="space-y-2">
+                                            <label
+                                                id="device-doc-file-label"
+                                                className="text-sm font-medium"
+                                            >
                                                 File
                                             </label>
-                                            <Input
-                                                type="file"
-                                                onChange={(e) =>
+                                            <FileDropzone
+                                                id="device-doc-file"
+                                                aria-labelledby="device-doc-file-label"
+                                                multiple={false}
+                                                title="Drag and drop a document here"
+                                                hint="PDF, Word, or image up to 20 MB"
+                                                disabled={docSubmitting}
+                                                onFiles={(files) => {
                                                     setDocFile(
-                                                        e.target.files?.[0] ??
-                                                            null,
-                                                    )
-                                                }
+                                                        files[0] ?? null,
+                                                    );
+                                                    setDocError('');
+                                                }}
                                             />
+                                            {docFile && (
+                                                <StagedFileCard
+                                                    file={docFile}
+                                                    onRemove={() =>
+                                                        setDocFile(null)
+                                                    }
+                                                />
+                                            )}
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-sm font-medium">
@@ -1669,7 +1718,12 @@ function DeviceShowBody({
                 )}
 
                 <Dialog open={serviceDueOpen} onOpenChange={setServiceDueOpen}>
-                    <DialogContent className="sm:max-w-md">
+                    <DialogContent
+                        style={{
+                            maxWidth: 'min(92vw, 480px)',
+                            width: 'min(92vw, 480px)',
+                        }}
+                    >
                         <DialogHeader>
                             <DialogTitle>Update next service date</DialogTitle>
                             <DialogDescription>
@@ -1713,7 +1767,12 @@ function DeviceShowBody({
 
                 {/* ── Assign dialog ─────────────────────────────── */}
                 <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-                    <DialogContent>
+                    <DialogContent
+                        style={{
+                            maxWidth: 'min(92vw, 720px)',
+                            width: 'min(92vw, 720px)',
+                        }}
+                    >
                         <DialogHeader>
                             <DialogTitle>
                                 {activeAssignment
@@ -1896,7 +1955,12 @@ function DeviceShowBody({
 
                 {/* ── Maintenance dialog ────────────────────────── */}
                 <Dialog open={maintOpen} onOpenChange={setMaintOpen}>
-                    <DialogContent>
+                    <DialogContent
+                        style={{
+                            maxWidth: 'min(92vw, 720px)',
+                            width: 'min(92vw, 720px)',
+                        }}
+                    >
                         <DialogHeader>
                             <DialogTitle>Schedule maintenance</DialogTitle>
                             <DialogDescription>
