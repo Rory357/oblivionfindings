@@ -1063,6 +1063,9 @@ app(Schedule::class)->job(new RecoverFirstAidDeliveries)->everyMinute()->without
 
 // Accepted restraint commands retain delivery intents independently of source completion.
 app(Schedule::class)->command('restraints:recover-deliveries')->everyMinute()->withoutOverlapping();
+// Saved chemical exposures reach the H&S register straight after the save; this retries failed or missed deliveries
+// (30 s doubling to 15 min) without the queue worker, so the register still fills if the worker is down.
+app(Schedule::class)->command('chemical-exposures:recover-deliveries')->everyMinute()->withoutOverlapping();
 app(Schedule::class)->command('restraints:followup-reminders')->dailyAt('08:00')->timezone('Pacific/Auckland')->withoutOverlapping();
 
 // Recover committed participation intents through independently current recipient source admission.

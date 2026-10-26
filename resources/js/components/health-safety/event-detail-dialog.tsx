@@ -85,6 +85,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { EventReviewFlags, type EventReviewFlag } from '@/components/health-safety/event-review-flags';
 import {
     Field,
     InfoCard,
@@ -452,6 +453,8 @@ export type ClosureException = {
 export type EventDetail = {
     id: number;
     reference_number: string;
+    /** Source changes a person must review (job 3): open flags only. */
+    review_flags?: EventReviewFlag[];
     event_category: string;
     severity: string;
     status: string;
@@ -1215,6 +1218,11 @@ function EventWorkspace({
                 </div>
             ) : null}
 
+            {d.review_flags?.length ? (
+                <div className="mb-4">
+                    <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+                </div>
+            ) : null}
             {section === 'overview' ? (
                 <OverviewSection d={d} cat={cat} stage={stage} />
             ) : null}
@@ -1813,6 +1821,9 @@ function SafetyReviewPage({
                     aria-label={pane ? 'Current action' : sectionLabel}
                     className="grid min-w-0 gap-5"
                 >
+                    {!pane ? (
+                        <EventReviewFlags eventId={d.id} flags={d.review_flags} canDecideWorksafe={d.worksafe.can_decide} />
+                    ) : null}
                     {main}
                 </div>
                 <aside

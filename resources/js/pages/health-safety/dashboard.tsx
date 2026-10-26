@@ -45,6 +45,8 @@ import { HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
 
 type Props = {
+    /** Exposure managers only: how many exposures haven't reached the H&S register (job 3). */
+    exposure_delivery_problems?: number | null;
     source_scope?: 'readable_subset';
     source_completeness?: 'unknown';
     kpis: Record<string, number | null>;
@@ -169,6 +171,7 @@ const EMPTY_RESTRAINTS: RestraintDashboardData = {
 
 export default function HealthSafetyDashboard({
     source_completeness,
+    exposure_delivery_problems,
     kpis,
     incident_trends,
     backbone,
@@ -281,6 +284,7 @@ export default function HealthSafetyDashboard({
             ppeState={worklists.ppe_expiring_state}
             worksafePending={backbone?.events.worksafe_pending ?? null}
             activeAlerts={kpis.active_alerts ?? null}
+            exposureDeliveryProblems={exposure_delivery_problems ?? null}
             site={filters.site}
         />
     );

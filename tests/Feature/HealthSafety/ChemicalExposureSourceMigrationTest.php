@@ -108,6 +108,10 @@ final class ChemicalExposureSourceMigrationTest extends ChemicalExposureCommandT
         $public = $this->catalogue(); $sharedIntentCount = DB::table('chemical_command_intents')->count();
         $reversed = [];
         try {
+            // Later migrations that alter these tables reverse first and re-apply last (job 3's delivery retry state),
+            // so the re-created tables match the real schema for every later test in this process.
+            $retry = require database_path('migrations/2026_10_26_100000_add_automatic_delivery_state_to_chemical_exposure_deliveries.php');
+            $retry->down(); $reversed[] = $retry;
             $dependent = $this->projectionMigration(); $dependent->down(); $reversed[] = $dependent;
             $private = $this->migration(); $private->down(); $reversed[] = $private;
             $this->assertDatabaseHas('substance_exposure_records', ['id' => $row->id, 'user_id' => $this->worker->id,

@@ -127,6 +127,10 @@ class TaskAggregator
             new Providers\RestraintReviewProvider,
             // Private follow-ups remain source-owned; generic Tasks cannot mutate them.
             new Providers\ChemicalExposureFollowupProvider,
+            // Exposures that haven't reached the H&S register, for exposure managers (job 3).
+            new Providers\ChemicalExposureDeliveryProvider,
+            // H&S events whose source changed after a signed WorkSafe decision or after close (job 3).
+            new Providers\HsEventReviewFlagProvider,
         ];
     }
 

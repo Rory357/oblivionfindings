@@ -95,6 +95,7 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/events/{hsEvent}/worksafe/decision', HsWorksafeDecisionController::class)->name('events.worksafe.decision');
         Route::post('/events/{hsEvent}/worksafe/notify', [HsEventController::class, 'worksafeNotify'])->name('events.worksafe.notify');
         Route::post('/events/{hsEvent}/worksafe/acknowledge', [HsEventController::class, 'worksafeAcknowledge'])->name('events.worksafe.acknowledge');
+        Route::post('/events/{hsEvent}/review-flags/{flag}/resolve', [HsEventController::class, 'resolveReviewFlag'])->whereNumber(['hsEvent', 'flag'])->name('events.review-flags.resolve');
         Route::post('/events/{hsEvent}/worksafe/site-preservation', [HsEventController::class, 'worksafeSitePreservation'])->name('events.worksafe.site-preservation');
         Route::post('/events/{hsEvent}/worksafe/site-preservation/release', [HsEventController::class, 'worksafeSitePreservationRelease'])->name('events.worksafe.site-preservation.release');
 
@@ -337,6 +338,10 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/{exposure}/command-options', [ChemicalExposureWorkspaceController::class, 'commandOptions'])->whereNumber('exposure')->name('command-options');
             Route::get('/{exposure}/evidence/{evidence}/download', [ChemicalExposureWorkspaceController::class, 'downloadEvidence'])->whereNumber(['exposure', 'evidence'])->name('evidence.download');
             Route::get('/{exposure}/delivery-attempts', [ChemicalExposureWorkspaceController::class, 'deliveryAttempts'])->whereNumber('exposure')->name('delivery-attempts');
+            // Exposure managers inspect and retry H&S deliveries (job 3). JSON only; GET never dispatches.
+            Route::get('/{exposure}/deliveries', [ChemicalExposureWorkspaceController::class, 'deliveries'])->whereNumber('exposure')->name('deliveries.index');
+            Route::get('/{exposure}/deliveries/{delivery}', [ChemicalExposureWorkspaceController::class, 'delivery'])->whereNumber(['exposure', 'delivery'])->name('deliveries.show');
+            Route::post('/{exposure}/deliveries/{delivery}/retry', [ChemicalExposureWorkspaceController::class, 'retryDelivery'])->whereNumber(['exposure', 'delivery'])->middleware('throttle:30,1')->name('deliveries.retry');
             Route::put('/{exposure}', [ChemicalExposureWorkspaceController::class, 'correct'])->whereNumber('exposure')->name('correct');
             Route::post('/{exposure}/reviews', [ChemicalExposureWorkspaceController::class, 'review'])->whereNumber('exposure')->name('reviews.store');
             Route::post('/{exposure}/followups', [ChemicalExposureWorkspaceController::class, 'assignFollowup'])->whereNumber('exposure')->name('followups.store');

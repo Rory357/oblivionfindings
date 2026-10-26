@@ -239,6 +239,8 @@ class HealthSafetyDashboardController extends Controller
 
         return [
             'kpis' => $kpis,
+            // Exposure managers only: a count of exposures not on the H&S register yet, no details (job 3).
+            'exposure_delivery_problems' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->countFor($user, $context),
             'source_scope' => 'readable_subset',
             'source_completeness' => 'unknown',
             'workplace_injury_state' => array_diff_key($injuryOperands, ['injuries' => true, 'lost_time_days' => true]),
@@ -561,6 +563,7 @@ class HealthSafetyDashboardController extends Controller
             ...\App\Services\HealthSafety\FirstAidAccessService::PERMISSIONS,
             ...\App\Services\HealthSafety\RestraintAccessService::PERMISSIONS,
             ...\App\Services\HealthSafety\InjuryAccessService::PERMISSIONS,
+            ...\App\Services\HealthSafety\ChemicalExposureCommandAccess::PERMISSIONS,
             ...FleetIncidentReadScope::PERMISSIONS,
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
         ]));

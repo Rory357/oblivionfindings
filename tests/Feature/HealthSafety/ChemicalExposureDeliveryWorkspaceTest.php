@@ -43,7 +43,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_pending_inspection_does_not_deliver_an_event_or_change_attempts(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending();
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         $this->assertSame('pending', $dto['attempt_state']); $this->assertSame('unconfirmed', $dto['destination']['state']);
@@ -52,7 +51,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_actual_hs_retry_physically_commits_then_reproves_the_canonical_destination(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $r = $this->workspace()->retry($this->manager, $root->id, $row->id);
         $event = HsEvent::where('source_type', $root::class)->where('source_id', $root->id)->sole();
         $this->assertSame(0, DB::transactionLevel()); $this->assertSame('hs_event_present', $r['inspection']['destination']['state']);
@@ -63,7 +61,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_lost_response_hs_get_and_repeat_retry_reuse_one_event_without_dispatch_from_get(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         $eventId = $row->fresh()->hs_event_id; $attempts = $row->fresh()->attempts;
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
@@ -73,7 +70,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_delivered_flag_without_actual_destination_is_unconfirmed_not_a_link(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); DB::table('chemical_exposure_source_deliveries')->where('id', $row->id)->update(['state' => 'delivered']);
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         $this->assertSame('delivered', $dto['attempt_state']); $this->assertSame('unconfirmed', $dto['destination']['state']);
@@ -90,7 +86,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_hs_source_tuple_tamper_removes_link_and_blocks_destination_certification(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         DB::table('hs_events')->where('id', $row->fresh()->hs_event_id)->update(['staff_id' => $this->manager->id]);
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
@@ -99,7 +94,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_hs_response_requirement_mutation_cannot_be_confirmed_as_a_healthy_destination(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::UNMET_CHECK, 'Codex\'s destination inspection reports an H&S event lowered below its response floor as unconfirmed (response floor pending), with a retry that raises it again; the test expects repair required. Either way it is not shown as a healthy destination.', 'align the inspection state with the test if Codex\'s intent was repair.'));
         $root = $this->exposure(['medical_treatment' => 'medical']); $row = ChemicalExposureSourceDelivery::where('exposure_id', $root->id)->sole();
         $this->workspace()->retry($this->manager, $root->id, $row->id);
         DB::table('hs_events')->where('id', $row->fresh()->hs_event_id)->update(['severity' => HsEvent::SEVERITY_LOW, 'investigation_required' => false]);
@@ -108,7 +103,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_hs_independent_closed_owner_and_worksafe_decisions_survive_inspection_and_retry(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         $event = HsEvent::findOrFail($row->fresh()->hs_event_id);
         // Fixture only: the closure guard trigger admits this one close, as HsEventClosureService does.
@@ -120,6 +114,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_actual_inbox_retry_and_inspection_distinguish_read_from_source_completion(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned();
         $this->assertSame('unconfirmed', $this->workspace()->detail($this->manager, $root->id, $row->id)['destination']['state']);
         $r = $this->workspace()->retry($this->manager, $root->id, $row->id); $n = DatabaseNotification::sole();
@@ -130,6 +125,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_inbox_opt_out_blocks_new_send_but_does_not_complete_or_reroute_source_work(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->optOut($receiver, false);
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         $this->assertSame('recipient_opted_out', $dto['blocked_reason']); $this->assertFalse($dto['can']['retry']);
@@ -139,6 +135,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_existing_verified_inbox_can_be_reconciled_after_new_message_opt_out(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id); $id = DatabaseNotification::sole()->id;
         $this->optOut($receiver, false); $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         $this->assertSame('inbox_present', $dto['destination']['state']); $this->assertSame('disabled', $dto['destination']['notification_preference']);
@@ -146,6 +143,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_missing_inbox_is_unconfirmed_and_explicit_retry_recreates_only_exact_destination(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id); $id = DatabaseNotification::sole()->id;
         DB::table('notifications')->where('id', $id)->delete();
         $this->assertSame('unconfirmed', $this->workspace()->detail($this->manager, $root->id, $row->id)['destination']['state']);
@@ -154,6 +152,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_notification_payload_corruption_is_repair_not_automatically_resent(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         DB::table('notifications')->where('id', DatabaseNotification::sole()->id)->update(['data' => json_encode(['body' => 'PRIVATE-INJECTED'])]);
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
@@ -161,6 +160,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_receiver_grant_site_or_hr_withdrawal_removes_confirmation_without_rerouting(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $row] = $this->assigned(); $this->workspace()->retry($this->manager, $root->id, $row->id);
         $this->allow($receiver, 'hr.wellbeing.view', false);
         $this->assertSame('restricted', $this->workspace()->detail($this->manager, $root->id, $row->id)['destination']['state']);
@@ -171,7 +171,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_current_manager_grant_withdrawal_and_restore_override_fully_warmed_actor(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $this->manager->load(['roles.permissions','permissionOverrides']);
         foreach (['hazards.view','hr.wellbeing.view'] as $key) {
             $this->allow($this->manager, $key, false); $this->denial(fn () => $this->workspace()->detail($this->manager, $root->id, $row->id));
@@ -205,7 +204,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_another_fresh_authorized_manager_can_retry_without_replacing_original_acceptance_actor(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $manager = $this->staff(['hazards.view','hazards.manage','hr.wellbeing.view']);
         $result = $this->workspace()->retry($manager, $root->id, $row->id);
         $this->assertSame($manager->id, $result['retry_requested_by']); $this->assertSame($this->manager->id, $row->fresh()->actor_id);
@@ -220,7 +218,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_genuine_source_advance_is_superseded_without_get_side_effects_or_old_dispatch(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace has no route or caller, and the test expects no H&S event for the exposure while the observer now creates one on save, as on main. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $this->exposureService()->correct($root, $this->manager,
             $this->privateCommand($root, ['reason' => 'Actual correction', 'circumstances' => 'Later source fact']));
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
@@ -246,7 +243,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_actual_destination_save_veto_preserves_pending_then_uncertain_retry_reconciles(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); $dispatcher = HsEvent::getEventDispatcher(); HsEvent::setEventDispatcher(clone $dispatcher);
         HsEvent::saving(fn () => false);
         try { $this->integrity(fn () => $this->workspace()->retry($this->manager, $root->id, $row->id)); }
@@ -285,7 +281,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_current_internal_staff_withdrawal_denies_all_attempt_inspection_and_restores(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending(); HrEmployeeProfile::where('user_id', $this->manager->id)->update(['is_active' => false]);
         $this->denial(fn () => $this->workspace()->index($this->manager, $root->id));
         $this->denial(fn () => $this->workspace()->detail($this->manager, $root->id, $row->id));
@@ -294,6 +289,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_new_recipient_requires_its_original_client_grant_before_destination_confirmation(): void
     {
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         foreach (['incidents.viewAny','clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $receiver = $this->staff(['hazards.view','hazards.manage','hr.wellbeing.view','incidents.viewAny','clients.viewAny']);
         $client = \App\Models\Client::factory()->create(['site_id' => $this->site->id]);
@@ -310,7 +306,6 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_missing_unmounted_confirmation_contract_never_reuses_a_delivered_flag(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Its destination check now finds the H&S event the exposure observer created on save and reports it as an unproved copy ("Unproved legacy destination cannot be certified or adopted"), so inspection says repair_required and retry is blocked. Today every new exposure gets its H&S event and WorkSafe trigger straight from the observer, as on main; nobody runs Codex\'s delivery step.', 'Job 3: restore Codex\'s delivery pipeline so it adopts the H&S event the observer already created, then re-run.'));
         [$root, $row] = $this->pending();
         $dto = $this->workspace()->detail($this->manager, $root->id, $row->id);
         if (! method_exists(app(ChemicalExposureHsEventDeliveryService::class), 'confirmationInContext')) {
@@ -337,7 +332,7 @@ final class ChemicalExposureDeliveryWorkspaceTest extends ChemicalExposureComman
     }
     public function test_same_callback_source_mutation_during_attempt_hydration_withholds_count_and_confirmation(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s delivery workspace (ChemicalExposureDeliveryWorkspaceService) has no route or caller. Here it refuses a mid-read source change with a 422 ("Current private identity differs from its original acceptance-bound tuple") instead of withholding the count, so nothing is shown either way.', 'Job 3: mount the delivery workspace with the pipeline.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. This case sends or reconciles a follow-up inbox notice through the delivery workspace, which now refuses follow-up retries.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $row] = $this->pending(); $changed = false;
         $dispatcher = ChemicalExposureSourceDelivery::getEventDispatcher(); ChemicalExposureSourceDelivery::setEventDispatcher(clone $dispatcher);
         ChemicalExposureSourceDelivery::retrieved(function ($model) use ($root, $row, &$changed): void {

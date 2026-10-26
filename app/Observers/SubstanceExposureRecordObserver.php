@@ -5,44 +5,78 @@ namespace App\Observers;
 use App\Models\HsEvent;
 use App\Models\SubstanceExposureRecord;
 use App\Services\HealthSafety\ChemicalExposureDeliveryService;
+use App\Services\HealthSafety\ChemicalExposureSystemDeliveryService;
+use App\Services\HealthSafety\HsEventReviewFlagService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use Illuminate\Contracts\Events\ShouldHandleEventsAfterCommit;
 use Illuminate\Support\Facades\Log;
 
 /**
- * New source commands retain revision-bound delivery intents. No current-incident fallback certifies historical context.
- *
- * Codex's delivery consumer for those intents is not mounted in this build, so every new exposure also gets its H&S
- * event here, as on main: an exposure reaches the H&S register and its WorkSafe review the moment it is recorded.
- * Without this, no new exposure would ever reach either.
+ * Job 3 (Stephan, 26 Oct): every saved exposure command stages a revision-bound delivery, and the system delivers it to
+ * the H&S register straight after the save commits. Failures stay pending for the every-minute recovery and show to
+ * exposure managers. Old-style records (no governed provenance, source_schema_version 0) keep main's direct event,
+ * so no exposure can ever be saved without reaching the register and its WorkSafe review.
  */
 final class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCommit
 {
     private const SEVERITY_RANK = [HsEvent::SEVERITY_LOW => 0, HsEvent::SEVERITY_MEDIUM => 1, HsEvent::SEVERITY_HIGH => 2, HsEvent::SEVERITY_CRITICAL => 3];
 
+    /** Facts whose correction after a signed WorkSafe decision needs a person to look again. */
+    private const BOOKKEEPING = ['created_at', 'updated_at', 'updated_by', 'source_schema_version', 'source_revision'];
+
     public function __construct(
         private readonly ChemicalExposureDeliveryService $delivery,
+        private readonly ChemicalExposureSystemDeliveryService $system,
         private readonly HsEventService $hsEventService,
         private readonly NotifiableEventClassifier $classifier,
+        private readonly HsEventReviewFlagService $flags,
     ) {}
 
     public function created(SubstanceExposureRecord $source): void
     {
         $this->delivery->sourceCommitted($source);
+        if ($this->governed($source)) {
+            $this->deliver($source);
+
+            return;
+        }
         $this->recordHsEvent($source);
     }
 
     public function updated(SubstanceExposureRecord $source): void
     {
         $this->delivery->sourceCommitted($source);
+        if ($this->governed($source)) {
+            $this->deliver($source);
+
+            return;
+        }
         $this->raiseHsEventSeverity($source);
     }
 
+    private function governed(SubstanceExposureRecord $source): bool
+    {
+        return (int) $source->source_schema_version >= 1;
+    }
+
+    private function deliver(SubstanceExposureRecord $source): void
+    {
+        try {
+            $this->system->afterCommit((int) $source->getKey());
+        } catch (\Throwable $e) {
+            // The pending delivery stays for the every-minute recovery and shows to exposure managers.
+            Log::error('SubstanceExposureRecordObserver: automatic H&S delivery could not start', [
+                'substance_exposure_record_id' => $source->getKey(),
+                'error' => $e::class,
+            ]);
+        }
+    }
+
     /**
-     * Interim until the delivery pipeline is finished (job 3): a corrected exposure (say, treatment none → hospitalisation)
-     * raises its open H&S event's severity, and a material escalation marks an investigation required. Severity is never
-     * lowered, the WorkSafe decision is never touched, and a closed event is left as recorded (logged for review).
+     * Old-style records only: a corrected exposure raises its H&S event's severity and a material escalation marks an
+     * investigation required. Severity is never lowered and the WorkSafe decision is never touched. A closed event is
+     * raised but never reopened, and is flagged for review; a correction after a signed WorkSafe decision is flagged.
      */
     private function raiseHsEventSeverity(SubstanceExposureRecord $record): void
     {
@@ -53,19 +87,13 @@ final class SubstanceExposureRecordObserver implements ShouldHandleEventsAfterCo
             if ($event === null) {
                 return;
             }
+            $before = clone $event;
             $severity = $this->severityFor($record);
-            if ((self::SEVERITY_RANK[$severity] ?? 0) <= (self::SEVERITY_RANK[$event->severity] ?? 0)) {
-                return;
+            if ((self::SEVERITY_RANK[$severity] ?? 0) > (self::SEVERITY_RANK[$event->severity] ?? 0)) {
+                $this->hsEventService->syncSeverity($event, $severity);
             }
-            if ($event->status === HsEvent::STATUS_CLOSED) {
-                Log::warning('SubstanceExposureRecordObserver: corrected exposure would raise a closed H&S event', [
-                    'substance_exposure_record_id' => $record->id, 'hs_event_id' => $event->id,
-                    'from' => $event->severity, 'to' => $severity,
-                ]);
-
-                return;
-            }
-            $this->hsEventService->syncSeverity($event, $severity);
+            $corrected = array_diff(array_keys($record->getChanges()), self::BOOKKEEPING) !== [];
+            $this->flags->afterSourceChange($before, $record, null, (string) $event->fresh()->severity, $corrected);
         } catch (\Throwable $e) {
             Log::error('SubstanceExposureRecordObserver: HsEvent severity raise failed', [
                 'substance_exposure_record_id' => $record->id,

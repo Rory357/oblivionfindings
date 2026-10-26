@@ -261,7 +261,7 @@ final class ChemicalExposureDerivedSourcePrivacyTest extends TestCase
 
     public function test_hse_family_final_scope_preserves_unrelated_events_and_conceals_exposure_without_wellbeing(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure source guard (hide chemical-exposure H&S events and their actions, investigations and risk assessments from viewers without hr.wellbeing.view, and incident-linked ones without incident and client read) isn\'t applied. Stephan kept main\'s rule for this merge (25 Oct, "Keep today\'s rule"): H&S view at the event\'s Site.', 'revisit with job 3, the exposure delivery pipeline.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose main\'s rule for who sees exposure H&S events (26 Oct, job 3): people with H&S view at the event\'s Site. Codex\'s guard would hide them from everyone without wellbeing access, and whenever a delivery is behind.', 'none unless that rule is revisited.'));
         $ordinary = $this->ordinary();
         $this->assertSame([$ordinary->id], $this->eventIds($this->safety, HsEvent::whereKey([$ordinary->id, $this->event->id])));
         $this->assertSame([$this->event->id, $ordinary->id], $this->eventIds($this->viewer, HsEvent::whereKey([$ordinary->id, $this->event->id])));
@@ -269,7 +269,7 @@ final class ChemicalExposureDerivedSourcePrivacyTest extends TestCase
 
     public function test_incomplete_discovery_candidates_never_widen_final_child_source_denial(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'candidate mechanics of Codex\'s exposure source guard, which isn\'t applied; the viewer in this test already holds every grant the guard asks for.', 'Stephan\'s decision on exposure H&S event privacy, with job 3.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose main\'s rule for who sees exposure H&S events (26 Oct, job 3): people with H&S view at the event\'s Site. Codex\'s guard would hide them from everyone without wellbeing access, and whenever a delivery is behind.', 'none unless that rule is revisited.'));
         $visible = $this->action($this->event);
         $omitted = $this->event($this->source()); $denied = $this->action($omitted);
         $ordinary = $this->action($this->ordinary());
@@ -282,7 +282,7 @@ final class ChemicalExposureDerivedSourcePrivacyTest extends TestCase
 
     public function test_modern_and_legacy_risk_bindings_both_deny_private_sources_preserving_orphans(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s exposure source guard (hide chemical-exposure H&S events and their actions, investigations and risk assessments from viewers without hr.wellbeing.view, and incident-linked ones without incident and client read) isn\'t applied. Stephan kept main\'s rule for this merge (25 Oct, "Keep today\'s rule"): H&S view at the event\'s Site.', 'revisit with job 3, the exposure delivery pipeline.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose main\'s rule for who sees exposure H&S events (26 Oct, job 3): people with H&S view at the event\'s Site. Codex\'s guard would hide them from everyone without wellbeing access, and whenever a delivery is behind.', 'none unless that rule is revisited.'));
         $ordinary = $this->ordinary();
         $modern = $this->risk(['hs_event_id' => $this->event->id]);
         $legacy = $this->risk(['assessable_type' => HsEvent::class, 'assessable_id' => $this->event->id]);
@@ -350,7 +350,7 @@ final class ChemicalExposureDerivedSourcePrivacyTest extends TestCase
 
     public function test_changed_typed_current_facts_conceal_copy_and_child_count_instead_of_certifying_markers(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'destination-marker and acceptance-digest proofs: the markers are written only by the unmounted delivery pipeline, so events the observer creates have none. These are tamper checks on rows edited directly in the database, not checks on who sees what.', 'job 3 after the merge: finish the delivery pipeline.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose main\'s rule for who sees exposure H&S events (26 Oct, job 3): people with H&S view at the event\'s Site. This case checks that the H&S register hides an exposure event whose destination marker is missing, changed or behind, which is Codex\'s visibility guard. The deliveries themselves still refuse a missing or changed marker.', 'none unless that rule is revisited.'));
         [$source] = $this->recorded(); $event = $this->event($source); $action = $this->action($event);
         DB::table('substance_exposure_records')->where('id', $source->id)->update(['symptoms' => 'EXTERNALLY-MUTATED-PRIVATE-FACT']);
         $dto = $this->projection()->forHsEvent($event->id, $this->viewer);
