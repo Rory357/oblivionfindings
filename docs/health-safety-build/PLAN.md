@@ -249,6 +249,33 @@ Stephan approved merging and deploying overnight (relayed by the coordinator, 24
 - Pest final gate (about 390 files in seven lanes): 5,780 passed. Every failure is now failing the same way on main (5, listed below), skipped with its reason (294), fixed in its test, or a shared-fake-disk artefact that passes alone. Solo reruns of every changed file pass or skip as intended.
 - Browser walkthrough (private database, 1440 px): lone-worker Shift GPS shown with its time to a GPS viewer and withheld from the H&S officer (no position in the data); a chemical exposure recorded through the form creates its H&S event with "Record the WorkSafe decision" and no narrative; the team lead sees and acts on an incident-linked event without incident details (decision 9); registers and Overview load for admin and team lead.
 
+## Paused 26 Oct (Stephan: "please pause work safely now… will continue thursday") — resume here
+
+Stephan's answers on the open H&S items (26 Oct ~14:10, pop-ups in the coordinator session):
+- **Substance register exposure counts and the "awaiting WorkSafe" badge:** "Anyone who sees the list", as main. Bring them back for every substance register viewer.
+- **Overview safeguarding count:** "Hide it" unless the viewer holds safeguarding access (`safeguarding.viewAny`). This applies Codex's extraction; `HealthSafetyDashboardSafeguardingReadTest` expects it.
+- **Client profile recent incidents and First Aid:** "Yes, narrow them". Port Codex's `readableRecentIncidents` and `FirstAidSourceProjectionService::forClient` narrowing.
+- **Sidebar portal client list:** "Yes, apply it". Codex's rule: someone with an HR profile (even archived) isn't treated as a portal member.
+- **Respite "record a restraint for this stay" page:** "yes build it", rebuilt on main's newer respite privacy rules (`RespiteWorkspaceMedicationPrivacyTest`).
+- **Meeting delivery pipeline and participation inbox:** "Not now". Their tests stay skipped; re-word them as decided.
+- **Risk-assessment acceptance step:** "Yes, add it". Wire `RiskAssessmentAcceptanceService`; `HsRiskAssessmentAcceptanceTest` (13) is skipped today.
+- **Codex's changes in other modules (29 tests):** "Leave for those modules". These are outside "H&S complete"; list them for those owners: Control Room/Clinical restraint (9), Clinical restraint lens (5), S&D lone-worker links (2), Governance training reviewer settings (9), Control Room notification rewrite (2), Fleet incident date window (2).
+- No decision needed, so do them:
+  - #1 older exposures with a linked incident (mount Codex's legacy association recovery for exposure managers);
+  - #3 the /tasks exposure follow-up link (`/health-safety/chemical-exposures/{id}?section=followups&followup={child}`, and drop the "can't be opened here" note);
+  - #10 exposure evidence recovery-staging endpoints;
+  - #11 the safeguarding concern read-scope hardening;
+  - #13 Codex's unmet checks (late-withdrawal races and similar).
+- **#14 demo data** (9 .com incidents with incomplete data, the demo H&S officers' HR profiles) stays in the Part 3 clean-up. Ask before deleting or editing data.
+
+**Resume order (Thursday 29 Oct, after the usage reset at 18:59 NZ):**
+1. Ease-of-use clean-up **Part 1**: the H&S `vocabulary.md` and one shared labels file (server + client), plain wording, the dead ends, blocked reasons shown on the page, StatusBadge and standard headers, and POPUP-SYSTEM.md's "found while drawing" items. The brief is in the shared notes: `hs-ease-of-use-cleanup-brief-2026-10-26.md`.
+2. #1, #3, #10, #11, then the decided items above (substance counts, safeguarding count, client profile narrowing, portal rule, respite stay page, risk-assessment acceptance), then #13. Each is its own tested change.
+3. Ease-of-use **Part 2**: drawings in the app (Control Room style, realistic data) for Stephan's approval **before** building. Then Part 3 (demo data; ask first) and Part 4 (the user test, arranged by the coordinator).
+4. After "H&S complete": the slow pages (My Day, H&S Overview, Tasks, Clients, Incidents).
+
+Before any Pest run in a worktree that holds a local `npm run build`, move `public/build` aside: its manifest sets Inertia's asset version, and every X-Inertia test request then answers 409.
+
 ## Jobs after the H&S merge (each its own tested change, pushed and deploy-checked)
 
 1. ✅ **Participation Site checks on every write** (Stephan, option A "All participation"): committees (create), representatives (add, edit), consultations (add, edit, status, document upload) and meetings. Each write needs the record's Site among the manager's H&S Sites; `healthSafety.viewAllSites` covers every Site; a record with no Site needs all-Sites access. Tests per write type: own Site allowed, other Site refused, all-Sites allowed, Site-less without all-Sites refused. **Done 26 Oct:** every participation write route (13) checks the record's Site; another Site's record answers 404 like the register, creating at another Site 403; `WorkerParticipationSiteWriteTest` covers own, other, all-Sites and Site-less for each.
