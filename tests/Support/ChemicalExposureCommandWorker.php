@@ -37,6 +37,8 @@ if (! is_string($storageRoot) || ! str_starts_with($storageRoot, sys_get_temp_di
     throw new RuntimeException('Private race bytes require the exact generated test temporary storage root.');
 }
 config(['filesystems.disks.private' => ['driver' => 'local', 'root' => $storageRoot, 'throw' => true]]);
+// As in ChemicalExposureCommandTestCase: these races exercise the commands, not the automatic delivery after the save.
+config(['health_safety.exposure_automatic_delivery' => false]);
 Carbon::setTestNow(Carbon::parse('2026-10-12T01:00:00Z'));
 $barrierMode = getenv('EXPOSURE_TEST_BARRIER_MODE');
 if (! in_array($barrierMode, ['first_claim', 'start'], true)) { throw new RuntimeException('Exact test barrier mode is required.'); }

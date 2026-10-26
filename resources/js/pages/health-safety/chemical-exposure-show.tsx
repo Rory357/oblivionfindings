@@ -12,6 +12,7 @@ import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderR
 import { PageHeaderStages, type PageHeaderNextStep, type PageHeaderStage } from '@/components/page/page-header-strip';
 import { dateTimeWithYear } from '@/components/incidents/incident-stages';
 import { Note, SideColumn, Surface } from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SafetyFormDraftContext, useSafetyWorkspaceDrafts } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
@@ -20,7 +21,7 @@ import { CHEMICAL_EXPOSURES, exposureHref, exposureLocation, exposureReturn, typ
 import type { ExposureEvidence, ExposureFollowup, ExposureWorkspaceDetail } from '@/lib/health-safety/chemical-exposure-read-contract';
 import type { SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { ClipboardCheck, FileText, History, Link2, ListChecks, LockKeyhole, MoreHorizontal, Paperclip, PencilLine, RefreshCw, UserPlus } from 'lucide-react';
+import { ClipboardCheck, FileText, History, Link2, ListChecks, LockKeyhole, MoreHorizontal, Paperclip, PencilLine, RefreshCw, TriangleAlert, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ExposureCommandForm } from './components/exposure-command-form';
 import { ExposureDeliveryPanel } from './components/exposure-delivery-panel';
@@ -31,7 +32,14 @@ import type { ExposureReceipt } from './components/use-exposure-command';
 const SECTIONS = [{ key: 'overview', label: 'Recorded facts', icon: LockKeyhole }, { key: 'reviews', label: 'Reviews', icon: ClipboardCheck },
     { key: 'followups', label: 'Follow-ups', icon: ListChecks }, { key: 'evidence', label: 'Evidence', icon: FileText },
     { key: 'history', label: 'History', icon: History }, { key: 'connections', label: 'Connections', icon: Link2 }] as const;
-type Props = { detail: ExposureWorkspaceDetail; return_to: string | null; chemical_exposure_confirmation: ExposureReceipt | null };
+/** Exposure managers only (job 3): this exposure hasn't reached the H&S register yet. */
+type DeliveryAlert = { state: 'needs_manager' | 'failed' | 'overdue'; since: string | null };
+type Props = { detail: ExposureWorkspaceDetail; return_to: string | null; chemical_exposure_confirmation: ExposureReceipt | null; delivery_alert?: DeliveryAlert | null };
+const DELIVERY_ALERT: Record<DeliveryAlert['state'], string> = {
+    needs_manager: 'The automatic delivery stopped because the record needs checking. Check it and retry from Connections.',
+    failed: 'The automatic delivery failed and is trying again. If it keeps failing, retry it from Connections.',
+    overdue: 'It has been waiting more than 10 minutes. Check the delivery from Connections.',
+};
 type Pending = { action: ExposureAction; sourceId?: number; child?: ExposureFollowup | ExposureEvidence };
 const dayOf = (value?: string | null) => (value && toDateInput(value) ? formatDateOnly(toDateInput(value)) : 'Not recorded');
 
@@ -66,7 +74,7 @@ export default function ChemicalExposureShow(props: Props) {
     const { props: shared } = usePage<SharedData>();
     return <ExposureWorkspace key={`${shared.auth.user.id}:${props.detail.id}`} {...props} />;
 }
-function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation }: Props) {
+function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation, delivery_alert = null }: Props) {
     const { url, props: shared } = usePage<SharedData>(); const location = exposureLocation(url); const drafts = useSafetyWorkspaceDrafts();
     const [withdrawn, setWithdrawn] = useState(false); const onWithdraw = useCallback(() => setWithdrawn(true), []);
     const admitted = !withdrawn && detail.exposure_access === 'readable' && detail.record?.id === detail.id
@@ -141,6 +149,16 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation }
                 strip={stages ? <PageHeaderStages steps={stages.steps} next={stages.next} ariaLabel="Exposure stage" /> : undefined}
                 rail={<PageHeaderRail items={rail} value={section} onSelect={(next) => move(next)} ariaLabel="Private exposure sections" />} />}>
                 <div className="grid min-w-0 gap-5">
+                    {admitted && delivery_alert ? (
+                        <Note tone={delivery_alert.state === 'needs_manager' ? 'critical' : 'warning'} icon={TriangleAlert}>
+                            <p><b>This exposure isn’t on the H&amp;S register yet.</b> {DELIVERY_ALERT[delivery_alert.state]}</p>
+                            {section !== 'connections' ? (
+                                <Button type="button" variant="link" size="sm" className="mt-1 h-auto px-0" onClick={() => move('connections')}>
+                                    Open delivery checks
+                                </Button>
+                            ) : null}
+                        </Note>
+                    ) : null}
                     {chemical_exposure_confirmation && admitted && <p role="status" className="text-subtle">The original submission was confirmed. Current facts and source access were checked separately.</p>}
                     {action && !allowed && !retained[commandKey] && <Surface aria-label="Change unavailable"><p role="alert" className="p-5 text-subtle text-status-warning">This change is unavailable on the current source. Open the recorded section to review it.</p></Surface>}
                     <div className={commandShown ? 'sg-surface p-5' : 'contents'}>
@@ -154,7 +172,7 @@ function ExposureWorkspace({ detail, return_to, chemical_exposure_confirmation }
                             {admitted ? <>{requestedFocus !== null && focusedFollowupId === null && <p role="status" className="text-subtle text-status-warning">The linked follow-up cannot currently be confirmed. No follow-up has been selected.</p>}
                                 <ExposureRecordPanel detail={current} section={section} open={open} onPage={onPage} focusedFollowupId={focusedFollowupId} /></>
                                 : <div role="status"><Note tone="warning">Saved private details and changes are withheld. Retained entries stay in memory until you leave or discard them.</Note></div>}
-                            <ExposureDeliveryPanel key={shared.auth.user.id} actorId={shared.auth.user.id} detail={current} active={admitted && section === 'connections'} onWithdraw={onWithdraw} />
+                            <ExposureDeliveryPanel key={shared.auth.user.id} actorId={shared.auth.user.id} detail={current} active={admitted && section === 'connections'} autoCheck={!!delivery_alert} onWithdraw={onWithdraw} />
                         </div>
                         {admitted ? <aside className="min-w-0" aria-label="Care answers and record"><SideColumn><ExposureRecordSide detail={current} /></SideColumn></aside> : null}
                     </div>

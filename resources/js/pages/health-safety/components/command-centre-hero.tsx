@@ -61,6 +61,8 @@ type AttentionProps = {
     ppeState?: PpeExpiringState;
     worksafePending: number | null;
     activeAlerts: number | null;
+    /** Exposure managers only: exposures not on the H&S register yet (a count, no details). Absent for everyone else. */
+    exposureDeliveryProblems?: number | null;
 };
 export type CommandCentreHeroProps = AttentionProps & {
     sourceCompleteness?: 'unknown';
@@ -474,6 +476,7 @@ export function CommandCentreAttention({
     ppeState,
     worksafePending,
     activeAlerts,
+    exposureDeliveryProblems = null,
     site = null,
 }: AttentionProps & { site?: number | null }) {
     const ppeRestricted = ppeState?.source_integrity === 'restricted';
@@ -517,6 +520,16 @@ export function CommandCentreAttention({
             tone: (activeAlerts ?? 0) > 0 ? 'critical' : undefined,
             href: register('/health-safety/lone-workers'),
         },
+        ...(exposureDeliveryProblems === null
+            ? []
+            : [
+                  {
+                      value: String(exposureDeliveryProblems),
+                      label: 'Exposures not on the H&S register yet',
+                      tone: exposureDeliveryProblems > 0 ? ('critical' as const) : undefined,
+                      href: '/tasks?sources=chemical_exposure_delivery',
+                  },
+              ]),
         {
             value: String(count('sds')),
             label: 'Safety data sheets to review',

@@ -12,7 +12,11 @@ use Illuminate\Validation\ValidationException;
 use LogicException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
-/** Unmounted recovery composition. Inspecting accepted outbox work never dispatches a destination. */
+/**
+ * Exposure managers' inspect-and-retry workspace (job 3, mounted under /deliveries). Inspecting accepted outbox work never
+ * dispatches a destination; a retry runs Codex's delivery as the manager. Follow-up notices stay off (Stephan), so a
+ * follow-up delivery is shown but never sent from here.
+ */
 final class ChemicalExposureDeliveryWorkspaceService
 {
     public const PERMISSIONS = ChemicalExposureCommandAccess::PERMISSIONS;
@@ -83,8 +87,7 @@ final class ChemicalExposureDeliveryWorkspaceService
         if (DB::transactionLevel() !== 0) { throw new LogicException('Exposure destination must start after recovery preflight commits.'); }
         // Concrete services only. No supplied callback or delivered boolean can impersonate a destination.
         if ($before['kind'] === 'health_safety') { $this->healthSafety->deliver($viewer, $deliveryId, $exposureId); }
-        elseif ($before['kind'] === 'followup') { $this->followup->deliverForViewer($viewer, $deliveryId, $exposureId); }
-        else { throw new LogicException('Unknown exposure recovery purpose.'); }
+        else { throw new LogicException('Only Health and Safety deliveries can be retried while follow-up notices are off.'); }
         if (DB::transactionLevel() !== 0) { throw new LogicException('Exposure destination did not complete its physical transaction.'); }
         // A lost/uncertain response is reconciled by a NEW read proof, never by the consumer's returned delivered flag.
         return ['retry_requested_by' => (int) $viewer->id, 'inspection' => $this->detail($viewer, $exposureId, $deliveryId)];
@@ -157,7 +160,8 @@ final class ChemicalExposureDeliveryWorkspaceService
         catch (LogicException) { $context->assertActive(); return $this->repair($id); }
         if (($accepted['attribution_state'] ?? null) !== 'recorded' || ! $this->stableRoot($root, $proof, $current, $reads, $sites)) { return $this->repair($id); }
         $row = $reads->query(ChemicalExposureSourceDelivery::query())->where('exposure_id', $root->id)->whereKey($id)->firstOrFail([
-            'id','exposure_id','kind','state','attempts','source_version_id','recipient_id','membership']);
+            'id','exposure_id','kind','state','attempts','source_version_id','recipient_id','membership',
+            'failed_attempts','failure_code','needs_manager','last_attempted_at','next_attempt_at','created_at']);
         if (! in_array($row->kind, ['health_safety','followup'], true) || ! in_array($row->state, ['pending','delivered','superseded'], true)
             || $row->attempts < 0) { return $this->repair($id); }
         $membership = ['exposure_id' => (int) $root->id, 'substance_id' => (int) $root->hazardous_substance_id,
@@ -168,11 +172,25 @@ final class ChemicalExposureDeliveryWorkspaceService
         $destination = $stale ? $this->destination('superseded', 'source_advanced') : $this->confirmation($row, $current, $context);
         if (! $this->stableRoot($root, $proof, $current, $reads, $sites)) { return $this->repair($id); }
         $manage = $current->canDo('hazards.manage');
+        $noticesOff = $row->kind === 'followup';
         return ['id' => $id, 'kind' => $row->kind, 'attempt_state' => $row->state, 'currency' => $stale ? 'superseded' : 'current',
             'source_revision' => (int) $row->membership['source_revision'], 'attempts' => (int) $row->attempts,
-            'acceptance_integrity' => 'recorded', 'destination' => $destination,
-            'can' => ['retry' => $manage && ! $stale && $destination['can_deliver']],
-            'blocked_reason' => ! $manage ? 'current_manage_required' : ($stale ? 'source_advanced' : $destination['blocked_reason'])];
+            'acceptance_integrity' => 'recorded', 'destination' => $destination, 'automatic' => $this->automatic($row),
+            'can' => ['retry' => $manage && ! $stale && ! $noticesOff && $destination['can_deliver']],
+            'blocked_reason' => ! $manage ? 'current_manage_required' : ($stale ? 'source_advanced'
+                : ($noticesOff ? 'followup_notices_off' : $destination['blocked_reason']))];
+    }
+
+    /** The automatic delivery's own record: how many attempts failed, why (a code, never a message), and what happens next. */
+    private function automatic(ChemicalExposureSourceDelivery $row): array
+    {
+        $pending = $row->kind === 'health_safety' && $row->state === 'pending';
+        return ['failed_attempts' => (int) $row->failed_attempts, 'failure' => $pending ? $row->failure_code : null,
+            'needs_manager' => $pending && (bool) $row->needs_manager,
+            'next_attempt_at' => $pending && ! $row->needs_manager ? $row->next_attempt_at?->toIso8601String() : null,
+            'last_attempted_at' => $row->last_attempted_at?->toIso8601String(),
+            'stuck' => $pending && ((int) $row->failed_attempts > 0
+                || $row->created_at?->lte(now()->subMinutes(ChemicalExposureSystemDeliveryService::STUCK_AFTER_MINUTES)) === true)];
     }
 
     private function confirmation(ChemicalExposureSourceDelivery $row, User $current, HealthSafetyReadContext $context): array

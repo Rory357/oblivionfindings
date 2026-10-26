@@ -12,7 +12,6 @@ use App\Models\SubstanceExposureRecord;
 use App\Models\User;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\AuditLogger;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use LogicException;
@@ -194,9 +193,11 @@ final class ChemicalExposureHsEventDeliveryService
             if ($previous->source_revision > $version->aggregate_revision) {
                 throw new LogicException('The retained destination is ahead of this accepted source.');
             }
+            $before = clone $event;
             $event->forceFill($desired);
             // Operational response may rise; independently recorded severity and investigation are retained.
             $this->raiseResponseFloor($event, $floor);
+            $review = [$before, $previous->source_revision];
         }
         if (! $event->save()) { throw new LogicException('The required H&S destination save was vetoed.'); }
         $stored = $this->exactEventQuery((int) $event->id, $desired, $reads)->firstOrFail();
@@ -224,6 +225,10 @@ final class ChemicalExposureHsEventDeliveryService
         $marker->audit_log_id = (int) $audits[0]->id;
         $this->source->save($marker);
         $this->assertMarker($marker, $version, $first, $reads);
+        if (isset($review)) {
+            app(HsEventReviewFlagService::class)->afterSourceChange($review[0], $root, (int) $version->aggregate_revision,
+                $stored->severity, ChemicalExposureHsDestinationRules::correctedAfterDecision($review[0], $history, $review[1], $version));
+        }
         return $this->confirmation($stored, $version);
     }
 
@@ -266,27 +271,12 @@ final class ChemicalExposureHsEventDeliveryService
 
     private function projection(ChemicalExposureSourceVersion $version, ChemicalExposureSourceVersion $first): array
     {
-        $snapshot = $version->content['root_after'];
-        $context = $snapshot['original_context'];
-        return ['source_type' => SubstanceExposureRecord::class, 'source_id' => (int) $version->exposure_id,
-            'event_category' => HsEvent::CATEGORY_EXPOSURE, 'site_id' => (int) $version->site_id,
-            'staff_id' => (int) $version->worker_id, 'client_id' => $context['client_id'], 'shift_id' => $context['shift_id'],
-            'asset_id' => null, 'occurred_at' => CarbonImmutable::parse($snapshot['exposed_at'])->utc()->format('Y-m-d H:i:s'),
-            'reported_at' => $first->recorded_at->copy()->utc()->format('Y-m-d H:i:s'),
-            'idempotency_key' => HsEvent::buildIdempotencyKey(SubstanceExposureRecord::class, $version->exposure_id, HsEvent::CATEGORY_EXPOSURE)];
+        return ChemicalExposureHsDestinationRules::projection($version, $first);
     }
 
     private function eventProjection(HsEvent $event): array
     {
-        $values = array_intersect_key($event->getAttributes(), array_flip(['source_type', 'source_id', 'event_category',
-            'site_id', 'staff_id', 'client_id', 'shift_id', 'asset_id', 'idempotency_key']));
-        foreach (['source_id', 'site_id', 'staff_id', 'client_id', 'shift_id', 'asset_id'] as $key) {
-            $values[$key] = $event->getAttribute($key) === null ? null : (int) $event->getAttribute($key);
-        }
-        foreach (['occurred_at', 'reported_at'] as $key) {
-            $values[$key] = $event->getAttribute($key)?->copy()->utc()->format('Y-m-d H:i:s');
-        }
-        return $values;
+        return ChemicalExposureHsDestinationRules::eventProjection($event);
     }
 
     private function exactEventQuery(int $id, array $projection, CurrentAuthorizationReads $reads): Builder
@@ -309,7 +299,7 @@ final class ChemicalExposureHsEventDeliveryService
         $meta = $this->markerAuditMeta($marker, $version);
         $audit = $reads->query(AuditLog::query())->whereKey($marker->audit_log_id)->first();
         if ($audit === null || (int) $audit->user_id !== $marker->recorded_by
-            || $audit->action !== 'chemical.exposure.deliver_health_safety'
+            || ! in_array($audit->action, ChemicalExposureHsDestinationRules::MARKER_AUDIT_ACTIONS, true)
             || $audit->auditable_type !== (new SubstanceExposureRecord)->getMorphClass()
             || (int) $audit->auditable_id !== $marker->exposure_id
             || ChemicalCommandValues::digest(array_intersect_key($audit->meta ?? [], $meta)) !== ChemicalCommandValues::digest($meta)) {
@@ -317,16 +307,9 @@ final class ChemicalExposureHsEventDeliveryService
         }
     }
 
-    /** Only bounded scalar acceptance evidence reaches the protected source audit. */
     private function markerAuditMeta(ChemicalExposureHsProjection $marker, ChemicalExposureSourceVersion $version): array
     {
-        return ['actor_id' => $marker->recorded_by, 'root_type' => 'exposure', 'root_id' => $marker->exposure_id,
-            'source_type' => 'exposure', 'source_id' => $marker->exposure_id, 'expected_version' => $version->expected_version,
-            'version' => $marker->source_revision, 'source_version_id' => $marker->source_version_id,
-            'idempotency_key' => $version->idempotency_key, 'changed' => true,
-            'source_content_digest' => $marker->source_content_digest,
-            'source_tuple_digest' => ChemicalCommandValues::digest(['hs_event_id' => $marker->hs_event_id,
-                'projection' => $marker->projection, 'recorded_at' => $marker->recorded_at->copy()->utc()->format('Y-m-d H:i:s.u')])];
+        return ChemicalExposureHsDestinationRules::markerAuditMeta($marker, $version);
     }
 
     private function versionFromHistory(array $history, int $id): ChemicalExposureSourceVersion
@@ -354,17 +337,9 @@ final class ChemicalExposureHsEventDeliveryService
         return $floor;
     }
 
-    private function severityRank(string $severity): int
-    {
-        $rank = array_search($severity, [HsEvent::SEVERITY_LOW, HsEvent::SEVERITY_MEDIUM, HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true);
-        if ($rank === false) { throw new LogicException('Exposure destination severity is unavailable.'); }
-        return $rank;
-    }
-
     private function meetsSeverityFloor(HsEvent $event, string $floor): bool
     {
-        return $this->severityRank($event->severity) >= $this->severityRank($floor)
-            && (! in_array($floor, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true) || $event->investigation_required);
+        return ChemicalExposureHsDestinationRules::meetsSeverityFloor($event, $floor);
     }
 
     private function assertSeverityFloor(HsEvent $event, string $floor): void
@@ -376,8 +351,7 @@ final class ChemicalExposureHsEventDeliveryService
 
     private function raiseResponseFloor(HsEvent $event, string $floor): void
     {
-        if ($this->severityRank($floor) > $this->severityRank($event->severity)) { $event->severity = $floor; }
-        if (in_array($floor, [HsEvent::SEVERITY_HIGH, HsEvent::SEVERITY_CRITICAL], true)) { $event->investigation_required = true; }
+        ChemicalExposureHsDestinationRules::raiseResponseFloor($event, $floor);
     }
 
     /** Same-version policy reconciliation is strictly audited; it creates no new source or projection acceptance. */

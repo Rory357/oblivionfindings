@@ -4,6 +4,7 @@ namespace Tests\Feature\HealthSafety;
 
 use App\Models\HazardousSubstance;
 use App\Models\HsEvent;
+use App\Models\HsEventReviewFlag;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\SubstanceExposureRecord;
@@ -140,7 +141,7 @@ class ChemicalExposureHsEventCreationTest extends TestCase
         return [$record, $event];
     }
 
-    /** Interim until job 3: a corrected exposure raises its open H&S event, never lowers it, and leaves a closed one. */
+    /** Old-style records (job 3): a corrected exposure raises its H&S event and never lowers it; see the closed case below. */
     public function test_corrected_treatment_raises_the_open_event_and_marks_investigation_required(): void
     {
         [$record, $event] = $this->exposureWithTreatment('none');
@@ -165,7 +166,8 @@ class ChemicalExposureHsEventCreationTest extends TestCase
         $this->assertTrue((bool) $event->fresh()->investigation_required);
     }
 
-    public function test_corrected_treatment_leaves_a_closed_event_as_recorded(): void
+    /** Stephan, job 3 (26 Oct): "Escalation after close: flag, don't reopen." */
+    public function test_corrected_treatment_raises_a_closed_event_flags_it_and_never_reopens_it(): void
     {
         [$record, $event] = $this->exposureWithTreatment('none');
         // Fixture only: the closure guard trigger admits this one close, as HsEventClosureService does.
@@ -175,8 +177,26 @@ class ChemicalExposureHsEventCreationTest extends TestCase
 
         $record->update(['medical_treatment' => 'hospitalisation', 'medical_attention_sought' => true]);
 
-        $this->assertSame(HsEvent::SEVERITY_LOW, $event->fresh()->severity);
+        $this->assertSame(HsEvent::SEVERITY_HIGH, $event->fresh()->severity);
         $this->assertSame(HsEvent::STATUS_CLOSED, $event->fresh()->status);
+        $flag = HsEventReviewFlag::query()->where('hs_event_id', $event->id)->sole();
+        $this->assertSame(HsEventReviewFlag::REASON_ESCALATED_AFTER_CLOSE, $flag->reason);
+        $this->assertNull($flag->source_revision);
+    }
+
+    public function test_a_correction_after_a_signed_worksafe_decision_flags_the_old_style_event(): void
+    {
+        $this->seed(RbacSeeder::class);
+        [$record, $event] = $this->exposureWithTreatment('first_aid');
+        $lead = User::factory()->create(['approved_at' => now()]);
+        $lead->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'hazards.manage')->sole()->id => ['allowed' => true]]);
+        app(HsEventService::class)->recordWorksafeDecision($event, false, 'First aid only: not a notifiable illness.', $lead);
+        $decision = array_intersect_key($event->fresh()->getAttributes(), array_flip(['worksafe_notifiable', 'worksafe_decided_at', 'worksafe_decision_reason']));
+
+        $record->update(['symptoms' => 'Corrected symptom notes.']);
+
+        $this->assertSame($decision, array_intersect_key($event->fresh()->getAttributes(), $decision));
+        $this->assertSame(HsEventReviewFlag::REASON_WORKSAFE_REVIEW, HsEventReviewFlag::query()->where('hs_event_id', $event->id)->sole()->reason);
     }
 
     public function test_exposure_observer_leaves_reduced_medical_treatment_input_undecided(): void

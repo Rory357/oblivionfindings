@@ -879,6 +879,10 @@ function taskRbacMatrix(): array
         // This fixture creates no chemical exposure follow-ups; ChemicalExposureTaskPrivacyTest and
         // ChemicalExposureTaskReadTestCase prove their actual assigned and foreign-Site rows.
         'chemical_exposure_followup' => ['visible' => [], 'hidden' => []],
+        // No exposure deliveries or review flags here; ChemicalExposureAutomaticDeliveryTest proves those rows show
+        // to exposure and H&S managers only.
+        'chemical_exposure_delivery' => ['visible' => [], 'hidden' => []],
+        'hs_event_review' => ['visible' => [], 'hidden' => []],
     ];
 
     return [

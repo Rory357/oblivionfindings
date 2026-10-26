@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Services\HealthSafety\ChemicalExposureDeliveryWorkspaceService;
 use App\Services\HealthSafety\ChemicalExposureDownloadService;
 use App\Services\HealthSafety\ChemicalExposureEvidenceService;
 use App\Services\HealthSafety\ChemicalExposureLedger;
@@ -21,7 +22,8 @@ final class ChemicalExposureWorkspaceController extends Controller
 {
     public function __construct(private readonly ChemicalExposureWorkspaceService $workspace,
         private readonly ChemicalExposureSourceService $source, private readonly ChemicalExposureEvidenceService $evidence,
-        private readonly ChemicalExposureDownloadService $downloads) {}
+        private readonly ChemicalExposureDownloadService $downloads,
+        private readonly ChemicalExposureDeliveryWorkspaceService $deliveryWorkspace) {}
 
     public function index(Request $r)
     {
@@ -42,7 +44,9 @@ final class ChemicalExposureWorkspaceController extends Controller
             $r->only(ChemicalExposureWorkspaceService::PAGES), $followup);
         return $this->present($r, 'health-safety/chemical-exposure-show', ['detail' => $detail,
             'return_to' => ChemicalExposureReturn::sanitize($r->input('return_to')),
-            'chemical_exposure_confirmation' => $this->confirmation($r, $exposure)]);
+            'chemical_exposure_confirmation' => $this->confirmation($r, $exposure),
+            // Exposure managers only: this exposure hasn't reached the H&S register yet (job 3).
+            'delivery_alert' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->forExposure($r->user(), $exposure)]);
     }
     public function capture(Request $r)
     {
@@ -112,6 +116,29 @@ final class ChemicalExposureWorkspaceController extends Controller
         $this->jsonOnly($r); $this->queryKeys($r, []);
         return $this->headers(response()->json($this->workspace->deliveryAttempts($r->user(), $exposure)));
     }
+    /** Exposure managers inspect delivery attempts (job 3). JSON only; GET never dispatches. */
+    public function deliveries(Request $r, string|int $exposure)
+    {
+        $exposure = $this->id($exposure);
+        $this->recoveryJson($r); $this->recoveryQuery($r, ['page']);
+        return $this->headers(response()->json($this->deliveryWorkspace->index($r->user(), $exposure, $r->query())));
+    }
+    public function delivery(Request $r, string|int $exposure, string|int $delivery)
+    {
+        $exposure = $this->id($exposure); $delivery = $this->id($delivery);
+        $this->recoveryJson($r); $this->recoveryQuery($r, []);
+        return $this->headers(response()->json(['inspection' => $this->deliveryWorkspace->detail($r->user(), $exposure, $delivery)]));
+    }
+    /** Explicit POST with no input: a retry carries no new command, callback, prose or file. */
+    public function retryDelivery(Request $r, string|int $exposure, string|int $delivery)
+    {
+        $exposure = $this->id($exposure); $delivery = $this->id($delivery);
+        $this->recoveryJson($r); $this->recoveryQuery($r, []);
+        if ($r->request->count() > 0 || $r->json()->count() > 0 || $r->allFiles() !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['delivery' => 'A retry takes no input.']);
+        }
+        return $this->headers(response()->json($this->deliveryWorkspace->retry($r->user(), $exposure, $delivery)));
+    }
     private function accepted(Request $r, array $receipt, ?int $substanceId = null)
     {
         if (array_diff(array_keys($receipt), ChemicalExposureLedger::RECEIPT_KEYS)
@@ -164,6 +191,8 @@ final class ChemicalExposureWorkspaceController extends Controller
     }
     private function directJson(Request $r): bool { return ! $r->header('X-Inertia') && $r->expectsJson(); }
     private function jsonOnly(Request $r): void { abort_unless($this->directJson($r), 404); }
+    private function recoveryJson(Request $r): void { abort_unless($this->directJson($r), 406); }
+    private function recoveryQuery(Request $r, array $keys): void { abort_if(array_diff(array_keys($r->query()), $keys) !== [], 400); }
     private function explicitKeyIsJsonOnly(Request $r): void { if ($r->has('receipt_key')) { $this->jsonOnly($r); } }
     private function present(Request $r, string $component, array $props)
     {

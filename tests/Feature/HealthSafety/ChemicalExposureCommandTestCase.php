@@ -17,6 +17,9 @@ abstract class ChemicalExposureCommandTestCase extends ChemicalCommandTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Codex's suites exercise the manager's delivery and retry path as written: the automatic delivery after the
+        // save (job 3) is switched off here and covered by ChemicalExposureAutomaticDeliveryTest.
+        config(['health_safety.exposure_automatic_delivery' => false]);
         $this->allow($this->manager, 'hr.wellbeing.view');
         $this->worker = $this->staff([]);
         $this->reporter = $this->staff(['hazards.create']);

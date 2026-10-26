@@ -126,7 +126,8 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
             ->orderByDesc('occurred_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 
-        if (empty($filters['include_done'])) {
+        $query = $this->scopeEvents($query);
+        if (empty($filters['include_done']) && ! $this->includesClosedEvents()) {
             $query->where('status', '!=', HsEvent::STATUS_CLOSED);
         }
 
@@ -152,12 +153,12 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
             function (HsEvent $event) use ($includeSearchContext, $user, $context, $current, $navigation) {
                 if ($navigation) {
                     // Preserve the canonical query, ordering and cap before badge eligibility.
-                    return new TaskItem(id: 'hs_event-'.$event->id, source: $this->sourceKey(), sourceLabel: $this->label(),
+                    return $this->present(new TaskItem(id: 'hs_event-'.$event->id, source: $this->sourceKey(), sourceLabel: $this->label(),
                         ref: null, title: '', status: (string) $event->status, bucket: match ($event->status) {
                             HsEvent::STATUS_CLOSED => TaskItem::BUCKET_DONE, HsEvent::STATUS_INVESTIGATING, HsEvent::STATUS_CORRECTIVE_ACTION, HsEvent::STATUS_MONITORING => TaskItem::BUCKET_IN_PROGRESS, default => TaskItem::BUCKET_OPEN
                         },
                         severity: 'info', assignee: (int) $event->owner_user_id === (int) $current->id ? ['id' => $current->id] : null,
-                        dueAt: null);
+                        dueAt: null), $event, true);
                 }
 
                 $journey = IncidentJourneyTaskContext::make(
@@ -177,7 +178,7 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
                     'name' => $event->site->name,
                 ] : null);
 
-                return new TaskItem(
+                return $this->present(new TaskItem(
                     id: 'hs_event-'.$event->id,
                     source: $this->sourceKey(),
                     sourceLabel: $this->label(),
@@ -205,8 +206,24 @@ class HsEventProvider implements ContextualHealthSafetyTaskProvider, HasModelCla
                     actionLabel: $event->handover_status === HsEvent::HANDOVER_AWAITING_ACCEPTANCE
                         ? 'Accept H&S handover'
                         : 'Continue H&S governance',
-                );
+                ), $event, false);
             },
         );
+    }
+
+    /** A narrower list of the same readable events (HsEventReviewFlagProvider). */
+    protected function scopeEvents(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query;
+    }
+
+    protected function includesClosedEvents(): bool
+    {
+        return false;
+    }
+
+    protected function present(TaskItem $item, HsEvent $event, bool $navigation): TaskItem
+    {
+        return $item;
     }
 }

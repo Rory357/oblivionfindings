@@ -13,47 +13,84 @@ function detail(): ExposureWorkspaceDetail {
             recorded_by: null, updated_by: null, created_at: null, updated_at: null, attribution_state: 'recorded', href: null },
         reviews: empty, followups: empty, attachments: empty, history: empty, delivery: { state: 'unconfirmed', attempts: null } };
 }
-// The real GET /health-safety/chemical-exposures/{id}/delivery-attempts shape (ChemicalExposureWorkspaceService::deliveryAttempts).
-const row = (over: Partial<ExposureDeliveryAttempt> = {}): ExposureDeliveryAttempt => ({ id: 41, kind: 'followup', reported_state: 'pending', source_revision: 3, attempts: 0, can_retry: false, ...over });
-const list = (attempts: ExposureDeliveryAttempt[] | null = [row()], state: ExposureDeliveryCollection['state'] = 'recorded'): ExposureDeliveryCollection =>
-    ({ state, destination_confirmation: 'not_checked', attempts });
+// The real GET /health-safety/chemical-exposures/{id}/deliveries shape (ChemicalExposureDeliveryWorkspaceService::index).
+const automatic = { failed_attempts: 0, failure: null, needs_manager: false, next_attempt_at: null, last_attempted_at: null, stuck: false } as const;
+const row = (over: Partial<ExposureDeliveryAttempt> = {}): ExposureDeliveryAttempt => ({ id: 41, kind: 'health_safety', attempt_state: 'delivered', currency: 'current',
+    source_revision: 3, attempts: 1, acceptance_integrity: 'recorded', destination: { state: 'hs_event_present', can_deliver: true, blocked_reason: null },
+    automatic: { ...automatic }, can: { retry: false }, blocked_reason: 'current_manage_required', ...over });
+const list = (attempts: ExposureDeliveryAttempt[] | null = [row()], source_integrity: ExposureDeliveryCollection['source_integrity'] = 'recorded'): ExposureDeliveryCollection =>
+    ({ source_integrity, attempts, page: { current_page: 1, total: attempts?.length ?? null } });
 afterEach(() => { cleanup(); io.get.mockReset(); io.post.mockReset(); });
 
-it('reads the real delivery-attempts endpoint only when asked and never sends or retries', async () => {
-    io.get.mockResolvedValueOnce({ data: list([row({ kind: 'health_safety', reported_state: 'delivered', attempts: 1 })]) });
+it('reads the real deliveries endpoint only when asked and shows a checked destination', async () => {
+    io.get.mockResolvedValueOnce({ data: list() });
     render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
     expect(io.get).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
-    await waitFor(() => expect(screen.getByText('Health & Safety delivery')).toBeInTheDocument());
-    expect(io.get).toHaveBeenCalledWith('/health-safety/chemical-exposures/22/delivery-attempts', expect.objectContaining({ headers: { Accept: 'application/json' } }));
-    // A reported "delivered" is never shown as received: the destination is not checked.
-    expect(screen.getByText('Reported delivered · destination not checked')).toBeInTheDocument();
-    expect(screen.getByText('Destination not checked')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Retry|Check this destination/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('On the H&S register')).toBeInTheDocument());
+    expect(io.get).toHaveBeenCalledWith('/health-safety/chemical-exposures/22/deliveries', expect.objectContaining({ headers: { Accept: 'application/json' } }));
+    expect(screen.queryByRole('button', { name: 'Retry delivery' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(io.post).not.toHaveBeenCalled();
 });
 
-it('keeps follow-up completion separate from inbox presence', async () => {
-    io.get.mockResolvedValueOnce({ data: list() });
-    render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
-    fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
-    await waitFor(() => expect(screen.getByText('Named follow-up delivery')).toBeInTheDocument());
-    expect(screen.getByText('Inbox presence or a read flag does not record follow-up completion. Review the named work in Follow-ups.')).toBeInTheDocument();
-    expect(screen.getByText('This counter does not include every failed or interrupted retry.')).toBeInTheDocument();
+it('loads by itself when the page says the exposure is not on the register yet', async () => {
+    io.get.mockResolvedValueOnce({ data: list([row({ attempt_state: 'pending', destination: { state: 'unconfirmed', can_deliver: true, blocked_reason: null },
+        automatic: { ...automatic, failed_attempts: 2, failure: 'error', next_attempt_at: '2026-10-12T01:02:00Z', stuck: true } })]) });
+    render(<ExposureDeliveryPanel actorId={7} detail={detail()} active autoCheck />);
+    await waitFor(() => expect(screen.getByText('Failed · trying again')).toBeInTheDocument());
+    expect(screen.getByText('Something went wrong while saving it to the register.')).toBeInTheDocument();
+    expect(screen.getByText('Failed attempts')).toBeInTheDocument();
+    expect(screen.getByText('Next try')).toBeInTheDocument();
 });
 
-it('shows repair-required history as unavailable, and refuses a malformed collection', async () => {
+it('lets a manager retry a stopped delivery and checks it again', async () => {
+    const stopped = row({ attempt_state: 'pending', destination: { state: 'unconfirmed', can_deliver: true, blocked_reason: null },
+        automatic: { ...automatic, failed_attempts: 1, failure: 'integrity', needs_manager: true, stuck: true }, can: { retry: true }, blocked_reason: null });
+    io.get.mockResolvedValueOnce({ data: list([stopped]) }).mockResolvedValueOnce({ data: list() });
+    io.post.mockResolvedValueOnce({ data: { retry_requested_by: 7, inspection: { destination: { state: 'hs_event_present' } } } });
+    render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
+    await waitFor(() => expect(screen.getByText('Needs a manager')).toBeInTheDocument());
+    expect(screen.getByText(/It won’t be tried again automatically/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
+    await waitFor(() => expect(screen.getByText('Delivered. The exposure is on the H&S register.')).toBeInTheDocument());
+    expect(io.post).toHaveBeenCalledWith('/health-safety/chemical-exposures/22/deliveries/41/retry', {}, expect.objectContaining({ headers: { Accept: 'application/json' } }));
+    await waitFor(() => expect(io.get).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByText('On the H&S register')).toBeInTheDocument());
+});
+
+it('explains a refused retry in plain words', async () => {
+    const pending = row({ attempt_state: 'pending', destination: { state: 'unconfirmed', can_deliver: true, blocked_reason: null }, can: { retry: true }, blocked_reason: null });
+    io.get.mockResolvedValue({ data: list([pending]) });
+    io.post.mockRejectedValueOnce({ response: { status: 422, data: { errors: { delivery: ['source_advanced'] } } } });
+    render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry delivery' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Retry delivery' }));
+    await waitFor(() => expect(screen.getByText('A later save replaced this delivery.')).toBeInTheDocument());
+});
+
+it('shows a follow-up attempt as a notice that is not sent', async () => {
+    io.get.mockResolvedValueOnce({ data: list([row({ kind: 'followup', attempt_state: 'pending', destination: { state: 'unconfirmed', can_deliver: false, blocked_reason: null },
+        automatic: undefined, blocked_reason: 'followup_notices_off' })]) });
+    render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
+    await waitFor(() => expect(screen.getByText('Notice not sent')).toBeInTheDocument());
+    expect(screen.getByText('Follow-up notices are off. The assignee sees this work in Tasks.')).toBeInTheDocument();
+});
+
+it('shows withheld history as unavailable, and refuses a malformed collection', async () => {
     io.get.mockResolvedValueOnce({ data: list(null, 'repair_required') });
     const { unmount } = render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
     fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
     await waitFor(() => expect(screen.getByText(/Delivery history needs review/)).toBeInTheDocument());
     unmount();
-    io.get.mockResolvedValueOnce({ data: { ...list(), attempts: [{ ...row(), can_retry: true }] } });
+    io.get.mockResolvedValueOnce({ data: { ...list(), attempts: [{ ...row(), can: { retry: 'yes' } }] } });
     render(<ExposureDeliveryPanel actorId={7} detail={detail()} active />);
     fireEvent.click(screen.getByRole('button', { name: 'Check delivery records' }));
     await waitFor(() => expect(screen.getByText('Delivery records could not be confirmed. Saved source acceptance remains separate.')).toBeInTheDocument());
-    expect(screen.queryByText('Named follow-up delivery')).not.toBeInTheDocument();
+    expect(screen.queryByText('On the H&S register')).not.toBeInTheDocument();
 });
 
 it('withdraws the private view when the read is refused', async () => {
@@ -76,7 +113,7 @@ it('drops a late read after source withdrawal, then reads fresh on return', asyn
     rerender(<ExposureDeliveryPanel {...props} detail={{ ...d, source_integrity: 'repair_required' }} />);
     expect(signal.aborted).toBe(true);
     resolve({ data: list() });
-    expect(screen.queryByText('Named follow-up delivery')).not.toBeInTheDocument();
+    expect(screen.queryByText('On the H&S register')).not.toBeInTheDocument();
     io.get.mockResolvedValueOnce({ data: list([]) });
     rerender(<ExposureDeliveryPanel {...props} />);
     await waitFor(() => expect(io.get).toHaveBeenCalledTimes(2));

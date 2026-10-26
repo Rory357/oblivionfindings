@@ -32,6 +32,7 @@ use App\Services\HealthSafety\FirstAidSourceProjectionService;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventReviewFlagService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use App\Services\HealthSafety\RestraintAccessService;
@@ -590,6 +591,21 @@ class HsEventController extends Controller
     /**
      * Record WorkSafe's acknowledgement of the notification (notified â†’ acknowledged).
      */
+    /**
+     * Mark a review flag reviewed (job 3): a person checked a source change that landed after the WorkSafe decision
+     * was signed, or after the event was closed, and says what they decided. Nothing else on the event changes.
+     */
+    public function resolveReviewFlag(Request $request, int $hsEvent, int $flag)
+    {
+        return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, function (HsEvent $event) use ($request, $flag) {
+            $data = $request->validate(['note' => ['required', 'string', 'min:10', 'max:2000']]);
+            $row = \App\Models\HsEventReviewFlag::query()->where('hs_event_id', $event->id)->whereKey($flag)->firstOrFail();
+            app(HsEventReviewFlagService::class)->resolve($row, $request->user(), $data['note']);
+
+            return back()->with('success', 'Marked reviewed.');
+        }));
+    }
+
     public function worksafeAcknowledge(Request $request, int $hsEvent)
     {
         return DB::transaction(fn () => $this->onAccessibleEvent($request, $hsEvent, fn (HsEvent $event) => $this->worksafeAcknowledgeWithinSourceAuthority($request, $event)));
@@ -1226,6 +1242,7 @@ class HsEventController extends Controller
                 'eligible_owners' => $assignableStaff,
                 'unresolved_control_room_tasks' => $unresolvedControlRoomTasks,
             ],
+            'review_flags' => app(HsEventReviewFlagService::class)->present($hsEvent, $canManage),
             'can' => [
                 'manage' => $canManage,
                 'close' => $currentUser->canDo('healthSafety.events.close'),

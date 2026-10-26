@@ -24,6 +24,8 @@ foreach ([$ready, $go] as $path) {
     }
 }
 $app = require dirname(__DIR__, 2).'/bootstrap/app.php'; $app->make(Kernel::class)->bootstrap();
+// As in ChemicalExposureCommandTestCase: workers exercise the commands, not the automatic delivery after the save.
+config(['health_safety.exposure_automatic_delivery' => false]);
 if (! app()->environment('testing') || DB::connection()->getDriverName() !== 'mysql' || DB::connection()->getDatabaseName() !== $database
     || DB::transactionLevel() !== 0 || ! in_array(config('database.connections.mysql.host'), ['127.0.0.1', 'localhost'], true)
     || (int) config('database.connections.mysql.port') !== 3306 || config('database.connections.mysql.url')

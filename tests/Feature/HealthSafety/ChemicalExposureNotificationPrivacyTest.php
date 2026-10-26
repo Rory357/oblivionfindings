@@ -75,7 +75,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_original_reported_a_site_context_and_acceptance_are_bound_after_current_b_delivery_discovery(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $healthy, $incident, $original] = $this->priorReportedOriginNotices();
         $receipt = (array) DB::table('chemical_exposure_command_receipts')->where('source_version_id', $original['id'])->sole();
         $intent = (array) DB::table('chemical_command_intents')->where('id', $receipt['intent_id'])->sole();
@@ -102,7 +102,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_new_reported_origin_after_discovery_cannot_enter_current_notification_membership(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $healthy] = $this->priorReportedOriginNotices();
         $unrelated = $this->exposure(['medical_attention_sought' => false]);
         $version = (array) DB::table('chemical_exposure_source_versions')->where('exposure_id', $unrelated->id)->sole();
@@ -118,7 +118,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_default_common_query_excludes_private_even_for_saved_dual_reader_and_keeps_nullable_ordinary_data(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted, so the ordinary notification query returns a notice the test writes through the unmounted follow-up delivery. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified();
         $ordinary = $this->ordinary($receiver, ['kind' => null, 'event_key' => null]);
         $receiver->load('roles.permissions', 'permissionOverrides', 'hrEmployeeProfile');
@@ -130,7 +130,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_default_marker_exclusion_survives_changed_class_and_exact_event_copy_without_global_delivery_id_guess(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified();
         DB::table('notifications')->where('id', $notice->id)->update(['type' => 'App\\Notifications\\AppEventNotification']);
         $copy = $this->ordinary($receiver, ['event_key' => ChemicalExposureFollowupDestinationService::EVENT_KEY]);
@@ -141,7 +141,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_private_grant_denial_has_no_private_source_or_notification_body_hydration_and_preserves_ordinary(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $receiver->load('roles.permissions', 'permissionOverrides'); $this->allow($receiver, 'hr.wellbeing.view', false);
         [$ids, $queries] = $this->capturedQueries(fn () => $this->visible($receiver));
@@ -158,7 +158,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_current_site_and_employment_withdraw_restore_cannot_erase_unrelated_inbox_work(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $receiver->load('hrEmployeeProfile');
         $receiver->hrEmployeeProfile()->update(['primary_site_id' => $this->foreignSite->id]);
@@ -172,7 +172,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_other_receivers_and_catalogue_reporter_have_no_notification_identity_or_source_self_grant(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified();
         $other = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         $this->assertSame([], $this->visible($other)); $this->assertSame([], $this->visible($this->reporter));
@@ -181,7 +181,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_materializer_reuses_supplied_union_and_refuses_actor_preparation_lifetime_and_model_escape(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $escaped = null;
         HealthSafetyReadContext::within($receiver, ChemicalExposureNotificationAccessService::PERMISSIONS,
             function ($context) use ($receiver, &$escaped): void {
@@ -216,7 +216,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_current_data_replaces_stale_preloaded_body_and_contains_no_medical_worker_or_receipt_fields(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified();
         $notice->data = ['title' => 'PRIVATE-STALE-BODY', 'worker_id' => $this->worker->id, 'idempotency_key' => 'stale'];
         $data = $this->data($receiver, $notice);
@@ -231,7 +231,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_type_and_all_payload_markers_rebound_after_discovery_cannot_become_ordinary_or_read(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $revision = $root->fresh()->source_revision;
         $this->inbox()->materialize($receiver, function ($current, $context) use ($notice, $ordinary): null {
@@ -261,7 +261,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_body_and_delivery_payload_mutation_after_discovery_is_rejected_before_body_and_bulk_read_sql(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery] = $this->notified(); $ordinary = $this->ordinary($receiver);
         [$foreignRoot, $foreignReceiver, $foreignNotice, $foreignDelivery] = $this->notified();
         $original = $notice->data;
@@ -304,7 +304,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_recipient_rebinding_after_discovery_and_denied_private_marker_rebound_do_not_hydrate_body(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $other = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         foreach ([['notifiable_id' => $other->id], ['notifiable_type' => 'App\\Models\\ForeignRecipient']] as $rebind) {
@@ -337,7 +337,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_current_root_tuple_revision_and_unversioned_facts_changed_after_discovery_deny_before_count_body_and_read(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $before = (array) DB::table('substance_exposure_records')->where('id', $root->id)->first();
         $mutations = [
@@ -356,7 +356,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_delivery_reparent_version_recipient_actor_and_membership_changes_after_discovery_are_not_authority(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery] = $this->notified(); $ordinary = $this->ordinary($receiver);
         [$foreignRoot, $foreignReceiver, $foreignNotice, $foreignDelivery] = $this->notified();
         $before = (array) DB::table('chemical_exposure_source_deliveries')->where('id', $delivery->id)->first();
@@ -373,7 +373,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_followup_assignee_completion_provenance_and_private_fact_changes_after_discovery_are_concealed(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $foreignRoot = $this->exposure();
         $before = (array) DB::table('chemical_exposure_followups')->where('id', $accepted['source_id'])->first();
@@ -390,7 +390,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_version_acceptance_and_original_incident_client_context_mutations_after_discovery_deny_before_payload(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $incident = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
             'shift_id' => null, 'service_context_id' => null, 'respite_stay_id' => null, 'reported_by' => $this->manager->id]);
@@ -422,7 +422,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_independently_approved_nondefault_site_notice_remains_readable_without_cross_recipient_or_site_grant(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$ownRoot, $ownReceiver, $ownNotice] = $this->notified();
         $manager = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view'], $this->foreignSite);
         $worker = $this->staff([], $this->foreignSite);
@@ -474,7 +474,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_new_source_validation_refusal_is_per_notice_and_does_not_abort_a_genuinely_delivered_healthy_neighbour(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified();
         $healthy = $this->exposure();
         $accepted = $this->exposureService()->assignFollowup($healthy, $this->manager, $this->privateCommand($healthy,
@@ -493,7 +493,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_genuine_unlinked_legacy_origin_can_receive_typed_named_work_without_inventing_original_client_context(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         $receiver = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         $root = SubstanceExposureRecord::create(['hazardous_substance_id' => $this->catalogue()->id, 'user_id' => $this->worker->id,
             'site_id' => $this->site->id, 'exposed_at' => '2026-10-12T00:00:00Z', 'exposure_type' => 'skin_contact',
@@ -518,7 +518,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_payload_damage_and_archived_or_rebound_source_are_concealed_without_hiding_healthy_neighbour(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified(); $ordinary = $this->ordinary($receiver);
         $original = $notice->data; $bad = [...$original, 'body' => 'PRIVATE-INJECTED-COPY'];
         DB::table('notifications')->where('id', $notice->id)->update(['data' => json_encode($bad, JSON_THROW_ON_ERROR)]);
@@ -532,7 +532,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_original_incident_client_withdraw_restore_and_retarget_remain_private_before_notice_payload(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $incident = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
             'shift_id' => null, 'service_context_id' => null, 'respite_stay_id' => null, 'reported_by' => $this->manager->id]);
@@ -548,7 +548,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_real_transfer_hides_old_recipient_and_admits_only_actual_successor_inbox(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified();
         $next = $this->staff(['hazards.view', 'hazards.manage', 'hr.wellbeing.view']);
         $result = $this->exposureService()->reassignFollowup($root, $accepted['source_id'], $this->manager,
@@ -563,7 +563,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_foreign_accepted_root_or_followup_lineage_rebound_after_discovery_denies_count_body_and_read_only_for_that_notice(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, , $accepted] = $this->notified();
         $healthyRoot = $this->exposure();
         $healthyAcceptance = $this->exposureService()->assignFollowup($healthyRoot, $this->manager, $this->privateCommand($healthyRoot,
@@ -623,7 +623,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_reading_is_an_inbox_flag_only_and_suppressed_private_write_is_not_confirmed(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified();
         $version = $root->fresh()->source_revision;
         $this->inbox()->materialize($receiver, function ($current, $context) use ($notice): void {
@@ -645,7 +645,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_inbox_optout_after_accepted_delivery_does_not_erase_saved_notice_or_start_external_delivery(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery] = $this->notified();
         UserNotificationPreference::create(['user_id' => $receiver->id, 'key' => ChemicalExposureFollowupDestinationService::EVENT_KEY,
             'enabled' => false, 'channel_inapp' => false, 'channel_email' => false, 'channel_push' => false]);
@@ -657,7 +657,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_unrelated_recipient_without_hr_keeps_ordinary_notifications_and_prepared_flags_are_not_grants(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         $user = \App\Models\User::factory()->create(['approved_at' => now(), 'external_clinical_account' => false]);
         $ordinary = $this->ordinary($user);
         $this->assertSame([$ordinary->id], $this->visible($user));
@@ -669,7 +669,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_saved_notice_read_does_not_grant_new_assignment_or_completion_after_manage_withdrawal(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice, $delivery, $accepted] = $this->notified();
         $this->allow($receiver, 'hazards.manage', false);
         $this->assertSame([$notice->id], $this->visible($receiver), 'Actual destination reader requires current dual read, not a new mutation grant.');
@@ -681,7 +681,7 @@ final class ChemicalExposureNotificationPrivacyTest extends ChemicalExposureNoti
 
     public function test_corrupt_private_notice_does_not_hide_a_genuinely_delivered_healthy_private_neighbour(): void
     {
-        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::NEVER_BUILT, 'Codex\'s private follow-up notice reader is not mounted: the notification centre (BoardPackAccessService::visibleNotificationQuery) refuses an H&S read context. Today nothing in the app writes these notices (only the unmounted FollowupDestinationService::deliverForViewer does), so a follow-up assignee gets no notice, only the task in /tasks, and nobody can see one.', 'Job 3: mount the follow-up inbox delivery together with its notification-centre reader, never the writer alone.'));
+        $this->markTestSkipped(\Tests\Support\NotInThisBuild::reason(\Tests\Support\NotInThisBuild::DECIDED, 'Stephan chose to keep follow-up assignment notices off (26 Oct, job 3): the assignee sees the work in /tasks, which applies their current access. No follow-up notice is staged or sent.', 'none unless notices are turned on together with their notification-centre reader.'));
         [$root, $receiver, $notice] = $this->notified();
         $healthy = $this->exposure();
         $accepted = $this->exposureService()->assignFollowup($healthy, $this->manager, $this->privateCommand($healthy,

@@ -15,7 +15,10 @@ use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ActionItemProvider;
 use App\Services\Tasks\Providers\CdLossReportProvider;
+use App\Services\HealthSafety\ChemicalExposureDeliveryProblems;
+use App\Services\Tasks\Providers\ChemicalExposureDeliveryProvider;
 use App\Services\Tasks\Providers\ChemicalExposureFollowupProvider;
+use App\Services\Tasks\Providers\HsEventReviewFlagProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use App\Services\Tasks\Providers\ControlRoomAlertProvider;
 use App\Services\Tasks\Providers\DataBreachProvider;
@@ -67,7 +70,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(46);
+    expect($providers)->toHaveCount(48);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -117,6 +120,8 @@ it('registers every task source behind exactly one authorization boundary', func
         FirstAidFollowupProvider::class => 'first_aid_followup',
         RestraintReviewProvider::class => 'restraint_review',
         ChemicalExposureFollowupProvider::class => 'chemical_exposure_followup',
+        ChemicalExposureDeliveryProvider::class => 'chemical_exposure_delivery',
+        HsEventReviewFlagProvider::class => 'hs_event_review',
     ]);
 
     // Owning-domain adapters retain the same Site/person boundary; their
@@ -185,6 +190,22 @@ it('registers every task source behind exactly one authorization boundary', func
                 ->toContain('->taskRows($viewer, $filters, $context, $navigation)')
                 ->toContain('restricted: true')
                 ->not->toContain('ChemicalExposureFollowup::query(')
+                ->not->toContain('->siteScoped(')
+                ->not->toContain(TaskProviderAuthorization::class)
+                ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
+
+            continue;
+        }
+
+        if ($provider instanceof ChemicalExposureDeliveryProvider) {
+            // Exposures not on the H&S register (job 3): the problems reader admits exposure managers and readable
+            // exposures under fresh actor/Site authority and returns scalars only.
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain(ChemicalExposureDeliveryProblems::class)
+                ->toContain('->rows($viewer, $context, $only)')
+                ->toContain('restricted: true')
+                ->not->toContain('ChemicalExposureSourceDelivery::query(')
                 ->not->toContain('->siteScoped(')
                 ->not->toContain(TaskProviderAuthorization::class)
                 ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
