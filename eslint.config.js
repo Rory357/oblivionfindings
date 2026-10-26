@@ -29,6 +29,10 @@ export default [
             'react/prop-types': 'off',
             'react/no-unescaped-entities': 'off',
 
+            // Pop-up kit (design_styles/POPUP_STYLE_GUIDE.md): no browser
+            // alert() / confirm() / prompt() — use the kit's Confirm or a Form.
+            'no-alert': 'error',
+
             // Pragmatic baseline for large mixed-quality pages while module work continues.
             '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': 'off',

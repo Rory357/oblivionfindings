@@ -48,6 +48,70 @@ lucide-react icons, Recharts.
    surfaces use fixed `status-critical`/`status-warning` pairs, never
    brand-derived tints — an admin's brand hue must not be able to push a
    safety warning below AA contrast.
+7. **Build every module from the kits.** A new module adds its own words
+   and fields, never a new page shape, header, pop-up frame or way of
+   writing (approved by Stephan 2026-10-20 → 26):
+   - every page is one of the page kit's templates, built from its blocks
+     (`design_styles/PAGE_KIT_STYLE_GUIDE.md`);
+   - every header follows one-header-per-template
+     (`design_styles/PAGE_HEADER_STYLE_GUIDE.md` §11);
+   - every overlay is a pop-up kit type at a kit width
+     (`design_styles/POPUP_STYLE_GUIDE.md`); long dropdowns are searchable;
+   - every word follows `design_styles/WRITING_STYLE_GUIDE.md`;
+   - before shipping, run the page kit's checklist (§12) and compare the new
+     pages with an existing module's pages of the same template.
+
+---
+
+## The Slate look (approved by Stephan 2026-10-20)
+
+Stephan chose **D · Slate** for the whole app after the grey ground
+(`#DFDFE2`) and the lavender option both "felt dated". It replaces the
+grey-ground palette everywhere: every page, card, list and pop-up, light
+and dark.
+
+**Rollout status:** the rules below are approved; `resources/css/app.css`
+still carries the old values until the Slate token change lands (tokens
+first, then one module at a time). New work follows Slate. Visual
+reference: the "Oblivion colours & look" canvas
+(claude.ai/artifact/CPsdrsDkwjpYwscYf8jHbY): page 2 row D, plus pages
+3–9 (templates, date & time, controls, cards, page layouts, every pop-up).
+Decision notes, contrast table and inventory:
+`docs/design-refresh-2026-10-19/`.
+
+| Role | Light | Dark | Token |
+|---|---|---|---|
+| Page ground | `#F8FAFC` | `#0F172A` | `--background` |
+| Cards, pop-ups, popovers | `#FFFFFF` | `#1E293B` | `--card`, `--popover` |
+| Secondary surface — nested sections, inactive tabs and segments, grouped information, table headers, pop-up footers | `#F1F5F9` | `#273449` | `--muted`, `--secondary` |
+| Hairline borders and inputs | `#E2E8F0` | `#334155` | `--border`, `--input` |
+| Body text | `#0F172A` | `#F1F5F9` | `--foreground` |
+| Muted text | `#475569` | `#94A3B8` | `--muted-foreground` |
+| Sidebar + top bar (**the same in both modes**) | `#1E293B` | `#1E293B` | `--sidebar` |
+| Sidebar text · selected item | `#94A3B8` · `#334155` + white | `#94A3B8` · `#273449` + white | `--sidebar-foreground`, `--sidebar-accent` |
+| Brand (default `--primary`) | Journey purple `#7040D6` | `#7040D6` (fills clamp to L 0.50; brand text `#C3A8FF`) | `--primary` |
+| Brand tint (selected, info) | `#F3EEFF` | `#2C2547` | `--accent`, `--status-info-bg` |
+
+Rules that come with it:
+
+- **Layering:** ground → white card (a `#E2E8F0` border plus a 1–3 px
+  soft shadow does the lifting; white on `#F8FAFC` is only 1.05:1) →
+  secondary `#F1F5F9` for anything nested inside a card. Never put a card
+  colour straight on a card, and never use the old mid-grey.
+- **Muted text floor:** `--muted-foreground` is slate-600 `#475569`
+  (6.9:1 on `#F1F5F9`). Slate-500 `#64748B` fails AA on the secondary
+  surface (4.34:1) and is not used for text.
+- **Chrome:** the nav and top bar are slate-800 `#1E293B` in **both**
+  modes (Stephan, 2026-10-20). In light mode it is the one dark element
+  framing a light page; in dark mode it matches the cards, one step above
+  the `#0F172A` ground.
+- **Buttons:** Slate flattens the primary — a solid `--primary-fill` with
+  a 1–2 px neutral shadow and a faint inner highlight, no gradient and no
+  coloured glow (see `design_styles/BUTTON_STYLE_GUIDE.md`, Slate
+  revision).
+- **Unchanged:** the Event Horizon header sky (brand ramp), status pairs,
+  calendar source colours, the 20 px gutter, pop-up widths (480 / 720 /
+  900 / 1100), Instrument Sans and the type helpers.
 
 ---
 
@@ -81,12 +145,14 @@ New status key? Add it to `status-colors.ts` once; it's used on 50+ pages.
 
 **The global shell chrome (approved 2026-09-05).** The top bar +
 sidebar follow `design_styles/APP_SHELL_STYLE_GUIDE.md` — the "Event
-Horizon chrome": one continuous ink surface for header and sidebar
-(dark in light mode, by design), "Oblivion Care" ring-O wordmark,
+Horizon chrome": one continuous surface for header and sidebar
+(slate-800 `#1E293B` in both modes since the Slate look, 2026-10-20),
+"Oblivion Care" ring-O wordmark,
 centred command search, Report incident / Clock in / Messages / bell /
 avatar in the header (no Live chip), collapsible module groups, an
-edge-tab whole-sidebar collapse, and a neutral grey page ground with
-white lifted cards. **The shell owns a single 20px gutter** (approved
+edge-tab whole-sidebar collapse, and the Slate page ground (`#F8FAFC`)
+with white cards (see "The Slate look" above; the neutral grey ground
+was retired 2026-10-20). **The shell owns a single 20px gutter** (approved
 2026-09-05; 10px was tried and revised up the same day) between the
 ink chrome (sidebar + top bar) and page content — `p-5` in
 `app-sidebar-layout.tsx`'s `DEFAULT_CONTENT_CLASS`
@@ -121,8 +187,7 @@ positional tones) below it. Visual reference:
 Implemented (2026-09-06, meter-row revision included) as **one
 `PageHeader` component** — `components/page/page-header.tsx` (with the
 `PageHeaderMeterBlock` family) plus the `.eh-header` / `.eh-mark-ring`
-/ `.eh-meter` utilities in `app.css`; reference migration
-`pages/sites/index.tsx`. The sky is **always the branding colour's
+/ `.eh-meter` utilities in `app.css`. The sky is **always the branding colour's
 own ramp** (approved 2026-09-06): whatever colour Settings → Branding
 sets, a dark shade of `--primary` at the top fades into the brand, no
 lighter than L 0.46, at the bottom (relative-colour oklch keeps the hue;
@@ -142,10 +207,6 @@ rules (amended 2026-10-02): `.page-hero` in `app.css` paints the brand,
 category or Site colour (`--hero-base`) floored to L ≤ 0.36 and
 opaque; faint text on it is never below 70%; status tones on it use
 the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
-Both profile heroes are now migrated and deleted (sites 2026-09-06,
-clients 2026-09-07 — `pages/operations/clients/show.tsx` is on the
-`PageHeader` profile variant with its alert ribbon folded into the
-meter row).
 
 ---
 
@@ -294,7 +355,9 @@ meter row).
   terminology, fields, tabs, statuses, permissions and lifecycle; do not rename
   every record Ticket or copy Maintenance's release process into other modules.
   Full contract: `design_styles/WORK_RECORD_STYLE_GUIDE.md`.
-- **Buttons — the "soft depth" treatment (approved 2026-09-04).** Primary
+- **Buttons — the "soft depth" treatment (approved 2026-09-04; flattened
+  by the Slate look 2026-10-20: solid fill, neutral 1–2 px shadow, no
+  gradient or glow — the guide's Slate revision wins).** Primary
   (`default`) = gradient-lit primary with inner highlight + violet glow;
   secondary (`outline`) = card surface with soft shadow and
   purple-tinting border on hover; both lift 1px on hover, press 0.5px,
@@ -340,7 +403,7 @@ meter row).
   page `--background` and sits flush with the hero's bottom edge — never
   as a tinted-pill strip below the hero. Counters follow the counter
   state-colour rule. Reference implementation: `PageHeaderRail` in
-  `components/page/page-header.tsx` (used by `pages/sites/index.tsx`).
+  `components/page/page-header.tsx`.
   `components/page/page-tabs.tsx`'s tinted-pill
   strip remains only for secondary in-page tab rows that have no hero
   rail to live in.
@@ -368,8 +431,7 @@ meter row).
   right-click context menu on every card/row, fed by one `MenuItem[]`.
   No readiness/onboarding displays. Implemented (2026-09-06) in
   `components/lists/` (`EntityCard`, `EntityTable`, cell library,
-  shared `entity-menu.tsx`, `ListCaption`); reference migration
-  `pages/sites/index.tsx`.
+  shared `entity-menu.tsx`, `ListCaption`).
 - **Data tables & pagination** — table markup uses the
   `components/ui/table.tsx` primitives; server-paginated lists use
   `components/ui/laravel-pagination.tsx` (the canonical paginator — 64+
@@ -412,8 +474,10 @@ meter row).
   panels (a row with facts opens a 480px panel whose one action links to
   the module). Light mode uses the app tokens. Two overview-only choices
   are piloted there and are candidates for the whole app — Stephan
-  decides: the **graphite dark palette** and the **calm categorical chart
-  palette** (both as oklch tokens at the top of `workspace.css`), and the
+  decides: the **graphite dark palette** (superseded 2026-10-20 by the
+  app-wide Slate dark: `#0F172A` ground, `#1E293B` cards) and the **calm
+  categorical chart palette** (both as oklch tokens at the top of
+  `workspace.css`), and the
   **comfortable 38px header dropdowns** (`PageHeaderFilterSelect
   size="comfortable"`, PAGE_HEADER_STYLE_GUIDE.md §6). Status colours
   there always use the app's verified pairs. The seventh role, **Business
@@ -461,6 +525,48 @@ before.
   ESLint (`design/no-oblivion-fallback`) blocks an "Oblivion Care" string in
   the public site and sign-in layout files (the screen-reader text of the
   Powered by line is JSX text, which it allows).
+- **Hard-coded logos or brand colours.** Corrected 2026-10-20 (Stephan): "the clients will need to add their own logos … also their colours". Every client sets its own logos (one for light and one for dark backgrounds) and one brand colour in Settings › Branding.
+  - Logo: every logo spot reads the brand slot (`components/brand/brand-lockup.tsx`). This covers the top bar, sign-in, family portal, print and email headers. The slot shows:
+    - by default, the Journey mark + "oblivion care";
+    - if the client uploaded a logo, their logo with a small "Powered by oblivion care";
+    - if they set only a name, the name without our mark.
+  - Never point a component at a logo image path. Never crop a client logo to a fixed shape.
+  - Colour: every brand-coloured surface derives from `--primary`. No `#7c3aed` / `#7040D6` literals in components, CSS, Blade, PDFs or email.
+  - Status and safety colours never follow the brand.
+  - Check new UI with a second brand colour. Known offenders are listed in `docs/design-refresh-2026-10-19/GOOD-CATCHES.md` §6, including the app default `#7c3aed` in `derive-palette.ts`.
+  - ESLint already catches classNames. Hex values in CSS, Blade and PDFs need review.
+- **A page header that changes shape between pages of the same kind.** Corrected 2026-10-21 (Stephan): "hero banners and pages are starting to look inconsistent".
+  - The header (`PageHero`, the sky) belongs to the page's template, not to the page:
+    - **Size:** full on hubs, lists and records (title row, up to 6 numbers, tabs); compact everywhere else. A compact page's numbers lead the body as one tally.
+    - **Avatar:** an initials avatar only on a person's record and their own My HR pages. Every other page shows its icon.
+    - **Back arrow:** only on a record, a page that belongs to one record, a document or a full-page form.
+    - **Status chip:** only on records.
+    - **Header search:** only on hubs, lists and workspaces.
+    - **Filters:** at most 4 filter chips in the header, then "More filters".
+    - **Numbers:** a number the tab rail already counts never repeats as a header number.
+    - **Sub-line:** one line under the title. Privacy, safety and legal wording stays even if it wraps.
+  - The full rules (H1–H11): `design_styles/PAGE_HEADER_STYLE_GUIDE.md` §11.
+- **The same thing written different ways across modules.** Found 2026-10-22 in the cross-module audit of the page drawings:
+  - "Add agreement" here and "New agreement" there.
+  - Dates as 2026-10-27, 27/10/2026 and 27 October 2026.
+  - 24-hour times beside "9:30 am".
+  - Breadcrumbs without Home, and Title Case labels.
+  - The rules:
+    - **Make a record:** "Add …". "New …" is only for a message or conversation; "Create …" only when something is built from other things (a report, a pack, a pay run). Incidents are always "Report incident".
+    - **Dates and times:** always through `lib/datetime.ts` (`formatDate`, `formatTime`, `formatDateTime`) — never a raw ISO string, a slash date or a 24-hour clock on screen. Durations and countdowns are not clock times.
+    - **Money:** "$84.60", never "NZD".
+    - **Te reo:** with macrons (whānau, Māori).
+    - **Breadcrumbs:** start at Home.
+  - Full list: `design_styles/WRITING_STYLE_GUIDE.md`.
+- **A long dropdown you have to scroll through.** Corrected 2026-10-26 (Stephan): "if there is a dropdown and alot of items the search option should be there also the dropdown look should be modern and searchable".
+  - Any dropdown with 8 or more options, or a list that can grow, is a searchable dropdown: a search box at the top of the open list, grouped options, a tick on the choice, and a quiet "No matches".
+  - Every dropdown has the modern look: the same height, radius and focus ring as a text field, and a popover list that scrolls inside.
+  - Built once on the shared `Popover` + `Command` primitives; new work never uses a native `<select>`.
+  - Full rules: `design_styles/POPUP_STYLE_GUIDE.md` › Dropdowns.
+  - No ESLint check yet: 132 files still use a native `<select>`. Add it once the modules have moved onto the kit.
+- **Generic, stock-SaaS screens.** Corrected 2026-10-20 (Stephan): "everything is mostly generic and nothing original for Oblivion".
+  - A screen built only from plain tokens and rounded-square icon tiles, with nothing of the Journey brand (islands, pathway, lowercase wordmark) or the Event Horizon (ring, sky), is not finished.
+  - The proposed signature that fixes this is in `docs/design-refresh-2026-10-19/SIGNATURE.md`. It awaits Stephan's approval; until then, follow its intent.
 - **Raw palette classes / inline hex** — bypasses rebranding; ESLint blocks it.
 - **Hardcoded hues inside CSS utilities** — ESLint only sees classNames, so
   hex hiding in `app.css` rules or `style={{}}` props escapes it. Known
@@ -563,9 +669,8 @@ before.
   non-negotiable #6).
 - **Rebuilding an existing primitive** — check the inventory first.
 - **Full-page create/edit wizards** — entity add/edit is a `WizardShell`
-  modal opened from the index page, not a routed page.
-  (`pages/sites/create.tsx` + `edit.tsx` on `wizard-stepper` are the last
-  legacy holdouts — migration targets, not precedents.)
+  modal opened from the index page, not a routed page. Legacy holdouts are
+  migration targets, not precedents.
 - **Hand-rolled multi-step chrome** — bespoke steppers, progress bars, or
   success screens inside a dialog; compose `WizardShell` and its companions
   instead.
@@ -638,12 +743,9 @@ before.
   band collapses a row and the rhythm jumps between tabs. EVERY rail
   view supplies real filter pills for its own content (queue filters,
   a report range, a catalogue category, a board priority) — and never
-  a decorative pill that filters nothing. Reference: IT & Support
-  (`pages/it/index.tsx`), all seven views
-  (PAGE_HEADER_STYLE_GUIDE.md §6).
+  a decorative pill that filters nothing (PAGE_HEADER_STYLE_GUIDE.md §6).
 - **Rail without the Find chip** (corrected 2026-09-08) — every rail
-  ends with the ghost "⌕ Find" chip, exactly as the Sites profile
-  renders it. `PageHeaderRail` now renders it BY DEFAULT with a
+  ends with the ghost "⌕ Find" chip. `PageHeaderRail` now renders it BY DEFAULT with a
   built-in palette over its own views; record profiles pass `onFind`
   for their richer grouped `TabSearchPalette` (`/` opens it there —
   elsewhere `/` belongs to the header's scoped search). Suppressing
@@ -706,9 +808,7 @@ before.
   Stephan chose the standard header for Control Room: consistency across
   modules wins. Fix a header that looks wrong by keeping it compact (title,
   ≤ 4 linked numbers, filters and view tabs inside it), not by giving one
-  module its own header. Control Room pages use `ControlRoomPage`
-  (`components/control-room/control-room-page.tsx`), which wraps the shared
-  `PageHeader` and the destination's view tabs.
+  module its own header.
 - **A live board that reads like a generic admin list** (corrected
   2026-10-24, Control Room Live response: "looks so generic … hard to
   understand"). A list of reference numbers, device names, small pills and
@@ -718,15 +818,8 @@ before.
   the house**, says **what happened** in one sentence, shows **who is on
   it** (or "No one on it yet"), and shows **time as age or countdown**
   ("raised 3 min ago", "due in 4 min", "missed by 12 min") — never a bare
-  time without its date. Use Control Room's marks
-  (`components/control-room/live-response/`): the **countdown lens**
-  (`TargetLens`, `.cr-lens` — the pop-up kit's round lens with a ring that
-  empties toward the target; grey "waiting" when there is no target), the
-  **urgency bar** (`UrgencyBar`, fixed safety colours), the **Live mark**
-  (`LiveMark`) in the header subline, and the **"Needs you now"** card
-  for an urgent top alert (only when it is urgent). Reference numbers stay
-  small and last. Hide empty fields; say a thing once; plain tab names
-  (Needs action · Mine · Escalated · Snoozed · Incident reports · Done).
+  time without its date. Reference numbers stay
+  small and last. Hide empty fields; say a thing once; plain tab names.
 - **Page tops that bypass the Event Horizon header** — a page opening
   with a plain heading, a one-off banner, a legacy `PageHero`, or a
   search/filter bar sitting BELOW the header, instead of the fixed
@@ -746,30 +839,20 @@ before.
   had 26 for chairs/secretaries). Group sibling registers into hubs: the
   sidebar shows ONE entry per hub and the siblings become the hub's
   connected-tab header rail, each keeping its canonical URL so deep links
-  and server authorisation are unchanged. Keep the config in one place
-  (reference: `lib/governance-sections.ts` + `GovernanceSectionRail`, with
-  the sidebar entry staying lit across the hub). Don't orphan a module
-  that has no other entry (Roadmap became a Strategy hub tab), and never
-  use hidden nav as the security boundary.
-  Reinforced 2026-10-12 for **Workforce**: six destinations — Rostering,
-  Available shifts, Attendance, Timesheets, Handovers, Settings. The Shifts
-  list, Conflict queue, Qualifications and Availability open from
-  Rostering's header (the Rostering entry stays lit on them); Shift notes
-  is a tab in the Handovers header. Their routes, permissions and command
-  search entries stay; someone who can't open Rostering (or the Shift notes
-  tab) keeps a direct entry instead (`buildWorkforceSubPanelGroups`).
+  and server authorisation are unchanged. Keep the config in one place, with
+  the sidebar entry staying lit across the hub. Don't orphan a module
+  that has no other entry, and never use hidden nav as the security
+  boundary. Someone who can't open the hub keeps a direct entry instead.
 - **Auditor and developer language in member-facing copy** (corrected
   2026-09-14, Governance: "for a normal person it is difficult to
   understand") — reference codes used as names (`RES-2026-004` as a title
   or breadcrumb), raw enum values (`full_board`, `no_quorum`,
   `charitable_trust`), formulas (`floor(N/2)+1`), Title Case, US spelling,
   and words like immutable, frozen, snapshot, electorate, recuse,
-  attestation, fingerprint or "bound". Write for a volunteer: follow
-  `docs/audits/2026-09-14-governance-plain-language-ux/vocabulary.md` —
+  attestation, fingerprint or "bound". Write for a volunteer (`design_styles/WRITING_STYLE_GUIDE.md`):
   sentence case, NZ English, the record title first with the code as a
-  muted `refSuffix()`, every enum through `lib/governance-labels.ts`
-  (server: `GovernanceLabels`), a `GovernanceTermHint` for any term that
-  needs explaining, "Not available" instead of a green 0 when data is
+  muted suffix, every enum through a labels map, a short hint for any term
+  that needs explaining, "Not available" instead of a green 0 when data is
   missing, a confirm dialog that states the effect for consequential
   actions, and visible text saying why something is blocked and who can
   unblock it. Server-generated titles, flash and validation messages
@@ -777,11 +860,34 @@ before.
 - **A global "Live"/sync chip in the top bar** — removed from the
   approved shell (2026-09-05); live/sync status belongs on the page
   surfaces that need it, not in the global chrome.
-- **Violet-tinted or pure-white page grounds** — the light
-  `--background` is a neutral mid-light grey with white cards on top
-  (see `APP_SHELL_STYLE_GUIDE.md` §4; charcoal grounds were tried and
-  rejected as too dark). Don't reintroduce tinted near-whites behind
-  cards or hardcode a per-page ground.
+- **Off-palette page grounds** (corrected 2026-10-20: the grey ground and
+  then the lavender option "felt dated") — the light `--background` is
+  Slate `#F8FAFC` with white cards on top, and dark is `#0F172A` with
+  `#1E293B` cards ("The Slate look" above). Don't bring back the
+  `#dcdde0` mid-grey, violet/lavender-tinted grounds, warm paper, a
+  charcoal ground, or a hardcoded per-page ground.
+- **Chrome that flips between modes** (corrected 2026-10-20) — a sidebar
+  or top bar that is the card colour in one mode and darker than the page
+  in the other. The nav and top bar are the same slate-800 `#1E293B` in
+  both modes.
+- **Muted text on secondary surfaces below 4.5:1** (found 2026-10-20) —
+  slate-500 `#64748B` on `#F1F5F9` measures 4.34:1. Muted text is
+  `--muted-foreground` (slate-600 `#475569`), never a lighter slate.
+- **Mockups or pop-ups with plain browser date / time boxes** (caught by
+  Stephan 2026-10-19) — operational dates and times use the approved
+  calendar and clock pickers (`POPUP_STYLE_GUIDE.md`); the 240 `date`, 58
+  `datetime-local` and 28 `time` inputs still in the code are migration
+  targets, not precedents. A mockup set is incomplete without the
+  picker states (canvas page 4). The ESLint guardrail lands with that
+  migration: a rule today would break the zero-warning lint gate on
+  326 existing inputs.
+- **Invented pop-up widths** (caught 2026-10-19) — the only pop-up widths
+  are 480 / 720 / 900 / 1100 (wizards 1100). A mockup proposed 440 / 600 /
+  760 and had to be redrawn; more than 20 widths exist in the code today.
+- **Harmless confirms drawn in red** (found 2026-10-19) — `ConfirmDialog`
+  defaults to the destructive tone, so 34 of 53 eMAR confirms (e.g.
+  "Resolve chart alert") look like delete warnings. Pass `variant`
+  explicitly; red is only for actions that remove or can't be undone.
 - **Stacked chrome-to-content gutters** — the app shell owns ONE 20px
   gutter between the ink chrome (sidebar + top bar) and page content
   (`p-5` in `app-sidebar-layout.tsx`; approved 2026-09-05, replacing
@@ -860,8 +966,7 @@ before.
 - **Approximating an approved mockup** (corrected 2026-09-23, PKG-02B
   vehicle profile) — an approved design is built "in spirit": sections
   re-laid-out, tables turned into tiles, extra cards added, or whole views
-  left as restyled legacy "interim" content (the vehicle Calendar shipped
-  as a bookings list instead of the approved five-view calendar). Every
+  left as restyled legacy "interim" content. Every
   approved view is built to the mockup, section for section. Before
   calling a UI change done, open the mockup and the build side by side at
   the same width and walk every view, then record the comparison. Views
@@ -964,11 +1069,9 @@ When asked to "check everything conforms", audit the codebase against this
 file. Concrete, mechanically-checkable probes:
 
 1. **Legacy wizards** — any import of `components/wizard-stepper.tsx`
-   (known: `pages/sites/create.tsx`, `pages/sites/edit.tsx`,
-   `pages/sites/_wizard.tsx`) and any routed full-page create/edit wizard.
-   Target state: a `WizardShell` add/edit dialog on the index page (the
-   Add Site dialog `components/sites/add-site-dialog.tsx` already exists —
-   check the *edit* path uses it too).
+   and any routed full-page create/edit wizard. Target state: a
+   `WizardShell` add/edit dialog on the index page, used for both add and
+   edit.
 2. **Bespoke multi-step dialogs** — dialogs with their own step state that
    don't import `components/wizard/shell.tsx`. Also audit the parallel
    wizard helper modules (`components/wizard/primitives.tsx`,
@@ -996,9 +1099,7 @@ file. Concrete, mechanically-checkable probes:
    its tones aligned to the positional cycle. Flag hero rails still using
    white-pill active states, carded/underline-only sub-strips,
    hand-picked tones, or toned inactive states. (b) pages whose main view tabs still render below
-   the hero as tinted-pill strips (`ViewTabs` in
-   `pages/sites/calendar/SiteCalendar.tsx`; the clients index migrated
-   2026-09-07) — migrate to the
+   the hero as tinted-pill strips — migrate to the
    connected-tab hero rail (reference: `PageHeaderRail` in
    `components/page/page-header.tsx`).
 10. **Nav counters** — count/warning pills that don't follow their tab's
@@ -1054,9 +1155,7 @@ file. Concrete, mechanically-checkable probes:
     cards, per-page table styling or invented cells, cards/rows
     missing the kebab or right-click context menu (or with diverged
     `MenuItem` sets between the two), dishonest empty states, and any
-    remaining readiness/onboarding displays. `pages/sites/index.tsx`
-    (2026-09-06, the reference) and
-    `pages/operations/clients/index.tsx` (2026-09-07) are migrated.
+    remaining readiness/onboarding displays.
 19. **Attachment and selector coverage** (approved by Stephan 2026-09-20) —
     flag plain visible file inputs or bespoke upload chrome for document /
     invoice / evidence fields instead of the shared premium pattern; missing
@@ -1116,8 +1215,13 @@ This file only works if it reflects reality. The loop:
 ## Deeper guides
 
 - `design_styles/DESIGN_TOKENS.md` — full token reference, charts, adding tokens
-- `design_styles/APP_SHELL_STYLE_GUIDE.md` — the global shell: ink header + sidebar chrome, collapse behaviour, grey page ground
-- `design_styles/POPUP_STYLE_GUIDE.md` — dialog anatomy and conventions
+- `design_styles/APP_SHELL_STYLE_GUIDE.md` — the global shell: Slate header + sidebar chrome, collapse behaviour, page ground
+- `design_styles/PAGE_KIT_STYLE_GUIDE.md` — the page kit: 13 templates, 6 layouts, the blocks (incl. the Oblivion blocks), tabs, rows, long pages, states, the new-module checklist
+- `design_styles/POPUP_STYLE_GUIDE.md` — the pop-up kit (8 types, 21 blocks, 4 widths), dialog anatomy, dropdowns and searchable selectors
+- `design_styles/WRITING_STYLE_GUIDE.md` — one way to write dates, times, money, case, button verbs and labels
+- `design_styles/CALENDAR_STYLE_GUIDE.md` — calendars and date selection
+- `design_styles/FILE_PREVIEW_STYLE_GUIDE.md` — file preview and download
+- `design_styles/MAP_GEOFENCING_STYLE_GUIDE.md` — maps, boundaries and geofencing
 - `design_styles/WORK_RECORD_STYLE_GUIDE.md` — ticket-style work/issue detail hierarchy with module-owned terminology and lifecycle
 - `design_styles/BUTTON_STYLE_GUIDE.md` — the soft-depth button spec (primary/outline)
 - `design_styles/NAVIGATION_STYLE_GUIDE.md` — two-tier section nav (connected tab + toned strip)
@@ -1127,8 +1231,3 @@ This file only works if it reflects reality. The loop:
 - `resources/css/app.css` — the tokens themselves (source of truth)
 - `resources/js/lib/status-colors.ts` — status → class map
 - `resources/js/lib/derive-palette.ts` — brand colour → derived palette
-# User-authorized additions · 22 September 2026
-
-- Maps and cross-profile geofencing follow [MAP_GEOFENCING_STYLE_GUIDE.md](design_styles/MAP_GEOFENCING_STYLE_GUIDE.md), based on the inspected Client Location implementation. Greyscale base tiles, coloured overlays, canonical shared boundaries, separate profile assignments and separate monitoring authority are required.
-- Structured form choices follow the searchable catalog and interval amendment in [POPUP_STYLE_GUIDE.md](design_styles/POPUP_STYLE_GUIDE.md). Service types and service interval presets use searchable choices with explicit **Add custom** where the field represents a configurable catalog. Service recurrence is expressed in calendar months by default, with distance as an independent trigger.
-- Vehicle checks require a reusable library owned with Maintenance checklists, editable questions and evidence requirements, profile/category assignment, controlled versions, and immutable submitted question/answer snapshots. A changed template must not rewrite previous checks. Workflow previews demonstrate configuration; approval of operational checklist content remains with its responsible owner.
