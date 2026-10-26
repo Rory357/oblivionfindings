@@ -12,9 +12,11 @@ import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/datetime';
+import { endpointAgentBadgeMeta } from '@/pages/security-devices/devices/device-endpoint-section';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
+    Download,
     ExternalLink,
     FileCode,
     Monitor,
@@ -40,6 +42,13 @@ interface Computer {
     last_seen_at: string | null;
     href: string;
     management_href?: string;
+    endpoint_posture_href?: string | null;
+    endpoint_agent?: {
+        state: string;
+        agentVersion: string | null;
+        lastSeenAt: string | null;
+        observedAt: string | null;
+    } | null;
 }
 export interface RemoteSupportProps {
     actor_id: number;
@@ -49,6 +58,8 @@ export interface RemoteSupportProps {
     can_manage_software_policy?: boolean;
     can_view_software_catalogue?: boolean;
     can_view_script_catalogue?: boolean;
+    can_view_agent_downloads?: boolean;
+    can_view_endpoint_posture?: boolean;
     computers: {
         data: Computer[];
         total: number;
@@ -77,6 +88,7 @@ function RemoteSupportWorkspace({
     can_manage_software_policy,
     can_view_software_catalogue,
     can_view_script_catalogue,
+    can_view_agent_downloads,
     computers,
     selected,
     ticket,
@@ -141,6 +153,14 @@ function RemoteSupportWorkspace({
                                     </Link>
                                 </PageHeaderGlassButton>
                             )}
+                            {can_view_agent_downloads && (
+                                <PageHeaderGlassButton asChild>
+                                    <Link href="/security-devices/agent-downloads">
+                                        <Download aria-hidden="true" />
+                                        Agent downloads
+                                    </Link>
+                                </PageHeaderGlassButton>
+                            )}
                         </>
                     }
                     meters={
@@ -200,40 +220,56 @@ function RemoteSupportWorkspace({
                         </div>
                         {computers.data.length ? (
                             <ul className="divide-y">
-                                {computers.data.map((computer) => (
-                                    <li key={computer.id}>
-                                        <Link
-                                            href={`/it/remote-support?device=${computer.id}${filters.q ? '&q=' + encodeURIComponent(filters.q) : ''}`}
-                                            aria-current={
-                                                selected?.id === computer.id
-                                                    ? 'page'
-                                                    : undefined
-                                            }
-                                            className={`frontline-focus flex items-center gap-3 px-4 py-3 ${selected?.id === computer.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}`}
-                                        >
-                                            <Monitor
-                                                className="h-4 w-4 shrink-0"
-                                                aria-hidden="true"
-                                            />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="block truncate font-medium">
-                                                    {computer.name}
+                                {computers.data.map((computer) => {
+                                    const agentBadge = computer.endpoint_agent
+                                        ? endpointAgentBadgeMeta(
+                                              computer.endpoint_agent.state,
+                                          )
+                                        : null;
+                                    return (
+                                        <li key={computer.id}>
+                                            <Link
+                                                href={`/it/remote-support?device=${computer.id}${filters.q ? '&q=' + encodeURIComponent(filters.q) : ''}`}
+                                                aria-current={
+                                                    selected?.id === computer.id
+                                                        ? 'page'
+                                                        : undefined
+                                                }
+                                                className={`frontline-focus flex items-center gap-3 px-4 py-3 ${selected?.id === computer.id ? 'bg-accent text-accent-foreground' : 'hover:bg-muted'}`}
+                                            >
+                                                <Monitor
+                                                    className="h-4 w-4 shrink-0"
+                                                    aria-hidden="true"
+                                                />
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate font-medium">
+                                                        {computer.name}
+                                                    </span>
+                                                    <span className="text-caption block">
+                                                        {computer.uid} ·{' '}
+                                                        {computer.category ===
+                                                        'server'
+                                                            ? 'Server'
+                                                            : 'Workstation'}
+                                                    </span>
                                                 </span>
-                                                <span className="text-caption block">
-                                                    {computer.uid} ·{' '}
-                                                    {computer.category ===
-                                                    'server'
-                                                        ? 'Server'
-                                                        : 'Workstation'}
-                                                </span>
-                                            </span>
-                                            <ArrowRight
-                                                className="h-4 w-4 shrink-0"
-                                                aria-hidden="true"
-                                            />
-                                        </Link>
-                                    </li>
-                                ))}
+                                                {agentBadge && (
+                                                    <StatusBadge
+                                                        variant={
+                                                            agentBadge.variant
+                                                        }
+                                                    >
+                                                        {agentBadge.label}
+                                                    </StatusBadge>
+                                                )}
+                                                <ArrowRight
+                                                    className="h-4 w-4 shrink-0"
+                                                    aria-hidden="true"
+                                                />
+                                            </Link>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         ) : (
                             <div className="p-5">
@@ -282,19 +318,56 @@ function RemoteSupportWorkspace({
                             </div>
                             {selected && (
                                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-                                    <p className="text-subtle">
-                                        Last device observation:{' '}
-                                        {formatDateTime(
-                                            selected.last_seen_at,
-                                            'Not yet reported',
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {selected.endpoint_agent && (
+                                            <StatusBadge
+                                                variant={
+                                                    endpointAgentBadgeMeta(
+                                                        selected.endpoint_agent
+                                                            .state,
+                                                    ).variant
+                                                }
+                                            >
+                                                {
+                                                    endpointAgentBadgeMeta(
+                                                        selected.endpoint_agent
+                                                            .state,
+                                                    ).label
+                                                }
+                                                {selected.endpoint_agent
+                                                    .agentVersion
+                                                    ? ` (${selected.endpoint_agent.agentVersion})`
+                                                    : ''}
+                                            </StatusBadge>
                                         )}
-                                    </p>
-                                    <Button variant="outline" asChild>
-                                        <Link href={selected.href}>
-                                            <ExternalLink aria-hidden="true" />
-                                            Device record
-                                        </Link>
-                                    </Button>
+                                        <p className="text-subtle">
+                                            Last device observation:{' '}
+                                            {formatDateTime(
+                                                selected.last_seen_at,
+                                                'Not yet reported',
+                                            )}
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selected.endpoint_posture_href && (
+                                            <Button variant="outline" asChild>
+                                                <Link
+                                                    href={
+                                                        selected.endpoint_posture_href
+                                                    }
+                                                >
+                                                    <Monitor aria-hidden="true" />
+                                                    Endpoint posture
+                                                </Link>
+                                            </Button>
+                                        )}
+                                        <Button variant="outline" asChild>
+                                            <Link href={selected.href}>
+                                                <ExternalLink aria-hidden="true" />
+                                                Device record
+                                            </Link>
+                                        </Button>
+                                    </div>
                                 </div>
                             )}
                             {selected && can_manage_remote_policy && (

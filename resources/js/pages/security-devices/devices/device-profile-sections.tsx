@@ -825,7 +825,20 @@ function DeviceManagementWorkspace({
                                 </div>
                                 <p className="mt-3 text-sm">{command.reason}</p>
                                 <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2 lg:grid-cols-3">
-                                    {command.restart ? (
+                                    {command.service ? (
+                                        <CommandDetail
+                                            label="Expected result"
+                                            value={
+                                                (command.service.serviceLabel ??
+                                                    command.service
+                                                        .serviceName ??
+                                                    'Approved Windows service') +
+                                                (command.service.operation
+                                                    ? ` · ${humanise(command.service.operation)}`
+                                                    : '')
+                                            }
+                                        />
+                                    ) : command.restart ? (
                                         <CommandDetail
                                             label="Expected result"
                                             value="Computer restarts and checks in"
@@ -868,7 +881,8 @@ function DeviceManagementWorkspace({
                                     <CommandDetail
                                         label="Execution route"
                                         value={
-                                            (command.restart ||
+                                            (command.service ||
+                                                command.restart ||
                                                 command.software) &&
                                             command.executionRoute ===
                                                 'endpoint'
@@ -897,6 +911,61 @@ function DeviceManagementWorkspace({
                                     <p className="mt-2 text-xs text-muted-foreground">
                                         Approved by {command.approvedBy}
                                     </p>
+                                )}
+                                {command.service && (
+                                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-3 text-xs">
+                                        <span className="font-medium">
+                                            Windows SCM:{' '}
+                                            {command.service.serviceName ??
+                                                'Service'}
+                                        </span>
+                                        {command.service.beforeState &&
+                                            command.service.afterState && (
+                                                <span className="text-muted-foreground">
+                                                    {humanise(
+                                                        command.service
+                                                            .beforeState,
+                                                    )}{' '}
+                                                    →{' '}
+                                                    {humanise(
+                                                        command.service
+                                                            .afterState,
+                                                    )}
+                                                </span>
+                                            )}
+                                        {command.service.reasonCode && (
+                                            <StatusBadge variant="neutral">
+                                                {humanise(
+                                                    command.service.reasonCode,
+                                                )}
+                                            </StatusBadge>
+                                        )}
+                                        {command.service.readbackState && (
+                                            <StatusBadge
+                                                variant={
+                                                    command.service
+                                                        .readbackState ===
+                                                    'running'
+                                                        ? 'success'
+                                                        : command.service
+                                                                .readbackState ===
+                                                            'stopped'
+                                                          ? 'info'
+                                                          : 'warning'
+                                                }
+                                            >
+                                                Readback:{' '}
+                                                {humanise(
+                                                    command.service
+                                                        .readbackState,
+                                                )}
+                                                {command.service
+                                                    .readbackObservedAt
+                                                    ? ` (${formatDateTime(command.service.readbackObservedAt)})`
+                                                    : ''}
+                                            </StatusBadge>
+                                        )}
+                                    </div>
                                 )}
                                 {command.restart && (
                                     <RestartRequestState

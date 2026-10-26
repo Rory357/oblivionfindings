@@ -38,6 +38,7 @@ use App\Domain\Monitoring\Jobs\EnforceMonitoringRetention;
 use App\Domain\Monitoring\Jobs\EvaluateCollectorHealth;
 use App\Domain\Monitoring\Jobs\ScheduleDueMonitors;
 use App\Domain\Monitoring\Jobs\ScheduleProviderCapabilities;
+use App\Domain\Referrals\Models\ReferralIntakeDraft;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
@@ -75,6 +76,7 @@ use App\Jobs\RecoverFirstAidDeliveries;
 use App\Jobs\RecoverIncidentOwnerDeliveries;
 use App\Jobs\RecoverLoneWorkerEmergencies;
 use App\Jobs\RecoverProcedureReviewDeliveries;
+use App\Jobs\RecoverWorkerParticipationMeetingDeliveries;
 use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
@@ -1022,6 +1024,11 @@ app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
 // Native attempt expiry is bookkeeping only; it never retries a computer action.
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 
+// Read-only Intune visibility refreshes explicitly linked computer records only when configured.
+if (config('endpoint_management.intune.enabled', false)) {
+    app(Schedule::class)->command('endpoints:intune-sync')->everyThirtyMinutes()->withoutOverlapping()->onOneServer();
+}
+
 // Media watchdogs enforce 15-second authority; this erases expired central signalling.
 Illuminate\Support\Facades\Schedule::command('cctv:expire-live-sessions')->everyMinute()->withoutOverlapping();
 
@@ -1045,7 +1052,7 @@ app(Schedule::class)->command('referrals:deliver-communications --limit=25')->ev
 
 // Intake drafts already expire after seven days, but were only removed when their author came back.
 Artisan::command('referrals:prune-intake-drafts', function () {
-    $this->info((string) \App\Domain\Referrals\Models\ReferralIntakeDraft::query()->where('expires_at', '<=', now())->delete());
+    $this->info((string) ReferralIntakeDraft::query()->where('expires_at', '<=', now())->delete());
 })->purpose('Remove unfinished referral intake drafts once their seven-day expiry has passed');
 app(Schedule::class)->command('referrals:prune-intake-drafts')->dailyAt('02:20')->timezone('Pacific/Auckland')->withoutOverlapping()->onOneServer();
 app(Schedule::class)->command('chat:reconcile-calls')->everyTenSeconds()->withoutOverlapping(2)->runInBackground();
@@ -1071,7 +1078,7 @@ app(Schedule::class)->command('restraints:followup-reminders')->dailyAt('08:00')
 
 // Recover committed participation intents through independently current recipient source admission.
 // A sending mail claim becomes uncertain after a crash and is never automatically resent.
-app(Schedule::class)->job(new \App\Jobs\RecoverWorkerParticipationMeetingDeliveries)
+app(Schedule::class)->job(new RecoverWorkerParticipationMeetingDeliveries)
     ->everyMinute()->withoutOverlapping();
 
 // Content expiry applies independently of publication, execution policy and agent enrolment.

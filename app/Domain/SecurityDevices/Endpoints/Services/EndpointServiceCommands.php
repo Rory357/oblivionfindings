@@ -280,6 +280,49 @@ final class EndpointServiceCommands
         return $count;
     }
 
+    public function projection(DeviceCommandRequest $request, ?DeviceCommandAttempt $attempt): ?array
+    {
+        if ($request->capability !== EndpointServiceAuthority::CAPABILITY) {
+            return null;
+        }
+        $delivery = $attempt ? EndpointDelivery::query()->where('device_command_attempt_id', $attempt->id)->first() : null;
+        $state = match ($request->status) {
+            CommandStatus::Reconciled => 'confirmed',
+            CommandStatus::Reconciling => 'awaiting_observation',
+            CommandStatus::Uncertain => 'uncertain',
+            CommandStatus::Expired => 'expired',
+            CommandStatus::Cancelled => 'cancelled',
+            CommandStatus::Failed, CommandStatus::Rejected, CommandStatus::Blocked, CommandStatus::Mismatch => 'failed',
+            default => $delivery?->claimed_at ? 'claimed' : 'requested',
+        };
+        $result = is_array($delivery?->result) ? $delivery->result : null;
+        $readback = is_array($delivery?->service_readback) ? $delivery->service_readback : null;
+        $serviceName = $request->encrypted_parameters['service_name'] ?? $request->safe_parameter_summary['service_name'] ?? null;
+        $operation = $request->encrypted_parameters['operation'] ?? $request->safe_parameter_summary['operation'] ?? null;
+        $serviceLabel = null;
+        if (is_string($serviceName)) {
+            foreach (app(EndpointServiceCatalogue::class)->all() as $entry) {
+                if ($entry['name'] === $serviceName) {
+                    $serviceLabel = $entry['label'];
+                    break;
+                }
+            }
+        }
+
+        return [
+            'serviceName' => is_string($serviceName) ? $serviceName : null,
+            'serviceLabel' => $serviceLabel,
+            'operation' => is_string($operation) ? $operation : null,
+            'consentMode' => is_string($request->expected_state['consent_mode'] ?? null) ? $request->expected_state['consent_mode'] : null,
+            'state' => $state,
+            'beforeState' => is_string($result['before_state'] ?? null) ? $result['before_state'] : null,
+            'afterState' => is_string($result['after_state'] ?? null) ? $result['after_state'] : null,
+            'reasonCode' => is_string($result['reason_code'] ?? null) ? $result['reason_code'] : null,
+            'readbackState' => is_string($readback['state'] ?? null) ? $readback['state'] : null,
+            'readbackObservedAt' => is_string($readback['observed_at'] ?? null) ? $readback['observed_at'] : null,
+        ];
+    }
+
     private function validateResult(array $data): void
     {
         if ($data['status'] === 'succeeded') {
