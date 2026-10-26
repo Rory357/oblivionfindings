@@ -2,6 +2,7 @@
 
 namespace App\Services\Integration;
 
+use App\Enums\AlertSeverity;
 use App\Models\ControlRoomAlert;
 use App\Models\Integration\IntegrationEvent;
 use App\Models\Integration\IntegrationProviderConnection;
@@ -52,8 +53,10 @@ class AlertRoutingService
             return null;
         }
 
-        // Step 2: Apply quiet hours suppression for non-critical events
-        if ($event->severity !== IntegrationEvent::SEVERITY_CRITICAL) {
+        // Step 2: Apply quiet hours suppression for non-critical events. Use the
+        // canonical severity, so a fall or panic a device reports as "info" is
+        // still critical and is never muted by quiet hours.
+        if ($this->normaliser->resolveSeverity($event) !== AlertSeverity::CRITICAL) {
             if ($this->isQuietHours($event->provider)) {
                 Log::info('AlertRoutingService: event suppressed during quiet hours', SafeOperationalData::logContext([
                     'integration_event_id' => $event->id,

@@ -11,6 +11,7 @@ import {
     toDateInput,
     toDatetimeLocal,
     workerTimeOffsets,
+    workerDayRange,
 } from './datetime';
 
 describe('age on the NZ calendar day', () => {
@@ -49,6 +50,22 @@ describe('age on the NZ calendar day', () => {
 });
 
 describe('NZ date input and filename boundaries', () => {
+    it('selects inclusive New Zealand reporting days before UTC midnight and across DST', () => {
+        expect(workerDayRange(7, '2026-09-27T11:30:00Z')).toEqual({
+            from: '2026-09-22',
+            to: '2026-09-28',
+        });
+        expect(workerDayRange(30, '2026-10-06T12:00:00Z')).toEqual({
+            from: '2026-09-08',
+            to: '2026-10-07',
+        });
+        expect(workerDayRange(1, '2026-04-04T14:30:00Z')).toEqual({
+            from: '2026-04-05',
+            to: '2026-04-05',
+        });
+        expect(workerDayRange(0)).toEqual({ from: '', to: '' });
+        expect(workerDayRange(7, 'invalid')).toEqual({ from: '', to: '' });
+    });
     it('formats a date-only value without shifting it through a timezone', () => {
         expect(formatDateOnly('2026-07-21', 'Pacific/Auckland')).toBe(
             '21 Jul 2026',

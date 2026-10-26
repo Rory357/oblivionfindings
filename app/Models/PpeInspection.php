@@ -27,6 +27,8 @@ class PpeInspection extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
         'inspected_at' => 'datetime',
         'next_inspection_due' => 'date',
     ];
@@ -68,5 +70,11 @@ class PpeInspection extends Model
     public function failed(): bool
     {
         return in_array($this->result, ['fail', 'condemned']);
+    }
+
+    /** Governed facts remain distinct from legacy rows and current authority. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PpeSourceVersion::class, 'source_id')->where('source_type', 'inspection');
     }
 }

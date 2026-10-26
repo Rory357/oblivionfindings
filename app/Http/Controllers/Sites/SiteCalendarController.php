@@ -10,6 +10,7 @@ use App\Models\CalendarSyncMapping;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Models\User;
+use App\Services\HealthSafety\WorkerParticipationCalendarReadService;
 use App\Services\Sites\Calendar\CalendarSources;
 use App\Services\Sites\Calendar\CalendarSyncService;
 use App\Services\Sites\Calendar\IcsFeedBuilder;
@@ -71,21 +72,22 @@ class SiteCalendarController extends Controller
     /**
      * Unified JSON feed for a single site (manual events + obligations).
      */
-    public function events(Request $request, Site $site)
+    public function events(Request $request, Site $site, WorkerParticipationCalendarReadService $participation)
     {
         $this->authorize('view', $site);
 
         [$start, $end] = $this->range($request);
 
-        return response()->json([
-            'events' => $this->aggregator->arrayForRange([$site->id], $start, $end, $this->filters($request)),
-        ]);
+        // Same `events` list; participation is read for the signed-in viewer and its access status is reported.
+        $read = $participation->json($request->user(), [$site->id], $start, $end, $this->filters($request));
+
+        return response($read['body'], 200, ['Content-Type' => $read['content_type']]);
     }
 
     /**
      * Unified JSON feed across every site the user can see (with filters).
      */
-    public function globalEvents(Request $request)
+    public function globalEvents(Request $request, WorkerParticipationCalendarReadService $participation)
     {
         $user = $request->user();
         abort_unless($user?->canDo('calendar.view'), 403);
@@ -93,9 +95,9 @@ class SiteCalendarController extends Controller
         [$start, $end] = $this->range($request);
         $siteIds = $this->resolveGlobalSites($request)->pluck('id')->all();
 
-        return response()->json([
-            'events' => $this->aggregator->arrayForRange($siteIds, $start, $end, $this->filters($request)),
-        ]);
+        $read = $participation->json($request->user(), $siteIds, $start, $end, $this->filters($request));
+
+        return response($read['body'], 200, ['Content-Type' => $read['content_type']]);
     }
 
     public function store(Request $request, Site $site)
@@ -224,7 +226,7 @@ class SiteCalendarController extends Controller
      * Public per-user subscribe feed (token-authenticated, no session). Returns a
      * VCALENDAR of the user's accessible sites' events + obligations for a window.
      */
-    public function feed(Request $request, string $token)
+    public function feed(Request $request, string $token, WorkerParticipationCalendarReadService $participation)
     {
         $user = User::query()->where('calendar_feed_token', $token)->first();
         abort_unless($user, 404);
@@ -235,15 +237,13 @@ class SiteCalendarController extends Controller
 
         $siteIds = $this->siteAccess()->accessibleSiteIds($user);
 
-        // Never re-publish pulled external busy back out (would loop on two-way maps).
-        $items = array_values(array_filter(
-            $this->aggregator->itemsForRange($siteIds, $start, $end),
-            fn ($item) => $item->source !== 'external',
-        ));
+        // The token's owner is the source viewer; the read still never re-publishes pulled external busy.
+        $read = $participation->ics($user, $siteIds, $start, $end);
 
-        return response($this->icsFeedBuilder->build($items, 'Oblivion Findings — Site Calendar'), 200, [
-            'Content-Type' => 'text/calendar; charset=utf-8',
+        return response($read['body'], 200, [
+            'Content-Type' => $read['content_type'],
             'Content-Disposition' => 'inline; filename="site-calendar.ics"',
+            'X-Calendar-Participation-Source' => $read['participation_source_access']['status'],
         ]);
     }
 
@@ -300,6 +300,8 @@ class SiteCalendarController extends Controller
         abort_unless(hash_equals((string) $mapping->ical_feed_token, $token), 404);
 
         $filters = ! empty($mapping->sources) ? ['sources' => $mapping->sources] : [];
+        // Resource mapping authority is not a staff viewer: no participation, drill or PPE source reads.
+        $filters['viewer'] = null;
         $items = array_values(array_filter(
             $this->aggregator->itemsForRange(
                 [$site->id],
@@ -314,6 +316,7 @@ class SiteCalendarController extends Controller
         return response($this->icsFeedBuilder->build($items, $site->name.' — Calendar'), 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
             'Content-Disposition' => 'inline; filename="house-'.$site->id.'-calendar.ics"',
+            'X-Calendar-Participation-Source' => $this->aggregator->participationSourceAccess()['status'],
         ]);
     }
 

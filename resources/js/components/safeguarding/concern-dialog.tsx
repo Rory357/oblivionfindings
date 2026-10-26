@@ -692,7 +692,7 @@ function PaneShell({
     );
 }
 
-function DeclassificationRequestPane({
+export function DeclassificationRequestPane({
     d,
     onDone,
 }: {
@@ -794,7 +794,7 @@ function DeclassificationRequestPane({
     );
 }
 
-function DeclassificationReviewPane({
+export function DeclassificationReviewPane({
     d,
     onDone,
 }: {
@@ -900,7 +900,7 @@ function DeclassificationReviewPane({
     );
 }
 
-function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const staff = d.assignable_staff ?? [];
     const form = useForm<{ assigned_to_user_id: string }>({
         assigned_to_user_id: '',
@@ -949,7 +949,7 @@ function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     );
 }
 
-function InvestigationPane({
+export function InvestigationPane({
     d,
     onDone,
 }: {
@@ -1074,7 +1074,7 @@ const AUTHORITIES = [
     { value: 'other', label: 'Other' },
 ];
 
-function ReportPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function ReportPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const form = useForm<{
         authority_type: string;
         authority_name: string;
@@ -1199,7 +1199,7 @@ const RISK_OPTS = [
     { value: 'critical', label: 'Critical' },
 ];
 
-function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const form = useForm<{
         overall_risk_level: string;
         risk_to_self: string;
@@ -1339,7 +1339,7 @@ function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     );
 }
 
-function ActionItemPane({
+export function ActionItemPane({
     d,
     onDone,
 }: {
@@ -1501,7 +1501,7 @@ const TRIAGE_PATHS = [
     },
 ];
 
-function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const staff = d.assignable_staff ?? [];
     const form = useForm<{
         substantiation: string;
@@ -1642,7 +1642,7 @@ function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     );
 }
 
-function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const invOpen = (d.investigations ?? []).some(
         (i) => !['completed', 'abandoned'].includes(i.status),
     );
@@ -2278,14 +2278,17 @@ const INVESTIGATION_OUTCOMES = [
 
 // Completing an investigation flips its status → the SafeguardingInvestigationObserver
 // auto-advances the concern to its action-plan stage (W5).
-function InvestigationCompleteForm({
+export function InvestigationCompleteForm({
     concernId,
     investigationId,
+    startOpen = false,
 }: {
     concernId: number;
     investigationId: number;
+    /** The record page's header action lands straight on the form. */
+    startOpen?: boolean;
 }) {
-    const [openForm, setOpenForm] = useState(false);
+    const [openForm, setOpenForm] = useState(startOpen);
     const form = useForm<{
         status: string;
         outcome: string;
@@ -2436,14 +2439,16 @@ function ReportsSection({ d }: { d: ConcernDetail }) {
 
 // Records an authority's acknowledgement of a logged report — clears the "Acks awaited"
 // worklist + hero count once an authority confirms receipt.
-function ReportAckForm({
+export function ReportAckForm({
     concernId,
     reportId,
+    startOpen = false,
 }: {
     concernId: number;
     reportId: number;
+    startOpen?: boolean;
 }) {
-    const [openForm, setOpenForm] = useState(false);
+    const [openForm, setOpenForm] = useState(startOpen);
     const form = useForm<{
         acknowledgement_received: boolean;
         acknowledged_at: string;

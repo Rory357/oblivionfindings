@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Jobs\DispatchIncidentOwnerDelivery;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientIncident;
@@ -10,11 +11,14 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Incidents\IncidentOwnershipService;
 use App\Services\Tasks\TaskAggregator;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -261,9 +265,15 @@ it('gates every provider on the module permission', function () {
 });
 
 it('filters to unassigned items', function () {
-    $user = makeTasksUser(['incidents.viewAny']);
-    $unassigned = makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => null]);
-    makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => $user->id]);
+    $user = makeTasksUser(['incidents.viewAny', 'incidents.owner.hold']);
+    $unassigned = makeTasksIncident($user, ['status' => 'submitted', 'incident_owner_user_id' => null, 'investigation_assigned_to' => $user->id]);
+    $owned = makeTasksIncident($user, ['status' => 'submitted', 'investigation_assigned_to' => null]);
+    // A raw owner pointer is replacement work, not ownership: assign through the governed owner command.
+    $manager = makeTasksUser(['incidents.viewAny', 'incidents.owner.assign']);
+    scopeAllTasksUserToSite($manager, $owned->site);
+    Bus::fake([DispatchIncidentOwnerDelivery::class]);
+    app(IncidentOwnershipService::class)->assign($manager, $owned, $user->id, 0, (string) Str::uuid(), null);
+    expect((int) $owned->fresh()->incident_owner_user_id)->toBe((int) $user->id);
 
     $this->actingAs($user)
         ->get('/tasks?assigned=unassigned')

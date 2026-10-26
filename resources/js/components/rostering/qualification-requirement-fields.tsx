@@ -116,7 +116,7 @@ export function QualificationMappingField({
     const missing =
         value !== null && !options.some((option) => option.id === value);
     return (
-        <div className="min-w-0 space-y-2 [&_button[role=combobox]]:min-h-11">
+        <div className="min-w-0 space-y-2">
             <p className="text-sm font-medium">{label}</p>
             <RecordPicker
                 label={label}
@@ -216,7 +216,7 @@ export function HouseQualificationFields({
                 >
                     <SelectTrigger
                         id={`${id}-applicability`}
-                        className="min-h-11"
+                        className="frontline-hit"
                         aria-invalid={!!errors.applicability_mode}
                     >
                         <SelectValue placeholder="Choose for this requirement" />
@@ -248,7 +248,7 @@ export function HouseQualificationFields({
                         step={1}
                         inputMode="numeric"
                         disabled={disabled}
-                        className="min-h-11"
+                        className="frontline-hit"
                         value={value.minimum_qualified_staff ?? ''}
                         aria-invalid={!!errors.minimum_qualified_staff}
                         aria-describedby={`${id}-minimum-help`}

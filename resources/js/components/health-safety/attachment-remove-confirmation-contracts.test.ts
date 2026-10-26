@@ -14,6 +14,7 @@ const VIEWERS = [
     'resources/js/components/health-safety/procedure-detail-dialog.tsx',
     'resources/js/components/health-safety/risk-assessments/ra-detail-dialog.tsx',
     'resources/js/components/safeguarding/concern-dialog.tsx',
+    'resources/js/components/safeguarding/concern-record.tsx',
     'resources/js/components/privacy/privacy-attachments-pane.tsx',
 ];
 
@@ -32,9 +33,9 @@ describe('attachment removal asks first', () => {
         expect(source).toContain('variant="destructive"');
         expect(source).toContain('processing={removingFile}');
 
-        // The trash button only picks the file; it never deletes directly.
-        expect(source).not.toMatch(/onClick=\{\(\) =>\s*router\.delete\(/);
-        expect(source).toMatch(/onClick=\{\(\) =>\s*setFileToRemove\(/);
+        // The trash button (or row-menu item) only picks the file; it never deletes directly.
+        expect(source).not.toMatch(/onClick(?:=\{|:\s*)\(\) =>\s*router\.delete\(/);
+        expect(source).toMatch(/onClick(?:=\{|:\s*)\(\) =>\s*setFileToRemove\(/);
 
         // The delete request is sent only from the confirmed handler.
         expect(source).toMatch(

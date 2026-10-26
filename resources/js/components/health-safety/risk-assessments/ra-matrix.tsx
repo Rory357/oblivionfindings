@@ -13,7 +13,7 @@ import {
 
 const CELL_BG: Record<RaTone, string> = {
     success: 'bg-status-success-bg',
-    info: 'bg-primary/10',
+    info: 'bg-status-info-bg',
     warning: 'bg-status-warning-bg',
     critical: 'bg-status-critical-bg',
     neutral: 'bg-muted',
@@ -35,17 +35,19 @@ export function RaMatrix({
     onSelect,
     compact = false,
 }: {
-    likelihood: number;
-    consequence: number;
+    likelihood: number | null;
+    consequence: number | null;
     residualLikelihood?: number | null;
     residualConsequence?: number | null;
     onSelect?: (likelihood: number, consequence: number) => void;
     compact?: boolean;
 }) {
     const interactive = !!onSelect;
-    const cellSize = compact
-        ? 'h-[26px] w-[26px] text-[11px]'
-        : 'h-[34px] w-[34px] text-xs';
+    const cellSize = interactive
+        ? 'h-11 w-11 text-xs'
+        : compact
+          ? 'h-[26px] w-[26px] text-[11px]'
+          : 'h-[34px] w-[34px] text-xs';
     const hasResidual =
         residualLikelihood != null && residualConsequence != null;
 
@@ -58,7 +60,11 @@ export function RaMatrix({
                             key={l}
                             className={cn(
                                 'flex items-center justify-end pr-1 text-right text-[9px] leading-tight text-muted-foreground',
-                                compact ? 'h-[26px] w-14' : 'h-[34px] w-20',
+                                interactive
+                                    ? 'h-11 w-20'
+                                    : compact
+                                      ? 'h-[26px] w-14'
+                                      : 'h-[34px] w-20',
                             )}
                         >
                             {LIKELIHOOD_LABELS[l - 1]}
@@ -118,7 +124,11 @@ export function RaMatrix({
                                 key={c}
                                 className={cn(
                                     'text-center text-[8.5px] leading-tight text-muted-foreground',
-                                    compact ? 'w-[26px]' : 'w-[34px]',
+                                    interactive
+                                        ? 'w-11'
+                                        : compact
+                                          ? 'w-[26px]'
+                                          : 'w-[34px]',
                                 )}
                             >
                                 {CONSEQUENCE_LABELS[c - 1]}

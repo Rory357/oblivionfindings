@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\HsEvent;
 use App\Models\SafeguardingActionPlan;
 use App\Models\SafeguardingAttachment;
@@ -17,6 +18,8 @@ use App\Policies\SafeguardingConcernPolicy;
 use App\Services\Safeguarding\SafeguardingLifecycle;
 use App\Services\Safeguarding\SafeguardingSensitivityService;
 use App\Services\Safeguarding\SafeguardingTerminalTransitionService;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -33,7 +36,7 @@ class SafeguardingConcernController extends Controller
     public function __construct(
         private readonly SafeguardingSensitivityService $sensitivity,
         private readonly SafeguardingConcernPolicy $concernPolicy,
-        private readonly \App\Services\UserSiteAccessService $siteAccess,
+        private readonly UserSiteAccessService $siteAccess,
     ) {}
 
     /**
@@ -90,6 +93,7 @@ class SafeguardingConcernController extends Controller
 
         $tabScopes = [
             'all' => fn ($q) => $q,
+            'open' => fn ($q) => $q->open(),
             'triage' => fn ($q) => $q->where('status', 'reported'),
             'investigation' => fn ($q) => $q->where('status', 'investigating'),
             'action_plan' => fn ($q) => $q->where('status', 'action_plan'),
@@ -99,16 +103,19 @@ class SafeguardingConcernController extends Controller
             'mine' => fn ($q) => $q->where('assigned_to_user_id', $user->id)->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES),
         ];
 
+        // Every list, count and tab below starts from the concerns this reader may
+        // open (SafeguardingConcernPolicy::applyVisibleScope): their Sites plus
+        // Site-less organisation records, or everything with the reports bypass.
         $tabCounts = [];
         foreach ($tabScopes as $key => $scope) {
-            $q = SafeguardingConcern::query();
+            $q = $this->visibleConcerns($user);
             $applyFilters($q);
             $scope($q);
             $tabCounts[$key] = $q->count();
         }
 
         // Reviews worklist source (footer-filtered, non-terminal).
-        $reviewBase = SafeguardingConcern::query()->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES);
+        $reviewBase = $this->visibleConcerns($user)->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES);
         $applyFilters($reviewBase);
         $reviewConcernIds = $reviewBase->pluck('id');
         $tabCounts['reviews'] = $this->riskReviewQuery($reviewConcernIds)->count()
@@ -119,7 +126,7 @@ class SafeguardingConcernController extends Controller
             $rowsKind = 'reviews';
         } else {
             $scope = $tabScopes[$tab] ?? $tabScopes['all'];
-            $query = SafeguardingConcern::query()
+            $query = $this->visibleConcerns($user)
                 ->with(['subject', 'assignedTo', 'site', 'latestRiskAssessment', 'relatedIncident:id,reference_number'])
                 ->withCount([
                     'externalReports',
@@ -137,6 +144,9 @@ class SafeguardingConcernController extends Controller
             $rowsKind = 'concerns';
         }
 
+        // The Site and subject pickers stay inside the same Site boundary as the rows.
+        $visibleSiteIds = $this->concernPolicy->visibleSiteIds($user);
+
         return Inertia::render('safeguarding/index', [
             'filters' => $filters,
             'tab' => $tab,
@@ -145,25 +155,25 @@ class SafeguardingConcernController extends Controller
             'rowsKind' => $rowsKind,
             'hero' => [
                 'openWork' => [
-                    'open' => ['value' => SafeguardingConcern::open()->count()],
-                    'awaitingTriage' => ['value' => SafeguardingConcern::where('status', 'reported')->count()],
-                    'investigating' => ['value' => SafeguardingConcern::where('status', 'investigating')->count()],
-                    'referred' => ['value' => SafeguardingConcern::where('status', 'referred_external')->count()],
+                    'open' => ['value' => $this->visibleConcerns($user)->open()->count()],
+                    'awaitingTriage' => ['value' => $this->visibleConcerns($user)->where('status', 'reported')->count()],
+                    'investigating' => ['value' => $this->visibleConcerns($user)->where('status', 'investigating')->count()],
+                    'referred' => ['value' => $this->visibleConcerns($user)->where('status', 'referred_external')->count()],
                 ],
                 'attention' => [
-                    'overdueActions' => ['value' => $this->overdueActionsCount()],
-                    'reviewsDue' => ['value' => $this->riskReviewQuery($this->openConcernIds())->count()],
-                    'acksAwaited' => ['value' => $this->acksAwaitedQuery($this->openConcernIds())->count()],
-                    'criticalOpen' => ['value' => SafeguardingConcern::open()->where('severity', 'critical')->count()],
+                    'overdueActions' => ['value' => $this->overdueActionsCount($user)],
+                    'reviewsDue' => ['value' => $this->riskReviewQuery($this->openConcernIds($user))->count()],
+                    'acksAwaited' => ['value' => $this->acksAwaitedQuery($this->openConcernIds($user))->count()],
+                    'criticalOpen' => ['value' => $this->visibleConcerns($user)->open()->where('severity', 'critical')->count()],
                 ],
             ],
-            'referralOverdueCount' => SafeguardingConcern::query()
+            'referralOverdueCount' => $this->visibleConcerns($user)
                 ->where('requires_external_referral', true)
                 ->whereDoesntHave('externalReports')
                 ->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES)
                 ->count(),
-            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'subjects' => Client::query()->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+            'sites' => Site::query()->where('is_active', true)->whereIn('id', $visibleSiteIds)->orderBy('name')->get(['id', 'name']),
+            'subjects' => Client::query()->whereIn('site_id', $visibleSiteIds)->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
                 ->map(fn (Client $c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])
                 ->values(),
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get()
@@ -197,15 +207,54 @@ class SafeguardingConcernController extends Controller
     /**
      * Show the form for creating a new concern.
      */
-    /**
-     * The full-page create form is retired — raising is a modal wizard on the
-     * list. Redirect deep links to the list with the wizard open.
-     */
-    public function create(): RedirectResponse
+    public function create(Request $request): Response
     {
         $this->authorize('create', SafeguardingConcern::class);
 
-        return redirect()->route('safeguarding.index', ['raise' => 1]);
+        // Reporting authority does not imply permission to browse the register.
+        // The intake page contains only the choices the reporter may use.
+        $user = $request->user();
+
+        return Inertia::render('safeguarding/create', [
+            'clients' => $this->siteAccess->applyClientScope(Client::query(), $user)
+                ->orderBy('last_name')->orderBy('first_name')->get(['id', 'first_name', 'last_name'])
+                ->map(fn (Client $client) => ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)])
+                ->values(),
+            'staff' => $this->siteAccess->applyStaffScope(User::query(), $user)
+                ->orderBy('name')->get(['id', 'name']),
+            'sites' => $this->siteAccess->applySiteScope(Site::query(), $user)
+                ->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'returnUrl' => $this->reportingReturnUrl($request),
+        ]);
+    }
+
+    /** Keep the permitted caller's filters, never an external or nested return. */
+    private function reportingReturnUrl(Request $request): string
+    {
+        $allowed = ['/my-day'];
+        if ($request->user()->canDo('incidents.viewAny') || $request->user()->canDo('incidents.viewAssigned')) {
+            $allowed[] = '/incidents';
+        }
+        if ($request->user()->canDo('safeguarding.viewAny')) {
+            $allowed[] = '/safeguarding';
+        }
+        $fallback = end($allowed);
+        $value = $request->input('return_to');
+        if (! is_string($value) || ! str_starts_with($value, '/') || str_starts_with($value, '//')
+            || str_contains($value, '\\') || preg_match('/[\x00-\x1f\x7f]/', $value)) {
+            return $fallback;
+        }
+        $parts = parse_url($value);
+        if (! is_array($parts) || isset($parts['host']) || ! in_array($parts['path'] ?? '', $allowed, true)) {
+            return $fallback;
+        }
+        parse_str($parts['query'] ?? '', $query);
+        $query = array_filter(Arr::only($query, [
+            'q', 'tab', 'severity', 'category', 'site_id', 'client_id', 'subject_id', 'source', 'from', 'to', 'page',
+        ]), fn ($item) => is_scalar($item));
+        $encoded = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        return $parts['path'].($encoded !== '' ? '?'.$encoded : '');
     }
 
     /**
@@ -276,6 +325,7 @@ class SafeguardingConcernController extends Controller
 
         return Inertia::render('safeguarding/concern', [
             'detail' => $this->buildConcernDetail($concern, $request->user(), $canSensitive),
+            'returnUrl' => $this->reportingReturnUrl($request),
         ]);
     }
 
@@ -731,10 +781,16 @@ class SafeguardingConcernController extends Controller
             ->all();
     }
 
-    /** Non-terminal concern ids — the universe for "needs attention" worklists. */
-    private function openConcernIds()
+    /** Concerns this reader may open — the policy's Site rule, applied before anything is read or counted. */
+    private function visibleConcerns(User $user): Builder
     {
-        return SafeguardingConcern::query()
+        return $this->concernPolicy->applyVisibleScope(SafeguardingConcern::query(), $user);
+    }
+
+    /** Non-terminal concern ids this reader may see — the universe for "needs attention" worklists. */
+    private function openConcernIds(User $user)
+    {
+        return $this->visibleConcerns($user)
             ->whereNotIn('status', SafeguardingConcern::TERMINAL_STATUSES)
             ->pluck('id');
     }
@@ -755,12 +811,12 @@ class SafeguardingConcernController extends Controller
             ->whereIn('safeguarding_concern_id', $concernIds);
     }
 
-    private function overdueActionsCount(): int
+    private function overdueActionsCount(User $user): int
     {
         return SafeguardingActionPlan::query()
             ->where('due_date', '<', now())
             ->whereNotIn('status', ['completed', 'cancelled'])
-            ->whereIn('safeguarding_concern_id', $this->openConcernIds())
+            ->whereIn('safeguarding_concern_id', $this->openConcernIds($user))
             ->count();
     }
 
@@ -1224,7 +1280,7 @@ class SafeguardingConcernController extends Controller
         // 4. Canonical Incident reconciliation
         $incidentId = $validated['related_incident_id'] ?? $existing?->related_incident_id;
         if ($incidentId) {
-            $incident = \App\Models\ClientIncident::findOrFail($incidentId);
+            $incident = ClientIncident::findOrFail($incidentId);
 
             if ($siteId) {
                 $this->siteAccess->assertCanUseClientIncidentAtSite($user, $incident, (int) $siteId);

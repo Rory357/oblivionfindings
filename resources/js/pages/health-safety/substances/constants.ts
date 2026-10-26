@@ -160,3 +160,19 @@ export function substanceRiskTone(
     if (isControlled || sdsState === 'expiring') return 'warning';
     return 'success';
 }
+
+/* ── Chemical register and record (approved H&S drawings pg-hsn-125, 126 — Stephan 23 Oct 2026) ── */
+
+/** A reference's sheet state in plain words. A current sheet reads green; anything needing a person reads amber. */
+export const CHEMICAL_SHEET_LABELS: Record<string, string> = {
+    current: 'Current', expiring: 'Review due soon', expired: 'Review overdue', missing: 'No current sheet', unknown: 'Currency unknown',
+    ambiguous: 'Current sheet unconfirmed', unavailable: 'File unavailable', not_yet_effective: 'Not yet effective', repair_required: 'Source needs review',
+    superseded: 'Replaced',
+};
+export const chemicalSheetLabel = (state: string | null | undefined) => CHEMICAL_SHEET_LABELS[state ?? ''] ?? 'State unconfirmed';
+export const chemicalSheetTone = (state: string | null | undefined): Tone => (state === 'current' ? 'success' : state === 'superseded' ? 'neutral' : 'warning');
+/** A saved option value in its label ("liquid" → "Liquid"); an unlisted saved value keeps its own words. */
+export function optionLabel(options: Opt[], value: string | null | undefined, fallback = 'Not recorded'): string {
+    if (value === null || value === undefined || value === '') return fallback;
+    return options.find((option) => option.value === value)?.label ?? value.replaceAll('_', ' ');
+}

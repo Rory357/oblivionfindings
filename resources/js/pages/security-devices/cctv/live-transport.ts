@@ -1,6 +1,7 @@
 import {
     recordingBase,
     recordingListHref,
+    recordingReader,
     recordingRecoveryBase,
 } from './_recording-contract';
 import { sourceBase, sourceHref } from './_source-contract';
@@ -91,6 +92,11 @@ export async function hikvisionJson(
     if (!hikPath(camera, actor, path, body !== undefined))
         throw Error('Camera setup destination changed.');
     return cameraJsonRequest(path, signal, body, 20000, 262144);
+}
+/** An existing canonical reference only; callers must decode its current actor and source tuple. */
+export async function cctvRecordingDetailJson(uuid: string, signal: AbortSignal): Promise<unknown> {
+    if (!cctvUuid(uuid)) throw Error('Recording reference destination changed.');
+    return cameraJsonRequest(recordingReader(uuid), signal, undefined, 10000);
 }
 async function cameraJsonRequest(
     path: string,

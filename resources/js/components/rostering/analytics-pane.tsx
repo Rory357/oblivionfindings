@@ -167,7 +167,7 @@ export function AnalyticsPane({
                         <h3 className="text-sm font-bold tracking-tight">
                             Recorded shift starts
                         </h3>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                             Assigned and unassigned starts · all statuses
                         </div>
                     </div>
@@ -192,7 +192,7 @@ export function AnalyticsPane({
                                         <div className="font-semibold">
                                             {day.day}
                                         </div>
-                                        <div className="text-[10px] text-muted-foreground">
+                                        <div className="text-xs text-muted-foreground">
                                             {new Date(
                                                 `${day.date}T00:00:00`,
                                             ).toLocaleDateString(undefined, {
@@ -225,7 +225,7 @@ export function AnalyticsPane({
                                         </div>
                                         <div
                                             className={cn(
-                                                'text-[10px] tabular-nums',
+                                                'text-xs tabular-nums',
                                                 day.open > 0
                                                     ? 'text-status-warning'
                                                     : 'text-muted-foreground',
@@ -245,7 +245,7 @@ export function AnalyticsPane({
                         <h3 className="text-sm font-bold tracking-tight">
                             Shift type mix
                         </h3>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                             {totalShifts} shifts · this week
                         </div>
                     </div>
@@ -277,7 +277,7 @@ export function AnalyticsPane({
                                     </span>
                                     <span className="font-semibold tabular-nums">
                                         {t.value}
-                                        <span className="ml-1 text-[10px] text-muted-foreground">
+                                        <span className="ml-1 text-xs text-muted-foreground">
                                             ·{' '}
                                             {Math.round(
                                                 (t.value /
@@ -298,7 +298,7 @@ export function AnalyticsPane({
                         <h3 className="text-sm font-bold tracking-tight">
                             Staff numbers by site
                         </h3>
-                        <div className="text-[11px] text-muted-foreground">
+                        <div className="text-xs text-muted-foreground">
                             Windows at or above configured staff numbers
                         </div>
                     </div>
@@ -343,7 +343,7 @@ export function AnalyticsPane({
                             <h3 className="text-sm font-bold tracking-tight">
                                 Overtime hours · trend
                             </h3>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                                 {overtimeTrend.length > 0
                                     ? 'Recorded hours by week'
                                     : 'Recorded overtime hours are not available'}
@@ -352,7 +352,7 @@ export function AnalyticsPane({
                         {overtimeTrend.length >= 2 ? (
                             <span
                                 className={cn(
-                                    'rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                    'rounded-full px-2 py-0.5 text-xs font-semibold',
                                     otDelta >= 0
                                         ? 'bg-status-warning-bg text-status-warning'
                                         : 'bg-status-success-bg text-status-success',
@@ -381,7 +381,7 @@ export function AnalyticsPane({
                                         height: `${(v / maxOt) * 80}%`,
                                     }}
                                 />
-                                <span className="mt-1 text-[9px] text-muted-foreground">
+                                <span className="mt-1 text-xs text-muted-foreground">
                                     W{i + 1}
                                 </span>
                             </div>

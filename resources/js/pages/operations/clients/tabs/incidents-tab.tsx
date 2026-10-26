@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { formatDateTimeLong } from '@/lib/datetime';
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+import { incidentWorkspaceHref } from '@/lib/incidents/navigation';
 import { AlertTriangle, Check } from 'lucide-react';
 
 const SEV_TILE: Record<string, string> = {
@@ -16,6 +17,10 @@ const SEV_TILE: Record<string, string> = {
 };
 
 export function IncidentsTab({ incidents }: { incidents: any[] }) {
+    const { url } = usePage();
+    // This component only renders on the incident tab; Inertia's URL may still name the previous tab.
+    const sourcePath = url.split('?')[0];
+    const returnTo = sourcePath + '?tab=incidents_accidents';
     const openCount = incidents.filter(
         (i) =>
             !['closed', 'resolved'].includes(
@@ -141,7 +146,10 @@ export function IncidentsTab({ incidents }: { incidents: any[] }) {
                                                 asChild
                                             >
                                                 <Link
-                                                    href={`/incidents/${inc.id}`}
+                                                    href={incidentWorkspaceHref(
+                                                        inc.id,
+                                                        returnTo,
+                                                    )}
                                                 >
                                                     Open incident
                                                 </Link>

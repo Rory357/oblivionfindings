@@ -19,6 +19,8 @@ use Inertia\Testing\AssertableInertia;
 
 uses(RefreshDatabase::class);
 
+require_once __DIR__.'/../../Support/RespiteCommencementFixtures.php';
+
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
     $this->site = Site::factory()->create();
@@ -48,7 +50,9 @@ test('check in requires completed admission medication reconciliation for client
         'client_id' => $client->id,
         'location_id' => $this->site->id,
         'status' => 'confirmed',
+        'start_at' => now(), 'end_at' => now()->addDays(2),
     ]);
+    prepareRespiteCommencement($booking);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -76,7 +80,9 @@ test('completed admission medication reconciliation allows check in', function (
         'client_id' => $client->id,
         'location_id' => $this->site->id,
         'status' => 'confirmed',
+        'start_at' => now(), 'end_at' => now()->addDays(2),
     ]);
+    prepareRespiteCommencement($booking);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -116,7 +122,9 @@ test('life threatening allergies require anaphylaxis acknowledgement before chec
         'client_id' => $client->id,
         'location_id' => $this->site->id,
         'status' => 'confirmed',
+        'start_at' => now(), 'end_at' => now()->addDays(2),
     ]);
+    prepareRespiteCommencement($booking);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,
@@ -169,7 +177,9 @@ test('admission medication reconciliation can be completed before check in witho
         'client_id' => $client->id,
         'location_id' => $this->site->id,
         'status' => 'confirmed',
+        'start_at' => now(), 'end_at' => now()->addDays(2),
     ]);
+    prepareRespiteCommencement($booking);
     $stay = RespiteStay::create([
         'booking_id' => $booking->id,
         'client_id' => $client->id,

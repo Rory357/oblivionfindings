@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\CurrentAuthorizationReads;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -111,7 +112,7 @@ class CarePlan extends Model
      * Once a newer working version exists, the published source becomes
      * historical even before the review is completed and archived.
      */
-    public function isMutableVersion(): bool
+    public function isMutableVersion(?CurrentAuthorizationReads $reads = null): bool
     {
         if (! in_array($this->status, ['draft', 'active', 'review'], true)) {
             return false;
@@ -120,7 +121,7 @@ class CarePlan extends Model
         $rootId = $this->parent_id ?? $this->getKey();
         $version = (int) ($this->version ?? 1);
 
-        return ! self::query()
+        $query = self::query()
             ->where('client_id', $this->client_id)
             ->whereKeyNot($this->getKey())
             ->whereIn('status', ['active', 'review'])
@@ -133,8 +134,9 @@ class CarePlan extends Model
                         $sameVersion->where('version', $version)
                             ->where('id', '>', $this->getKey());
                     });
-            })
-            ->exists();
+            });
+
+        return ! ($reads ? $reads->query($query) : $query)->exists();
     }
 
     public function allowsGenericTransitionTo(?string $status): bool

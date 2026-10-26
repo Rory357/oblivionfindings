@@ -1,0 +1,140 @@
+- generic [ref=f6e2]:
+  - generic [ref=f6e3]:
+    - generic [ref=f6e4]: Interactive prototype · fictional data
+    - generic [ref=f6e6]:
+      - combobox "Preview role" [ref=f6e7] [cursor=pointer]:
+        - option "Referral manager" [selected]
+        - option "Receptionist"
+        - option "Coordinator"
+        - option "Funding navigator"
+        - option "Finance reviewer"
+        - option "Support worker"
+        - option "Settings administrator"
+      - button "Website entry" [ref=f6e8] [cursor=pointer]
+      - button "Walkthroughs" [ref=f6e9] [cursor=pointer]
+      - button "Use dark theme" [ref=f6e10] [cursor=pointer]
+  - generic [ref=f6e11]:
+    - banner [ref=f6e12]:
+      - button "Oblivion Care home" [ref=f6e13] [cursor=pointer]:
+        - text: blivion
+        - strong [ref=f6e15]: Care
+      - generic [ref=f6e16]:
+        - textbox "Search referrals globally" [ref=f6e20]:
+          - /placeholder: Search referrals, people and reference numbers
+        - generic [ref=f6e21]: /
+      - generic [ref=f6e22]: Thursday, 15 October 2026
+      - button "Review current permissions" [ref=f6e23] [cursor=pointer]: ET
+    - complementary [ref=f6e24]:
+      - generic [ref=f6e25]: CARE OPERATIONS
+      - button "Referrals" [ref=f6e26] [cursor=pointer]:
+        - generic [ref=f6e31]: "8"
+      - button "Supported people" [ref=f6e32] [cursor=pointer]
+      - button "Funding assistance" [ref=f6e39] [cursor=pointer]
+      - button "Follow-ups" [ref=f6e44] [cursor=pointer]
+      - button "Reports" [ref=f6e48] [cursor=pointer]
+      - button "Settings" [active] [ref=f6e55] [cursor=pointer]
+      - generic [ref=f6e60]:
+        - generic [ref=f6e61]: One organisation
+        - paragraph [ref=f6e62]: "Approved sites · role permissionsPreviewing: Referral manager"
+        - button "Collapse navigation" [ref=f6e63] [cursor=pointer]
+    - main [ref=f6e66]:
+      - navigation "Breadcrumb" [ref=f6e67]:
+        - button "Home" [ref=f6e68] [cursor=pointer]
+        - button "Settings" [ref=f6e74] [cursor=pointer]
+      - generic [ref=f6e76]:
+        - generic [ref=f6e78]:
+          - generic [ref=f6e84]:
+            - generic [ref=f6e85]:
+              - heading "Referral settings" [level=1] [ref=f6e86]
+              - generic [ref=f6e87]: Published v1
+            - paragraph [ref=f6e88]: One organisation · controlled configuration across approved sites
+          - generic [ref=f6e89]:
+            - button "Review changes" [disabled]
+        - tablist "Views" [ref=f6e94]:
+          - tab "Overview" [selected] [ref=f6e95] [cursor=pointer]
+          - tab "Intake" [ref=f6e100] [cursor=pointer]
+          - tab "Workflow" [ref=f6e105] [cursor=pointer]
+          - tab "Funding" [ref=f6e111] [cursor=pointer]
+          - tab "Access" [ref=f6e116] [cursor=pointer]
+          - tab "History" [ref=f6e121] [cursor=pointer]
+      - generic [ref=f6e128]:
+        - generic [ref=f6e129]:
+          - generic [ref=f6e130]:
+            - paragraph [ref=f6e131]: MAKE THE PROCESS YOURS
+            - heading "One thoughtful journey. Configured for your team." [level=2] [ref=f6e132]: One thoughtful journey.Configured for your team.
+            - paragraph [ref=f6e133]: Set the defaults once. Keep room for each person’s needs.
+          - generic [ref=f6e134]:
+            - generic [ref=f6e140]:
+              - paragraph [ref=f6e141]: LIVE CONFIGURATION
+              - strong [ref=f6e142]: Version 1
+              - paragraph [ref=f6e143]: Published 15 Oct 2026
+            - button "View configuration history" [ref=f6e144] [cursor=pointer]
+        - generic [ref=f6e145]:
+          - generic [ref=f6e146]:
+            - generic [ref=f6e147]:
+              - strong [ref=f6e148]: The referral journey
+              - paragraph [ref=f6e149]: A consistent foundation, with configurable steps in between.
+            - button "Configure workflow" [ref=f6e150] [cursor=pointer]
+          - generic [ref=f6e151]:
+            - generic [ref=f6e152]:
+              - strong [ref=f6e159]: Receive
+              - paragraph [ref=f6e160]: Website or a conversation
+            - generic [ref=f6e161]:
+              - strong [ref=f6e170]: Understand
+              - paragraph [ref=f6e171]: Listen, assess and assign
+            - generic [ref=f6e172]:
+              - strong [ref=f6e179]: Arrange
+              - paragraph [ref=f6e180]: Support and funding
+            - generic [ref=f6e181]:
+              - strong [ref=f6e189]: Handover
+              - paragraph [ref=f6e190]: Create or link the person
+            - generic [ref=f6e191]:
+              - strong [ref=f6e197]: Start safely
+              - paragraph [ref=f6e198]: Approve service commencement
+        - generic [ref=f6e199]:
+          - generic [ref=f6e200]:
+            - generic [ref=f6e201]:
+              - generic [ref=f6e206]: Intake & forms
+              - button "Configure Intake & forms" [ref=f6e207] [cursor=pointer]
+            - heading "A welcoming first step" [level=3] [ref=f6e208]
+            - paragraph [ref=f6e209]: Decide what to ask, how to contact people safely and what happens after they reach out.
+            - generic [ref=f6e210]:
+              - generic [ref=f6e211]: Website + staff intake
+              - generic [ref=f6e214]: Short enquiry first
+            - button "Open intake & forms" [ref=f6e217] [cursor=pointer]
+          - generic [ref=f6e218]:
+            - generic [ref=f6e219]:
+              - generic [ref=f6e225]: Routing & follow-up
+              - button "Configure Routing & follow-up" [ref=f6e226] [cursor=pointer]
+            - heading "Keep the next step clear" [level=3] [ref=f6e227]
+            - paragraph [ref=f6e228]: Give every referral an accountable team, a realistic response target and a clear path forward.
+            - generic [ref=f6e229]:
+              - generic [ref=f6e230]: 1 business day first contact
+              - generic [ref=f6e233]: 8 workflow stages
+            - button "Open routing & follow-up" [ref=f6e236] [cursor=pointer]
+          - generic [ref=f6e237]:
+            - generic [ref=f6e238]:
+              - generic [ref=f6e243]: Funding pathways
+              - button "Configure Funding pathways" [ref=f6e244] [cursor=pointer]
+            - heading "Help funding move forward" [level=3] [ref=f6e245]
+            - paragraph [ref=f6e246]: Tailor preparation checklists for each pathway while keeping external decisions and service approval separate.
+            - generic [ref=f6e247]:
+              - generic [ref=f6e248]: 7 pathways
+              - generic [ref=f6e251]: Pending-funding onboarding allowed
+            - button "Open funding pathways" [ref=f6e254] [cursor=pointer]
+          - generic [ref=f6e255]:
+            - generic [ref=f6e256]:
+              - generic [ref=f6e261]: Permissions & privacy
+              - button "Configure Permissions & privacy" [ref=f6e262] [cursor=pointer]
+            - heading "The right access, by role" [level=3] [ref=f6e263]
+            - paragraph [ref=f6e264]: Control who can view, work on and approve a referral across your organisation’s approved sites.
+            - generic [ref=f6e265]:
+              - generic [ref=f6e266]: 7 role presets
+              - generic [ref=f6e269]: Private evidence stays protected
+            - button "Open permissions & privacy" [ref=f6e272] [cursor=pointer]
+        - generic [ref=f6e273]:
+          - generic [ref=f6e277]:
+            - strong [ref=f6e278]: Changes are reviewed before they go live.
+            - paragraph [ref=f6e279]: 8 open referrals retain their current workflow version. Publish for new cases, or review a controlled migration for existing work.
+          - button "Version history" [ref=f6e280] [cursor=pointer]
+  - status [ref=f6e281]

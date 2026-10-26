@@ -73,6 +73,13 @@ class ConsentValidationService
         return self::evaluateEvidence($consent, $client, $expectedConsentTypeId, $expectedPurpose);
     }
 
+    public static function isConsumableFromCurrentEvidence(CurrentConsentEvidence $evidence, Client|int $client, int $consentTypeId, ?string $purpose = null): bool
+    {
+        CurrentConsentEvidence::assertTransaction();
+
+        return self::evaluateEvidence($evidence->consent, $evidence->client($client), $consentTypeId, $purpose)->allowed;
+    }
+
     public static function isValidResidentLocationConsentFromCurrentEvidence(CurrentConsentEvidence $evidence, Client|int $client): bool
     {
         CurrentConsentEvidence::assertTransaction();

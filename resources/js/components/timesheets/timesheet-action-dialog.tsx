@@ -43,41 +43,82 @@ export type TimesheetActionDialogProps = {
 };
 /** Keep this component mounted in the owning page, outside transient viewers. */
 export function TimesheetActionDialog(props: TimesheetActionDialogProps) {
-    const requestedKey = props.record && props.action
-        ? `${props.record.id}:${props.action}` : null;
-    const serial = useRef(0), wasOpen = useRef(props.open);
+    const requestedKey =
+        props.record && props.action
+            ? `${props.record.id}:${props.action}`
+            : null;
+    const serial = useRef(0),
+        wasOpen = useRef(props.open);
     const protectedForm = useRef<() => boolean>(() => true);
     const [session, setSession] = useState<{
-        key: string; serial: number; record: ViewTimesheetRow; action: TimesheetReviewAction;
-    } | null>(() => props.open && requestedKey && props.record && props.action
-        ? { key: requestedKey, serial: 0, record: props.record, action: props.action } : null);
+        key: string;
+        serial: number;
+        record: ViewTimesheetRow;
+        action: TimesheetReviewAction;
+    } | null>(() =>
+        props.open && requestedKey && props.record && props.action
+            ? {
+                  key: requestedKey,
+                  serial: 0,
+                  record: props.record,
+                  action: props.action,
+              }
+            : null,
+    );
     useLayoutEffect(() => {
         const reopening = props.open && !wasOpen.current;
         wasOpen.current = props.open;
-        if (!props.open || !requestedKey || !props.record || !props.action) return;
-        if (!session || (!protectedForm.current() &&
-            (requestedKey !== session.key || reopening))) {
+        if (!props.open || !requestedKey || !props.record || !props.action)
+            return;
+        if (
+            !session ||
+            (!protectedForm.current() &&
+                (requestedKey !== session.key || reopening))
+        ) {
             protectedForm.current = () => true;
             serial.current += 1;
-            setSession({ key: requestedKey, serial: serial.current,
-                record: props.record, action: props.action });
+            setSession({
+                key: requestedKey,
+                serial: serial.current,
+                record: props.record,
+                action: props.action,
+            });
         }
     }, [props.open, props.record, props.action, requestedKey, session]);
     if (!session) return null;
     const targetAvailable = requestedKey === session.key;
-    return <TimesheetActionBody {...props} key={`${session.key}:${session.serial}`}
-        action={session.action} record={targetAvailable && props.record ? props.record : session.record}
-        canAct={targetAvailable && props.canAct} targetAvailable={targetAvailable}
-        protectedForm={protectedForm} releaseDraft={() => setSession(null)} />;
+    return (
+        <TimesheetActionBody
+            {...props}
+            key={`${session.key}:${session.serial}`}
+            action={session.action}
+            record={
+                targetAvailable && props.record ? props.record : session.record
+            }
+            canAct={targetAvailable && props.canAct}
+            targetAvailable={targetAvailable}
+            protectedForm={protectedForm}
+            releaseDraft={() => setSession(null)}
+        />
+    );
 }
-function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 'record'> & {
-    action: TimesheetReviewAction; record: ViewTimesheetRow; targetAvailable: boolean;
-    protectedForm: { current: () => boolean }; releaseDraft: () => void;
-}) {
+function TimesheetActionBody(
+    props: Omit<TimesheetActionDialogProps, 'action' | 'record'> & {
+        action: TimesheetReviewAction;
+        record: ViewTimesheetRow;
+        targetAvailable: boolean;
+        protectedForm: { current: () => boolean };
+        releaseDraft: () => void;
+    },
+) {
     const { action, record, canAct, writeCoordination, onOpenChange } = props;
     const rawActor = usePage<SharedData>().props.auth.user?.id;
-    const currentActor = typeof rawActor === 'number' && Number.isSafeInteger(rawActor) && rawActor > 0
-        ? rawActor : 0;
+    const currentActor =
+        typeof rawActor === 'number' &&
+        Number.isSafeInteger(rawActor) &&
+        rawActor > 0
+            ? rawActor
+            : 0;
     const currentClientId =
         record.client_id !== undefined
             ? record.client_id
@@ -95,14 +136,18 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
         mutationPending.current = true;
         setReasonState(value);
     };
-    useLayoutEffect(() => { mutationPending.current = false; }, [reason]);
-    const [error, setError] = useState(''), [discard, setDiscard] = useState(false);
+    useLayoutEffect(() => {
+        mutationPending.current = false;
+    }, [reason]);
+    const [error, setError] = useState(''),
+        [discard, setDiscard] = useState(false);
     const command = useTimesheetCommand(
         `${currentActor}:${record.id}:${record.staff?.id ?? record.user_id}:${record.shift?.id ?? ''}:${currentClientId}:${action}:${canAct}`,
         writeCoordination,
     );
     const allowed =
-        canAct && props.targetAvailable &&
+        canAct &&
+        props.targetAvailable &&
         currentActor === initial.actor &&
         initial.actor > 0 &&
         record.id === initial.recordId &&
@@ -114,25 +159,54 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
         command.outcome?.status === 'confirmed'
             ? command.outcome.receipt
             : null;
-    useEffect(() => { if (!props.open) setDiscard(false); }, [props.open]);
+    useEffect(() => {
+        if (!props.open) setDiscard(false);
+    }, [props.open]);
     useLayoutEffect(() => {
-        props.protectedForm.current = () => mutationPending.current || reason !== '' ||
-            command.busy.current || command.held.current || command.pending ||
-            command.outcome !== null || discard || currentActor !== initial.actor;
-        return () => { props.protectedForm.current = () => true; };
-    }, [props.protectedForm, reason, command.pending, command.outcome, discard,
-        currentActor, initial.actor, command.busy, command.held]);
+        props.protectedForm.current = () =>
+            mutationPending.current ||
+            reason !== '' ||
+            command.busy.current ||
+            command.held.current ||
+            command.pending ||
+            command.outcome !== null ||
+            discard ||
+            currentActor !== initial.actor;
+        return () => {
+            props.protectedForm.current = () => true;
+        };
+    }, [
+        props.protectedForm,
+        reason,
+        command.pending,
+        command.outcome,
+        discard,
+        currentActor,
+        initial.actor,
+        command.busy,
+        command.held,
+    ]);
     useEffect(() => {
         const warn = (event: BeforeUnloadEvent) => {
-            if (!confirmed && (mutationPending.current || reason !== '' || command.busy.current ||
-                command.held.current || command.outcome?.status === 'unknown')) {
-                event.preventDefault(); event.returnValue = '';
+            if (
+                !confirmed &&
+                (mutationPending.current ||
+                    reason !== '' ||
+                    command.busy.current ||
+                    command.held.current ||
+                    command.outcome?.status === 'unknown')
+            ) {
+                event.preventDefault();
+                event.returnValue = '';
             }
         };
         window.addEventListener('beforeunload', warn);
         return () => window.removeEventListener('beforeunload', warn);
     }, [reason, confirmed, command.outcome, command.busy, command.held]);
-    const releaseAndClose = () => { props.releaseDraft(); onOpenChange(false); };
+    const releaseAndClose = () => {
+        props.releaseDraft();
+        onOpenChange(false);
+    };
     const close = () => {
         if (command.busy.current) return;
         if (
@@ -183,25 +257,49 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
             },
         );
     }
-    if (!props.targetAvailable || currentActor !== initial.actor || initial.actor <= 0)
-        return <Dialog open={props.open} onOpenChange={(open) => !open && onOpenChange(false)}>
-            <DialogContent className="max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Timesheet review unavailable</DialogTitle>
-                    <DialogDescription>This view cannot send this review. Any entries are kept in this page.</DialogDescription>
-                </DialogHeader>
-                <Button variant="outline" className="frontline-tap" onClick={() => onOpenChange(false)}>Close</Button>
-            </DialogContent>
-        </Dialog>;
+    if (
+        !props.targetAvailable ||
+        currentActor !== initial.actor ||
+        initial.actor <= 0
+    )
+        return (
+            <Dialog
+                open={props.open}
+                onOpenChange={(open) => !open && onOpenChange(false)}
+            >
+                <DialogContent
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
+                    <DialogHeader>
+                        <DialogTitle>Timesheet review unavailable</DialogTitle>
+                        <DialogDescription>
+                            This view cannot send this review. Any entries are
+                            kept in this page.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <Button
+                        variant="outline"
+                        className="frontline-tap"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        Close
+                    </Button>
+                </DialogContent>
+            </Dialog>
+        );
     return (
         <>
             <Dialog open={props.open} onOpenChange={(open) => !open && close()}>
                 <DialogContent
                     style={{
-                        width: 'min(92vw, 600px)',
-                        maxWidth: 'min(92vw, 600px)',
+                        width: 'min(92vw, 480px)',
+                        maxWidth: 'min(92vw, 480px)',
                     }}
-                    className="max-h-[90vh] overflow-y-auto"
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
                 >
                     <DialogHeader>
                         <DialogTitle>
@@ -223,7 +321,10 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
                                     ? `Timesheet #${confirmed.timesheet_id} is confirmed ${confirmed.status}.`
                                     : `Timesheet #${confirmed.timesheet_id} was already ${confirmed.status}. Your new reason was not added.`}
                             </p>
-                            <Button className="frontline-tap" onClick={releaseAndClose}>
+                            <Button
+                                className="frontline-tap"
+                                onClick={releaseAndClose}
+                            >
                                 Done
                             </Button>
                         </div>
@@ -235,10 +336,18 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
                                     current records. Your reason is retained;
                                     any entries are kept in this form. Check the
                                     current record in a new tab to check access.
-                                    <Button asChild variant="outline" className="mt-3 frontline-tap">
-                                        <a href={`/operations/timesheets?view=${initial.recordId}`}
-                                            target="_blank" rel="noopener noreferrer">
-                                            Check current timesheet <ExternalLink className="size-4" />
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="frontline-tap mt-3"
+                                    >
+                                        <a
+                                            href={`/operations/timesheets?view=${initial.recordId}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            Check current timesheet{' '}
+                                            <ExternalLink className="size-4" />
                                         </a>
                                     </Button>
                                 </InfoCard>
@@ -255,7 +364,8 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
                                     htmlFor="timesheet-decision-reason"
                                     error={
                                         error ||
-                                        (command.outcome && command.outcome.status !== 'confirmed'
+                                        (command.outcome &&
+                                        command.outcome.status !== 'confirmed'
                                             ? Object.values(
                                                   command.outcome.errors ?? {},
                                               )[0]
@@ -299,7 +409,7 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
                                                     <Button
                                                         asChild
                                                         variant="outline"
-                                                        className="mt-3 frontline-tap"
+                                                        className="frontline-tap mt-3"
                                                     >
                                                         <a
                                                             href={`/operations/timesheets?view=${initial.recordId}`}
@@ -349,7 +459,8 @@ function TimesheetActionBody(props: Omit<TimesheetActionDialogProps, 'action' | 
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={() => {
-                    if (command.outcome?.status === 'unknown') onOpenChange(false);
+                    if (command.outcome?.status === 'unknown')
+                        onOpenChange(false);
                     else releaseAndClose();
                 }}
                 title={

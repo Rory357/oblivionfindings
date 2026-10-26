@@ -3,6 +3,7 @@
 use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
+use App\Http\Controllers\ClientContactPreferencesController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
@@ -107,6 +108,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+        Route::put('/clients/{client}/contact-preferences', [ClientContactPreferencesController::class, 'update'])
+            ->whereNumber('client')->name('clients.contact-preferences.update');
         Route::post('/clients/{client}/photo', [ClientController::class, 'updatePhoto'])
             ->name('clients.photo.update');
         Route::delete('/clients/{client}/photo', [ClientController::class, 'destroyPhoto'])

@@ -1,3 +1,7 @@
+import {
+    CareDocumentStatus,
+    type CareDocumentRelease,
+} from '@/components/clients/care-document-status';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -35,6 +39,7 @@ export type ClientDocumentItem = {
     effective_date?: string | null;
     expiry_date?: string | null;
     portal_visible?: boolean;
+    care_release?: CareDocumentRelease;
     notes?: string | null;
     original_name?: string | null;
     mime_type?: string | null;
@@ -49,6 +54,7 @@ type DocumentsTabProps = {
 };
 
 const CATEGORY_OPTIONS = [
+    { value: 'referral_handover', label: 'Referral handover' },
     { value: 'care_plan', label: 'Care Plans' },
     { value: 'assessment', label: 'Assessments' },
     { value: 'medical', label: 'Medical' },
@@ -384,7 +390,7 @@ export function DocumentsTab({
                                 {docs.length}
                             </Badge>
                         </div>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                             {docs.map((d) => {
                                 const fi = getFileIcon(d.original_name);
                                 const state = expiryState(d.expiry_date);
@@ -392,7 +398,15 @@ export function DocumentsTab({
                                 return (
                                     <a
                                         key={d.id}
-                                        href={`/operations/clients/${clientId}/documents/${d.id}/download`}
+                                        href={
+                                            d.care_release?.review_required
+                                                ? undefined
+                                                : `/operations/clients/${clientId}/documents/${d.id}/download`
+                                        }
+                                        aria-disabled={
+                                            d.care_release?.review_required ||
+                                            undefined
+                                        }
                                         className={cn(
                                             'group rounded-xl border bg-card p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md',
                                             state === 'expired' &&
@@ -419,6 +433,9 @@ export function DocumentsTab({
                                                 d.original_name ||
                                                 'Untitled'}
                                         </p>
+                                        <CareDocumentStatus
+                                            release={d.care_release}
+                                        />
                                         <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1">
                                             {d.portal_visible ? (
                                                 <Globe className="h-3 w-3 text-status-info" />

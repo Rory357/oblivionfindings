@@ -124,7 +124,7 @@ class FleetAutoAlertJob implements ShouldQueue
                 'occurred_at' => now(),
                 'payload' => [
                     'expired_at' => $asset->wof_expires_at->toDateString(),
-                    'days_overdue' => Carbon::parse($asset->wof_expires_at->toDateString(), $expiryTimezone)->diffInDays($today),
+                    'days_overdue' => (int) Carbon::parse($asset->wof_expires_at->toDateString(), $expiryTimezone)->diffInDays($today),
                 ],
             ]);
 
@@ -182,7 +182,8 @@ class FleetAutoAlertJob implements ShouldQueue
                 'occurred_at' => now(),
                 'payload' => [
                     'due_at' => $asset->maintenance_due_at->toDateString(),
-                    'days_overdue' => $asset->maintenance_due_at->diffInDays(now()),
+                    // Whole days: Carbon 3's diffInDays() is a float.
+                    'days_overdue' => (int) $asset->maintenance_due_at->diffInDays(now()),
                 ],
             ]);
 

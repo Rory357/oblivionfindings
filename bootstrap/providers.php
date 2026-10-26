@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Referrals\ReferralSearchServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\AuthServiceProvider;
 use App\Providers\EventServiceProvider;
@@ -18,4 +19,5 @@ return [
     WorkforceEligibilityServiceProvider::class,
     FortifyServiceProvider::class,
     LlmServiceProvider::class,
+    ReferralSearchServiceProvider::class,
 ];

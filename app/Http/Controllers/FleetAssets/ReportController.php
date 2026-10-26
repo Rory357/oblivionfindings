@@ -186,7 +186,10 @@ class ReportController extends Controller
         // ── Decision Report Data ──────────────────────────────────────
 
         // Vehicle utilisation with flags
-        $periodDays = max(1, now()->diffInDays($startDate));
+        // Start → now: Carbon 3's diffInDays() is signed, and the reverse
+        // order was always negative, so the period was 1 day and per-week
+        // figures were period totals.
+        $periodDays = max(1, (int) $startDate->diffInDays(now()));
         $periodWeeks = max(1, $periodDays / 7);
 
         $vehicleUtilisation = $hasTripsTable
@@ -214,7 +217,8 @@ class ReportController extends Controller
             $tripsPerWeek = round($trips / $periodWeeks, 1);
             $kmPerWeek = round($km / $periodWeeks, 1);
             $lastTripAt = $data->last_trip_at ?? null;
-            $idleDays = $lastTripAt ? max(0, now()->diffInDays($lastTripAt)) : null;
+            // Last trip → now (the reverse order was negative, so always 0).
+            $idleDays = $lastTripAt ? max(0, (int) \Carbon\Carbon::parse($lastTripAt)->diffInDays(now())) : null;
             $fuelCost = round((float) ($vehicleFuelCosts[$v->id] ?? 0), 2);
             $costPerKm = $km > 0 ? round($fuelCost / $km, 2) : null;
 

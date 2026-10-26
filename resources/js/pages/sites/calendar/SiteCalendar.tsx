@@ -194,6 +194,14 @@ export interface CalendarDataAdapter {
     subline?: string;
     breadcrumbs?: { title: string; href?: string }[];
     allowSubscriptions?: boolean;
+    /** Module adapters can deny calendar-file export independently of viewing. */
+    allowExport?: boolean;
+    /** Optional identity and compact header for standalone module previews. */
+    currentUserId?: number | null;
+    onOpenMine?: (items: CalendarItem[]) => void;
+    mobileSummary?: string;
+    /** Keep full agenda titles readable on narrow module screens. */
+    responsiveAgenda?: boolean;
     initialSources?: string[];
     initialView?: CalView;
     sourceFilters?: SourceDef[];
@@ -202,6 +210,11 @@ export interface CalendarDataAdapter {
     onMove?: (item: Decorated, start: Date, end?: Date) => void;
     onCreate?: (seed: CreateSeed) => void;
     showApprovalMeter?: boolean;
+    /** Open-work feeds cannot report a completion percentage. */
+    showCompletionMeter?: boolean;
+    /** Explicit label for adapters whose grid uses the browser timezone. */
+    timeZoneLabel?: string;
+    interactionHint?: string;
     mineLink?: { href: string; label: string };
     /** Optional glass "back" link in the header (e.g. "Governance home"). Omitted → nothing renders. */
     backLink?: { href: string; label: string };
@@ -603,7 +616,10 @@ export default function SiteCalendar({
     } | null>(null);
     const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const currentUserId = page.props.auth?.user?.id ?? null;
+    const currentUserId =
+        dataAdapter?.currentUserId !== undefined
+            ? dataAdapter.currentUserId
+            : (page.props.auth?.user?.id ?? null);
     // Admins who manage integrations get a deep-link to the resource-calendar sync
     // settings (Settings → Calendar sync). Staff never see connection management here.
     const canManageIntegrations = Boolean(
@@ -634,6 +650,8 @@ export default function SiteCalendar({
 
     const fetchGenerationRef = useRef(0);
     const abortControllerRef = useRef<AbortController | null>(null);
+    const railGenerationRef = useRef(0);
+    const railAbortRef = useRef<AbortController | null>(null);
 
     const fetchEvents = useCallback(async () => {
         const generation = ++fetchGenerationRef.current;
@@ -676,6 +694,12 @@ export default function SiteCalendar({
                         (err as any)?.statusCode;
                     if (status === 403 || status === 401) {
                         setEvents([]);
+                        ++railGenerationRef.current;
+                        railAbortRef.current?.abort();
+                        setRailEvents([]);
+                        setRailUnavailable(true);
+                        setSelected(null);
+                        setPreview(null);
                         setFetchError('forbidden');
                     } else {
                         setFetchError('network');
@@ -741,11 +765,21 @@ export default function SiteCalendar({
 
     useEffect(() => {
         void fetchEvents();
+        return () => {
+            // A generation counter, not a DOM ref: bumping it on cleanup drops responses from the superseded fetch.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            ++fetchGenerationRef.current;
+            abortControllerRef.current?.abort();
+        };
     }, [fetchEvents]);
 
     // Today-anchored window for the right-hand rail — independent of the browsed
     // period, and reaching ~45 days back so overdue obligations surface.
     const fetchRail = useCallback(async () => {
+        const generation = ++railGenerationRef.current;
+        railAbortRef.current?.abort();
+        const controller = new AbortController();
+        railAbortRef.current = controller;
         const start = addDays(new Date(), -45);
         start.setHours(0, 0, 0, 0);
         const end = addDays(new Date(), 30);
@@ -755,17 +789,38 @@ export default function SiteCalendar({
                 const res = await dataAdapter.loadItems({
                     start,
                     end,
+                    signal: controller.signal,
                     committeeId:
                         committeeFilter === 'all'
                             ? null
                             : Number(committeeFilter),
                 });
+                if (generation !== railGenerationRef.current) return;
                 setRailEvents((res.events ?? []).map(decorate));
                 setRailAvailability(res.availability ?? {});
                 setRailUnavailable(false);
-            } catch {
+            } catch (error) {
+                if (
+                    generation !== railGenerationRef.current ||
+                    controller.signal.aborted
+                )
+                    return;
                 setRailEvents([]);
                 setRailUnavailable(true);
+                const failure = error as {
+                    status?: number;
+                    response?: { status?: number };
+                };
+                const status = failure?.status ?? failure?.response?.status;
+                if (status === 401 || status === 403) {
+                    ++fetchGenerationRef.current;
+                    abortControllerRef.current?.abort();
+                    setEvents([]);
+                    setLoading(false);
+                    setFetchError('forbidden');
+                    setSelected(null);
+                    setPreview(null);
+                }
             }
             return;
         }
@@ -780,21 +835,35 @@ export default function SiteCalendar({
                 : `/sites/${site?.id}/calendar/events?${params}`;
         try {
             const res = await fetch(url, {
+                signal: controller.signal,
                 headers: { Accept: 'application/json' },
             });
+            if (generation !== railGenerationRef.current) return;
             if (!res.ok) {
                 setRailEvents([]);
                 return;
             }
             const data = await res.json();
+            if (generation !== railGenerationRef.current) return;
             setRailEvents((data.events ?? []).map(decorate));
         } catch {
+            if (
+                generation !== railGenerationRef.current ||
+                controller.signal.aborted
+            )
+                return;
             setRailEvents([]);
         }
     }, [scope, site?.id, dataAdapter, committeeFilter]);
 
     useEffect(() => {
         void fetchRail();
+        return () => {
+            // A generation counter, not a DOM ref: bumping it on cleanup drops responses from the superseded fetch.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            ++railGenerationRef.current;
+            railAbortRef.current?.abort();
+        };
     }, [fetchRail]);
 
     const refresh = useCallback(() => {
@@ -1142,6 +1211,7 @@ export default function SiteCalendar({
                     <AgendaView
                         events={visibleEvents}
                         navDate={navDate}
+                        responsive={dataAdapter?.responsiveAgenda}
                         sourcesOff={enabledSources.size === 0}
                         filtersActive={
                             enabledSources.size !== effectiveSources.length ||
@@ -1361,14 +1431,15 @@ export default function SiteCalendar({
                 <div className="flex items-center gap-2">
                     <span
                         className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground"
-                        title="All calendar times are shown in New Zealand time"
+                        title={`All calendar times are shown in ${dataAdapter?.timeZoneLabel ?? 'New Zealand time'}`}
                     >
                         <Clock aria-hidden="true" className="h-3 w-3" /> Times
-                        in NZT
+                        in {dataAdapter?.timeZoneLabel ?? 'NZT'}
                     </span>
                     {canCreate && (
                         <span className="hidden items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground md:inline-flex">
-                            Right-click to add · drag to reschedule
+                            {dataAdapter?.interactionHint ??
+                                'Right-click to add · drag to reschedule'}
                         </span>
                     )}
                 </div>
@@ -1511,6 +1582,7 @@ export default function SiteCalendar({
                         </DropdownMenuItem>
                     )}
                     <DropdownMenuItem
+                        disabled={dataAdapter?.allowExport === false}
                         onSelect={() =>
                             downloadICS(
                                 visibleEvents,
@@ -1815,7 +1887,7 @@ export default function SiteCalendar({
                     upcoming from today
                 </PageHeaderMeterCaption>
             </PageHeaderMeterBlock>
-            {periodCount > 0 ? (
+            {periodCount > 0 && dataAdapter?.showCompletionMeter !== false ? (
                 <PageHeaderMeterBlock
                     label="Done / approved"
                     ariaLabel="View completed entries in the agenda"
@@ -1869,10 +1941,28 @@ export default function SiteCalendar({
             )}
             <PageHeaderMeterBlock
                 label="Mine"
-                href={
-                    dataAdapter?.mineLink?.href ??
-                    (dataAdapter ? '/governance/my-work' : '/my-calendar')
-                }
+                {...(dataAdapter?.onOpenMine
+                    ? {
+                          onClick: () =>
+                              dataAdapter.onOpenMine?.(
+                                  visibleEvents.filter(
+                                      (e) =>
+                                          e.owner?.id === currentUserId ||
+                                          (currentUserId != null &&
+                                              (e.attendeeIds?.includes(
+                                                  currentUserId,
+                                              ) ??
+                                                  false)),
+                                  ),
+                              ),
+                      }
+                    : {
+                          href:
+                              dataAdapter?.mineLink?.href ??
+                              (dataAdapter
+                                  ? '/governance/my-work'
+                                  : '/my-calendar'),
+                      })}
                 ariaLabel={
                     dataAdapter?.mineLink?.label ??
                     (dataAdapter ? 'Open My Work' : 'Open My Calendar')
@@ -2085,6 +2175,11 @@ export default function SiteCalendar({
                             (scope === 'site'
                                 ? `Site calendar · manual events and auto-derived obligations · ${effectiveSources.length} sources`
                                 : `Manual events and auto-derived obligations · ${effectiveSources.length} sources · ${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`)
+                        }
+                        mobileSummary={
+                            dataAdapter?.mobileSummary
+                                ? `${periodLabel(view, navDate)} · ${periodCount} entries`
+                                : undefined
                         }
                         actions={headerActions}
                         meters={headerMeters}

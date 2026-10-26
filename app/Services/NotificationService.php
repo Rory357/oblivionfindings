@@ -46,6 +46,11 @@ class NotificationService
         'auditor',
     ];
 
+    // The finance team (role group "finance"), e.g. drafts made from referrals that need review.
+    public const FINANCE_ROLES = [
+        'finance',
+    ];
+
     /**
      * Send a simple, consistent "CRUD event" notification.
      */
@@ -87,6 +92,8 @@ class NotificationService
             ], true) ? 'client_medical' : null),
             'entity' => $entityLabel,
             'client_id' => $client?->id ?? ($entity?->client_id ?? null),
+            'task_source' => $extra['data']['task_source'] ?? null,
+            'task_id' => $extra['data']['task_id'] ?? null,
         ];
         $recipients = $this->filterRecipientScope(
             $this->resolveRecipients($actor, $entity, $client, $extra),
@@ -133,7 +140,7 @@ class NotificationService
         $recipients->each(fn(User $u) => $u->notify($notification));
     }
 
-    /** Medical facts require the same current reads as the Medical section. */
+    /** Sensitive notifications retain their owning module's current read boundary. */
     public function filterRecipientScope(Collection $recipients, array $payload): Collection
     {
         $scope = $payload['recipient_scope'] ?? null;
@@ -144,7 +151,15 @@ class NotificationService
             $scope = 'client_medical';
         }
         if ($scope === null) {
+            // Old task notices lack a stable item identity for reauthorization.
+            // Do not replay their private titles through delayed escalation.
+            if (($payload['entity'] ?? null) === 'task' && ($payload['context']['Module'] ?? null) === 'Referrals') {
+                return collect();
+            }
             return $recipients;
+        }
+        if ($scope === 'referral_task') {
+            return app(\App\Domain\Referrals\Services\ReferralTaskNotifications::class)->recipients($recipients, $payload);
         }
         if ($scope !== 'client_medical' || ! is_numeric($payload['client_id'] ?? null)) {
             return collect();
@@ -369,6 +384,9 @@ class NotificationService
                 ->pluck('id'),
             'auditors' => User::query()
                 ->whereHas('roles', fn($q) => $q->whereIn('name', self::AUDITOR_ROLES))
+                ->pluck('id'),
+            'finance' => User::query()
+                ->whereHas('roles', fn($q) => $q->whereIn('name', self::FINANCE_ROLES))
                 ->pluck('id'),
             'approvers' => User::query()
                 ->where(function ($q) {

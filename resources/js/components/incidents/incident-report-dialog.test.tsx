@@ -182,6 +182,17 @@ beforeEach(() => {
 afterEach(() => cleanup());
 
 describe('IncidentReportDialog truthful incident intent', () => {
+    it('opens a persisted occurrence instant on its NZ date while preserving local draft defaults', () => {
+        renderDialog('incidents', {
+            defaults: { ...defaults, occurred_at: '2026-07-13T22:15:00Z' },
+        });
+        openStep(/What happened/);
+        expect(screen.getByLabelText('Incident date')).toHaveValue(
+            '2026-07-14',
+        );
+        expect(screen.getByLabelText('Incident time')).toHaveValue('10:15');
+    });
+
     it('closes an untouched report without pretending the default clock is draft content', () => {
         const onClose = vi.fn();
         inertia.pageProps = {
@@ -873,6 +884,158 @@ describe('IncidentReportDialog truthful incident intent', () => {
                 notes: 'Update the care plan.',
                 assigned_to_user_id: 81,
                 due_at: '2026-07-15',
+            },
+        ]);
+    });
+
+    it('keeps a restored staff identity when its label is unavailable instead of calling it unassigned', () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            staff: [],
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Review retained work with the lead.',
+                        assigned_to_user_id: '81',
+                        due_at: '',
+                    },
+                ],
+            },
+        });
+        openReviewStep();
+        expect(screen.getByText('Staff selection unavailable')).toBeVisible();
+        expect(screen.queryByText('Unassigned')).not.toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().followups).toEqual([
+            {
+                notes: 'Review retained work with the lead.',
+                assigned_to_user_id: 81,
+                due_at: null,
+            },
+        ]);
+    });
+
+    it('still calls a follow-up unassigned when no staff identity was recorded', () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Review the agreed plan.',
+                        assigned_to_user_id: '',
+                        due_at: '',
+                    },
+                ],
+            },
+        });
+        openReviewStep();
+        expect(screen.getByText('Unassigned')).toBeVisible();
+        expect(
+            screen.queryByText('Staff selection unavailable'),
+        ).not.toBeInTheDocument();
+    });
+
+    it('lets a worker explicitly clear an unavailable saved selection while keeping task text', () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            staff: [],
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Keep this operational instruction.',
+                        assigned_to_user_id: '81',
+                        due_at: '',
+                    },
+                ],
+            },
+        });
+        openStep(/Follow-ups/);
+        expect(screen.getByRole('combobox')).toHaveTextContent(
+            'Staff selection unavailable',
+        );
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Clear assignment' }),
+        );
+        expect(screen.getByRole('combobox')).toHaveTextContent('Unassigned');
+        openReviewStep();
+        expect(
+            screen.getByText('Keep this operational instruction.'),
+        ).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().followups).toEqual([
+            {
+                notes: 'Keep this operational instruction.',
+                assigned_to_user_id: null,
+                due_at: null,
+            },
+        ]);
+    });
+
+    it('keeps a deadline through an unconfirmed calendar choice and explicitly clears it without changing the task or assignee', async () => {
+        renderDialog('incidents', {
+            canManageFollowups: true,
+            staff: [{ id: 81, name: 'Moana Rangi' }],
+            defaults: {
+                ...defaults,
+                followups: [
+                    {
+                        notes: 'Review the agreed support plan.',
+                        assigned_to_user_id: '81',
+                        due_at: '2026-07-15',
+                    },
+                ],
+            },
+        });
+        openStep(/Follow-ups/);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Task 1 due: 15 Jul 2026' }),
+        );
+        const calendar = await screen.findByRole('dialog', {
+            name: 'Task 1 due picker',
+        });
+        fireEvent.click(
+            within(calendar).getByRole('button', { name: 'Thu 16 July 2026' }),
+        );
+        fireEvent.click(
+            within(calendar).getByRole('button', { name: 'Cancel' }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Task 1 due: 15 Jul 2026' }),
+        ).toBeVisible();
+        expect(inertia.post).not.toHaveBeenCalled();
+        openReviewStep();
+        expect(screen.getByText('15 Jul 2026')).toBeVisible();
+        openStep(/Follow-ups/);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Task 1 due: 15 Jul 2026' }),
+        );
+        const reopened = await screen.findByRole('dialog', {
+            name: 'Task 1 due picker',
+        });
+        fireEvent.click(
+            within(reopened).getByRole('button', { name: 'Clear date' }),
+        );
+        expect(
+            screen.getByRole('button', { name: 'Task 1 due: Choose date' }),
+        ).toBeVisible();
+        openReviewStep();
+        expect(screen.getByText('No due date')).toBeVisible();
+        expect(screen.getByText('Moana Rangi')).toBeVisible();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+        expect(postedPayload().followups).toEqual([
+            {
+                notes: 'Review the agreed support plan.',
+                assigned_to_user_id: 81,
+                due_at: null,
             },
         ]);
     });

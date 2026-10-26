@@ -48,6 +48,66 @@ interface EventTimelineProps {
     correctiveActions: CorrectiveAction[];
 }
 
+/** One timeline milestone for the record page's Log (newest first). */
+export interface TimelineMilestone {
+    date: string;
+    label: string;
+    detail?: string;
+    tone: 'critical' | 'warning' | 'info' | 'success' | 'brand';
+}
+
+/** The same milestones EventTimeline draws, newest first, for the signature Log block. */
+export function timelineMilestones({
+    reportedAt,
+    occurredAt,
+    closedAt,
+    investigations,
+    correctiveActions,
+}: EventTimelineProps): TimelineMilestone[] {
+    const entries: TimelineMilestone[] = [];
+    if (occurredAt)
+        entries.push({ date: occurredAt, label: 'Event happened', tone: 'critical' });
+    if (reportedAt)
+        entries.push({ date: reportedAt, label: 'Event reported', tone: 'warning' });
+    for (const inv of investigations) {
+        if (inv.started_at)
+            entries.push({
+                date: inv.started_at,
+                label: 'Investigation started',
+                detail: `${inv.reference_number}${inv.lead_investigator_name ? ` · ${inv.lead_investigator_name}` : ''}`,
+                tone: 'info',
+            });
+        if (inv.completed_at)
+            entries.push({
+                date: inv.completed_at,
+                label: 'Investigation completed',
+                detail: inv.reference_number,
+                tone: 'success',
+            });
+    }
+    for (const action of correctiveActions) {
+        if (action.completed_at)
+            entries.push({
+                date: action.completed_at,
+                label: 'Action completed',
+                detail: `${action.reference_number} — ${action.title}`,
+                tone: 'success',
+            });
+        if (action.verified_at)
+            entries.push({
+                date: action.verified_at,
+                label: 'Action checked',
+                detail: action.reference_number,
+                tone: 'success',
+            });
+    }
+    if (closedAt)
+        entries.push({ date: closedAt, label: 'Safety review closed', tone: 'brand' });
+    return entries.sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+    );
+}
+
 function fmtDate(iso: string | null): string {
     if (!iso) return '';
     return new Date(iso).toLocaleDateString('en-NZ', {

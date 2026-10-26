@@ -1,4 +1,3 @@
-import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -15,14 +14,18 @@ import {
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
+import { PersonDisc } from '@/components/lists';
 import { Button } from '@/components/ui/button';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 
 import type { JobPost, JobPostTaskKind } from './types';
 
 interface JobCardProps {
     job: JobPost;
+    /** Passed only when the viewer may claim. No handler = no Claim button. */
     onClaim?: (job: JobPost) => void;
+    /** Passed only when the viewer may approve. No handler = no Approve button. */
     onApprove?: (job: JobPost) => void;
     onOpen?: (job: JobPost) => void;
     density?: 'comfortable' | 'compact';
@@ -52,33 +55,17 @@ function hours(start: string | null, end: string | null): number {
     return Math.round((mins / 60) * 10) / 10;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-    open: 'Open',
-    claimed: 'Pending',
-    filled: 'Filled',
-    cancelled: 'Cancelled',
-};
-
-const STATUS_BADGE: Record<string, string> = {
-    open: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
-    claimed:
-        'border-primary/25 bg-accent text-[var(--brand-deep,var(--primary))]',
-    filled: 'border-status-success/30 bg-status-success-bg text-status-success',
-    cancelled:
-        'border-status-critical/30 bg-status-critical-bg text-status-critical',
-};
-
-const STATUS_DOT: Record<string, string> = {
-    open: 'bg-status-warning',
-    claimed: 'bg-primary',
-    filled: 'bg-status-success',
-    cancelled: 'bg-status-critical',
+const STATUS: Record<string, { label: string; variant: StatusVariant }> = {
+    open: { label: 'Open', variant: 'warning' },
+    claimed: { label: 'Awaiting approval', variant: 'info' },
+    filled: { label: 'Filled', variant: 'success' },
+    cancelled: { label: 'Cancelled', variant: 'neutral' },
 };
 
 const KIND_BADGE: Record<JobPostTaskKind, string> = {
     med: 'bg-status-critical-bg text-status-critical',
     meal: 'bg-status-warning-bg text-status-warning',
-    care: 'bg-accent text-[var(--brand-deep,var(--primary))]',
+    care: 'bg-primary-fill/10 text-primary',
     access: 'bg-status-success-bg text-status-success',
 };
 
@@ -94,38 +81,29 @@ function EligibilityChip({
     if (!eligibility) return null;
     if (!eligibility.is_eligible) {
         return (
-            <span
-                className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-[2px] text-[10.5px] font-bold tracking-wide text-status-critical uppercase"
+            <StatusBadge
+                variant="critical"
+                size="sm"
                 title={eligibility.blocked_reasons[0] ?? undefined}
             >
-                <ShieldCheck className="h-2.5 w-2.5" /> Blocked
-            </span>
+                <ShieldCheck className="size-3" /> Not eligible
+            </StatusBadge>
         );
     }
     if (eligibility.warning_count > 0) {
         return (
-            <span className="inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-[2px] text-[10.5px] font-bold tracking-wide text-status-warning uppercase">
-                <AlertTriangle className="h-2.5 w-2.5" />
+            <StatusBadge variant="warning" size="sm">
+                <AlertTriangle className="size-3" />
                 {eligibility.warning_count}{' '}
                 {eligibility.warning_count === 1 ? 'warning' : 'warnings'}
-            </span>
+            </StatusBadge>
         );
     }
     return (
-        <span className="inline-flex items-center gap-1 rounded-full bg-status-success-bg px-2 py-[2px] text-[10.5px] font-bold tracking-wide text-status-success uppercase">
-            <Check className="h-2.5 w-2.5" strokeWidth={3} /> Eligible
-        </span>
+        <StatusBadge variant="success" size="sm">
+            <Check className="size-3" strokeWidth={3} /> Eligible
+        </StatusBadge>
     );
-}
-
-function initialsOf(name: string): string {
-    return name
-        .split(' ')
-        .map((part) => part[0] ?? '')
-        .filter(Boolean)
-        .slice(0, 2)
-        .join('')
-        .toUpperCase();
 }
 
 export function JobCard({
@@ -141,6 +119,10 @@ export function JobCard({
     const skillsMatch = job.your_skills?.length ?? 0;
     const skillsTotal = job.required_skills.length;
     const skillsOk = skillsTotal === 0 || skillsMatch >= skillsTotal;
+    const status = STATUS[job.status] ?? {
+        label: job.status,
+        variant: 'neutral' as const,
+    };
 
     const isStrongMatch =
         job.status === 'open' &&
@@ -158,31 +140,8 @@ export function JobCard({
     const claimDisabled =
         !!job.viewer_eligibility && !job.viewer_eligibility.is_eligible;
     const canShowSensitive = job.privacy.can_view_sensitive_details;
-
-    const handleClaim = () => {
-        if (claimDisabled) return;
-        if (onClaim) {
-            onClaim(job);
-            return;
-        }
-        router.post(
-            `/operations/job-board/${job.id}/claim`,
-            {},
-            { preserveScroll: true },
-        );
-    };
-
-    const handleApprove = () => {
-        if (onApprove) {
-            onApprove(job);
-            return;
-        }
-        router.post(
-            `/operations/job-board/${job.id}/approve`,
-            {},
-            { preserveScroll: true },
-        );
-    };
+    const showClaim = job.status === 'open' && !!onClaim;
+    const showApprove = job.status === 'claimed' && !!onApprove;
 
     const padding = density === 'compact' ? 'p-3.5' : 'p-[18px]';
 
@@ -198,7 +157,7 @@ export function JobCard({
                     'border-[color-mix(in_oklch,var(--primary)_25%,var(--border))] bg-[linear-gradient(180deg,color-mix(in_oklch,var(--primary)_4%,var(--card))_0%,var(--card)_28%)]',
                 job.status === 'filled' && 'opacity-85 hover:translate-y-0',
                 job.status === 'claimed' &&
-                    'bg-[linear-gradient(180deg,var(--accent)_0%,var(--card)_28%)]',
+                    'bg-[linear-gradient(180deg,color-mix(in_oklch,var(--primary)_6%,var(--card))_0%,var(--card)_28%)]',
             )}
         >
             {isStrongMatch ? (
@@ -208,13 +167,16 @@ export function JobCard({
                 </div>
             ) : null}
 
+            {/* Says only that an existing assignment needs cover. Why the
+                rostered person is away is private HR information and is
+                never shown here (the server doesn't send it either). */}
             {job.replacement ? (
-                <div className="-mx-1 -mt-1 inline-flex items-center gap-1.5 self-start rounded-lg bg-status-warning-bg px-2.5 py-1.5 text-xs font-semibold text-status-warning">
+                <div
+                    data-test="job-board-replacement-cover"
+                    className="-mx-1 -mt-1 inline-flex items-center gap-1.5 self-start rounded-lg bg-status-warning-bg px-2.5 py-1.5 text-xs font-semibold text-status-warning"
+                >
                     <AlertTriangle className="h-3 w-3" strokeWidth={2.5} />
-                    Short-notice replacement
-                    {job.replacement.reason
-                        ? ` · ${job.replacement.reason}`
-                        : ''}
+                    Replacement cover
                 </div>
             ) : null}
 
@@ -223,14 +185,13 @@ export function JobCard({
                     className={cn(
                         'flex w-[52px] shrink-0 flex-col items-center rounded-[10px] border border-border bg-muted px-1 py-1.5 text-center',
                         isStrongMatch &&
-                            'border-[color-mix(in_oklch,var(--primary)_25%,var(--border))] bg-accent',
+                            'border-[color-mix(in_oklch,var(--primary)_25%,var(--border))] bg-primary-fill/10',
                     )}
                 >
                     <span
                         className={cn(
                             'text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase',
-                            isStrongMatch &&
-                                'text-[var(--brand-deep,var(--primary))]',
+                            isStrongMatch && 'text-primary',
                         )}
                     >
                         {dateParts.weekday}
@@ -245,22 +206,14 @@ export function JobCard({
                         <h3 className="m-0 min-w-0 flex-auto text-[14.5px] leading-[1.25] font-bold tracking-tight">
                             {job.title}
                         </h3>
-                        <span
-                            className={cn(
-                                'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-[2px] text-[10.5px] font-bold tracking-wide uppercase',
-                                STATUS_BADGE[job.status] ??
-                                    'border-border bg-muted text-muted-foreground',
-                            )}
+                        <StatusBadge
+                            variant={status.variant}
+                            size="sm"
+                            className="shrink-0"
+                            data-test="job-board-card-status"
                         >
-                            <span
-                                className={cn(
-                                    'h-1.5 w-1.5 rounded-full',
-                                    STATUS_DOT[job.status] ??
-                                        'bg-muted-foreground',
-                                )}
-                            />
-                            {STATUS_LABEL[job.status] ?? job.status}
-                        </span>
+                            {status.label}
+                        </StatusBadge>
                     </div>
                     {(job.client || job.location) && (
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -317,7 +270,9 @@ export function JobCard({
                     main={`${skillsMatch}/${skillsTotal} required`}
                     sub={
                         skillsOk
-                            ? 'All certifications current'
+                            ? skillsTotal === 0
+                                ? 'No skills required'
+                                : 'You have every required skill'
                             : `Missing: ${job.required_skills
                                   .filter((s) => !job.your_skills.includes(s))
                                   .join(', ')}`
@@ -344,7 +299,7 @@ export function JobCard({
                                 className={cn(
                                     'inline-flex items-center gap-1 rounded-md border px-2 py-[2px] text-[10.5px] font-semibold',
                                     have
-                                        ? 'border-[color-mix(in_oklch,var(--primary)_15%,transparent)] bg-accent text-[var(--brand-deep,var(--primary))]'
+                                        ? 'border-primary/15 bg-primary-fill/10 text-primary'
                                         : 'border-status-critical/30 bg-status-critical-bg text-status-critical',
                                 )}
                             >
@@ -352,11 +307,13 @@ export function JobCard({
                                     <Check
                                         className="h-2.5 w-2.5"
                                         strokeWidth={3}
+                                        aria-label="You have this skill"
                                     />
                                 ) : (
                                     <X
                                         className="h-2.5 w-2.5"
                                         strokeWidth={3}
+                                        aria-label="You don't have this skill yet"
                                     />
                                 )}
                                 {skill}
@@ -388,9 +345,10 @@ export function JobCard({
                         >
                             <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-foreground [&::-webkit-details-marker]:hidden">
                                 <span className="inline-flex items-center gap-2">
-                                    <span className="inline-grid h-4 w-4 place-items-center rounded bg-status-success text-[10px] font-extrabold text-white">
-                                        ✓
-                                    </span>
+                                    <CheckCircle2
+                                        className="size-4 text-status-success"
+                                        aria-hidden="true"
+                                    />
                                     {job.tasks_total}{' '}
                                     {job.tasks_total === 1 ? 'task' : 'tasks'}{' '}
                                     planned for this shift
@@ -427,7 +385,7 @@ export function JobCard({
                         <div className="px-3 py-2 text-xs text-muted-foreground">
                             {job.tasks_total}{' '}
                             {job.tasks_total === 1 ? 'task' : 'tasks'} planned ·
-                            details visible after claim approval
+                            details show once a claim is approved
                         </div>
                     )}
                 </div>
@@ -452,10 +410,8 @@ export function JobCard({
 
             {job.claimed_by && (
                 <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-2.5 py-2">
-                    <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-primary/60 text-[10.5px] font-bold text-primary-foreground">
-                        {initialsOf(job.claimed_by.name)}
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <PersonDisc name={job.claimed_by.name} size={28} />
+                    <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
                         <span className="truncate text-xs font-semibold text-foreground">
                             {job.status === 'filled'
                                 ? 'Filled by'
@@ -473,56 +429,47 @@ export function JobCard({
                 <div className="min-w-0" data-test="viewer-eligibility">
                     <EligibilityChip eligibility={job.viewer_eligibility} />
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex gap-3">
                     {onOpen ? (
                         <Button
                             type="button"
                             size="sm"
                             variant="ghost"
-                            className="h-8 px-2 text-xs"
-                            onClick={() => onOpen?.(job)}
+                            className="frontline-hit text-xs"
+                            onClick={() => onOpen(job)}
                         >
-                            <Eye className="mr-1 h-3 w-3" /> Details
+                            <Eye className="size-3" /> Details
                         </Button>
                     ) : null}
-                    {job.status === 'open' && (
+                    {showClaim && (
                         <Button
                             type="button"
                             size="sm"
                             data-test="job-board-claim-button"
-                            className="h-8 px-3 text-xs"
+                            className="frontline-hit text-xs"
                             disabled={claimDisabled}
-                            title={claimBlockedReason ?? 'Claim this shift'}
-                            onClick={handleClaim}
+                            title={claimBlockedReason ?? undefined}
+                            onClick={() => {
+                                if (!claimDisabled) onClaim?.(job);
+                            }}
                         >
-                            <Hand className="mr-1 h-3 w-3" strokeWidth={2.5} />
-                            {claimDisabled ? 'Blocked' : 'Claim shift'}
+                            <Hand className="size-3" strokeWidth={2.5} />
+                            {claimDisabled ? 'Not eligible' : 'Claim shift'}
                         </Button>
                     )}
-                    {job.status === 'claimed' && (
+                    {showApprove && (
                         <Button
                             type="button"
                             size="sm"
-                            className="h-8 px-3 text-xs"
-                            onClick={handleApprove}
+                            data-test="job-board-approve-button"
+                            className="frontline-hit text-xs"
+                            onClick={() => onApprove?.(job)}
                         >
                             <CheckCircle2
-                                className="mr-1 h-3 w-3"
+                                className="size-3"
                                 strokeWidth={2.5}
                             />
                             Approve
-                        </Button>
-                    )}
-                    {job.status === 'filled' && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-8 px-3 text-xs"
-                            disabled
-                        >
-                            <Check className="mr-1 h-3 w-3" strokeWidth={2.5} />
-                            Filled
                         </Button>
                     )}
                 </div>
@@ -572,7 +519,7 @@ function Fact({
                 >
                     {main}
                 </span>
-                <span className="mt-0.5 text-[11px] font-medium text-muted-foreground/80">
+                <span className="mt-0.5 text-[11px] font-medium text-muted-foreground">
                     {sub}
                 </span>
             </dd>

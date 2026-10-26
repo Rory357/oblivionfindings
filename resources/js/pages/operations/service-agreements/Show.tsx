@@ -33,7 +33,7 @@ import {
 import { type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -105,6 +105,8 @@ type Props = {
         title: string;
         reference_number: string | null;
         status: string;
+        submitted_for_approval_by: number | null;
+        submitted_for_approval_at: string | null;
         agreement_type: string;
         funding_body: string | null;
         funding_reference: string | null;
@@ -456,7 +458,7 @@ function getTransitions(status: string): TransitionDef[] {
 
 /* ---------- TransitionDialog ---------- */
 
-function TransitionDialog({
+export function TransitionDialog({
     open,
     onOpenChange,
     transition,
@@ -471,17 +473,20 @@ function TransitionDialog({
     const [notes, setNotes] = useState('');
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const submittingForApproval = transition?.toStatus === 'pending_approval';
 
     function doTransition() {
         if (!transition) return;
         setProcessing(true);
         router.post(
-            `/operations/service-agreements/${agreementId}/transition`,
-            {
-                status: transition.toStatus,
-                reason,
-                notes,
-            },
+            `/operations/service-agreements/${agreementId}/${submittingForApproval ? 'submit-for-approval' : 'transition'}`,
+            submittingForApproval
+                ? {}
+                : {
+                      status: transition.toStatus,
+                      reason,
+                      notes,
+                  },
             {
                 preserveScroll: true,
                 onSuccess: () => {
@@ -504,44 +509,54 @@ function TransitionDialog({
                 <DialogHeader>
                     <DialogTitle>{transition.label}</DialogTitle>
                     <DialogDescription>
-                        Transition this agreement to{' '}
-                        <strong>
-                            {transition.toStatus.replace(/_/g, ' ')}
-                        </strong>
-                        . Provide a reason or notes for the audit trail.
+                        {submittingForApproval ? (
+                            'Send this draft for independent approval. The submitter cannot approve their own submission.'
+                        ) : (
+                            <>
+                                Transition this agreement to{' '}
+                                <strong>
+                                    {transition.toStatus.replace(/_/g, ' ')}
+                                </strong>
+                                . Provide a reason or notes for the audit trail.
+                            </>
+                        )}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                    <div>
-                        <Label htmlFor="reason">Reason</Label>
-                        <Textarea
-                            id="reason"
-                            value={reason}
-                            onChange={(e) => setReason(e.target.value)}
-                            placeholder="Why is this transition being made?"
-                            rows={2}
-                        />
-                        {errors.reason && (
-                            <p className="mt-1 text-xs text-status-critical">
-                                {errors.reason}
-                            </p>
-                        )}
-                    </div>
-                    <div>
-                        <Label htmlFor="notes">Notes</Label>
-                        <Textarea
-                            id="notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Any additional notes..."
-                            rows={2}
-                        />
-                        {errors.notes && (
-                            <p className="mt-1 text-xs text-status-critical">
-                                {errors.notes}
-                            </p>
-                        )}
-                    </div>
+                    {!submittingForApproval && (
+                        <>
+                            <div>
+                                <Label htmlFor="reason">Reason</Label>
+                                <Textarea
+                                    id="reason"
+                                    value={reason}
+                                    onChange={(e) => setReason(e.target.value)}
+                                    placeholder="Why is this transition being made?"
+                                    rows={2}
+                                />
+                                {errors.reason && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {errors.reason}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <Label htmlFor="notes">Notes</Label>
+                                <Textarea
+                                    id="notes"
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="Any additional notes..."
+                                    rows={2}
+                                />
+                                {errors.notes && (
+                                    <p className="mt-1 text-xs text-status-critical">
+                                        {errors.notes}
+                                    </p>
+                                )}
+                            </div>
+                        </>
+                    )}
                     <DialogFooter>
                         <Button
                             type="button"
@@ -571,7 +586,15 @@ function TransitionDialog({
 
 /* ---------- Line Item Dialog ---------- */
 
-const UNIT_OPTIONS = ['hour', 'night', 'day', 'km', 'trip', 'flat'] as const;
+const UNIT_OPTIONS = [
+    'hour',
+    'night',
+    'day',
+    'visit',
+    'km',
+    'trip',
+    'flat',
+] as const;
 
 function LineItemDialog({
     open,
@@ -994,6 +1017,18 @@ export default function ServiceAgreementShow({
     budget_summary,
     related_record_permissions: relatedRecordPermissions,
 }: Props) {
+    const { auth } = usePage<{
+        auth: {
+            user: { id: number };
+            can?: { service_agreements?: { update?: boolean } };
+        };
+    }>().props;
+    const canUpdate = auth.can?.service_agreements?.update === true;
+    const canApprove =
+        canUpdate &&
+        !!ag.submitted_for_approval_at &&
+        !!ag.submitted_for_approval_by &&
+        Number(ag.submitted_for_approval_by) !== auth.user.id;
     const bs = budget_summary ?? {
         total_budget: ag.total_budget,
         budget_used: ag.budget_used,
@@ -1133,25 +1168,31 @@ export default function ServiceAgreementShow({
                         <>
                             <PageHeaderGlassButton
                                 icon={XCircle}
+                                disabled={!canUpdate}
                                 onClick={() => setRejectDialogOpen(true)}
                             >
                                 Reject
                             </PageHeaderGlassButton>
                             <PageHeaderPrimaryButton
                                 icon={ShieldCheck}
+                                disabled={!canApprove}
                                 onClick={() =>
                                     router.post(
                                         `/operations/service-agreements/${ag.id}/approve`,
                                     )
                                 }
                             >
-                                Approve
+                                {Number(ag.submitted_for_approval_by) ===
+                                auth.user.id
+                                    ? 'Awaiting independent approval'
+                                    : 'Approve'}
                             </PageHeaderPrimaryButton>
                         </>
                     ) : (
                         transitions.map((t) => (
                             <PageHeaderGlassButton
                                 key={t.toStatus}
+                                disabled={!canUpdate}
                                 onClick={() => openTransition(t)}
                             >
                                 {t.label}
@@ -1160,6 +1201,7 @@ export default function ServiceAgreementShow({
                     )}
                     <PageHeaderGlassButton
                         icon={Pencil}
+                        disabled={!canUpdate}
                         onClick={() =>
                             router.visit(
                                 `/operations/service-agreements/${ag.id}/edit`,
@@ -1735,6 +1777,7 @@ export default function ServiceAgreementShow({
                                         setEditingLineItem(null);
                                         setLineItemDialogOpen(true);
                                     }}
+                                    disabled={!canUpdate}
                                 >
                                     <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
                                     Line Item
@@ -1829,6 +1872,10 @@ export default function ServiceAgreementShow({
                                                                 size="icon"
                                                                 variant="ghost"
                                                                 className="h-7 w-7"
+                                                                aria-label={`Edit ${item.description}`}
+                                                                disabled={
+                                                                    !canUpdate
+                                                                }
                                                                 onClick={() => {
                                                                     setEditingLineItem(
                                                                         item,
@@ -1852,6 +1899,10 @@ export default function ServiceAgreementShow({
                                                                         true,
                                                                     );
                                                                 }}
+                                                                disabled={
+                                                                    !canUpdate
+                                                                }
+                                                                aria-label={`Delete ${item.description}`}
                                                             >
                                                                 <Trash2 className="h-3 w-3" />
                                                             </Button>
@@ -1887,6 +1938,7 @@ export default function ServiceAgreementShow({
                                 size="sm"
                                 variant="outline"
                                 onClick={() => setRateDialogOpen(true)}
+                                disabled={!canUpdate}
                             >
                                 <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Rate
                             </Button>
@@ -1961,6 +2013,8 @@ export default function ServiceAgreementShow({
                                                                 true,
                                                             );
                                                         }}
+                                                        disabled={!canUpdate}
+                                                        aria-label={`Delete ${rate.rate_type} rate`}
                                                     >
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>

@@ -246,7 +246,13 @@ export const STATUS_META: Record<string, StatusMeta> = {
 };
 
 export function statusMeta(status: string): StatusMeta {
-    return STATUS_META[status] ?? STATUS_META.scheduled;
+    return (
+        STATUS_META[status] ?? {
+            label: titleCase(status),
+            icon: Activity,
+            tone: 'neutral',
+        }
+    );
 }
 
 export const OUTCOME_META: Record<string, { label: string; tone: ChipTone }> = {
@@ -262,6 +268,42 @@ export function outcomeMeta(
     return (
         OUTCOME_META[outcome] ?? { label: titleCase(outcome), tone: 'neutral' }
     );
+}
+
+/**
+ * Where a drill is up to, as the record's stages (pg-hsn-65, 66): scheduled,
+ * run, completed, findings resolved. A cancelled drill has no stage.
+ */
+export function drillStage(row: {
+    status: string;
+    findings_open: number;
+    finding_overdue?: boolean;
+}): {
+    stage: number;
+    label: string;
+    note?: string;
+    tone?: 'critical' | 'warning' | 'success';
+} | null {
+    switch (row.status) {
+        case 'cancelled':
+            return null;
+        case 'overdue':
+            return { stage: 1, label: 'Overdue', note: 'Not run yet', tone: 'critical' };
+        case 'scheduled':
+            return { stage: 1, label: 'Scheduled' };
+        case 'in_progress':
+            return { stage: 2, label: 'In progress', tone: 'warning' };
+        case 'completed':
+            return row.findings_open > 0
+                ? {
+                      stage: 4,
+                      label: 'Findings open',
+                      tone: row.finding_overdue ? 'critical' : 'warning',
+                  }
+                : { stage: 5, label: 'Completed' };
+        default:
+            return { stage: 1, label: statusMeta(row.status).label };
+    }
 }
 
 export const SEVERITY_TONE: Record<string, ChipTone> = {

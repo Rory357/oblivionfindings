@@ -96,7 +96,9 @@ it('keeps Control Room Device pages focused on signal activity instead of duplic
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $controller = file_get_contents($root.'/app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php');
     $presenter = file_get_contents($root.'/app/Services/ControlRoom/ControlRoomDevicePresenter.php');
-    $sidebar = file_get_contents($root.'/resources/js/components/app-sidebar.tsx');
+    // Control Room's menu lives in one navigation map (12 items → 6, 11 Oct 2026);
+    // the device pages are its Monitoring › Signals view.
+    $navigation = file_get_contents($root.'/resources/js/lib/control-room-navigation.ts');
     $index = file_get_contents($root.'/resources/js/pages/control-room/devices/index.tsx');
 
     expect($controller)
@@ -108,8 +110,9 @@ it('keeps Control Room Device pages focused on signal activity instead of duplic
         ->and($presenter)
         ->not->toContain("'status' => \$projection->status")
         ->not->toContain('isStale(')
-        ->and($sidebar)
-        ->toContain("title: 'Device signals'")
+        ->and($navigation)
+        ->toContain("key: '/control-room/devices',")
+        ->toContain("label: 'Signals',")
         ->and($index)
         ->toContain('Open Device registry')
         ->not->toContain('Signal offline')
@@ -200,10 +203,11 @@ it('keeps the interaction audit bound to the exact release cross-module source i
         'resources/js/pages/control-room/map.tsx',
         'resources/js/pages/control-room/devices/index.tsx',
         'resources/js/pages/control-room/devices/show.tsx',
-        'resources/js/components/control-room/alert-workspace-dialog.tsx',
+        'resources/js/components/control-room/alert-record/alert-sections.tsx',
+        'resources/js/components/control-room/alert-record/alert-actions.tsx',
         'resources/js/components/control-room/alert-workspace/linked-journey.tsx',
-        'resources/js/components/control-room/alert-worklist/alert-worklist.tsx',
-        'resources/js/components/control-room/alert-worklist/alert-worklist-row.tsx',
+        'resources/js/components/control-room/live-response/response-worklist.tsx',
+        'resources/js/components/control-room/live-response/alert-preview.tsx',
         'resources/js/pages/sites/show.tsx',
         'resources/js/components/sites/site-technology-projection.tsx',
         'resources/js/pages/operations/clients/show.tsx',

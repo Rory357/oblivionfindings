@@ -1,4 +1,9 @@
 import type { HandoverWorkerNotes } from '@/components/handover-person-notes';
+import type {
+    SafetySession,
+    SessionDelivery,
+    SessionObservation,
+} from '@/components/health-safety/lone-workers/types';
 /* -------------------------------------------------------------------------- */
 /*  TypeScript types for the /my-day Inertia payload                          */
 /* -------------------------------------------------------------------------- */
@@ -356,6 +361,26 @@ export interface MyDayNotification {
     title: string;
     at: string;
     tone?: 'primary' | 'info' | 'muted';
+    broadcast?: {
+        schema_version: 1;
+        notification_id: string;
+        recipient_viewer_id: number;
+        reader_read_id: string;
+        href: string;
+    };
+}
+
+/** Server reader association, never a cached permission or an auth-derived grant. */
+export interface MyDayBroadcastReader {
+    schema_version: 1;
+    viewer_id: number;
+    read_id: string;
+    checked_at: string;
+    capabilities: {
+        mark_read: boolean;
+        acknowledge: false;
+        bulk_mark_read: boolean;
+    };
 }
 
 export interface MyDayActiveRound {
@@ -372,13 +397,17 @@ export interface MyDayActiveRound {
 }
 
 /**
- * The signed-in worker's live Lone Worker Safety session — the data behind the
- * My Day "You're being monitored — check in" card. Present only when the worker
- * is currently being monitored. Mirrors
+ * The signed-in worker's live safety session, with actual observation and
+ * delivery evidence kept separate from session existence. Mirrors
  * `MyTasksController::getActiveLoneWorkerSession()`.
  */
 export interface MyDayLoneWorkerSession {
     id: number;
+    expected_version: number;
+    lock_version: number;
+    can: SafetySession['can'];
+    observation: SessionObservation;
+    source_delivery: SessionDelivery | null;
     status: 'active' | 'overdue' | 'emergency';
     started_at: string | null;
     expected_end_at: string | null;
@@ -395,7 +424,7 @@ export interface MyDayLoneWorkerSession {
 /**
  * One open first-aid follow-up assigned to the signed-in worker — the data
  * behind the My Day "First-aid follow-ups assigned to me" card. Read-only;
- * `url` deep-links to the First Aid Register's record modal. Mirrors
+ * `url` opens the selected follow-up on its permanent treatment page. Mirrors
  * `MyTasksController::getFirstAidFollowups()`.
  */
 export interface MyDayFirstAidFollowup {
@@ -407,6 +436,7 @@ export interface MyDayFirstAidFollowup {
     treated_person_name: string | null;
     site_name: string | null;
     url: string;
+    href: string;
 }
 
 /**
@@ -416,14 +446,17 @@ export interface MyDayFirstAidFollowup {
  */
 export interface MyDayPpe {
     id: number;
-    type_name: string;
+    type_name: string | null;
     category: string | null;
     serial_number: string | null;
     site: string | null;
     allocated_at: string | null;
-    acknowledged: boolean;
-    fit_test_required: boolean;
-    fit_test_completed: boolean;
+    acknowledged: boolean | null;
+    fit_test_required: boolean | null;
+    fit_test_completed: boolean | null;
+    source_integrity?: 'intact' | 'legacy_unknown' | 'repair_required';
+    catalogue_integrity?: 'recorded' | 'legacy_unknown' | 'repair_required';
+    can?: { acknowledge_own: boolean };
 }
 
 /**
@@ -448,6 +481,8 @@ export interface MyDayAggregatedTask {
 
 /** The My Day "My tasks" card payload — first 8 items + uncapped count. */
 export interface MyDayMyTasks {
+    /** Response identity, not a permission or record-access grant. */
+    viewer_id?: number;
     total: number;
     items: MyDayAggregatedTask[];
 }
@@ -548,6 +583,7 @@ export interface MyDayPageProps {
     } | null;
     hr_tasks?: MyDayHrTask[];
     notifications?: MyDayNotification[];
+    broadcast_updates_reader?: MyDayBroadcastReader | null;
     can_view_medications?: boolean;
     can_record_medications?: boolean;
     can_record_controlled_medications?: boolean;

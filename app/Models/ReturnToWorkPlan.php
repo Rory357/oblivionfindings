@@ -16,6 +16,10 @@ class ReturnToWorkPlan extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'source_schema_version',
+        'source_revision',
+        'worker_snapshot',
+        'recorder_snapshot',
         'workplace_injury_id',
         'worker_id',
         'manager_id',
@@ -38,6 +42,10 @@ class ReturnToWorkPlan extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'worker_snapshot' => 'array',
+        'recorder_snapshot' => 'array',
         'plan_start_date' => 'date',
         'plan_end_date' => 'date',
         'medical_clearance_date' => 'date',
@@ -101,5 +109,11 @@ class ReturnToWorkPlan extends Model
         return $query->whereNotNull('next_review_date')
             ->where('next_review_date', '<=', now())
             ->where('status', 'active');
+    }
+
+    /** Immutable source history; no authority is inherited from this relation. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WorkplaceInjurySourceVersion::class, 'source_id')->where('source_type', 'rtw_plan');
     }
 }

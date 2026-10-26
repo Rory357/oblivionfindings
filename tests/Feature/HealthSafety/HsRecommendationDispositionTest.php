@@ -6,10 +6,13 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\AuditLog;
 use App\Models\ControlRoom\AlertTask;
 use App\Models\ControlRoomAlert;
+use App\Models\FirstAidFollowup;
+use App\Models\FirstAidRecord;
 use App\Models\HsCorrectiveAction;
 use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRecommendationDisposition;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
@@ -255,6 +258,9 @@ class HsRecommendationDispositionTest extends TestCase
         $owner->update(['name' => 'Zed Eligible H&S Owner']);
         $officer->hrEmployeeProfile()->update(['primary_site_id' => $site->id]);
         $owner->hrEmployeeProfile()->update(['primary_site_id' => $site->id]);
+        // H&S parent access cannot make operational task descriptions readable.
+        $alertView = Permission::query()->where('key', 'controlRoom.alerts.view')->sole();
+        $officer->permissionOverrides()->syncWithoutDetaching([$alertView->id => ['allowed' => true]]);
         User::factory()
             ->count(205)
             ->sequence(fn ($sequence) => [
@@ -268,6 +274,11 @@ class HsRecommendationDispositionTest extends TestCase
                 'primary_site_id' => $site->id,
                 'secondary_site_ids' => [],
             ]));
+        // Keep real treatment-derived work present: empty-source shortcuts cannot satisfy this ceiling.
+        $treatment = FirstAidRecord::factory()->create(['site_id' => $site->id, 'first_aider_id' => $officer->id]);
+        HsEvent::factory()->create(['site_id' => $site->id, 'source_type' => FirstAidRecord::class, 'source_id' => $treatment->id,
+            'event_category' => HsEvent::CATEGORY_INJURY, 'client_id' => null, 'staff_id' => null, 'owner_user_id' => $officer->id]);
+        FirstAidFollowup::create(['first_aid_record_id' => $treatment->id, 'assigned_to_user_id' => $officer->id, 'created_by' => $officer->id, 'due_at' => now()->addDay()]);
         $alert = ControlRoomAlert::factory()->triaging()->create(['site_id' => $site->id]);
         $event = HsEvent::factory()
             ->handoverAccepted($owner, $officer)
@@ -325,10 +336,22 @@ class HsRecommendationDispositionTest extends TestCase
         $queryCount = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThan(
-            100,
-            $queryCount,
-            "Event detail used {$queryCount} queries for a large site-scoped owner set.",
+        // The H&S read has a fixed cost per page (authority evidence, source scopes, the in-page task badge), so the
+        // check is that a large owner set adds no per-person queries: 100 more Site staff must not change the count.
+        User::factory()->count(100)->create(['approved_at' => now()])
+            ->each(fn (User $user) => HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id, 'primary_site_id' => $site->id, 'secondary_site_ids' => [],
+            ]));
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->actingAs($officer)->get("/health-safety/events/{$event->id}")->assertOk();
+        $largerCount = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        $this->assertLessThanOrEqual(
+            $queryCount + 2,
+            $largerCount,
+            "Event detail went from {$queryCount} to {$largerCount} queries when 100 more Site staff were added.",
         );
 
         $response
@@ -349,6 +372,29 @@ class HsRecommendationDispositionTest extends TestCase
                     'Replace the unsafe bathroom rail',
                 )
                 ->where('detail.investigations.0.id', $investigation->id)
+            );
+
+        $officer->permissionOverrides()->syncWithoutDetaching([$alertView->id => ['allowed' => false]]);
+        $this->actingAs($officer->fresh())
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.linked_access.control_room', 'restricted')
+                ->where('detail.handover_summary.alert_reference', null)
+                ->has('detail.handover_summary.operational_tasks', 0)
+                ->has('detail.action_handover.unresolved_control_room_tasks', 0)
+            );
+
+        $officer->permissionOverrides()->syncWithoutDetaching([$alertView->id => ['allowed' => true]]);
+        $alert->update(['site_id' => Site::factory()->create()->id]);
+        $this->actingAs($officer->fresh())
+            ->get("/health-safety/events/{$event->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('detail.linked_access.control_room', 'restricted')
+                ->where('detail.handover_summary.alert_reference', null)
+                ->has('detail.handover_summary.operational_tasks', 0)
+                ->has('detail.action_handover.unresolved_control_room_tasks', 0)
             );
     }
 
@@ -412,8 +458,10 @@ class HsRecommendationDispositionTest extends TestCase
         $user = User::factory()->create(['role' => 'health_safety_officer', 'approved_at' => now()]);
         $role = Role::query()->where('name', 'health_safety_officer')->firstOrFail();
         $user->roles()->attach($role);
+        // H&S reads need at least one approved Site; an all-Sites officer still works at a real one.
         HrEmployeeProfile::factory()->create([
             'user_id' => $user->id,
+            'primary_site_id' => Site::factory()->create()->id,
             'secondary_site_ids' => [],
         ]);
 

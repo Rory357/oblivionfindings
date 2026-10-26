@@ -39,6 +39,8 @@ use App\Services\Fleet\FleetSignalService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\ShiftSignalService;
+use App\Services\Tracking\ClientTrackerFallService;
+use App\Services\Tracking\ClientZoneMonitoringService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -162,8 +164,8 @@ class SignalProcessingService
                     throw new SafetySignalUnroutable('Client zone source evidence is unavailable.');
                 }
                 $projection = data_get($signal->normalized_data, 'client_tracker_fall') === true
-                    ? app(\App\Services\Tracking\ClientTrackerFallService::class)->projection($fleet)
-                    : app(\App\Services\Tracking\ClientZoneMonitoringService::class)->projection($fleet);
+                    ? app(ClientTrackerFallService::class)->projection($fleet)
+                    : app(ClientZoneMonitoringService::class)->projection($fleet);
                 foreach (['idempotency_key', 'signal_source_id', 'signal_type_code', 'client_id', 'site_id', 'asset_id'] as $field) {
                     if ((string) $signal->{$field} !== (string) $projection[$field]) {
                         throw new SafetySignalUnroutable('Client zone projection does not match canonical evidence.');
@@ -186,7 +188,7 @@ class SignalProcessingService
 
             $this->assertSignalRelationshipsAreCanonical($signal);
 
-            // Maintenance suppression applies to both operational and technical destinations.
+            // Technical maintenance never silently mutes a care-safety response.
             if ($this->isInMaintenanceWindow($signal)) {
                 $signal->markSuppressed('In maintenance window');
 
@@ -1035,13 +1037,35 @@ class SignalProcessingService
     }
 
     /**
-     * Check if signal should be suppressed due to maintenance window.
+     * Check whether technical maintenance may suppress this signal.
+     * A deliberate safety-device test needs its own bounded, authorised
+     * workflow; a generic maintenance window is not that authority.
      */
     public function isInMaintenanceWindow(Signal $signal): bool
     {
         // D8 (eMAR audit, decided under Stephan's delegation): a maintenance
         // window never silences a medication alert.
         if (str_starts_with((string) $signal->signal_type_code, 'medication_')) {
+            return false;
+        }
+
+        // SD-02: technical maintenance never silences a care-safety signal
+        // (falls, panic/duress, fire, lone-worker emergencies).
+        if (in_array($signal->signalType?->category, [
+            SignalType::CATEGORY_PEOPLE_SAFETY,
+            SignalType::CATEGORY_MEDICAL_WELLBEING,
+        ], true) || in_array($signal->signal_type_code, [
+            'fall_detected',
+            'panic_sos_person',
+            'panic_sos_vehicle',
+            'fire_alarm',
+            'integration_sos_triggered',
+            'integration_panic_alarm',
+            'integration_duress_alarm',
+            LoneWorkerSignalService::TYPE_EMERGENCY,
+            LoneWorkerSignalService::TYPE_OVERDUE_CHECKIN,
+            LoneWorkerSignalService::TYPE_SESSION_OVERRUN,
+        ], true)) {
             return false;
         }
 
@@ -1684,11 +1708,11 @@ class SignalProcessingService
      */
     public function ingestFromFleetSignal(FleetSignal $fleetSignal): Signal
     {
-        if ($fleetSignal->signal_type === \App\Services\Tracking\ClientTrackerFallService::SIGNAL) {
-            return $this->ingest(app(\App\Services\Tracking\ClientTrackerFallService::class)->projection($fleetSignal));
+        if ($fleetSignal->signal_type === ClientTrackerFallService::SIGNAL) {
+            return $this->ingest(app(ClientTrackerFallService::class)->projection($fleetSignal));
         }
-        if ($fleetSignal->signal_type === \App\Services\Tracking\ClientZoneMonitoringService::SIGNAL) {
-            return $this->ingest(app(\App\Services\Tracking\ClientZoneMonitoringService::class)->projection($fleetSignal));
+        if ($fleetSignal->signal_type === ClientZoneMonitoringService::SIGNAL) {
+            return $this->ingest(app(ClientZoneMonitoringService::class)->projection($fleetSignal));
         }
         // The canonical outbox worker owns the surrounding transaction. Keep the
         // source configuration stable until signal and alert publication finish.

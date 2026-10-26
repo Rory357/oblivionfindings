@@ -7,27 +7,126 @@ import {
     isSubItemActive,
 } from './app-sidebar';
 
+describe('app sidebar referral destinations', () => {
+    it('selects Reports separately while retaining intake and calendar navigation', () => {
+        for (const url of [
+            '/operations/referrals/reports?view=overview',
+            '/operations/referrals/reports/',
+        ]) {
+            expect(isSubItemActive(url, '/operations/referrals')).toBe(false);
+            expect(isSubItemActive(url, '/operations/referrals/reports')).toBe(
+                true,
+            );
+        }
+        for (const url of [
+            '/operations/referrals',
+            '/operations/referrals/calendar',
+            '/operations/referrals/01M56KN8AKKP86VRZ8TKNXD5WY',
+        ]) {
+            expect(isSubItemActive(url, '/operations/referrals')).toBe(true);
+            expect(isSubItemActive(url, '/operations/referrals/reports')).toBe(
+                false,
+            );
+        }
+    });
+});
+
 describe('app sidebar workforce navigation', () => {
-    it('selects only the queue entry for queue pages and preserves other Rostering views', () => {
+    it('keeps Rostering lit on the pages its header opens and Handovers lit on Shift notes', () => {
         for (const url of [
             '/operations/rostering/conflicts?week=2026-11-09',
             '/operations/rostering/conflicts/',
             '/operations/rostering/conflicts/review/42',
-        ]) {
-            expect(isSubItemActive(url, '/operations/rostering')).toBe(false);
-            expect(
-                isSubItemActive(url, '/operations/rostering/conflicts'),
-            ).toBe(true);
-        }
-        for (const url of [
             '/operations/rostering?tab=availability',
             '/operations/rostering/templates',
             '/operations/rostering/conflicts-history',
+            '/operations/shifts',
+            '/operations/shifts/42',
+            '/operations/qualifications?site_id=3',
+            '/operations/qualifications/check/17',
+            '/operations/availability?week=2026-10-12',
         ]) {
             expect(isSubItemActive(url, '/operations/rostering')).toBe(true);
-            expect(
-                isSubItemActive(url, '/operations/rostering/conflicts'),
-            ).toBe(false);
+            expect(isSubItemActive(url, '/operations/handovers')).toBe(false);
+        }
+        for (const url of [
+            '/operations/handovers?week=2026-10-12',
+            '/operations/shift-notes',
+            '/operations/shift-notes?site_id=3&week=2026-10-12',
+        ]) {
+            expect(isSubItemActive(url, '/operations/handovers')).toBe(true);
+            expect(isSubItemActive(url, '/operations/rostering')).toBe(false);
+        }
+        expect(
+            isSubItemActive(
+                '/operations/shifts-archive',
+                '/operations/rostering',
+            ),
+        ).toBe(false);
+    });
+
+    it('shows the six Workforce destinations in their agreed order', () => {
+        const sidebar = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true, manageAny: true },
+                job_board: { viewAny: true },
+                rostering: { viewAny: true },
+                timesheets: { viewAny: true },
+            },
+        }).filter((item) => item.group === 'Workforce');
+
+        expect(sidebar.map((item) => item.label)).toEqual([
+            'Rostering',
+            'Available shifts',
+            'Attendance',
+            'Timesheets',
+            'Handovers',
+            'Settings',
+        ]);
+    });
+
+    it('keeps direct entries for shift and availability readers without Rostering', () => {
+        const shiftReader = buildNavSearchCatalog({
+            can: { shifts: { viewAny: true } },
+        }).filter((item) => item.group === 'Workforce');
+        expect(shiftReader.map((item) => item.label)).toEqual([
+            'Shifts',
+            'Available shifts',
+            'Handovers',
+            'Shift notes',
+        ]);
+
+        const availabilityEditor = buildNavSearchCatalog({
+            can: { staff: { availabilityUpdateSelf: true } },
+        }).filter((item) => item.group === 'Workforce');
+        expect(availabilityEditor.map((item) => item.label)).toEqual([
+            'Availability',
+        ]);
+    });
+
+    it('finds renamed and header-only Workforce pages in command search', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true, manageAny: true },
+                job_board: { viewAny: true },
+                rostering: { viewAny: true },
+            },
+        });
+        expect(
+            catalog.find((item) => item.href === '/operations/job-board'),
+        ).toMatchObject({
+            label: 'Available shifts',
+            keywords: expect.arrayContaining(['job board']),
+        });
+        for (const [label, href, group] of [
+            ['Shifts', '/operations/shifts', 'Rostering'],
+            ['Conflict queue', '/operations/rostering/conflicts', 'Rostering'],
+            ['Qualifications', '/operations/qualifications', 'Rostering'],
+            ['Shift notes', '/operations/shift-notes', 'Handovers'],
+        ]) {
+            expect(catalog.filter((item) => item.href === href)).toEqual([
+                expect.objectContaining({ label, group, section: 'Workforce' }),
+            ]);
         }
     });
 
@@ -285,17 +384,18 @@ describe('app sidebar workforce navigation', () => {
             },
         });
 
-        const workforceLabels = [
-            'Shifts',
-            'Job Board',
-            'Rostering',
-            'Availability',
-            'Handovers',
-            'Shift Notes',
-            'Timesheets',
-            'Attendance',
-            'Conflict Queue',
-        ];
+        const workforceGroups: Record<string, string> = {
+            Rostering: 'Workforce',
+            'Available shifts': 'Workforce',
+            Attendance: 'Workforce',
+            Timesheets: 'Workforce',
+            Handovers: 'Workforce',
+            Shifts: 'Rostering',
+            Availability: 'Rostering',
+            'Conflict queue': 'Rostering',
+            'Shift notes': 'Handovers',
+        };
+        const workforceLabels = Object.keys(workforceGroups);
 
         expect(
             workforceLabels.map((label) =>
@@ -306,7 +406,7 @@ describe('app sidebar workforce navigation', () => {
                 expect.objectContaining({
                     label,
                     section: 'Workforce',
-                    group: label === 'Availability' ? 'Rostering' : 'Workforce',
+                    group: workforceGroups[label],
                 }),
             ),
         );
@@ -326,12 +426,12 @@ describe('app sidebar workforce navigation', () => {
             href: '/operations/handovers',
         });
         expect(
-            catalog.find((item) => item.label === 'Shift Notes'),
+            catalog.find((item) => item.label === 'Shift notes'),
         ).toMatchObject({
             href: '/operations/shift-notes',
         });
         expect(
-            catalog.find((item) => item.label === 'Conflict Queue'),
+            catalog.find((item) => item.label === 'Conflict queue'),
         ).toMatchObject({
             href: '/operations/rostering/conflicts',
         });

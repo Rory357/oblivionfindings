@@ -1533,12 +1533,13 @@ export function MonthView({
     return (
         <GuardrailCard
             unstyled
+            role="grid"
+            aria-label={`${MO[navDate.getMonth()]} ${navDate.getFullYear()}`}
+            aria-rowcount={rows + 1}
+            aria-colcount={7}
             className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
         >
-            <div
-                role="presentation"
-                className="grid grid-cols-7 border-b bg-muted/40"
-            >
+            <div role="row" className="grid grid-cols-7 border-b bg-muted/40">
                 {WD.map((d, idx) => (
                     <div
                         key={d}
@@ -1551,10 +1552,7 @@ export function MonthView({
                 ))}
             </div>
             <div
-                role="grid"
-                aria-label={`${MO[navDate.getMonth()]} ${navDate.getFullYear()}`}
-                aria-rowcount={rows}
-                aria-colcount={7}
+                role="rowgroup"
                 className="scroll-pretty grid flex-1 grid-cols-7 overflow-y-auto"
                 style={{
                     gridTemplateRows: `repeat(${rows}, minmax(118px, 1fr))`,
@@ -1647,7 +1645,7 @@ export function MonthView({
                                     )}
                                     <div className="mb-1 flex items-center justify-between px-0.5">
                                         <span
-                                            className={`tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground shadow-sm' : inMonth ? 'text-foreground' : 'text-muted-foreground/60'}`}
+                                            className={`tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground shadow-sm' : inMonth ? 'text-foreground' : 'text-muted-foreground'}`}
                                         >
                                             {d.getDate()}
                                         </span>
@@ -1881,6 +1879,7 @@ export function AgendaView({
     navDate,
     sourcesOff = false,
     filtersActive = false,
+    responsive = false,
 }: {
     events: Decorated[];
     navDate: Date;
@@ -1888,6 +1887,7 @@ export function AgendaView({
     sourcesOff?: boolean;
     /** Some — but not all — sources/houses are filtered out. */
     filtersActive?: boolean;
+    responsive?: boolean;
 }) {
     const ui = useCalUI();
     const { colorBy, srcByKey, onSelect, onContext } = ui;
@@ -1946,7 +1946,7 @@ export function AgendaView({
                         }
                     >
                         <div
-                            className={`sticky top-0 flex w-24 shrink-0 flex-col items-center gap-0.5 border-r py-4 ${isToday ? 'bg-primary/5' : 'bg-muted/30'}`}
+                            className={`sticky top-0 flex ${responsive ? 'w-16 sm:w-24' : 'w-24'} shrink-0 flex-col items-center gap-0.5 border-r py-4 ${isToday ? 'bg-primary/5' : 'bg-muted/30'}`}
                         >
                             <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                                 {WD[g.date.getDay()]}
@@ -1960,7 +1960,7 @@ export function AgendaView({
                                 {MO[g.date.getMonth()].slice(0, 3)}
                             </span>
                         </div>
-                        <div className="flex-1 divide-y">
+                        <div className="min-w-0 flex-1 divide-y">
                             {g.items.map((e) => (
                                 <GuardrailButton
                                     unstyled
@@ -1969,15 +1969,17 @@ export function AgendaView({
                                     onContextMenu={(event) =>
                                         contextEntry(event, e, ui)
                                     }
-                                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
+                                    className={`${responsive ? 'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-2 gap-y-1 px-3 sm:flex sm:gap-3 sm:px-4' : 'flex gap-3 px-4'} w-full items-center py-3 text-left transition-colors hover:bg-accent/40`}
                                 >
-                                    <span className="tnum w-20 shrink-0 text-[12px] font-medium text-muted-foreground">
+                                    <span
+                                        className={`tnum ${responsive ? 'col-start-2 sm:w-20' : 'w-20'} shrink-0 text-[12px] font-medium text-muted-foreground`}
+                                    >
                                         {e.allDay
                                             ? 'All day'
                                             : fmtTime(e._start)}
                                     </span>
                                     <span
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                        className={`${responsive ? 'row-start-2' : ''} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg`}
                                         style={{
                                             color: 'var(--c)',
                                             background: 'var(--cb)',
@@ -1989,9 +1991,11 @@ export function AgendaView({
                                             className="h-4 w-4"
                                         />
                                     </span>
-                                    <span className="min-w-0 flex-1">
+                                    <span
+                                        className={`${responsive ? 'col-start-2 row-start-2' : ''} min-w-0 flex-1`}
+                                    >
                                         <span
-                                            className={`flex items-center gap-1.5 truncate text-sm font-medium ${e.status === 'overdue' ? 'text-status-critical' : 'text-foreground'}`}
+                                            className={`${responsive ? 'block break-words whitespace-normal sm:flex sm:truncate' : 'flex truncate'} items-center gap-1.5 text-sm font-medium ${e.status === 'overdue' ? 'text-status-critical' : 'text-foreground'}`}
                                         >
                                             {e.title}
                                             <RecurGlyph
@@ -1999,7 +2003,9 @@ export function AgendaView({
                                                 className="h-3 w-3 shrink-0 text-muted-foreground"
                                             />
                                         </span>
-                                        <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                        <span
+                                            className={`flex ${responsive ? 'flex-wrap' : ''} items-center gap-1.5 text-[12px] text-muted-foreground`}
+                                        >
                                             <span
                                                 style={{
                                                     color: `var(--src-${e.source})`,
@@ -2025,7 +2031,14 @@ export function AgendaView({
                                             )}
                                         </span>
                                     </span>
-                                    {e.owner && <Avatar person={e.owner} />}
+                                    {e.owner &&
+                                        (responsive ? (
+                                            <span className="hidden sm:block">
+                                                <Avatar person={e.owner} />
+                                            </span>
+                                        ) : (
+                                            <Avatar person={e.owner} />
+                                        ))}
                                     <StatusBadge
                                         status={e.status}
                                         label={e.statusLabel}
@@ -2237,6 +2250,7 @@ function RailRow({
     showDay?: boolean;
 }) {
     const railContext = useRailContext();
+    const { srcByKey } = useCalUI();
     return (
         <GuardrailButton
             unstyled
@@ -2263,7 +2277,9 @@ function RailRow({
                     className="block truncate text-[11px]"
                     style={{ color: `var(--src-${ev.source})` }}
                 >
-                    {ev.typeLabel || srcLabel(ev.source)}
+                    {ev.typeLabel ||
+                        srcByKey[ev.source]?.short ||
+                        srcLabel(ev.source)}
                 </span>
             </span>
             {ev.owner && <Avatar person={ev.owner} size="h-6 w-6" />}

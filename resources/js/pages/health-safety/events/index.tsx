@@ -1,11 +1,3 @@
-/* H&S Events register — the governance convergence view. Every incident type
- * lands here as an HsEvent for investigation, corrective action, WorkSafe
- * notification and gated closure. Shares the gold-standard `hs-hero-kit` hero
- * chrome + rostering TabStrip/EntityFilter/ShiftContextMenu with /incidents,
- * /safeguarding, /fleet-assets/incidents and its sibling Corrective-actions
- * register so the whole safety workflow reads as one product and can't drift
- * apart. Row helpers come from the neutral register-row-kit. ShiftContextMenu +
- * detail-as-modal workflow preserved. NZ-only, web-only. */
 import {
     EVENT_CATEGORY_LABELS,
     EventDetailDialog,
@@ -15,68 +7,83 @@ import {
     type EventSectionKey,
     type WorksafeState,
 } from '@/components/health-safety/event-detail-dialog';
-import { PageHeaderGlassButton } from '@/components/page/page-header';
+import {
+    SafetyDateFilter,
+    SafetyRegisterSearch,
+    SafetyWorkspaceRail,
+} from '@/components/health-safety/workspace-header';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+} from '@/components/page';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
 import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
+import {
+    Note,
+    PersonChip,
+    StageDots,
+    Surface,
+} from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-    type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Field, SelectInput } from '@/components/wizard/primitives';
+import AppLayout from '@/layouts/app-layout';
+import {
+    formatDateOnly,
+    formatDateTime,
+    formatTime,
+    toDateInput,
+} from '@/lib/datetime';
+import { safetyReviewHref } from '@/lib/health-safety/navigation';
+import { type Tone } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     FlagBadge,
-    RegisterTableHeader,
-    TONE_BG,
-    TONE_DOT,
-    entityTone,
-    initials,
     titleCase,
 } from '@/pages/health-safety/components/register-row-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import { type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
     CheckCircle2,
-    ClipboardCheck,
     Clock,
     FileText,
-    Flame,
-    FlaskConical,
-    Hand,
-    HeartPulse,
     LayoutList,
     Link2,
     ListChecks,
-    MousePointer2,
+    MoreVertical,
     Search,
     Shield,
     ShieldAlert,
     ShieldCheck,
-    Truck,
-    Wrench,
+    SlidersHorizontal,
     X,
-    type LucideIcon,
 } from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 
@@ -84,7 +91,7 @@ import { useState, type MouseEvent as ReactMouseEvent } from 'react';
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type EventRow = {
+export type EventRow = {
     id: number;
     reference_number: string;
     event_category: string;
@@ -126,6 +133,10 @@ type Paginated<T> = {
     data: T[];
     links: { url: string | null; label: string; active: boolean }[];
     last_page: number;
+    /** Laravel's paginator sends these with every page. */
+    total?: number;
+    from?: number | null;
+    to?: number | null;
 };
 
 type Filters = {
@@ -138,6 +149,15 @@ type Filters = {
     worksafe: boolean | null;
     from: string | null;
     to: string | null;
+    action_context?: {
+        q?: string;
+        priority?: string;
+        unassigned?: boolean | number;
+        site_id?: number;
+        from?: string;
+        to?: string;
+        tab?: string;
+    } | null;
 };
 
 type Props = {
@@ -163,6 +183,7 @@ type Props = {
     sites: Array<{ id: number; name: string }>;
     detail: EventDetail | null;
     can: { manage: boolean };
+    actionReturnUrl?: string | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -176,48 +197,27 @@ const SEV: Record<string, { tone: Tone; label: string }> = {
     critical: { tone: 'critical', label: 'Critical' },
 };
 
-const STAGE: Record<string, { label: string; cls: string; icon: LucideIcon }> =
-    {
-        open: {
-            label: 'Open',
-            cls: 'bg-status-info-bg text-status-info',
-            icon: AlertTriangle,
-        },
-        investigating: {
-            label: 'Investigating',
-            cls: 'bg-primary/10 text-primary',
-            icon: Search,
-        },
-        corrective_action: {
-            label: 'Corrective action',
-            cls: 'bg-status-warning-bg text-status-warning',
-            icon: ListChecks,
-        },
-        monitoring: {
-            label: 'Monitoring',
-            cls: 'bg-status-success-bg text-status-success',
-            icon: Activity,
-        },
-        closed: {
-            label: 'Closed',
-            cls: 'bg-status-success-bg text-status-success',
-            icon: CheckCircle2,
-        },
-    };
+/** The five review stages, in order (Open › Investigating › Corrective action › Monitoring › Closed). */
+const STAGE_ORDER = [
+    'open',
+    'investigating',
+    'corrective_action',
+    'monitoring',
+    'closed',
+] as const;
+const STAGE: Record<string, { label: string }> = {
+    open: { label: 'Open' },
+    investigating: { label: 'Investigating' },
+    corrective_action: { label: 'Corrective action' },
+    monitoring: { label: 'Monitoring' },
+    closed: { label: 'Closed' },
+};
 
-/** Originating module (HsEvent.source_type class basename) → label + icon for the
- *  convergence column. */
-const SOURCE_MODULE: Record<string, { label: string; icon: LucideIcon }> = {
-    ClientIncident: { label: 'Incidents', icon: ShieldAlert },
-    SafeguardingConcern: { label: 'Safeguarding', icon: ShieldCheck },
-    FleetIncident: { label: 'Fleet & Assets', icon: Truck },
-    WorkplaceInjury: { label: 'Injuries', icon: HeartPulse },
-    SubstanceExposureRecord: { label: 'Exposure', icon: FlaskConical },
-    SiteHazard: { label: 'Site hazards', icon: AlertTriangle },
-    SiteInspectionRecord: { label: 'Inspection', icon: ClipboardCheck },
-    FleetWorkOrder: { label: 'Equipment', icon: Wrench },
-    RestraintEvent: { label: 'Restraints', icon: Hand },
-    EmergencyDrill: { label: 'Drills', icon: Flame },
+const SEVERITY_VARIANT: Record<string, StatusVariant> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
 };
 
 const SOURCE_OPTIONS = [
@@ -249,45 +249,23 @@ const CATEGORY_OPTIONS = [
 
 /** The five governance board reports surfaced from the hero CTA popover. */
 const BOARD_REPORTS = [
-    { label: 'Board summary', href: '/health-safety/reports/board-summary' },
+    { label: 'Board summary', href: '/health-safety/reports?view=board' },
     {
         label: 'WorkSafe register',
-        href: '/health-safety/reports/worksafe-register',
+        href: '/health-safety/reports?view=notifications',
     },
     {
         label: 'Investigation outcomes',
-        href: '/health-safety/reports/investigation-outcomes',
+        href: '/health-safety/reports?view=investigation-outcomes',
     },
     {
         label: 'Corrective-action traceability',
-        href: '/health-safety/reports/corrective-action-traceability',
+        href: '/health-safety/reports?view=action-traceability',
     },
     {
         label: 'Risk-assessment register',
-        href: '/health-safety/reports/risk-assessment-register',
+        href: '/health-safety/reports?view=risk-register',
     },
-];
-
-/* date helpers (browser-local) */
-const todayStr = () => {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-const daysAgoStr = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-
-const RANGE_ITEMS = [
-    { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'custom', label: 'Custom' },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -303,13 +281,11 @@ export default function HsEventsIndex({
     sites,
     detail,
     can,
+    actionReturnUrl,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [pendingSection, setPendingSection] =
-        useState<EventSectionKey>('overview');
-    const [pendingAction, setPendingAction] = useState<EventActionKey | null>(
-        null,
-    );
+    const [pendingSection] = useState<EventSectionKey>('overview');
+    const [pendingAction] = useState<EventActionKey | null>(null);
 
     // Board-report routes are gated on governance.view; hide the launcher for
     // register-only roles (Team Lead, H&S Officer, …) so they don't hit a 403.
@@ -330,19 +306,13 @@ export default function HsEventsIndex({
             { preserveScroll: true },
         );
 
-    // Detail-over-list: fetch only the `detail` prop and open the dialog without
-    // navigating away; closing drops the param so `detail` comes back null.
+    const pageUrl = usePage().url;
+    // New work opens the permanent record; retained ?event= links remain compatible.
     const openEvent = (
         id: number,
         opts?: { section?: EventSectionKey; action?: EventActionKey },
     ) => {
-        setPendingSection(opts?.section ?? 'overview');
-        setPendingAction(opts?.action ?? null);
-        router.get(
-            '/health-safety/events',
-            { ...filters, event: id },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
-        );
+        router.visit(safetyReviewHref(id, { ...opts, returnTo: pageUrl }));
     };
     const closeDetail = () =>
         router.get(
@@ -366,7 +336,8 @@ export default function HsEventsIndex({
         filters.site_id ||
         filters.worksafe ||
         filters.from ||
-        filters.to
+        filters.to ||
+        filters.action_context
     );
 
     const TABS: RosterTabItem[] = [
@@ -428,36 +399,16 @@ export default function HsEventsIndex({
         },
     ];
 
-    /* ---- date range (footer pills) ---- */
-    const activeRange = !filters.from
-        ? 'week'
-        : filters.from === daysAgoStr(7)
-          ? 'week'
-          : filters.from === daysAgoStr(30)
-            ? '30d'
-            : filters.from === daysAgoStr(90)
-              ? 'quarter'
-              : 'custom';
-    const onRange = (key: string) => {
-        if (key === 'all') {
-            go({ from: null, to: null });
-            return;
-        }
-        if (key === 'custom') {
-            return;
-        }
-        const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
-        go({ from: daysAgoStr(map[key]), to: todayStr() });
-    };
-
     /* ---- right-click context menu (mirrors the dialog Options bar) ---- */
     const openRowCtx = (e: ReactMouseEvent, ev: EventRow) => {
         e.preventDefault();
+        e.stopPropagation();
+        const anchor = e.currentTarget.getBoundingClientRect();
         const sev = SEV[ev.severity] ?? SEV.low;
         const items: ShiftCtxItem[] = [
             {
                 icon: <Shield className="h-3.5 w-3.5" />,
-                label: 'View event',
+                label: 'Open safety review',
                 sub: ev.reference_number,
                 tone: 'primary',
                 onClick: () => openEvent(ev.id),
@@ -565,42 +516,76 @@ export default function HsEventsIndex({
         if (can.manage && ev.status !== 'closed') {
             items.push({
                 icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-                label: 'Close event',
+                label: 'Close safety review',
                 tone: 'critical',
                 onClick: () => openEvent(ev.id, { action: 'close' }),
             });
         }
-        items.push(
-            { sep: true },
-            {
-                icon: <Link2 className="h-3.5 w-3.5" />,
-                label: 'Open full page',
-                onClick: () => router.visit(`/health-safety/events/${ev.id}`),
-            },
-        );
-
         setCtx({
-            x: e.clientX,
-            y: e.clientY,
+            x: e.clientX || anchor.left,
+            y: e.clientY || anchor.bottom,
             tag: sev.label.toUpperCase(),
             meta: `${ev.reference_number} · ${EVENT_CATEGORY_LABELS[ev.event_category] ?? titleCase(ev.event_category)}`,
             items,
         });
     };
 
-    const live = hero.live;
     const at = hero.attention;
+    const moreFilterCount = [
+        filters.category,
+        filters.source,
+        filters.severity,
+        filters.worksafe,
+    ].filter(Boolean).length;
+    // Four numbers that double as lenses; Open and Monitoring stay in the Review view filter.
+    const numbers: {
+        key: string;
+        label: string;
+        value: number;
+        caption: string;
+        tone?: 'critical' | 'warning';
+    }[] = [
+        {
+            key: 'investigation_due',
+            label: 'Investigation needed',
+            value: at.investigation_due,
+            caption: 'Required, not finished',
+            tone: at.investigation_due ? 'warning' : undefined,
+        },
+        {
+            key: 'awaiting_verification',
+            label: 'Waiting to be checked',
+            value: at.awaiting_verification,
+            caption: 'Actions done, not yet checked',
+        },
+        {
+            key: 'worksafe_pending',
+            label: 'WorkSafe to notify',
+            value: at.worksafe_due,
+            caption: 'Notification due',
+            tone: at.worksafe_due ? 'warning' : undefined,
+        },
+        {
+            key: 'handover',
+            label: 'Handover to accept',
+            value: at.handover_due,
+            caption: 'Waiting for Health & safety',
+        },
+    ];
     const tableTitle =
         {
-            all: 'All events',
-            open: 'Open events',
+            all: 'All safety reviews',
+            open: 'Open safety reviews',
             investigating: 'Under investigation',
             corrective_actions: 'In corrective action',
             handover: 'Awaiting H&S acceptance',
             worksafe: 'WorkSafe-notifiable',
             monitoring: 'Monitoring',
-            closed: 'Closed events',
-        }[tab] ?? 'Events';
+            closed: 'Closed safety reviews',
+            investigation_due: 'Investigation needed',
+            awaiting_verification: 'Actions awaiting verification',
+            worksafe_pending: 'WorkSafe pending',
+        }[tab] ?? 'Safety reviews';
     const showOrphanNote =
         (tab === 'all' || tab === 'open') &&
         events.data.some((ev) => ev.flags.unwired);
@@ -608,304 +593,380 @@ export default function HsEventsIndex({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Events', href: '/health-safety/events' },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Safety reviews', href: '/health-safety/events' },
             ]}
         >
-            <Head title="Safety events" />
+            <Head title="Safety reviews" />
 
-            <div className="flex flex-col gap-6 p-6">
+            <div className="flex min-w-0 flex-col gap-5">
                 {/* ---- Hero ---- */}
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented
-                                label="Period"
-                                variant="pill"
-                                ariaLabel="Date range"
-                                items={RANGE_ITEMS}
-                                value={activeRange}
-                                onChange={onRange}
+                <PageHeader
+                    wrapTitle
+                    icon={ShieldCheck}
+                    title="Safety reviews"
+                    subline="Investigate, agree actions and check that people are safe"
+                    actions={
+                        <>
+                            <SafetyRegisterSearch
+                                key={filters.q}
+                                query={filters.q ?? ''}
+                                onSearch={(q) => go({ q })}
+                                placeholder="Search safety reviews"
                             />
-                            {sites?.length ? (
+                            {actionReturnUrl && (
+                                <PageHeaderGlassButton
+                                    onClick={() =>
+                                        router.visit(actionReturnUrl)
+                                    }
+                                >
+                                    Back to actions
+                                </PageHeaderGlassButton>
+                            )}
+                            {canViewBoardReports && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <PageHeaderGlassButton icon={FileText}>
+                                            Reports
+                                        </PageHeaderGlassButton>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="end"
+                                        className="w-72 max-w-[calc(100vw-2rem)] p-1.5"
+                                    >
+                                        {BOARD_REPORTS.map((report) => (
+                                            <Button
+                                                key={report.href}
+                                                unstyled
+                                                className="frontline-tap frontline-focus flex w-full items-center rounded-md p-2.5 text-left text-sm hover:bg-muted"
+                                                onClick={() =>
+                                                    router.visit(report.href)
+                                                }
+                                            >
+                                                {report.label}
+                                            </Button>
+                                        ))}
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                        </>
+                    }
+                    strip={
+                        <PageHeaderNumbers>
+                            {numbers.map((number) => (
+                                <PageHeaderNumber
+                                    key={number.key}
+                                    value={number.value}
+                                    label={number.label}
+                                    caption={number.caption}
+                                    tone={number.tone}
+                                    pressed={tab === number.key}
+                                    onClick={() => setTab(number.key)}
+                                />
+                            ))}
+                        </PageHeaderNumbers>
+                    }
+                    filters={
+                        <>
+                            {sites.length > 0 && (
                                 <EntityFilter
                                     label="Site"
                                     allLabel="All sites"
                                     items={sites}
                                     value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
+                                    onChange={(site_id) => go({ site_id })}
                                     onDark
                                 />
-                            ) : null}
-                            <label className="inline-flex items-center gap-1.5">
-                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                                    Category
-                                </span>
-                                <select
-                                    value={filters.category ?? ''}
-                                    onChange={(e) =>
-                                        go({ category: e.target.value || null })
-                                    }
-                                    aria-label="Category filter"
-                                    className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
-                                >
-                                    <option value="">All categories</option>
-                                    {CATEGORY_OPTIONS.map((c) => (
-                                        <option key={c} value={c}>
-                                            {EVENT_CATEGORY_LABELS[c] ??
-                                                titleCase(c)}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label className="inline-flex items-center gap-1.5">
-                                <span className="text-[11px] font-semibold tracking-wide text-primary-foreground/60 uppercase">
-                                    Source
-                                </span>
-                                <select
-                                    value={filters.source ?? ''}
-                                    onChange={(e) =>
-                                        go({ source: e.target.value || null })
-                                    }
-                                    aria-label="Source filter"
-                                    className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
-                                >
-                                    <option value="">All sources</option>
-                                    {SOURCE_OPTIONS.map((source) => (
-                                        <option
-                                            key={source.value}
-                                            value={source.value}
-                                        >
-                                            {source.label}
-                                        </option>
-                                    ))}
-                                </select>
-                            </label>
-                            {/* eslint-disable-next-line no-restricted-syntax -- onDark WorkSafe toggle on the hero footer; not a shadcn Button. */}
-                            <button
-                                type="button"
-                                aria-pressed={!!filters.worksafe}
-                                onClick={() =>
-                                    go({
-                                        worksafe: filters.worksafe
-                                            ? null
-                                            : true,
-                                    })
-                                }
-                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none ${
-                                    filters.worksafe
-                                        ? 'border-primary-foreground bg-primary-foreground text-primary-strong'
-                                        : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20'
-                                }`}
-                            >
-                                <ShieldAlert className="h-3.5 w-3.5" />{' '}
-                                WorkSafe-notifiable
-                            </button>
-                            <div className="relative ml-auto">
-                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                <input
-                                    type="search"
-                                    placeholder="Search events…"
-                                    defaultValue={filters.q ?? ''}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            go({
-                                                q:
-                                                    (
-                                                        e.target as HTMLInputElement
-                                                    ).value || null,
-                                            });
-                                    }}
-                                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                                />
-                            </div>
-                            {hasFilters ? (
-                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                                >
-                                    <X className="h-3 w-3" /> Clear
-                                </button>
-                            ) : null}
-                        </div>
-                    }
-                >
-                    <WorkflowRibbon current="investigate" />
-
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={ShieldCheck} />
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <HeroStatusPill>
-                                        Safety events · governance register
-                                    </HeroStatusPill>
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-primary-foreground/85 uppercase">
-                                        <Activity className="h-3.5 w-3.5" />{' '}
-                                        Every incident type converges here
-                                    </span>
-                                </div>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                    Health &amp; Safety events
-                                </h1>
-                                <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    The governance hub. Every safety event —
-                                    from Incidents, Safeguarding, Fleet,
-                                    Injuries, Hazards, Restraints and Drills —
-                                    lands here to be investigated, driven to
-                                    verified corrective action, notified to
-                                    WorkSafe NZ, and closed through a gate.
-                                </p>
-                            </div>
-                        </div>
-
-                        {canViewBoardReports ? (
+                            )}
+                            <PageHeaderFilterSelect
+                                label="Review view"
+                                value={tab}
+                                options={[
+                                    ...TABS,
+                                    {
+                                        id: 'investigation_due',
+                                        label: 'Investigation needed',
+                                    },
+                                    {
+                                        id: 'awaiting_verification',
+                                        label: 'Actions awaiting verification',
+                                    },
+                                    {
+                                        id: 'worksafe_pending',
+                                        label: 'WorkSafe pending',
+                                    },
+                                ].map((item) => ({
+                                    value: item.id,
+                                    label: `${item.label} (${tabCounts[item.id] ?? 0})`,
+                                }))}
+                                onChange={setTab}
+                            />
+                            <SafetyDateFilter
+                                label="Occurred"
+                                from={filters.from}
+                                to={filters.to}
+                                onChange={go}
+                            />
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <PageHeaderGlassButton icon={FileText}>
-                                        Board reports
-                                        <span aria-hidden className="ml-1">
-                                            ▾
-                                        </span>
-                                    </PageHeaderGlassButton>
+                                    <PageHeaderFilterButton
+                                        icon={SlidersHorizontal}
+                                        active={moreFilterCount > 0}
+                                    >
+                                        {moreFilterCount
+                                            ? `More filters · ${moreFilterCount}`
+                                            : 'More filters'}
+                                    </PageHeaderFilterButton>
                                 </PopoverTrigger>
                                 <PopoverContent
-                                    align="end"
-                                    className="w-64 p-1.5"
+                                    align="start"
+                                    className="w-80 max-w-[calc(100vw-2rem)] space-y-4"
                                 >
-                                    {BOARD_REPORTS.map((report) => (
-                                        // eslint-disable-next-line no-restricted-syntax -- popover menu item (report link), not a form control
-                                        <button
-                                            key={report.href}
-                                            type="button"
-                                            onClick={() =>
-                                                router.visit(report.href)
+                                    <Field label="Category">
+                                        <SelectInput
+                                            ariaLabel="Category"
+                                            placeholder="All categories"
+                                            value={filters.category ?? 'all'}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'All categories',
+                                                },
+                                                ...CATEGORY_OPTIONS.map(
+                                                    (value) => ({
+                                                        value,
+                                                        label:
+                                                            EVENT_CATEGORY_LABELS[
+                                                                value
+                                                            ] ??
+                                                            titleCase(value),
+                                                    }),
+                                                ),
+                                            ]}
+                                            onChange={(value) =>
+                                                go({
+                                                    category:
+                                                        value === 'all'
+                                                            ? null
+                                                            : value,
+                                                })
                                             }
-                                            className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted"
-                                        >
-                                            <FileText className="h-4 w-4 shrink-0 text-primary" />
-                                            {report.label}
-                                        </button>
-                                    ))}
+                                        />
+                                    </Field>
+                                    <Field label="Source">
+                                        <SelectInput
+                                            ariaLabel="Source"
+                                            placeholder="All sources"
+                                            value={filters.source ?? 'all'}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'All sources',
+                                                },
+                                                ...SOURCE_OPTIONS,
+                                            ]}
+                                            onChange={(value) =>
+                                                go({
+                                                    source:
+                                                        value === 'all'
+                                                            ? null
+                                                            : value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                    <Field label="Severity">
+                                        <SelectInput
+                                            ariaLabel="Severity"
+                                            placeholder="All severities"
+                                            value={filters.severity ?? 'all'}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'All severities',
+                                                },
+                                                ...Object.entries(SEV).map(
+                                                    ([value, { label }]) => ({
+                                                        value,
+                                                        label,
+                                                    }),
+                                                ),
+                                            ]}
+                                            onChange={(value) =>
+                                                go({
+                                                    severity:
+                                                        value === 'all'
+                                                            ? null
+                                                            : value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                    <label className="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox
+                                            checked={!!filters.worksafe}
+                                            onCheckedChange={(value) =>
+                                                go({
+                                                    worksafe:
+                                                        value === true || null,
+                                                })
+                                            }
+                                        />
+                                        WorkSafe-notifiable only
+                                    </label>
                                 </PopoverContent>
                             </Popover>
-                        ) : null}
-                    </div>
-
-                    {/* stat clusters */}
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster
-                            title="Live · open governance"
-                            icon={Activity}
-                        >
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=open"
-                                label="Open"
-                                value={fmt(live.open)}
-                                caption="newest today"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=investigating"
-                                label="Investigating"
-                                value={fmt(live.investigating)}
-                                caption="in progress"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=corrective_actions"
-                                label="Corrective"
-                                value={fmt(live.corrective_action)}
-                                caption="driving actions"
-                                tone="warning"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=monitoring"
-                                label="Monitoring"
-                                value={fmt(live.monitoring)}
-                                caption="residual review"
-                                tone="success"
-                            />
-                        </HeroCluster>
-                        <HeroCluster
-                            title="Needs attention"
-                            icon={AlertTriangle}
-                        >
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=investigating"
-                                label="Inv due"
-                                value={fmt(at.investigation_due)}
-                                caption={
-                                    at.investigation_due > 0
-                                        ? 'needs a lead'
-                                        : 'all started'
-                                }
-                                tone="critical"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=corrective_actions"
-                                label="Await verify"
-                                value={fmt(at.awaiting_verification)}
-                                caption="+ completer"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=worksafe"
-                                label="WorkSafe due"
-                                value={fmt(at.worksafe_due)}
-                                caption={
-                                    at.worksafe_due > 0
-                                        ? 'notify ASAP'
-                                        : 'none pending'
-                                }
-                                tone="critical"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=handover"
-                                label="Handover"
-                                value={fmt(at.handover_due)}
-                                caption={
-                                    at.handover_due > 0
-                                        ? 'acceptance required'
-                                        : 'none waiting'
-                                }
-                                tone="warning"
-                            />
-                        </HeroCluster>
-                    </div>
-                </HeroShell>
-
-                {/* ---- Tabs ---- */}
-                <TabStrip
-                    value={tab}
-                    items={TABS}
-                    onChange={setTab}
-                    ariaLabel="Safety event views"
+                            {filters.action_context && (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <PageHeaderFilterButton active>
+                                            Matching actions
+                                        </PageHeaderFilterButton>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] space-y-3 text-sm">
+                                        <p>
+                                            Reviews with actions matching these
+                                            filters:
+                                        </p>
+                                        <dl className="space-y-2">
+                                            <div>
+                                                <dt className="text-muted-foreground">
+                                                    Search
+                                                </dt>
+                                                <dd>
+                                                    {filters.action_context.q ||
+                                                        'All actions'}
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-muted-foreground">
+                                                    Priority
+                                                </dt>
+                                                <dd>
+                                                    {filters.action_context
+                                                        .priority
+                                                        ? titleCase(
+                                                              filters.action_context.priority.replaceAll(
+                                                                  ',',
+                                                                  ' / ',
+                                                              ),
+                                                          )
+                                                        : 'All priorities'}
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-muted-foreground">
+                                                    Site
+                                                </dt>
+                                                <dd>
+                                                    {sites.find(
+                                                        (site) =>
+                                                            site.id ===
+                                                            Number(
+                                                                filters
+                                                                    .action_context
+                                                                    ?.site_id,
+                                                            ),
+                                                    )?.name ??
+                                                        (filters.action_context
+                                                            .site_id
+                                                            ? 'Selected site'
+                                                            : 'All permitted sites')}
+                                                </dd>
+                                            </div>
+                                            <div>
+                                                <dt className="text-muted-foreground">
+                                                    Action due date
+                                                </dt>
+                                                <dd>
+                                                    {filters.action_context.from
+                                                        ? formatDateOnly(
+                                                              filters
+                                                                  .action_context
+                                                                  .from,
+                                                          )
+                                                        : 'Any start'}{' '}
+                                                    –{' '}
+                                                    {filters.action_context.to
+                                                        ? formatDateOnly(
+                                                              filters
+                                                                  .action_context
+                                                                  .to,
+                                                          )
+                                                        : 'Any end'}
+                                                </dd>
+                                            </div>
+                                            {filters.action_context
+                                                .unassigned ? (
+                                                <p>
+                                                    Only work without an owner
+                                                </p>
+                                            ) : null}
+                                        </dl>
+                                        <Button
+                                            className="frontline-tap"
+                                            variant="outline"
+                                            onClick={() =>
+                                                go({ action_context: null })
+                                            }
+                                        >
+                                            Clear matching-action filter
+                                        </Button>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                            {hasFilters && (
+                                <PageHeaderGlassButton
+                                    icon={X}
+                                    onClick={clearFilters}
+                                >
+                                    Clear filters
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
+                    }
+                    rail={
+                        <SafetyWorkspaceRail hub="actions" current="reviews" />
+                    }
                 />
 
-                {showOrphanNote ? <OrphanNotice /> : null}
-
-                {/* ---- Table ---- */}
-                <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <RegisterTableHeader
-                        icon={Shield}
-                        title={tableTitle}
-                        subtitle="the convergence view"
-                        hint="Right-click a row for governance actions"
-                        hintIcon={MousePointer2}
-                    />
-                    <EventTable
-                        rows={events.data}
-                        onRowCtx={openRowCtx}
-                        onOpen={openEvent}
-                    />
-                </section>
-
-                {events.last_page > 1 ? (
-                    <LaravelPagination links={events.links} />
+                {showOrphanNote ? (
+                    <Note tone="warning" icon={AlertTriangle}>
+                        Some reviews aren’t linked to the record they came
+                        from. Check their history before you rely on them for
+                        what happened.
+                    </Note>
                 ) : null}
+
+                {/* ---- The register (pg-hsn-40) ---- */}
+                <Surface
+                    title={tableTitle}
+                    sub={
+                        events.total && events.from
+                            ? `Showing ${events.from}–${events.to} of ${events.total} · click a review to open it, or use ⋮ for options`
+                            : 'Click a review to open it, or use ⋮ for options'
+                    }
+                >
+                    <div className="mt-3">
+                        <EventTable
+                            rows={events.data}
+                            onRowCtx={openRowCtx}
+                            onOpen={openEvent}
+                        />
+                    </div>
+                    {events.data.length ? (
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-[18px] py-3">
+                            <p className="text-sm text-muted-foreground">
+                                Showing {events.data.length}
+                                {events.total ? ` of ${events.total}` : ''}
+                            </p>
+                            {events.last_page > 1 ? (
+                                <LaravelPagination links={events.links} />
+                            ) : null}
+                        </div>
+                    ) : null}
+                </Surface>
             </div>
 
             {ctx ? (
@@ -930,85 +991,6 @@ export default function HsEventsIndex({
 /*  Events-specific row helpers                                        */
 /* ------------------------------------------------------------------ */
 
-function OrphanNotice() {
-    return (
-        <div className="flex items-start gap-3 rounded-2xl border border-status-warning/35 bg-status-warning-bg px-4 py-3 text-status-warning">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-status-warning text-primary-foreground">
-                <AlertTriangle className="h-4 w-4" />
-            </span>
-            <p className="text-sm leading-6">
-                <strong>Orphan categories shown below as "unwired":</strong>{' '}
-                these were defined in HsEvent before a source observer existed.
-                Each appears here so the convergence view is complete; until an
-                event is created from its source module it has no originating
-                record to link back to.
-            </p>
-        </div>
-    );
-}
-
-const SOURCE_CHIP: Record<string, string> = {
-    ClientIncident: 'bg-status-critical-bg text-status-critical',
-    SafeguardingConcern: 'bg-status-info-bg text-status-info',
-    FleetIncident: 'bg-status-warning-bg text-status-warning',
-    WorkplaceInjury: 'bg-status-critical-bg text-status-critical',
-    SubstanceExposureRecord: 'bg-status-warning-bg text-status-warning',
-    SiteHazard: 'bg-status-warning-bg text-status-warning',
-    SiteInspectionRecord: 'bg-status-info-bg text-status-info',
-    FleetWorkOrder: 'bg-status-warning-bg text-status-warning',
-    RestraintEvent: 'bg-status-critical-bg text-status-critical',
-    EmergencyDrill: 'bg-status-info-bg text-status-info',
-};
-
-function formatWhenCompact(value: string | null): {
-    main: string;
-    title: string;
-} {
-    if (!value) {
-        return { main: '—', title: 'No event date recorded' };
-    }
-
-    const date = new Date(value);
-    const now = new Date();
-    const startToday = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate(),
-    ).getTime();
-    const startValue = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate(),
-    ).getTime();
-    const days = Math.round((startToday - startValue) / 86400000);
-    const time = new Intl.DateTimeFormat('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    }).format(date);
-
-    if (days === 0)
-        return { main: `Today ${time}`, title: formatDateTime(value) };
-    if (days === 1)
-        return { main: `Yesterday ${time}`, title: formatDateTime(value) };
-    if (days > 1 && days < 7)
-        return {
-            main: `${days} days ago ${time}`,
-            title: formatDateTime(value),
-        };
-
-    return {
-        main: new Intl.DateTimeFormat('en-NZ', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-        }).format(date),
-        title: formatDateTime(value),
-    };
-}
-
 function eventContext(ev: EventRow): string {
     if (ev.source?.label) return ev.source.label;
     if (ev.staff_name) return `Reported by ${ev.staff_name}`;
@@ -1026,40 +1008,55 @@ function worksafeState(ev: EventRow): WorksafeState {
     };
 }
 
-function worksafeFlagTone(
-    worksafe: WorksafeState,
-): 'critical' | 'warning' | 'success' | 'info' | 'neutral' {
-    if (worksafe.notifiable === null || worksafe.decision_signed === false)
-        return 'warning';
-    if (worksafe.notifiable === false || worksafe.status === 'acknowledged')
-        return 'success';
-    if (!worksafe.status || worksafe.status === 'pending') return 'critical';
-    return 'warning';
-}
-
-function sourceRef(ev: EventRow): string {
-    if (!ev.source) return 'No source';
-    const prefix =
-        {
-            ClientIncident: 'INC',
-            SafeguardingConcern: 'SG',
-            FleetIncident: 'FI',
-            WorkplaceInjury: 'WI',
-            SubstanceExposureRecord: 'EX',
-            SiteInspectionRecord: 'SI',
-            FleetWorkOrder: 'WO',
-            EmergencyDrill: 'DR',
-            SiteHazard: 'HZ',
-            RestraintEvent: 'RE',
-        }[ev.source.type] ?? 'SRC';
-    return `${prefix}-${ev.source.id}`;
+/** Where a review is up to: its stage on the five-stage line and what it is waiting on, in words. */
+function reviewWhere(ev: EventRow): {
+    stage: number;
+    label: string;
+    note: string;
+    tone?: 'critical' | 'warning' | 'success';
+} {
+    const rank = Math.max(
+        0,
+        STAGE_ORDER.indexOf(ev.status as (typeof STAGE_ORDER)[number]),
+    );
+    const worksafe = worksafeState(ev);
+    const waits: string[] = [];
+    if (ev.handover.status === 'awaiting_acceptance')
+        waits.push('Waiting for Health & safety');
+    if (ev.status !== 'closed')
+        waits.push(`WorkSafe: ${worksafeLabel(worksafe)}`);
+    if (ev.flags.investigation_overdue) waits.push('Investigation overdue');
+    else if (ev.investigation_required && !ev.has_investigation)
+        waits.push('Investigation due');
+    if (ev.flags.awaiting_verification > 0)
+        waits.push(
+            `${ev.flags.awaiting_verification} action${ev.flags.awaiting_verification === 1 ? '' : 's'} to check`,
+        );
+    else if (ev.has_open_actions) waits.push('Open actions');
+    if (ev.flags.unwired) waits.push('No source record');
+    const tone =
+        ev.status === 'closed'
+            ? ('success' as const)
+            : ev.flags.investigation_overdue || ev.flags.worksafe_pending
+              ? ('critical' as const)
+              : ev.handover.status === 'awaiting_acceptance' ||
+                  worksafe.notifiable === null ||
+                  worksafe.decision_signed === false
+                ? ('warning' as const)
+                : undefined;
+    return {
+        stage: rank + 1,
+        label: STAGE[ev.status]?.label ?? titleCase(ev.status),
+        note: waits.join(' · '),
+        tone,
+    };
 }
 
 /* ------------------------------------------------------------------ */
 /*  Events table                                                       */
 /* ------------------------------------------------------------------ */
 
-function EventTable({
+export function EventTable({
     rows,
     onRowCtx,
     onOpen,
@@ -1073,7 +1070,7 @@ function EventTable({
             <div className="px-4 py-16 text-center">
                 <Shield className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
                 <p className="font-medium text-muted-foreground">
-                    No events here
+                    No safety reviews match
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground/70">
                     Nothing matches this tab and filters.
@@ -1082,261 +1079,344 @@ function EventTable({
         );
     }
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] text-sm">
-                <thead className="bg-muted/70">
-                    <tr className="border-b border-border text-left text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-3">When</th>
-                        <th className="px-4 py-3">Event</th>
-                        <th className="px-4 py-3">Source &amp; category</th>
-                        <th className="px-4 py-3">Site / Client</th>
-                        <th className="px-4 py-3">Severity</th>
-                        <th className="px-4 py-3">Stage</th>
-                        <th className="px-4 py-3">Governance flags</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {rows.map((ev) => {
-                        const sev = SEV[ev.severity] ?? SEV.low;
-                        const stage = STAGE[ev.status] ?? STAGE.open;
-                        const StageIcon = stage.icon;
-                        const mod = ev.source
-                            ? SOURCE_MODULE[ev.source.type]
-                            : null;
-                        const ModIcon = mod?.icon ?? Link2;
-                        const when = formatWhenCompact(
-                            ev.occurred_at ?? ev.reported_at,
-                        );
-                        const category =
-                            EVENT_CATEGORY_LABELS[ev.event_category] ??
-                            titleCase(ev.event_category);
-                        const entityName =
-                            ev.client_name ??
-                            ev.site_name ??
-                            ev.staff_name ??
-                            'Unassigned';
-                        const entitySub =
-                            ev.client_name && ev.site_name
-                                ? ev.site_name
-                                : ev.staff_name
-                                  ? ev.staff_name
-                                  : ev.site_name
-                                    ? 'Site record'
-                                    : 'No linked person';
-                        const worksafe = worksafeState(ev);
-                        const WorksafeIcon =
-                            worksafe.notifiable === false ||
-                            worksafe.status === 'acknowledged'
-                                ? ShieldCheck
-                                : worksafe.notifiable === null
-                                  ? Clock
-                                  : ShieldAlert;
-                        return (
-                            <tr
-                                key={ev.id}
+        <>
+            <ul
+                aria-label="Safety reviews"
+                className="min-w-0 divide-y divide-border md:hidden"
+            >
+                {rows.map((ev) => (
+                    <li key={ev.id} className="min-w-0 space-y-4 p-4">
+                        <div className="flex items-start gap-3">
+                            <Button
+                                unstyled
+                                className="frontline-tap frontline-focus min-w-0 flex-1 text-left text-sm font-semibold text-primary"
                                 onClick={() => onOpen(ev.id)}
-                                onContextMenu={(e) => onRowCtx(e, ev)}
-                                tabIndex={0}
-                                aria-label={`Open event ${ev.reference_number}`}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter' || e.key === ' ') {
-                                        e.preventDefault();
-                                        onOpen(ev.id);
-                                    }
-                                }}
-                                className="cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                aria-label={`Open safety review ${ev.reference_number}`}
                             >
-                                <td className="px-4 py-3 align-top whitespace-nowrap">
-                                    <div
-                                        className="text-xs font-bold text-foreground"
-                                        title={when.title}
+                                {ev.reference_number} ·{' '}
+                                {EVENT_CATEGORY_LABELS[ev.event_category] ??
+                                    titleCase(ev.event_category)}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="frontline-tap size-11 shrink-0"
+                                aria-label={`Options for ${ev.reference_number}`}
+                                onClick={(event) => onRowCtx(event, ev)}
+                            >
+                                <MoreVertical aria-hidden className="size-4" />
+                            </Button>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                            {eventContext(ev)}
+                        </p>
+                        <dl className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="col-span-2">
+                                <dt className="text-xs text-muted-foreground">
+                                    {ev.occurred_at ? 'Occurred' : 'Reported'}
+                                </dt>
+                                <dd>
+                                    {formatDateTime(
+                                        ev.occurred_at ?? ev.reported_at,
+                                    )}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs text-muted-foreground">
+                                    Site / person
+                                </dt>
+                                <dd>
+                                    {ev.client_name ??
+                                        ev.staff_name ??
+                                        'No linked person'}
+                                    <span className="block text-xs text-muted-foreground">
+                                        {ev.site_name ?? 'No site recorded'}
+                                    </span>
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs text-muted-foreground">
+                                    Review owner
+                                </dt>
+                                <dd>
+                                    {ev.handover.owner?.name ??
+                                        'Needs an owner'}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs text-muted-foreground">
+                                    Severity
+                                </dt>
+                                <dd>
+                                    <StatusBadge status={ev.severity} />
+                                </dd>
+                            </div>
+                            <div>
+                                <dt className="text-xs text-muted-foreground">
+                                    Stage
+                                </dt>
+                                <dd>
+                                    <StatusBadge
+                                        status={ev.status}
+                                        label={
+                                            STAGE[ev.status]?.label ??
+                                            titleCase(ev.status)
+                                        }
+                                    />
+                                </dd>
+                            </div>
+                            <div className="col-span-2">
+                                <dt className="text-xs text-muted-foreground">
+                                    WorkSafe
+                                </dt>
+                                <dd>{worksafeLabel(worksafeState(ev))}</dd>
+                            </div>
+                            <div className="col-span-2">
+                                <dt className="text-xs text-muted-foreground">
+                                    Source
+                                </dt>
+                                <dd>
+                                    {ev.source?.label ??
+                                        'No linked source record'}
+                                </dd>
+                            </div>
+                        </dl>
+                        <div
+                            className="flex flex-wrap gap-2"
+                            aria-label="Review flags"
+                        >
+                            {ev.handover.status === 'awaiting_acceptance' && (
+                                <FlagBadge
+                                    icon={ShieldCheck}
+                                    tone="warning"
+                                    title="H&S acceptance required"
+                                >
+                                    Awaiting acceptance
+                                </FlagBadge>
+                            )}
+                            {ev.handover.status === 'accepted' && (
+                                <FlagBadge
+                                    icon={ShieldCheck}
+                                    tone="info"
+                                    title={
+                                        ev.handover.accepted_by
+                                            ? `Accepted by ${ev.handover.accepted_by.name}`
+                                            : 'H&S handover accepted'
+                                    }
+                                >
+                                    Accepted
+                                    {ev.handover.accepted_by
+                                        ? ` by ${ev.handover.accepted_by.name}`
+                                        : ''}
+                                </FlagBadge>
+                            )}
+                            {ev.flags.investigation_overdue && (
+                                <FlagBadge
+                                    icon={Clock}
+                                    tone="critical"
+                                    title="Investigation overdue"
+                                >
+                                    Investigation overdue
+                                </FlagBadge>
+                            )}
+                            {ev.investigation_required &&
+                                !ev.has_investigation && (
+                                    <FlagBadge
+                                        icon={Search}
+                                        tone="warning"
+                                        title="Investigation has not started"
                                     >
-                                        {when.main}
-                                    </div>
-                                    <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                                        {ev.reference_number}
-                                    </div>
-                                </td>
-                                <td className="max-w-[280px] px-4 py-3 align-top">
-                                    <div className="flex items-start gap-2">
-                                        <span
-                                            className={`h-2 w-2 shrink-0 rounded-full ${TONE_DOT[sev.tone]}`}
+                                        Investigation needed
+                                    </FlagBadge>
+                                )}
+                            {ev.flags.awaiting_verification > 0 && (
+                                <FlagBadge
+                                    icon={ShieldCheck}
+                                    tone="warning"
+                                    title="Actions awaiting verification"
+                                >
+                                    {ev.flags.awaiting_verification} awaiting
+                                    verification
+                                </FlagBadge>
+                            )}
+                            {ev.has_open_actions && (
+                                <FlagBadge
+                                    icon={ListChecks}
+                                    tone="info"
+                                    title="Open corrective actions"
+                                >
+                                    Open actions
+                                </FlagBadge>
+                            )}
+                            {ev.flags.unwired && (
+                                <FlagBadge
+                                    icon={Link2}
+                                    tone="warning"
+                                    title="No originating record to link back to"
+                                >
+                                    No linked source
+                                </FlagBadge>
+                            )}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+            <div
+                role="region"
+                aria-label="Safety reviews table"
+                className="hidden max-w-full md:block"
+            >
+                <Table className="min-w-[1040px]">
+                    <TableHeader>
+                        <TableRow className="hover:bg-transparent">
+                            {[
+                                'When',
+                                'Type',
+                                'Owner',
+                                'Site / client',
+                                'Severity',
+                                'Where it’s up to',
+                            ].map((label) => (
+                                <TableHead
+                                    key={label}
+                                    className="h-auto bg-muted/60 px-4 py-2.5 font-semibold tracking-wide text-muted-foreground uppercase"
+                                >
+                                    <span className="text-caption">{label}</span>
+                                </TableHead>
+                            ))}
+                            <TableHead className="h-auto w-12 bg-muted/60 px-2 py-2.5">
+                                <span className="sr-only">Options</span>
+                            </TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {rows.map((ev) => {
+                            const when = ev.occurred_at ?? ev.reported_at;
+                            const category =
+                                EVENT_CATEGORY_LABELS[ev.event_category] ??
+                                titleCase(ev.event_category);
+                            const place = ev.client_name ?? ev.site_name;
+                            const placeSub = ev.client_name
+                                ? ev.site_name
+                                : ev.staff_name;
+                            const where = reviewWhere(ev);
+                            return (
+                                <TableRow
+                                    key={ev.id}
+                                    onClick={() => onOpen(ev.id)}
+                                    onContextMenu={(e) => onRowCtx(e, ev)}
+                                    tabIndex={0}
+                                    aria-label={`Open event ${ev.reference_number}`}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            e.target === e.currentTarget &&
+                                            (e.key === 'Enter' || e.key === ' ')
+                                        ) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            onOpen(ev.id);
+                                        }
+                                    }}
+                                    className="cursor-pointer align-top focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                >
+                                    <TableCell className="px-4 py-3">
+                                        <p
+                                            className="font-semibold text-foreground"
+                                            title={
+                                                when
+                                                    ? formatDateTime(when)
+                                                    : 'No occurrence time recorded'
+                                            }
+                                        >
+                                            {when
+                                                ? formatDateOnly(
+                                                      toDateInput(when),
+                                                  )
+                                                : 'Not recorded'}
+                                        </p>
+                                        <p className="mt-0.5 text-caption text-muted-foreground">
+                                            {when ? `${formatTime(when)} · ` : ''}
+                                            {ev.reference_number}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell className="max-w-[18rem] px-4 py-3 whitespace-normal">
+                                        <p className="font-semibold text-foreground">
+                                            {category}
+                                        </p>
+                                        <p className="mt-0.5 text-caption [overflow-wrap:anywhere] text-muted-foreground">
+                                            {eventContext(ev)}
+                                        </p>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3">
+                                        {ev.handover.owner ? (
+                                            <PersonChip
+                                                name={ev.handover.owner.name}
+                                            />
+                                        ) : (
+                                            <StatusBadge variant="warning">
+                                                Needs an owner
+                                            </StatusBadge>
+                                        )}
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3">
+                                        <p className="font-semibold text-foreground">
+                                            {place ?? 'No site recorded'}
+                                        </p>
+                                        {placeSub ? (
+                                            <p className="mt-0.5 text-caption text-muted-foreground">
+                                                {placeSub}
+                                            </p>
+                                        ) : null}
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3">
+                                        <StatusBadge
+                                            variant={
+                                                SEVERITY_VARIANT[ev.severity] ??
+                                                'neutral'
+                                            }
+                                        >
+                                            {SEV[ev.severity]?.label ??
+                                                titleCase(ev.severity)}
+                                        </StatusBadge>
+                                    </TableCell>
+                                    <TableCell className="px-4 py-3 whitespace-normal">
+                                        <StageDots
+                                            stage={where.stage}
+                                            of={STAGE_ORDER.length}
+                                            label={where.label}
+                                            note={
+                                                where.note ? (
+                                                    <span className="whitespace-normal">
+                                                        {where.note}
+                                                    </span>
+                                                ) : undefined
+                                            }
+                                            tone={where.tone}
                                         />
-                                        <span className="min-w-0">
-                                            <span className="block text-xs font-bold text-foreground">
-                                                {category}
-                                            </span>
-                                            <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                                                {eventContext(ev)}
-                                            </span>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    {ev.source && mod ? (
-                                        <div className="flex items-center gap-2">
-                                            <span
-                                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${SOURCE_CHIP[ev.source.type] ?? 'bg-muted text-muted-foreground'}`}
-                                            >
-                                                <ModIcon className="h-3.5 w-3.5" />
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block text-xs font-bold text-foreground">
-                                                    {mod.label}
-                                                </span>
-                                                <span className="block truncate text-[11px] font-medium text-muted-foreground">
-                                                    {sourceRef(ev)}
-                                                </span>
-                                            </span>
-                                        </div>
-                                    ) : (
-                                        <span
-                                            className="inline-flex items-center gap-1 rounded-md bg-status-warning-bg px-2 py-1 text-[11px] font-bold text-status-warning"
-                                            title="No originating module"
+                                    </TableCell>
+                                    <TableCell className="px-2 py-3 text-right">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="frontline-hit size-8 text-muted-foreground"
+                                            aria-label={`Options for ${ev.reference_number}`}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                onRowCtx(event, ev);
+                                            }}
                                         >
-                                            <Link2 className="h-3 w-3" />{' '}
-                                            Unwired category
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    {entityName ? (
-                                        <span className="flex items-center gap-2">
-                                            <span
-                                                className={`grid h-7 w-7 shrink-0 place-items-center rounded-md text-[10px] font-bold ${entityTone(ev.id)}`}
-                                            >
-                                                {initials(entityName)}
-                                            </span>
-                                            <span className="min-w-0">
-                                                <span className="block truncate text-xs font-bold text-foreground">
-                                                    {entityName}
-                                                </span>
-                                                <span className="block truncate text-[11px] text-muted-foreground">
-                                                    {entitySub}
-                                                </span>
-                                            </span>
-                                        </span>
-                                    ) : (
-                                        <span className="text-xs text-muted-foreground">
-                                            —
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_BG[sev.tone]}`}
-                                    >
-                                        {sev.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <span
-                                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${stage.cls}`}
-                                    >
-                                        <StageIcon className="h-3 w-3" />
-                                        {stage.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 align-top">
-                                    <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
-                                        {ev.handover.status ===
-                                        'awaiting_acceptance' ? (
-                                            <FlagBadge
-                                                icon={ShieldCheck}
-                                                tone="warning"
-                                                title="H&S handover awaiting acceptance"
-                                            >
-                                                Awaiting H&S
-                                            </FlagBadge>
-                                        ) : ev.handover.status ===
-                                          'accepted' ? (
-                                            <FlagBadge
-                                                icon={ShieldCheck}
-                                                tone="success"
-                                                title={
-                                                    ev.handover.accepted_by
-                                                        ? `Accepted by ${ev.handover.accepted_by.name}`
-                                                        : 'H&S handover accepted'
-                                                }
-                                            >
-                                                H&S accepted
-                                            </FlagBadge>
-                                        ) : null}
-                                        <FlagBadge
-                                            icon={WorksafeIcon}
-                                            tone={worksafeFlagTone(worksafe)}
-                                            title={`WorkSafe: ${worksafeLabel(worksafe)}`}
-                                        >
-                                            {worksafeLabel(worksafe)}
-                                        </FlagBadge>
-                                        {ev.flags.investigation_overdue ? (
-                                            <FlagBadge
-                                                icon={Search}
-                                                tone="critical"
-                                                title="Investigation overdue"
-                                            >
-                                                Inv overdue
-                                            </FlagBadge>
-                                        ) : ev.investigation_required &&
-                                          !ev.has_investigation ? (
-                                            <FlagBadge
-                                                icon={Search}
-                                                tone="warning"
-                                                title="Investigation required"
-                                            >
-                                                Inv due
-                                            </FlagBadge>
-                                        ) : null}
-                                        {ev.flags.awaiting_verification > 0 ? (
-                                            <FlagBadge
-                                                icon={ShieldCheck}
-                                                tone="info"
-                                                title={`${ev.flags.awaiting_verification} action(s) awaiting verification`}
-                                            >
-                                                {ev.flags.awaiting_verification}{' '}
-                                                verify
-                                            </FlagBadge>
-                                        ) : null}
-                                        {ev.has_open_actions ? (
-                                            <FlagBadge
-                                                icon={ListChecks}
-                                                tone="info"
-                                                title="Open corrective actions"
-                                            >
-                                                Actions
-                                            </FlagBadge>
-                                        ) : null}
-                                        {ev.flags.unwired ? (
-                                            <FlagBadge
-                                                icon={Link2}
-                                                tone="warning"
-                                                title="No originating record to link back to"
-                                            >
-                                                Unwired
-                                            </FlagBadge>
-                                        ) : null}
-                                        {ev.handover.status !==
-                                            'awaiting_acceptance' &&
-                                        ev.handover.status !== 'accepted' &&
-                                        !ev.flags.investigation_overdue &&
-                                        !(
-                                            ev.investigation_required &&
-                                            !ev.has_investigation
-                                        ) &&
-                                        ev.flags.awaiting_verification === 0 &&
-                                        !ev.has_open_actions &&
-                                        !ev.flags.unwired ? (
-                                            <span className="text-xs text-muted-foreground">
-                                                —
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+                                            <MoreVertical
+                                                aria-hidden
+                                                className="size-4"
+                                            />
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
+            </div>
+        </>
     );
 }

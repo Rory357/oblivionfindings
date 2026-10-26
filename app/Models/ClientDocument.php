@@ -3,7 +3,9 @@
 namespace App\Models;
 
 use App\Contracts\Timeline\EmitsToTimeline;
+use App\Domain\Referrals\Services\ReferralDocumentHandovers;
 use App\Models\Concerns\AuditableChanges;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -31,10 +33,32 @@ class ClientDocument extends Model implements EmitsToTimeline
     ];
 
     protected $casts = [
+        'source_referral_evidence_id' => 'integer',
+        'referral_release' => 'encrypted:array',
         'effective_date' => 'date',
         'expiry_date' => 'date',
         'portal_visible' => 'boolean',
     ];
+
+    protected $hidden = ['source_referral_evidence_id', 'referral_release'];
+
+    protected $auditExcludedAttributes = ['source_referral_evidence_id', 'referral_release'];
+
+    protected static function booted(): void
+    {
+        $protectRelease = function (self $document): void {
+            if ($document->source_referral_evidence_id) {
+                $document->auditExcludedAttributes = ['source_referral_evidence_id', 'referral_release', 'title', 'category', 'folder', 'notes', 'storage_disk', 'storage_path', 'original_name', 'openai_file_id'];
+            }
+        };
+        static::saving($protectRelease);
+        static::deleting($protectRelease);
+    }
+
+    public function scopeVisibleReferralReleases(Builder $query, User $actor): Builder
+    {
+        return app(ReferralDocumentHandovers::class)->visible($query, $actor);
+    }
 
     public function client(): BelongsTo
     {
@@ -51,7 +75,7 @@ class ClientDocument extends Model implements EmitsToTimeline
      */
     public function toTimelineEvent(): ?array
     {
-        if (! $this->expiry_date) {
+        if ($this->source_referral_evidence_id || ! $this->expiry_date) {
             return null;
         }
 

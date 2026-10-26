@@ -3,6 +3,8 @@
 @import 'tw-animate-css';
 @import './maintenance-date-time.css';
 @import './journey-auth.css';
+@import './signature-blocks.css';
+@import './journey-site.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -441,6 +443,23 @@
     --src-period-close: oklch(50% 0.13 105);
     --src-period-close-bg: oklch(96% 0.05 105);
     --src-period-close-ln: oklch(86% 0.09 105);
+    /* Referrals → Calendar sources: next actions and follow-ups, calls and
+       meetings (appointments), assessment work and funding assistance. Same
+       fixed, distinct-hue rule; the four are spaced well apart from each other
+       (135 / 245 / 88 / 300) so they read side by side on the referral calendar
+       without borrowing the Sites inspection/compliance keys. */
+    --src-referral-follow-up: oklch(48% 0.13 135);
+    --src-referral-follow-up-bg: oklch(95% 0.05 135);
+    --src-referral-follow-up-ln: oklch(85% 0.08 135);
+    --src-referral-appointment: oklch(50% 0.15 245);
+    --src-referral-appointment-bg: oklch(96% 0.035 245);
+    --src-referral-appointment-ln: oklch(87% 0.06 245);
+    --src-referral-assessment: oklch(50% 0.12 88);
+    --src-referral-assessment-bg: oklch(96% 0.05 90);
+    --src-referral-assessment-ln: oklch(86% 0.09 90);
+    --src-referral-funding: oklch(50% 0.18 300);
+    --src-referral-funding-bg: oklch(96% 0.04 300);
+    --src-referral-funding-ln: oklch(88% 0.07 300);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
     --src-external: oklch(46% 0.03 265);
@@ -469,7 +488,9 @@
         from var(--primary) 0.834 calc(c * 0.468) calc(h + 11.5)
     );
     /* Text on ink that isn't white: ≥ 7:1 on --journey-ink for every hue. */
-    --journey-ink-muted: oklch(from var(--journey-lavender) 0.8 calc(c * 0.35) h);
+    --journey-ink-muted: oklch(
+        from var(--journey-lavender) 0.8 calc(c * 0.35) h
+    );
     --journey-lilac: oklch(from var(--journey-lavender) 0.94 calc(c * 0.3) h);
     /* The form half of the sign-in pages and its input fill. */
     --journey-surface: var(--journey-paper);
@@ -1039,6 +1060,325 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     color: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Header facts and the one strip (approved by Stephan 23 Oct 2026 with the
+ * Health & safety drawings, design viewer v35) — page-header-strip.tsx.
+ * Same dark glass and fixed status floors as the meter blocks: facts are
+ * value + label chips; numbers are up to four equal boxes (number first);
+ * stages are a record's stage line with its next step on top.
+ * ────────────────────────────────────────────────────────────────────────── */
+.eh-fact,
+.eh-number,
+.eh-stages {
+    --eh-glass: color-mix(in oklch, var(--eh-ink, oklch(0.17 0.01 277)) 45%, transparent);
+    --eh-edge: color-mix(in oklch, var(--band-foreground) 16%, transparent);
+    --eh-crit: oklch(from var(--status-critical) max(l, 0.84) c h);
+    --eh-warn: oklch(from var(--status-warning) max(l, 0.82) c h);
+    --eh-ok: oklch(from var(--status-success) max(l, 0.82) c h);
+}
+.eh-fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+    font-size: calc(12.5rem / 14);
+    white-space: nowrap;
+}
+.eh-fact b {
+    font-weight: 650;
+}
+.eh-fact em {
+    font-style: normal;
+    color: color-mix(in oklch, var(--band-foreground) 78%, transparent);
+}
+.eh-fact > i {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--band-foreground);
+}
+.eh-fact--critical {
+    border-color: color-mix(in oklch, var(--eh-crit) 55%, transparent);
+}
+.eh-fact--critical > i {
+    background: var(--eh-crit);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--eh-crit) 25%, transparent);
+}
+.eh-fact--warning {
+    border-color: color-mix(in oklch, var(--eh-warn) 55%, transparent);
+}
+.eh-fact--warning > i {
+    background: var(--eh-warn);
+}
+.eh-fact--success > i {
+    background: var(--eh-ok);
+}
+.eh-fact--neutral > i {
+    background: color-mix(in oklch, var(--band-foreground) 55%, transparent);
+}
+
+.eh-numbers {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+@media (max-width: 1023px) {
+    .eh-numbers {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+.eh-number {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-align: left;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+    transition:
+        transform 0.15s ease,
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+.eh-number:hover {
+    transform: translateY(-1px);
+    background: color-mix(in oklch, var(--eh-ink, oklch(0.17 0.01 277)) 62%, transparent);
+    border-color: color-mix(in oklch, var(--band-foreground) 34%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+    .eh-number,
+    .eh-number:hover {
+        transform: none;
+        transition: none;
+    }
+}
+.eh-number-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: calc(22rem / 14);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.eh-number-text {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+}
+.eh-number-text em {
+    font-style: normal;
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.eh-number-text small {
+    font-size: calc(11.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 75%, transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.eh-number-go {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 11px;
+    height: 11px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.eh-number:hover .eh-number-go,
+.eh-number:focus-visible .eh-number-go {
+    opacity: 1;
+}
+.eh-number-ring {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: conic-gradient(
+        currentColor calc(var(--p) * 1%),
+        color-mix(in oklch, var(--band-foreground) 22%, transparent) 0
+    );
+    -webkit-mask: radial-gradient(circle, transparent 0 6px, #000 7px);
+    mask: radial-gradient(circle, transparent 0 6px, #000 7px);
+}
+.eh-number--critical {
+    border-color: color-mix(in oklch, var(--eh-crit) 60%, transparent);
+}
+.eh-number--critical .eh-number-value,
+.eh-number--critical .eh-number-text em {
+    color: var(--eh-crit);
+}
+.eh-number--warning {
+    border-color: color-mix(in oklch, var(--eh-warn) 60%, transparent);
+}
+.eh-number--warning .eh-number-value,
+.eh-number--warning .eh-number-text em {
+    color: var(--eh-warn);
+}
+.eh-number--success .eh-number-value {
+    color: var(--eh-ok);
+}
+
+.eh-stages {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+}
+.eh-next {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-bottom: 12px;
+}
+.eh-next > b {
+    font-size: calc(15rem / 14);
+    font-weight: 650;
+}
+.eh-next > small {
+    flex-basis: 100%;
+    font-size: calc(12.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-next-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: calc(11rem / 14);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+.eh-next-kicker > i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--band-foreground);
+}
+.eh-next-kicker--critical {
+    color: var(--eh-crit);
+}
+.eh-next-kicker--critical > i {
+    background: var(--eh-crit);
+}
+.eh-next-kicker--warning {
+    color: var(--eh-warn);
+}
+.eh-next-kicker--warning > i {
+    background: var(--eh-warn);
+}
+.eh-next-kicker--success > i {
+    background: var(--eh-ok);
+}
+.eh-stage-line {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.eh-stage-line::before,
+.eh-stage-line::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 7px;
+    height: 2px;
+    border-radius: 2px;
+}
+.eh-stage-line::before {
+    right: 8px;
+    background: color-mix(in oklch, var(--band-foreground) 24%, transparent);
+}
+.eh-stage-line::after {
+    width: calc((100% - 16px) * var(--done, 0));
+    background: var(--band-foreground);
+}
+.eh-stage {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: start;
+    align-content: start;
+    gap: 4px;
+    padding-right: 8px;
+}
+.eh-stage:last-child {
+    justify-items: end;
+    padding-right: 0;
+    text-align: right;
+}
+.eh-stage > i {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--eh-ink, oklch(0.17 0.01 277));
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--band-foreground) 50%, transparent);
+}
+/* A stage line the reader can move along (a full-page form's steps): each label is a button. */
+.eh-stage-pick {
+    all: unset;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.eh-stage-pick:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.eh-stage-pick:focus-visible {
+    outline: 2px solid var(--band-foreground);
+    outline-offset: 2px;
+}
+.eh-stage > b,
+.eh-stage > .eh-stage-pick {
+    font-size: calc(12.5rem / 14);
+    font-weight: 650;
+}
+.eh-stage > small {
+    font-size: calc(11.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 75%, transparent);
+}
+.eh-stage--done > i {
+    background: var(--band-foreground);
+    box-shadow: none;
+}
+.eh-stage--todo > b,
+.eh-stage--todo > .eh-stage-pick {
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-stage--now > i {
+    box-shadow:
+        inset 0 0 0 4px var(--band-foreground),
+        0 0 12px color-mix(in oklch, var(--band-foreground) 55%, transparent);
+}
+.eh-stage--warning > i {
+    box-shadow:
+        inset 0 0 0 4px var(--eh-warn),
+        0 0 12px color-mix(in oklch, var(--eh-warn) 55%, transparent);
+}
+.eh-stage--critical > i {
+    box-shadow:
+        inset 0 0 0 4px var(--eh-crit),
+        0 0 12px color-mix(in oklch, var(--eh-crit) 55%, transparent);
+}
+
 /* Hide scrollbars on icon sidebar */
 .scrollbar-none::-webkit-scrollbar {
     display: none;
@@ -1518,4 +1858,217 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 /* Fleet overview: mute only raster basemap tiles; markers retain status tones. */
 .grayscale-map .leaflet-tile-pane {
     filter: grayscale(1);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * The pop-up kit (components/popup/, DESIGN.md "Pop-up kit"; approved by
+ * Stephan 23 Oct 2026 — Control Room first). Two brand marks, both derived
+ * from --primary so Settings › Branding retints them:
+ *   .popup-lens     the round icon lens in a pop-up header (never a rounded
+ *                   square). Critical/warning lenses use the fixed status
+ *                   pairs — safety tones never follow the brand.
+ *   .popup-horizon  the 2px horizon line on the top edge of anything that
+ *                   floats (dialog, confirm, selection bar).
+ * ────────────────────────────────────────────────────────────────────────── */
+.popup-lens {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--primary);
+    background:
+        radial-gradient(
+            110% 110% at 50% 118%,
+            color-mix(in oklch, var(--primary) 22%, transparent) 0%,
+            transparent 62%
+        ),
+        color-mix(in oklch, var(--primary-fill) 9%, var(--card));
+    box-shadow:
+        inset 0 0 0 1.5px color-mix(in oklch, currentColor 36%, transparent),
+        0 0 0 5px color-mix(in oklch, currentColor 7%, transparent);
+}
+.popup-lens--sm {
+    width: 30px;
+    height: 30px;
+    box-shadow: inset 0 0 0 1.5px var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+}
+.popup-lens--critical {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+}
+.popup-lens--warning {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+/* No `position` here: this rule is outside Tailwind's layers, so it would
+   beat the dialog's `fixed` and drop the pop-up to the foot of the page.
+   Every frame that uses it is already fixed, sticky or `relative`. */
+.popup-horizon::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            20%,
+        var(--primary) 50%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            80%,
+        transparent 100%
+    );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Control Room's own marks (Stephan, 24 Oct 2026: "light board + Oblivion
+ * details"; components/control-room/live-response/target-lens.tsx).
+ *   .cr-lens  the countdown lens — the pop-up kit's round lens with a ring
+ *             that empties as a response target gets closer. Brand while
+ *             there's time; the fixed warning / critical pairs when it's
+ *             close or missed (safety tones never follow the brand); grey
+ *             when there's no target and it shows how long it has waited.
+ *   .cr-live  the "Live · updated 9:46 am" mark on the header band.
+ * ────────────────────────────────────────────────────────────────────────── */
+.cr-lens {
+    --cr-lens-tone: var(--primary);
+    --cr-lens-left: 100%;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--cr-lens-tone);
+    background:
+        radial-gradient(
+            closest-side,
+            color-mix(in oklch, var(--cr-lens-tone) 7%, var(--card)) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        conic-gradient(
+            var(--cr-lens-tone) var(--cr-lens-left),
+            color-mix(in oklch, var(--cr-lens-tone) 16%, transparent) 0
+        );
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--cr-lens-tone) 7%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+.cr-lens-value {
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+}
+.cr-lens-unit {
+    margin-top: 2px;
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--muted-foreground);
+}
+.cr-lens--lg {
+    width: 68px;
+    height: 68px;
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--cr-lens-tone) 8%, transparent);
+}
+.cr-lens--lg .cr-lens-value {
+    font-size: 18px;
+}
+.cr-lens--warning {
+    --cr-lens-tone: var(--status-warning);
+}
+.cr-lens--critical {
+    --cr-lens-tone: var(--status-critical);
+}
+.cr-lens--neutral {
+    --cr-lens-tone: var(--muted-foreground);
+}
+.cr-lens--late {
+    background:
+        radial-gradient(
+            closest-side,
+            var(--status-critical-bg) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        var(--status-critical);
+}
+
+.cr-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.cr-live-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: oklch(from var(--live) 0.86 calc(c * 1.4) h);
+}
+.cr-live--stale .cr-live-dot {
+    background: oklch(from var(--status-warning) 0.86 c h);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .cr-live:not(.cr-live--stale) .cr-live-dot::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        border: 1.5px solid oklch(from var(--live) 0.86 calc(c * 1.4) h);
+        animation: cr-live-pulse 2.4s ease-out infinite;
+    }
+    .cr-lens--late {
+        animation: cr-lens-late 2.4s ease-in-out infinite;
+    }
+}
+@keyframes cr-live-pulse {
+    0% {
+        opacity: 0.7;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(2.2);
+    }
+}
+@keyframes cr-lens-late {
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-critical) 10%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 7px color-mix(in oklch, var(--status-critical) 18%, transparent);
+    }
+}
+/* A row that arrived since the list first drew glows once (the critical
+   notice above the list says it in words). */
+@media (prefers-reduced-motion: no-preference) {
+    .cr-row-new {
+        animation: cr-row-new 4s ease-out 1;
+    }
+}
+@keyframes cr-row-new {
+    0%,
+    30% {
+        background-color: color-mix(in oklch, var(--live) 16%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
 }

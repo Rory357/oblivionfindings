@@ -121,7 +121,8 @@ class RespiteReferralController extends Controller
                     'service_context_id' => ServiceContext::defaultId(),
                     'funding_type' => RespiteFundingSource::label($fundingSource),
                     'funding_notes' => $fundingReference,
-                    'status' => 'active',
+                    // Established intake behaviour, unless the organisation requires a commencement review for everyone.
+                    'status' => \App\Domain\Referrals\Services\ReferralActivationGuard::requiredForEveryone() ? 'onboarding' : 'active',
                 ]);
             }
         }

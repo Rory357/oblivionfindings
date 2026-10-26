@@ -1,0 +1,237 @@
+- generic [ref=f21e2]:
+  - generic [ref=f21e3]:
+    - generic [ref=f21e4]: Interactive prototype · fictional data
+    - generic [ref=f21e6]:
+      - combobox "Preview role" [ref=f21e7] [cursor=pointer]:
+        - option "Referral manager" [selected]
+        - option "Receptionist"
+        - option "Coordinator"
+        - option "Funding navigator"
+        - option "Finance reviewer"
+        - option "Support worker"
+        - option "Settings administrator"
+      - button "Website entry" [ref=f21e8] [cursor=pointer]
+      - button "Walkthroughs" [ref=f21e9] [cursor=pointer]
+      - button "Use dark theme" [ref=f21e10] [cursor=pointer]
+  - generic [ref=f21e11]:
+    - banner [ref=f21e12]:
+      - button "Oblivion Care home" [ref=f21e13] [cursor=pointer]:
+        - text: blivion
+        - strong [ref=f21e15]: Care
+      - generic [ref=f21e16]:
+        - textbox "Search referrals globally" [ref=f21e20]:
+          - /placeholder: Search referrals, people and reference numbers
+        - generic [ref=f21e21]: /
+      - generic [ref=f21e22]: Thursday, 15 October 2026
+      - button "Review current permissions" [ref=f21e23] [cursor=pointer]: ET
+    - complementary [ref=f21e24]:
+      - generic [ref=f21e25]: CARE OPERATIONS
+      - button "Referrals" [ref=f21e26] [cursor=pointer]:
+        - generic [ref=f21e31]: "8"
+      - button "Supported people" [ref=f21e32] [cursor=pointer]
+      - button "Funding assistance" [ref=f21e39] [cursor=pointer]
+      - button "Follow-ups" [ref=f21e44] [cursor=pointer]
+      - button "Calendar" [ref=f21e48] [cursor=pointer]
+      - button "Reports" [ref=f21e52] [cursor=pointer]
+      - button "Settings" [ref=f21e59] [cursor=pointer]
+      - generic [ref=f21e64]:
+        - generic [ref=f21e65]: One organisation
+        - paragraph [ref=f21e66]: "Approved sites · role permissionsPreviewing: Referral manager"
+        - button "Collapse navigation" [ref=f21e67] [cursor=pointer]
+    - main [ref=f21e70]:
+      - navigation "Breadcrumb" [ref=f21e71]:
+        - button "Home" [ref=f21e72] [cursor=pointer]
+        - button "Referrals" [ref=f21e78] [cursor=pointer]
+      - generic [ref=f21e80]:
+        - generic [ref=f21e81]:
+          - generic [ref=f21e82]:
+            - generic [ref=f21e88]:
+              - generic [ref=f21e89]:
+                - heading "Referrals" [level=1] [ref=f21e90]
+                - generic [ref=f21e91]: 9 in your scope
+              - paragraph [ref=f21e92]: Every enquiry has a person, an owner and a next step.
+            - generic [ref=f21e93]:
+              - generic [ref=f21e94]:
+                - searchbox "Find a person or reference" [ref=f21e95]
+                - generic [aria-hidden]: /
+              - button "Saved views" [ref=f21e96] [cursor=pointer]
+              - button "New referral" [ref=f21e97] [cursor=pointer]
+          - generic [ref=f21e99]:
+            - generic [ref=f21e100]:
+              - button "View open referrals" [pressed] [ref=f21e101] [cursor=pointer]:
+                - generic [ref=f21e105]: Open referrals
+                - generic [ref=f21e107]: "8"
+                - generic [ref=f21e108]: View this queue
+              - button "View unassigned" [ref=f21e109] [cursor=pointer]:
+                - generic [ref=f21e113]: Unassigned
+                - generic [ref=f21e115]: "1"
+                - generic [ref=f21e116]: View this queue
+              - button "View follow-up overdue" [ref=f21e117] [cursor=pointer]:
+                - generic [ref=f21e121]: Follow-up overdue
+                - generic [ref=f21e123]: "1"
+                - generic [ref=f21e124]: Human follow-up needed
+              - button "View ready for handover" [ref=f21e125] [cursor=pointer]:
+                - generic [ref=f21e129]: Ready for handover
+                - generic [ref=f21e131]: "1"
+                - generic [ref=f21e132]: View this queue
+            - generic [ref=f21e133]:
+              - button "Site" [ref=f21e135] [cursor=pointer]
+              - button "View" [ref=f21e140] [cursor=pointer]
+              - radiogroup "Layout" [ref=f21e144]:
+                - radio "Cards" [ref=f21e145] [cursor=pointer]
+                - radio "Table" [checked] [ref=f21e151] [cursor=pointer]
+                - radio "Pipeline" [ref=f21e153] [cursor=pointer]
+        - generic [ref=f21e157]:
+          - tablist "Views" [ref=f21e158]:
+            - tab "Referrals" [selected] [ref=f21e159] [cursor=pointer]
+            - tab "Funding assistance" [ref=f21e164] [cursor=pointer]
+            - tab "Follow-ups" [ref=f21e169] [cursor=pointer]
+            - tab "Calendar" [ref=f21e173] [cursor=pointer]
+            - tab "Reports" [ref=f21e177] [cursor=pointer]
+          - button "Find a section" [ref=f21e184] [cursor=pointer]:
+            - generic [ref=f21e188]: Find
+            - generic [aria-hidden] [ref=f21e189]: /
+      - generic [ref=f21e190]:
+        - generic [ref=f21e191]:
+          - generic [ref=f21e193]:
+            - heading "Referrals" [level=2] [ref=f21e194]
+            - generic [ref=f21e195]: 8 of 9 shown
+          - table [ref=f21e199]:
+            - row "Person / referral Stage Owner Site Next action Follow up by Actions" [ref=f21e200]:
+              - columnheader "Person / referral" [ref=f21e201]
+              - columnheader "Stage" [ref=f21e202]
+              - columnheader "Owner" [ref=f21e203]
+              - columnheader "Site" [ref=f21e204]
+              - columnheader "Next action" [ref=f21e205]
+              - columnheader "Follow up by" [ref=f21e206]
+              - columnheader "Actions"
+            - row [ref=f21e208] [cursor=pointer]:
+              - cell "MB Maia Bennett REF-1042 · Website" [ref=f21e209]:
+                - generic [ref=f21e210]: MB
+                - generic [ref=f21e211]:
+                  - generic [ref=f21e212]: Maia Bennett
+                  - generic [ref=f21e214]: REF-1042 · Website
+              - cell "New" [ref=f21e215]
+              - cell "—" [ref=f21e217]
+              - cell "Central intake" [ref=f21e224]
+              - cell "Confirm safe contact and authority" [ref=f21e226]
+              - cell "16 Oct 2026" [ref=f21e228]
+              - cell [ref=f21e230]:
+                - button "Actions for Maia Bennett" [ref=f21e232]
+            - row [ref=f21e237] [cursor=pointer]:
+              - cell "NC Noah Clarke REF-1043 · Professional" [ref=f21e238]:
+                - generic [ref=f21e239]: NC
+                - generic [ref=f21e240]:
+                  - generic [ref=f21e241]: Noah Clarke
+                  - generic [ref=f21e243]: REF-1043 · Professional
+              - cell "Ready for handover" [ref=f21e244]
+              - cell "ET Emma Taylor" [ref=f21e246]:
+                - generic [ref=f21e247]:
+                  - generic [ref=f21e248]: ET
+                  - generic [ref=f21e249]: Emma Taylor
+              - cell "Auckland" [ref=f21e250]
+              - cell "Review handover into supported living" [ref=f21e252]
+              - cell "16 Oct 2026" [ref=f21e254]
+              - cell [ref=f21e256]:
+                - button "Actions for Noah Clarke" [ref=f21e258]
+            - row [ref=f21e263] [cursor=pointer]:
+              - cell "HR Hana Reed REF-1044 · Phone" [ref=f21e264]:
+                - generic [ref=f21e265]: HR
+                - generic [ref=f21e266]:
+                  - generic [ref=f21e267]: Hana Reed
+                  - generic [ref=f21e269]: REF-1044 · Phone
+              - cell "Funding assistance" [ref=f21e270]
+              - cell "ET Emma Taylor" [ref=f21e272]:
+                - generic [ref=f21e273]:
+                  - generic [ref=f21e274]: ET
+                  - generic [ref=f21e275]: Emma Taylor
+              - cell "Auckland" [ref=f21e276]
+              - cell "Discuss the funding gap with Hana" [ref=f21e278]
+              - cell "14 Oct 2026 Overdue" [ref=f21e280]:
+                - generic [ref=f21e281]:
+                  - text: 14 Oct 2026
+                  - generic [ref=f21e282]: Overdue
+              - cell [ref=f21e283]:
+                - button "Actions for Hana Reed" [ref=f21e285]
+            - row [ref=f21e290] [cursor=pointer]:
+              - cell "LM Leo Morgan REF-1045 · Website" [ref=f21e291]:
+                - generic [ref=f21e292]: LM
+                - generic [ref=f21e293]:
+                  - generic [ref=f21e294]: Leo Morgan
+                  - generic [ref=f21e296]: REF-1045 · Website
+              - cell "Assessment" [ref=f21e297]
+              - cell "ET Emma Taylor" [ref=f21e299]:
+                - generic [ref=f21e300]:
+                  - generic [ref=f21e301]: ET
+                  - generic [ref=f21e302]: Emma Taylor
+              - cell "Auckland" [ref=f21e303]
+              - cell "Review private payer proposal" [ref=f21e305]
+              - cell "16 Oct 2026" [ref=f21e307]
+              - cell [ref=f21e309]:
+                - button "Actions for Leo Morgan" [ref=f21e311]
+            - row [ref=f21e316] [cursor=pointer]:
+              - cell "AW Aria Wilson REF-1046 · Website" [ref=f21e317]:
+                - generic [ref=f21e318]: AW
+                - generic [ref=f21e319]:
+                  - generic [ref=f21e320]: Aria Wilson
+                  - generic [ref=f21e322]: REF-1046 · Website
+              - cell "On hold" [ref=f21e323]
+              - cell "ET Emma Taylor" [ref=f21e325]:
+                - generic [ref=f21e326]:
+                  - generic [ref=f21e327]: ET
+                  - generic [ref=f21e328]: Emma Taylor
+              - cell "Auckland" [ref=f21e329]
+              - cell "Review capacity waitlist" [ref=f21e331]
+              - cell "16 Oct 2026" [ref=f21e333]
+              - cell [ref=f21e335]:
+                - button "Actions for Aria Wilson" [ref=f21e337]
+            - row [ref=f21e342] [cursor=pointer]:
+              - cell "TB Theo Brooks REF-1047 · Professional" [ref=f21e343]:
+                - generic [ref=f21e344]: TB
+                - generic [ref=f21e345]:
+                  - generic [ref=f21e346]: Theo Brooks
+                  - generic [ref=f21e348]: REF-1047 · Professional
+              - cell "Funding assistance" [ref=f21e349]
+              - cell "OC Olivia Chen" [ref=f21e351]:
+                - generic [ref=f21e352]:
+                  - generic [ref=f21e353]: OC
+                  - generic [ref=f21e354]: Olivia Chen
+              - cell "Waikato" [ref=f21e355]
+              - cell "Prepare grant application" [ref=f21e357]
+              - cell "16 Oct 2026" [ref=f21e359]
+              - cell [ref=f21e361]:
+                - button "Actions for Theo Brooks" [ref=f21e363]
+            - row [ref=f21e368] [cursor=pointer]:
+              - cell "IJ Isla James REF-1048 · Phone" [ref=f21e369]:
+                - generic [ref=f21e370]: IJ
+                - generic [ref=f21e371]:
+                  - generic [ref=f21e372]: Isla James
+                  - generic [ref=f21e374]: REF-1048 · Phone
+              - cell "Triage" [ref=f21e375]
+              - cell "ET Emma Taylor" [ref=f21e377]:
+                - generic [ref=f21e378]:
+                  - generic [ref=f21e379]: ET
+                  - generic [ref=f21e380]: Emma Taylor
+              - cell "Auckland" [ref=f21e381]
+              - cell "Arrange benefit appointment" [ref=f21e383]
+              - cell "16 Oct 2026" [ref=f21e385]
+              - cell [ref=f21e387]:
+                - button "Actions for Isla James" [ref=f21e389]
+            - row [ref=f21e394] [cursor=pointer]:
+              - cell "EC Eli Carter REF-1049 · Website" [ref=f21e395]:
+                - generic [ref=f21e396]: EC
+                - generic [ref=f21e397]:
+                  - generic [ref=f21e398]: Eli Carter
+                  - generic [ref=f21e400]: REF-1049 · Website
+              - cell "Assessment" [ref=f21e401]
+              - cell "ET Emma Taylor" [ref=f21e403]:
+                - generic [ref=f21e404]:
+                  - generic [ref=f21e405]: ET
+                  - generic [ref=f21e406]: Emma Taylor
+              - cell "Auckland" [ref=f21e407]
+              - cell "Review additional support" [ref=f21e409]
+              - cell "16 Oct 2026" [ref=f21e411]
+              - cell [ref=f21e413]:
+                - button "Actions for Eli Carter" [ref=f21e415]
+        - paragraph [ref=f21e420]: 8 visible referrals · Dates shown in New Zealand time · Private records outside your scope are excluded.
+  - status [ref=f21e421]

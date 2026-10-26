@@ -28,6 +28,7 @@ import {
     type WpCan,
     type WpDetailAction,
 } from '@/components/worker-participation/shared';
+import { toDateInput } from '@/lib/datetime';
 import {
     titleCase,
     type Tone,
@@ -47,6 +48,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useState, type ComponentType, type FormEvent } from 'react';
+import { ParticipationOwnershipNotice } from './ownership-notice';
 
 const WP_BASE = '/health-safety/worker-participation';
 
@@ -115,7 +117,10 @@ export function RepresentativeDetailDialog({
     const name = d.user?.name ?? 'Representative';
     const active = d.status === 'active';
     const statusTone: Tone = REP_STATUS[d.status] ?? 'neutral';
-    const belowMin = (d.training_days_completed ?? 0) < 2;
+    const belowMin =
+        Number.isSafeInteger(d.training_days_completed) &&
+        d.training_days_completed >= 0 &&
+        d.training_days_completed < 2;
 
     const SECTIONS: {
         key: SectionKey;
@@ -207,7 +212,7 @@ export function RepresentativeDetailDialog({
             open={open}
             onClose={onClose}
             title={`Representative · ${name}`}
-            description={`H&S representative — ${d.site?.name ?? 'site'}`}
+            description={`H&S representative — ${d.site?.name ?? 'Site not recorded'}`}
             railIcon={ShieldCheck}
             railTitle={name}
             railSub={`H&S rep · ${d.site?.name ?? '—'}`}
@@ -220,6 +225,7 @@ export function RepresentativeDetailDialog({
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
+            <ParticipationOwnershipNotice state={d.site_ownership} />
             {action === 'edit' ? (
                 <EditPane d={d} onDone={() => setAction(null)} />
             ) : action === 'training' ? (
@@ -342,7 +348,7 @@ function EditPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
                         />
                     </Field>
                     <Field
-                        label="Training days completed"
+                        label="Recorded training days"
                         error={form.errors.training_days_completed}
                     >
                         <Input
@@ -445,7 +451,8 @@ function TrainingPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
             />
             <form onSubmit={submit} className="flex flex-col gap-4">
                 <Field
-                    label="Training days completed"
+                    label="Recorded training days"
+                    hint="Cumulative paid days"
                     required
                     error={form.errors.training_days_completed}
                 >
@@ -463,13 +470,13 @@ function TrainingPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
                     />
                 </Field>
                 <Field
-                    label="Initial training completed"
-                    hint="NZQA US 29315 — optional"
+                    label="Reported initial training date"
+                    hint="Optional · qualification evidence is managed in HR"
                     error={form.errors.initial_training_completed_at}
                 >
                     <Input
                         type="date"
-                        max={new Date().toISOString().slice(0, 10)}
+                        max={toDateInput(new Date())}
                         value={form.data.initial_training_completed_at}
                         onChange={(e) =>
                             form.setData(
@@ -480,11 +487,11 @@ function TrainingPane({ d, onDone }: { d: RepDetail; onDone: () => void }) {
                     />
                 </Field>
                 <InfoCard icon={GraduationCap} tone="info">
-                    Under HSWA 2015 an elected H&amp;S representative is
-                    entitled to <b>two days&apos; paid training each year</b>.
-                    Approved training maps to <b>NZQA Unit Standard 29315</b>{' '}
-                    (HSR training). Recording the completion date adds a tracked
-                    credential to the rep&apos;s HR record.
+                    Record the paid training days and reported completion date.
+                    This cumulative total does not establish the current
+                    year&apos;s training position or achievement of NZQA Unit
+                    Standard 29315. Qualification evidence and credentials are
+                    managed in HR.
                 </InfoCard>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={onDone}>
@@ -516,7 +523,11 @@ function OverviewSection({
     belowMin: boolean;
     onTraining?: () => void;
 }) {
-    const trainingDays = d.training_days_completed ?? 0;
+    const trainingDays =
+        Number.isSafeInteger(d.training_days_completed) &&
+        d.training_days_completed >= 0
+            ? d.training_days_completed
+            : null;
     return (
         <div className="grid gap-4 sm:grid-cols-2">
             {/* Person header */}
@@ -551,15 +562,14 @@ function OverviewSection({
             </div>
 
             {belowMin ? (
-                <InfoCard icon={GraduationCap} tone="warn">
+                <InfoCard icon={GraduationCap} tone="info">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <span>
                             <span className="font-semibold">
-                                Below the training minimum.
+                                Fewer than two training days recorded.
                             </span>{' '}
-                            This rep has {trainingDays}{' '}
-                            {trainingDays === 1 ? 'day' : 'days'} — HSWA 2015
-                            entitles them to two paid days a year.
+                            This is a cumulative total. Review dated training
+                            records for the current year.
                         </span>
                         {onTraining ? (
                             <Button size="sm" onClick={onTraining}>
@@ -605,26 +615,21 @@ function OverviewSection({
 
             <ReviewCard icon={GraduationCap} title="Training">
                 <ReviewRow
-                    label="Days completed"
+                    label="Recorded days (cumulative)"
                     value={
-                        <span
-                            className={
-                                belowMin
-                                    ? 'text-status-warning'
-                                    : 'text-status-success'
-                            }
-                        >
-                            {trainingDays} {trainingDays === 1 ? 'day' : 'days'}
+                        <span className="text-muted-foreground">
+                            {trainingDays === null
+                                ? 'Not recorded'
+                                : `${trainingDays} ${trainingDays === 1 ? 'day' : 'days'}`}
                         </span>
                     }
                 />
-                <ReviewRow label="HSWA minimum" value="2 days / year" />
                 <ReviewRow
-                    label="Standard met"
-                    value={belowMin ? 'Below minimum' : 'Minimum met'}
+                    label="Annual training position"
+                    value="Not confirmed by this cumulative total"
                 />
                 <ReviewRow
-                    label="First trained"
+                    label="Reported initial training date"
                     value={
                         d.initial_training_completed_at
                             ? fmtDate(d.initial_training_completed_at)
@@ -645,6 +650,7 @@ function OverviewSection({
 function HistorySection({ d }: { d: RepDetail }) {
     type TLEvent = {
         at: string;
+        instant?: boolean;
         label: string;
         tone: Tone;
         icon: ComponentType<{ className?: string }>;
@@ -653,6 +659,7 @@ function HistorySection({ d }: { d: RepDetail }) {
     if (d.created_at) {
         events.push({
             at: d.created_at,
+            instant: true,
             label: `Added to the register${d.creator?.name ? ` by ${d.creator.name}` : ''}`,
             tone: 'neutral',
             icon: UserRound,
@@ -672,13 +679,13 @@ function HistorySection({ d }: { d: RepDetail }) {
     if (d.initial_training_completed_at) {
         events.push({
             at: d.initial_training_completed_at,
-            label: 'Initial HSWA training completed',
+            label: 'Initial training completion reported',
             tone: 'success',
             icon: GraduationCap,
         });
     }
     if (d.term_expires_at) {
-        const ended = new Date(d.term_expires_at).getTime() < Date.now();
+        const ended = d.term_expires_at < toDateInput(new Date());
         events.push({
             at: d.term_expires_at,
             label: ended ? 'Term ended' : 'Term ends',
@@ -686,7 +693,11 @@ function HistorySection({ d }: { d: RepDetail }) {
             icon: CalendarClock,
         });
     }
-    events.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+    events.sort((a, b) =>
+        (a.instant ? toDateInput(a.at) : a.at).localeCompare(
+            b.instant ? toDateInput(b.at) : b.at,
+        ),
+    );
 
     return (
         <div className="flex flex-col gap-5">
@@ -706,7 +717,9 @@ function HistorySection({ d }: { d: RepDetail }) {
                                     </span>
                                 </div>
                                 <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {fmtDate(e.at)}
+                                    {e.instant
+                                        ? fmtDateTime(e.at)
+                                        : fmtDate(e.at)}
                                 </p>
                             </li>
                         );
@@ -725,7 +738,7 @@ function HistorySection({ d }: { d: RepDetail }) {
                 />
                 <ReviewRow label="Added by" value={d.creator?.name} />
                 <ReviewRow
-                    label="Initial training completed"
+                    label="Reported initial training date"
                     value={
                         d.initial_training_completed_at
                             ? fmtDate(d.initial_training_completed_at)

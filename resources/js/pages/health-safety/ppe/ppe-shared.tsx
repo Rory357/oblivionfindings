@@ -106,7 +106,7 @@ export function catIcon(category?: string | null): LucideIcon {
     return CAT_ICON[category ?? 'other'] ?? Package;
 }
 export function catLabel(category?: string | null): string {
-    return CAT_LABEL[category ?? 'other'] ?? 'Other';
+    return category == null || category === '' ? 'Not recorded' : CAT_LABEL[category] ?? 'Not confirmed';
 }
 export function catTone(category?: string | null): PpeTone {
     return CAT_TONE[category ?? 'other'] ?? 'neutral';
@@ -492,6 +492,8 @@ export type HeroBlock = {
 };
 
 export type PpeAttachment = {
+    can_relocate?: boolean;
+    relocate_blocked_reason?: string | null;
     id: number;
     original_name: string;
     url: string;

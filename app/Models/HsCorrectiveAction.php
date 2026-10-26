@@ -9,6 +9,7 @@ use App\Services\References\ReferenceNumberGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -100,6 +101,7 @@ class HsCorrectiveAction extends Model
         'effectiveness_confirmed' => 'boolean',
         'closed_at' => 'datetime',
         'recommendation_index' => 'integer',
+        'owner_revision' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -141,6 +143,27 @@ class HsCorrectiveAction extends Model
         return $this->belongsTo(User::class, 'assigned_by_user_id');
     }
 
+    public function ownerChanges(): HasMany
+    {
+        return $this->hasMany(HsCorrectiveActionOwnerChange::class, 'action_id')->orderByDesc('revision');
+    }
+
+    /** Reassigning an action does not make a previous owner independent of it. */
+    public function hasBeenOwnedBy(int $userId): bool
+    {
+        if ((int) $this->assigned_to_user_id === $userId) {
+            return true;
+        }
+        if (! $this->owner_revision) {
+            return false;
+        }
+        if ($this->relationLoaded('ownerChanges')) {
+            return $this->ownerChanges->contains(fn ($change) => (int) $change->owner_user_id === $userId || (int) $change->previous_owner_user_id === $userId);
+        }
+
+        return $this->ownerChanges()->where(fn ($query) => $query->where('owner_user_id', $userId)->orWhere('previous_owner_user_id', $userId))->exists();
+    }
+
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by_user_id');
@@ -170,10 +193,16 @@ class HsCorrectiveAction extends Model
         return $query->whereNotIn('status', [self::STATUS_VERIFIED, self::STATUS_CLOSED]);
     }
 
+    /** The worker calendar; an empty setting falls back to the application timezone. */
+    private static function workerTimezone(): string
+    {
+        return (string) (config('app.worker_timezone', 'Pacific/Auckland') ?: config('app.timezone') ?: 'UTC');
+    }
+
     public function scopeOverdue($query)
     {
         return $query->whereNotNull('due_date')
-            ->where('due_date', '<', now()->toDateString())
+            ->where('due_date', '<', now(self::workerTimezone())->toDateString())
             ->whereNotIn('status', [self::STATUS_VERIFIED, self::STATUS_CLOSED]);
     }
 
@@ -222,7 +251,7 @@ class HsCorrectiveAction extends Model
     public function isOverdue(): bool
     {
         return $this->due_date
-            && $this->due_date->isPast()
+            && $this->due_date->toDateString() < now(self::workerTimezone())->toDateString()
             && $this->isOpen();
     }
 

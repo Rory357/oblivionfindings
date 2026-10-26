@@ -119,6 +119,11 @@ return [
             'controlroom.alert',
         ],
 
+        // --- Service agreements ---
+        'Service agreements' => [
+            'service_agreements.referral_draft_created',
+        ],
+
         // --- Cross-Domain ---
         'Cross-Module Notifications' => [
             'cross_domain.hr_compliance_concern_created',

@@ -49,7 +49,7 @@ const roles: {
     can: Record<string, unknown>;
     overview: boolean;
 }[] = [
-    // Overview is every staff role's home since 753a7f396 (six role workspaces).
+    // Every role has an Overview workspace now (role Overview, Oct 2026).
     { role: 'support_worker', can: {}, overview: true },
     {
         role: 'provider_manager',

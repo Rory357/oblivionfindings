@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\LoneWorkerSession;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\HealthSafety\LoneWorkerSessionAccessService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,6 +13,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
 /**
@@ -55,17 +58,18 @@ class CheckLoneWorkerOverdueJob implements ShouldQueue
                                 ->whereKey($candidate->id)
                                 ->lockForUpdate()
                                 ->first();
-                            if (! $session || ! in_array($session->status, ['active', 'overdue'], true)) {
+                            if (! $session || ! in_array($session->status, ['active', 'overdue'], true) || $session->ended_at !== null) {
                                 return ['overdue' => 0, 'overrun' => 0];
                             }
 
+                            CurrentAuthorizationReads::within(fn ($reads) => app(LoneWorkerSessionAccessService::class)->assertSource($session, $reads));
                             $overdue = 0;
                             $overrun = 0;
                             $lastCheckIn = ($session->last_check_in_at ?? $session->started_at)->copy();
                             $checkInDeadline = $lastCheckIn->addMinutes($session->check_in_interval_minutes);
                             if ($session->status === 'active' && $checkInDeadline->isPast()) {
                                 $minutesOverdue = (int) $checkInDeadline->diffInMinutes(now());
-                                $session->update(['status' => 'overdue']);
+                                $session->forceFill(['status' => 'overdue', 'lock_version' => (int) $session->lock_version + 1])->saveQuietly();
                                 $signalService->emitOverdueCheckIn($session, $minutesOverdue);
                                 $overdue = 1;
                             }
@@ -76,15 +80,22 @@ class CheckLoneWorkerOverdueJob implements ShouldQueue
                                 $overrun = 1;
                             }
 
+                            $session->forceFill(['last_monitor_checked_at' => now(), 'monitor_failed_at' => null, 'monitor_failure_code' => null])->saveQuietly();
+
                             return ['overdue' => $overdue, 'overrun' => $overrun];
                         }, 3);
 
                         $overdueCount += $outcome['overdue'];
                         $overrunCount += $outcome['overrun'];
                     } catch (Throwable $exception) {
+                        try {
+                            LoneWorkerSession::query()->whereKey($candidate->id)->whereIn('status', ['active', 'overdue'])->whereNull('ended_at')->update(['monitor_failed_at' => now(), 'monitor_failure_code' => $exception instanceof HttpException ? 'source_authority_revoked' : 'signal_delivery_failed']);
+                        } catch (Throwable $receiptError) {
+                            Log::error('CheckLoneWorkerOverdueJob: failure receipt unavailable', ['session_id' => $candidate->id, 'exception_type' => $receiptError::class]);
+                        }
                         Log::error('CheckLoneWorkerOverdueJob: session failed', [
                             'session_id' => $candidate->id,
-                            'error' => $exception->getMessage(),
+                            'exception_type' => $exception::class,
                         ]);
                     }
                 }

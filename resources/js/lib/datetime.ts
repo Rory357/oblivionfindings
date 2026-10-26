@@ -139,6 +139,22 @@ export function toDateInput(
     return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
+/** Inclusive reporting days on the NZ calendar, independent of browser timezone. */
+export function workerDayRange(
+    days: number,
+    asAt: DateInput = new Date(),
+): { from: string; to: string } {
+    const to = toDateInput(asAt);
+    if (!to || !Number.isInteger(days) || days < 1) {
+        return { from: '', to: '' };
+    }
+    // UTC is only the arithmetic carrier for calendar components here, not the
+    // zone of the reported events. Subtracting 24-hour instants crosses DST badly.
+    const calendar = new Date(`${to}T00:00:00Z`);
+    calendar.setUTCDate(calendar.getUTCDate() - (days - 1));
+    return { from: calendar.toISOString().slice(0, 10), to };
+}
+
 /** Completed calendar years on the worker's NZ day; a birth date is not an instant. */
 export function ageOnWorkerDay(
     birthDate: string | null | undefined,

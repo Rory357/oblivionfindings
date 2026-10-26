@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\IncidentController;
+use App\Http\Controllers\IncidentRecordingCommandController;
 use App\Http\Controllers\IncidentFollowupController;
+use App\Http\Controllers\IncidentOwnershipController;
 use App\Http\Controllers\IncidentReportController;
 use App\Http\Controllers\IncidentReportDraftController;
 use App\Http\Controllers\IncidentTemplateController;
@@ -50,21 +52,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Incident management (assigned staff + managers).
     // {incident} is constrained to numeric IDs so sibling segments like
     // /incidents/templates or /incidents/create can't be swallowed here.
+    Route::get('/incidents', [IncidentController::class, 'index'])
+        ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)->name('incidents.index');
+    Route::get('/incidents/{incident}', [IncidentController::class, 'show'])
+        ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
+        ->whereNumber('incident')->name('incidents.show');
+    Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
+        ->middleware(\App\Http\Middleware\CurrentIncidentRegisterAccess::class)
+        ->whereNumber(['incident', 'attachment'])->name('incidents.attachments.download');
     Route::middleware('permission:incidents.viewAny|incidents.viewAssigned')->group(function () {
-        Route::get('/incidents', [IncidentController::class, 'index'])->name('incidents.index');
-        Route::get('/incidents/{incident}', [IncidentController::class, 'show'])
-            ->whereNumber('incident')
-            ->name('incidents.show');
-
-        // Attachments
-        Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
-            ->whereNumber(['incident', 'attachment'])
-            ->name('incidents.attachments.download');
+        // Linked Control Room evidence retains its existing source policy pending its owning current-read seam.
         Route::get('/incidents/{incident}/control-room-evidence/{item}/download', [IncidentController::class, 'downloadControlRoomEvidence'])
             ->whereNumber(['incident', 'item'])
             ->name('incidents.control-room-evidence.download');
     });
 
+    Route::middleware('permission:incidents.owner.assign')->group(function () {
+        Route::get('/incidents/{incident}/owners/options', [IncidentOwnershipController::class, 'candidates'])
+            ->whereNumber('incident')->name('incidents.owners.options');
+        Route::post('/incidents/{incident}/owner', [IncidentOwnershipController::class, 'store'])
+            ->whereNumber('incident')->name('incidents.owner.store');
+        Route::post('/incidents/{incident}/owner-deliveries/{delivery}/retry', [IncidentOwnershipController::class, 'retry'])
+            ->whereNumber('incident')->whereUuid('delivery')->name('incidents.owner-deliveries.retry');
+    });
+
+    // NEW recording reconstruction commands; operation/source authority is checked by the current-read service.
+    Route::post('/incidents/{incident}/recording-attachments', [IncidentRecordingCommandController::class, 'attach'])
+        ->whereNumber('incident')->name('incidents.recording-attachments.store');
+    Route::post('/incidents/{incident}/evidence-windows', [IncidentRecordingCommandController::class, 'recordWindow'])
+        ->whereNumber('incident')->name('incidents.evidence-windows.store');
+    Route::get('/incidents/{incident}/recording-attachment-commands/{idempotencyKey}', [IncidentRecordingCommandController::class, 'recoverAttachment'])
+        ->whereNumber('incident')->whereUuid('idempotencyKey')->name('incidents.recording-attachment-commands.recover');
+    Route::get('/incidents/{incident}/evidence-window-commands/{idempotencyKey}', [IncidentRecordingCommandController::class, 'recoverWindow'])
+        ->whereNumber('incident')->whereUuid('idempotencyKey')->name('incidents.evidence-window-commands.recover');
     // Incident updates
     Route::put('/incidents/{incident}', [IncidentController::class, 'update'])
         ->whereNumber('incident')

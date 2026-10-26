@@ -8,7 +8,7 @@ import type { QueueFilter } from './use-conflict-queue';
 const SEV_TILE: Record<Severity, string> = {
     critical: 'bg-status-critical-bg text-status-critical',
     warning: 'bg-status-warning-bg text-status-warning',
-    info: 'bg-accent text-primary',
+    info: 'bg-primary-fill/10 text-primary',
 };
 
 const SEV_BAR: Record<Severity, string> = {
@@ -67,7 +67,7 @@ function QueueRow({
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
                 {hideType ? null : (
-                    <span className="text-[11px] text-muted-foreground">
+                    <span className="text-xs text-muted-foreground">
                         {meta.label}
                     </span>
                 )}
@@ -153,10 +153,10 @@ export function ConflictQueueList({
                                     >
                                         <GroupIcon className="h-3 w-3" />
                                     </span>
-                                    <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                                         {meta.short}
                                     </span>
-                                    <span className="ml-auto text-[11px] font-semibold text-muted-foreground tabular-nums">
+                                    <span className="ml-auto text-xs font-semibold text-muted-foreground tabular-nums">
                                         {group.items.length}
                                     </span>
                                 </div>

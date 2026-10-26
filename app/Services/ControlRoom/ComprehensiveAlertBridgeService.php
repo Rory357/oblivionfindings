@@ -196,6 +196,11 @@ class ComprehensiveAlertBridgeService
      */
     public function bridgeOperationalAlert(string $type, string $severity, array $context = []): ?ControlRoomAlert
     {
+        // Restraint events keep one revision-bound alert per event with a receipt for each source delivery.
+        if ($type === 'restraint_event') {
+            return app(RestraintOperationalAlertBridge::class)->deliver($severity, $context);
+        }
+
         return $this->createBridgedAlert([
             'source' => 'operations',
             'alert_type' => "operations.{$type}",

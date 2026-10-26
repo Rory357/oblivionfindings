@@ -3,17 +3,41 @@
 namespace Database\Factories;
 
 use App\Models\Client;
+use App\Support\Fixtures\HistoricalClientFixture;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Enumerable;
 
 class ClientFactory extends Factory
 {
     protected $model = Client::class;
 
+    /** Seed pre-existing synthetic people; runtime creation must use the guarded model. */
+    protected function store(Collection $results)
+    {
+        $results->each(function (Client $model) {
+            if (! isset($this->connection)) {
+                $model->setConnection($model->newQueryWithoutScopes()->getConnection()->getName());
+            }
+            if ($model->status === 'active' || $model->service_start_date !== null) {
+                HistoricalClientFixture::save($model);
+            } else {
+                $model->save();
+            }
+            foreach ($model->getRelations() as $name => $items) {
+                if ($items instanceof Enumerable && $items->isEmpty()) {
+                    $model->unsetRelation($name);
+                }
+            }
+            $this->createChildren($model);
+        });
+    }
+
     public function definition(): array
     {
         return [
             'first_name' => fake()->firstName(),
-            'last_name'  => fake()->lastName(),
+            'last_name' => fake()->lastName(),
             'nhi_number' => $this->generateNhi(),
             'date_of_birth' => fake()->dateTimeBetween('-80 years', '-18 years'),
             'phone' => fake()->phoneNumber(),
@@ -23,7 +47,7 @@ class ClientFactory extends Factory
             'postcode' => fake()->postcode(),
             // Deterministic: custody, assignment and ownership paths only accept
             // active clients. Use ->inactive() when a test needs one.
-            'status'     => 'active',
+            'status' => 'active',
         ];
     }
 
@@ -32,9 +56,10 @@ class ClientFactory extends Factory
      */
     private function generateNhi(): string
     {
-        $letters = strtoupper(fake()->randomLetter() . fake()->randomLetter() . fake()->randomLetter());
+        $letters = strtoupper(fake()->randomLetter().fake()->randomLetter().fake()->randomLetter());
         $numbers = str_pad(fake()->numberBetween(0, 9999), 4, '0', STR_PAD_LEFT);
-        return $letters . $numbers;
+
+        return $letters.$numbers;
     }
 
     /**

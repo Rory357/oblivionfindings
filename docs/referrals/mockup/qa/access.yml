@@ -1,0 +1,157 @@
+- generic [ref=f10e1]:
+  - generic [ref=f10e2]:
+    - generic [ref=f10e3]:
+      - generic [ref=f10e4]: Interactive prototype · fictional data
+      - generic [ref=f10e6]:
+        - combobox "Preview role" [ref=f10e7] [cursor=pointer]:
+          - option "Referral manager" [selected]
+          - option "Receptionist"
+          - option "Coordinator"
+          - option "Funding navigator"
+          - option "Finance reviewer"
+          - option "Support worker"
+          - option "Settings administrator"
+        - button "Website entry" [ref=f10e8] [cursor=pointer]
+        - button "Walkthroughs" [ref=f10e9] [cursor=pointer]
+        - button "Use dark theme" [ref=f10e10] [cursor=pointer]
+    - generic [ref=f10e11]:
+      - banner [ref=f10e12]:
+        - button "Oblivion Care home" [ref=f10e13] [cursor=pointer]:
+          - text: blivion
+          - strong [ref=f10e15]: Care
+        - generic [ref=f10e16]:
+          - textbox "Search referrals globally" [ref=f10e20]:
+            - /placeholder: Search referrals, people and reference numbers
+          - generic [ref=f10e21]: /
+        - generic [ref=f10e22]: Thursday, 15 October 2026
+        - button "Review current permissions" [ref=f10e23] [cursor=pointer]: ET
+      - complementary [ref=f10e24]:
+        - generic [ref=f10e25]: CARE OPERATIONS
+        - button "Referrals" [ref=f10e26] [cursor=pointer]:
+          - generic [ref=f10e31]: "8"
+        - button "Supported people" [ref=f10e32] [cursor=pointer]
+        - button "Funding assistance" [ref=f10e39] [cursor=pointer]
+        - button "Follow-ups" [ref=f10e44] [cursor=pointer]
+        - button "Reports" [ref=f10e48] [cursor=pointer]
+        - button "Settings" [ref=f10e55] [cursor=pointer]
+        - generic [ref=f10e60]:
+          - generic [ref=f10e61]: One organisation
+          - paragraph [ref=f10e62]: "Approved sites · role permissionsPreviewing: Referral manager"
+          - button "Collapse navigation" [ref=f10e63] [cursor=pointer]
+      - main [ref=f10e66]:
+        - navigation "Breadcrumb" [ref=f10e67]:
+          - button "Home" [ref=f10e68] [cursor=pointer]
+          - button "Settings" [ref=f10e74] [cursor=pointer]
+        - generic [ref=f10e76]:
+          - generic [ref=f10e78]:
+            - generic [ref=f10e84]:
+              - generic [ref=f10e85]:
+                - heading "Referral settings" [level=1] [ref=f10e86]
+                - generic [ref=f10e87]: Published v2
+              - paragraph [ref=f10e88]: One organisation · controlled configuration across approved sites
+            - generic [ref=f10e89]:
+              - button "Review changes" [disabled]
+          - tablist "Views" [ref=f10e94]:
+            - tab "Overview" [ref=f10e95] [cursor=pointer]
+            - tab "Intake" [ref=f10e100] [cursor=pointer]
+            - tab "Workflow" [ref=f10e105] [cursor=pointer]
+            - tab "Funding" [ref=f10e111] [cursor=pointer]
+            - tab "Access" [selected] [ref=f10e116] [cursor=pointer]
+            - tab "History" [ref=f10e121] [cursor=pointer]
+        - generic [ref=f10e127]:
+          - tablist "Workspace sections" [ref=f10e128]:
+            - tab [selected] [ref=f10e129] [cursor=pointer]
+            - tab [ref=f10e135] [cursor=pointer]
+          - generic [ref=f10e141]:
+            - generic [ref=f10e142]:
+              - heading "Role permissions" [level=2] [ref=f10e147]
+              - paragraph [ref=f10e148]: A grant never bypasses approved sites, canonical record ownership or privacy restrictions.
+            - generic [ref=f10e149]:
+              - generic [ref=f10e150]:
+                - generic [ref=f10e151]: Role to configure
+                - combobox "Role to configure" [expanded] [ref=f10e152] [cursor=pointer]: Coordinator
+              - generic [ref=f10e153]:
+                - generic [ref=f10e160]:
+                  - strong [ref=f10e161]: Coordinator
+                  - paragraph [ref=f10e162]: 5 permissions enabled. Record scope still applies to every action.
+                - generic [ref=f10e163]:
+                  - heading "Everyday referral work" [level=3] [ref=f10e164]
+                  - generic [ref=f10e165]:
+                    - generic [ref=f10e166]: View referrals
+                    - generic [ref=f10e167]: Allowed
+                    - switch "View referrals" [checked] [ref=f10e168] [cursor=pointer]
+                  - generic [ref=f10e169]:
+                    - generic [ref=f10e170]: Create referrals
+                    - generic [ref=f10e171]: Allowed
+                    - switch "Create referrals" [checked] [ref=f10e172] [cursor=pointer]
+                  - generic [ref=f10e173]:
+                    - generic [ref=f10e174]: Edit assigned referrals
+                    - generic [ref=f10e175]: Allowed
+                    - switch "Edit assigned referrals" [checked] [ref=f10e176] [cursor=pointer]
+                  - generic [ref=f10e177]:
+                    - generic [ref=f10e178]: Assign referrals
+                    - generic [ref=f10e179]: "Off"
+                    - switch "Assign referrals" [ref=f10e180] [cursor=pointer]
+                - generic [ref=f10e181]:
+                  - heading "Funding & handover" [level=3] [ref=f10e182]
+                  - generic [ref=f10e183]:
+                    - generic [ref=f10e184]: View assessments & evidence
+                    - generic [ref=f10e185]: Allowed
+                    - switch "View assessments & evidence" [checked] [ref=f10e186] [cursor=pointer]
+                  - generic [ref=f10e187]:
+                    - generic [ref=f10e188]: Manage funding assistance
+                    - generic [ref=f10e189]: "Off"
+                    - switch "Manage funding assistance" [ref=f10e190] [cursor=pointer]
+                  - generic [ref=f10e191]:
+                    - generic [ref=f10e192]: Verify funding decisions
+                    - generic [ref=f10e193]: "Off"
+                    - switch "Verify funding decisions" [ref=f10e194] [cursor=pointer]
+                  - generic [ref=f10e195]:
+                    - generic [ref=f10e196]: Create / link supported person
+                    - generic [ref=f10e197]: Allowed
+                    - switch "Create / link supported person" [checked] [ref=f10e198] [cursor=pointer]
+                  - generic [ref=f10e199]:
+                    - generic [ref=f10e200]: Approve service start
+                    - generic [ref=f10e201]: "Off"
+                    - switch "Approve service start" [ref=f10e202] [cursor=pointer]
+                - generic [ref=f10e203]:
+                  - heading "Information & configuration" [level=3] [ref=f10e204]
+                  - generic [ref=f10e205]:
+                    - generic [ref=f10e206]: Export referral reports
+                    - generic [ref=f10e207]: "Off"
+                    - switch "Export referral reports" [ref=f10e208] [cursor=pointer]
+                  - generic [ref=f10e209]:
+                    - generic [ref=f10e210]: View audit history
+                    - generic [ref=f10e211]: "Off"
+                    - switch "View audit history" [ref=f10e212] [cursor=pointer]
+                  - generic [ref=f10e213]:
+                    - generic [ref=f10e214]: Publish settings
+                    - generic [ref=f10e215]: "Off"
+                    - switch "Publish settings" [ref=f10e216] [cursor=pointer]
+                - generic [ref=f10e217]:
+                  - heading "Record scope" [level=3] [ref=f10e218]
+                  - generic [ref=f10e219]:
+                    - generic [ref=f10e220]: View central intake
+                    - generic [ref=f10e221]: "Off"
+                    - switch "View central intake" [ref=f10e222] [cursor=pointer]
+                  - generic [ref=f10e223]:
+                    - generic [ref=f10e224]: View all approved sites
+                    - generic [ref=f10e225]: "Off"
+                    - switch "View all approved sites" [ref=f10e226] [cursor=pointer]
+                  - generic [ref=f10e227]:
+                    - generic [ref=f10e228]: View privacy-restricted referrals
+                    - generic [ref=f10e229]: "Off"
+                    - switch "View privacy-restricted referrals" [ref=f10e230] [cursor=pointer]
+    - status [ref=f10e231]
+  - dialog [ref=f10e233]:
+    - generic [ref=f10e234]:
+      - combobox [expanded] [active] [ref=f10e240]
+      - listbox "Suggestions" [ref=f10e241]:
+        - group [ref=f10e243]:
+          - option "Referral manager" [selected] [ref=f10e244]
+          - option "Receptionist" [ref=f10e245]
+          - option "Coordinator" [ref=f10e246]
+          - option "Funding navigator" [ref=f10e247]
+          - option "Finance reviewer" [ref=f10e248]
+          - option "Support worker" [ref=f10e249]
+          - option "Settings administrator" [ref=f10e250]

@@ -33,6 +33,7 @@ import {
     TilePicker,
     type IconType,
 } from '@/components/wizard/primitives';
+import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { useForm, usePage } from '@inertiajs/react';
 import {
@@ -150,6 +151,10 @@ export type ClientWizardForm = {
     create_client_portal_user: boolean;
     // cultural
     ethnicity: string;
+    iwi: string;
+    hapu: string;
+    marae: string;
+    cultural_dietary_needs: string;
     languages: string[];
     religion: string;
     // support
@@ -388,6 +393,10 @@ const COMPLETION_FIELDS: (keyof ClientWizardForm)[] = [
     'city',
     'postcode',
     'ethnicity',
+    'iwi',
+    'hapu',
+    'marae',
+    'cultural_dietary_needs',
     'languages',
     'religion',
     'mobility_needs',
@@ -401,7 +410,6 @@ const COMPLETION_FIELDS: (keyof ClientWizardForm)[] = [
     'life_story',
     'education_level',
     'employment_status',
-    'service_start_date',
     'key_worker_id',
     'house_geofence_id',
     'funding_type',
@@ -511,6 +519,10 @@ function initialForm(
         postcode: '',
         create_client_portal_user: false,
         ethnicity: '',
+        iwi: '',
+        hapu: '',
+        marae: '',
+        cultural_dietary_needs: '',
         languages: [],
         religion: '',
         mobility_needs: '',
@@ -570,6 +582,10 @@ const STEP_FOR_PREFIX: { prefix: string; step: StepKey }[] = [
     { prefix: 'conditions', step: 'health' },
     { prefix: 'emergency_contacts', step: 'contacts' },
     { prefix: 'ethnicity', step: 'cultural' },
+    { prefix: 'iwi', step: 'cultural' },
+    { prefix: 'hapu', step: 'cultural' },
+    { prefix: 'marae', step: 'cultural' },
+    { prefix: 'cultural_dietary_needs', step: 'cultural' },
     { prefix: 'languages', step: 'cultural' },
     { prefix: 'religion', step: 'cultural' },
     { prefix: 'mobility_needs', step: 'support' },
@@ -711,12 +727,14 @@ function PhotoField({ ctx }: { ctx: StepCtx }) {
 function validateStep(
     key: StepKey,
     d: ClientWizardForm,
+    allowUnknownBirthDate = false,
 ): Record<string, string> {
     const e: Record<string, string> = {};
     if (key === 'basics') {
         if (!d.first_name.trim()) e.first_name = 'First name is required';
         if (!d.last_name.trim()) e.last_name = 'Last name is required';
-        if (!d.date_of_birth) e.date_of_birth = 'Date of birth is required';
+        if (!d.date_of_birth && !allowUnknownBirthDate)
+            e.date_of_birth = 'Date of birth is required';
         if (!d.site_id) e.site_id = 'Choose a site';
         if (!d.service_context_id)
             e.service_context_id = 'Choose a service context';
@@ -809,6 +827,7 @@ function AddClientBody({
 }: AddClientDialogProps) {
     const page = usePage<{ flash?: { created_client_id?: number | null } }>();
     const isEditMode = clientId != null;
+    const allowUnknownBirthDate = isEditMode && !initialValues?.date_of_birth;
     const steps =
         isEditMode && !canEditMedical
             ? STEPS.filter(
@@ -851,7 +870,7 @@ function AddClientBody({
     };
 
     const next = () => {
-        const e = validateStep(cur.key, data);
+        const e = validateStep(cur.key, data, allowUnknownBirthDate);
         setErrors(e);
         if (Object.keys(e).length) return;
         setStepIndex((i) => Math.min(i + 1, steps.length - 1));
@@ -870,7 +889,11 @@ function AddClientBody({
     const submit = (addAnother: boolean) => {
         // Re-validate every gating step; jump to the first that fails.
         const all: Record<string, string> = {};
-        for (const s of steps) Object.assign(all, validateStep(s.key, data));
+        for (const s of steps)
+            Object.assign(
+                all,
+                validateStep(s.key, data, allowUnknownBirthDate),
+            );
         if (Object.keys(all).length) {
             setErrors(all);
             goToStep(stepForError(Object.keys(all)[0]));
@@ -908,6 +931,7 @@ function AddClientBody({
         if (isEditMode && clientId) {
             form.transform((payload) => {
                 const permitted = { ...payload } as Partial<ClientWizardForm>;
+                delete permitted.service_start_date;
                 if (!canEditMedical) {
                     delete permitted.medical;
                     delete permitted.conditions;
@@ -917,13 +941,19 @@ function AddClientBody({
             });
             form.post(`/operations/clients/${clientId}`, options);
         } else {
-            form.transform((payload) => payload);
+            form.transform((payload) => {
+                const permitted = { ...payload } as Partial<ClientWizardForm>;
+                delete permitted.service_start_date;
+                return permitted;
+            });
             form.post('/operations/clients', options);
         }
     };
 
     const ctx: StepCtx = {
         data,
+        canRetainActiveStatus: isEditMode && initialValues?.status === 'active',
+        allowUnknownBirthDate,
         set,
         setMedical,
         setMany,
@@ -1160,6 +1190,8 @@ function AddClientBody({
 
 type StepCtx = {
     data: ClientWizardForm;
+    canRetainActiveStatus: boolean;
+    allowUnknownBirthDate: boolean;
     set: <K extends keyof ClientWizardForm>(
         k: K,
         v: ClientWizardForm[K],
@@ -1253,7 +1285,12 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                     </Field>
                     <Field
                         label="Date of birth"
-                        required
+                        required={!ctx.allowUnknownBirthDate}
+                        hint={
+                            ctx.allowUnknownBirthDate
+                                ? 'Not yet known. Leave blank until verified.'
+                                : undefined
+                        }
                         error={err('date_of_birth')}
                     >
                         <div className="flex items-center gap-2.5">
@@ -1287,7 +1324,14 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             value={data.preferred_pronouns}
                             onChange={(v) => set('preferred_pronouns', v)}
                             placeholder="Select pronouns"
-                            options={PRONOUNS.map((p) => ({
+                            options={[
+                                ...new Set(
+                                    [
+                                        ...PRONOUNS,
+                                        data.preferred_pronouns,
+                                    ].filter(Boolean),
+                                ),
+                            ].map((p) => ({
                                 value: p,
                                 label: p,
                             }))}
@@ -1386,13 +1430,18 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             }))}
                         />
                     </Field>
-                    <Field label="Status">
+                    <Field
+                        label="Status"
+                        hint="Support becomes active through the separate service-start review. Use Prepare support on the person's onboarding page after saving their details."
+                    >
                         <Segmented
                             value={data.status}
                             onChange={(v) => set('status', v)}
                             options={[
                                 { value: 'onboarding', label: 'Onboarding' },
-                                { value: 'active', label: 'Active' },
+                                ...(ctx.canRetainActiveStatus
+                                    ? [{ value: 'active', label: 'Active' }]
+                                    : []),
                                 { value: 'inactive', label: 'Inactive' },
                             ]}
                         />
@@ -1539,17 +1588,54 @@ function StepCultural({ ctx }: { ctx: StepCtx }) {
                         value={data.ethnicity}
                         onChange={(v) => set('ethnicity', v)}
                         placeholder="Select ethnicity"
-                        options={ETHNICITIES.map((e) => ({
+                        options={[
+                            ...new Set(
+                                [...ETHNICITIES, data.ethnicity].filter(
+                                    Boolean,
+                                ),
+                            ),
+                        ].map((e) => ({
                             value: e,
                             label: e,
                         }))}
+                    />
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-3">
+                    {(['iwi', 'hapu', 'marae'] as const).map((key) => (
+                        <Field
+                            key={key}
+                            label={
+                                { iwi: 'Iwi', hapu: 'Hapū', marae: 'Marae' }[
+                                    key
+                                ]
+                            }
+                        >
+                            <Input
+                                value={data[key]}
+                                maxLength={255}
+                                onChange={(event) =>
+                                    set(key, event.target.value)
+                                }
+                            />
+                        </Field>
+                    ))}
+                </div>
+                <Field label="Cultural dietary needs">
+                    <Textarea
+                        value={data.cultural_dietary_needs}
+                        maxLength={2000}
+                        onChange={(event) =>
+                            set('cultural_dietary_needs', event.target.value)
+                        }
                     />
                 </Field>
                 <Field label="Languages spoken" hint="select all that apply">
                     <ChipMulti
                         values={data.languages}
                         onChange={(v) => set('languages', v)}
-                        options={LANGUAGES}
+                        options={[
+                            ...new Set([...LANGUAGES, ...data.languages]),
+                        ]}
                     />
                 </Field>
                 <Field label="Religion / spiritual beliefs">
@@ -1557,14 +1643,18 @@ function StepCultural({ ctx }: { ctx: StepCtx }) {
                         value={data.religion}
                         onChange={(v) => set('religion', v)}
                         placeholder="Select if relevant"
-                        options={RELIGIONS.map((r) => ({ value: r, label: r }))}
+                        options={[
+                            ...new Set(
+                                [...RELIGIONS, data.religion].filter(Boolean),
+                            ),
+                        ].map((r) => ({ value: r, label: r }))}
                     />
                 </Field>
                 <div className="grid">
                     <InfoCard icon={Info}>
-                        Cultural needs flow through to the support plan, meal
-                        planning and rostering — e.g. matching a
-                        Te&nbsp;Reo–speaking key worker where possible.
+                        Review these preferences with the person when preparing
+                        their support plan, meal arrangements and staff
+                        matching.
                     </InfoCard>
                 </div>
             </div>
@@ -2048,14 +2138,18 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
             />
             <div className="grid gap-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Service start date">
-                        <Input
-                            type="date"
-                            value={data.service_start_date}
-                            onChange={(e) =>
-                                set('service_start_date', e.target.value)
-                            }
-                        />
+                    <Field label="Actual service start">
+                        <p className="text-subtle">
+                            {formatDateOnly(
+                                data.service_start_date,
+                                'Not recorded',
+                            )}
+                        </p>
+                        <p className="text-caption text-muted-foreground">
+                            Recorded through the separate service-start review.
+                            Use Prepare support on the onboarding page to
+                            arrange a start.
+                        </p>
                     </Field>
                     <Field label="Key worker">
                         <SelectInput
@@ -2584,6 +2678,13 @@ function ReviewStep({
                     onEdit={() => goToStep('cultural')}
                 >
                     <ReviewRow label="Ethnicity" value={data.ethnicity} />
+                    <ReviewRow label="Iwi" value={data.iwi} />
+                    <ReviewRow label="Hapū" value={data.hapu} />
+                    <ReviewRow label="Marae" value={data.marae} />
+                    <ReviewRow
+                        label="Cultural dietary needs"
+                        value={data.cultural_dietary_needs}
+                    />
                     <ReviewRow
                         label="Languages"
                         value={data.languages.join(', ')}
@@ -2660,8 +2761,11 @@ function ReviewStep({
                     onEdit={() => goToStep('care')}
                 >
                     <ReviewRow
-                        label="Start date"
-                        value={data.service_start_date}
+                        label="Actual service start"
+                        value={formatDateOnly(
+                            data.service_start_date,
+                            'Not recorded',
+                        )}
                     />
                     <ReviewRow label="Key worker" value={kw} />
                     <ReviewRow

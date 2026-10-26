@@ -1,4 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { AttendanceBreakFeedback } from '@/components/attendance-break-feedback';
+import { useAttendanceBreak } from '@/hooks/use-attendance-break';
 import {
     AlertTriangle,
     Calendar,
@@ -37,7 +39,7 @@ import {
 
 import { BeforeYouFinish } from './components/before-you-finish';
 import { DayWorkList } from './components/day-work-list';
-import { DigestPanel } from './components/digest-panel';
+import { DigestPanel, TeamUpdates } from './components/digest-panel';
 import { MedicinesCard } from './components/medicines-card';
 import {
     MyDayHeader,
@@ -51,6 +53,8 @@ import { ShiftSummary } from './components/shift-summary';
 import { TaskDetailDialog } from './components/task-detail-dialog';
 import { TaskHelpInbox } from './components/task-help-inbox';
 import { TomorrowPanel } from './components/tomorrow-panel';
+import { myDayIncidentHref } from './lib/incident-navigation';
+import { useBroadcastUpdates } from './lib/use-broadcast-updates';
 import { residentHue, residentInitials } from './lib/resident-hue';
 import { buildStream } from './lib/stream-grouping';
 import type {
@@ -118,6 +122,12 @@ export default function MyDay() {
         can_record_clinical?: boolean;
     };
     const auth = props.auth;
+    const broadcastUpdates = useBroadcastUpdates({
+        viewerId: auth?.user?.id ?? null,
+        notifications: props.notifications,
+        reader: props.broadcast_updates_reader,
+        url: page.url,
+    });
 
     const availabilityHref =
         auth?.user?.id && auth?.can?.staff?.availabilityUpdateSelf
@@ -319,6 +329,30 @@ export default function MyDay() {
     const openSession = props.clock?.open_session ?? null;
     const clockedIn = !!openSession;
     const isOnBreak = !!openSession?.is_on_break;
+    const breakCommand = useAttendanceBreak(
+        {
+            actorId: auth?.user?.id ?? null,
+            sessionId: openSession?.id ?? null,
+            shiftId: openSession?.shift_id ?? null,
+            canAct: props.clock?.can_clock === true,
+            onBreak: isOnBreak,
+        },
+        (raw) => {
+            if (!raw || typeof raw !== 'object') return null;
+            const fresh = raw as SharedProps;
+            if (typeof fresh.clock?.open_session?.is_on_break !== 'boolean') return null;
+            if (!(fresh.clock.open_session.shift_id === null ||
+                (Number.isSafeInteger(fresh.clock.open_session.shift_id) && fresh.clock.open_session.shift_id > 0)))
+                return null;
+            return {
+                actorId: fresh.auth?.user?.id ?? null,
+                sessionId: fresh.clock?.open_session?.id ?? null,
+                shiftId: fresh.clock?.open_session?.shift_id ?? null,
+                canAct: fresh.clock?.can_clock === true,
+                onBreak: fresh.clock?.open_session?.is_on_break === true,
+            };
+        },
+    );
 
     // CLOCKED headline ticks up from the session's clock-in time. The backend
     // doesn't report elapsed minutes, so derive it from clock_in_at against the
@@ -385,6 +419,7 @@ export default function MyDay() {
     // surface the legacy clock-in/active-shift cards use, so the back-end can
     // trust the payload it receives.
     const handleClockToggle = () => {
+        if (breakCommand.isBlocked()) return;
         if (clockedIn) {
             setEndShiftOpen(true);
             return;
@@ -401,15 +436,6 @@ export default function MyDay() {
         if (!openSession?.shift_id) return;
         setHandoverWriteOpen(true);
     }, [openSession?.shift_id]);
-
-    const handleBreakToggle = useCallback(() => {
-        if (!openSession?.id) return;
-        router.post(
-            isOnBreak ? '/attendance/break/end' : '/attendance/break/start',
-            { session_id: openSession.id },
-            { preserveScroll: true },
-        );
-    }, [isOnBreak, openSession?.id]);
 
     // The "Today's timesheet" hero button is the worker's one-click entry
     // into the per-client allocation popup for today's shift. If a draft /
@@ -631,6 +657,7 @@ export default function MyDay() {
             alertTasks={openItemTasks}
             incidents={props.incidents ?? []}
             notifications={props.notifications ?? []}
+            broadcastUpdates={broadcastUpdates}
             onAckAlert={handleAckAlert}
             onSnoozeAlert={handleSnoozeAlert}
             onConfirmHandoverRead={handleConfirmHandoverRead}
@@ -811,6 +838,9 @@ export default function MyDay() {
                                 props.medications_hidden_controlled_overdue ?? 0
                             }
                         />
+                    )}
+                    {view === 'today' && (
+                        <TeamUpdates notifications={props.notifications ?? []} broadcastUpdates={broadcastUpdates} />
                     )}
                     {view === 'handover' && (
                         <>
@@ -993,6 +1023,7 @@ export default function MyDay() {
                             )}
                         />
                     )}
+                    <AttendanceBreakFeedback command={breakCommand} checkHref="/my-day" />
                     <ShiftSummary
                         location={
                             site?.name ??
@@ -1017,7 +1048,9 @@ export default function MyDay() {
                             (!!auth?.can?.timesheets?.create && !!activeShift)
                         }
                         onClock={handleClockToggle}
-                        onToggleBreak={handleBreakToggle}
+                        onToggleBreak={breakCommand.submit}
+                        breakPending={breakCommand.pending}
+                        clockActionsBlocked={breakCommand.blocked}
                         onReviewTime={handleOpenTimesheets}
                     />
                     {view === 'today' && (
@@ -1066,10 +1099,7 @@ export default function MyDay() {
                         onObservation={() => setVitalsOpen(true)}
                         onIncident={() =>
                             router.visit(
-                                activeShift
-                                    ? '/incidents/create?shift_id=' +
-                                          activeShift.id
-                                    : '/incidents/create',
+                                myDayIncidentHref({ shiftId: activeShift?.id }),
                             )
                         }
                     />

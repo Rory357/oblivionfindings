@@ -218,6 +218,30 @@ export default function ShiftSeriesShow({
                 },
             },
         );
+    // "Reopen occurrence" only opens the confirmation; the request is sent
+    // from its confirm button (ShiftController::reopenOccurrence).
+    const [occurrenceToReopen, setOccurrenceToReopen] =
+        useState<SeriesOccurrence | null>(null);
+    const [reopening, setReopening] = useState(false);
+    const reopenOccurrence = () => {
+        if (occurrenceToReopen === null) return;
+        router.patch(
+            `/operations/shifts/${occurrenceToReopen.id}/reopen`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setReopening(true),
+                onFinish: () => {
+                    setReopening(false);
+                    setOccurrenceToReopen(null);
+                },
+            },
+        );
+    };
+    const reopenStaff = occurrenceToReopen?.user_id
+        ? (occurrenceToReopen.staff?.name?.trim() ?? '') ||
+          'the same staff member'
+        : null;
     const remainingShiftsLabel = `${stats.remaining_occurrences} upcoming ${
         stats.remaining_occurrences === 1 ? 'shift' : 'shifts'
     }`;
@@ -370,7 +394,7 @@ export default function ShiftSeriesShow({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: '/operations/rostering' },
                 { title: 'Rostering', href: '/operations/rostering' },
                 {
                     title: 'Recurring series',
@@ -473,51 +497,8 @@ export default function ShiftSeriesShow({
                     </CardContent>
                 </Card>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-4">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Total
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.occurrences_total}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Remaining
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.remaining_occurrences}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Open
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.open_occurrences}
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-xs text-muted-foreground uppercase">
-                                Replacements
-                            </div>
-                            <div className="mt-1 text-2xl font-semibold">
-                                {stats.active_replacements}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-                    <div className="space-y-4">
+                <div className="mt-5 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base">
@@ -679,7 +660,8 @@ export default function ShiftSeriesShow({
                                                         {occurrence.replacement
                                                             .open_position_status ? (
                                                             <Badge variant="outline">
-                                                                Job board{' '}
+                                                                Available
+                                                                shifts:{' '}
                                                                 {
                                                                     occurrence
                                                                         .replacement
@@ -748,7 +730,7 @@ export default function ShiftSeriesShow({
                         </Card>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-5">
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="text-base">
@@ -973,12 +955,8 @@ export default function ShiftSeriesShow({
                                                             size="sm"
                                                             variant="outline"
                                                             onClick={() =>
-                                                                router.patch(
-                                                                    `/operations/shifts/${occurrence.id}/reopen`,
-                                                                    {},
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                    },
+                                                                setOccurrenceToReopen(
+                                                                    occurrence,
                                                                 )
                                                             }
                                                         >
@@ -1016,10 +994,10 @@ export default function ShiftSeriesShow({
                             .
                         </p>
                         <p>
-                            Any cover requests or open-shift offers for them
-                            are closed. Staff aren&apos;t sent a notification,
-                            so let them know. You can still reopen single
-                            shifts afterwards.
+                            Any cover requests or open-shift offers for them are
+                            closed. Staff aren&apos;t sent a notification, so
+                            let them know. You can still reopen single shifts
+                            afterwards.
                         </p>
                     </div>
                 }
@@ -1027,6 +1005,42 @@ export default function ShiftSeriesShow({
                 cancelText="Keep shifts"
                 variant="destructive"
                 processing={cancellingFuture}
+            />
+
+            <ConfirmDialog
+                open={occurrenceToReopen !== null}
+                onClose={() => {
+                    if (!reopening) setOccurrenceToReopen(null);
+                }}
+                onConfirm={reopenOccurrence}
+                title="Reopen this shift?"
+                description={
+                    <div className="space-y-2">
+                        <p className="font-medium text-foreground">
+                            {[
+                                formatDateTime(occurrenceToReopen?.starts_at),
+                                series.client?.name,
+                                occurrenceToReopen?.location,
+                            ]
+                                .filter(Boolean)
+                                .join(' · ')}
+                        </p>
+                        <p>
+                            {reopenStaff
+                                ? `It goes back on the roster with ${reopenStaff} still assigned, so check they can still work it. Nobody is notified.`
+                                : 'It goes back on the roster as an unassigned draft. Nobody is notified.'}
+                        </p>
+                        <p>
+                            Anything changed when it was cancelled, such as a
+                            returned timesheet or a closed cover request, stays
+                            as it is. The rest of the series doesn&apos;t
+                            change.
+                        </p>
+                    </div>
+                }
+                confirmText="Reopen shift"
+                variant="default"
+                processing={reopening}
             />
         </AppLayout>
     );

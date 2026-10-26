@@ -4,6 +4,23 @@ Applies to the primary/secondary action-button pair (first seen on Site →
 Clients: "Create client" + "Link existing client"). Intended to become the
 app-wide `default` and `outline` button treatments.
 
+## Slate revision (approved by Stephan 2026-10-20) — overrides the colour treatment below
+
+With the Slate look (DESIGN.md) the pair is flatter; anatomy, sizes,
+motion, focus ring and text rules below are unchanged.
+
+- **Primary:** solid `--primary-fill` — no gradient. Shadow
+  `0 1px 2px rgb(15 23 42 / .14)` plus `inset 0 1px 0 rgb(255 255 255 /
+  .14)`; no coloured glow. Hover: 1 px lift, shadow
+  `0 2px 6px rgb(15 23 42 / .16)`; pressed: 0.5 px.
+- **Secondary (outline):** `--card` fill, `--border` (`#E2E8F0`) 1 px,
+  shadow `0 1px 2px rgb(15 23 42 / .05)`; hover border
+  `color-mix(in oklch, var(--primary) 45%, var(--border))`.
+- This drops the fixed hue-277 `--color-purple-700/-400` glow and border
+  below, which never followed the branding colour (GOOD-CATCHES §4).
+- On the brand sky the white primary and glass secondary are unchanged.
+- Reference: canvas page 5 (Controls), every state in light and dark.
+
 ## Shared anatomy (both buttons)
 
 - Height: 44px (`min-h-11`), padding: 0 18px, gap between icon and label: 8px

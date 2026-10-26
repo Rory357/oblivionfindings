@@ -29,6 +29,10 @@ export default [
             'react/prop-types': 'off',
             'react/no-unescaped-entities': 'off',
 
+            // Pop-up kit (design_styles/POPUP_STYLE_GUIDE.md): no browser
+            // alert() / confirm() / prompt() — use the kit's Confirm or a Form.
+            'no-alert': 'error',
+
             // Pragmatic baseline for large mixed-quality pages while module work continues.
             '@typescript-eslint/no-explicit-any': 'off',
             '@typescript-eslint/no-unused-vars': 'off',
@@ -158,6 +162,9 @@ export default [
                     'no-accent-active-state': builtinRules.get(
                         'no-restricted-syntax',
                     ),
+                    'no-oblivion-fallback': builtinRules.get(
+                        'no-restricted-syntax',
+                    ),
                 },
             },
         },
@@ -269,6 +276,38 @@ export default [
                         ':matches(Literal[value=/(?:^|\\s)(?:data-\\[state=(?:on|active|checked)\\]|aria-pressed|aria-selected|aria-checked):bg-accent(?:\\x2f\\d+)?(?:\\s|$)/], TemplateElement[value.raw=/(?:^|\\s)(?:data-\\[state=(?:on|active|checked)\\]|aria-pressed|aria-selected|aria-checked):bg-accent(?:\\x2f\\d+)?(?:\\s|$)/])',
                     message:
                         'bg-accent is under 4.5:1 as a selected/pressed/active surface (4.03:1 on the shared Toggle) and purple in dark mode. Mark the state with bg-primary-fill/10 + text-primary, as components/ui/toggle.tsx does. See DESIGN.md "Accent as an active surface".',
+                },
+            ],
+        },
+    },
+    {
+        // DESIGN.md "Oblivion identity on a client's site" (client demo
+        // website, 23 Oct 2026): the public website and the sign-in layout
+        // speak as the client. The provider's name comes from Settings ›
+        // Branding or Settings › Referrals and reads neutrally when unset —
+        // never an "Oblivion Care" string fallback or @oblivioncare
+        // placeholder. JSX text (the Powered by line's screen-reader text)
+        // isn't a Literal, so it stays allowed.
+        files: [
+            'resources/js/components/Header.tsx',
+            'resources/js/components/Footer.tsx',
+            'resources/js/components/public-site/**/*.{ts,tsx}',
+            'resources/js/layouts/marketing-layout.tsx',
+            'resources/js/layouts/auth/auth-journey-layout.tsx',
+            'resources/js/pages/public-provider/**/*.{ts,tsx}',
+            'resources/js/pages/public-referrals/**/*.{ts,tsx}',
+            'resources/js/pages/auth/login.tsx',
+            'resources/js/pages/portal/login.tsx',
+        ],
+        ignores: ['**/*.test.tsx', '**/*.test.ts'],
+        rules: {
+            'design/no-oblivion-fallback': [
+                'error',
+                {
+                    selector:
+                        ':matches(Literal[value=/oblivion ?care/i], TemplateElement[value.raw=/oblivion ?care/i])',
+                    message:
+                        'The public website and sign-in pages are the client’s: take the provider name from usePublicSite() / useCustomBrandName() and read neutrally when it is null, never "Oblivion Care". See DESIGN.md "Oblivion identity on a client’s site".',
                 },
             ],
         },

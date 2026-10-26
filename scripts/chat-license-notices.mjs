@@ -90,7 +90,9 @@ const output = path.join(
     'chat-third-party-notices.txt',
 );
 fs.mkdirSync(path.dirname(output), { recursive: true });
-fs.writeFileSync(output, `${text}\n`);
+// Some packages ship CRLF licence files; write LF only so a build never leaves
+// the deploy checkout modified (the deploy refuses a dirty checkout).
+fs.writeFileSync(output, `${text}\n`.replace(/\r\n?/g, '\n'));
 console.log(
     `Preserved licences/notices for ${entries.length} installed runtime packages in public/legal/chat-third-party-notices.txt`,
 );
