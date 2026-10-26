@@ -3,6 +3,7 @@
 namespace Tests\Unit\SecurityDevices;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
@@ -13,6 +14,7 @@ final class EndpointScriptReadinessMigrationTest extends TestCase
 {
     public function test_readiness_is_an_additive_nullable_observation_with_an_exact_rollback(): void
     {
+        $previousContainer = Container::getInstance();
         $previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -40,6 +42,7 @@ final class EndpointScriptReadinessMigrationTest extends TestCase
             self::assertCount(1, $down);
             self::assertSame('alter table `endpoint_agents` drop `script_actions`', $down[0]['query']);
         } finally {
+            Container::setInstance($previousContainer);
             Facade::setFacadeApplication($previous);
             Facade::clearResolvedInstances();
         }

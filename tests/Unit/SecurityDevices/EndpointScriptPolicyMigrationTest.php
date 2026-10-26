@@ -3,6 +3,7 @@
 namespace Tests\Unit\SecurityDevices;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
@@ -13,6 +14,7 @@ final class EndpointScriptPolicyMigrationTest extends TestCase
 {
     public function test_policy_migration_has_unique_receipts_and_revisions_without_cascading_history_deletion(): void
     {
+        $previousContainer = Container::getInstance();
         $previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -48,6 +50,7 @@ final class EndpointScriptPolicyMigrationTest extends TestCase
             self::assertCount(1, $down);
             self::assertSame('drop table if exists `endpoint_script_policy_revisions`', $down[0]['query']);
         } finally {
+            Container::setInstance($previousContainer);
             Facade::setFacadeApplication($previous);
             Facade::clearResolvedInstances();
         }

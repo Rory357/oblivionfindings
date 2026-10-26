@@ -3,6 +3,7 @@
 namespace Tests\Unit\SecurityDevices;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
@@ -13,6 +14,7 @@ final class EndpointScriptOutputMigrationTest extends TestCase
 {
     public function test_private_output_has_one_retained_receipt_per_delivery_and_expiry_index(): void
     {
+        $previousContainer = Container::getInstance();
         $previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -49,6 +51,7 @@ final class EndpointScriptOutputMigrationTest extends TestCase
                 'drop table if exists `endpoint_script_outputs`',
             ], array_column($down, 'query'));
         } finally {
+            Container::setInstance($previousContainer);
             Facade::setFacadeApplication($previous);
             Facade::clearResolvedInstances();
         }

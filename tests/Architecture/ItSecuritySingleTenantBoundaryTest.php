@@ -1501,10 +1501,10 @@ function itSecurityCompatibilityEvidenceFingerprints(): array
         // response has no tenant_id key, or a migration's SQL contains neither
         // tenant_id nor organization_id. No tenant storage or comparison.
         'resources/js/components/security-devices/collector-installation-profile.test.ts' => 'cd5256ee9c0fa8510d1d6c7956c14290ef5cec982a0db1cc20ac69dd09ab8184',
-        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '9aa213da0516d7a27ab59a648063be63053b2495757a6ff2f95c3fd13770657d',
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '45cb962c87812d1a51f9d32135f6e5ac763a14ee845f56460d5f6f6a2ab591c9',
         'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php' => '9f8026a7a883a95d888572e0a5fcadb54c161c59f169d66ec0587e871bb52360',
-        'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php' => '5b398a7c029e4662c34d9272a7735b431e96a6e92874090d6b5a1f14661cab01',
-        'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php' => '1227fb93bd2fdbcc2216a8bf204fb572f5254e616c584c3cecc5c1fcbb0a1f51',
+        'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php' => '0953f8d830067600a33153b476e216f726fe0a42ae7da6af5b9eba865dc98866',
+        'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php' => '150ebfb00b38ee3d835bf80898e7d3868c50228ccfc30bb79960fcd7d66e444d',
     ];
 }
 

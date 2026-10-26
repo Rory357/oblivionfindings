@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartContract;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartPolicy;
 use Carbon\CarbonImmutable;
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Translation\ArrayLoader;
@@ -19,11 +20,14 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class EndpointRestartContractTest extends TestCase
 {
+    private $previousContainer;
+
     private $previous;
 
     protected function setUp(): void
     {
         parent::setUp();
+        $this->previousContainer = Container::getInstance();
         $this->previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -36,6 +40,7 @@ final class EndpointRestartContractTest extends TestCase
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
+        Container::setInstance($this->previousContainer);
         Facade::setFacadeApplication($this->previous);
         Facade::clearResolvedInstances();
         parent::tearDown();

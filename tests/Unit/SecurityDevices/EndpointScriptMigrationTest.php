@@ -3,6 +3,7 @@
 namespace Tests\Unit\SecurityDevices;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
@@ -13,6 +14,7 @@ final class EndpointScriptMigrationTest extends TestCase
 {
     public function test_mysql_schema_compiles_bounded_identifiers_without_connecting_or_applying_any_migration(): void
     {
+        $previousContainer = Container::getInstance();
         $previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -45,6 +47,7 @@ final class EndpointScriptMigrationTest extends TestCase
             }
             self::assertSame(6, $foreign);
         } finally {
+            Container::setInstance($previousContainer);
             Facade::setFacadeApplication($previous);
             Facade::clearResolvedInstances();
         }

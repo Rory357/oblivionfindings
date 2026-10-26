@@ -8,8 +8,8 @@ import {
     within,
 } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reportFixture } from './reports-test-fixtures';
 import Reports from './reports';
+import { reportFixture } from './reports-test-fixtures';
 const mocks = vi.hoisted(() => ({
     actor: 7,
     can: {} as Record<string, Record<string, boolean>>,

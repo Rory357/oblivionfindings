@@ -3,6 +3,7 @@
 namespace Tests\Unit\SecurityDevices;
 
 use Illuminate\Config\Repository;
+use Illuminate\Container\Container;
 use Illuminate\Database\MySqlConnection;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Facade;
@@ -13,6 +14,7 @@ final class EndpointScriptCancellationMigrationTest extends TestCase
 {
     public function test_cancellation_receipts_and_lease_history_are_unique_and_do_not_cascade(): void
     {
+        $previousContainer = Container::getInstance();
         $previous = Facade::getFacadeApplication();
         $app = new Application;
         $app->instance('config', new Repository);
@@ -50,6 +52,7 @@ final class EndpointScriptCancellationMigrationTest extends TestCase
                 'drop table if exists `endpoint_script_cancel_receipts`',
             ], array_column($down, 'query'));
         } finally {
+            Container::setInstance($previousContainer);
             Facade::setFacadeApplication($previous);
             Facade::clearResolvedInstances();
         }
