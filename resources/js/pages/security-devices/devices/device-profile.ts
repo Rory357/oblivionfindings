@@ -9,6 +9,7 @@ export type DeviceProfileSectionKey =
     | 'topology'
     | 'interfaces-sensors'
     | 'configuration'
+    | 'endpoint'
     | 'management'
     | 'assignments'
     | 'tickets'
@@ -89,6 +90,148 @@ export type DeviceConfigurationSnapshot = {
     };
     downloadHref: string | null;
     compareHref?: string | null;
+};
+
+export type ServiceCommandProjection = {
+    serviceName: string | null;
+    serviceLabel: string | null;
+    operation: string | null;
+    consentMode: string | null;
+    state: string;
+    beforeState: string | null;
+    afterState: string | null;
+    reasonCode: string | null;
+    readbackState: string | null;
+    readbackObservedAt: string | null;
+};
+
+export type DeviceEndpointPosture = {
+    agent: {
+        uuid: string | null;
+        state:
+            | 'not_enrolled'
+            | 'pending_enrolment'
+            | 'enrolment_expired'
+            | 'enrolled_awaiting_heartbeat'
+            | 'fresh'
+            | 'stale'
+            | 'assignment_drift'
+            | 'revoked'
+            | string;
+        platform: string;
+        agentVersion: string | null;
+        enrolledAt: string | null;
+        enrolmentExpiresAt: string | null;
+        revokedAt: string | null;
+        lastSeenAt: string | null;
+        observedAt: string | null;
+        sequence: number;
+        serviceActionsReady: boolean;
+        restartActionsReady: boolean;
+        softwareActionsReady: boolean;
+        scriptExecutionAvailable: boolean;
+        canRevoke: boolean;
+        revokeHref: string | null;
+    };
+    diagnosticsRestricted: boolean;
+    inventory: {
+        hostname: string | null;
+        osVersion: string | null;
+        architecture: string | null;
+        memoryTotalBytes: number | null;
+        memoryAvailableBytes: number | null;
+        uptimeSeconds: number | null;
+        cpuPercent: number | null;
+        disks: Array<{
+            name: string;
+            totalBytes: number;
+            freeBytes: number;
+            usedBytes: number;
+            usedPercent: number | null;
+        }>;
+        services: Array<{
+            name: string;
+            label: string | null;
+            state: string;
+            approved: boolean;
+            allowedOperations: string[];
+            manageHref: string | null;
+        }>;
+        servicesTotal: number;
+        servicesTruncated: boolean;
+        servicesComplete: boolean;
+        software: Array<{
+            name: string;
+            version: string | null;
+            publisher: string | null;
+        }>;
+        softwareTotal: number;
+        softwareTruncated: boolean;
+        softwareComplete: boolean;
+        probeErrors: string[];
+    } | null;
+    policies: {
+        service: {
+            available: boolean;
+            version: number;
+            enabled: boolean;
+            consentMode: string;
+            catalogueCount: number;
+            canManage: boolean;
+        };
+        restart: {
+            available: boolean;
+            version: number;
+            enabled: boolean;
+            consentMode: string;
+            minimumWarningSeconds: number;
+            canManage: boolean;
+        };
+        software: {
+            available: boolean;
+            version: number;
+            enabled: boolean;
+            consentMode: string;
+            canManage: boolean;
+        };
+        script: {
+            available: boolean;
+            unavailableReason: string;
+            version: number;
+            enabled: boolean;
+            consentMode: string;
+            canManage: boolean;
+        };
+    };
+    intune: {
+        integrationEnabled: boolean;
+        canManageLink: boolean;
+        linkHref: string | null;
+        linked: boolean;
+        managedDeviceId: string | null;
+        syncStatus: string | null;
+        syncedAt: string | null;
+        lastAttemptAt: string | null;
+        snapshot: {
+            deviceName: string | null;
+            operatingSystem: string | null;
+            osVersion: string | null;
+            complianceState: string | null;
+            isEncrypted: boolean | null;
+            managementAgent: string | null;
+            managedDeviceOwnerType: string | null;
+            manufacturer: string | null;
+            model: string | null;
+            serialNumber: string | null;
+            enrolledDateTime: string | null;
+            lastSyncDateTime: string | null;
+        } | null;
+    } | null;
+    links: {
+        remoteSupportHref: string | null;
+        approvedSoftwareHref: string | null;
+        agentDownloadsHref: string | null;
+    };
 };
 
 export type DeviceProfile = {
@@ -320,6 +463,7 @@ export type DeviceProfile = {
             id: number;
             uuid: string;
             capability: string;
+            service?: ServiceCommandProjection | null;
             restart?: RestartRequest | null;
             software?: SoftwareRequest | null;
             label: string;
@@ -405,6 +549,7 @@ export type DeviceProfile = {
             breakGlassReviewDue: number;
         };
     };
+    endpointPosture?: DeviceEndpointPosture | null;
     capabilities: {
         registry: Capability;
         assignment: Capability;

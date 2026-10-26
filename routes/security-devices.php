@@ -8,6 +8,7 @@ use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionDiscoveryControlle
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionSourceController;
 use App\Domain\SecurityDevices\Credentials\Http\Controllers\CredentialReferenceController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointDownloadsController;
+use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointIntuneLinkController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointLifecycleController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartCommandController;
 use App\Domain\SecurityDevices\Endpoints\Http\Controllers\EndpointRestartPolicyController;
@@ -198,6 +199,18 @@ Route::middleware([
     $restartPolicy = EndpointRestartPolicyController::class;
     Route::get('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'show'])->name('security-devices.devices.endpoint.restart-policy.show');
     Route::put('/devices/{device}/endpoint/restart-policy', [$restartPolicy, 'update'])->name('security-devices.devices.endpoint.restart-policy.update');
+    Route::middleware([
+        'permission:securityDevices.integrations.manage|securityDevices.commands.admin',
+        'permission:securityDevices.devices.update',
+        'throttle:20,1',
+    ])->group(function (): void {
+        Route::post('/devices/{device}/endpoint/intune-link', [EndpointIntuneLinkController::class, 'store'])
+            ->whereNumber('device')
+            ->name('security-devices.devices.endpoint.intune-link.store');
+        Route::delete('/devices/{device}/endpoint/intune-link', [EndpointIntuneLinkController::class, 'destroy'])
+            ->whereNumber('device')
+            ->name('security-devices.devices.endpoint.intune-link.destroy');
+    });
     Route::post('/devices/{device}/commands/{command}/cancel', [EndpointRestartCommandController::class, 'cancel'])->name('security-devices.devices.commands.cancel');
     Route::get('/devices/{device}/commands/{command}/script-output/{attempt}', [EndpointScriptCommandController::class, 'outputReceipt'])
         ->whereUuid('attempt')->name('security-devices.devices.commands.script-output');

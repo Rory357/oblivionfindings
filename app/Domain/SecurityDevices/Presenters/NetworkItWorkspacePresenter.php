@@ -11,6 +11,8 @@ use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
 use App\Domain\SecurityDevices\Data\NetworkMapFilters;
+use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
+use App\Domain\SecurityDevices\Endpoints\Presenters\EndpointDevicePosturePresenter;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Management\Services\CommandExecutionRouteResolver;
 use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabilities;
@@ -28,6 +30,7 @@ use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -98,8 +101,34 @@ class NetworkItWorkspacePresenter
         $latestObservations = $this->latestObservations($viewer, $monitorIds);
         $siteContext = $this->siteContext($devices);
         $maintenanceWindows = $this->maintenanceWindows($canonicalSiteIds->filter()->unique()->values());
+        $computerIds = $devices
+            ->filter(fn (Device $device): bool => EndpointDevicePosturePresenter::isComputer($device))
+            ->pluck('id');
+        $endpointAgents = $computerIds->isNotEmpty() && Schema::hasTable('endpoint_agents')
+            ? EndpointAgent::query()
+                ->whereIn('device_id', $computerIds)
+                ->get([
+                    'id',
+                    'device_id',
+                    'site_id',
+                    'assignment_fingerprint',
+                    'enrolled_at',
+                    'enrolment_expires_at',
+                    'revoked_at',
+                    'last_seen_at',
+                    'observed_at',
+                    'agent_version',
+                ])
+                ->keyBy('device_id')
+            : collect();
         $mappedDevices = $devices
-            ->map(fn (Device $device): array => $this->mapDevice($device, $siteContext, $maintenanceWindows, $canonicalSiteIds->get($device->id)))
+            ->map(fn (Device $device): array => $this->mapDevice(
+                $device,
+                $siteContext,
+                $maintenanceWindows,
+                $canonicalSiteIds->get($device->id),
+                $endpointAgents->get($device->id),
+            ))
             ->values();
         $relationships = $exploration !== null ? ($exploration->runtime ? collect() : DeviceRelationship::query()->active()->whereKey($exploration->edgeIds)->whereIn('parent_device_id', $deviceIds)->whereIn('child_device_id', $deviceIds)->orderBy('id')->get()) : $this->relationships($deviceIds);
         $topologySiteIds = $canonicalSiteIds;
@@ -298,6 +327,7 @@ class NetworkItWorkspacePresenter
         array $context,
         Collection $maintenanceWindows = new Collection,
         ?int $canonicalSiteId = null,
+        ?EndpointAgent $endpointAgent = null,
     ): array {
         $site = $this->siteForDevice($device, $context);
         $enabledMonitors = $device->monitors->where('is_enabled', true);
@@ -335,6 +365,9 @@ class NetworkItWorkspacePresenter
                 ])->count(),
             ],
             'maintenance' => $this->maintenanceFor($maintenanceWindows, $canonicalSiteId, (int) $device->id, null),
+            'endpointAgent' => EndpointDevicePosturePresenter::isComputer($device)
+                ? EndpointDevicePosturePresenter::agentBadge($endpointAgent, $canonicalSiteId, null, true)
+                : null,
             'wanPath' => $this->isWanDevice($device),
         ];
     }

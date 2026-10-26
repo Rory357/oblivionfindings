@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
+import { endpointAgentBadgeMeta } from '@/pages/security-devices/devices/device-endpoint-section';
 import { router } from '@inertiajs/react';
 import {
     Activity,
@@ -138,6 +139,9 @@ function MaintenanceBadges({
     );
 }
 function MonitoringFacts({ row }: { row: NetworkDevice }) {
+    const agentBadge = row.endpointAgent
+        ? endpointAgentBadgeMeta(row.endpointAgent.state)
+        : null;
     return (
         <>
             <EntityChip>{row.monitoring.enabled} enabled checks</EntityChip>
@@ -149,6 +153,14 @@ function MonitoringFacts({ row }: { row: NetworkDevice }) {
             {row.monitoring.uncertain > 0 ? (
                 <StatusBadge variant="neutral">
                     {row.monitoring.uncertain} uncertain
+                </StatusBadge>
+            ) : null}
+            {agentBadge ? (
+                <StatusBadge variant={agentBadge.variant}>
+                    {agentBadge.label}
+                    {row.endpointAgent?.agentVersion
+                        ? ` (${row.endpointAgent.agentVersion})`
+                        : ''}
                 </StatusBadge>
             ) : null}
             <MaintenanceBadges maintenance={row.maintenance} />

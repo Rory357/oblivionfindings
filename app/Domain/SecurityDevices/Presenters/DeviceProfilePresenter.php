@@ -13,7 +13,9 @@ use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
+use App\Domain\SecurityDevices\Endpoints\Presenters\EndpointDevicePosturePresenter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommands;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommands;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommands;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
@@ -105,6 +107,7 @@ class DeviceProfilePresenter
         $audit = $canViewAudit ? $this->audit($device) : collect();
         $controlRoomAlerts = $this->controlRoomAlerts($viewer, $device, $canViewControlRoom);
         $management = $this->management($viewer, $device);
+        $endpointPosture = app(EndpointDevicePosturePresenter::class)->present($viewer, $device, $canonicalSiteId);
 
         return [
             'header' => $this->header(
@@ -128,6 +131,7 @@ class DeviceProfilePresenter
                 $controlRoomAlerts,
                 (bool) $management['visible'],
                 count($management['history']),
+                $endpointPosture !== null,
             ),
             'health' => $this->health($device, $monitors, $canViewMonitoring, $maintenanceWindows, $canonicalSiteId),
             'monitors' => $canViewMonitoring
@@ -141,6 +145,7 @@ class DeviceProfilePresenter
             'controlRoomAlerts' => $controlRoomAlerts->values(),
             'audit' => $audit->values(),
             'management' => $management,
+            'endpointPosture' => $endpointPosture,
             'capabilities' => $this->capabilities($viewer, $device, $management),
             'cctv' => app(CctvNavigation::class)->forDevice($viewer, $device),
         ];
@@ -480,6 +485,7 @@ class DeviceProfilePresenter
         Collection $controlRoomAlerts,
         bool $canViewManagement,
         int $commandCount,
+        bool $canViewEndpointPosture = false,
     ): array {
         return collect([
             ['key' => 'health', 'label' => 'Health', 'group' => 'status'],
@@ -487,6 +493,7 @@ class DeviceProfilePresenter
             ['key' => 'topology', 'label' => 'Topology', 'group' => 'technical'],
             $canViewMonitoring ? ['key' => 'interfaces-sensors', 'label' => 'Interfaces & sensors', 'group' => 'technical'] : null,
             ['key' => 'configuration', 'label' => 'Configuration', 'group' => 'technical'],
+            $canViewEndpointPosture ? ['key' => 'endpoint', 'label' => 'Endpoint', 'group' => 'technical'] : null,
             $canViewManagement ? ['key' => 'management', 'label' => 'Management', 'group' => 'technical', 'count' => $commandCount] : null,
             ['key' => 'assignments', 'label' => 'Assignments', 'group' => 'operations', 'count' => $device->assignments->count()],
             $canViewIt || $tickets->isNotEmpty() ? ['key' => 'tickets', 'label' => 'Tickets', 'group' => 'operations', 'count' => $tickets->count()] : null,
@@ -1514,6 +1521,7 @@ class DeviceProfilePresenter
                         'confirmationMode' => $command->confirmation_mode?->value,
                         'impactAcknowledgedAt' => $command->impact_acknowledged_at?->toISOString(),
                         'reason' => $command->reason,
+                        'service' => app(EndpointServiceCommands::class)->projection($command, $latestAttempt),
                         'restart' => app(EndpointRestartCommands::class)->projection($command, $viewer, $latestAttempt),
                         'software' => app(EndpointSoftwareCommands::class)->projection($command, $viewer, $latestAttempt),
                         'safeParameters' => $command->safe_parameter_summary ?? [],

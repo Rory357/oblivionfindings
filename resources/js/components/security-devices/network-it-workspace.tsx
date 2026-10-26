@@ -78,6 +78,12 @@ export type NetworkDevice = {
     firmwareVersion: string | null;
     monitoring: { enabled: number; attention: number; uncertain: number };
     maintenance?: MaintenanceWindowNotice | null;
+    endpointAgent?: {
+        state: string;
+        agentVersion: string | null;
+        lastSeenAt: string | null;
+        observedAt: string | null;
+    } | null;
     wanPath: boolean;
 };
 

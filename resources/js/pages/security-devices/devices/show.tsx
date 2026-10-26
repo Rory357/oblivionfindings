@@ -56,6 +56,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { InstallationProfileDialog } from './_installation-dialog';
+import { DeviceEndpointSection } from './device-endpoint-section';
 import type { DeviceProfile, DeviceProfileSectionKey } from './device-profile';
 import { DeviceProfileHeader } from './device-profile-header';
 import {
@@ -987,6 +988,18 @@ function DeviceShowBody({
                                 deviceName={device.name}
                                 onEditRegistry={editDeviceDialog.openDialog}
                                 onEditServiceDue={() => setServiceDueOpen(true)}
+                            />
+                        </TabsContent>
+
+                        <TabsContent value="endpoint">
+                            <DeviceEndpointSection
+                                posture={profile.endpointPosture}
+                                deviceId={device.id}
+                                deviceName={device.name}
+                                canSetupAgent={endpoint_setup !== null}
+                                onOpenInstallation={() =>
+                                    setInstallationOpen(true)
+                                }
                             />
                         </TabsContent>
 
