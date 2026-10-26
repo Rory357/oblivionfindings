@@ -85,6 +85,7 @@ type TrackingDevice = {
     } | null;
     canonicalHref: string | null;
     historyHref: string | null;
+    queclinkHref?: string | null;
 };
 
 type TrackingGeofence = {
@@ -534,14 +535,27 @@ function DeviceCard({ device }: { device: TrackingDevice }) {
                 ) : null}
             </div>
 
-            {device.canonicalHref ? (
-                <Link
-                    href={device.canonicalHref}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm font-medium text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                    <ExternalLink className="h-4 w-4" />
-                    {canonicalActionLabel(device)}
-                </Link>
+            {device.canonicalHref || device.queclinkHref ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    {device.canonicalHref ? (
+                        <Link
+                            href={device.canonicalHref}
+                            className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm font-medium text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            {canonicalActionLabel(device)}
+                        </Link>
+                    ) : null}
+                    {device.queclinkHref ? (
+                        <Link
+                            href={device.queclinkHref}
+                            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-xs font-medium text-primary hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <RadioTower className="h-3.5 w-3.5" />
+                            Open in Queclink hub
+                        </Link>
+                    ) : null}
+                </div>
             ) : null}
         </article>
     );

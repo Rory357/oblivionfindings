@@ -923,6 +923,30 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
     const [revocationReasons, setRevocationReasons] = useState<
         Record<number, string>
     >({});
+    const [credentialSearch, setCredentialSearch] = useState('');
+    const [credentialStatus, setCredentialStatus] = useState<
+        'all' | 'active' | 'pending' | 'failed' | 'revoked'
+    >('all');
+
+    const normalizedSearch = credentialSearch.trim().toLowerCase();
+    const filteredCredentials = data.credentials.filter((credential) => {
+        if (
+            credentialStatus !== 'all' &&
+            credential.providerLifecycle.state !== credentialStatus
+        ) {
+            return false;
+        }
+        if (!normalizedSearch) {
+            return true;
+        }
+        return [
+            credential.label,
+            credential.holderLabel,
+            credential.siteName,
+            credential.referenceKey,
+        ].some((field) => field.toLowerCase().includes(normalizedSearch));
+    });
+
     return (
         <Card>
             <CardHeader>
@@ -932,13 +956,64 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
                 </h3>
             </CardHeader>
             <CardContent className="space-y-3">
+                {data.credentials.length > 0 ? (
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0 flex-1 sm:max-w-sm">
+                            <Label
+                                htmlFor="access-credential-search"
+                                className="sr-only"
+                            >
+                                Search credentials
+                            </Label>
+                            <Input
+                                id="access-credential-search"
+                                value={credentialSearch}
+                                onChange={(event) =>
+                                    setCredentialSearch(event.target.value)
+                                }
+                                placeholder="Search credential, holder, site, or reference..."
+                            />
+                        </div>
+                        <div className="sm:w-52">
+                            <Label
+                                htmlFor="access-credential-status-filter"
+                                className="sr-only"
+                            >
+                                Filter credentials by lifecycle status
+                            </Label>
+                            <select
+                                id="access-credential-status-filter"
+                                className={selectClass}
+                                value={credentialStatus}
+                                onChange={(event) =>
+                                    setCredentialStatus(
+                                        event.target
+                                            .value as typeof credentialStatus,
+                                    )
+                                }
+                            >
+                                <option value="all">All statuses</option>
+                                <option value="active">Active</option>
+                                <option value="pending">Pending</option>
+                                <option value="failed">Failed</option>
+                                <option value="revoked">
+                                    Inactive / ended
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                ) : null}
                 {data.credentials.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                         No physical access credentials are registered in the
                         authorised Sites.
                     </p>
+                ) : filteredCredentials.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                        No credentials match the current filter.
+                    </p>
                 ) : (
-                    data.credentials.map((credential) => (
+                    filteredCredentials.map((credential) => (
                         <article
                             key={credential.id}
                             className="rounded-xl border p-4"
@@ -1138,6 +1213,11 @@ export function AccessControlWorkspace({
 }: {
     data: AccessControlWorkspaceData;
 }) {
+    const [scheduleSearch, setScheduleSearch] = useState('');
+    const [scheduleStatus, setScheduleStatus] = useState<
+        'all' | 'active' | 'inactive'
+    >('all');
+
     if (data.restricted)
         return (
             <Card>
@@ -1152,6 +1232,16 @@ export function AccessControlWorkspace({
                 </CardContent>
             </Card>
         );
+
+    const normalizedScheduleSearch = scheduleSearch.trim().toLowerCase();
+    const filteredSchedules = data.schedules.filter((schedule) => {
+        if (scheduleStatus === 'active' && !schedule.isActive) return false;
+        if (scheduleStatus === 'inactive' && schedule.isActive) return false;
+        if (!normalizedScheduleSearch) return true;
+        return [schedule.name, schedule.siteName].some((field) =>
+            field.toLowerCase().includes(normalizedScheduleSearch),
+        );
+    });
 
     return (
         <div className="space-y-4">
@@ -1212,12 +1302,65 @@ export function AccessControlWorkspace({
                         </h3>
                     </CardHeader>
                     <CardContent className="space-y-3">
+                        {data.schedules.length > 0 ? (
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="min-w-0 flex-1">
+                                    <Label
+                                        htmlFor="access-schedule-search"
+                                        className="sr-only"
+                                    >
+                                        Search access schedules
+                                    </Label>
+                                    <Input
+                                        id="access-schedule-search"
+                                        value={scheduleSearch}
+                                        onChange={(event) =>
+                                            setScheduleSearch(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Search schedule or site..."
+                                    />
+                                </div>
+                                <div className="sm:w-44">
+                                    <Label
+                                        htmlFor="access-schedule-status-filter"
+                                        className="sr-only"
+                                    >
+                                        Filter schedules by status
+                                    </Label>
+                                    <select
+                                        id="access-schedule-status-filter"
+                                        className={selectClass}
+                                        value={scheduleStatus}
+                                        onChange={(event) =>
+                                            setScheduleStatus(
+                                                event.target
+                                                    .value as typeof scheduleStatus,
+                                            )
+                                        }
+                                    >
+                                        <option value="all">
+                                            All schedules
+                                        </option>
+                                        <option value="active">Active</option>
+                                        <option value="inactive">
+                                            Inactive
+                                        </option>
+                                    </select>
+                                </div>
+                            </div>
+                        ) : null}
                         {data.schedules.length === 0 ? (
                             <p className="text-sm text-muted-foreground">
                                 No access schedules are registered.
                             </p>
+                        ) : filteredSchedules.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">
+                                No access schedules match the current filter.
+                            </p>
                         ) : (
-                            data.schedules.map((schedule) => (
+                            filteredSchedules.map((schedule) => (
                                 <article
                                     key={schedule.id}
                                     className="rounded-xl border p-3"
