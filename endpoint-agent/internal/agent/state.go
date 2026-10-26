@@ -26,6 +26,7 @@ type State struct {
 }
 
 type Store struct {
+	scriptJournalGate         sync.Mutex
 	mutationGate              sync.Mutex
 	softwareReady             func() bool
 	softwareObservations      func(string, string) []SoftwareObservation

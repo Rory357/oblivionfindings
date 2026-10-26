@@ -40,11 +40,14 @@ describe('Security & Devices governed confirmations', () => {
         );
 
         expect(milesight).not.toMatch(/\bconfirm\s*\(/);
-        expect(milesight).toContain('title="Remove Milesight credentials?"');
+        // One shared ConfirmDialog covers all three removals; its title
+        // follows which removal is pending.
+        expect(milesight).toContain('open={currentRemoval !== null}');
+        expect(milesight).toContain("? 'Remove Milesight credentials?'");
         expect(milesight).toContain(
-            'title="Disable Milesight webhook verification?"',
+            "? 'Disable Milesight webhook verification?'",
         );
-        expect(milesight).toContain('title="Remove Milesight Site mapping?"');
+        expect(milesight).toContain(": 'Remove Milesight Site mapping?'");
     });
 
     it('keeps Queclink reject, restore, release, and legacy cleanup governed', () => {

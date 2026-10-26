@@ -100,12 +100,12 @@ import {
     Target,
     Timer,
     Truck,
-    type LucideIcon,
     UserCheck,
     Users,
     Utensils,
     Wrench,
     X,
+    type LucideIcon,
 } from 'lucide-react';
 import {
     useCallback,
@@ -442,6 +442,15 @@ export function isIconActive(
     if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
         return false;
     }
+    // Approved scripts belongs to IT & Support › Remote support (see
+    // isSubItemActive), not to the Security & Devices group its URL sits in.
+    if (item.subPanel && subPanelGroups && isApprovedScriptsUrl(currentUrl)) {
+        return subPanelGroups.some((group) =>
+            (group?.items ?? []).some(
+                (sub) => resolveUrl(sub.href) === '/it/remote-support',
+            ),
+        );
+    }
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
         return subPanelGroups.some((group) =>
@@ -461,7 +470,27 @@ export function isSubItemActive(
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');
     }
+    // Estate overview's address is the start of every Security & Devices
+    // page, so a prefix match lit it beside the real page. It is current only
+    // on itself (the module's own isSecurityDevicesDestinationActive rule).
+    if (resolveUrl(href) === '/security-devices') {
+        return normalizePath(resolveUrl(currentUrl)) === '/security-devices';
+    }
+    // Approved scripts lives under /security-devices but is reached only from
+    // IT & Support › Remote support, so that is the link that stays lit.
+    if (isApprovedScriptsUrl(currentUrl)) {
+        return resolveUrl(href) === '/it/remote-support';
+    }
     return matchScore(currentUrl, href) > 0;
+}
+
+function isApprovedScriptsUrl(url: string): boolean {
+    const path = normalizePath(resolveUrl(url));
+
+    return (
+        path === '/security-devices/scripts' ||
+        path.startsWith('/security-devices/scripts/')
+    );
 }
 
 // ── Build icon nav items ───────────────────────────────────────────────────

@@ -13,9 +13,10 @@ uses(TestCase::class);
 it('defines the complete provider-neutral management catalogue with safe policy defaults', function () {
     $capabilities = app(CommandCapabilityRegistry::class)->all();
 
-    expect($capabilities)->toHaveCount(35)
+    expect($capabilities)->toHaveCount(39)
         ->and($capabilities->keys()->all())->toContain(
             'diagnostics.ping',
+            'endpoint.script.run',
             'tracking.location_refresh',
             'configuration.refresh',
             'device.reboot',
@@ -40,10 +41,15 @@ it('defines the complete provider-neutral management catalogue with safe policy 
             'facilities.actuator.set_state',
         );
 
+    // A scheduled restart is booked up to 24 hours ahead (SCHEDULED-RESTART.md),
+    // so its approval stays valid for that window plus a 5-second margin.
+    // Everything else expires within an hour.
+    $maximumExpiry = ['endpoint.computer.restart' => 86405];
+
     foreach ($capabilities as $key => $capability) {
         expect($capability->key)->toBe($key)
             ->and($capability->expiresAfterSeconds)->toBeGreaterThanOrEqual(30)
-            ->and($capability->expiresAfterSeconds)->toBeLessThanOrEqual(3600)
+            ->and($capability->expiresAfterSeconds)->toBeLessThanOrEqual($maximumExpiry[$key] ?? 3600)
             ->and($capability->deviceDomains)->not->toBeEmpty()
             ->and($capability->sensitivity)->not->toBeEmpty()
             ->and($capability->impact)->not->toBeEmpty()

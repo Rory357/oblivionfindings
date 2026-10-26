@@ -31,6 +31,7 @@ final class EndpointHeartbeat
                 'observed_at' => $observed, 'last_seen_at' => now(),
                 'agent_version' => $data['agent_version'], 'boot_id' => $data['boot_id'],
                 'inventory' => $data['inventory'],
+                ...(Schema::hasColumn('endpoint_agents', 'script_actions') ? ['script_actions' => $data['script_actions'] ?? null] : []),
                 ...(Schema::hasColumn('endpoint_agents', 'service_actions') ? ['service_actions' => $data['service_actions'] ?? null, 'service_action_observations' => app(EndpointServiceCommands::class)->observations($agent, $data['service_action_observations'] ?? [], $observed, $data['sequence'])] : []),
                 ...(Schema::hasColumn('endpoint_agents', 'software_actions') ? ['software_actions' => $data['software_actions'] ?? null, 'software_observations' => app(EndpointSoftwareCommands::class)->observations($agent, $data['software_observations'] ?? [], $observed, $data['sequence'], $data['boot_id'])] : []),
                 ...(Schema::hasColumn('endpoint_agents', 'restart_actions') ? ['restart_actions' => $data['restart_actions'] ?? null, 'restart_observations' => app(EndpointRestartCommands::class)->observations($agent, $data['restart_observations'] ?? [], $observed, $data['sequence'], $data['boot_id'])] : []),
@@ -48,6 +49,11 @@ final class EndpointHeartbeat
         $integer = ['integer', 'min:0', 'max:9007199254740991'];
 
         return Validator::make($payload, [
+            'script_actions' => ['sometimes', 'required', 'array:version,installed_service,release_enabled,executor', 'size:4'],
+            'script_actions.version' => ['required_with:script_actions', 'integer:strict', 'in:1'],
+            'script_actions.installed_service' => ['sometimes', 'required_with:script_actions', 'accepted', 'boolean:strict'],
+            'script_actions.release_enabled' => ['sometimes', 'required_with:script_actions', 'accepted', 'boolean:strict'],
+            'script_actions.executor' => ['required_with:script_actions', 'string', 'in:reviewed_script'],
             'software_actions' => ['sometimes', 'required', 'array:version,installed_service,release_enabled,executor', 'size:4'],
             'software_actions.version' => ['required_with:software_actions', 'integer:strict', 'in:1'],
             'software_actions.installed_service' => ['sometimes', 'required_with:software_actions', 'accepted', 'boolean:strict'],

@@ -24,6 +24,7 @@ const inertiaMocks = vi.hoisted(() => ({
         post: vi.fn(),
         get: vi.fn(),
         delete: vi.fn(),
+        on: vi.fn(() => () => {}),
     },
     formPost: vi.fn(),
     formErrors: {} as Record<string, string>,
@@ -44,6 +45,20 @@ vi.mock('@inertiajs/react', () => ({
         </a>
     ),
     router: inertiaMocks.router,
+    usePage: () => ({
+        props: {
+            auth: {
+                user: { id: 17 },
+                can: {
+                    securityDevices: {
+                        viewAny: true,
+                        integrationsManage: true,
+                        devicesView: true,
+                    },
+                },
+            },
+        },
+    }),
     useForm: (initial: Record<string, unknown>) => ({
         data: initial,
         setData: vi.fn(),
@@ -179,8 +194,9 @@ describe('QueclinkHub debug console', () => {
         expect(screen.getByText('Live frames are unavailable.')).toBeVisible();
     });
 
-    it('keeps the debug console usable when no tracker is paired yet', () => {
+    it('keeps the debug console usable when no tracker is paired yet', async () => {
         render(<DebugConsoleTab devices={[]} can={{ manage: true }} />);
+        await act(async () => {});
 
         expect(screen.getByRole('status')).toHaveTextContent('Connecting');
         expect(screen.getByText('Pick a paired device…')).toBeVisible();
@@ -376,7 +392,10 @@ describe('QueclinkHub page chrome', () => {
         );
 
         expect(screen.getByText('Rejected devices')).toBeVisible();
-        fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+        fireEvent.contextMenu(
+            screen.getByText('Tracker ending 0091').closest('[role="row"]')!,
+        );
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Restore' }));
         expect(
             screen.getByRole('heading', {
                 name: 'Restore tracker to pending?',
@@ -394,7 +413,17 @@ describe('QueclinkHub page chrome', () => {
         expect(inertiaMocks.router.get).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink?rejected_page=2',
             {},
-            expect.objectContaining({ only: ['devices'] }),
+            expect.objectContaining({
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
+            }),
         );
     });
 
@@ -576,7 +605,18 @@ describe('QueclinkHub page chrome', () => {
                 target_type: 'vehicle',
                 target_search: 'Vehicle 0501',
             }),
-            expect.objectContaining({ only: ['targets'], preserveState: true }),
+            expect.objectContaining({
+                only: [
+                    'targets',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
+                preserveState: true,
+            }),
         );
     });
 
@@ -614,7 +654,18 @@ describe('QueclinkHub page chrome', () => {
                 target_type: 'staff',
                 target_search: 'Worker 0501',
             }),
-            expect.objectContaining({ only: ['targets'], preserveState: true }),
+            expect.objectContaining({
+                only: [
+                    'targets',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
+                preserveState: true,
+            }),
         );
     });
 
@@ -622,6 +673,8 @@ describe('QueclinkHub page chrome', () => {
         inertiaMocks.router.get.mockClear();
         render(
             <QueclinkHub
+                actor_id={17}
+                as_of="2026-10-13T03:00:00Z"
                 listener={{
                     port: 8090,
                     endpoint_configured: true,
@@ -683,20 +736,43 @@ describe('QueclinkHub page chrome', () => {
         expect(inertiaMocks.router.get).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink',
             { device_search: 'NeedleModel' },
-            expect.objectContaining({ only: ['devices'] }),
+            expect.objectContaining({
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
+            }),
         );
 
+        fireEvent.click(screen.getByRole('tab', { name: /^Devices/ }));
         fireEvent.click(screen.getByRole('button', { name: 'Next devices' }));
         expect(inertiaMocks.router.get).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink?paired_page=2',
             {},
-            expect.objectContaining({ only: ['devices'] }),
+            expect.objectContaining({
+                only: [
+                    'devices',
+                    'actor_id',
+                    'as_of',
+                    'auth',
+                    'can',
+                    'listener',
+                    'statistics',
+                ],
+            }),
         );
     });
 
     it('uses the full-width Sites-style hero and tab rail', () => {
         render(
             <QueclinkHub
+                actor_id={17}
+                as_of="2026-10-13T03:00:00Z"
                 listener={{
                     port: 8090,
                     endpoint_configured: true,
@@ -750,13 +826,16 @@ describe('QueclinkHub page chrome', () => {
         );
 
         expect(screen.getByTestId('queclink-page-shell')).toHaveClass('w-full');
-        // Unified compact PageHero (post hero-unification): back link + title,
-        // not the former bespoke gradient banner.
-        expect(screen.getByText('Back to APIs & Integrations')).toBeVisible();
-        expect(screen.getByText('Paired devices')).toBeVisible();
-        const tabList = screen.getByTestId('queclink-tab-list');
-        expect(tabList).toHaveClass('border-b', 'flex-wrap');
-        expect(tabList).not.toHaveClass('overflow-x-auto');
+        expect(
+            screen.getByRole('heading', { name: 'Queclink integration' }),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: 'View paired devices' }),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('tablist', { name: 'Queclink views' }),
+        ).toBeVisible();
+        expect(screen.getByText(/Read started/)).toHaveTextContent('NZ time');
     });
 });
 
@@ -813,11 +892,11 @@ describe('QueclinkHub device settings', () => {
 
         expect(screen.getByText('Retired preset history')).toBeVisible();
         expect(screen.getByText(/Moana Jones/)).toBeVisible();
-        expect(screen.getByText(/Profile v3/)).toBeVisible();
+        expect(screen.getByText(/Version 3/)).toBeVisible();
         expect(screen.getByText(/Replaced by the approved/)).toBeVisible();
     });
 
-    it('renders the latest config snapshot and safe GL30 controls', () => {
+    it('renders the latest config snapshot and safe GL30 controls', async () => {
         inertiaMocks.router.post.mockClear();
 
         render(
@@ -887,7 +966,7 @@ describe('QueclinkHub device settings', () => {
         );
 
         expect(screen.getByText('Device settings')).toBeVisible();
-        expect(screen.getByText('Connection health')).toBeVisible();
+        expect(screen.getByText('Connection')).toBeVisible();
         expect(screen.getByText(/Amelia Wilson/)).toBeVisible();
         expect(screen.getByText(/Values are protected/)).toBeVisible();
         expect(
@@ -904,12 +983,12 @@ describe('QueclinkHub device settings', () => {
         ).toBeVisible();
         expect(
             screen.getByText(
-                'Legacy provider-console command · cancellation only · content protected',
+                'Older Queclink console command · can only be cancelled · details protected',
             ),
         ).toBeVisible();
         expect(
             screen.getByText(
-                'Legacy provider-console history · read only · content protected',
+                'Older Queclink console history · read only · details protected',
             ),
         ).toBeVisible();
         expect(
@@ -927,12 +1006,40 @@ describe('QueclinkHub device settings', () => {
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/devices/2/configuration/server/read',
             { command: 'SRI' },
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
 
+        const syntheticAttributedReply = {
+            component: 'security-devices/integrations/queclink-hub',
+            url: '/security-devices/integrations/queclink',
+            props: {
+                actor_id: 17,
+                as_of: '2026-05-18T03:20:00Z',
+                auth: {
+                    user: { id: 17 },
+                    can: {
+                        securityDevices: {
+                            viewAny: true,
+                            integrationsManage: true,
+                        },
+                    },
+                },
+            },
+        };
+        // Synthetic request attribution permits the next review; it is not device completion.
+        act(() => {
+            const request = inertiaMocks.router.post.mock.calls.at(-1)?.[2];
+            request.onSuccess(syntheticAttributedReply);
+            request.onFinish();
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: /^Advanced GL30 sections/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'Review Watchdog auto-reboot',
+                name: 'Continue to Device Management',
             }),
         );
 
@@ -941,27 +1048,56 @@ describe('QueclinkHub device settings', () => {
             expect.objectContaining({
                 command: 'dog',
             }),
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
 
+        act(() => {
+            const request = inertiaMocks.router.post.mock.calls.at(-1)?.[2];
+            request.onError({
+                command: 'Synthetic validation keeps this draft for review.',
+            });
+            request.onFinish();
+        });
         fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.keyDown(
+            screen.getByRole('button', { name: 'Actions for GTDOG' }),
+            { key: 'Enter', code: 'Enter' },
+        );
+        fireEvent.click(
+            await screen.findByRole('menuitem', {
+                name: 'Cancel queued command',
+            }),
+        );
+        expect(inertiaMocks.router.post).not.toHaveBeenCalledWith(
+            '/security-devices/integrations/queclink/commands/44/cancel',
+            expect.anything(),
+            expect.anything(),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel command' }));
 
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/commands/44/cancel',
             {},
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
 
+        act(() => {
+            const request = inertiaMocks.router.post.mock.calls.at(-1)?.[2];
+            request.onSuccess(syntheticAttributedReply);
+            request.onFinish();
+        });
         fireEvent.click(
-            screen.getByRole('button', {
-                name: 'Resident safety profile',
-            }),
+            screen.getByRole('button', { name: 'Resident safety profile' }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Continue to governed review' }),
         );
 
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
             '/security-devices/integrations/queclink/devices/2/configuration/resident-safety-profile',
             {},
-            { preserveScroll: true },
+            expect.objectContaining({ preserveScroll: true }),
         );
     });
 });

@@ -70,12 +70,20 @@ export function NativeMonitorSavedRequests({
     actorId: number;
 }) {
     const { auth } = usePage<{
-        auth?: { user?: { id: number } | null; can?: Record<string, boolean> };
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    monitoringManage?: boolean;
+                };
+            };
+        };
     }>().props;
     if (!open) return null;
     if (
         auth?.user?.id !== actorId ||
-        auth.can?.['securityDevices.monitoring.manage'] !== true
+        auth.can?.securityDevices?.monitoringManage !== true
     )
         return null;
     return (

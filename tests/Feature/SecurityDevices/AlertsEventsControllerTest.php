@@ -73,6 +73,7 @@ class AlertsEventsControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/alerts-events')
+                ->where('pageMeta.title', 'Alerts & events')
                 ->has('stats')
                 ->has('events.data')
                 ->has('events.meta')
@@ -260,6 +261,34 @@ class AlertsEventsControllerTest extends TestCase
         $response->assertInertia(fn ($page) => $page
             ->has('events.data', 1) // only the one from 2 days ago
         );
+    }
+
+    public function test_date_range_uses_new_zealand_calendar_days(): void
+    {
+        $device = Device::factory()->create();
+
+        // 11:30 UTC on 1 Oct 2026 is 12:30 am on Fri 2 Oct in New Zealand (NZDT).
+        $event = DeviceEvent::create([
+            'device_id' => $device->id, 'event_type' => 'heartbeat',
+            'severity' => 'info', 'occurred_at' => '2026-10-01 11:30:00',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/alerts-events?from=2026-10-02&to=2026-10-02')
+            ->assertInertia(fn ($page) => $page
+                ->has('events.data', 1)
+                ->where('events.data.0.id', $event->id)
+            );
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/alerts-events?from=2026-10-01&to=2026-10-01')
+            ->assertInertia(fn ($page) => $page->has('events.data', 0));
+
+        // A malformed day is ignored rather than compared as raw text.
+        $this->actingAs($this->admin)
+            ->get('/security-devices/alerts-events?from=not-a-date&to=2026-13-40')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->has('events.data', 1));
     }
 
     // ── Processed filter ──────────────────────────────────────────

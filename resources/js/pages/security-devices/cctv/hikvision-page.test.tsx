@@ -22,8 +22,33 @@ vi.mock('./live-transport', () => ({
     cctvSourceJson: vi.fn(),
 }));
 vi.mock('@/layouts/app-layout', () => ({
-    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+    default: ({
+        breadcrumbs = [],
+        children,
+    }: {
+        breadcrumbs?: { title: string; href?: string }[];
+        children: ReactNode;
+    }) => (
+        <main>
+            <nav aria-label="Breadcrumbs">
+                {breadcrumbs.map((crumb) =>
+                    crumb.href ? (
+                        <a key={crumb.title} href={crumb.href}>
+                            {crumb.title}
+                        </a>
+                    ) : (
+                        <span key={crumb.title}>{crumb.title}</span>
+                    ),
+                )}
+            </nav>
+            {children}
+        </main>
+    ),
 }));
+const trail = () =>
+    [...screen.getByRole('navigation', { name: 'Breadcrumbs' }).children].map(
+        (crumb) => [crumb.textContent, crumb.getAttribute('href')],
+    );
 vi.mock('@inertiajs/react', () => ({
     Head: () => null,
     Link: ({ href, children }: { href: string; children: ReactNode }) => (
@@ -111,6 +136,19 @@ async function reachMapping() {
     await choose('Camera channel', 'Reception');
     fireEvent.click(screen.getByRole('button', { name: 'Review connection' }));
 }
+describe('Hikvision camera setup placement', () => {
+    it('roots the trail at Home and follows the sidebar to All devices and the camera', () => {
+        const { setup } = respond();
+        render(<CctvSourcePage {...setup} />);
+        expect(trail()).toEqual([
+            ['Home', '/dashboard'],
+            ['Security & Devices', '/security-devices'],
+            ['All devices', '/security-devices/devices'],
+            ['Reception camera', '/security-devices/devices/42'],
+            ['Camera setup', null],
+        ]);
+    });
+});
 describe('Hikvision manager workflow (component fixtures)', () => {
     it('checks equipment then saves only the selected channel and leaves viewing off', async () => {
         const { setup, review } = respond();

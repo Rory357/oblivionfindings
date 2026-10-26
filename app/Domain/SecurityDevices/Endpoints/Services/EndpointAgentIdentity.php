@@ -55,6 +55,7 @@ final class EndpointAgentIdentity
                 'enrolment_expires_at' => now()->addMinutes(max(1, min(30, (int) config('endpoint_management.enrolment_minutes', 15)))),
                 'credential_hash' => null, 'enrolled_at' => null, 'revoked_at' => null,
                 'last_seen_at' => null, 'observed_at' => null, 'agent_version' => null,
+                ...(Schema::hasColumn('endpoint_agents', 'script_actions') ? ['script_actions' => null] : []),
                 ...(Schema::hasColumn('endpoint_agents', 'software_actions') ? ['software_actions' => null, 'software_observations' => null] : []),
                 ...(Schema::hasColumn('endpoint_agents', 'restart_actions') ? ['restart_actions' => null, 'restart_observations' => null] : []),
                 'boot_id' => null, 'sequence' => 0, 'heartbeat_hash' => null, 'inventory' => null,

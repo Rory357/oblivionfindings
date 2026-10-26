@@ -6,6 +6,8 @@ use App\Domain\It\Services\ItRemoteSupportAccess;
 use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointActionPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScripts;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePolicy;
 use App\Domain\SecurityDevices\Models\Device;
@@ -46,6 +48,7 @@ final class ItRemoteSupportController extends Controller
         $response = Inertia::render('it/remote-support/index', [
             'actor_id' => $actor->id,
             'can_view_software_catalogue' => EndpointSoftwarePackages::canOpen($actor),
+            'can_view_script_catalogue' => app(EndpointScripts::class)->canOpen($actor),
             'can_manage_software_policy' => $actor->canDo(EndpointSoftwarePolicy::MANAGE),
             'can_manage_restart_policy' => $actor->canDo(EndpointRestartPolicy::MANAGE),
             'can_manage_action_policy' => $actor->canDo(EndpointActionPolicy::MANAGE),
@@ -59,7 +62,11 @@ final class ItRemoteSupportController extends Controller
                 'endpoints' => (clone $query)->where('category', 'endpoint')->count(),
                 'servers' => (clone $query)->where('category', 'server')->count(),
             ],
-            'availability' => ['remote_support' => false, 'obli' => (bool) (config('endpoint_management.enabled') && config('endpoint_management.obli.technician_enabled') && ($actor->canDo('securityDevices.endpoints.diagnostics') || $actor->canDo('securityDevices.obli.assist')))],
+            'availability' => [
+                'remote_support' => false,
+                'obli' => (bool) (config('endpoint_management.enabled') && config('endpoint_management.obli.technician_enabled') && ($actor->canDo('securityDevices.endpoints.diagnostics') || $actor->canDo('securityDevices.obli.assist'))),
+                'script_execution' => app(EndpointScriptPolicy::class)->available(),
+            ],
         ]);
         $response = $response->toResponse($request);
         $response->headers->set('Cache-Control', 'private, no-store');

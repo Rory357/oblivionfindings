@@ -1,6 +1,28 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { PageHero, PageLayout } from '@/components/page';
-import { ReasonDialog } from '@/components/reason-dialog';
+import InputError from '@/components/input-error';
+import {
+    EntityCard,
+    EntityCardGrid,
+    EntityChip,
+    EntityContextMenu,
+    EntityTable,
+    ListCaption,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+} from '@/components/page';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,14 +33,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,44 +43,35 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { TabsRoot as Tabs, TabsContent } from '@/components/ui/tabs';
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
+    ReviewCard,
+    ReviewRow,
+    WizardShell,
+    WizardStepPane,
+} from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
+import { formatDateTimeLong, formatRelative, formatTime } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    Archive,
     ArrowDownLeft,
     ArrowUpRight,
-    BookMarked,
     CheckCircle,
     Clock,
     Database,
-    Gauge,
+    Eye,
     Inbox,
     LayoutDashboard,
+    LayoutGrid,
+    List,
     Loader2,
     Play,
     RefreshCw,
     Satellite,
-    Save,
     Send,
     Server,
     Settings2,
@@ -76,13 +82,29 @@ import {
     XCircle,
 } from 'lucide-react';
 import {
-    ReactNode,
+    createContext,
     useCallback,
+    useContext,
     useEffect,
+    useId,
     useMemo,
     useRef,
     useState,
 } from 'react';
+import {
+    assignmentTypeLabel,
+    CommandStatusBadge,
+    connectionStateLabel,
+    pageScopeHint,
+    pairingStateLabel,
+    plainLabel,
+    QueclinkRequestBoundary,
+    QueclinkSettingsWorkspace,
+    REQUEST_FAILURE_MESSAGES,
+    requestFailure,
+    sectionReadLabels,
+    useQueclinkRequestLedger,
+} from './_queclink-settings';
 import {
     SiteCredentialsCard,
     type SiteCredentialRow,
@@ -92,10 +114,14 @@ import {
 
 type DeviceStatus = 'pending' | 'paired' | 'rejected';
 type PairingType = 'vehicle' | 'staff' | 'client';
+/** DeviceAssignment::TARGET_* — a claim pairs vehicle/staff/client; Device Management can also assign a Site or room. */
+type AssignmentType = PairingType | 'site' | 'room';
+/** SafeOperationalData::serviceState() — the only listener states the server sends. */
+type ListenerServiceState = 'active' | 'inactive' | 'unavailable';
 type Direction = 'inbound' | 'outbound';
 type FrameType = 'RESP' | 'ACK' | 'SACK' | 'BUFF' | 'AT' | 'unknown';
 
-type Device = {
+export type Device = {
     id: number;
     canonical_device_id?: number | null;
     reference: string;
@@ -109,7 +135,7 @@ type Device = {
     last_seen_at: string | null;
     last_frame_at: string | null;
     assignment: {
-        type: PairingType;
+        type: AssignmentType;
         assigned_at: string | null;
         label: string;
     } | null;
@@ -140,7 +166,7 @@ type DeviceConfiguration = {
     sections: string[];
 };
 
-type RecentCommand = {
+export type RecentCommand = {
     id: number;
     command_word: string;
     status: 'queued' | 'sent' | 'acked' | 'failed' | 'expired' | 'cancelled';
@@ -154,7 +180,7 @@ type RecentCommand = {
     failure_category: string | null;
 };
 
-type Preset = {
+export type Preset = {
     id: number;
     name: string;
     slug: string;
@@ -162,12 +188,13 @@ type Preset = {
     target_category: string;
     is_system: boolean;
     sections: string[];
+    profile_uuid?: string | null;
     profile_version?: number | null;
     payload_hash?: string | null;
     created_at: string | null;
 };
 
-type RetiredPreset = Preset & {
+export type RetiredPreset = Preset & {
     retired_at: string | null;
     retired_by: string | null;
     retirement_reason: string | null;
@@ -182,11 +209,13 @@ type DevicePagination = {
     next_page_url: string | null;
 };
 
-type Props = {
+export type Props = {
+    actor_id: number;
+    as_of: string;
     listener: {
         port: number;
         endpoint_configured: boolean;
-        service_state: string;
+        service_state: ListenerServiceState;
         connected_count: number;
     };
     devices: {
@@ -272,247 +301,617 @@ function frameStreamUrl(filters: FrameFilters): string {
 }
 
 function fmt(iso: string | null): string {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
+    return formatDateTimeLong(iso);
 }
 
 function fmtRel(iso: string | null): string {
-    if (!iso) return 'never';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return iso;
-    const diff = Date.now() - d.getTime();
-    if (diff < 60_000) return 'just now';
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
-    return `${Math.floor(diff / 86_400_000)}d ago`;
+    return formatRelative(iso, Date.now(), 'Not observed');
+}
+
+function trackerContextKey(device: Device): string {
+    return JSON.stringify([
+        device.id,
+        device.canonical_device_id ?? null,
+        device.status,
+        device.assignment?.type ?? null,
+        device.assignment?.assigned_at ?? null,
+    ]);
+}
+function presetContextKey(preset: Preset): string {
+    return JSON.stringify([
+        preset.id,
+        preset.profile_uuid ?? null,
+        preset.profile_version ?? null,
+        preset.payload_hash ?? null,
+        preset.target_category,
+        preset.is_system,
+        [...preset.sections].sort(),
+    ]);
 }
 
 function deviceCount(devices: Props['devices'], status: DeviceStatus): number {
     return devices.counts?.[status] ?? devices[status].length;
 }
 
+function listenerLabel(state: ListenerServiceState): string {
+    return state === 'active'
+        ? 'Listener active'
+        : state === 'inactive'
+          ? 'Listener stopped'
+          : 'Listener status unavailable';
+}
+
+/** Server refusals and failed reads for hub actions, shown above the views. */
+const HubNoticeContext = createContext<(message: string) => void>(() => {});
+const useHubNotice = () => useContext(HubNoticeContext);
+
+/** The first server validation message for a refused hub action. */
+function firstError(errors: Record<string, string | undefined>): string {
+    const message = Object.values(errors).find(
+        (value): value is string =>
+            typeof value === 'string' &&
+            value.trim() !== '' &&
+            value.length <= 300,
+    );
+    return message ?? REQUEST_FAILURE_MESSAGES.refused;
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/integrations' },
     { title: 'Queclink', href: '/security-devices/integrations/queclink' },
 ];
 
-const hubTabClassName =
-    'inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none';
+type HubView =
+    | 'overview'
+    | 'pending'
+    | 'devices'
+    | 'rejected'
+    | 'settings'
+    | 'console'
+    | 'ims';
+type RecordLayout = 'cards' | 'table';
+const hubPath = '/security-devices/integrations/queclink';
+// Every partial read returns current authority and the header summary with it:
+// "Read started" (as_of) must never stamp header numbers from an older read.
+const authorityProps = [
+    'actor_id',
+    'as_of',
+    'auth',
+    'can',
+    'listener',
+    'statistics',
+];
+// Writes the hub's own views send with plain router/useForm calls. Settings
+// requests own their replies (see useQueclinkRequest) and are not listed.
+const hubWritePath =
+    /^\/security-devices\/integrations\/queclink\/(?:devices\/\d+\/(?:claim|reject|restore|release|command)|bulk|settings|key)$/;
 
-// ── Page ───────────────────────────────────────────────────────────
+// The payload belongs to the returned actor. Current shared permissions must
+// independently allow this manager-only hub, including after partial visits.
+export default function QueclinkHub(data: Props) {
+    const { auth } = usePage<{
+        auth?: {
+            user?: { id?: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    integrationsManage?: boolean;
+                    devicesView?: boolean;
+                };
+            };
+        };
+    }>().props;
+    const requestLedger = useQueclinkRequestLedger();
+    const [denied, setDenied] = useState(false);
+    const [notice, setNotice] = useState('');
+    const [sourceActor] = useState(data.actor_id);
+    const denyAccess = useCallback(() => {
+        setNotice('');
+        setDenied(true);
+    }, []);
+    const [activeTab, setActiveTab] = useState<HubView>(
+        deviceCount(data.devices, 'pending') > 0 ? 'pending' : 'overview',
+    );
+    const [layout, setLayout] = useState<RecordLayout>('table');
+    const visible =
+        !denied &&
+        Boolean(
+            data.actor_id > 0 &&
+            sourceActor === data.actor_id &&
+            auth?.user?.id === data.actor_id &&
+            data.can.manage &&
+            auth.can?.securityDevices?.viewAny === true &&
+            auth.can.securityDevices.integrationsManage === true,
+        );
+    useEffect(
+        () =>
+            router.on('invalid', (event) => {
+                const response = event.detail.response;
+                if (typeof response.config.url !== 'string') return;
+                let target: URL;
+                try {
+                    target = new URL(
+                        response.config.url,
+                        window.location.origin,
+                    );
+                } catch {
+                    return;
+                }
+                if (
+                    target.origin !== window.location.origin ||
+                    (target.pathname !== hubPath &&
+                        !target.pathname.startsWith(hubPath + '/'))
+                )
+                    return;
+                const failure = requestFailure(response);
+                if (failure === 'denied') {
+                    // Lost access, or the hub page itself was refused: clear
+                    // every private record and draft.
+                    event.preventDefault();
+                    denyAccess();
+                    return;
+                }
+                const method = (response.config.method ?? 'get').toLowerCase();
+                if (method === 'get' && target.pathname === hubPath) {
+                    // A search, page or refresh read failed; nothing changed.
+                    event.preventDefault();
+                    setNotice(
+                        'Current records could not be loaded. The details shown are from the previous read. Try again in a moment.',
+                    );
+                } else if (hubWritePath.test(target.pathname)) {
+                    // Hub actions without their own reply handling. Settings
+                    // requests explain their own replies beside the form.
+                    event.preventDefault();
+                    setNotice(REQUEST_FAILURE_MESSAGES[failure]);
+                }
+            }),
+        [denyAccess],
+    );
+    if (!visible)
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="Queclink integration" />
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            icon={Satellite}
+                            title="Queclink integration"
+                            subline="Approved tracker intake and assignment"
+                            titleChip={
+                                <PageHeaderStatusChip variant="neutral">
+                                    Access unavailable
+                                </PageHeaderStatusChip>
+                            }
+                        />
+                    }
+                >
+                    <EmptyState
+                        icon={ShieldCheck}
+                        title="Queclink access is unavailable"
+                        description="Your current account needs Security & Devices access and permission to manage integrations. Refresh to check access again."
+                        action={
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    router.get(
+                                        hubPath,
+                                        {},
+                                        { preserveState: false },
+                                    )
+                                }
+                            >
+                                Refresh access
+                            </Button>
+                        }
+                    />
+                </PageLayout>
+            </AppLayout>
+        );
+    // Ordinary response DTOs retain active forms until Inertia delivers their
+    // callbacks. Current role and resource withdrawal boundaries remain explicit.
+    return (
+        <QueclinkRequestBoundary ledger={requestLedger}>
+            <HubNoticeContext.Provider value={setNotice}>
+                <QueclinkWorkspace
+                    key={JSON.stringify([
+                        data.actor_id,
+                        data.can.manage,
+                        auth?.can?.securityDevices,
+                    ])}
+                    data={data}
+                    canViewDevices={
+                        auth?.can?.securityDevices?.devicesView === true
+                    }
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                    layout={layout}
+                    setLayout={setLayout}
+                    onAccessDenied={denyAccess}
+                    notice={notice}
+                    onDismissNotice={() => setNotice('')}
+                />
+            </HubNoticeContext.Provider>
+        </QueclinkRequestBoundary>
+    );
+}
 
-export default function QueclinkHub({
-    listener,
-    devices,
-    statistics,
-    cloudIntegration,
-    siteCredentials,
-    targets,
-    presets,
-    retiredPresets = [],
-    can,
-}: Props) {
+function QueclinkWorkspace({
+    data,
+    canViewDevices,
+    activeTab,
+    setActiveTab,
+    layout,
+    setLayout,
+    onAccessDenied,
+    notice = '',
+    onDismissNotice,
+}: {
+    data: Props;
+    canViewDevices: boolean;
+    activeTab: HubView;
+    setActiveTab: (view: HubView) => void;
+    layout: RecordLayout;
+    setLayout: (layout: RecordLayout) => void;
+    onAccessDenied: () => void;
+    notice?: string;
+    onDismissNotice?: () => void;
+}) {
+    const {
+        listener,
+        devices,
+        statistics,
+        cloudIntegration,
+        siteCredentials,
+        targets,
+        presets,
+        retiredPresets = [],
+        can,
+        as_of,
+    } = data;
     const [deviceSearch, setDeviceSearch] = useState(devices.search ?? '');
     const pendingCount = deviceCount(devices, 'pending');
     const pairedCount = deviceCount(devices, 'paired');
     const rejectedCount = deviceCount(devices, 'rejected');
-    const [activeTab, setActiveTab] = useState<string>(
-        pendingCount > 0 ? 'pending' : 'overview',
+    const searchDevices = () =>
+        router.get(
+            hubPath,
+            { device_search: deviceSearch },
+            {
+                only: ['devices', ...authorityProps],
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+            },
+        );
+    const listView = ['pending', 'devices', 'rejected'].includes(activeTab);
+    // Device settings mounts on first visit and then stays mounted (hidden)
+    // for this authority, so its drafts are not lost on a view switch.
+    const [settingsOpened, setSettingsOpened] = useState(
+        activeTab === 'settings',
     );
-
+    if (activeTab === 'settings' && !settingsOpened) setSettingsOpened(true);
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Queclink Integration" />
-            <PageLayout
-                hero={
-                    <PageHero
-                        variant="compact"
-                        backHref="/security-devices/integrations"
-                        backLabel="Back to APIs & Integrations"
-                        title="Queclink Integration"
-                        description="Direct device-to-server TCP intake for vehicle, lone-worker, and client safeguarding trackers."
-                    />
-                }
+            <Head title="Queclink integration" />
+            <Tabs
+                value={activeTab}
+                onValueChange={(v) => setActiveTab(v as HubView)}
             >
-                <div
-                    data-testid="queclink-page-shell"
-                    className="w-full space-y-6"
-                >
-                    <SiteCredentialsCard rows={siteCredentials} />
-                    <form
-                        className="flex max-w-xl gap-2"
-                        onSubmit={(event) => {
-                            event.preventDefault();
-                            router.get(
-                                '/security-devices/integrations/queclink',
-                                { device_search: deviceSearch },
-                                {
-                                    only: ['devices'],
-                                    preserveScroll: true,
-                                    preserveState: true,
-                                    replace: true,
-                                },
-                            );
-                        }}
-                    >
-                        <Input
-                            value={deviceSearch}
-                            onChange={(event) =>
-                                setDeviceSearch(event.target.value)
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            icon={Satellite}
+                            title="Queclink integration"
+                            wrapTitle
+                            subline="Tracker intake · vehicle, lone-worker and client assignments"
+                            titleChip={
+                                <PageHeaderStatusChip
+                                    variant={
+                                        listener.service_state === 'active'
+                                            ? 'success'
+                                            : listener.service_state ===
+                                                'inactive'
+                                              ? 'critical'
+                                              : 'neutral'
+                                    }
+                                >
+                                    {listenerLabel(listener.service_state)}
+                                </PageHeaderStatusChip>
                             }
-                            placeholder="Search devices…"
-                            aria-label="Search devices"
-                        />
-                        <Button type="submit" variant="outline">
-                            Search devices
-                        </Button>
-                    </form>
-                    <DevicePager
-                        pagination={devices.pagination?.paired}
-                        label="devices"
-                    />
-                    {/* ── Tabs ────────────────────────────────────── */}
-                    <Tabs
-                        value={activeTab}
-                        onValueChange={setActiveTab}
-                        className="space-y-4"
-                    >
-                        <div className="relative">
-                            <TabsList
-                                data-testid="queclink-tab-list"
-                                className="flex h-auto w-full flex-wrap justify-start gap-1 rounded-none border-b bg-transparent p-0 pb-1"
-                            >
-                                <TabsTrigger
-                                    value="overview"
-                                    className={hubTabClassName}
-                                >
-                                    <LayoutDashboard className="h-4 w-4" />
-                                    Overview
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="pending"
-                                    className={hubTabClassName}
-                                >
-                                    <Inbox className="h-4 w-4" />
-                                    Pending
-                                    {pendingCount > 0 && (
-                                        <Badge
-                                            variant="outline"
-                                            className="ml-1 px-1.5 py-0 text-xs"
-                                        >
+                            actions={
+                                <>
+                                    <PageHeaderSearch
+                                        value={deviceSearch}
+                                        onChange={setDeviceSearch}
+                                        placeholder="Search devices…"
+                                        ariaLabel="Search devices"
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter')
+                                                searchDevices();
+                                        }}
+                                    />
+                                    <PageHeaderGlassButton
+                                        onClick={searchDevices}
+                                    >
+                                        Search devices
+                                    </PageHeaderGlassButton>
+                                    <PageHeaderGlassButton
+                                        icon={RefreshCw}
+                                        onClick={() =>
+                                            router.get(
+                                                hubPath,
+                                                {},
+                                                {
+                                                    preserveState: false,
+                                                    preserveScroll: true,
+                                                },
+                                            )
+                                        }
+                                    >
+                                        Refresh
+                                    </PageHeaderGlassButton>
+                                </>
+                            }
+                            meters={
+                                <>
+                                    <PageHeaderMeterBlock
+                                        label="Paired devices"
+                                        value={pairedCount}
+                                        onClick={() => setActiveTab('devices')}
+                                    >
+                                        <PageHeaderMeterDonut
+                                            percent={
+                                                devices.total
+                                                    ? (pairedCount /
+                                                          devices.total) *
+                                                      100
+                                                    : 0
+                                            }
+                                        />
+                                        <PageHeaderMeterCaption>
+                                            {pairedCount} of {devices.total}{' '}
+                                            matching trackers paired
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Pending"
+                                        tone={
+                                            pendingCount ? 'warning' : 'brand'
+                                        }
+                                        onClick={() => setActiveTab('pending')}
+                                    >
+                                        <PageHeaderMeterBig>
                                             {pendingCount}
-                                        </Badge>
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Waiting for an authorised claim
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Rejected"
+                                        onClick={() => setActiveTab('rejected')}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {rejectedCount}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Review or restore a recognised
+                                            tracker
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Connected now"
+                                        onClick={() => setActiveTab('overview')}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {listener.connected_count}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Listener scope · returned connection
+                                            state
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                    <PageHeaderMeterBlock
+                                        label="Frames last hour"
+                                        onClick={() => setActiveTab('console')}
+                                    >
+                                        <PageHeaderMeterBig>
+                                            {statistics.frames_last_hour}
+                                        </PageHeaderMeterBig>
+                                        <PageHeaderMeterCaption>
+                                            Last frame:{' '}
+                                            {fmtRel(statistics.last_frame_at)}
+                                        </PageHeaderMeterCaption>
+                                    </PageHeaderMeterBlock>
+                                </>
+                            }
+                            filters={
+                                <>
+                                    {(listView || activeTab === 'settings') && (
+                                        <PageHeaderViewToggle
+                                            value={layout}
+                                            onChange={setLayout}
+                                            options={[
+                                                {
+                                                    value: 'cards',
+                                                    label: 'Cards',
+                                                    icon: LayoutGrid,
+                                                },
+                                                {
+                                                    value: 'table',
+                                                    label: 'Table',
+                                                    icon: List,
+                                                },
+                                            ]}
+                                            ariaLabel="Tracker layout"
+                                        />
                                     )}
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="devices"
-                                    className={hubTabClassName}
-                                >
-                                    <Smartphone className="h-4 w-4" />
-                                    Devices ({pairedCount})
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="rejected"
-                                    className={hubTabClassName}
-                                >
-                                    <XCircle className="h-4 w-4" />
-                                    Rejected ({rejectedCount})
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="settings"
-                                    className={hubTabClassName}
-                                >
-                                    <Settings2 className="h-4 w-4" />
-                                    Device settings
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="console"
-                                    className={hubTabClassName}
-                                >
-                                    <Activity className="h-4 w-4" />
-                                    Debug console
-                                </TabsTrigger>
-                                <TabsTrigger
-                                    value="ims"
-                                    className={hubTabClassName}
-                                >
-                                    <Database className="h-4 w-4" />
-                                    Cloud API
-                                </TabsTrigger>
-                            </TabsList>
-                        </div>
-
-                        <TabsContent
-                            value="overview"
-                            className="space-y-6 pt-6"
-                        >
+                                    <span className="text-caption text-band-foreground/80">
+                                        Read started {fmt(as_of)} · NZ time
+                                        {devices.search
+                                            ? ' · device counts match the search'
+                                            : ''}
+                                    </span>
+                                </>
+                            }
+                            rail={
+                                <PageHeaderRail
+                                    value={activeTab}
+                                    onSelect={setActiveTab}
+                                    ariaLabel="Queclink views"
+                                    items={[
+                                        {
+                                            key: 'overview',
+                                            label: 'Overview',
+                                            icon: LayoutDashboard,
+                                        },
+                                        {
+                                            key: 'pending',
+                                            label: 'Pending',
+                                            icon: Inbox,
+                                            count: pendingCount,
+                                        },
+                                        {
+                                            key: 'devices',
+                                            label: 'Devices',
+                                            icon: Smartphone,
+                                            count: pairedCount,
+                                        },
+                                        {
+                                            key: 'rejected',
+                                            label: 'Rejected',
+                                            icon: XCircle,
+                                            count: rejectedCount,
+                                        },
+                                        {
+                                            key: 'settings',
+                                            label: 'Device settings',
+                                            icon: Settings2,
+                                        },
+                                        {
+                                            key: 'console',
+                                            label: 'Debug console',
+                                            icon: Activity,
+                                        },
+                                        {
+                                            key: 'ims',
+                                            label: 'Cloud API',
+                                            icon: Database,
+                                        },
+                                    ]}
+                                />
+                            }
+                        />
+                    }
+                >
+                    <div
+                        data-testid="queclink-page-shell"
+                        className="w-full space-y-5"
+                    >
+                        {notice && (
+                            <Alert variant="warning">
+                                <AlertTriangle aria-hidden="true" />
+                                <AlertTitle>Request not completed</AlertTitle>
+                                <AlertDescription>
+                                    <p>{notice}</p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={onDismissNotice}
+                                    >
+                                        Dismiss
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        <TabsContent value="overview" className="space-y-5">
+                            <SiteCredentialsCard rows={siteCredentials} />
                             <OverviewTab
                                 listener={listener}
                                 devices={devices}
                                 statistics={statistics}
                                 can={can}
+                                onAccessDenied={onAccessDenied}
                             />
                         </TabsContent>
-
-                        <TabsContent value="pending" className="space-y-6 pt-6">
+                        <TabsContent value="pending" className="space-y-5">
                             <PendingTab
                                 pending={devices.pending}
+                                total={pendingCount}
                                 pagination={devices.pagination?.pending}
                                 targets={targets}
                                 can={can}
+                                layout={layout}
+                                canViewDevices={canViewDevices}
                             />
                         </TabsContent>
-
-                        <TabsContent value="devices" className="space-y-6 pt-6">
+                        <TabsContent value="devices" className="space-y-5">
                             <DevicesTab
                                 paired={devices.paired}
+                                total={pairedCount}
+                                pagination={devices.pagination?.paired}
                                 presets={presets}
                                 can={can}
+                                layout={layout}
+                                canViewDevices={canViewDevices}
                             />
                         </TabsContent>
-
-                        <TabsContent
-                            value="rejected"
-                            className="space-y-6 pt-6"
-                        >
+                        <TabsContent value="rejected" className="space-y-5">
                             <RejectedTab
                                 rejected={devices.rejected}
+                                total={rejectedCount}
                                 pagination={devices.pagination?.rejected}
                                 can={can}
+                                layout={layout}
+                                canViewDevices={canViewDevices}
                             />
                         </TabsContent>
-
+                        {/* Once opened, kept mounted while hidden: "Keep
+                            draft" values and the chosen tracker survive a
+                            switch to another view and back. */}
                         <TabsContent
                             value="settings"
-                            className="space-y-6 pt-6"
+                            forceMount
+                            hidden={activeTab !== 'settings'}
+                            className="space-y-5"
                         >
-                            <DeviceSettingsTab
-                                devices={devices.paired}
-                                listener={listener}
-                                presets={presets}
-                                retiredPresets={retiredPresets}
-                                can={can}
-                            />
+                            {settingsOpened && (
+                                <DeviceSettingsTab
+                                    devices={devices.paired}
+                                    total={pairedCount}
+                                    listener={listener}
+                                    presets={presets}
+                                    retiredPresets={retiredPresets}
+                                    can={can}
+                                    layout={layout}
+                                    onAccessDenied={onAccessDenied}
+                                />
+                            )}
                         </TabsContent>
-
-                        <TabsContent value="console" className="space-y-6 pt-6">
+                        <TabsContent value="console" className="space-y-5">
                             <DebugConsoleTab
+                                key={devices.paired
+                                    .map(trackerContextKey)
+                                    .sort()
+                                    .join('|')}
                                 devices={devices.paired}
+                                total={pairedCount}
                                 can={can}
+                                onAccessDenied={onAccessDenied}
                             />
                         </TabsContent>
-
-                        <TabsContent value="ims" className="space-y-6 pt-6">
+                        <TabsContent value="ims" className="space-y-5">
                             <CloudIntegrationTab
                                 cloudIntegration={cloudIntegration}
                                 can={can}
                             />
                         </TabsContent>
-                    </Tabs>
-                </div>
-            </PageLayout>
+                    </div>
+                </PageLayout>
+            </Tabs>
         </AppLayout>
     );
 }
@@ -521,40 +920,17 @@ export default function QueclinkHub({
 
 function ListenerStatusBadge({ listener }: { listener: Props['listener'] }) {
     const state = listener.service_state;
-    const isActive = state === 'active';
-    const isInactive =
-        state === 'inactive' || state === 'failed' || state === 'unknown';
-    const isDev = state === 'not_applicable';
-
-    if (isDev) {
-        return (
-            <Badge className="bg-muted text-muted-foreground" variant="outline">
-                <Server className="mr-1.5 h-3 w-3" />
-                Dev host — run{' '}
-                <code className="mx-1 rounded bg-background px-1 py-0.5">
-                    php artisan queclink:listen
-                </code>{' '}
-                manually
-            </Badge>
-        );
-    }
+    const variant =
+        state === 'active'
+            ? 'success'
+            : state === 'inactive'
+              ? 'critical'
+              : 'neutral';
     return (
-        <Badge
-            className={
-                isActive
-                    ? 'bg-status-success-bg text-status-success'
-                    : isInactive
-                      ? 'bg-status-critical-bg text-status-critical'
-                      : 'bg-status-warning-bg text-status-warning'
-            }
-        >
-            {isActive ? (
-                <CheckCircle className="mr-1.5 h-3 w-3" />
-            ) : (
-                <XCircle className="mr-1.5 h-3 w-3" />
-            )}
-            Listener {state} · {listener.connected_count} connected
-        </Badge>
+        <StatusBadge variant={variant}>
+            <Server aria-hidden="true" className="size-3" />
+            {listenerLabel(state)} · {listener.connected_count} connected
+        </StatusBadge>
     );
 }
 
@@ -565,11 +941,13 @@ export function OverviewTab({
     devices,
     statistics,
     can,
+    onAccessDenied,
 }: {
     listener: Props['listener'];
     devices: Props['devices'];
     statistics: Props['statistics'];
     can: Props['can'];
+    onAccessDenied?: () => void;
 }) {
     const settings = useForm<{ port: number; public_hostname: string }>({
         port: listener.port,
@@ -586,6 +964,13 @@ export function OverviewTab({
     const [provisioningLoading, setProvisioningLoading] = useState(false);
     const provisioningRequest = useRef(0);
 
+    useEffect(
+        () => () => {
+            provisioningRequest.current += 1;
+        },
+        [],
+    );
+
     const portChanged = settings.data.port !== listener.port;
 
     async function generateProvisioning() {
@@ -599,6 +984,10 @@ export function OverviewTab({
                 `/security-devices/integrations/queclink/provisioning?family=${family}`,
                 { headers: { Accept: 'application/json' } },
             );
+            if ([401, 403, 404].includes(response.status)) {
+                onAccessDenied?.();
+                return;
+            }
             const payload: unknown = await response.json().catch(() => null);
 
             if (requestId !== provisioningRequest.current) return;
@@ -655,38 +1044,31 @@ export function OverviewTab({
 
     return (
         <>
-            <div className="grid gap-4 md:grid-cols-4">
-                <StatCard
-                    label="Paired devices"
-                    value={deviceCount(devices, 'paired')}
-                />
-                <StatCard
-                    label="Pending"
-                    value={deviceCount(devices, 'pending')}
-                    tone={
-                        deviceCount(devices, 'pending') > 0
-                            ? 'warning'
-                            : undefined
-                    }
-                />
-                <StatCard
-                    label="Connected now"
-                    value={listener.connected_count}
-                />
-                <StatCard
-                    label="Frames (last hour)"
-                    value={statistics.frames_last_hour}
-                />
-            </div>
-
+            <Alert role="region" aria-label="Listener observation">
+                <Server aria-hidden="true" />
+                <AlertTitle>Listener observation</AlertTitle>
+                <AlertDescription>
+                    <ListenerStatusBadge listener={listener} />
+                    <p className="mt-2">
+                        Port {listener.port} · protected endpoint{' '}
+                        {listener.endpoint_configured
+                            ? 'configured'
+                            : 'not configured'}{' '}
+                        · last frame {fmt(statistics.last_frame_at)} (NZ time).
+                    </p>
+                    <p className="mt-1">
+                        A connected listener does not confirm a tracker location
+                        or a completed device action.
+                    </p>
+                </AlertDescription>
+            </Alert>
             <Card>
                 <CardHeader>
                     <CardTitle>Listener settings</CardTitle>
                     <CardDescription>
-                        These are the values devices dial into. Changing the
-                        port will rewrite the systemd unit and restart the
-                        listener — all paired devices must be reconfigured to
-                        match.
+                        These are the details trackers connect to. Changing the
+                        port restarts the listener, and every paired tracker
+                        must then be set to the new port.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -720,11 +1102,12 @@ export function OverviewTab({
                                 Default: 8090. Apply this port through the
                                 approved secure device-management process.
                             </p>
+                            <InputError message={settings.errors.port} />
                             {portChanged &&
                                 deviceCount(devices, 'paired') > 0 && (
-                                    <p className="flex items-start gap-1 rounded-md border border-status-warning/30 bg-status-warning-bg p-2 text-xs text-status-warning">
-                                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                                        <span>
+                                    <Alert variant="warning" role="status">
+                                        <AlertTriangle aria-hidden="true" />
+                                        <AlertDescription>
                                             {deviceCount(devices, 'paired')}{' '}
                                             paired{' '}
                                             {deviceCount(devices, 'paired') ===
@@ -734,8 +1117,8 @@ export function OverviewTab({
                                             will need to be reconfigured to dial
                                             port {settings.data.port} before
                                             they reconnect.
-                                        </span>
-                                    </p>
+                                        </AlertDescription>
+                                    </Alert>
                                 )}
                         </div>
                         <div className="space-y-2">
@@ -754,10 +1137,13 @@ export function OverviewTab({
                                 disabled={!can.manage}
                             />
                             <p className="text-xs text-muted-foreground">
-                                The address devices dial into. An existing
+                                The address trackers connect to. An existing
                                 hostname remains protected; enter a value only
                                 to set or replace it.
                             </p>
+                            <InputError
+                                message={settings.errors.public_hostname}
+                            />
                         </div>
                         <div className="md:col-span-2">
                             <Button
@@ -840,28 +1226,30 @@ export function OverviewTab({
                         </Alert>
                     ) : null}
                     {provisioning && (
-                        <div
-                            className="space-y-3 rounded-lg border border-status-success/30 bg-status-success-bg p-4"
+                        <Alert
+                            variant="success"
+                            role="status"
                             aria-live="polite"
                         >
-                            <div className="flex items-center gap-2 font-medium text-status-success">
-                                <ShieldCheck
-                                    className="h-4 w-4"
-                                    aria-hidden="true"
-                                />
+                            <ShieldCheck aria-hidden="true" />
+                            <AlertTitle>
                                 Ready for secure provisioning
-                            </div>
-                            <ol className="space-y-1 text-sm text-muted-foreground">
-                                {provisioning.instructions.map((step, i) => (
-                                    <li key={i}>
-                                        <span className="mr-2 font-medium text-foreground">
-                                            {i + 1}.
-                                        </span>
-                                        {step}
-                                    </li>
-                                ))}
-                            </ol>
-                        </div>
+                            </AlertTitle>
+                            <AlertDescription>
+                                <ol className="space-y-1">
+                                    {provisioning.instructions.map(
+                                        (step, i) => (
+                                            <li key={i}>
+                                                <span className="mr-2 font-medium">
+                                                    {i + 1}.
+                                                </span>
+                                                {step}
+                                            </li>
+                                        ),
+                                    )}
+                                </ol>
+                            </AlertDescription>
+                        </Alert>
                     )}
                 </CardContent>
             </Card>
@@ -912,20 +1300,24 @@ export function OverviewTab({
                             tracking: Vehicle, Staff (lone worker), or Client
                             (with consent record).
                         </Step>
-                        <Step n={6} title="Confirm in the Debug Console">
+                        <Step n={6} title="Confirm in the Debug console">
                             Open the <strong>Debug console</strong> tab and
                             confirm bounded heartbeat and location-report
                             states. Raw frame and device identifiers remain
                             protected.
                         </Step>
                     </ol>
-                    <div className="mt-4 rounded-md border border-status-warning/30 bg-status-warning-bg p-3 text-xs text-status-warning">
-                        <strong>Safety note:</strong> any device that knows this
-                        server's address and port can land in the Pending tab.
-                        Claim only IMEIs you recognise. Rejected devices are
-                        inert — they stay connected but receive no
-                        acknowledgements and contribute nothing to the system.
-                    </div>
+                    <Alert variant="warning" role="note" className="mt-4">
+                        <AlertTriangle aria-hidden="true" />
+                        <AlertTitle>Safety note</AlertTitle>
+                        <AlertDescription>
+                            Any device that knows this server&apos;s address and
+                            port can land in the Pending tab. Claim only IMEIs
+                            you recognise. Rejected devices are inert — they
+                            stay connected but receive no acknowledgements and
+                            contribute nothing to the system.
+                        </AlertDescription>
+                    </Alert>
                 </CardContent>
             </Card>
         </>
@@ -954,35 +1346,6 @@ function Step({
     );
 }
 
-function StatCard({
-    label,
-    value,
-    tone,
-}: {
-    label: string;
-    value: number;
-    tone?: 'warning';
-}) {
-    return (
-        <Card>
-            <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p
-                    className={`mt-1 text-2xl font-semibold ${
-                        tone === 'warning' && value > 0
-                            ? 'text-status-warning'
-                            : ''
-                    }`}
-                >
-                    {value}
-                </p>
-            </CardContent>
-        </Card>
-    );
-}
-
-// ── Pending tab ───────────────────────────────────────────────────
-
 function DevicePager({
     pagination,
     label,
@@ -998,7 +1361,7 @@ function DevicePager({
             url,
             {},
             {
-                only: ['devices'],
+                only: ['devices', ...authorityProps],
                 preserveScroll: true,
                 preserveState: true,
                 replace: true,
@@ -1033,132 +1396,569 @@ function DevicePager({
     );
 }
 
+function TrackerRecords({
+    rows,
+    total,
+    title,
+    layout = 'table',
+    actionsFor,
+    selection,
+    canViewDevices = false,
+}: {
+    rows: Device[];
+    total: number;
+    title: string;
+    layout?: RecordLayout;
+    actionsFor: (device: Device) => MenuItem[];
+    selection?: {
+        keys: ReadonlySet<string | number>;
+        onToggle: (device: Device, checked: boolean) => void;
+        labelFor: (device: Device) => string;
+    };
+    canViewDevices?: boolean;
+}) {
+    const [readingId, setReadingId] = useState<number | null>(null);
+    const reading = rows.find((row) => row.id === readingId);
+    const context = useEntityContextMenu<Device>();
+    const contextDevice = context.ctx?.record;
+    const contextRecord = contextDevice
+        ? rows.find(
+              (row) =>
+                  row.id === contextDevice.id &&
+                  trackerContextKey(row) === trackerContextKey(contextDevice),
+          )
+        : undefined;
+    const actions = (device: Device): MenuItem[] => [
+        {
+            label: 'View tracker details',
+            icon: Eye,
+            onClick: () => setReadingId(device.id),
+        },
+        ...actionsFor(device),
+    ];
+    const connection = (device: Device) => (
+        <StatusBadge
+            variant={
+                device.connection_state === 'connected' ? 'info' : 'neutral'
+            }
+        >
+            {connectionStateLabel(device.connection_state)}
+        </StatusBadge>
+    );
+    return (
+        <>
+            <ListCaption
+                title={title}
+                caption={rows.length + ' of ' + total + ' shown'}
+            />
+            {layout === 'cards' ? (
+                <EntityCardGrid>
+                    {rows.map((device) => (
+                        <EntityCard
+                            key={device.id}
+                            icon={Satellite}
+                            name={device.reference}
+                            subline={device.model_hint ?? 'Model not observed'}
+                            meridian="neutral"
+                            actions={actions(device)}
+                            onContextMenu={(event) =>
+                                context.open(event, device)
+                            }
+                            onOpen={() => setReadingId(device.id)}
+                            selection={
+                                selection
+                                    ? {
+                                          checked: selection.keys.has(
+                                              device.id,
+                                          ),
+                                          label: selection.labelFor(device),
+                                          onToggle: (checked) =>
+                                              selection.onToggle(
+                                                  device,
+                                                  checked,
+                                              ),
+                                      }
+                                    : undefined
+                            }
+                            chips={
+                                <>
+                                    {connection(device)}
+                                    <EntityChip>
+                                        {pairingStateLabel(device.status)}
+                                    </EntityChip>
+                                    {device.assignment && (
+                                        <EntityChip>
+                                            {assignmentTypeLabel(
+                                                device.assignment.type,
+                                            )}
+                                        </EntityChip>
+                                    )}
+                                </>
+                            }
+                            footer={{
+                                primary:
+                                    device.assignment?.label ??
+                                    'No current assignment',
+                                secondary:
+                                    'Last seen ' + fmtRel(device.last_seen_at),
+                                personIcon: Satellite,
+                            }}
+                        />
+                    ))}
+                </EntityCardGrid>
+            ) : (
+                <EntityTable
+                    rows={rows}
+                    rowKey={(device) => device.id}
+                    identityLabel="Tracker"
+                    wrapIdentity
+                    identity={(device) => ({
+                        name: device.reference,
+                        subline: device.model_hint ?? 'Model not observed',
+                        icon: Satellite,
+                    })}
+                    columns={[
+                        {
+                            key: 'assignment',
+                            label: 'Current assignment',
+                            width: '1.7fr',
+                            cell: (device) => (
+                                <span>
+                                    {device.assignment?.label ??
+                                        'No current assignment'}
+                                    {device.assignment && (
+                                        <span className="text-caption block">
+                                            {assignmentTypeLabel(
+                                                device.assignment.type,
+                                            )}
+                                        </span>
+                                    )}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'seen',
+                            label: 'Last seen',
+                            width: '1.5fr',
+                            cell: (device) => (
+                                <span title={fmt(device.last_seen_at)}>
+                                    {fmtRel(device.last_seen_at)}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'first',
+                            label: 'First seen',
+                            width: '1.5fr',
+                            cell: (device) => (
+                                <span title={fmt(device.first_seen_at)}>
+                                    {fmtRel(device.first_seen_at)}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'connection',
+                            label: 'Connection',
+                            width: '1fr',
+                            cell: connection,
+                        },
+                    ]}
+                    actionsFor={actions}
+                    onOpen={(device) => setReadingId(device.id)}
+                    onRowContextMenu={context.open}
+                    selection={selection}
+                    rowHeight="content"
+                />
+            )}
+            {context.ctx && contextRecord && (
+                <EntityContextMenu
+                    x={context.ctx.x}
+                    y={context.ctx.y}
+                    title={contextRecord.reference}
+                    icon={Satellite}
+                    items={actions(contextRecord)}
+                    onClose={context.close}
+                />
+            )}
+            {reading && (
+                <TrackerReader
+                    key={reading.id}
+                    device={reading}
+                    onClose={() => setReadingId(null)}
+                    canViewDevices={canViewDevices}
+                />
+            )}
+        </>
+    );
+}
+
+function TrackerReader({
+    device,
+    onClose,
+    canViewDevices,
+}: {
+    device: Device;
+    onClose: () => void;
+    canViewDevices: boolean;
+}) {
+    const [section, setSection] = useState(0);
+    return (
+        <WizardShell
+            open
+            onClose={onClose}
+            title={'Tracker details · ' + device.reference}
+            description="Returned observations and current assignment. Location history and consent remain in their owning records."
+            railIcon={Satellite}
+            railTitle={device.reference}
+            railSub="Tracker observations"
+            sequential={false}
+            stepIndex={section}
+            onStepClick={setSection}
+            headerLabel={
+                section === 0
+                    ? 'Tracker and assignment'
+                    : 'Technical observations'
+            }
+            steps={[
+                {
+                    key: 'tracker',
+                    label: 'Tracker and assignment',
+                    blurb: 'Identity, connection and source times',
+                    icon: Satellite,
+                },
+                {
+                    key: 'technical',
+                    label: 'Technical observations',
+                    blurb: 'Configuration and command receipts',
+                    icon: Settings2,
+                },
+            ]}
+            footerEnd={
+                <Button variant="outline" onClick={onClose}>
+                    Close details
+                </Button>
+            }
+        >
+            <WizardStepPane>
+                <div className="space-y-5">
+                    {section === 0 ? (
+                        <>
+                            <ReviewCard icon={Satellite} title="Tracker">
+                                <ReviewRow
+                                    label="Reference"
+                                    value={device.reference}
+                                />
+                                <ReviewRow
+                                    label="Pairing state"
+                                    value={pairingStateLabel(device.status)}
+                                />
+                                <ReviewRow
+                                    label="Model"
+                                    value={device.model_hint}
+                                />
+                                <ReviewRow
+                                    label="Connection"
+                                    value={connectionStateLabel(
+                                        device.connection_state,
+                                    )}
+                                />
+                                <ReviewRow
+                                    label="First seen"
+                                    value={fmt(device.first_seen_at)}
+                                />
+                                <ReviewRow
+                                    label="Last seen"
+                                    value={fmt(device.last_seen_at)}
+                                />
+                                <ReviewRow
+                                    label="Last frame"
+                                    value={fmt(device.last_frame_at)}
+                                />
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={ShieldCheck}
+                                title="Current assignment"
+                            >
+                                <ReviewRow
+                                    label="Type"
+                                    value={
+                                        device.assignment
+                                            ? assignmentTypeLabel(
+                                                  device.assignment.type,
+                                              )
+                                            : device.pending_pairing_type
+                                              ? `${assignmentTypeLabel(device.pending_pairing_type)} (expected)`
+                                              : null
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Assigned to"
+                                    value={device.assignment?.label}
+                                />
+                                <ReviewRow
+                                    label="Assigned at"
+                                    value={fmt(
+                                        device.assignment?.assigned_at ?? null,
+                                    )}
+                                />
+                                <p className="text-caption mt-3">
+                                    Times are shown in NZ time. Current
+                                    assignment does not establish who carried
+                                    the tracker at an earlier event. Provider
+                                    address and raw identifiers remain
+                                    protected.
+                                </p>
+                            </ReviewCard>
+                            {canViewDevices && device.canonical_device_id && (
+                                <Button asChild variant="outline">
+                                    <Link
+                                        href={
+                                            '/security-devices/devices/' +
+                                            device.canonical_device_id
+                                        }
+                                    >
+                                        Open device record
+                                    </Link>
+                                </Button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <ReviewCard
+                                icon={Settings2}
+                                title="Observed configuration"
+                            >
+                                <ReviewRow
+                                    label="Protocol version"
+                                    value={device.protocol_version}
+                                />
+                                <ReviewRow
+                                    label="Firmware version"
+                                    value={device.firmware_version}
+                                />
+                                <ReviewRow
+                                    label="Configuration state"
+                                    value={
+                                        device.configuration?.state ===
+                                        'observed'
+                                            ? 'Observed'
+                                            : 'Not observed'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Observed at"
+                                    value={fmt(
+                                        device.configuration?.observed_at ??
+                                            null,
+                                    )}
+                                />
+                                <ReviewRow
+                                    label="Sections"
+                                    value={
+                                        device.configuration
+                                            ? sectionReadLabels(
+                                                  device.configuration.sections,
+                                                  SECTION_READ_OPTIONS,
+                                              )
+                                            : undefined
+                                    }
+                                />
+                            </ReviewCard>
+                            <ListCaption
+                                title="Recent command observations"
+                                caption={
+                                    (device.recent_commands?.length ?? 0) +
+                                    ' returned'
+                                }
+                            />
+                            {(device.recent_commands ?? []).length === 0 ? (
+                                <EmptyState
+                                    variant="compact"
+                                    icon={Inbox}
+                                    title="No recent command observations"
+                                    description="No command receipt was returned for this tracker."
+                                />
+                            ) : (
+                                (device.recent_commands ?? []).map(
+                                    (command) => (
+                                        <ReviewCard
+                                            key={command.id}
+                                            icon={Send}
+                                            title={command.command_word}
+                                        >
+                                            <ReviewRow
+                                                label="Status"
+                                                value={
+                                                    <CommandStatusBadge
+                                                        status={command.status}
+                                                    />
+                                                }
+                                            />
+                                            <ReviewRow
+                                                label="Started from"
+                                                value={
+                                                    command.governed
+                                                        ? 'Device Management'
+                                                        : 'Older Queclink console'
+                                                }
+                                            />
+                                            <ReviewRow
+                                                label="Created"
+                                                value={fmt(command.created_at)}
+                                            />
+                                            <ReviewRow
+                                                label="Sent"
+                                                value={fmt(command.sent_at)}
+                                            />
+                                            <ReviewRow
+                                                label="Acknowledged at"
+                                                value={fmt(command.acked_at)}
+                                            />
+                                            <ReviewRow
+                                                label="Fulfilled"
+                                                value={fmt(
+                                                    command.fulfilled_at,
+                                                )}
+                                            />
+                                            <ReviewRow
+                                                label="Cancelled"
+                                                value={fmt(
+                                                    command.cancelled_at ??
+                                                        null,
+                                                )}
+                                            />
+                                            <ReviewRow
+                                                label="Expires"
+                                                value={fmt(command.expires_at)}
+                                            />
+                                            <ReviewRow
+                                                label="Reason it failed"
+                                                value={
+                                                    command.failure_category
+                                                        ? plainLabel(
+                                                              command.failure_category,
+                                                          )
+                                                        : null
+                                                }
+                                            />
+                                        </ReviewCard>
+                                    ),
+                                )
+                            )}
+                            <p className="text-caption">
+                                Transport acknowledgement does not confirm that
+                                the intended device change took effect.
+                            </p>
+                        </>
+                    )}
+                </div>
+            </WizardStepPane>
+        </WizardShell>
+    );
+}
+
 function PendingTab({
     pending,
     pagination,
+    total,
     targets,
     can,
+    layout = 'table',
+    canViewDevices = false,
 }: {
     pending: Device[];
     pagination?: DevicePagination;
+    total?: number;
     targets: Props['targets'];
     can: Props['can'];
+    layout?: RecordLayout;
+    canViewDevices?: boolean;
 }) {
-    const [claiming, setClaiming] = useState<Device | null>(null);
-    const [rejecting, setRejecting] = useState<Device | null>(null);
-
-    if (pending.length === 0) {
+    const notify = useHubNotice();
+    const [claimingId, setClaimingId] = useState<number | null>(null);
+    const [rejectingId, setRejectingId] = useState<number | null>(null);
+    const claiming = can.manage
+        ? pending.find((device) => device.id === claimingId)
+        : null;
+    const rejecting = can.manage
+        ? pending.find((device) => device.id === rejectingId)
+        : null;
+    if (!can.manage)
         return (
-            <>
-                <Card>
-                    <CardContent className="flex flex-col items-center gap-2 p-12 text-center">
-                        <Inbox className="h-10 w-10 text-muted-foreground" />
-                        <p className="text-sm font-medium">
-                            No devices waiting for pairing
-                        </p>
-                        <p className="max-w-md text-xs text-muted-foreground">
-                            When a device dials in for the first time it lands
-                            here. Configure it with the provisioning string from
-                            the Overview tab.
-                        </p>
-                    </CardContent>
-                </Card>
-                <DevicePager pagination={pagination} label="pending" />
-            </>
+            <EmptyState
+                icon={ShieldCheck}
+                title="Tracker access is unavailable"
+                description="Permission to manage this integration is required."
+            />
         );
-    }
-
     return (
         <>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Pending pairings</CardTitle>
-                    <CardDescription>
-                        New IMEIs detected by the listener. Claim only ones you
-                        recognise — any device that knows your server address
-                        can land here.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>IMEI</TableHead>
-                                <TableHead>Model</TableHead>
-                                <TableHead>First seen</TableHead>
-                                <TableHead>Last seen</TableHead>
-                                <TableHead>From</TableHead>
-                                <TableHead className="text-right">
-                                    Actions
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {pending.map((d) => (
-                                <TableRow key={d.id}>
-                                    <TableCell className="font-mono text-xs">
-                                        {d.reference}
-                                    </TableCell>
-                                    <TableCell>{d.model_hint ?? '—'}</TableCell>
-                                    <TableCell className="text-xs">
-                                        {fmtRel(d.first_seen_at)}
-                                    </TableCell>
-                                    <TableCell className="text-xs">
-                                        {fmtRel(d.last_seen_at)}
-                                    </TableCell>
-                                    <TableCell className="font-mono text-xs text-muted-foreground">
-                                        Provider address protected
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button
-                                            size="sm"
-                                            disabled={!can.manage}
-                                            onClick={() => setClaiming(d)}
-                                        >
-                                            Claim
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="ml-1 text-status-critical hover:text-status-critical"
-                                            disabled={!can.manage}
-                                            aria-label={`Reject tracker ${d.reference}`}
-                                            onClick={() => setRejecting(d)}
-                                        >
-                                            <Trash2 className="h-3 w-3" />
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <Alert>
+                <ShieldCheck aria-hidden="true" />
+                <AlertTitle>Recognise the tracker before claiming</AlertTitle>
+                <AlertDescription>
+                    Only claim a known tracker for an approved Site and target.
+                    Client pairing requires current location-tracking consent in
+                    the client record.
+                </AlertDescription>
+            </Alert>
+            {pending.length ? (
+                <TrackerRecords
+                    rows={pending}
+                    total={total ?? pagination?.total ?? pending.length}
+                    title="Pending pairings"
+                    layout={layout}
+                    canViewDevices={canViewDevices}
+                    actionsFor={(device) => [
+                        {
+                            label: 'Claim device',
+                            icon: ShieldCheck,
+                            onClick: () => setClaimingId(device.id),
+                        },
+                        {
+                            label: 'Reject tracker',
+                            icon: Trash2,
+                            danger: true,
+                            onClick: () => setRejectingId(device.id),
+                        },
+                    ]}
+                />
+            ) : (
+                <EmptyState
+                    icon={Inbox}
+                    title="No devices waiting for pairing"
+                    description="A recognised tracker appears here when its first connection is received. Check protected provisioning readiness in Overview."
+                />
+            )}
             <DevicePager pagination={pagination} label="pending" />
-
             {claiming && (
                 <ClaimDialog
+                    key={claiming.id}
                     device={claiming}
                     targets={targets}
-                    onClose={() => setClaiming(null)}
+                    onClose={() => setClaimingId(null)}
                 />
             )}
             <ConfirmDialog
-                open={rejecting !== null}
-                onClose={() => setRejecting(null)}
+                open={Boolean(rejecting)}
+                onClose={() => setRejectingId(null)}
                 onConfirm={() => {
-                    if (rejecting) {
+                    if (rejecting && can.manage)
                         router.post(
-                            `/security-devices/integrations/queclink/devices/${rejecting.id}/reject`,
+                            hubPath + '/devices/' + rejecting.id + '/reject',
                             {},
-                            { preserveScroll: true },
+                            {
+                                preserveScroll: true,
+                                onError: (errors) => notify(firstError(errors)),
+                            },
                         );
-                    }
                 }}
                 title="Reject tracker?"
                 description={
                     rejecting
-                        ? `Reject “${rejecting.reference}”? It will be ignored until an authorised operator restores it to the pending tray.`
+                        ? 'Reject “' +
+                          rejecting.reference +
+                          '”? It will be ignored until an authorised operator restores it to the pending tray.'
                         : ''
                 }
                 confirmText="Reject tracker"
@@ -1170,106 +1970,76 @@ function PendingTab({
 export function RejectedTab({
     rejected,
     pagination,
+    total,
     can,
+    layout = 'table',
+    canViewDevices = false,
 }: {
     rejected: Device[];
     pagination?: DevicePagination;
+    total?: number;
     can: Props['can'];
+    layout?: RecordLayout;
+    canViewDevices?: boolean;
 }) {
-    const [restoring, setRestoring] = useState<Device | null>(null);
-
+    const notify = useHubNotice();
+    const [restoringId, setRestoringId] = useState<number | null>(null);
+    const restoring = can.manage
+        ? rejected.find((device) => device.id === restoringId)
+        : null;
+    if (!can.manage)
+        return (
+            <EmptyState
+                icon={ShieldCheck}
+                title="Tracker access is unavailable"
+                description="Permission to manage this integration is required."
+            />
+        );
     return (
         <>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Rejected devices</CardTitle>
-                    <CardDescription>
-                        Devices blocked from pairing. Restore a recognised
-                        tracker to return it to the pending tray for review.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {rejected.length === 0 ? (
-                        <div className="flex flex-col items-center gap-2 p-10 text-center">
-                            <ShieldCheck className="h-10 w-10 text-muted-foreground" />
-                            <p className="text-sm font-medium">
-                                No rejected devices
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                                Rejected trackers remain visible here for safe
-                                review and recovery.
-                            </p>
-                        </div>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>IMEI</TableHead>
-                                    <TableHead>Model</TableHead>
-                                    <TableHead>Last seen</TableHead>
-                                    <TableHead>Connection</TableHead>
-                                    <TableHead className="text-right">
-                                        Actions
-                                    </TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rejected.map((device) => (
-                                    <TableRow key={device.id}>
-                                        <TableCell className="font-mono text-xs">
-                                            {device.reference}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {device.model_hint ?? '—'}
-                                        </TableCell>
-                                        <TableCell className="text-xs">
-                                            {fmtRel(device.last_seen_at)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline">
-                                                {device.connection_state ===
-                                                'connected'
-                                                    ? 'online'
-                                                    : 'offline'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                disabled={!can.manage}
-                                                onClick={() =>
-                                                    setRestoring(device)
-                                                }
-                                            >
-                                                <RefreshCw className="mr-1 h-3 w-3" />
-                                                Restore
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
+            {rejected.length ? (
+                <TrackerRecords
+                    rows={rejected}
+                    total={total ?? pagination?.total ?? rejected.length}
+                    title="Rejected devices"
+                    layout={layout}
+                    canViewDevices={canViewDevices}
+                    actionsFor={(device) => [
+                        {
+                            label: 'Restore',
+                            icon: RefreshCw,
+                            onClick: () => setRestoringId(device.id),
+                        },
+                    ]}
+                />
+            ) : (
+                <EmptyState
+                    icon={ShieldCheck}
+                    title="No rejected devices"
+                    description="Rejected trackers remain here for authorised review and recovery."
+                />
+            )}
             <DevicePager pagination={pagination} label="rejected" />
             <ConfirmDialog
-                open={restoring !== null}
-                onClose={() => setRestoring(null)}
+                open={Boolean(restoring)}
+                onClose={() => setRestoringId(null)}
                 onConfirm={() => {
-                    if (restoring) {
+                    if (restoring && can.manage)
                         router.post(
-                            `/security-devices/integrations/queclink/devices/${restoring.id}/restore`,
+                            hubPath + '/devices/' + restoring.id + '/restore',
                             {},
-                            { preserveScroll: true },
+                            {
+                                preserveScroll: true,
+                                onError: (errors) => notify(firstError(errors)),
+                            },
                         );
-                    }
                 }}
                 title="Restore tracker to pending?"
                 description={
                     restoring
-                        ? `Restore “${restoring.reference}” to the pending tray? It will still require an authorised claim before it receives commands.`
+                        ? 'Restore “' +
+                          restoring.reference +
+                          '” to the pending tray? It will still require an authorised claim before it receives commands.'
                         : ''
                 }
                 confirmText="Restore tracker"
@@ -1298,6 +2068,28 @@ export function ClaimDialog({
         consent_id: '',
     });
     const [targetSearch, setTargetSearch] = useState('');
+    const [step, setStep] = useState(0);
+    const [discardOpen, setDiscardOpen] = useState(false);
+    const dirty =
+        form.isDirty ||
+        targetSearch.trim() !== '' ||
+        form.data.target_id !== '' ||
+        form.data.consent_id !== '' ||
+        form.data.pairing_type !== (device.pending_pairing_type ?? 'vehicle');
+    const close = () => {
+        if (!form.processing) {
+            if (dirty) setDiscardOpen(true);
+            else onClose();
+        }
+    };
+    const submit = () => {
+        if (form.processing || !form.data.target_id) return;
+        form.post(hubPath + '/devices/' + device.id + '/claim', {
+            preserveScroll: true,
+            onError: () => setStep(0),
+            onSuccess: onClose,
+        });
+    };
     const errorSummaryRef = useRef<HTMLDivElement>(null);
     const claimErrors = Object.entries(form.errors).filter(
         (error): error is [string, string] => Boolean(error[1]),
@@ -1314,7 +2106,7 @@ export function ClaimDialog({
         if (Object.values(form.errors).some(Boolean)) {
             errorSummaryRef.current?.focus();
         }
-    }, [form.errors]);
+    }, [form.errors, step]);
 
     const availableTargets = useMemo(() => {
         return form.data.pairing_type === 'vehicle'
@@ -1324,10 +2116,83 @@ export function ClaimDialog({
               : targets.clients;
     }, [form.data.pairing_type, targets]);
 
+    const selectedTarget = availableTargets.find(
+        (target) => String(target.id) === form.data.target_id,
+    );
     return (
-        <Dialog open onOpenChange={onClose}>
-            <DialogContent
-                className="sm:max-w-md"
+        <>
+            <WizardShell
+                open
+                onClose={close}
+                title="Claim device"
+                description={
+                    device.reference +
+                    ' — choose the approved target for this tracker.'
+                }
+                railIcon={Satellite}
+                railTitle="Claim device"
+                railSub={device.reference}
+                steps={[
+                    {
+                        key: 'assignment',
+                        label: 'Assignment',
+                        blurb: 'Approved target and current consent',
+                        icon: ShieldCheck,
+                    },
+                    {
+                        key: 'review',
+                        label: 'Review',
+                        blurb: 'Check before claiming the tracker',
+                        icon: CheckCircle,
+                    },
+                ]}
+                stepIndex={step}
+                onStepClick={(index) => {
+                    if (!form.processing) setStep(index);
+                }}
+                pct={form.data.target_id ? 100 : 0}
+                pctLabel="Required details"
+                footerStart={
+                    <>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            disabled={form.processing}
+                            onClick={close}
+                        >
+                            Cancel
+                        </Button>
+                        {step > 0 && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={form.processing}
+                                onClick={() => setStep(0)}
+                            >
+                                Back
+                            </Button>
+                        )}
+                    </>
+                }
+                footerEnd={
+                    step === 0 ? (
+                        <Button
+                            type="button"
+                            disabled={form.processing || !form.data.target_id}
+                            onClick={() => setStep(1)}
+                        >
+                            Continue to review
+                        </Button>
+                    ) : (
+                        <Button
+                            type="button"
+                            disabled={form.processing || !form.data.target_id}
+                            onClick={submit}
+                        >
+                            {form.processing ? 'Claiming…' : 'Claim device'}
+                        </Button>
+                    )
+                }
                 onOpenAutoFocus={(event) => {
                     if (claimErrors.length > 0) {
                         event.preventDefault();
@@ -1335,250 +2200,315 @@ export function ClaimDialog({
                     }
                 }}
             >
-                <DialogHeader>
-                    <DialogTitle>Claim device</DialogTitle>
-                    <DialogDescription>
-                        IMEI{' '}
-                        <code className="rounded bg-muted px-1 py-0.5 text-xs">
-                            {device.reference}
-                        </code>{' '}
-                        — choose what this device is tracking.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                        form.post(
-                            `/security-devices/integrations/queclink/devices/${device.id}/claim`,
-                            {
-                                preserveScroll: true,
-                                onSuccess: () => onClose(),
-                            },
-                        );
-                    }}
-                    className="space-y-4"
-                >
-                    {claimErrors.length > 0 && (
-                        <div
-                            ref={errorSummaryRef}
-                            role="alert"
-                            tabIndex={-1}
-                            aria-labelledby={`claim-device-${device.id}-error-title`}
-                            className="flex gap-2.5 rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-status-critical focus-visible:ring-offset-2"
-                        >
-                            <AlertTriangle
-                                className="mt-0.5 h-4 w-4 shrink-0 text-status-critical"
-                                aria-hidden="true"
-                            />
-                            <div>
-                                <p
-                                    id={`claim-device-${device.id}-error-title`}
-                                    className="font-semibold text-status-critical"
-                                >
-                                    We couldn't claim this device
-                                </p>
-                                <p className="mt-1">
-                                    Check the highlighted details below and try
-                                    again.
-                                </p>
-                                <ul className="mt-1 list-disc space-y-1 pl-4">
-                                    {claimErrors.map(([field, error]) => (
-                                        <li key={field}>{error}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Label htmlFor={pairingTypeId}>
-                            What is this device?
-                        </Label>
-                        <Select
-                            value={form.data.pairing_type}
-                            onValueChange={(v) => {
-                                form.setData({
-                                    pairing_type: v as PairingType,
-                                    target_id: '',
-                                    consent_id: '',
-                                });
+                <WizardStepPane>
+                    {step === 0 ? (
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                if (form.data.target_id) setStep(1);
                             }}
+                            className="space-y-5"
                         >
-                            <SelectTrigger
-                                id={pairingTypeId}
-                                aria-invalid={Boolean(form.errors.pairing_type)}
-                                aria-describedby={
-                                    form.errors.pairing_type
-                                        ? pairingTypeErrorId
-                                        : undefined
-                                }
-                            >
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="vehicle">
-                                    Vehicle (fleet asset)
-                                </SelectItem>
-                                <SelectItem value="staff">
-                                    Staff member (lone worker)
-                                </SelectItem>
-                                <SelectItem value="client">
-                                    Client (safeguarding)
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                        {form.errors.pairing_type && (
-                            <p
-                                id={pairingTypeErrorId}
-                                className="text-sm text-destructive"
-                            >
-                                {form.errors.pairing_type}
-                            </p>
-                        )}
-                        {form.data.pairing_type === 'staff' && (
-                            <p className="text-xs text-muted-foreground">
-                                Staff appear only when they have an active HR
-                                profile with a primary site. Update the staff
-                                profile before pairing if they are missing.
-                            </p>
-                        )}
-                        {form.data.pairing_type === 'client' && (
-                            <p className="text-xs text-muted-foreground">
-                                Clients appear only when their profile has a
-                                current site. Update the client profile before
-                                pairing if they are missing.
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor={targetId}>
-                            {form.data.pairing_type === 'vehicle'
-                                ? 'Vehicle'
-                                : form.data.pairing_type === 'staff'
-                                  ? 'Staff member'
-                                  : 'Client'}
-                        </Label>
-                        <div className="flex gap-2">
-                            <Input
-                                value={targetSearch}
-                                onChange={(event) =>
-                                    setTargetSearch(event.target.value)
-                                }
-                                placeholder={`Search ${form.data.pairing_type === 'vehicle' ? 'vehicles' : form.data.pairing_type === 'staff' ? 'staff' : 'clients'}…`}
-                            />
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() =>
-                                    router.get(
-                                        '/security-devices/integrations/queclink',
-                                        {
-                                            target_type: form.data.pairing_type,
-                                            target_search: targetSearch,
-                                            selected_target_id:
-                                                form.data.target_id ||
-                                                undefined,
-                                        },
-                                        {
-                                            only: ['targets'],
-                                            preserveScroll: true,
-                                            preserveState: true,
-                                            replace: true,
-                                        },
-                                    )
-                                }
-                            >
-                                Search
-                            </Button>
-                        </div>
-                        <Select
-                            value={form.data.target_id}
-                            onValueChange={(v) => form.setData('target_id', v)}
-                        >
-                            <SelectTrigger
-                                id={targetId}
-                                aria-invalid={Boolean(form.errors.target_id)}
-                                aria-describedby={
-                                    form.errors.target_id
-                                        ? targetErrorId
-                                        : undefined
-                                }
-                            >
-                                <SelectValue placeholder="Select…" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {availableTargets.map((t) => (
-                                    <SelectItem key={t.id} value={String(t.id)}>
-                                        {t.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {form.errors.target_id && (
-                            <p
-                                id={targetErrorId}
-                                className="text-sm text-destructive"
-                            >
-                                {form.errors.target_id}
-                            </p>
-                        )}
-                    </div>
-
-                    {form.data.pairing_type === 'client' && (
-                        <div className="space-y-2">
-                            <Label htmlFor={consentId}>
-                                Consent record ID (optional when current consent
-                                exists)
-                            </Label>
-                            <Input
-                                id={consentId}
-                                type="number"
-                                value={form.data.consent_id}
-                                onChange={(e) =>
-                                    form.setData('consent_id', e.target.value)
-                                }
-                                placeholder="e.g. 42"
-                                aria-invalid={Boolean(form.errors.consent_id)}
-                                aria-describedby={`${consentHelpId}${form.errors.consent_id ? ` ${consentErrorId}` : ''}`}
-                            />
-                            <p
-                                id={consentHelpId}
-                                className="text-xs text-muted-foreground"
-                            >
-                                A current location-tracking consent is required
-                                before you can claim this device. Leave this
-                                blank to use the client's current consent, or
-                                enter another current consent record ID. If
-                                there is no current consent, record it in the
-                                client's profile first.
-                            </p>
-                            {form.errors.consent_id && (
-                                <p
-                                    id={consentErrorId}
-                                    className="text-sm text-destructive"
+                            {claimErrors.length > 0 && (
+                                <div
+                                    ref={errorSummaryRef}
+                                    role="alert"
+                                    tabIndex={-1}
+                                    aria-labelledby={`claim-device-${device.id}-error-title`}
+                                    className="flex gap-2.5 rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-status-critical focus-visible:ring-offset-2"
                                 >
-                                    {form.errors.consent_id}
-                                </p>
+                                    <AlertTriangle
+                                        className="mt-0.5 h-4 w-4 shrink-0 text-status-critical"
+                                        aria-hidden="true"
+                                    />
+                                    <div>
+                                        <p
+                                            id={`claim-device-${device.id}-error-title`}
+                                            className="font-semibold text-status-critical"
+                                        >
+                                            We couldn't claim this device
+                                        </p>
+                                        <p className="mt-1">
+                                            Check the highlighted details below
+                                            and try again.
+                                        </p>
+                                        <ul className="mt-1 list-disc space-y-1 pl-4">
+                                            {claimErrors.map(
+                                                ([field, error]) => (
+                                                    <li key={field}>{error}</li>
+                                                ),
+                                            )}
+                                        </ul>
+                                    </div>
+                                </div>
                             )}
+
+                            <div className="space-y-2">
+                                <Label htmlFor={pairingTypeId}>
+                                    What is this device?
+                                </Label>
+                                <Select
+                                    value={form.data.pairing_type}
+                                    onValueChange={(v) => {
+                                        form.setData({
+                                            pairing_type: v as PairingType,
+                                            target_id: '',
+                                            consent_id: '',
+                                        });
+                                    }}
+                                >
+                                    <SelectTrigger
+                                        id={pairingTypeId}
+                                        aria-invalid={Boolean(
+                                            form.errors.pairing_type,
+                                        )}
+                                        aria-describedby={
+                                            form.errors.pairing_type
+                                                ? pairingTypeErrorId
+                                                : undefined
+                                        }
+                                    >
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="vehicle">
+                                            Vehicle (fleet asset)
+                                        </SelectItem>
+                                        <SelectItem value="staff">
+                                            Staff member (lone worker)
+                                        </SelectItem>
+                                        <SelectItem value="client">
+                                            Client (safeguarding)
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.pairing_type && (
+                                    <p
+                                        id={pairingTypeErrorId}
+                                        className="text-sm text-destructive"
+                                    >
+                                        {form.errors.pairing_type}
+                                    </p>
+                                )}
+                                {form.data.pairing_type === 'staff' && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Staff appear only when they have an
+                                        active HR profile with a primary site.
+                                        Update the staff profile before pairing
+                                        if they are missing.
+                                    </p>
+                                )}
+                                {form.data.pairing_type === 'client' && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Clients appear only when their profile
+                                        has a current site. Update the client
+                                        profile before pairing if they are
+                                        missing.
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor={targetId}>
+                                    {form.data.pairing_type === 'vehicle'
+                                        ? 'Vehicle'
+                                        : form.data.pairing_type === 'staff'
+                                          ? 'Staff member'
+                                          : 'Client'}
+                                </Label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        value={targetSearch}
+                                        onChange={(event) =>
+                                            setTargetSearch(event.target.value)
+                                        }
+                                        aria-label="Search assignment targets"
+                                        placeholder={`Search ${form.data.pairing_type === 'vehicle' ? 'vehicles' : form.data.pairing_type === 'staff' ? 'staff' : 'clients'}…`}
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() =>
+                                            router.get(
+                                                '/security-devices/integrations/queclink',
+                                                {
+                                                    target_type:
+                                                        form.data.pairing_type,
+                                                    target_search: targetSearch,
+                                                    selected_target_id:
+                                                        form.data.target_id ||
+                                                        undefined,
+                                                },
+                                                {
+                                                    only: [
+                                                        'targets',
+                                                        ...authorityProps,
+                                                    ],
+                                                    preserveScroll: true,
+                                                    preserveState: true,
+                                                    replace: true,
+                                                },
+                                            )
+                                        }
+                                    >
+                                        Search
+                                    </Button>
+                                </div>
+                                <Select
+                                    value={form.data.target_id}
+                                    onValueChange={(v) =>
+                                        form.setData('target_id', v)
+                                    }
+                                >
+                                    <SelectTrigger
+                                        id={targetId}
+                                        aria-invalid={Boolean(
+                                            form.errors.target_id,
+                                        )}
+                                        aria-describedby={
+                                            form.errors.target_id
+                                                ? targetErrorId
+                                                : undefined
+                                        }
+                                    >
+                                        <SelectValue placeholder="Select…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableTargets.map((t) => (
+                                            <SelectItem
+                                                key={t.id}
+                                                value={String(t.id)}
+                                            >
+                                                {t.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.target_id && (
+                                    <p
+                                        id={targetErrorId}
+                                        className="text-sm text-destructive"
+                                    >
+                                        {form.errors.target_id}
+                                    </p>
+                                )}
+                            </div>
+
+                            {form.data.pairing_type === 'client' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor={consentId}>
+                                        Consent record ID (optional when current
+                                        consent exists)
+                                    </Label>
+                                    <Input
+                                        id={consentId}
+                                        type="number"
+                                        value={form.data.consent_id}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'consent_id',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="e.g. 42"
+                                        aria-invalid={Boolean(
+                                            form.errors.consent_id,
+                                        )}
+                                        aria-describedby={`${consentHelpId}${form.errors.consent_id ? ` ${consentErrorId}` : ''}`}
+                                    />
+                                    <p
+                                        id={consentHelpId}
+                                        className="text-xs text-muted-foreground"
+                                    >
+                                        A current location-tracking consent is
+                                        required before you can claim this
+                                        device. Leave this blank to use the
+                                        client's current consent, or enter
+                                        another current consent record ID. If
+                                        there is no current consent, record it
+                                        in the client's profile first.
+                                    </p>
+                                    {form.errors.consent_id && (
+                                        <p
+                                            id={consentErrorId}
+                                            className="text-sm text-destructive"
+                                        >
+                                            {form.errors.consent_id}
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                        </form>
+                    ) : (
+                        <div className="space-y-5">
+                            <ReviewCard
+                                icon={Satellite}
+                                title="Tracker"
+                                onEdit={() => setStep(0)}
+                            >
+                                <ReviewRow
+                                    label="Reference"
+                                    value={device.reference}
+                                />
+                                <ReviewRow
+                                    label="Model"
+                                    value={device.model_hint}
+                                />
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={ShieldCheck}
+                                title="Assignment"
+                                onEdit={() => setStep(0)}
+                            >
+                                <ReviewRow
+                                    label="Type"
+                                    value={assignmentTypeLabel(
+                                        form.data.pairing_type,
+                                    )}
+                                />
+                                <ReviewRow
+                                    label="Target"
+                                    value={
+                                        selectedTarget?.label ??
+                                        (form.data.target_id
+                                            ? 'Selected record #' +
+                                              form.data.target_id
+                                            : null)
+                                    }
+                                />
+                                {form.data.pairing_type === 'client' && (
+                                    <ReviewRow
+                                        label="Consent"
+                                        value={
+                                            form.data.consent_id
+                                                ? 'Record #' +
+                                                  form.data.consent_id +
+                                                  ' · validation required'
+                                                : 'Use current tracking consent · validation required'
+                                        }
+                                    />
+                                )}
+                            </ReviewCard>
+                            <p className="text-subtle">
+                                The server checks current Site access, record
+                                ownership and any required consent when you
+                                claim. Review does not establish a saved
+                                assignment.
+                            </p>
                         </div>
                     )}
-
-                    <DialogFooter>
-                        <Button type="button" variant="ghost" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={form.processing || !form.data.target_id}
-                        >
-                            {form.processing ? 'Claiming…' : 'Claim device'}
-                        </Button>
-                    </DialogFooter>
-                </form>
-            </DialogContent>
-        </Dialog>
+                </WizardStepPane>
+            </WizardShell>
+            <ConfirmDialog
+                open={discardOpen}
+                onClose={() => setDiscardOpen(false)}
+                onConfirm={onClose}
+                title="Discard this draft?"
+                description="The unsent tracker assignment will be discarded."
+                confirmText="Discard draft"
+                cancelText="Keep editing"
+            />
+        </>
     );
 }
 
@@ -1586,160 +2516,107 @@ export function ClaimDialog({
 
 function DevicesTab({
     paired,
+    pagination,
+    total,
     presets,
     can,
+    layout = 'table',
+    canViewDevices = false,
 }: {
     paired: Device[];
+    pagination?: DevicePagination;
+    total?: number;
     presets: Preset[];
     can: Props['can'];
+    layout?: RecordLayout;
+    canViewDevices?: boolean;
 }) {
+    const notify = useHubNotice();
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [bulkOpen, setBulkOpen] = useState(false);
-    const [releasing, setReleasing] = useState<Device | null>(null);
-    const allSelected =
-        paired.length > 0 && selectedIds.length === paired.length;
+    const [releasingId, setReleasingId] = useState<number | null>(null);
     const selectedDevices = paired.filter((device) =>
         selectedIds.includes(device.id),
     );
-
-    if (paired.length === 0) {
+    const releasing = can.manage
+        ? paired.find((device) => device.id === releasingId)
+        : null;
+    if (!can.manage)
         return (
-            <>
-                <Card>
-                    <CardContent className="flex flex-col items-center gap-2 p-12 text-center">
-                        <Satellite className="h-10 w-10 text-muted-foreground" />
-                        <p className="text-sm font-medium">
-                            No devices paired yet
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                            Pair a device from the Pending tab to see it here.
-                        </p>
-                    </CardContent>
-                </Card>
-            </>
+            <EmptyState
+                icon={ShieldCheck}
+                title="Tracker access is unavailable"
+                description="Permission to manage this integration is required."
+            />
         );
-    }
-
     return (
         <>
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                            <CardTitle>Paired devices</CardTitle>
-                            <CardDescription>
-                                Devices actively reporting to Oblivion.
-                                Releasing a device returns it to the pending
-                                tray.
-                            </CardDescription>
-                        </div>
-                        <Button
-                            type="button"
-                            disabled={
-                                !can.manage || selectedDevices.length === 0
-                            }
-                            onClick={() => setBulkOpen(true)}
-                        >
-                            <Send className="mr-2 h-3 w-3" />
-                            Bulk apply ({selectedDevices.length})
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-10">
-                                    <input
-                                        aria-label="Select all paired devices"
-                                        type="checkbox"
-                                        checked={allSelected}
-                                        onChange={(event) =>
-                                            setSelectedIds(
-                                                event.target.checked
-                                                    ? paired.map(
-                                                          (device) => device.id,
-                                                      )
-                                                    : [],
-                                            )
-                                        }
-                                    />
-                                </TableHead>
-                                <TableHead>IMEI</TableHead>
-                                <TableHead>Type</TableHead>
-                                <TableHead>Linked to</TableHead>
-                                <TableHead>Model</TableHead>
-                                <TableHead>Last seen</TableHead>
-                                <TableHead>Connection</TableHead>
-                                <TableHead className="text-right">
-                                    Actions
-                                </TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paired.map((d) => (
-                                <TableRow key={d.id}>
-                                    <TableCell>
-                                        <input
-                                            aria-label={`Select ${d.reference}`}
-                                            type="checkbox"
-                                            checked={selectedIds.includes(d.id)}
-                                            onChange={(event) =>
-                                                setSelectedIds((current) =>
-                                                    event.target.checked
-                                                        ? [...current, d.id]
-                                                        : current.filter(
-                                                              (id) =>
-                                                                  id !== d.id,
-                                                          ),
-                                                )
-                                            }
-                                        />
-                                    </TableCell>
-                                    <TableCell className="font-mono text-xs">
-                                        {d.reference}
-                                    </TableCell>
-                                    <TableCell className="text-xs capitalize">
-                                        {d.assignment?.type ?? '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {d.assignment?.label ?? '—'}
-                                    </TableCell>
-                                    <TableCell className="text-xs">
-                                        {d.model_hint ?? '—'}
-                                    </TableCell>
-                                    <TableCell className="text-xs">
-                                        {fmtRel(d.last_seen_at)}
-                                    </TableCell>
-                                    <TableCell>
-                                        {d.connection_state === 'connected' ? (
-                                            <Badge className="bg-status-success-bg text-status-success">
-                                                online
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="outline">
-                                                offline
-                                            </Badge>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            disabled={!can.manage}
-                                            onClick={() => setReleasing(d)}
-                                        >
-                                            <Unlink className="mr-1 h-3 w-3" />
-                                            Release
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-            {bulkOpen && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-subtle">
+                    Releasing a tracker returns it to pending. Paired status
+                    does not confirm a recent location.
+                </p>
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={() =>
+                            setSelectedIds(
+                                selectedDevices.length === paired.length
+                                    ? []
+                                    : paired.map((device) => device.id),
+                            )
+                        }
+                        disabled={!paired.length}
+                    >
+                        {' '}
+                        {selectedDevices.length === paired.length &&
+                        paired.length
+                            ? 'Clear selection'
+                            : 'Select all on this page'}
+                    </Button>
+                    <Button
+                        disabled={!selectedDevices.length}
+                        onClick={() => setBulkOpen(true)}
+                    >
+                        <Send className="mr-2 size-4" />
+                        Bulk apply ({selectedDevices.length})
+                    </Button>
+                </div>
+            </div>
+            {paired.length ? (
+                <TrackerRecords
+                    rows={paired}
+                    total={total ?? pagination?.total ?? paired.length}
+                    title="Paired devices"
+                    layout={layout}
+                    canViewDevices={canViewDevices}
+                    selection={{
+                        keys: new Set(selectedIds),
+                        labelFor: (device) => 'Select ' + device.reference,
+                        onToggle: (device, checked) =>
+                            setSelectedIds((current) =>
+                                checked
+                                    ? [...new Set([...current, device.id])]
+                                    : current.filter((id) => id !== device.id),
+                            ),
+                    }}
+                    actionsFor={(device) => [
+                        {
+                            label: 'Release',
+                            icon: Unlink,
+                            onClick: () => setReleasingId(device.id),
+                        },
+                    ]}
+                />
+            ) : (
+                <EmptyState
+                    icon={Satellite}
+                    title="No devices paired yet"
+                    description="Claim a recognised tracker from the Pending view to see it here."
+                />
+            )}
+            <DevicePager pagination={pagination} label="devices" />
+            {bulkOpen && selectedDevices.length > 0 && (
                 <BulkActionDialog
                     devices={selectedDevices}
                     presets={presets}
@@ -1747,21 +2624,25 @@ function DevicesTab({
                 />
             )}
             <ConfirmDialog
-                open={releasing !== null}
-                onClose={() => setReleasing(null)}
+                open={Boolean(releasing)}
+                onClose={() => setReleasingId(null)}
                 onConfirm={() => {
-                    if (releasing) {
+                    if (releasing && can.manage)
                         router.post(
-                            `/security-devices/integrations/queclink/devices/${releasing.id}/release`,
+                            hubPath + '/devices/' + releasing.id + '/release',
                             {},
-                            { preserveScroll: true },
+                            {
+                                preserveScroll: true,
+                                onError: (errors) => notify(firstError(errors)),
+                            },
                         );
-                    }
                 }}
                 title="Release tracker assignment?"
                 description={
                     releasing
-                        ? `Release “${releasing.reference}”? It will return to the pending tray and stop receiving governed commands until it is claimed again.`
+                        ? 'Release “' +
+                          releasing.reference +
+                          '”? It will return to the pending tray and stop receiving governed commands until it is claimed again.'
                         : ''
                 }
                 confirmText="Release tracker"
@@ -1769,6 +2650,18 @@ function DevicesTab({
         </>
     );
 }
+
+type BulkAction =
+    | 'read_configuration'
+    | 'reboot'
+    | 'resident_safety_profile'
+    | 'apply_preset';
+const BULK_ACTION_LABELS: Record<BulkAction, string> = {
+    read_configuration: 'Read full configuration',
+    apply_preset: 'Apply a preset',
+    resident_safety_profile: 'Apply resident safety profile',
+    reboot: 'Reboot selected devices',
+};
 
 function BulkActionDialog({
     devices,
@@ -1779,584 +2672,373 @@ function BulkActionDialog({
     presets: Preset[];
     onClose: () => void;
 }) {
-    const [action, setAction] = useState<
-        | 'read_configuration'
-        | 'reboot'
-        | 'resident_safety_profile'
-        | 'apply_preset'
-    >('read_configuration');
+    const [action, setAction] = useState<BulkAction>('read_configuration');
     const [section, setSection] = useState('all');
     const [presetId, setPresetId] = useState<string>(
         presets[0] ? String(presets[0].id) : '',
     );
 
+    const [sourceTargets] = useState(() =>
+        devices.map(trackerContextKey).sort().join('|'),
+    );
+    const [sourcePreset, setSourcePreset] = useState(() =>
+        presets[0] ? presetContextKey(presets[0]) : null,
+    );
+    const validTargets =
+        sourceTargets === devices.map(trackerContextKey).sort().join('|');
+    const validPreset =
+        action !== 'apply_preset' ||
+        !presetId ||
+        presets.some(
+            (preset) =>
+                String(preset.id) === presetId &&
+                presetContextKey(preset) === sourcePreset,
+        );
+    useEffect(() => {
+        if (!validTargets || !validPreset) onClose();
+    }, [validTargets, validPreset, onClose]);
+    const [step, setStep] = useState(0);
+    const [discardOpen, setDiscardOpen] = useState(false);
+    const [processing, setProcessing] = useState(false);
+    const [failure, setFailure] = useState('');
+    const dirty =
+        action !== 'read_configuration' ||
+        section !== 'all' ||
+        presetId !== (presets[0] ? String(presets[0].id) : '');
+    const close = () => {
+        if (!processing) {
+            if (dirty) setDiscardOpen(true);
+            else onClose();
+        }
+    };
+    const submit = () => {
+        if (
+            processing ||
+            devices.length === 0 ||
+            (action === 'apply_preset' && !presetId)
+        )
+            return;
+        setFailure('');
+        setProcessing(true);
+        router.post(
+            hubPath + '/bulk',
+            {
+                device_ids: devices.map((device) => device.id),
+                action,
+                section: action === 'read_configuration' ? section : undefined,
+                preset_id:
+                    action === 'apply_preset' ? Number(presetId) : undefined,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: onClose,
+                onError: (errors) =>
+                    setFailure(
+                        `${firstError(errors)} Your choices remain here. Review the selected trackers and try again.`,
+                    ),
+                onFinish: () => setProcessing(false),
+            },
+        );
+    };
+    if (!validTargets || !validPreset) return null;
     return (
-        <Dialog open onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Review bulk management</DialogTitle>
-                    <DialogDescription>
-                        Choose the intended action, then continue to Device
-                        Management for Site checks, change control, independent
-                        approval, and protected verification.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4">
-                    <div className="rounded-md border bg-muted/20 p-3">
-                        <p className="text-xs font-medium text-muted-foreground">
-                            Selected devices
-                        </p>
-                        <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-y-auto">
-                            {devices.map((device) => (
-                                <Badge
-                                    key={device.id}
-                                    variant="outline"
-                                    className="font-mono"
-                                >
-                                    {device.reference}
-                                </Badge>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Action</Label>
-                        <Select
-                            value={action}
-                            onValueChange={(value) =>
-                                setAction(
-                                    value as
-                                        | 'read_configuration'
-                                        | 'reboot'
-                                        | 'resident_safety_profile'
-                                        | 'apply_preset',
-                                )
-                            }
+        <>
+            <WizardShell
+                open
+                onClose={close}
+                title="Review bulk management"
+                description="Choose the intended action, then continue to canonical Device Management for Site checks, change control, independent approval and protected verification."
+                railIcon={Send}
+                railTitle="Bulk management"
+                railSub={devices.length + ' selected trackers'}
+                steps={[
+                    {
+                        key: 'action',
+                        label: 'Action',
+                        blurb: 'Choose supported management intent',
+                        icon: Settings2,
+                    },
+                    {
+                        key: 'review',
+                        label: 'Review',
+                        blurb: 'Check selected trackers and handoff',
+                        icon: ShieldCheck,
+                    },
+                ]}
+                stepIndex={step}
+                onStepClick={(index) => {
+                    if (!processing) setStep(index);
+                }}
+                pct={action === 'apply_preset' && !presetId ? 50 : 100}
+                footerStart={
+                    <>
+                        <Button
+                            variant="ghost"
+                            disabled={processing}
+                            onClick={close}
                         >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="read_configuration">
-                                    Read full configuration
-                                </SelectItem>
-                                <SelectItem value="apply_preset">
-                                    Apply a preset
-                                </SelectItem>
-                                <SelectItem value="resident_safety_profile">
-                                    Apply resident safety profile
-                                </SelectItem>
-                                <SelectItem value="reboot">
-                                    Reboot selected devices
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {action === 'read_configuration' && (
-                        <div className="space-y-2">
-                            <Label>Read section</Label>
-                            <Select value={section} onValueChange={setSection}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    {SECTION_READ_OPTIONS.map((option) => (
-                                        <SelectItem
-                                            key={option.code}
-                                            value={option.code}
-                                        >
-                                            {option.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                            Cancel
+                        </Button>
+                        {step > 0 && (
+                            <Button
+                                variant="outline"
+                                disabled={processing}
+                                onClick={() => setStep(0)}
+                            >
+                                Back
+                            </Button>
+                        )}
+                    </>
+                }
+                footerEnd={
+                    step === 0 ? (
+                        <Button
+                            disabled={
+                                processing ||
+                                devices.length === 0 ||
+                                (action === 'apply_preset' && !presetId)
+                            }
+                            onClick={() => setStep(1)}
+                        >
+                            Continue to review
+                        </Button>
+                    ) : (
+                        <Button
+                            disabled={
+                                processing ||
+                                devices.length === 0 ||
+                                (action === 'apply_preset' && !presetId)
+                            }
+                            onClick={submit}
+                        >
+                            {processing
+                                ? 'Saving handoff…'
+                                : 'Review ' +
+                                  devices.length +
+                                  ' device' +
+                                  (devices.length === 1 ? '' : 's')}
+                        </Button>
+                    )
+                }
+            >
+                <WizardStepPane>
+                    {failure && (
+                        <Alert variant="destructive">
+                            <AlertTitle>Handoff unavailable</AlertTitle>
+                            <AlertDescription>{failure}</AlertDescription>
+                        </Alert>
                     )}
-
-                    {action === 'apply_preset' && (
-                        <div className="space-y-2">
-                            <Label>Preset</Label>
-                            {presets.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">
-                                    No presets available yet. Save one from the
-                                    Device settings tab first.
-                                </p>
-                            ) : (
-                                <Select
-                                    value={presetId}
-                                    onValueChange={setPresetId}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {presets.map((preset) => (
-                                            <SelectItem
-                                                key={preset.id}
-                                                value={String(preset.id)}
+                    {step === 0 ? (
+                        <fieldset disabled={processing}>
+                            <div className="space-y-4">
+                                <div className="rounded-md border bg-muted/20 p-3">
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                        Selected devices
+                                    </p>
+                                    <div className="mt-2 flex max-h-24 flex-wrap gap-2 overflow-y-auto">
+                                        {devices.map((device) => (
+                                            <Badge
+                                                key={device.id}
+                                                variant="outline"
+                                                className="font-mono"
                                             >
-                                                {preset.name}
-                                                {preset.is_system
-                                                    ? ' (built-in)'
-                                                    : ''}
-                                            </SelectItem>
+                                                {device.reference}
+                                            </Badge>
                                         ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Action</Label>
+                                    <Select
+                                        value={action}
+                                        onValueChange={(value) =>
+                                            setAction(value as BulkAction)
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {(
+                                                Object.keys(
+                                                    BULK_ACTION_LABELS,
+                                                ) as BulkAction[]
+                                            ).map((key) => (
+                                                <SelectItem
+                                                    key={key}
+                                                    value={key}
+                                                >
+                                                    {BULK_ACTION_LABELS[key]}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {action === 'read_configuration' && (
+                                    <div className="space-y-2">
+                                        <Label>Read section</Label>
+                                        <Select
+                                            value={section}
+                                            onValueChange={setSection}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">
+                                                    All
+                                                </SelectItem>
+                                                {SECTION_READ_OPTIONS.map(
+                                                    (option) => (
+                                                        <SelectItem
+                                                            key={option.code}
+                                                            value={option.code}
+                                                        >
+                                                            {option.label}
+                                                        </SelectItem>
+                                                    ),
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                {action === 'apply_preset' && (
+                                    <div className="space-y-2">
+                                        <Label>Preset</Label>
+                                        {presets.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground">
+                                                No presets available yet. Save
+                                                one from the Device settings tab
+                                                first.
+                                            </p>
+                                        ) : (
+                                            <Select
+                                                value={presetId}
+                                                onValueChange={(value) => {
+                                                    setPresetId(value);
+                                                    const preset = presets.find(
+                                                        (preset) =>
+                                                            String(
+                                                                preset.id,
+                                                            ) === value,
+                                                    );
+                                                    setSourcePreset(
+                                                        preset
+                                                            ? presetContextKey(
+                                                                  preset,
+                                                              )
+                                                            : null,
+                                                    );
+                                                }}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {presets.map((preset) => (
+                                                        <SelectItem
+                                                            key={preset.id}
+                                                            value={String(
+                                                                preset.id,
+                                                            )}
+                                                        >
+                                                            {preset.name}
+                                                            {preset.is_system
+                                                                ? ' (built-in)'
+                                                                : ''}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </fieldset>
+                    ) : (
+                        <div className="space-y-5">
+                            <ReviewCard
+                                icon={Send}
+                                title="Management intent"
+                                onEdit={() => setStep(0)}
+                            >
+                                <ReviewRow
+                                    label="Action"
+                                    value={BULK_ACTION_LABELS[action]}
+                                />
+                                <ReviewRow
+                                    label="Read section"
+                                    value={
+                                        action === 'read_configuration'
+                                            ? section === 'all'
+                                                ? 'All sections'
+                                                : (SECTION_READ_OPTIONS.find(
+                                                      (option) =>
+                                                          option.code ===
+                                                          section,
+                                                  )?.label ?? section)
+                                            : null
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Preset"
+                                    value={
+                                        action === 'apply_preset'
+                                            ? presets.find(
+                                                  (preset) =>
+                                                      String(preset.id) ===
+                                                      presetId,
+                                              )?.name
+                                            : null
+                                    }
+                                />
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={Satellite}
+                                title="Selected trackers"
+                                onEdit={() => setStep(0)}
+                            >
+                                {devices.map((device) => (
+                                    <ReviewRow
+                                        key={device.id}
+                                        label={device.reference}
+                                        value={
+                                            device.assignment?.label ??
+                                            'No current assignment'
+                                        }
+                                    />
+                                ))}
+                            </ReviewCard>
+                            <p className="text-subtle">
+                                This creates a management handoff for further
+                                review. It does not send a command or confirm a
+                                completed device action.
+                            </p>
                         </div>
                     )}
-                </div>
-
-                <DialogFooter>
-                    <Button type="button" variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        disabled={
-                            devices.length === 0 ||
-                            (action === 'apply_preset' && !presetId)
-                        }
-                        onClick={() => {
-                            router.post(
-                                '/security-devices/integrations/queclink/bulk',
-                                {
-                                    device_ids: devices.map(
-                                        (device) => device.id,
-                                    ),
-                                    action,
-                                    section:
-                                        action === 'read_configuration'
-                                            ? section
-                                            : undefined,
-                                    preset_id:
-                                        action === 'apply_preset'
-                                            ? Number(presetId)
-                                            : undefined,
-                                },
-                                {
-                                    preserveScroll: true,
-                                    onSuccess: onClose,
-                                },
-                            );
-                        }}
-                    >
-                        Review {devices.length} device
-                        {devices.length === 1 ? '' : 's'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                </WizardStepPane>
+            </WizardShell>
+            <ConfirmDialog
+                open={discardOpen}
+                onClose={() => setDiscardOpen(false)}
+                onConfirm={onClose}
+                title="Discard this draft?"
+                description="The unsent management choices will be discarded."
+                confirmText="Discard draft"
+                cancelText="Keep editing"
+            />
+        </>
     );
 }
 
 // ── Configuration presets ──────────────────────────────────────────
 
-function PresetsCard({
-    presets,
-    retiredPresets,
-    target,
-    can,
-    serverForm,
-    globalForm,
-}: {
-    presets: Preset[];
-    retiredPresets: RetiredPreset[];
-    target: Device | null;
-    can: Props['can'];
-    serverForm: ServerSettingsForm;
-    globalForm: GlobalSettingsForm;
-}) {
-    const [saveOpen, setSaveOpen] = useState(false);
-    const [confirm, setConfirm] = useState<Preset | null>(null);
-    const [retiring, setRetiring] = useState<Preset | null>(null);
-
-    const applyPreset = (preset: Preset) => {
-        if (!target) return;
-        router.post(
-            `/security-devices/integrations/queclink/devices/${target.id}/presets/${preset.id}/apply`,
-            {},
-            { preserveScroll: true, onSuccess: () => setConfirm(null) },
-        );
-    };
-
-    const retirePreset = (preset: Preset, reason: string, done: () => void) => {
-        router.delete(
-            `/security-devices/integrations/queclink/presets/${preset.id}`,
-            {
-                data: { reason },
-                preserveScroll: true,
-                onSuccess: () => setRetiring(null),
-                onFinish: done,
-            },
-        );
-    };
-
-    return (
-        <Card className="shadow-sm">
-            <CardHeader>
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                            <BookMarked className="h-4 w-4" />
-                        </div>
-                        <div>
-                            <CardTitle>Configuration presets</CardTitle>
-                            <CardDescription>
-                                Reuse an encrypted, immutable profile for{' '}
-                                {target
-                                    ? target.reference
-                                    : 'the selected device'}
-                                . Applying it always continues through governed
-                                Device Management.
-                            </CardDescription>
-                        </div>
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={!can.manage}
-                        onClick={() => setSaveOpen(true)}
-                    >
-                        <Save className="mr-2 h-3 w-3" />
-                        Save current as preset
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent>
-                {presets.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">
-                        No presets yet. Set up the Server and Global cards
-                        below, then save them as a reusable preset.
-                    </p>
-                ) : (
-                    <div className="grid gap-3 md:grid-cols-2">
-                        {presets.map((preset) => (
-                            <div
-                                key={preset.id}
-                                className="flex flex-col gap-3 rounded-lg border bg-muted/10 p-4"
-                            >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div>
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm font-semibold">
-                                                {preset.name}
-                                            </p>
-                                            <Badge
-                                                variant={
-                                                    preset.is_system
-                                                        ? 'secondary'
-                                                        : 'outline'
-                                                }
-                                                className="text-[10px]"
-                                            >
-                                                {preset.is_system
-                                                    ? 'Built-in'
-                                                    : 'Custom'}
-                                            </Badge>
-                                        </div>
-                                        {preset.description && (
-                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                {preset.description}
-                                            </p>
-                                        )}
-                                    </div>
-                                    {!preset.is_system && (
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                            disabled={!can.manage}
-                                            onClick={() => setRetiring(preset)}
-                                            aria-label={`Retire ${preset.name}`}
-                                        >
-                                            <Trash2 className="h-3.5 w-3.5" />
-                                        </Button>
-                                    )}
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                    {preset.sections.map((sectionName) => (
-                                        <Badge
-                                            key={sectionName}
-                                            variant="outline"
-                                            className="font-mono text-[10px] uppercase"
-                                        >
-                                            {sectionName}
-                                        </Badge>
-                                    ))}
-                                </div>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="self-start"
-                                    disabled={!can.manage || !target}
-                                    onClick={() => setConfirm(preset)}
-                                >
-                                    <Play className="mr-2 h-3 w-3" />
-                                    Review application
-                                </Button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {retiredPresets.length > 0 ? (
-                    <div className="mt-6 space-y-3 border-t pt-5">
-                        <div className="flex items-start gap-2">
-                            <Archive
-                                className="mt-0.5 h-4 w-4 text-muted-foreground"
-                                aria-hidden="true"
-                            />
-                            <div>
-                                <p className="text-sm font-medium">
-                                    Retired preset history
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Retired profiles cannot be selected or
-                                    executed. Their immutable version, actor and
-                                    reason remain available here.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="space-y-2">
-                            {retiredPresets.map((preset) => (
-                                <div
-                                    key={preset.id}
-                                    className="rounded-md border bg-muted/20 p-3 text-sm"
-                                >
-                                    <div className="flex flex-wrap items-start justify-between gap-2">
-                                        <div>
-                                            <p className="font-medium">
-                                                {preset.name}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                Retired{' '}
-                                                {formatDateTime(
-                                                    preset.retired_at,
-                                                )}
-                                                {preset.retired_by
-                                                    ? ` · ${preset.retired_by}`
-                                                    : ''}
-                                                {preset.profile_version
-                                                    ? ` · Profile v${preset.profile_version}`
-                                                    : ''}
-                                            </p>
-                                        </div>
-                                        <Badge
-                                            variant="outline"
-                                            className="gap-1.5"
-                                        >
-                                            <Archive
-                                                className="h-3.5 w-3.5"
-                                                aria-hidden="true"
-                                            />
-                                            Retired
-                                        </Badge>
-                                    </div>
-                                    {preset.retirement_reason ? (
-                                        <p className="mt-2 rounded-md bg-background px-3 py-2 text-xs">
-                                            <span className="font-medium">
-                                                Reason:{' '}
-                                            </span>
-                                            {preset.retirement_reason}
-                                        </p>
-                                    ) : null}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ) : null}
-            </CardContent>
-
-            {confirm && (
-                <Dialog open onOpenChange={() => setConfirm(null)}>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>
-                                Review “{confirm.name}” in Device Management?
-                            </DialogTitle>
-                            <DialogDescription>
-                                This does not send a tracker command. It opens a
-                                governed request for{' '}
-                                <span className="font-mono">
-                                    {target?.reference}
-                                </span>
-                                , where the profile, Site, approved change,
-                                independent approval, and protected readback are
-                                checked before and after execution.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="flex flex-wrap gap-2">
-                            {confirm.sections.map((sectionName) => (
-                                <Badge key={sectionName} variant="outline">
-                                    {sectionName}
-                                </Badge>
-                            ))}
-                        </div>
-                        <DialogFooter>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setConfirm(null)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                type="button"
-                                onClick={() => applyPreset(confirm)}
-                            >
-                                <Play className="mr-2 h-3 w-3" />
-                                Continue to governed review
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
-            )}
-
-            {saveOpen && (
-                <SavePresetDialog
-                    serverForm={serverForm}
-                    globalForm={globalForm}
-                    onClose={() => setSaveOpen(false)}
-                />
-            )}
-
-            <ReasonDialog
-                open={retiring !== null}
-                onClose={() => setRetiring(null)}
-                onConfirm={(reason, done) => {
-                    if (retiring) retirePreset(retiring, reason, done);
-                }}
-                title="Retire configuration preset?"
-                description={
-                    retiring
-                        ? `Retire “${retiring.name}” so it can no longer be selected or executed? Its immutable configuration versions and reasoned history will be retained.`
-                        : ''
-                }
-                label="Reason for retiring this preset"
-                placeholder="For example: replaced by the approved current configuration baseline."
-                confirmLabel="Retire preset"
-            />
-        </Card>
-    );
-}
-
-function SavePresetDialog({
-    serverForm,
-    globalForm,
-    onClose,
-}: {
-    serverForm: ServerSettingsForm;
-    globalForm: GlobalSettingsForm;
-    onClose: () => void;
-}) {
-    const [name, setName] = useState('');
-    const [description, setDescription] = useState('');
-    const [includeServer, setIncludeServer] = useState(false);
-    const [includeTracking, setIncludeTracking] = useState(true);
-
-    const canSubmit =
-        name.trim().length > 0 && (includeServer || includeTracking);
-
-    const submit = () => {
-        const sections: Record<string, Record<string, string>> = {};
-        if (includeTracking)
-            sections.tracking = { ...globalForm } as Record<string, string>;
-        if (includeServer)
-            sections.server = { ...serverForm } as Record<string, string>;
-
-        router.post(
-            '/security-devices/integrations/queclink/presets',
-            { name, description, sections },
-            { preserveScroll: true, onSuccess: onClose },
-        );
-    };
-
-    return (
-        <Dialog open onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>Save configuration preset</DialogTitle>
-                    <DialogDescription>
-                        Capture the current Server and Global form values as a
-                        reusable preset for your team.
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>Name</Label>
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder="e.g. Night shift"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Textarea
-                            value={description}
-                            onChange={(event) =>
-                                setDescription(event.target.value)
-                            }
-                            rows={2}
-                            placeholder="Optional — what is this preset for?"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Sections to include</Label>
-                        <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-input"
-                                checked={includeTracking}
-                                onChange={(event) =>
-                                    setIncludeTracking(event.target.checked)
-                                }
-                            />
-                            Global tracking (cadence, GNSS, panic button,
-                            battery)
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                            <input
-                                type="checkbox"
-                                className="h-4 w-4 rounded border-input"
-                                checked={includeServer}
-                                onChange={(event) =>
-                                    setIncludeServer(event.target.checked)
-                                }
-                            />
-                            Server connection (hosts, ports, heartbeat)
-                        </label>
-                    </div>
-                </div>
-                <DialogFooter>
-                    <Button type="button" variant="ghost" onClick={onClose}>
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        disabled={!canSubmit}
-                        onClick={submit}
-                    >
-                        <Save className="mr-2 h-3 w-3" />
-                        Save preset
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
 // ── Device Settings tab ────────────────────────────────────────────
 
-type ServerSettingsForm = {
+export type ServerSettingsForm = {
     report_mode: string;
     manual_netreg: string;
     buffer_mode: string;
@@ -2372,7 +3054,7 @@ type ServerSettingsForm = {
     protocol_format: string;
 };
 
-type GlobalSettingsForm = {
+export type GlobalSettingsForm = {
     device_name: string;
     gnss_timeout_seconds: string;
     event_mask: string;
@@ -2393,72 +3075,55 @@ type GlobalSettingsForm = {
     charge_standby_mode: string;
 };
 
-function str(value: unknown, fallback: string): string {
-    return value === null || value === undefined || value === ''
-        ? fallback
-        : String(value);
-}
-
+// Draft starting values. Device readback stays protected, so drafts always
+// start from these documented GL30 defaults, never from observed values.
 function serverDefaults(
-    device: Device | null,
+    _device: Device | null,
     listener: Props['listener'],
 ): ServerSettingsForm {
-    const current: Record<string, string> = {};
-    const host = str(current.main_host, '');
-    const port = str(current.main_port, String(listener.port || 8090));
+    const port = String(listener.port || 8090);
 
     return {
-        report_mode: str(current.report_mode, '3'),
-        manual_netreg: str(current.manual_netreg, '0'),
-        buffer_mode: str(current.buffer_mode, '1'),
-        main_host: host,
+        report_mode: '3',
+        manual_netreg: '0',
+        buffer_mode: '1',
+        main_host: '',
         main_port: port,
-        backup_host: str(current.backup_host, host),
-        backup_port: str(current.backup_port, port),
-        sms_gateway: str(current.sms_gateway, ''),
-        heartbeat_interval_minutes: str(
-            current.heartbeat_interval_minutes,
-            '5',
-        ),
-        sack_enable: str(current.sack_enable, '1'),
-        sms_ack_enable: str(current.sms_ack_enable, '0'),
-        psm_network_hold_time_seconds: str(
-            current.psm_network_hold_time_seconds,
-            '30',
-        ),
-        protocol_format: str(current.protocol_format, '0'),
+        backup_host: '',
+        backup_port: port,
+        sms_gateway: '',
+        heartbeat_interval_minutes: '5',
+        sack_enable: '1',
+        sms_ack_enable: '0',
+        psm_network_hold_time_seconds: '30',
+        protocol_format: '0',
     };
 }
 
 function globalDefaults(device: Device | null): GlobalSettingsForm {
-    const current: Record<string, string> = {};
-
     return {
-        device_name: str(current.device_name, device?.model_hint || 'GL30MEU'),
-        gnss_timeout_seconds: str(current.gnss_timeout_seconds, '150'),
-        event_mask: str(current.event_mask, '08E3'),
-        report_item_mask: str(current.report_item_mask, '006F'),
-        mode_selection: str(current.mode_selection, '1'),
-        continuous_send_interval_seconds: str(
-            current.continuous_send_interval_seconds,
-            '30',
-        ),
-        start_mode: str(current.start_mode, '0'),
-        specified_time_of_day: str(current.specified_time_of_day, '1200'),
-        wakeup_interval_hours: str(current.wakeup_interval_hours, '1'),
-        gnss_enable: str(current.gnss_enable, '1'),
-        agps_mode: str(current.agps_mode, '1'),
-        gsm_report: str(current.gsm_report, '0000'),
-        battery_low_percentage: str(current.battery_low_percentage, '10'),
-        function_button_mode: str(current.function_button_mode, '1'),
-        sos_report_mode: str(current.sos_report_mode, '1'),
-        wifi_report: str(current.wifi_report, '2'),
-        led_on: str(current.led_on, '1'),
-        charge_standby_mode: str(current.charge_standby_mode, '0'),
+        device_name: device?.model_hint || 'GL30MEU',
+        gnss_timeout_seconds: '150',
+        event_mask: '08E3',
+        report_item_mask: '006F',
+        mode_selection: '1',
+        continuous_send_interval_seconds: '30',
+        start_mode: '0',
+        specified_time_of_day: '1200',
+        wakeup_interval_hours: '1',
+        gnss_enable: '1',
+        agps_mode: '1',
+        gsm_report: '0000',
+        battery_low_percentage: '10',
+        function_button_mode: '1',
+        sos_report_mode: '1',
+        wifi_report: '2',
+        led_on: '1',
+        charge_standby_mode: '0',
     };
 }
 
-type SectionReadOption = {
+export type SectionReadOption = {
     section: string;
     label: string;
     code: string;
@@ -2481,7 +3146,7 @@ const SECTION_READ_OPTIONS: SectionReadOption[] = [
     { section: 'firmware', label: 'Firmware version', code: 'FVR' },
 ];
 
-type AdvancedField = {
+export type AdvancedField = {
     name: string;
     label: string;
     type?: 'text' | 'number' | 'textarea';
@@ -2489,7 +3154,7 @@ type AdvancedField = {
     placeholder?: string;
 };
 
-type AdvancedCommandDefinition = {
+export type AdvancedCommandDefinition = {
     key: string;
     section: string;
     label: string;
@@ -2994,1158 +3659,26 @@ function advancedPayload(
     return payload;
 }
 
-function commandStatusBadge(status: RecentCommand['status']) {
-    const classes = {
-        queued: 'bg-status-info-bg text-status-info',
-        sent: 'bg-status-warning-bg text-status-warning',
-        acked: 'bg-status-success-bg text-status-success',
-        failed: 'bg-status-critical-bg text-status-critical',
-        expired: 'bg-muted text-muted-foreground',
-        cancelled: 'bg-muted text-muted-foreground',
-    };
-
-    return <Badge className={classes[status]}>{status}</Badge>;
-}
-
-export function DeviceSettingsTab({
-    devices,
-    listener,
-    presets,
-    retiredPresets = [],
-    can,
-}: {
+export function DeviceSettingsTab(props: {
     devices: Device[];
+    /** Paired trackers across every page of the current search. */
+    total?: number;
     listener: Props['listener'];
     presets: Preset[];
     retiredPresets?: RetiredPreset[];
     can: Props['can'];
-}) {
-    const [targetId, setTargetId] = useState<string>(
-        devices[0] ? String(devices[0].id) : '',
-    );
-    const target = useMemo(
-        () => devices.find((device) => String(device.id) === targetId) ?? null,
-        [devices, targetId],
-    );
-    const [serverForm, setServerForm] = useState<ServerSettingsForm>(() =>
-        serverDefaults(devices[0] ?? null, listener),
-    );
-    const [globalForm, setGlobalForm] = useState<GlobalSettingsForm>(() =>
-        globalDefaults(devices[0] ?? null),
-    );
-    const [selectedCommand, setSelectedCommand] =
-        useState<RecentCommand | null>(null);
-
-    useEffect(() => {
-        setServerForm(serverDefaults(target, listener));
-        setGlobalForm(globalDefaults(target));
-    }, [listener, target]);
-
-    if (devices.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Device settings</CardTitle>
-                    <CardDescription>
-                        Pair a Queclink device before configuring device
-                        settings.
-                    </CardDescription>
-                </CardHeader>
-            </Card>
-        );
-    }
-
-    const post = (path: string, payload: Record<string, string | string[]>) => {
-        router.post(path, payload, { preserveScroll: true });
-    };
-
-    const config = target?.configuration;
-    const recentCommands = target?.recent_commands ?? [];
-    const readSection = (option: SectionReadOption) => {
-        if (!target) return;
-        post(
-            `/security-devices/integrations/queclink/devices/${target.id}/configuration/${option.section}/read`,
-            { command: option.code },
-        );
-    };
-
-    return (
-        <div className="space-y-6">
-            <Card className="overflow-hidden border-primary/10 shadow-sm">
-                <CardHeader className="border-b bg-gradient-to-r from-background via-muted/30 to-background">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                <Settings2 className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <CardTitle>Device settings</CardTitle>
-                                <CardDescription>
-                                    Protected GL30 readback and configuration
-                                    profiles governed through Device Management.
-                                </CardDescription>
-                            </div>
-                        </div>
-                        <Button
-                            type="button"
-                            disabled={!can.manage || !target}
-                            onClick={() => {
-                                if (!target) return;
-                                post(
-                                    `/security-devices/integrations/queclink/devices/${target.id}/configuration/read`,
-                                    { section: 'all' },
-                                );
-                            }}
-                        >
-                            <RefreshCw className="mr-2 h-3 w-3" />
-                            Read full config
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="space-y-5 p-6">
-                    <div className="grid gap-4 lg:grid-cols-[minmax(260px,420px)_1fr] lg:items-end">
-                        <div className="grid gap-2">
-                            <Label>Target device</Label>
-                            <Select
-                                value={targetId}
-                                onValueChange={setTargetId}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {devices.map((device) => (
-                                        <SelectItem
-                                            key={device.id}
-                                            value={String(device.id)}
-                                        >
-                                            {device.reference}
-                                            {device.assignment?.label
-                                                ? ` — ${device.assignment.label}`
-                                                : ''}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                            <SettingsMetric
-                                icon={<ShieldCheck className="h-4 w-4" />}
-                                label="Connection health"
-                                value={target?.connection_state ?? '—'}
-                                tone={
-                                    target?.connection_state === 'connected'
-                                        ? 'success'
-                                        : 'muted'
-                                }
-                            />
-                            <SettingsMetric
-                                icon={<Smartphone className="h-4 w-4" />}
-                                label="Model"
-                                value={target?.model_hint ?? 'Unknown'}
-                            />
-                            <SettingsMetric
-                                icon={<Clock className="h-4 w-4" />}
-                                label="Last frame"
-                                value={fmtRel(target?.last_frame_at ?? null)}
-                            />
-                            <SettingsMetric
-                                icon={<Database className="h-4 w-4" />}
-                                label="Config read"
-                                value={
-                                    config?.state === 'observed'
-                                        ? fmtRel(config.observed_at)
-                                        : 'not read yet'
-                                }
-                            />
-                            <SettingsMetric
-                                icon={<Send className="h-4 w-4" />}
-                                label="Queued commands"
-                                value={recentCommands.length}
-                            />
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
-            <Card className="shadow-sm">
-                <CardHeader>
-                    <div className="flex items-start gap-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                            <RefreshCw className="h-4 w-4" />
-                        </div>
-                        <div>
-                            <CardTitle>Read one section</CardTitle>
-                            <CardDescription>
-                                Request a protected GTRTO readback through the
-                                same governed Device Management lifecycle.
-                            </CardDescription>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-                        {SECTION_READ_OPTIONS.map((option) => (
-                            <Button
-                                key={`${option.section}-${option.code}`}
-                                type="button"
-                                variant="outline"
-                                className="justify-start"
-                                disabled={!can.manage || !target}
-                                onClick={() => readSection(option)}
-                            >
-                                <RefreshCw className="mr-2 h-3 w-3" />
-                                {option.label}
-                            </Button>
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-
-            <PresetsCard
-                presets={presets}
-                retiredPresets={retiredPresets}
-                target={target}
-                can={can}
-                serverForm={serverForm}
-                globalForm={globalForm}
-            />
-
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
-                <div className="space-y-6">
-                    <div className="grid gap-6 2xl:grid-cols-2">
-                        <Card className="shadow-sm">
-                            <CardHeader>
-                                <div className="flex items-start gap-3">
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                        <Server className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <CardTitle>Server connection</CardTitle>
-                                        <CardDescription>
-                                            GL30 SRI settings that keep the
-                                            device connected to Oblivion.
-                                        </CardDescription>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-5">
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    <Field
-                                        label="Main host"
-                                        value={serverForm.main_host}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                main_host: value,
-                                            })
-                                        }
-                                    />
-                                    <Field
-                                        label="Main port"
-                                        type="number"
-                                        value={serverForm.main_port}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                main_port: value,
-                                            })
-                                        }
-                                    />
-                                    <Field
-                                        label="Backup host"
-                                        value={serverForm.backup_host}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                backup_host: value,
-                                            })
-                                        }
-                                    />
-                                    <Field
-                                        label="Backup port"
-                                        type="number"
-                                        value={serverForm.backup_port}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                backup_port: value,
-                                            })
-                                        }
-                                    />
-                                    <Field
-                                        label="Heartbeat minutes"
-                                        type="number"
-                                        value={
-                                            serverForm.heartbeat_interval_minutes
-                                        }
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                heartbeat_interval_minutes:
-                                                    value,
-                                            })
-                                        }
-                                    />
-                                    <Field
-                                        label="PSM hold seconds"
-                                        type="number"
-                                        value={
-                                            serverForm.psm_network_hold_time_seconds
-                                        }
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                psm_network_hold_time_seconds:
-                                                    value,
-                                            })
-                                        }
-                                    />
-                                    <SelectField
-                                        label="Report mode"
-                                        value={serverForm.report_mode}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                report_mode: value,
-                                            })
-                                        }
-                                        options={[
-                                            ['3', 'TCP long connection'],
-                                            ['7', 'TCP long + backup'],
-                                            ['2', 'TCP short forced'],
-                                        ]}
-                                    />
-                                    <SelectField
-                                        label="SACK"
-                                        value={serverForm.sack_enable}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                sack_enable: value,
-                                            })
-                                        }
-                                        options={[
-                                            ['1', 'Enable and check'],
-                                            ['2', 'Enable no serial check'],
-                                            ['0', 'Disabled'],
-                                        ]}
-                                    />
-                                    <SelectField
-                                        label="Manual network"
-                                        value={serverForm.manual_netreg}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                manual_netreg: value,
-                                            })
-                                        }
-                                        options={[
-                                            ['0', 'Disabled'],
-                                            ['1', 'Enabled'],
-                                        ]}
-                                    />
-                                    <SelectField
-                                        label="Buffer mode"
-                                        value={serverForm.buffer_mode}
-                                        onChange={(value) =>
-                                            setServerForm({
-                                                ...serverForm,
-                                                buffer_mode: value,
-                                            })
-                                        }
-                                        options={[
-                                            ['1', 'Low priority'],
-                                            ['2', 'High priority'],
-                                            ['0', 'Disabled'],
-                                        ]}
-                                    />
-                                </div>
-                                <Button
-                                    type="button"
-                                    disabled={!can.manage || !target}
-                                    onClick={() => {
-                                        if (!target) return;
-                                        post(
-                                            `/security-devices/integrations/queclink/devices/${target.id}/configuration/server`,
-                                            serverForm,
-                                        );
-                                    }}
-                                >
-                                    <Send className="mr-2 h-3 w-3" />
-                                    Review server profile
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="shadow-sm">
-                            <CardHeader>
-                                <div className="flex items-start gap-3">
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                        <Gauge className="h-4 w-4" />
-                                    </div>
-                                    <div>
-                                        <CardTitle>Global tracking</CardTitle>
-                                        <CardDescription>
-                                            GL30 CFG settings for testing
-                                            cadence, GNSS, Wi-Fi fallback,
-                                            alerts, and LEDs.
-                                        </CardDescription>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-5">
-                                <div className="flex justify-end">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        disabled={!can.manage || !target}
-                                        onClick={() => {
-                                            if (!target) return;
-                                            post(
-                                                `/security-devices/integrations/queclink/devices/${target.id}/configuration/resident-safety-profile`,
-                                                {},
-                                            );
-                                        }}
-                                    >
-                                        <ShieldCheck className="mr-2 h-3 w-3" />
-                                        Resident safety profile
-                                    </Button>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <Field
-                                            label="Device name"
-                                            value={globalForm.device_name}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    device_name: value,
-                                                })
-                                            }
-                                        />
-                                        <Field
-                                            label="Send interval seconds"
-                                            type="number"
-                                            value={
-                                                globalForm.continuous_send_interval_seconds
-                                            }
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    continuous_send_interval_seconds:
-                                                        value,
-                                                })
-                                            }
-                                        />
-                                        <SelectField
-                                            label="Mode"
-                                            value={globalForm.mode_selection}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    mode_selection: value,
-                                                })
-                                            }
-                                            options={[
-                                                ['1', 'Continuous'],
-                                                ['0', 'Power saving'],
-                                            ]}
-                                        />
-                                        <Field
-                                            label="GNSS timeout seconds"
-                                            type="number"
-                                            value={
-                                                globalForm.gnss_timeout_seconds
-                                            }
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    gnss_timeout_seconds: value,
-                                                })
-                                            }
-                                        />
-                                        <SelectField
-                                            label="GNSS"
-                                            value={globalForm.gnss_enable}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    gnss_enable: value,
-                                                })
-                                            }
-                                            options={[
-                                                ['1', 'Enabled'],
-                                                ['0', 'Disabled'],
-                                            ]}
-                                        />
-                                        <SelectField
-                                            label="AGPS"
-                                            value={globalForm.agps_mode}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    agps_mode: value,
-                                                })
-                                            }
-                                            options={[
-                                                ['1', 'Enabled'],
-                                                ['0', 'Disabled'],
-                                            ]}
-                                        />
-                                        <SelectField
-                                            label="Wi-Fi fallback"
-                                            value={globalForm.wifi_report}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    wifi_report: value,
-                                                })
-                                            }
-                                            options={[
-                                                [
-                                                    '2',
-                                                    'Report Wi-Fi if GNSS fails',
-                                                ],
-                                                ['1', 'Always report GTFRI'],
-                                                ['4', 'Only Wi-Fi report'],
-                                                [
-                                                    '8',
-                                                    'Wi-Fi assisted position',
-                                                ],
-                                            ]}
-                                        />
-                                        <SelectField
-                                            label="LEDs"
-                                            value={globalForm.led_on}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    led_on: value,
-                                                })
-                                            }
-                                            options={[
-                                                ['1', 'Normal'],
-                                                ['0', 'Reduced GNSS LED'],
-                                                ['2', 'Mostly off'],
-                                            ]}
-                                        />
-                                        <Field
-                                            label="Report item mask"
-                                            value={globalForm.report_item_mask}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    report_item_mask:
-                                                        value.toUpperCase(),
-                                                })
-                                            }
-                                        />
-                                        <Field
-                                            label="Event mask"
-                                            value={globalForm.event_mask}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    event_mask:
-                                                        value.toUpperCase(),
-                                                })
-                                            }
-                                        />
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="grid gap-4 md:grid-cols-2">
-                                        <SelectField
-                                            label="Start mode"
-                                            value={globalForm.start_mode}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    start_mode: value,
-                                                })
-                                            }
-                                            options={[
-                                                ['0', 'First wakeup at time'],
-                                                ['1', 'Wake by interval'],
-                                                ['2', 'Wake by both'],
-                                            ]}
-                                        />
-                                        <Field
-                                            label="Specified time"
-                                            value={
-                                                globalForm.specified_time_of_day
-                                            }
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    specified_time_of_day:
-                                                        value,
-                                                })
-                                            }
-                                        />
-                                        <Field
-                                            label="Wakeup interval hours"
-                                            type="number"
-                                            value={
-                                                globalForm.wakeup_interval_hours
-                                            }
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    wakeup_interval_hours:
-                                                        value,
-                                                })
-                                            }
-                                        />
-                                        <Field
-                                            label="Battery low percentage"
-                                            type="number"
-                                            value={
-                                                globalForm.battery_low_percentage
-                                            }
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    battery_low_percentage:
-                                                        value,
-                                                })
-                                            }
-                                        />
-                                        <Field
-                                            label="GSM report mask"
-                                            value={globalForm.gsm_report}
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    gsm_report:
-                                                        value.toUpperCase(),
-                                                })
-                                            }
-                                        />
-                                        <SelectField
-                                            label="Charge standby"
-                                            value={
-                                                globalForm.charge_standby_mode
-                                            }
-                                            onChange={(value) =>
-                                                setGlobalForm({
-                                                    ...globalForm,
-                                                    charge_standby_mode: value,
-                                                })
-                                            }
-                                            options={[
-                                                ['0', 'Disabled'],
-                                                ['1', 'Enabled'],
-                                            ]}
-                                        />
-                                    </div>
-                                </div>
-                                <Button
-                                    type="button"
-                                    disabled={!can.manage || !target}
-                                    onClick={() => {
-                                        if (!target) return;
-                                        post(
-                                            `/security-devices/integrations/queclink/devices/${target.id}/configuration/global`,
-                                            globalForm,
-                                        );
-                                    }}
-                                >
-                                    <Send className="mr-2 h-3 w-3" />
-                                    Review global profile
-                                </Button>
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    <AdvancedQueclinkSectionForm
-                        target={target}
-                        can={can}
-                        post={post}
-                    />
-
-                    <Card className="shadow-sm">
-                        <CardHeader>
-                            <div className="flex items-start gap-3">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                    <Database className="h-4 w-4" />
-                                </div>
-                                <div>
-                                    <CardTitle>
-                                        Configuration snapshot
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Last parsed +RESP:GTALM response from
-                                        the selected device.
-                                    </CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                {config?.state === 'observed'
-                                    ? `Configuration observed. Sections: ${config.sections.join(', ') || 'none reported'}. Values are protected.`
-                                    : 'No configuration readback has been received yet.'}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <Card className="shadow-sm xl:sticky xl:top-6 xl:self-start">
-                    <CardHeader>
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                                <Send className="h-4 w-4" />
-                            </div>
-                            <div>
-                                <CardTitle>Command history</CardTitle>
-                                <CardDescription>
-                                    Protected delivery history. New or repeated
-                                    actions must start from Device Management.
-                                </CardDescription>
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {target?.canonical_device_id ? (
-                            <Button asChild size="sm" variant="outline">
-                                <Link
-                                    href={`/security-devices/devices/${target.canonical_device_id}?section=management`}
-                                >
-                                    <ShieldCheck className="mr-1 h-3 w-3" />
-                                    Open Device Management
-                                </Link>
-                            </Button>
-                        ) : (
-                            <p className="text-sm text-muted-foreground">
-                                Link this tracker to a canonical Device before
-                                starting a governed action.
-                            </p>
-                        )}
-                        {recentCommands.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                No commands queued yet.
-                            </p>
-                        ) : (
-                            <div className="max-h-[680px] space-y-3 overflow-y-auto pr-1">
-                                {recentCommands.map((command) => (
-                                    <Card
-                                        unstyled
-                                        key={command.id}
-                                        className="rounded-lg border bg-background p-3 shadow-xs"
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="font-medium">
-                                                {command.command_word}
-                                            </span>
-                                            {commandStatusBadge(command.status)}
-                                        </div>
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {command.governed
-                                                ? 'Governed Device execution detail · content protected'
-                                                : command.status === 'queued'
-                                                  ? 'Legacy provider-console command · cancellation only · content protected'
-                                                  : 'Legacy provider-console history · read only · content protected'}
-                                        </p>
-                                        <dl className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                            <div>
-                                                <dt>Created</dt>
-                                                <dd>
-                                                    {fmtRel(command.created_at)}
-                                                </dd>
-                                            </div>
-                                            <div>
-                                                <dt>ACK</dt>
-                                                <dd>
-                                                    {command.acked_at
-                                                        ? fmtRel(
-                                                              command.acked_at,
-                                                          )
-                                                        : 'waiting'}
-                                                </dd>
-                                            </div>
-                                            {command.failure_category && (
-                                                <div className="col-span-2">
-                                                    <dt>Failure</dt>
-                                                    <dd>
-                                                        Provider operation
-                                                        failed
-                                                    </dd>
-                                                </div>
-                                            )}
-                                            {command.cancelled_at && (
-                                                <div className="col-span-2">
-                                                    <dt>Cancelled</dt>
-                                                    <dd>
-                                                        {fmtRel(
-                                                            command.cancelled_at,
-                                                        )}
-                                                    </dd>
-                                                </div>
-                                            )}
-                                        </dl>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setSelectedCommand(command)
-                                                }
-                                            >
-                                                <Database className="mr-1 h-3 w-3" />
-                                                Inspect
-                                            </Button>
-                                            {command.status === 'queued' &&
-                                                !command.governed && (
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={!can.manage}
-                                                        onClick={() =>
-                                                            router.post(
-                                                                `/security-devices/integrations/queclink/commands/${command.id}/cancel`,
-                                                                {},
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            )
-                                                        }
-                                                    >
-                                                        <XCircle className="mr-1 h-3 w-3" />
-                                                        Cancel
-                                                    </Button>
-                                                )}
-                                        </div>
-                                    </Card>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-            <Dialog
-                open={selectedCommand !== null}
-                onOpenChange={(open) => {
-                    if (!open) setSelectedCommand(null);
-                }}
-            >
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>Command status</DialogTitle>
-                        <DialogDescription>
-                            Bounded delivery state. Command and ACK content are
-                            protected.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <p className="text-sm text-muted-foreground">
-                        {selectedCommand?.failure_category
-                            ? 'Provider operation failed.'
-                            : 'No failure category is recorded.'}
-                    </p>
-                    {!selectedCommand?.governed && (
-                        <p className="text-sm text-muted-foreground">
-                            This is read-only legacy provider-console history.
-                            Review current Device state and start any new action
-                            from Device Management.
-                        </p>
-                    )}
-                </DialogContent>
-            </Dialog>
-        </div>
-    );
-}
-
-function SettingsMetric({
-    icon,
-    label,
-    value,
-    tone = 'default',
-}: {
-    icon: ReactNode;
-    label: string;
-    value: ReactNode;
-    tone?: 'default' | 'success' | 'muted';
+    layout?: 'cards' | 'table';
+    onAccessDenied?: () => void;
 }) {
     return (
-        <Card
-            unstyled
-            className="rounded-lg border bg-background p-3 shadow-xs"
-        >
-            <div
-                className={
-                    tone === 'success'
-                        ? 'mb-2 flex h-8 w-8 items-center justify-center rounded-md bg-status-success-bg text-status-success'
-                        : tone === 'muted'
-                          ? 'mb-2 flex h-8 w-8 items-center justify-center rounded-md bg-muted text-muted-foreground'
-                          : 'mb-2 flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary'
-                }
-            >
-                {icon}
-            </div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-0.5 truncate text-sm font-semibold">{value}</p>
-        </Card>
-    );
-}
-
-function Field({
-    label,
-    value,
-    onChange,
-    type = 'text',
-}: {
-    label: string;
-    value: string;
-    onChange: (value: string) => void;
-    type?: 'text' | 'number';
-}) {
-    return (
-        <div className="space-y-2">
-            <Label className="text-xs">{label}</Label>
-            <Input
-                type={type}
-                value={value}
-                onChange={(event) => onChange(event.target.value)}
-            />
-        </div>
-    );
-}
-
-function SelectField({
-    label,
-    value,
-    options,
-    onChange,
-}: {
-    label: string;
-    value: string;
-    options: Array<[string, string]>;
-    onChange: (value: string) => void;
-}) {
-    return (
-        <div className="space-y-2">
-            <Label className="text-xs">{label}</Label>
-            <Select value={value} onValueChange={onChange}>
-                <SelectTrigger>
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {options.map(([optionValue, label]) => (
-                        <SelectItem key={optionValue} value={optionValue}>
-                            {label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-        </div>
-    );
-}
-
-function AdvancedQueclinkSectionForm({
-    target,
-    can,
-    post,
-}: {
-    target: Device | null;
-    can: Props['can'];
-    post: (path: string, payload: Record<string, string | string[]>) => void;
-}) {
-    const [commandKey, setCommandKey] = useState(ADVANCED_COMMANDS[0].key);
-    const definition =
-        ADVANCED_COMMANDS.find((command) => command.key === commandKey) ??
-        ADVANCED_COMMANDS[0];
-    const [values, setValues] = useState<Record<string, string>>(() =>
-        commandDefaults(definition),
-    );
-
-    useEffect(() => {
-        setValues(commandDefaults(definition));
-    }, [definition]);
-
-    const snapshot = null;
-
-    return (
-        <Card className="shadow-sm">
-            <CardHeader>
-                <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                        <Settings2 className="h-4 w-4" />
-                    </div>
-                    <div>
-                        <CardTitle>Advanced GL30 sections</CardTitle>
-                        <CardDescription>
-                            Build an encrypted profile for sections beyond SRI
-                            and CFG, then review it in Device Management.
-                        </CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(220px,320px)_1fr]">
-                    <div className="space-y-2">
-                        <Label className="text-xs">Section command</Label>
-                        <Select
-                            value={commandKey}
-                            onValueChange={setCommandKey}
-                        >
-                            <SelectTrigger>
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {ADVANCED_COMMANDS.map((command) => (
-                                    <SelectItem
-                                        key={command.key}
-                                        value={command.key}
-                                    >
-                                        {command.label}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        <p className="text-xs text-muted-foreground">
-                            {definition.description}
-                        </p>
-                    </div>
-
-                    <SnapshotSummary value={snapshot} />
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    {definition.fields.map((field) => {
-                        const value = values[field.name] ?? '';
-
-                        if (field.options) {
-                            return (
-                                <SelectField
-                                    key={field.name}
-                                    label={field.label}
-                                    value={value}
-                                    options={field.options}
-                                    onChange={(nextValue) =>
-                                        setValues((current) => ({
-                                            ...current,
-                                            [field.name]: nextValue,
-                                        }))
-                                    }
-                                />
-                            );
-                        }
-
-                        if (field.type === 'textarea') {
-                            return (
-                                <div
-                                    key={field.name}
-                                    className="space-y-2 md:col-span-2 xl:col-span-3"
-                                >
-                                    <Label className="text-xs">
-                                        {field.label}
-                                    </Label>
-                                    <Textarea
-                                        value={value}
-                                        placeholder={field.placeholder}
-                                        onChange={(event) =>
-                                            setValues((current) => ({
-                                                ...current,
-                                                [field.name]:
-                                                    event.target.value,
-                                            }))
-                                        }
-                                        className="min-h-24 font-mono text-xs"
-                                    />
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <Field
-                                key={field.name}
-                                label={field.label}
-                                type={
-                                    field.type === 'number' ? 'number' : 'text'
-                                }
-                                value={value}
-                                onChange={(nextValue) =>
-                                    setValues((current) => ({
-                                        ...current,
-                                        [field.name]: nextValue,
-                                    }))
-                                }
-                            />
-                        );
-                    })}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                    <Button
-                        type="button"
-                        disabled={!can.manage || !target}
-                        onClick={() => {
-                            if (!target) return;
-                            post(
-                                `/security-devices/integrations/queclink/devices/${target.id}/configuration/${definition.section}`,
-                                advancedPayload(definition, values),
-                            );
-                        }}
-                    >
-                        <Send className="mr-2 h-3 w-3" />
-                        Review {definition.label}
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        disabled={!can.manage || !target}
-                        onClick={() => setValues(commandDefaults(definition))}
-                    >
-                        Revert fields
-                    </Button>
-                </div>
-            </CardContent>
-        </Card>
-    );
-}
-
-function SnapshotSummary({ value }: { value: DeviceConfigurationSummary }) {
-    if (!value || (Array.isArray(value) && value.length === 0)) {
-        return (
-            <div className="rounded-md border bg-muted/20 p-3 text-xs text-muted-foreground">
-                No readback for this section yet.
-            </div>
-        );
-    }
-
-    const rows = Array.isArray(value) ? value : [value];
-    const pairs = rows.flatMap((row, rowIndex) =>
-        Object.entries(row).map(([key, item]) => ({
-            key: rows.length > 1 ? `${rowIndex + 1}.${key}` : key,
-            value: item,
-        })),
-    );
-
-    return (
-        <div className="rounded-md border bg-muted/20 p-3">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">
-                Current device value
-            </p>
-            <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
-                {pairs.slice(0, 18).map((pair) => (
-                    <Badge
-                        key={`${pair.key}-${pair.value}`}
-                        variant="outline"
-                        className="max-w-full truncate font-mono"
-                    >
-                        {pair.key}: {pair.value || 'blank'}
-                    </Badge>
-                ))}
-                {pairs.length > 18 && (
-                    <Badge variant="outline">+{pairs.length - 18} more</Badge>
-                )}
-            </div>
-        </div>
+        <QueclinkSettingsWorkspace
+            {...props}
+            serverDefaults={serverDefaults}
+            globalDefaults={globalDefaults}
+            definitions={ADVANCED_COMMANDS}
+            readOptions={SECTION_READ_OPTIONS}
+            payloadFor={advancedPayload}
+        />
     );
 }
 
@@ -4153,10 +3686,15 @@ function SnapshotSummary({ value }: { value: DeviceConfigurationSummary }) {
 
 export function DebugConsoleTab({
     devices,
+    total,
     can,
+    onAccessDenied,
 }: {
     devices: Device[];
+    /** Paired trackers across every page of the current search. */
+    total?: number;
     can: Props['can'];
+    onAccessDenied?: () => void;
 }) {
     const [frames, setFrames] = useState<Frame[]>([]);
     const [filters, setFilters] = useState<FrameFilters>({
@@ -4187,6 +3725,13 @@ export function DebugConsoleTab({
                     signal,
                 });
 
+                if ([401, 403, 404].includes(response.status)) {
+                    setFrames([]);
+                    esRef.current?.close();
+                    setStreaming(false);
+                    onAccessDenied?.();
+                    throw new Error('Current frame access is unavailable');
+                }
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}`);
                 }
@@ -4200,6 +3745,7 @@ export function DebugConsoleTab({
                     throw new Error('Unexpected frame history response');
                 }
 
+                if (signal?.aborted) return;
                 setFrames((previous) =>
                     mergeFrames(
                         previous,
@@ -4220,7 +3766,7 @@ export function DebugConsoleTab({
                 );
             }
         },
-        [filters],
+        [filters, onAccessDenied],
     );
 
     useEffect(() => {
@@ -4299,33 +3845,26 @@ export function DebugConsoleTab({
         }
     }, [frames, autoscroll]);
 
-    const streamStatus = {
-        connecting: {
-            label: 'Connecting',
-            icon: Loader2,
-            className: 'text-status-info',
-        },
-        live: {
-            label: 'Live',
-            icon: Activity,
-            className: 'text-status-success',
-        },
-        reconnecting: {
-            label: 'Reconnecting',
-            icon: RefreshCw,
-            className: 'text-status-warning',
-        },
-        error: {
-            label: 'Unavailable',
-            icon: XCircle,
-            className: 'text-status-critical',
-        },
-        paused: {
-            label: 'Paused',
-            icon: Clock,
-            className: 'text-muted-foreground',
-        },
-    }[streamState];
+    const streamStatus = (
+        {
+            connecting: {
+                label: 'Connecting',
+                icon: Loader2,
+                variant: 'info',
+            },
+            live: { label: 'Live', icon: Activity, variant: 'success' },
+            reconnecting: {
+                label: 'Reconnecting',
+                icon: RefreshCw,
+                variant: 'warning',
+            },
+            error: { label: 'Unavailable', icon: XCircle, variant: 'critical' },
+            paused: { label: 'Paused', icon: Clock, variant: 'neutral' },
+        } as const satisfies Record<
+            FrameStreamState,
+            { label: string; icon: typeof Activity; variant: StatusVariant }
+        >
+    )[streamState];
     const StreamStatusIcon = streamStatus.icon;
 
     const toggleStreaming = () => {
@@ -4361,14 +3900,13 @@ export function DebugConsoleTab({
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
-                            <Badge
-                                variant="outline"
+                            <StatusBadge
+                                variant={streamStatus.variant}
                                 role="status"
                                 aria-live="polite"
-                                className={streamStatus.className}
                             >
                                 <StreamStatusIcon
-                                    className={`mr-1 h-3 w-3 ${
+                                    className={`size-3 ${
                                         streamState === 'connecting' ||
                                         streamState === 'reconnecting'
                                             ? 'animate-spin motion-reduce:animate-none'
@@ -4377,7 +3915,7 @@ export function DebugConsoleTab({
                                     aria-hidden="true"
                                 />
                                 {streamStatus.label}
-                            </Badge>
+                            </StatusBadge>
                             <Button
                                 size="sm"
                                 variant="outline"
@@ -4512,7 +4050,7 @@ export function DebugConsoleTab({
                 </CardContent>
             </Card>
 
-            <GovernedCommandHandoff devices={devices} can={can} />
+            <GovernedCommandHandoff devices={devices} total={total} can={can} />
         </div>
     );
 }
@@ -4522,9 +4060,7 @@ function FrameLine({ frame }: { frame: Frame }) {
     return (
         <div className="flex items-start gap-2 px-3 py-1.5">
             <div className="w-16 shrink-0 text-[10px] text-muted-foreground">
-                {frame.created_at
-                    ? new Date(frame.created_at).toLocaleTimeString()
-                    : ''}
+                {formatTime(frame.created_at, '')}
             </div>
             <div className="w-4 shrink-0">
                 {isIn ? (
@@ -4552,12 +4088,16 @@ function FrameLine({ frame }: { frame: Frame }) {
 
 export function GovernedCommandHandoff({
     devices,
+    total = devices.length,
     can,
 }: {
     devices: Device[];
+    total?: number;
     can: Props['can'];
 }) {
     const [target, setTarget] = useState<Device | null>(devices[0] ?? null);
+    const pickerId = useId();
+    const pageLimited = total > devices.length;
     const locationForm = useForm<{
         mode: 'preset';
         preset: 'request_location';
@@ -4572,6 +4112,13 @@ export function GovernedCommandHandoff({
         mode: 'preset',
         preset: 'reboot',
     });
+    const actionErrors = {
+        ...locationForm.errors,
+        ...restartForm.errors,
+    } as Record<string, string | undefined>;
+    const actionError = Object.values(actionErrors).some(Boolean)
+        ? firstError(actionErrors)
+        : null;
 
     return (
         <Card className="order-first 2xl:order-last">
@@ -4585,7 +4132,7 @@ export function GovernedCommandHandoff({
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="space-y-2">
-                    <Label>Target device</Label>
+                    <Label htmlFor={pickerId}>Target device</Label>
                     <Select
                         value={target ? String(target.id) : ''}
                         onValueChange={(v) =>
@@ -4594,7 +4141,12 @@ export function GovernedCommandHandoff({
                             )
                         }
                     >
-                        <SelectTrigger>
+                        <SelectTrigger
+                            id={pickerId}
+                            aria-describedby={
+                                pageLimited ? `${pickerId}-scope` : undefined
+                            }
+                        >
                             <SelectValue placeholder="Pick a paired device…" />
                         </SelectTrigger>
                         <SelectContent>
@@ -4608,6 +4160,11 @@ export function GovernedCommandHandoff({
                             ))}
                         </SelectContent>
                     </Select>
+                    {pageLimited && (
+                        <p id={`${pickerId}-scope`} className="text-caption">
+                            {pageScopeHint(devices.length, total)}
+                        </p>
+                    )}
                 </div>
 
                 <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
@@ -4615,6 +4172,14 @@ export function GovernedCommandHandoff({
                     this provider console. Only capabilities with a governed
                     Device adapter appear in Management.
                 </div>
+
+                {actionError && (
+                    <Alert variant="destructive">
+                        <XCircle aria-hidden="true" />
+                        <AlertTitle>Action not started</AlertTitle>
+                        <AlertDescription>{actionError}</AlertDescription>
+                    </Alert>
+                )}
 
                 <div className="grid gap-2">
                     <Button
@@ -4673,6 +4238,7 @@ export function CloudIntegrationTab({
     cloudIntegration: Props['cloudIntegration'];
     can: Props['can'];
 }) {
+    const notify = useHubNotice();
     const [removeLegacyCredentialOpen, setRemoveLegacyCredentialOpen] =
         useState(false);
 
@@ -4682,7 +4248,9 @@ export function CloudIntegrationTab({
                 <CardHeader>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <CardTitle>Queclink cloud API</CardTitle>
-                        <Badge variant="outline">Cloud API unavailable</Badge>
+                        <StatusBadge variant="neutral">
+                            Cloud API unavailable
+                        </StatusBadge>
                     </div>
                     <CardDescription>
                         Direct TCP intake remains the primary path. No verified
@@ -4705,30 +4273,33 @@ export function CloudIntegrationTab({
                     </div>
 
                     {cloudIntegration.legacy_credential_stored ? (
-                        <div className="space-y-3 rounded-lg border border-status-warning/30 bg-status-warning/5 p-4 text-sm">
-                            <p className="font-medium">
+                        <Alert variant="warning" role="note">
+                            <AlertTriangle aria-hidden="true" />
+                            <AlertTitle>
                                 Legacy cloud credential ending in{' '}
                                 {cloudIntegration.legacy_credential_last4 ??
                                     'unknown'}
-                            </p>
-                            <p className="text-muted-foreground">
-                                This retained credential is not used, tested, or
-                                considered connected. Remove it after confirming
-                                no external process depends on the retired
-                                scaffold.
-                            </p>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                disabled={!can.manage}
-                                onClick={() =>
-                                    setRemoveLegacyCredentialOpen(true)
-                                }
-                            >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Remove legacy cloud credential
-                            </Button>
-                        </div>
+                            </AlertTitle>
+                            <AlertDescription>
+                                <p>
+                                    This retained credential is not used,
+                                    tested, or considered connected. Remove it
+                                    after confirming no external process depends
+                                    on the retired cloud connection.
+                                </p>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={!can.manage}
+                                    onClick={() =>
+                                        setRemoveLegacyCredentialOpen(true)
+                                    }
+                                >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remove legacy cloud credential
+                                </Button>
+                            </AlertDescription>
+                        </Alert>
                     ) : (
                         <p className="text-sm text-muted-foreground">
                             No legacy cloud credential is stored. There is
@@ -4743,7 +4314,10 @@ export function CloudIntegrationTab({
                 onConfirm={() =>
                     router.delete(
                         '/security-devices/integrations/queclink/key',
-                        { preserveScroll: true },
+                        {
+                            preserveScroll: true,
+                            onError: (errors) => notify(firstError(errors)),
+                        },
                     )
                 }
                 title="Remove legacy Queclink cloud credential?"

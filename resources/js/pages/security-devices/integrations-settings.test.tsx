@@ -471,10 +471,29 @@ describe('Security & Devices integrations and settings', () => {
                 created_at: '2026-07-20T00:00:00Z',
             },
         ];
+        entries.push({
+            id: 2,
+            action: 'integration.site_secret.updated',
+            actor: 'Alex',
+            record_type: 'IntegrationSiteSecret',
+            record_reference: '#9',
+            fields: ['site_id', 'health_status'],
+            created_at: '2026-07-20T00:00:00Z',
+        });
         render(<AuditEvidence visible entries={entries} />);
         expect(screen.getByText('Device updated')).toBeInTheDocument();
         expect(screen.queryByText('device.update')).not.toBeInTheDocument();
         expect(screen.getByText('Changed: name')).toBeInTheDocument();
+        // Record types and fields read as plain words, never class names or keys.
+        expect(
+            screen.getByText('Site integration credential'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Changed: Site, health status'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('IntegrationSiteSecret'),
+        ).not.toBeInTheDocument();
         expect(
             screen.queryByText(/IP address|user agent|before|after/i),
         ).not.toBeInTheDocument();

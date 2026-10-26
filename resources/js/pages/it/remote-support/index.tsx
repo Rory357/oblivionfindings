@@ -1,6 +1,7 @@
 import { ItModuleShell } from '@/components/it/it-module-shell';
 import {
     PageHeader,
+    PageHeaderGlassButton,
     PageHeaderMeterBig,
     PageHeaderMeterBlock,
     PageHeaderSearch,
@@ -15,6 +16,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowRight,
     ExternalLink,
+    FileCode,
     Monitor,
     Search,
     ShieldCheck,
@@ -24,6 +26,7 @@ import { useState, type FormEvent } from 'react';
 import { RemoteConnectionDialog } from './_dialogs';
 import { RemotePolicyEditor } from './policy-editor';
 import { RestartPolicyEditor } from './restart-policy';
+import { ScriptPolicyEditor } from './script-policy';
 import { ServiceActionPolicyEditor } from './service-action-policy';
 import { SoftwarePolicyEditor } from './software-policy';
 import { TechnicianObli } from './technician-obli';
@@ -45,6 +48,7 @@ export interface RemoteSupportProps {
     can_manage_restart_policy?: boolean;
     can_manage_software_policy?: boolean;
     can_view_software_catalogue?: boolean;
+    can_view_script_catalogue?: boolean;
     computers: {
         data: Computer[];
         total: number;
@@ -54,7 +58,11 @@ export interface RemoteSupportProps {
     ticket: { id: number; reference: string; href: string } | null;
     filters: { q: string };
     summary: { computers: number; endpoints: number; servers: number };
-    availability: { remote_support: boolean; obli: boolean };
+    availability: {
+        remote_support: boolean;
+        obli: boolean;
+        script_execution?: boolean;
+    };
 }
 
 export default function RemoteSupport(props: RemoteSupportProps) {
@@ -68,6 +76,7 @@ function RemoteSupportWorkspace({
     can_manage_restart_policy,
     can_manage_software_policy,
     can_view_software_catalogue,
+    can_view_script_catalogue,
     computers,
     selected,
     ticket,
@@ -104,20 +113,35 @@ function RemoteSupportWorkspace({
                     title="Remote support"
                     subline="Computer support and Obli assistance"
                     actions={
-                        <form
-                            onSubmit={searchComputers}
-                            className="flex items-center gap-2"
-                        >
-                            <PageHeaderSearch
-                                value={search}
-                                onChange={setSearch}
-                                placeholder="Search computers…"
-                            />
-                            <Button type="submit" variant="secondary">
-                                <Search aria-hidden="true" />
-                                Search
-                            </Button>
-                        </form>
+                        <>
+                            <form
+                                onSubmit={searchComputers}
+                                className="flex items-center gap-2"
+                            >
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search computers…"
+                                />
+                                <PageHeaderGlassButton type="submit">
+                                    <Search aria-hidden="true" />
+                                    Search
+                                </PageHeaderGlassButton>
+                            </form>
+                            {can_view_script_catalogue && (
+                                <PageHeaderGlassButton asChild>
+                                    <Link
+                                        href={
+                                            '/security-devices/scripts?expected_actor_id=' +
+                                            actor_id
+                                        }
+                                    >
+                                        <FileCode aria-hidden="true" />
+                                        Approved scripts
+                                    </Link>
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
                     }
                     meters={
                         <>
@@ -231,7 +255,7 @@ function RemoteSupportWorkspace({
                     </section>
                     <section
                         aria-labelledby="support-title"
-                        className="min-w-0 space-y-4"
+                        className="flex min-w-0 flex-col gap-5"
                     >
                         <Card className="gap-0 p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -248,11 +272,13 @@ function RemoteSupportWorkspace({
                                             : 'Choose a computer to open its support workspace.'}
                                     </p>
                                 </div>
-                                <StatusBadge variant="neutral">
-                                    {connectionOpen
-                                        ? 'Remote workspace open'
-                                        : 'No remote session'}
-                                </StatusBadge>
+                                {availability.remote_support && (
+                                    <StatusBadge variant="neutral">
+                                        {connectionOpen
+                                            ? 'Remote workspace open'
+                                            : 'No remote session'}
+                                    </StatusBadge>
+                                )}
                             </div>
                             {selected && (
                                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
@@ -275,6 +301,14 @@ function RemoteSupportWorkspace({
                                 <div className="mt-4">
                                     <RemotePolicyEditor
                                         key={actor_id + ':' + selected.id}
+                                        actorId={actor_id}
+                                        device={selected}
+                                    />
+                                </div>
+                            )}
+                            {selected && availability.script_execution && (
+                                <div className="mt-4">
+                                    <ScriptPolicyEditor
                                         actorId={actor_id}
                                         device={selected}
                                     />
@@ -360,34 +394,34 @@ function RemoteSupportWorkspace({
                                 </div>
                             )}
                         </Card>
-                        <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
-                            <Monitor
-                                className="h-5 w-5 shrink-0 text-primary"
-                                aria-hidden="true"
-                            />
-                            <div className="min-w-0 flex-1 space-y-1">
-                                <h3 className="text-section-title">
-                                    Connect to computer
-                                </h3>
-                                <p
-                                    id="connection-readiness"
-                                    className="text-subtle"
+                        {availability.remote_support && (
+                            <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
+                                <Monitor
+                                    className="h-5 w-5 shrink-0 text-primary"
+                                    aria-hidden="true"
+                                />
+                                <div className="min-w-0 flex-1 space-y-1">
+                                    <h3 className="text-section-title">
+                                        Connect to computer
+                                    </h3>
+                                    <p
+                                        id="connection-readiness"
+                                        className="text-subtle"
+                                    >
+                                        Screen viewing and control follow the
+                                        consent policy and your current
+                                        permissions.
+                                    </p>
+                                </div>
+                                <Button
+                                    disabled={!selected}
+                                    onClick={() => setConnectionOpen(true)}
+                                    aria-describedby="connection-readiness"
                                 >
-                                    {availability.remote_support
-                                        ? 'Screen viewing and control follow the consent policy and your current permissions.'
-                                        : 'Not available yet. Remote connection is still being built.'}
-                                </p>
-                            </div>
-                            <Button
-                                disabled={
-                                    !selected || !availability.remote_support
-                                }
-                                onClick={() => setConnectionOpen(true)}
-                                aria-describedby="connection-readiness"
-                            >
-                                Connect
-                            </Button>
-                        </Card>
+                                    Connect
+                                </Button>
+                            </Card>
+                        )}
                         {selected && (
                             <TechnicianObli
                                 scope={{

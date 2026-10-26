@@ -56,7 +56,10 @@ export type DeviceProfile = {
             id: number;
             name: string;
             uid: string;
+            /** The device type in words, e.g. "Card reader". */
             type: string;
+            /** Stored category key; chooses the header icon only. */
+            category?: string | null;
             manufacturer: string | null;
             model: string | null;
         };

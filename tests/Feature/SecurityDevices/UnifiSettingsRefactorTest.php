@@ -75,7 +75,13 @@ class UnifiSettingsRefactorTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get('/security-devices/integrations/unifi')
-            ->assertOk();
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('security-devices/integrations/unifi')
+                ->where('actor_id', $this->admin->id)
+                ->where('can.manage', true)
+                ->where('as_of', fn ($value) => is_string($value) && str_ends_with($value, 'Z'))
+            );
     }
 
     public function test_disable_requires_the_exact_integration_management_permission(): void
@@ -1175,5 +1181,45 @@ class UnifiSettingsRefactorTest extends TestCase
                 $this->assertStringNotContainsString($sentinel, $encoded);
             }
         });
+    }
+
+    public function test_local_writes_return_request_bound_acknowledgements_without_secret_material(): void
+    {
+        $prefix = '/security-devices/integrations/unifi';
+        $marker = str_repeat('a', 32);
+        $expected = ['actor_id' => $this->admin->id, 'request_id' => $marker, 'method' => 'post', 'path' => $prefix.'/key', 'outcome' => 'saved'];
+        $this->actingAs($this->admin)->withHeader('X-Obli-UniFi-Action', $marker)
+            ->post($prefix.'/key', ['api_key' => 'first-private-key-8844'])
+            ->assertRedirect()->assertSessionHas('unifi_action_outcome', $expected);
+        $this->get($prefix)->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actionOutcome', $expected)
+            ->where('providerConnection.secret_last4', '8844')
+            ->where('providerConnection.status', IntegrationProviderConnection::STATUS_DISCONNECTED));
+
+        $marker = str_repeat('b', 32);
+        $expected = ['actor_id' => $this->admin->id, 'request_id' => $marker, 'method' => 'post', 'path' => $prefix.'/rotate', 'outcome' => 'saved'];
+        $this->withHeader('X-Obli-UniFi-Action', $marker)->post($prefix.'/rotate', ['api_key' => 'second-private-key-8844'])
+            ->assertRedirect()->assertSessionHas('unifi_action_outcome', $expected);
+        $this->get($prefix)->assertOk()->assertInertia(fn ($page) => $page->where('actionOutcome', $expected));
+
+        $site = Site::factory()->create();
+        $connection = IntegrationProviderConnection::query()->forProvider('unifi')->firstOrFail();
+        $connection->update(['config' => ['discovered_sites' => [
+            ['external_id' => 'private-location-a', 'name' => 'Location A'],
+            ['external_id' => 'private-location-b', 'name' => 'Location B'],
+        ]]]);
+        IntegrationSiteConfig::create(['site_id' => $site->id, 'provider' => 'unifi', 'mapped_external_site_id' => 'private-location-a', 'mapped_external_site_name' => 'Location A', 'is_active' => true]);
+        $marker = str_repeat('c', 32);
+        $token = hash_hmac('sha256', 'unifi|private-location-b', (string) config('app.key'));
+        $expected = ['actor_id' => $this->admin->id, 'request_id' => $marker, 'method' => 'post', 'path' => $prefix.'/map-site', 'outcome' => 'saved'];
+        $this->withHeader('X-Obli-UniFi-Action', $marker)->post($prefix.'/map-site', ['site_id' => $site->id, 'mapping_token' => $token])
+            ->assertRedirect()->assertSessionHas('unifi_action_outcome', $expected);
+        $this->assertDatabaseHas('integration_site_configs', ['site_id' => $site->id, 'mapped_external_site_id' => 'private-location-b', 'is_active' => true]);
+        $this->get($prefix)->assertOk()->assertInertia(fn ($page) => $page->where('actionOutcome', $expected)->where('siteConfigs.0.mapped_external_site_name', 'Location B'));
+
+        $backend = $this->app->make(SecretManagerSecretStore::class);
+        $backend->available = false;
+        $this->withHeader('X-Obli-UniFi-Action', str_repeat('d', 32))->post($prefix.'/rotate', ['api_key' => 'failed-private-key-8844'])
+            ->assertRedirect()->assertSessionHas('error')->assertSessionMissing('unifi_action_outcome');
     }
 }
