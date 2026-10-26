@@ -237,6 +237,39 @@ describe('catalogue workspace privacy and draft boundaries', () => {
             screen.queryByRole('link', { name: 'Approved scripts' }),
         ).not.toBeInTheDocument();
     });
+    it('hides the per-computer script policy editor and unbuilt remote connection card while execution is switched off', () => {
+        const computer = {
+            id: 2100,
+            name: 'Reception PC',
+            uid: 'DEV-2100',
+            category: 'endpoint',
+            status: 'online',
+            last_seen_at: null,
+            href: '/security-devices/devices/2100',
+        };
+        render(
+            <RemoteSupport
+                actor_id={43}
+                can_manage_remote_policy={false}
+                computers={{ data: [computer], total: 1, links: [] }}
+                selected={computer}
+                ticket={null}
+                filters={{ q: '' }}
+                summary={{ computers: 1, endpoints: 1, servers: 0 }}
+                availability={{
+                    remote_support: false,
+                    obli: false,
+                    script_execution: false,
+                }}
+            />,
+        );
+        expect(
+            screen.queryByRole('button', { name: /Script policy/i }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByText(/Connect to computer/i),
+        ).not.toBeInTheDocument();
+    });
     it('removes an upload draft when its current upload permission is withdrawn', () => {
         const page = scriptIndex(corpus.index_pending);
         const rendered = render(<ScriptCatalogue {...page} />);

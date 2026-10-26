@@ -300,6 +300,17 @@ test:
     exact PID (newest or largest first)". On 26 Oct he lowered the limits
     ("Everything at 2 GB"): start heavy jobs only with at least 2 GB free, and
     stop test jobs below 1.5 GB.
+- 26 Oct 5:47 pm & 5:59 pm NZ, Phase B & C decisions (Gemini takeover):
+  - "all aprroved", confirmed via choices:
+    - Script policy editor: "Hide the per-computer script policy editor UI until
+      script execution ships".
+    - Go 1.27: user-space portable Go 1.27 approved (no Windows admin/UAC prompt)
+      when needed for `endpoint-agent/` tests.
+    - Phase C order: "Build all Phase C packages in bounded order, starting with
+      Package 3a (Auvik/PRTG-style network monitoring: thresholds, alert routing,
+      maintenance windows, history, port actions, and config backup/diff)".
+- 26 Oct 6:01 pm NZ, merging PR #24 and PR #23 to `main`:
+  "if you think we should merge to main please do, merge and push".
 
 ---
 

@@ -58,7 +58,11 @@ export interface RemoteSupportProps {
     ticket: { id: number; reference: string; href: string } | null;
     filters: { q: string };
     summary: { computers: number; endpoints: number; servers: number };
-    availability: { remote_support: boolean; obli: boolean };
+    availability: {
+        remote_support: boolean;
+        obli: boolean;
+        script_execution?: boolean;
+    };
 }
 
 export default function RemoteSupport(props: RemoteSupportProps) {
@@ -251,7 +255,7 @@ function RemoteSupportWorkspace({
                     </section>
                     <section
                         aria-labelledby="support-title"
-                        className="min-w-0 space-y-4"
+                        className="flex min-w-0 flex-col gap-5"
                     >
                         <Card className="gap-0 p-5 shadow-none">
                             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -268,11 +272,13 @@ function RemoteSupportWorkspace({
                                             : 'Choose a computer to open its support workspace.'}
                                     </p>
                                 </div>
-                                <StatusBadge variant="neutral">
-                                    {connectionOpen
-                                        ? 'Remote workspace open'
-                                        : 'No remote session'}
-                                </StatusBadge>
+                                {availability.remote_support && (
+                                    <StatusBadge variant="neutral">
+                                        {connectionOpen
+                                            ? 'Remote workspace open'
+                                            : 'No remote session'}
+                                    </StatusBadge>
+                                )}
                             </div>
                             {selected && (
                                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
@@ -300,7 +306,7 @@ function RemoteSupportWorkspace({
                                     />
                                 </div>
                             )}
-                            {selected && (
+                            {selected && availability.script_execution && (
                                 <div className="mt-4">
                                     <ScriptPolicyEditor
                                         actorId={actor_id}
@@ -388,34 +394,34 @@ function RemoteSupportWorkspace({
                                 </div>
                             )}
                         </Card>
-                        <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
-                            <Monitor
-                                className="h-5 w-5 shrink-0 text-primary"
-                                aria-hidden="true"
-                            />
-                            <div className="min-w-0 flex-1 space-y-1">
-                                <h3 className="text-section-title">
-                                    Connect to computer
-                                </h3>
-                                <p
-                                    id="connection-readiness"
-                                    className="text-subtle"
+                        {availability.remote_support && (
+                            <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
+                                <Monitor
+                                    className="h-5 w-5 shrink-0 text-primary"
+                                    aria-hidden="true"
+                                />
+                                <div className="min-w-0 flex-1 space-y-1">
+                                    <h3 className="text-section-title">
+                                        Connect to computer
+                                    </h3>
+                                    <p
+                                        id="connection-readiness"
+                                        className="text-subtle"
+                                    >
+                                        Screen viewing and control follow the
+                                        consent policy and your current
+                                        permissions.
+                                    </p>
+                                </div>
+                                <Button
+                                    disabled={!selected}
+                                    onClick={() => setConnectionOpen(true)}
+                                    aria-describedby="connection-readiness"
                                 >
-                                    {availability.remote_support
-                                        ? 'Screen viewing and control follow the consent policy and your current permissions.'
-                                        : 'Not available yet. Remote connection is still being built.'}
-                                </p>
-                            </div>
-                            <Button
-                                disabled={
-                                    !selected || !availability.remote_support
-                                }
-                                onClick={() => setConnectionOpen(true)}
-                                aria-describedby="connection-readiness"
-                            >
-                                Connect
-                            </Button>
-                        </Card>
+                                    Connect
+                                </Button>
+                            </Card>
+                        )}
                         {selected && (
                             <TechnicianObli
                                 scope={{
