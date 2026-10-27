@@ -7,6 +7,10 @@ import {
     type MonitorHistoryTarget,
 } from '@/components/security-devices/monitor-history-dialog';
 import {
+    NativeMonitorDialog,
+    type NativeMonitorManagement,
+} from '@/components/security-devices/native-monitor-dialogs';
+import {
     shortHash,
     snapshotDiffLabel,
 } from '@/components/security-devices/network-evidence-display';
@@ -33,6 +37,7 @@ import {
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { Switch } from '@/components/ui/switch';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { formatReadableOperationalState } from '@/lib/readable-operational-state';
 import { RestartRequestState } from '@/pages/it/remote-support/restart-request-state';
@@ -41,9 +46,11 @@ import { SoftwareRequestState } from '@/pages/it/remote-support/software-request
 import { uuidPattern } from '@/pages/security-devices/software/_contracts';
 import { SoftwarePackagePicker } from '@/pages/security-devices/software/_package-picker';
 import { Link, router } from '@inertiajs/react';
+import axios from 'axios';
 import {
     Activity,
     ArrowRight,
+    Bell,
     Cable,
     ClipboardList,
     Cpu,
@@ -52,6 +59,8 @@ import {
     FileDiff,
     HardDrive,
     History,
+    Loader2,
+    Plus,
     Power,
     PowerOff,
     RadioTower,
@@ -60,6 +69,7 @@ import {
     Settings2,
     ShieldCheck,
     TicketCheck,
+    Wifi,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DeviceMaintenanceNotice, DeviceProfile } from './device-profile';
@@ -2149,8 +2159,119 @@ function Metric({
     );
 }
 
-export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
+type LivePingResult = {
+    reachable: boolean;
+    target: string | null;
+    resolved_address: string | null;
+    latency_ms: number | null;
+    latency_label: string | null;
+    reason_code: string | null;
+    message: string;
+    checked_at: string;
+};
+
+function DeviceAddCheckAction({
+    management,
+    onOpenWizard,
+    onEditDevice,
+}: {
+    management?: NativeMonitorManagement;
+    onOpenWizard: () => void;
+    onEditDevice?: () => void;
+}) {
+    const canAddCheck = Boolean(management?.can_add_check);
+    const missingReason = management?.missing_reason ?? null;
+    const fixHref = management?.fix_href ?? null;
+    const fixLabel = management?.fix_label ?? null;
+
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <Button
+                type="button"
+                size="sm"
+                onClick={onOpenWizard}
+                disabled={!canAddCheck}
+            >
+                <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                Add check
+            </Button>
+            {!canAddCheck && missingReason && (
+                <>
+                    <span className="text-xs text-muted-foreground">
+                        {missingReason}
+                    </span>
+                    {fixLabel === 'Edit device' && onEditDevice ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onEditDevice}
+                        >
+                            Edit device
+                        </Button>
+                    ) : fixHref && fixLabel ? (
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={fixHref}>{fixLabel}</Link>
+                        </Button>
+                    ) : null}
+                </>
+            )}
+        </div>
+    );
+}
+
+export function DeviceHealthSection({
+    profile,
+    onEditDevice,
+}: {
+    profile: DeviceProfile;
+    onEditDevice?: () => void;
+}) {
     const monitoring = profile.health.monitoring;
+    const [pinging, setPinging] = useState(false);
+    const [pingResult, setPingResult] = useState<LivePingResult | null>(null);
+    const [togglingOffline, setTogglingOffline] = useState(false);
+    const [addCheckOpen, setAddCheckOpen] = useState(false);
+
+    const runPing = async () => {
+        if (!profile.ping?.url || pinging) return;
+        setPinging(true);
+        try {
+            const response = await axios.post<LivePingResult>(profile.ping.url);
+            setPingResult(response.data);
+        } catch (error: unknown) {
+            let message = 'Could not reach the server to test this device.';
+            if (axios.isAxiosError(error) && error.response?.data) {
+                const payload = error.response.data as { message?: string };
+                if (payload.message) message = payload.message;
+            }
+            setPingResult({
+                reachable: false,
+                target: profile.ping.target,
+                resolved_address: null,
+                latency_ms: null,
+                latency_label: null,
+                reason_code: 'request_failed',
+                message,
+                checked_at: new Date().toISOString(),
+            });
+        } finally {
+            setPinging(false);
+        }
+    };
+
+    const toggleOfflineAlert = (enabled: boolean) => {
+        if (!profile.offlineAlert?.url || togglingOffline) return;
+        setTogglingOffline(true);
+        router.post(
+            profile.offlineAlert.url,
+            { enabled },
+            {
+                preserveScroll: true,
+                onFinish: () => setTogglingOffline(false),
+            },
+        );
+    };
 
     return (
         <div className="space-y-4">
@@ -2199,22 +2320,195 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                 />
             </div>
 
+            {(profile.ping || profile.offlineAlert) && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {profile.ping && (
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="space-y-1">
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Wifi className="h-4 w-4" />
+                                            Connection test
+                                        </CardTitle>
+                                        <CardDescription>
+                                            {profile.ping.target ? (
+                                                <>
+                                                    Target:{' '}
+                                                    <span className="font-mono text-foreground">
+                                                        {profile.ping.target}
+                                                    </span>
+                                                </>
+                                            ) : (
+                                                'No IP address or hostname saved yet.'
+                                            )}
+                                        </CardDescription>
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void runPing()}
+                                        disabled={
+                                            !profile.ping.canPing || pinging
+                                        }
+                                    >
+                                        {pinging && (
+                                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                        )}
+                                        Ping now
+                                    </Button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 pt-0">
+                                {!profile.ping.canPing &&
+                                    profile.ping.missingReason && (
+                                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-3 text-xs">
+                                            <span className="text-muted-foreground">
+                                                {profile.ping.missingReason}
+                                            </span>
+                                            {onEditDevice && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={onEditDevice}
+                                                >
+                                                    Edit device
+                                                </Button>
+                                            )}
+                                        </div>
+                                    )}
+                                {pingResult && (
+                                    <div className="space-y-1.5 rounded-lg bg-muted/30 p-3 text-xs">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <StatusBadge
+                                                variant={
+                                                    pingResult.reachable
+                                                        ? 'success'
+                                                        : 'critical'
+                                                }
+                                            >
+                                                {pingResult.reachable
+                                                    ? (pingResult.latency_label ??
+                                                      'Reachable')
+                                                    : 'No reply'}
+                                            </StatusBadge>
+                                            <span className="text-muted-foreground">
+                                                Checked{' '}
+                                                {formatDateTime(
+                                                    pingResult.checked_at,
+                                                )}
+                                            </span>
+                                        </div>
+                                        <p className="text-foreground">
+                                            {pingResult.message}
+                                        </p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {profile.offlineAlert && (
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-1">
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <Bell className="h-4 w-4" />
+                                            Alert me if this goes offline
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Checks this device every minute and
+                                            raises an alert after 3 missed
+                                            replies.
+                                        </CardDescription>
+                                    </div>
+                                    <Switch
+                                        id="device-offline-alert-switch"
+                                        aria-label="Alert me if this goes offline"
+                                        checked={profile.offlineAlert.enabled}
+                                        disabled={
+                                            !profile.offlineAlert.canToggle ||
+                                            togglingOffline
+                                        }
+                                        onCheckedChange={toggleOfflineAlert}
+                                    />
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 pt-0">
+                                {profile.offlineAlert.enabled ? (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-3 text-xs">
+                                        <span className="text-foreground">
+                                            Offline alerts are on
+                                            {profile.offlineAlert.target
+                                                ? ` for ${profile.offlineAlert.target}`
+                                                : ''}
+                                            .
+                                        </span>
+                                        {profile.offlineAlert.state && (
+                                            <StatusBadge
+                                                variant={stateStatusVariant(
+                                                    profile.offlineAlert.state,
+                                                )}
+                                            >
+                                                {humanise(
+                                                    profile.offlineAlert.state,
+                                                )}
+                                            </StatusBadge>
+                                        )}
+                                    </div>
+                                ) : profile.offlineAlert.missingReason ? (
+                                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 p-3 text-xs">
+                                        <span className="text-muted-foreground">
+                                            {profile.offlineAlert.missingReason}
+                                        </span>
+                                        {onEditDevice &&
+                                            profile.offlineAlert.missingReason.includes(
+                                                'first',
+                                            ) && (
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={onEditDevice}
+                                                >
+                                                    Edit device
+                                                </Button>
+                                            )}
+                                    </div>
+                                ) : null}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            )}
+
             <Card>
                 <CardHeader>
-                    <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <CardTitle className="flex items-center gap-2">
-                                <Activity className="h-4 w-4" /> Native
-                                monitoring summary
+                                <Activity className="h-4 w-4" /> Checks summary
                             </CardTitle>
                             <CardDescription>
-                                Current retained checks for this device. Missing
-                                evidence is shown honestly as not collected.
+                                Active checks assigned to this device. Anything
+                                not collected is shown honestly.
                             </CardDescription>
                         </div>
-                        <DeviceMaintenancePills
-                            maintenance={profile.health.maintenance}
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                            <DeviceMaintenancePills
+                                maintenance={profile.health.maintenance}
+                            />
+                            {profile.monitorManagement && (
+                                <DeviceAddCheckAction
+                                    management={profile.monitorManagement}
+                                    onOpenWizard={() => setAddCheckOpen(true)}
+                                    onEditDevice={onEditDevice}
+                                />
+                            )}
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -2240,7 +2534,7 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                     ) : (
                         <p className="text-sm text-muted-foreground">
                             You can see this device record, but your role cannot
-                            open monitoring evidence.
+                            open check results.
                         </p>
                     )}
                 </CardContent>
@@ -2259,6 +2553,16 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                     </div>
                 </CardContent>
             </Card>
+
+            {profile.monitorManagement && (
+                <NativeMonitorDialog
+                    open={addCheckOpen}
+                    onOpenChange={setAddCheckOpen}
+                    management={profile.monitorManagement}
+                    monitor={null}
+                    onSaved={() => router.reload()}
+                />
+            )}
         </div>
     );
 }
@@ -2266,108 +2570,125 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
 export function DeviceMonitorsSection({
     profile,
     deviceName,
+    onEditDevice,
 }: {
     profile: DeviceProfile;
     deviceName?: string;
+    onEditDevice?: () => void;
 }) {
     const [historyTarget, setHistoryTarget] =
         useState<MonitorHistoryTarget | null>(null);
-
-    if (profile.monitors.length === 0) {
-        return (
-            <EmptyState
-                icon={RadioTower}
-                title="No monitoring coverage"
-                description="No native checks are assigned to this device. Add coverage from Monitoring when the device capability and your role allow it."
-                variant="compact"
-            />
-        );
-    }
-
+    const [addCheckOpen, setAddCheckOpen] = useState(false);
     const resolvedDeviceName = deviceName ?? profile.header.identity.name;
 
     return (
-        <>
-            <div className="grid gap-3 lg:grid-cols-2">
-                {profile.monitors.map((monitor) => (
-                    <Card key={monitor.id}>
-                        <CardContent className="space-y-3 p-4">
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <p className="truncate font-semibold">
-                                        {monitor.name}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {monitor.kindLabel}
-                                        {monitor.affectsAvailability
-                                            ? ' · affects availability'
-                                            : ''}
-                                    </p>
-                                </div>
-                                <StatusBadge
-                                    variant={
-                                        monitor.enabled
-                                            ? stateStatusVariant(monitor.state)
-                                            : 'neutral'
-                                    }
-                                >
-                                    {monitor.enabled
-                                        ? humanise(monitor.state)
-                                        : 'disabled'}
-                                </StatusBadge>
-                            </div>
-                            <DeviceMaintenancePills
-                                maintenance={monitor.maintenance}
-                            />
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                <Metric
-                                    label="Last observation"
-                                    value={formatRelative(
-                                        monitor.lastObservationAt,
-                                        Date.now(),
-                                        'Never observed',
-                                    )}
-                                />
-                                <Metric
-                                    label="Monitoring profile"
-                                    value={
-                                        monitor.profile?.name ?? 'Not assigned'
-                                    }
-                                />
-                            </div>
-                            {monitor.collector && (
-                                <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                                    <span>{monitor.collector.name}</span>
-                                    <span className="text-muted-foreground">
-                                        Collector{' '}
-                                        {humanise(monitor.collector.status)}
-                                    </span>
-                                </div>
-                            )}
-                            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                        setHistoryTarget({
-                                            monitorId: monitor.id,
-                                            monitorName: monitor.name,
-                                            deviceName: resolvedDeviceName,
-                                        })
-                                    }
-                                >
-                                    <History
-                                        className="mr-1.5 h-3.5 w-3.5"
-                                        aria-hidden="true"
-                                    />
-                                    View history
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+        <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">
+                    {profile.monitors.length === 0
+                        ? 'No checks are running on this device yet.'
+                        : `${profile.monitors.length} ${profile.monitors.length === 1 ? 'check' : 'checks'} configured for this device.`}
+                </p>
+                <DeviceAddCheckAction
+                    management={profile.monitorManagement}
+                    onOpenWizard={() => setAddCheckOpen(true)}
+                    onEditDevice={onEditDevice}
+                />
             </div>
+
+            {profile.monitors.length === 0 ? (
+                <EmptyState
+                    icon={RadioTower}
+                    title="No checks yet"
+                    description="Turn on offline alerts from Overview or add a check above to monitor this device."
+                    variant="compact"
+                />
+            ) : (
+                <div className="grid gap-3 lg:grid-cols-2">
+                    {profile.monitors.map((monitor) => (
+                        <Card key={monitor.id}>
+                            <CardContent className="space-y-3 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate font-semibold">
+                                            {monitor.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {monitor.kindLabel}
+                                            {monitor.affectsAvailability
+                                                ? ' · affects availability'
+                                                : ''}
+                                        </p>
+                                    </div>
+                                    <StatusBadge
+                                        variant={
+                                            monitor.enabled
+                                                ? stateStatusVariant(
+                                                      monitor.state,
+                                                  )
+                                                : 'neutral'
+                                        }
+                                    >
+                                        {monitor.enabled
+                                            ? humanise(monitor.state)
+                                            : 'disabled'}
+                                    </StatusBadge>
+                                </div>
+                                <DeviceMaintenancePills
+                                    maintenance={monitor.maintenance}
+                                />
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <Metric
+                                        label="Last observation"
+                                        value={formatRelative(
+                                            monitor.lastObservationAt,
+                                            Date.now(),
+                                            'Never observed',
+                                        )}
+                                    />
+                                    <Metric
+                                        label="Check schedule"
+                                        value={
+                                            monitor.profile?.name ??
+                                            'Not assigned'
+                                        }
+                                    />
+                                </div>
+                                {monitor.collector && (
+                                    <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
+                                        <span>{monitor.collector.name}</span>
+                                        <span className="text-muted-foreground">
+                                            Hub{' '}
+                                            {humanise(monitor.collector.status)}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            setHistoryTarget({
+                                                monitorId: monitor.id,
+                                                monitorName: monitor.name,
+                                                deviceName: resolvedDeviceName,
+                                            })
+                                        }
+                                    >
+                                        <History
+                                            className="mr-1.5 h-3.5 w-3.5"
+                                            aria-hidden="true"
+                                        />
+                                        View history
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
             <MonitorHistoryDialog
                 target={historyTarget}
                 open={historyTarget !== null}
@@ -2375,7 +2696,16 @@ export function DeviceMonitorsSection({
                     if (!open) setHistoryTarget(null);
                 }}
             />
-        </>
+            {profile.monitorManagement && (
+                <NativeMonitorDialog
+                    open={addCheckOpen}
+                    onOpenChange={setAddCheckOpen}
+                    management={profile.monitorManagement}
+                    monitor={null}
+                    onSaved={() => router.reload()}
+                />
+            )}
+        </div>
     );
 }
 

@@ -56,7 +56,12 @@ import {
 export type NativeMonitorManagement = {
     actor_id?: number;
     can_manage: boolean;
+    can_add_check?: boolean;
     create_url: string | null;
+    default_target?: string | null;
+    missing_reason?: string | null;
+    fix_href?: string | null;
+    fix_label?: string | null;
     kinds: Array<{ value: string; label: string }>;
     profiles: Array<{ id: number; name: string }>;
     devices: Array<{

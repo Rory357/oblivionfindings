@@ -4,13 +4,16 @@ namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
+use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
+use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Endpoints\Presenters\EndpointDevicePosturePresenter;
@@ -36,6 +39,7 @@ use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorization
 use App\Domain\SecurityDevices\Management\Services\NetworkDeviceCommandPolicyService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\QueclinkUnitConsoleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Asset;
 use App\Models\AuditLog;
@@ -108,6 +112,10 @@ class DeviceProfilePresenter
         $controlRoomAlerts = $this->controlRoomAlerts($viewer, $device, $canViewControlRoom);
         $management = $this->management($viewer, $device);
         $endpointPosture = app(EndpointDevicePosturePresenter::class)->present($viewer, $device, $canonicalSiteId);
+        $consoleService = app(QueclinkUnitConsoleService::class);
+        $queclinkConsole = $consoleService->canViewConsole($viewer) && $consoleService->supportsDevice($device)
+            ? $consoleService->present($viewer, $device)
+            : null;
 
         return [
             'header' => $this->header(
@@ -132,8 +140,12 @@ class DeviceProfilePresenter
                 (bool) $management['visible'],
                 count($management['history']),
                 $endpointPosture !== null,
+                $queclinkConsole !== null,
             ),
             'health' => $this->health($device, $monitors, $canViewMonitoring, $maintenanceWindows, $canonicalSiteId),
+            'ping' => $this->pingPayload($viewer, $device),
+            'offlineAlert' => $this->offlineAlertPayload($viewer, $device, $monitors, $canonicalSiteId),
+            'monitorManagement' => $this->monitorManagementPayload($viewer, $device, $canonicalSiteId),
             'monitors' => $canViewMonitoring
                 ? $monitors->map(fn (Monitor $monitor): array => $this->monitor($monitor, $maintenanceWindows, $canonicalSiteId, (int) $device->id))->values()
                 : [],
@@ -146,6 +158,7 @@ class DeviceProfilePresenter
             'audit' => $audit->values(),
             'management' => $management,
             'endpointPosture' => $endpointPosture,
+            'queclinkConsole' => $queclinkConsole,
             'capabilities' => $this->capabilities($viewer, $device, $management),
             'cctv' => app(CctvNavigation::class)->forDevice($viewer, $device),
         ];
@@ -486,6 +499,7 @@ class DeviceProfilePresenter
         bool $canViewManagement,
         int $commandCount,
         bool $canViewEndpointPosture = false,
+        bool $canViewQueclinkConsole = false,
     ): array {
         return collect([
             ['key' => 'health', 'label' => 'Health', 'group' => 'status'],
@@ -493,6 +507,7 @@ class DeviceProfilePresenter
             ['key' => 'topology', 'label' => 'Topology', 'group' => 'technical'],
             $canViewMonitoring ? ['key' => 'interfaces-sensors', 'label' => 'Interfaces & sensors', 'group' => 'technical'] : null,
             ['key' => 'configuration', 'label' => 'Configuration', 'group' => 'technical'],
+            $canViewQueclinkConsole ? ['key' => 'console', 'label' => 'Unit console', 'group' => 'technical'] : null,
             $canViewEndpointPosture ? ['key' => 'endpoint', 'label' => 'Endpoint', 'group' => 'technical'] : null,
             $canViewManagement ? ['key' => 'management', 'label' => 'Management', 'group' => 'technical', 'count' => $commandCount] : null,
             ['key' => 'assignments', 'label' => 'Assignments', 'group' => 'operations', 'count' => $device->assignments->count()],
@@ -1805,5 +1820,169 @@ class DeviceProfilePresenter
         $number = (float) $value;
 
         return is_finite($number) && abs($number) <= 1_000_000_000_000 ? $number : null;
+    }
+
+    /** @return array<string, mixed> */
+    private function pingPayload(User $viewer, Device $device): array
+    {
+        $target = trim((string) ($device->ip_address ?? ''));
+        $canView = $viewer->canDo('securityDevices.devices.view');
+        $canPing = $canView && $target !== '';
+        $missingReason = null;
+
+        if (! $canView) {
+            $missingReason = 'Device view permission is required.';
+        } elseif ($target === '') {
+            $missingReason = 'Add an IP address or hostname to this device first.';
+        }
+
+        return [
+            'url' => "/security-devices/devices/{$device->id}/ping",
+            'target' => $target !== '' ? $target : null,
+            'canPing' => $canPing,
+            'missingReason' => $missingReason,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function offlineAlertPayload(
+        User $viewer,
+        Device $device,
+        Collection $monitors,
+        ?int $canonicalSiteId,
+    ): array {
+        $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        $activeMonitor = $device->relationLoaded('monitors')
+            ? $monitors->first(fn (Monitor $monitor): bool => $monitor->collector_id === null
+                && ($monitor->kind?->value ?? (string) $monitor->kind) === MonitorKind::Icmp->value
+                && (bool) $monitor->affects_availability
+                && (bool) $monitor->is_enabled)
+            : ($canManage
+                ? Monitor::query()
+                    ->where('device_id', $device->id)
+                    ->whereNull('collector_id')
+                    ->where('kind', MonitorKind::Icmp->value)
+                    ->where('affects_availability', true)
+                    ->where('is_enabled', true)
+                    ->first()
+                : null);
+
+        $enabled = $activeMonitor !== null;
+        $target = trim((string) ($device->ip_address ?? ''));
+        $missingReason = null;
+
+        if (! $canManage) {
+            $missingReason = 'Monitoring management permission is required to change offline alerts.';
+        } elseif (! $enabled && $canonicalSiteId === null) {
+            $missingReason = 'Assign this device to a Site first so offline alerts know where it lives.';
+        } elseif (! $enabled && $target === '') {
+            $missingReason = 'Add an IP address or hostname to this device first.';
+        }
+
+        $canToggle = $canManage && ($enabled || ($canonicalSiteId !== null && $target !== ''));
+
+        return [
+            'url' => "/security-devices/devices/{$device->id}/offline-alert",
+            'enabled' => $enabled,
+            'canToggle' => $canToggle,
+            'monitorId' => $activeMonitor ? (int) $activeMonitor->id : null,
+            'state' => $activeMonitor?->current_state?->value,
+            'target' => $target !== '' ? $target : null,
+            'missingReason' => $missingReason,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function monitorManagementPayload(
+        User $viewer,
+        Device $device,
+        ?int $canonicalSiteId,
+    ): array {
+        $canManage = $viewer->canDo('securityDevices.monitoring.manage');
+        $site = $canonicalSiteId !== null
+            ? Site::query()
+                ->whereKey($canonicalSiteId)
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->first(['id', 'name'])
+            : null;
+
+        $profiles = $canManage
+            ? MonitoringProfile::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (MonitoringProfile $profile): array => [
+                    'id' => (int) $profile->id,
+                    'name' => $profile->name,
+                ])
+                ->values()
+                ->all()
+            : [];
+
+        $hasActiveCentralScope = false;
+        if ($canManage && $site !== null) {
+            $hasActiveCentralScope = DiscoveryScope::query()
+                ->where('site_id', $site->id)
+                ->whereNull('collector_id')
+                ->where('status', 'active')
+                ->get(['cidrs', 'protocols', 'exclusions', 'port_bounds'])
+                ->contains(function (DiscoveryScope $scope): bool {
+                    if (($scope->exclusions ?? []) !== [] || empty($scope->cidrs)) {
+                        return false;
+                    }
+                    $protocols = array_map('strtolower', array_filter($scope->protocols ?? [], 'is_string'));
+
+                    return collect($scope->port_bounds ?? [])->contains(
+                        fn (mixed $ports, mixed $protocol): bool => is_string($protocol)
+                            && in_array(strtolower($protocol), $protocols, true)
+                            && is_array($ports)
+                            && $ports !== [],
+                    );
+                });
+        }
+
+        $missingReason = null;
+        $fixHref = null;
+        $fixLabel = null;
+
+        if (! $canManage) {
+            $missingReason = 'You need monitoring management permission to add checks.';
+        } elseif ($site === null) {
+            $missingReason = 'Assign this device to a Site first so checks know where it lives.';
+            $fixLabel = 'Edit device';
+        } elseif ($profiles === []) {
+            $missingReason = 'Create an active check schedule on Setup first.';
+            $fixHref = '/security-devices/settings';
+            $fixLabel = 'Open Setup';
+        } elseif (! $hasActiveCentralScope) {
+            $missingReason = 'Add an approved Site subnet on Setup first (or switch on "Alert me if this goes offline" to cover this device\'s IP automatically).';
+            $fixHref = '/security-devices/discovery?tab=scopes';
+            $fixLabel = 'Add Site subnet';
+        }
+
+        $canAddCheck = $canManage && $site !== null && $profiles !== [] && $hasActiveCentralScope;
+
+        return [
+            'actor_id' => (int) $viewer->id,
+            'can_manage' => $canManage,
+            'can_add_check' => $canAddCheck,
+            'create_url' => $canManage ? '/security-devices/monitoring/native-monitors' : null,
+            'default_target' => $device->ip_address,
+            'kinds' => $canManage ? NativeMonitoringDefinitionService::directKindOptions() : [],
+            'profiles' => $profiles,
+            'devices' => $site ? [[
+                'id' => (int) $device->id,
+                'name' => $device->name,
+                'site' => [
+                    'id' => (int) $site->id,
+                    'name' => $site->name,
+                ],
+            ]] : [],
+            'missing_reason' => $missingReason,
+            'fix_href' => $fixHref,
+            'fix_label' => $fixLabel,
+        ];
     }
 }

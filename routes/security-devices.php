@@ -28,6 +28,9 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
+use App\Domain\SecurityDevices\Http\Controllers\DeviceOfflineAlertController;
+use App\Domain\SecurityDevices\Http\Controllers\DevicePingController;
+use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCandidateReviewController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCollectorController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryScopeLifecycleController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
@@ -51,6 +54,7 @@ use App\Domain\SecurityDevices\Http\Controllers\MonitoringRetentionSettingsContr
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringRuntimeHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\MonitoringThresholdSettingsController;
 use App\Domain\SecurityDevices\Http\Controllers\NativeMonitorLifecycleController;
+use App\Domain\SecurityDevices\Http\Controllers\QueclinkUnitConsoleController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
@@ -184,6 +188,40 @@ Route::middleware([
     Route::patch('/devices/{device}/fields', [DeviceController::class, 'patchFields'])
         ->middleware('permission:securityDevices.devices.update')
         ->name('security-devices.devices.patch-fields');
+
+    Route::post('/devices/{device}/ping', DevicePingController::class)
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.ping');
+
+    Route::post('/devices/{device}/offline-alert', DeviceOfflineAlertController::class)
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.monitoring.manage',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.offline-alert');
+
+    Route::get('/devices/{device}/queclink-console', [QueclinkUnitConsoleController::class, 'show'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.integrations.view|securityDevices.integrations.manage',
+            'throttle:30,1',
+        ])
+        ->name('security-devices.devices.queclink-console.show');
+
+    Route::post('/devices/{device}/queclink-console/commands', [QueclinkUnitConsoleController::class, 'sendCommand'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.integrations.view|securityDevices.integrations.manage',
+            'throttle:15,1',
+        ])
+        ->name('security-devices.devices.queclink-console.commands');
 
     Route::get('/devices/{device}/commands/confirm-identity', [DeviceCommandController::class, 'confirmIdentity'])
         ->middleware('permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin')
@@ -558,6 +596,28 @@ Route::middleware([
             Route::post('/{scope}/apply', [DiscoveryScopeLifecycleController::class, 'apply'])
                 ->whereNumber('scope')
                 ->name('security-devices.discovery.scopes.apply');
+        });
+
+    Route::prefix('/discovery/candidates')
+        ->middleware([
+            'permission:securityDevices.integrations.manage',
+            'throttle:30,1',
+        ])
+        ->group(function () {
+            Route::post('/adopt-all', [DiscoveryCandidateReviewController::class, 'adoptAll'])
+                ->middleware('permission:securityDevices.devices.create')
+                ->name('security-devices.discovery.candidates.adopt-all');
+            Route::post('/{candidate}/adopt', [DiscoveryCandidateReviewController::class, 'adopt'])
+                ->whereNumber('candidate')
+                ->middleware('permission:securityDevices.devices.create')
+                ->name('security-devices.discovery.candidates.adopt');
+            Route::post('/{candidate}/same-as', [DiscoveryCandidateReviewController::class, 'sameAs'])
+                ->whereNumber('candidate')
+                ->middleware('permission:securityDevices.devices.update')
+                ->name('security-devices.discovery.candidates.same-as');
+            Route::post('/{candidate}/ignore', [DiscoveryCandidateReviewController::class, 'ignore'])
+                ->whereNumber('candidate')
+                ->name('security-devices.discovery.candidates.ignore');
         });
 
     Route::prefix('/discovery/collectors')

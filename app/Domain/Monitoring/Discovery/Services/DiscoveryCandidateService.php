@@ -7,6 +7,7 @@ use App\Domain\Monitoring\Discovery\Data\IdentityMatchResult;
 use App\Domain\Monitoring\Discovery\Models\DeviceIdentityEvidence;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -17,6 +18,8 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use UnexpectedValueException;
@@ -55,7 +58,7 @@ final class DiscoveryCandidateService
     }
 
     /** @param array<string, mixed> $attributes */
-    public function adopt(DiscoveryCandidate $candidate, int $actorId, array $attributes): Device
+    public function adopt(DiscoveryCandidate $candidate, int $actorId, array $attributes = []): Device
     {
         return DB::transaction(function () use ($candidate, $actorId, $attributes): Device {
             $locked = $this->lockCandidate($candidate);
@@ -71,19 +74,22 @@ final class DiscoveryCandidateService
             if ($locked->review_action === 'adopted' && $locked->canonical_device_id !== null) {
                 return Device::query()->findOrFail($locked->canonical_device_id);
             }
-            if ($locked->reviewed_at !== null || $locked->decision !== 'proposed') {
+            if ($locked->reviewed_at !== null || ! in_array($locked->decision, ['proposed', 'review'], true)) {
                 throw new UnexpectedValueException('Discovery candidate cannot be adopted.');
             }
-            $identity = $this->identityFromSnapshot($locked->evidence_snapshot);
+            $identity = $this->identityFromSnapshot($locked->evidence_snapshot ?? []);
             $snapshot = $identity->snapshot();
-            $reviewedClassification = array_intersect_key($attributes, array_flip([
+            $reviewedClassification = collect(array_intersect_key($attributes, array_flip([
                 'name',
                 'domain',
                 'category',
                 'subcategory',
                 'manufacturer',
                 'model',
-            ]));
+            ])))
+                ->filter(fn (mixed $value): bool => is_string($value) && trim($value) !== '')
+                ->map(fn (string $value): string => trim($value))
+                ->all();
             $device = $this->registry->registerDiscoveredDevice([
                 ...$this->deviceAttributes($snapshot),
                 ...$reviewedClassification,
@@ -98,6 +104,145 @@ final class DiscoveryCandidateService
 
             return $device;
         }, 3);
+    }
+
+    public function sameAs(
+        DiscoveryCandidate $candidate,
+        Device $target,
+        int $actorId,
+    ): Device {
+        return DB::transaction(function () use ($candidate, $target, $actorId): Device {
+            $lockedCandidate = $this->lockCandidate($candidate);
+            $scope = $lockedCandidate->run()->with('scope')->firstOrFail()->scope;
+            if ($scope === null) {
+                throw new UnexpectedValueException('Discovery candidate scope is unavailable.');
+            }
+            $actor = $this->reviewer($actorId, [
+                'securityDevices.integrations.manage',
+                'securityDevices.devices.update',
+            ]);
+            $scopeSiteId = (int) $scope->site_id;
+            $this->access->assertCanViewSite($actor, $scopeSiteId);
+            if ($lockedCandidate->review_action === 'same_as' && $lockedCandidate->canonical_device_id !== null) {
+                $resolved = Device::query()->findOrFail($lockedCandidate->canonical_device_id);
+                $this->access->assertCanViewDevice($actor, $resolved);
+
+                return $resolved;
+            }
+            if ($lockedCandidate->reviewed_at !== null || ! in_array($lockedCandidate->decision, ['proposed', 'review'], true)) {
+                throw new UnexpectedValueException('Discovery candidate cannot be linked.');
+            }
+            $lockedTarget = Device::query()->lockForUpdate()->findOrFail($target->id);
+            $this->access->assertCanViewDevice($actor, $lockedTarget);
+            $targetSiteId = $this->siteResolver->resolve((int) $lockedTarget->id);
+            if ($lockedTarget->status === DeviceStatus::Decommissioned || $targetSiteId !== $scopeSiteId) {
+                throw new UnexpectedValueException('Select an active device assigned to the same Site.');
+            }
+
+            $identity = $this->identityFromSnapshot($lockedCandidate->evidence_snapshot ?? []);
+            $snapshot = $identity->snapshot();
+            $backfill = [];
+            if (($lockedTarget->ip_address === null || trim((string) $lockedTarget->ip_address) === '')
+                && is_string($snapshot['addresses'][0] ?? null)
+                && filter_var($snapshot['addresses'][0], FILTER_VALIDATE_IP) !== false) {
+                $backfill['ip_address'] = $snapshot['addresses'][0];
+            }
+            if (($lockedTarget->mac_address === null || trim((string) $lockedTarget->mac_address) === '')
+                && ($formattedMac = $this->formatMacAddress($snapshot['mac_addresses'][0] ?? null)) !== null) {
+                $backfill['mac_address'] = $formattedMac;
+            }
+            if ($backfill !== []) {
+                $lockedTarget->forceFill($backfill)->save();
+            }
+
+            $this->attachEvidence($lockedTarget, $identity);
+            $this->completeReview($lockedCandidate, $lockedTarget, $actorId, 'same_as');
+            AuditLogger::logOrFail('monitoring.discovery.candidate.same_as', $lockedTarget, [
+                'actor_id' => $actorId,
+                'candidate_id' => $lockedCandidate->id,
+                'site_id' => $scopeSiteId,
+            ]);
+
+            return $lockedTarget->fresh();
+        }, 3);
+    }
+
+    public function ignore(DiscoveryCandidate $candidate, int $actorId): DiscoveryCandidate
+    {
+        return DB::transaction(function () use ($candidate, $actorId): DiscoveryCandidate {
+            $lockedCandidate = $this->lockCandidate($candidate);
+            $scope = $lockedCandidate->run()->with('scope')->firstOrFail()->scope;
+            if ($scope === null) {
+                throw new UnexpectedValueException('Discovery candidate scope is unavailable.');
+            }
+            $actor = $this->reviewer($actorId, [
+                'securityDevices.integrations.manage',
+            ]);
+            $scopeSiteId = (int) $scope->site_id;
+            $this->access->assertCanViewSite($actor, $scopeSiteId);
+            if ($lockedCandidate->review_action === 'ignored') {
+                return $lockedCandidate;
+            }
+            if ($lockedCandidate->reviewed_at !== null || ! in_array($lockedCandidate->decision, ['proposed', 'review'], true)) {
+                throw new UnexpectedValueException('Discovery candidate cannot be ignored.');
+            }
+
+            $lockedCandidate->forceFill([
+                'reviewed_by_user_id' => $actorId,
+                'reviewed_at' => now(),
+                'review_action' => 'ignored',
+            ])->save();
+
+            AuditLogger::logOrFail('monitoring.discovery.candidate.ignored', $lockedCandidate, [
+                'actor_id' => $actorId,
+                'candidate_id' => $lockedCandidate->id,
+                'site_id' => $scopeSiteId,
+            ]);
+
+            return $lockedCandidate->fresh();
+        }, 3);
+    }
+
+    /** @return Collection<int, Device> */
+    public function adoptAll(int $actorId, ?int $siteId = null, ?int $scopeId = null): Collection
+    {
+        $actor = $this->reviewer($actorId, [
+            'securityDevices.integrations.manage',
+            'securityDevices.devices.create',
+        ]);
+        if ($siteId !== null) {
+            $this->access->assertCanViewSite($actor, $siteId);
+        }
+
+        $accessibleSiteIds = $this->access->accessibleSiteIds($actor);
+        $canViewAllSites = $this->access->canViewAllSites($actor);
+
+        $scopeIds = DiscoveryScope::query()
+            ->when(! $canViewAllSites, fn (Builder $query) => $accessibleSiteIds === []
+                ? $query->whereRaw('1 = 0')
+                : $query->whereIn('site_id', $accessibleSiteIds))
+            ->when($siteId !== null, fn (Builder $query) => $query->where('site_id', $siteId))
+            ->when($scopeId !== null, fn (Builder $query) => $query->whereKey($scopeId))
+            ->pluck('id');
+
+        if ($scopeIds->isEmpty()) {
+            return collect();
+        }
+
+        $candidates = DiscoveryCandidate::query()
+            ->whereNull('reviewed_at')
+            ->where('decision', 'proposed')
+            ->whereHas('run', fn (Builder $query): Builder => $query->whereIn('discovery_scope_id', $scopeIds))
+            ->orderBy('id')
+            ->limit(100)
+            ->get();
+
+        $adopted = collect();
+        foreach ($candidates as $candidate) {
+            $adopted->push($this->adopt($candidate, $actorId, []));
+        }
+
+        return $adopted;
     }
 
     public function merge(
@@ -342,17 +487,33 @@ final class DiscoveryCandidateService
     {
         $provider = is_string($snapshot['provider'] ?? null) ? $snapshot['provider'] : null;
         $providerId = is_string($snapshot['provider_id'] ?? null) ? $snapshot['provider_id'] : null;
+        $hostname = is_string($snapshot['hostname'] ?? null) && trim($snapshot['hostname']) !== ''
+            ? trim($snapshot['hostname'])
+            : null;
+        $firstAddress = is_string($snapshot['addresses'][0] ?? null) && trim($snapshot['addresses'][0]) !== ''
+            ? trim($snapshot['addresses'][0])
+            : null;
 
         return [
-            'name' => $snapshot['hostname'] ?? 'Discovered device',
+            'name' => $hostname ?? ($firstAddress !== null ? "Device {$firstAddress}" : 'Discovered device'),
             'domain' => 'it_infrastructure',
             'category' => 'network',
             'serial_number' => $snapshot['serial_number'] ?? null,
-            'mac_address' => $snapshot['mac_addresses'][0] ?? null,
-            'ip_address' => $snapshot['addresses'][0] ?? null,
+            'mac_address' => $this->formatMacAddress($snapshot['mac_addresses'][0] ?? null),
+            'ip_address' => $firstAddress,
             'provider' => $provider,
             'external_ref' => $providerId === null ? null : ['provider_entity_id' => $providerId],
         ];
+    }
+
+    private function formatMacAddress(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+        $hex = strtoupper(preg_replace('/[^A-Fa-f0-9]/', '', $raw) ?? '');
+
+        return strlen($hex) === 12 ? implode(':', str_split($hex, 2)) : null;
     }
 
     /** @param mixed $values @return list<string> */

@@ -34,7 +34,7 @@ test.describe('Security & Devices native monitor lifecycle', () => {
         ).toBeVisible();
 
         await page
-            .getByRole('button', { name: 'Add direct monitor' })
+            .getByRole('button', { name: 'Add check' })
             .click();
         const createDialog = page.getByRole('dialog', {
             name: 'Create native direct monitor',

@@ -89,7 +89,9 @@ export function initialNativeDraft(
             monitor?.profile?.id ??
                 (management.profiles.length === 1
                     ? management.profiles[0].id
-                    : ''),
+                    : (management.profiles.find(
+                          (item) => item.name === 'Standard availability',
+                      )?.id ?? '')),
         ),
         kind:
             monitor?.kind ??
@@ -97,7 +99,10 @@ export function initialNativeDraft(
                 ? 'icmp'
                 : (management.kinds[0]?.value ?? '')),
         name: monitor?.name ?? '',
-        target: '',
+        target:
+            !monitor && typeof management.default_target === 'string'
+                ? management.default_target
+                : '',
         port: '',
         dnsName: '',
         dnsType: monitor ? '' : 'A',

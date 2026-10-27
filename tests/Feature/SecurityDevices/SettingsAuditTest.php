@@ -115,7 +115,7 @@ class SettingsAuditTest extends TestCase
                     'refresh_interval_minutes' => 15,
                     'alert_motion_events' => true,
                 ], $props['providerOperationalDefaults'][0]['values']);
-                $this->assertSame(['Critical infrastructure', 'Unrelated profile'], collect($props['monitoringProfiles'])->pluck('name')->all());
+                $this->assertSame(['Critical infrastructure', 'Standard availability', 'Unrelated profile'], collect($props['monitoringProfiles'])->pluck('name')->all());
                 $this->assertSame(2, $props['dataQuality']['unassigned_devices']);
                 $this->assertSame('supported', $props['featureSupport']['discovery_candidates']['state']);
                 $this->assertSame('read_only_append_only_application_evidence', $props['audit']['evidence_state']);

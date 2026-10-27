@@ -12,6 +12,7 @@ import {
 } from '@/components/security-devices/add-device-dialog';
 import { CctvNavigationActions } from '@/components/security-devices/cctv-navigation-actions';
 import type { DeviceDocumentHistoryItem } from '@/components/security-devices/device-document-history';
+import { QueclinkUnitConsole } from '@/components/security-devices/queclink-unit-console';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -963,13 +964,25 @@ function DeviceShowBody({
                     >
                         {/* ── Overview tab ──────────────────────────── */}
                         <TabsContent value="health" className="space-y-6">
-                            <DeviceHealthSection profile={profile} />
+                            <DeviceHealthSection
+                                profile={profile}
+                                onEditDevice={
+                                    can.update
+                                        ? editDeviceDialog.openDialog
+                                        : undefined
+                                }
+                            />
                         </TabsContent>
 
                         <TabsContent value="monitors">
                             <DeviceMonitorsSection
                                 profile={profile}
                                 deviceName={device.name}
+                                onEditDevice={
+                                    can.update
+                                        ? editDeviceDialog.openDialog
+                                        : undefined
+                                }
                             />
                         </TabsContent>
 
@@ -1001,6 +1014,14 @@ function DeviceShowBody({
                                 }
                             />
                         </TabsContent>
+
+                        {profile.queclinkConsole && (
+                            <TabsContent value="console">
+                                <QueclinkUnitConsole
+                                    consoleData={profile.queclinkConsole}
+                                />
+                            </TabsContent>
+                        )}
 
                         <TabsContent value="management">
                             <DeviceManagementSection

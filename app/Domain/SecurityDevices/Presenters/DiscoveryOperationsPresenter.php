@@ -9,8 +9,14 @@ use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
+use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
+use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Site;
+use App\Models\SiteRoom;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -30,6 +36,9 @@ class DiscoveryOperationsPresenter
         $canViewAllSites = $this->access->canViewAllSites($viewer);
         $canManageCollectors = $viewer->canDo('securityDevices.integrations.manage');
         $canManageScopes = $viewer->canDo('securityDevices.integrations.manage');
+        $canAdoptCandidates = $canManageScopes && $viewer->canDo('securityDevices.devices.create');
+        $canSameAsCandidates = $canManageScopes && $viewer->canDo('securityDevices.devices.update');
+        $canIgnoreCandidates = $canManageScopes;
         $monitors = $visibleDeviceIds->isEmpty()
             ? collect()
             : Monitor::query()
@@ -102,12 +111,26 @@ class DiscoveryOperationsPresenter
         $candidateTotal = $candidateQuery === null ? 0 : (clone $candidateQuery)->count();
         $candidateReviewTotal = $candidateQuery === null
             ? 0
-            : (clone $candidateQuery)->whereIn('decision', ['proposed', 'review'])->count();
+            : (clone $candidateQuery)
+                ->whereNull('reviewed_at')
+                ->whereIn('decision', ['proposed', 'review'])
+                ->count();
+        $adoptableCandidateTotal = $candidateQuery === null
+            ? 0
+            : (clone $candidateQuery)
+                ->whereNull('reviewed_at')
+                ->where('decision', 'proposed')
+                ->count();
         $candidates = $candidateQuery === null
             ? collect()
             : $candidateQuery
-                ->with(['run:id,discovery_scope_id,run_uuid,status', 'canonicalDevice:id,name'])
-                ->orderByRaw("CASE WHEN decision IN ('proposed', 'review') THEN 0 ELSE 1 END")
+                ->with([
+                    'run:id,discovery_scope_id,run_uuid,status',
+                    'run.scope:id,name,site_id',
+                    'run.scope.site:id,name',
+                    'canonicalDevice:id,name',
+                ])
+                ->orderByRaw("CASE WHEN reviewed_at IS NULL AND decision IN ('proposed', 'review') THEN 0 ELSE 1 END")
                 ->latest('id')
                 ->limit(200)
                 ->get();
@@ -173,27 +196,59 @@ class DiscoveryOperationsPresenter
             'started_at' => $run->started_at?->toIso8601String(),
             'completed_at' => $run->completed_at?->toIso8601String(),
         ])->values();
-        $mappedCandidates = $candidates->map(fn (DiscoveryCandidate $candidate): array => [
-            'id' => $candidate->id,
-            'candidate_uuid' => $candidate->candidate_uuid,
-            'run_id' => $candidate->discovery_run_id,
-            'scope_id' => $candidate->run?->discovery_scope_id,
-            'decision' => $candidate->decision,
-            'confidence' => $candidate->confidence,
-            'reasons' => collect($candidate->reasons ?? [])
-                ->filter(fn ($reason): bool => is_string($reason))
-                ->take(10)
-                ->values(),
-            'canonical_device' => $candidate->canonicalDevice ? [
-                'id' => $candidate->canonicalDevice->id,
-                'name' => $candidate->canonicalDevice->name,
-                'href' => "/security-devices/devices/{$candidate->canonicalDevice->id}",
-            ] : null,
-            'review' => [
-                'action' => $candidate->review_action,
-                'reviewed_at' => $candidate->reviewed_at?->toIso8601String(),
-            ],
-        ])->values();
+        $mappedCandidates = $candidates->map(function (DiscoveryCandidate $candidate) use (
+            $canAdoptCandidates,
+            $canSameAsCandidates,
+            $canIgnoreCandidates,
+        ): array {
+            $snapshot = is_array($candidate->evidence_snapshot) ? $candidate->evidence_snapshot : [];
+            $safeHostname = $this->safeHostname($snapshot['hostname'] ?? null);
+            $safeIp = $this->safeIpAddress(($snapshot['addresses'] ?? [])[0] ?? null);
+            $safeMac = $this->safeMacAddress(($snapshot['mac_addresses'] ?? [])[0] ?? null);
+            $safeProvider = $this->safeProvider($snapshot['provider'] ?? null);
+            $unreviewedActionable = $candidate->reviewed_at === null
+                && in_array($candidate->decision, ['proposed', 'review'], true);
+
+            return [
+                'id' => $candidate->id,
+                'candidate_uuid' => $candidate->candidate_uuid,
+                'run_id' => $candidate->discovery_run_id,
+                'scope_id' => $candidate->run?->discovery_scope_id,
+                'scope_name' => $candidate->run?->scope?->name,
+                'site_id' => $candidate->run?->scope?->site_id ? (int) $candidate->run->scope->site_id : null,
+                'site_name' => $candidate->run?->scope?->site?->name,
+                'decision' => $candidate->decision,
+                'confidence' => $candidate->confidence,
+                'hostname' => $safeHostname,
+                'ip_address' => $safeIp,
+                'mac_address' => $safeMac,
+                'provider' => $safeProvider,
+                'reasons' => collect($candidate->reasons ?? [])
+                    ->filter(fn ($reason): bool => is_string($reason))
+                    ->take(10)
+                    ->values(),
+                'canonical_device' => $candidate->canonicalDevice ? [
+                    'id' => $candidate->canonicalDevice->id,
+                    'name' => $candidate->canonicalDevice->name,
+                    'href' => "/security-devices/devices/{$candidate->canonicalDevice->id}",
+                ] : null,
+                'review' => [
+                    'action' => $candidate->review_action,
+                    'reviewed_at' => $candidate->reviewed_at?->toIso8601String(),
+                ],
+                'actions' => [
+                    'adopt_url' => $canAdoptCandidates && $unreviewedActionable
+                        ? "/security-devices/discovery/candidates/{$candidate->id}/adopt"
+                        : null,
+                    'same_as_url' => $canSameAsCandidates && $unreviewedActionable
+                        ? "/security-devices/discovery/candidates/{$candidate->id}/same-as"
+                        : null,
+                    'ignore_url' => $canIgnoreCandidates && $unreviewedActionable
+                        ? "/security-devices/discovery/candidates/{$candidate->id}/ignore"
+                        : null,
+                ],
+            ];
+        })->values();
 
         return [
             'tabs' => [
@@ -211,7 +266,7 @@ class DiscoveryOperationsPresenter
             'boundary' => [
                 'title' => 'Direct first, collectors only where needed',
                 'description' => 'This system monitors SD-WAN reachable Sites from the main application. A collector is an explicit remote collection path, not a requirement for every monitor.',
-                'runtime_note' => 'Governed scopes, immutable runs, candidate reasons, collector state, and canonical Device links are shown from the native runtime.',
+                'runtime_note' => 'Shows your approved scan ranges, past scan runs, found devices waiting for review, and remote collectors.',
             ],
             'summary' => [
                 'monitors' => $monitors->count(),
@@ -282,6 +337,25 @@ class DiscoveryOperationsPresenter
             ],
             'runs' => $mappedRuns,
             'candidates' => $mappedCandidates,
+            'candidate_management' => [
+                'can_adopt' => $canAdoptCandidates,
+                'can_same_as' => $canSameAsCandidates,
+                'can_ignore' => $canIgnoreCandidates,
+                'adopt_all_url' => $canAdoptCandidates
+                    ? '/security-devices/discovery/candidates/adopt-all'
+                    : null,
+                'adoptable_count' => $adoptableCandidateTotal,
+                'taxonomy' => $canAdoptCandidates ? DeviceTaxonomy::all() : [],
+                'domains' => $canAdoptCandidates
+                    ? collect(DeviceDomain::cases())->map(fn (DeviceDomain $domain): array => [
+                        'value' => $domain->value,
+                        'label' => $domain->label(),
+                    ])->values()->all()
+                    : [],
+                'devices_by_site' => $canSameAsCandidates
+                    ? $this->devicesBySite($viewer, $scopes)
+                    : [],
+            ],
             'collection_paths' => $mappedCollectors->map(fn (array $collector): array => [
                 'collector_id' => $collector['id'],
                 'collector_name' => $collector['name'],
@@ -345,5 +419,128 @@ class DiscoveryOperationsPresenter
                     : null,
             ],
         ];
+    }
+
+    /**
+     * @param  Collection<int, DiscoveryScope>  $scopes
+     * @return array<int, list<array{id: int, uid: string, name: string, ip_address: string|null, category: string|null}>>
+     */
+    private function devicesBySite(User $viewer, Collection $scopes): array
+    {
+        $scopeSiteIds = $scopes->pluck('site_id')
+            ->filter(fn (mixed $id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($scopeSiteIds === []) {
+            return [];
+        }
+
+        $devices = $this->access->visibleDevices($viewer)
+            ->where('status', '!=', DeviceStatus::Decommissioned->value)
+            ->whereHas('assignments', fn (Builder $query): Builder => $query
+                ->active()
+                ->whereIn('assignable_type', [DeviceAssignment::TARGET_SITE, DeviceAssignment::TARGET_ROOM]))
+            ->with([
+                'assignments' => fn ($query) => $query
+                    ->active()
+                    ->whereIn('assignable_type', [DeviceAssignment::TARGET_SITE, DeviceAssignment::TARGET_ROOM]),
+            ])
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['devices.id', 'devices.device_uid', 'devices.name', 'devices.ip_address', 'devices.category']);
+
+        $roomIds = $devices
+            ->flatMap(fn (Device $device): Collection => $device->assignments)
+            ->where('assignable_type', DeviceAssignment::TARGET_ROOM)
+            ->pluck('assignable_id')
+            ->map(fn (mixed $id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $roomSites = $roomIds === []
+            ? collect()
+            : SiteRoom::query()->whereIn('id', $roomIds)->pluck('site_id', 'id');
+
+        $grouped = [];
+        foreach ($devices as $device) {
+            $assignment = $device->assignments->first();
+            if (! $assignment) {
+                continue;
+            }
+            $resolvedSiteId = $assignment->assignable_type === DeviceAssignment::TARGET_SITE
+                ? (int) $assignment->assignable_id
+                : (int) ($roomSites->get((int) $assignment->assignable_id) ?? 0);
+
+            if ($resolvedSiteId < 1 || ! in_array($resolvedSiteId, $scopeSiteIds, true)) {
+                continue;
+            }
+
+            $grouped[$resolvedSiteId][] = [
+                'id' => (int) $device->id,
+                'uid' => (string) $device->device_uid,
+                'name' => (string) $device->name,
+                'ip_address' => $device->ip_address,
+                'category' => $device->category,
+            ];
+        }
+
+        return $grouped;
+    }
+
+    private function safeHostname(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+        $trimmed = trim($raw);
+        if (
+            $trimmed === ''
+            || strlen($trimmed) > 253
+            || preg_match('/^(?!-)[a-z0-9-]{1,63}(?<!-)(?:\.(?!-)[a-z0-9-]{1,63}(?<!-))*$/i', $trimmed) !== 1
+        ) {
+            return null;
+        }
+
+        return $trimmed;
+    }
+
+    private function safeIpAddress(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+        $trimmed = trim($raw);
+
+        return filter_var($trimmed, FILTER_VALIDATE_IP) !== false ? $trimmed : null;
+    }
+
+    private function safeMacAddress(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+        $trimmed = trim($raw);
+        if (preg_match('/^(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$/', $trimmed) === 1) {
+            return strtoupper(str_replace('-', ':', $trimmed));
+        }
+        if (preg_match('/^[0-9A-Fa-f]{12}$/', $trimmed) === 1) {
+            return implode(':', str_split(strtoupper($trimmed), 2));
+        }
+
+        return null;
+    }
+
+    private function safeProvider(mixed $raw): ?string
+    {
+        if (! is_string($raw)) {
+            return null;
+        }
+        $trimmed = trim($raw);
+
+        return preg_match('/^[a-z0-9_-]{1,64}$/i', $trimmed) === 1 ? $trimmed : null;
     }
 }

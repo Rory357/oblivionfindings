@@ -616,7 +616,7 @@ describe('Monitoring shared records and scope', () => {
             target: { value: 'private search' },
         });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Add direct monitor' }),
+            screen.getByRole('button', { name: 'Add check' }),
         );
         fireEvent.click(screen.getByText('Device and policy', { exact: true }));
         fireEvent.change(screen.getByLabelText('Monitor name'), {

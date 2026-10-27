@@ -46,6 +46,8 @@ import {
     type ControlRoomAlertAccess,
 } from '@/components/security-devices/permission-destinations';
 import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { ReviewCard } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -846,6 +848,14 @@ function MonitoringScreen({
             </PageHeaderMeterCaption>
         </PageHeaderMeterBlock>
     );
+    const canAddCheck = Boolean(
+        management.can_add_check ??
+            (management.can_manage &&
+                management.create_url ===
+                    '/security-devices/monitoring/native-monitors' &&
+                management.devices.length > 0 &&
+                management.profiles.length > 0),
+    );
     return (
         <AppLayout
             breadcrumbs={[
@@ -890,21 +900,16 @@ function MonitoringScreen({
                                     Saved monitor changes
                                 </PageHeaderGlassButton>
                             ) : null}
-                            {management.can_manage &&
-                            management.create_url ===
-                                '/security-devices/monitoring/native-monitors' &&
-                            management.devices.length > 0 &&
-                            management.profiles.length > 0 ? (
-                                <PageHeaderPrimaryButton
-                                    onClick={() => {
-                                        setEditingMonitor(null);
-                                        setMonitorDialogOpen(true);
-                                    }}
-                                >
-                                    <Plus className="size-4" />
-                                    Add direct monitor
-                                </PageHeaderPrimaryButton>
-                            ) : null}
+                            <PageHeaderPrimaryButton
+                                disabled={!canAddCheck}
+                                onClick={() => {
+                                    setEditingMonitor(null);
+                                    setMonitorDialogOpen(true);
+                                }}
+                            >
+                                <Plus className="size-4" />
+                                Add check
+                            </PageHeaderPrimaryButton>
                             {workspace.can.view_control_room ? (
                                 <PageHeaderGlassButton asChild>
                                     <Link href="/control-room">
@@ -1099,6 +1104,20 @@ function MonitoringScreen({
                     section="alerts-upkeep"
                     activeTab="monitoring"
                 />
+                {!canAddCheck && management.missing_reason && (
+                    <Alert>
+                        <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                            <span>{management.missing_reason}</span>
+                            {management.fix_href && management.fix_label && (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={management.fix_href}>
+                                        {management.fix_label}
+                                    </Link>
+                                </Button>
+                            )}
+                        </AlertDescription>
+                    </Alert>
+                )}
                 <ReviewCard icon={ShieldCheck} title={workspace.boundary.title}>
                     <p className="text-sm text-muted-foreground">
                         {workspace.boundary.description}

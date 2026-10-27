@@ -40,9 +40,18 @@
 
 ---
 
-### Live `.com` fixture inventory (to remove after `mysqldump` backup)
+### Live `.com` fixture purge (`0.1` — executed 28 Oct 2026 NZDT)
 
-#### Release fixture packs to remove (2)
+- **Pre-deploy & pre-purge MySQL backups verified on `oblivionfindings.com` (stored outside `/var/www/oblivionfindings`):**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase0-20261027T133359Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK)
+  - `/home/oblivion/db-backups/oblivionfindings-pre-fixture-purge-20261027T134455Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK)
+- **Live execution result (`php artisan security-devices:purge-test-fixtures --force` at `254675f68`):**
+  - `Purge complete: 1 relationships unlinked, 19 devices hard-deleted, 3 devices soft-deleted (history retained), 5 Sites removed, 2 fixture packs removed.`
+  - Post-purge `--dry-run`: `Release fixture packs (0)`, `Test fixture devices to remove (0)`, `Test Sites to remove (0)`, `Real devices preserved (3)` (`1` `UX7`, `2` `Care tracker 867963069916998`, `95` `unif`).
+  - `php artisan database:verify-lifecycle-triggers postflight --json` → `"status": "verified"`, `16/16` triggers intact, `0` errors.
+  - `git -C /var/www/oblivionfindings status --porcelain` → empty.
+
+#### Release fixture packs removed (2)
 | ID | Pack key | State | Manifest records |
 | --- | --- | --- | --- |
 | 8 | `it-security-desktop-release-v1` | `ready` | 76 |
@@ -118,3 +127,88 @@
   ![Local Device Profile](screenshots/phase-0-local-device-profile.png)
 - **Settings › Server readiness:**
   ![Local Server Readiness](screenshots/phase-0-local-server-readiness.png)
+
+#### Live `oblivionfindings.com` walkthrough (`254675f68` — post-purge)
+- **Live Server readiness (`5` of `7` ready, `2` honestly flagged for Phase 2 keys):**
+  - `Redis`: **Ready** (`Connected and responding`)
+  - `Scheduler`: **Ready** (`Running every minute`)
+  - `Worker pools`: **Ready** (`9 of 9 pools running`)
+  - `Ping permission`: **Ready** (`Allowed · Local ping check succeeded`)
+  - `Credential store`: **Ready** (`Encrypted database store ready`)
+  - `Collector keys`: **Needs fix** (`Missing or unreadable: site hub configuration signing key, site hub certificate authority files` — scheduled for Phase 2 with server owner approval)
+  - `Release key`: **Needs fix** (`No valid 32-byte Ed25519 publisher public key is configured` — scheduled for Phase 2)
+- **Overview (`3` real devices, `0%` monitoring coverage, `First-run setup` `2 of 4 done`):**
+  ![Live Overview](screenshots/phase-0-live-overview.png)
+- **Devices list (`Care tracker 867963069916998`, `unif`, `UX7` — all 22 test devices removed, `Not monitored` shown honestly):**
+  ![Live Devices](screenshots/phase-0-live-devices.png)
+- **Device profile (`UX7` — `Not monitored`, `History & files` plain tab, fake configuration backup hidden):**
+  ![Live Device Profile](screenshots/phase-0-live-device-profile.png)
+- **Alerts & upkeep (`/security-devices/monitoring` — consolidated section tabs, `0` fixture checks remaining):**
+  ![Live Alerts & Upkeep](screenshots/phase-0-live-alerts-upkeep.png)
+- **Settings › Server readiness (live `oblivionfindings.com` checks):**
+  ![Live Server Readiness](screenshots/phase-0-live-server-readiness.png)
+
+---
+
+## Phase 1 — The basics
+
+### Summary of changes
+
+1. **Edit device (`1.1`) & Register device (`1.2`)**
+   - Updated `AddDeviceDialog` / `EditDeviceDialog` (`resources/js/components/security-devices/add-device-dialog.tsx`) and `DeviceController` (`app/Domain/SecurityDevices/Http/Controllers/DeviceController.php`) so both registration and editing expose a searchable Site combobox (`Popover` + `Command`) and **IP address or hostname** on Step 1 (**Classification**), alongside name, workspace/category/type, manufacturer/model, and notes.
+   - `DeviceController::store` and `DeviceController::update` accept IPv4, IPv6, or RFC-1123 hostnames (`ipOrHostnameRules()`) and atomically assign, transfer, or release Site assignments (`DeviceAssignmentService`) while guarding non-Site person/room/vehicle assignments.
+
+2. **`Ping now` on device profiles (`1.3`)**
+   - Added `POST /security-devices/devices/{device}/ping` (`DevicePingController`) backed by `DnsResolver`, `EgressPolicy` (`deny_cidrs` SSRF protection preserved), and `IcmpTransport` (`NativeIcmpTransport`).
+   - Added the **Connection test** card on `Status › Health` (`resources/js/pages/security-devices/devices/device-profile-sections.tsx`) showing live reply time (`< 1 ms`, `X ms`) or a plain-English failure reason (`missing_address`, `dns_failed`, `address_blocked`, `unreachable`, `timeout`, `permission_denied`).
+
+3. **One-switch `"Alert me if this goes offline"` & seeded default profile (`1.4`)**
+   - Added migration `2026_10_28_000001_seed_default_availability_profile.php` (`MonitoringProfile::DEFAULT_AVAILABILITY_NAME = 'Standard availability'`: 60s interval, 3 failure confirmations, 2 recovery confirmations, 300s stale threshold).
+   - Added `POST /security-devices/devices/{device}/offline-alert` (`DeviceOfflineAlertController`) and the one-switch **Alert me if this goes offline** card on device profiles, auto-provisioning or toggling the Site's `'Registered device hosts'` scope (`/32` or `/128` host CIDR), `'Standard availability'` profile, and ICMP availability check.
+
+4. **Always-visible `"Add check"` with plain-English missing-prerequisite guidance (`1.5`)**
+   - Updated `DeviceProfilePresenter`, `MonitoringOperationsPresenter`, `device-profile-sections.tsx`, `monitoring.tsx`, and `native-monitor-dialogs.tsx` so **Add check** is always visible on device profiles and **Alerts & upkeep**, disabling cleanly with a plain-English explanation and shortcut button when a Site assignment, monitoring profile, or eligible device is missing.
+
+5. **Discovery candidate review actions (`1.6`)**
+   - Wired `DiscoveryCandidateService` (`adopt`, `sameAs`, `ignore`, `adoptAll`) to `DiscoveryCandidateReviewController`, `DiscoveryOperationsPresenter`, `discovery-candidate-dialogs.tsx`, and `discovery.tsx` (`Setup › Discovery & hubs › Candidates`).
+   - Supports **Add as device**, **Same as…** (searchable Site device combobox that fills missing IP/MAC/hostname on the existing device), **Ignore**, and **Add all** (`ConfirmDialog`), normalising 12-hex MACs to `AA:BB:CC:11:22:33` without leaking raw `evidence_snapshot` payloads.
+
+6. **Queclink unit console (`1.7`)**
+   - Added `QueclinkUnitConsoleService`, `QueclinkUnitConsoleController`, `CommandBuilder::watchdogReboot` (`AT+GTDOG`), `queclink-unit-console.tsx`, and `docs/security-devices/SUPPORTED-DEVICES.md` citing the official *Queclink GL30MEU @Track Air Interface Protocol Specification* (`GL30MEUR01`, Rev. 2.04) and *GL320MG User Manual* (`GL320MGUM001`).
+   - Renders on **Technology › Unit console** for Queclink trackers and via direct console links on `/security-devices/integrations/queclink`.
+   - Masks IMEIs (`8679•••••••6998`), scrubs command passwords (`[REDACTED]`), enforces `PersonalTrackingPrivacyService` + `device_assignment_id` historical frame privacy so prior unconsented resident coordinates never leak after reassignment, and separates read-only queries (`Request current location`, `Read configuration`, `Request device status`) from confirmation-and-audit-reason gated changes (`Update reporting interval`, `Update scheduled watchdog`, `Reboot tracker`).
+
+---
+
+### Verification & local walkthrough
+
+- **Laravel Pint:** 0 issues across all touched/new PHP files.
+- **TypeScript (`tsc --noEmit`):** 0 errors across the repository.
+- **ESLint (`--max-warnings=0`):** 0 errors and 0 warnings across all 16 touched/new TS/TSX files (including `security-devices-copy/no-jargon`).
+- **Vitest (`--maxWorkers=2`):** 4 test files / 55 tests passed (`add-device-dialog.test.tsx`, `queclink-unit-console.test.tsx`, `monitoring.test.tsx`, `discovery.test.tsx`).
+- **Pest:**
+  - Architecture (`ItSecuritySingleTenantBoundaryTest`, `DeviceCommandOperationalBoundaryTest`, `MonitoringProbeEgressBoundaryTest`, `MonitoringSingleTenantBoundaryTest`): all passed (48+ tests, 657+ assertions).
+  - Feature (`Phase1DeviceBasicsTest`, `DiscoveryCandidateActionsTest`, `QueclinkUnitConsoleTest`, `SettingsAuditTest`, `OperationsWorkspacesTest`, `DiscoveryIdentityTest`, `DiscoveryRunTest`): 69 passed (944 assertions).
+- **Home network walkthrough (`172.16.0.0/24`):**
+  - Registered `Home Gateway UX7` assigned to `Home Network Lab (172.16.0.0/24)` with IP `172.16.0.1` (`1.2`), verified `Edit device` prefill (`1.1`).
+  - `Ping now` on `172.16.0.1` → `< 1 ms` (`Replied in < 1 ms.`) + toggled **Alert me if this goes offline** ON (`Offline alerts are on for 172.16.0.1.`) (`1.3`, `1.4`).
+  - `Ping now` on `172.16.0.253` (unassigned LAN host) → `No reply` (`The network reported that this address is unreachable from the server.`) (`1.3`).
+  - Unassigned `Spare Shelf Switch` (no Site, no IP) → **Add check** remains visible (`disabled`) with `Assign this device to a Site first so checks know where it lives.` and **Edit device** shortcut (`1.5`).
+  - Exercised `Ignore`, `Same as…`, and `Add all` on Discovery › Candidates (`1.6`).
+  - Exercised `Request current location` (`AT+GTRTO=[REDACTED],1,,,,,,6CC5$`) on `Care tracker 867963069916998` unit console with masked IMEI `8679•••••••6998` (`1.7`).
+
+#### Local walkthrough screenshots
+- **Register device (searchable Site combobox + IP address on Step 1):**
+  ![Local Register Device](screenshots/phase-1-local-register-device.png)
+- **Edit device (prefilled Site + IP/hostname):**
+  ![Local Edit Device](screenshots/phase-1-local-edit-device.png)
+- **`Ping now` (`< 1 ms` reply on `172.16.0.1`) + one-switch `"Alert me if this goes offline"` ON:**
+  ![Local Ping Reply & Offline Switch](screenshots/phase-1-local-ping-reply-and-offline-switch.png)
+- **`Ping now` plain-English unreachable reason (`172.16.0.253`):**
+  ![Local Ping Unreachable](screenshots/phase-1-local-ping-unreachable.png)
+- **Always-visible `"Add check"` with plain-English missing-Site reason:**
+  ![Local Add Check Missing Reason](screenshots/phase-1-local-add-check-missing-reason.png)
+- **Discovery › Candidates (`Add all` + per-candidate review actions):**
+  ![Local Discovery Candidates](screenshots/phase-1-local-discovery-candidates.png)
+- **Queclink unit console (masked IMEI, redacted command password, protocol citation, safe vs confirmation-gated commands):**
+  ![Local Queclink Console](screenshots/phase-1-local-queclink-console.png)
