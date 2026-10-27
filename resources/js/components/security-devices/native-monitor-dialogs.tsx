@@ -851,7 +851,7 @@ function NativeMonitorWizardBody({
                                     <strong>Affects Device availability</strong>
                                     <span className="mt-1 block text-xs text-muted-foreground">
                                         Use only for checks that should change
-                                        the canonical Device availability state.
+                                        this device's availability state.
                                     </span>
                                 </span>
                             </label>

@@ -250,11 +250,11 @@ describe('inline application navigation', () => {
             name: 'Security & Devices navigation',
         });
         expect(
-            within(navigation).getByRole('link', { name: 'All devices' }),
+            within(navigation).getByRole('link', { name: 'Devices' }),
         ).toHaveAttribute('aria-current', 'page');
         expect(
-            within(navigation).getByRole('link', { name: 'Network & IT' }),
-        ).toHaveAttribute('href', '/security-devices/network-it');
+            within(navigation).getByRole('link', { name: 'Alerts & upkeep' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring');
         expect(
             screen.queryByRole('button', { name: 'Close menu' }),
         ).not.toBeInTheDocument();

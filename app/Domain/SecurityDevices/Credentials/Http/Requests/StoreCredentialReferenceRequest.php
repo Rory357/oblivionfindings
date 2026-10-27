@@ -11,6 +11,11 @@ class StoreCredentialReferenceRequest extends FormRequest
         return $this->user()?->canDo('securityDevices.commands.admin') ?? false;
     }
 
+    protected $dontFlash = [
+        'secret_manager_reference',
+        'credential_material',
+    ];
+
     /** @return array<string, mixed> */
     public function rules(): array
     {
@@ -21,7 +26,9 @@ class StoreCredentialReferenceRequest extends FormRequest
             'purpose' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z][a-zA-Z0-9._-]{1,63}$/'],
             'capabilities' => ['required', 'array', 'min:1', 'max:64'],
             'capabilities.*' => ['required', 'string', 'max:120', 'regex:/^[a-zA-Z][a-zA-Z0-9._:-]{1,119}$/'],
-            'secret_manager_reference' => ['required', 'string', 'max:512', 'not_regex:/[\x00-\x1f\x7f]/'],
+            'secret_manager_reference' => ['required_without:credential_material', 'nullable', 'string', 'max:512', 'not_regex:/[\x00-\x1f\x7f]/'],
+            'credential_material' => ['nullable', 'array', 'min:1', 'max:64'],
+            'credential_material.*' => ['nullable', 'string', 'max:4096'],
         ];
     }
 }

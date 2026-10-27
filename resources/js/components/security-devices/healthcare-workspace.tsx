@@ -687,7 +687,7 @@ function MaintenanceRecords({
                     id="healthcare-maintenance-heading"
                     className="text-lg font-semibold"
                 >
-                    Canonical calibration & maintenance
+                    Calibration & maintenance
                 </h2>
                 <p className="text-sm text-muted-foreground">
                     These records come from the device maintenance history;
@@ -751,8 +751,7 @@ function MaintenanceRecords({
                 <Card>
                     <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
                         <Wrench className="h-5 w-5" />
-                        No canonical calibration or maintenance records are
-                        available.
+                        No calibration or maintenance records are available.
                     </CardContent>
                 </Card>
             )}

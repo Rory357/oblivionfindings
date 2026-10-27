@@ -189,7 +189,7 @@ export function SiteDevices({
     return (
         <EvidenceRecords<DeviceListItem>
             title={title}
-            description="Canonical devices assigned within this approved Site scope."
+            description="Devices assigned within this approved Site scope."
             rows={rows}
             view={view}
             icon={Cpu}

@@ -410,7 +410,7 @@ test('a governed UniFi door command is understandable and fully evidenced on des
             $browser->resize($case['width'], $case['height'])
                 ->loginAs($requester)
                 ->visit($managementUrl)
-                ->waitForText('Governed actions', 40)
+                ->waitForText('Device actions', 40)
                 ->assertSee($device->name)
                 ->assertSee($site->name)
                 ->assertSee('Unifi')
@@ -425,7 +425,7 @@ test('a governed UniFi door command is understandable and fully evidenced on des
                 ->waitForText('Confirm your password', 20)
                 ->type('#password', $password)
                 ->press('Confirm password')
-                ->waitForText('Governed actions', 40)
+                ->waitForText('Device actions', 40)
                 ->assertScript(
                     'new URL(window.location.href).searchParams.get("section")',
                     'management',
@@ -571,12 +571,12 @@ test('governed break glass is short lived notified and post-use reviewed on desk
             $browser->resize($case['width'], $case['height'])
                 ->loginAs($requester)
                 ->visit($managementUrl)
-                ->waitForText('Governed actions', 40)
+                ->waitForText('Device actions', 40)
                 ->clickLink('Confirm identity first')
                 ->waitForText('Confirm your password', 20)
                 ->type('#password', $password)
                 ->press('Confirm password')
-                ->waitForText('Governed actions', 40)
+                ->waitForText('Device actions', 40)
                 ->press('Request action')
                 ->waitForText('Declare emergency break glass', 20)
                 ->click('#command-break-glass')

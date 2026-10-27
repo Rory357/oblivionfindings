@@ -19,6 +19,7 @@ import {
     PageHeaderViewToggle,
 } from '@/components/page';
 import { ControlRoomAlertAccessRequired } from '@/components/security-devices/permission-destinations';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Button } from '@/components/ui/button';
 import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -655,6 +656,10 @@ function EventStream({
                             ariaLabel="Event summary views"
                         />
                     }
+                />
+                <SecurityDevicesSectionTabs
+                    section="alerts-upkeep"
+                    activeTab="alerts-events"
                 />
                 <section
                     aria-label="Permitted device event records"

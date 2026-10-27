@@ -659,12 +659,6 @@ class NetworkItWorkspacePresenter
                 ->values();
         $snapshotService = $this->snapshots ?? app(ConfigurationSnapshotService::class);
         $canViewSnapshots = $snapshotService->canViewSnapshots($viewer);
-        $declared = $this->declaredCapabilities ?? app(DeclaredDeviceCommandCapabilities::class);
-        $routes = $this->executionRoutes ?? app(CommandExecutionRouteResolver::class);
-        $canBackup = $viewer->canDo('securityDevices.commands.manage')
-            && $canonicalSiteId !== null
-            && $declared->supports($device, 'network.config.backup')
-            && $routes->resolve($device, $canonicalSiteId, 'network.config.backup')->available;
 
         $snapshotHistory = $snapshotHistory
             ->map(fn (ConfigurationSnapshot $snapshot): array => $this->configurationSnapshot($device, $snapshot, $canViewSnapshots))
@@ -675,9 +669,7 @@ class NetworkItWorkspacePresenter
             'deviceName' => $device->name,
             'deviceHref' => "/security-devices/devices/{$device->id}",
             'canViewSnapshots' => $canViewSnapshots,
-            'backupActionHref' => $canBackup
-                ? "/security-devices/devices/{$device->id}?section=management&action=network.config.backup"
-                : null,
+            'backupActionHref' => null,
             'configuration' => [
                 'state' => $configurationState,
                 'observedHash' => $observedHash,

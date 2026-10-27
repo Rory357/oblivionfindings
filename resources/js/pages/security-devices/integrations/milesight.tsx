@@ -1101,7 +1101,7 @@ function MilesightBody({
                                             Platform, discover applications, map
                                             each one to an approved Site, then
                                             import its gateways and sensors into
-                                            the canonical Device Registry.
+                                            the Device list.
                                         </CardDescription>
                                     </CardHeader>
                                     <CardContent className="space-y-3 text-sm">
@@ -1144,7 +1144,7 @@ function MilesightBody({
                                                 sensor and safety events through
                                                 the native Monitoring runtime.
                                                 Events remain linked to the
-                                                canonical Device and Site.
+                                                registered Device and Site.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
@@ -1466,11 +1466,11 @@ function MilesightBody({
                             }
                             description={
                                 currentRemoval === 'key'
-                                    ? 'Devices already synced remain in the canonical registry. Discovery, future syncs and signed callbacks stop until credentials are configured again.'
+                                    ? 'Devices already synced remain in the Device list. Discovery, future syncs and signed callbacks stop until credentials are configured again.'
                                     : currentRemoval === 'webhook'
                                       ? 'New callbacks will be rejected until a verified webhook secret is configured again. Existing Device and monitoring history is preserved.'
                                       : currentRemoval
-                                        ? `Remove the application mapping for “${currentRemoval.site_name}”? Imported Devices remain in the canonical registry. This Site will no longer receive Milesight sync or monitoring updates through this mapping.`
+                                        ? `Remove the application mapping for “${currentRemoval.site_name}”? Imported Devices remain in the Device list. This Site will no longer receive Milesight sync or monitoring updates through this mapping.`
                                         : ''
                             }
                             confirmText={
@@ -2299,7 +2299,7 @@ function MappingWizard({
                     {
                         key: 'site',
                         label: 'Approved Site',
-                        blurb: 'Choose canonical ownership',
+                        blurb: 'Choose Site ownership',
                         icon: MapPin,
                     },
                     {

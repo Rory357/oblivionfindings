@@ -138,7 +138,9 @@ function complianceBadgeMeta(state: string | null | undefined): {
         return { label: 'In grace period', variant: 'warning' };
     }
     return {
-        label: state.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        label: state
+            .replace(/_/g, ' ')
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
         variant: 'neutral',
     };
 }
@@ -530,7 +532,7 @@ export function DeviceEndpointSection({
                             <span>Computer action policies</span>
                         </CardTitle>
                         <CardDescription>
-                            Consent mode and release availability for governed
+                            Consent mode and release availability for remote
                             actions on this computer.
                         </CardDescription>
                     </div>
@@ -813,7 +815,7 @@ export function DeviceEndpointSection({
                                 <CardDescription>
                                     Reported Windows SCM services. Services in
                                     the approved catalogue can be started,
-                                    stopped, or restarted through governed
+                                    stopped, or restarted through remote
                                     commands.
                                 </CardDescription>
                             </div>
@@ -945,8 +947,8 @@ export function DeviceEndpointSection({
                         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <CardTitle className="text-base">
-                                    Installed software ({inventory.softwareTotal}
-                                    )
+                                    Installed software (
+                                    {inventory.softwareTotal})
                                 </CardTitle>
                                 <CardDescription>
                                     Applications reported by the Windows

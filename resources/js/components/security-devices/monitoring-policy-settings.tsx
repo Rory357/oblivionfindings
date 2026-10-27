@@ -1385,10 +1385,7 @@ function MonitoringPolicyEditor({
                     </Button>
                 </div>
                 {previewError ? (
-                    <p
-                        role="alert"
-                        className="mt-3 text-sm text-destructive"
-                    >
+                    <p role="alert" className="mt-3 text-sm text-destructive">
                         {previewError}
                     </p>
                 ) : null}
@@ -1449,45 +1446,49 @@ function MonitoringPolicyEditor({
                         />
                         <ReviewRow
                             label="Warning delivery"
-                            value={[
-                                effectivePreview.alert_route.warning
-                                    .notify_in_app
-                                    ? 'In-app'
-                                    : null,
-                                effectivePreview.alert_route.warning
-                                    .notify_email
-                                    ? 'Email'
-                                    : null,
-                                effectivePreview.alert_route.warning
-                                    .open_it_ticket
-                                    ? 'IT incident ticket'
-                                    : null,
-                            ]
-                                .filter(Boolean)
-                                .join(' · ') || 'Recorded on monitor only'}
+                            value={
+                                [
+                                    effectivePreview.alert_route.warning
+                                        .notify_in_app
+                                        ? 'In-app'
+                                        : null,
+                                    effectivePreview.alert_route.warning
+                                        .notify_email
+                                        ? 'Email'
+                                        : null,
+                                    effectivePreview.alert_route.warning
+                                        .open_it_ticket
+                                        ? 'IT incident ticket'
+                                        : null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ') || 'Recorded on monitor only'
+                            }
                         />
                         <ReviewRow
                             label="Critical delivery"
-                            value={[
-                                effectivePreview.alert_route.critical
-                                    .notify_in_app
-                                    ? 'In-app'
-                                    : null,
-                                effectivePreview.alert_route.critical
-                                    .notify_email
-                                    ? 'Email'
-                                    : null,
-                                effectivePreview.alert_route.critical
-                                    .open_it_ticket
-                                    ? 'IT incident ticket'
-                                    : null,
-                                effectivePreview.alert_route.critical
-                                    .escalate_control_room
-                                    ? 'Control Room escalation'
-                                    : null,
-                            ]
-                                .filter(Boolean)
-                                .join(' · ') || 'Recorded on monitor only'}
+                            value={
+                                [
+                                    effectivePreview.alert_route.critical
+                                        .notify_in_app
+                                        ? 'In-app'
+                                        : null,
+                                    effectivePreview.alert_route.critical
+                                        .notify_email
+                                        ? 'Email'
+                                        : null,
+                                    effectivePreview.alert_route.critical
+                                        .open_it_ticket
+                                        ? 'IT incident ticket'
+                                        : null,
+                                    effectivePreview.alert_route.critical
+                                        .escalate_control_room
+                                        ? 'Control Room escalation'
+                                        : null,
+                                ]
+                                    .filter(Boolean)
+                                    .join(' · ') || 'Recorded on monitor only'
+                            }
                         />
                         <ReviewRow
                             label="Permitted recipients"
@@ -2103,7 +2104,7 @@ function MonitoringPolicyEditor({
                                 : editor?.kind === 'retention' &&
                                     preview === null
                                   ? 'Preview impact'
-                                  : 'Save governed change'}
+                                  : 'Save policy change'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

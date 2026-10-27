@@ -268,7 +268,7 @@ export function CollectorEnrollmentDialog({
                                 </Select>
                                 <p className="text-xs text-muted-foreground">
                                     The resulting collector is scoped to this
-                                    canonical Site. It cannot enumerate other
+                                    approved Site. It cannot enumerate other
                                     Sites or access the application database.
                                 </p>
                             </div>

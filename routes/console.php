@@ -82,6 +82,7 @@ use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
 use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\SyncWorkCalendarsJob;
+use App\Jobs\System\RecordDefaultWorkerHeartbeatJob;
 use App\Models\MedicationIdempotencyResult;
 use App\Services\Eligibility\WorkforceEligibilityRefresh;
 use App\Services\Fleet\FinanceReviewNotices;
@@ -90,6 +91,7 @@ use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 app(Schedule::class)->job(new SyncWorkCalendarsJob)->everyFifteenMinutes()->withoutOverlapping();
@@ -108,6 +110,23 @@ if (config('fleet_maintenance.effects_enabled', false)) {
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Artisan::command('system:scheduler-heartbeat', function () {
+    Cache::put('system:scheduler:last_heartbeat_at', now()->utc()->toIso8601String(), 3600);
+
+    if ((string) config('queue.default') !== 'sync') {
+        try {
+            dispatch(new RecordDefaultWorkerHeartbeatJob);
+        } catch (Throwable) {
+            // Queue transport errors are reported separately on Server readiness.
+        }
+    }
+})->purpose('Record scheduler and default background worker readiness heartbeats');
+
+app(Schedule::class)
+    ->command('system:scheduler-heartbeat')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 // Schedule lightweight monitor orchestration only. Protocol checks and remote
 // collector configuration are routed to their isolated runtime workloads.

@@ -669,7 +669,7 @@ describe('Device Management section', () => {
     it('shows exact governance requirements and never enables an unsupported provider action', () => {
         render(<DeviceManagementSection profile={profile()} deviceId={42} />);
 
-        expect(screen.getByText('Governed actions')).toBeInTheDocument();
+        expect(screen.getByText('Device actions')).toBeInTheDocument();
         expect(screen.getAllByText('Independent approval')).toHaveLength(2);
         expect(screen.getAllByText('Fresh-state reconciliation')).toHaveLength(
             2,

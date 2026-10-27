@@ -47,7 +47,18 @@ const ACRONYMS: Record<string, string> = {
     winrm: 'WinRM',
 };
 
+const PLAIN_PHRASES: Record<string, string> = {
+    evidence_backed: 'based on active checks',
+};
+
 function words(value: string): string[] {
+    const normalized = value
+        .trim()
+        .toLowerCase()
+        .replace(/[\s.-]+/g, '_');
+    const override = PLAIN_PHRASES[normalized];
+    if (override) return override.split(' ');
+
     return value
         .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
         .split(/[\s._:-]+/)

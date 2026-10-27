@@ -66,6 +66,8 @@ use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerRestoreProbe;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerSecretStore;
+use App\Domain\SecurityDevices\Credentials\Services\EncryptedDatabaseSecretLeaseIssuer;
+use App\Domain\SecurityDevices\Credentials\Services\EncryptedDatabaseSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\GovernedCredentialLeaseBroker;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultSecretStore;
@@ -248,20 +250,23 @@ class AppServiceProvider extends ServiceProvider
         ], 'device-command-adapters');
         $this->app->bind(ReleaseFixtureCommandRuntime::class, DatabaseReleaseFixtureCommandRuntime::class);
         $this->app->bind(CredentialLeaseProvider::class, GovernedCredentialLeaseBroker::class);
-        $this->app->singleton(SecretManagerLeaseIssuer::class, function ($app): SecretManagerLeaseIssuer {
-            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+        $this->app->bind(SecretManagerLeaseIssuer::class, function ($app): SecretManagerLeaseIssuer {
+            return match ((string) config('monitoring.credentials.driver', 'database')) {
+                'database' => $app->make(EncryptedDatabaseSecretLeaseIssuer::class),
                 'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
                 default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
             };
         });
-        $this->app->singleton(SecretManagerRestoreProbe::class, function ($app): SecretManagerRestoreProbe {
-            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+        $this->app->bind(SecretManagerRestoreProbe::class, function ($app): SecretManagerRestoreProbe {
+            return match ((string) config('monitoring.credentials.driver', 'database')) {
+                'database' => $app->make(EncryptedDatabaseSecretLeaseIssuer::class),
                 'vault' => $app->make(HashicorpVaultLeaseIssuer::class),
                 default => $app->make(UnavailableSecretManagerLeaseIssuer::class),
             };
         });
-        $this->app->singleton(SecretManagerSecretStore::class, function ($app): SecretManagerSecretStore {
-            return match ((string) config('monitoring.credentials.driver', 'unavailable')) {
+        $this->app->bind(SecretManagerSecretStore::class, function ($app): SecretManagerSecretStore {
+            return match ((string) config('monitoring.credentials.driver', 'database')) {
+                'database' => $app->make(EncryptedDatabaseSecretStore::class),
                 'vault' => $app->make(HashicorpVaultSecretStore::class),
                 default => $app->make(UnavailableSecretManagerSecretStore::class),
             };

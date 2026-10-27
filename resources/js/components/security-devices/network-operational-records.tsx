@@ -1107,7 +1107,7 @@ function SnapshotDetails({
                 </div>
             ) : null}
             {latest ? (
-                <ReviewCard icon={FileDiff} title="Latest governed snapshot">
+                <ReviewCard icon={FileDiff} title="Latest saved snapshot">
                     <ReviewRow
                         label="Storage"
                         value={<StateBadge state={latest.storageState} />}
@@ -1173,7 +1173,7 @@ function SnapshotDetails({
                                 className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                             >
                                 <Download className="size-4" />
-                                Download governed snapshot
+                                Download saved snapshot
                             </a>
                         ) : (
                             <p className="text-sm text-muted-foreground">
@@ -1198,7 +1198,7 @@ function SnapshotDetails({
             {(row.snapshotHistory?.length ?? 0) > 1 ? (
                 <details className="rounded-lg border border-border bg-card">
                     <summary className="cursor-pointer rounded-lg px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring">
-                        View previous governed snapshots (
+                        View previous saved snapshots (
                         {(row.snapshotHistory?.length ?? 1) - 1})
                     </summary>
                     <div className="space-y-3 p-3">

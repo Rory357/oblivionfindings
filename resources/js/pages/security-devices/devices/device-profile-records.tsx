@@ -360,7 +360,7 @@ export function DeviceAssetRecords({
     return (
         <RecordList
             title="Linked assets"
-            description="Canonical asset links. Asset destination access is checked separately from device access."
+            description="Linked asset records. Asset destination access is checked separately from device access."
             rows={rows}
             view={view}
             icon={Link2}
@@ -643,7 +643,7 @@ export function DeviceDocumentRecords({
     return (
         <RecordList
             title="Documents"
-            description="Returned active files. Read metadata and notes before opening the canonical private download."
+            description="Returned active files. Read metadata and notes before opening the private download."
             rows={rows}
             view={view}
             icon={FileText}
@@ -1043,7 +1043,7 @@ export function DeviceControlRoomRecords({
         <div className="space-y-5">
             <RecordList
                 title="Control Room alerts"
-                description="Returned operational alerts linked through the canonical Control Room projection. Restricted alerts require separate access."
+                description="Returned operational alerts linked to the Control Room. Restricted alerts require separate access."
                 rows={available}
                 rowKey={(row) => row.id ?? row.href ?? 'alert'}
                 view={view}

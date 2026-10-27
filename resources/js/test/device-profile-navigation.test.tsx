@@ -125,9 +125,68 @@ describe('DeviceProfileNavigation', () => {
         ).not.toBeInTheDocument();
 
         fireEvent.click(
-            screen.getByRole('button', { name: 'Records & governance' }),
+            screen.getByRole('button', { name: 'History & files' }),
         );
         expect(screen.getAllByRole('tab')).toHaveLength(1);
+        expect(
+            screen.queryByRole('tab', { name: /Audit/ }),
+        ).not.toBeInTheDocument();
+    });
+
+    it('hides passive read-only tabs when their count is zero while keeping actionable tabs', () => {
+        const zeroCounts: DeviceProfileSection[] = [
+            { key: 'health', label: 'Health', group: 'status' },
+            { key: 'monitors', label: 'Monitors', group: 'status', count: 0 },
+            {
+                key: 'assignments',
+                label: 'Assignments',
+                group: 'operations',
+                count: 0,
+            },
+            { key: 'tickets', label: 'Tickets', group: 'operations', count: 0 },
+            { key: 'events', label: 'Events', group: 'operations', count: 0 },
+            {
+                key: 'maintenance',
+                label: 'Maintenance',
+                group: 'operations',
+                count: 0,
+            },
+            {
+                key: 'documents',
+                label: 'Documents',
+                group: 'records',
+                count: 0,
+            },
+            { key: 'audit', label: 'Audit', group: 'records', count: 0 },
+        ];
+
+        render(<NavigationHarness sections={zeroCounts} />);
+
+        // Monitors is actionable (Add check) so it stays visible even at 0.
+        expect(
+            screen.getByRole('tab', { name: 'Monitors' }),
+        ).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Operations' }));
+        expect(
+            screen.getByRole('tab', { name: 'Assignments' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByRole('tab', { name: 'Maintenance' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('tab', { name: /Tickets/ }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('tab', { name: /Events/ }),
+        ).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'History & files' }),
+        );
+        expect(
+            screen.getByRole('tab', { name: 'Documents' }),
+        ).toBeInTheDocument();
         expect(
             screen.queryByRole('tab', { name: /Audit/ }),
         ).not.toBeInTheDocument();

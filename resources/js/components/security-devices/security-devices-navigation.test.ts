@@ -4,6 +4,7 @@ import {
     buildSecurityDevicesNavigationGroups,
     isSecurityDevicesDestinationActive,
     securityDevicesDomainHref,
+    securityDevicesWorkspaceLabel,
 } from './security-devices-navigation';
 
 const allPermissions = {
@@ -21,135 +22,95 @@ const allPermissions = {
 };
 
 describe('Security & Devices navigation contract', () => {
-    it('routes estate domains through their canonical workspaces', () => {
+    it('routes estate domains into the single Devices list with domain filters', () => {
         expect(securityDevicesDomainHref('security')).toBe(
-            '/security-devices/security',
+            '/security-devices/devices?domain=security',
         );
         expect(securityDevicesDomainHref('tracking')).toBe(
-            '/security-devices/tracking',
+            '/security-devices/devices?domain=tracking',
         );
         expect(securityDevicesDomainHref('iot_healthcare')).toBe(
-            '/security-devices/healthcare',
+            '/security-devices/devices?domain=iot_healthcare',
         );
         expect(securityDevicesDomainHref('it_infrastructure')).toBe(
-            '/security-devices/network-it',
+            '/security-devices/devices?domain=it_infrastructure',
         );
         expect(securityDevicesDomainHref('facilities')).toBe(
-            '/security-devices/facilities-iot',
+            '/security-devices/devices?domain=facilities',
         );
         expect(securityDevicesDomainHref('unknown')).toBe(
             '/security-devices/devices',
         );
     });
 
-    it('uses the approved four groups and destination order', () => {
+    it('preserves readable labels for legacy workspace slugs on retained batches', () => {
+        expect(securityDevicesWorkspaceLabel('network-it')).toBe(
+            'Network & IT',
+        );
+        expect(securityDevicesWorkspaceLabel('security')).toBe('Security');
+        expect(securityDevicesWorkspaceLabel('healthcare')).toBe('Healthcare');
+        expect(securityDevicesWorkspaceLabel('tracking')).toBe('Tracking');
+        expect(securityDevicesWorkspaceLabel('facilities-iot')).toBe(
+            'Facilities & IoT',
+        );
+    });
+
+    it('uses the five menu entries in exact order', () => {
         const groups = buildSecurityDevicesNavigationGroups(allPermissions);
 
         expect(groups.map((group) => group.label)).toEqual([
-            'Overview',
-            'Workspaces',
-            'Operations',
-            'Setup',
+            'Security & Devices',
         ]);
-        expect(
-            groups.map((group) =>
-                group.items.map((item) => [item.title, item.href]),
-            ),
-        ).toEqual([
+        expect(groups[0]?.items.map((item) => [item.title, item.href])).toEqual(
             [
-                ['Estate overview', '/security-devices'],
+                ['Overview', '/security-devices'],
+                ['Devices', '/security-devices/devices'],
                 ['Sites', '/security-devices/sites'],
-                ['All devices', '/security-devices/devices'],
+                ['Alerts & upkeep', '/security-devices/monitoring'],
+                ['Setup', '/security-devices/discovery'],
             ],
-            [
-                ['Network & IT', '/security-devices/network-it'],
-                ['Security', '/security-devices/security'],
-                ['Healthcare', '/security-devices/healthcare'],
-                ['Tracking', '/security-devices/tracking'],
-                ['Facilities & IoT', '/security-devices/facilities-iot'],
-            ],
-            [
-                ['Monitoring', '/security-devices/monitoring'],
-                ['Maintenance', '/security-devices/maintenance'],
-            ],
-            [
-                ['Discovery & collectors', '/security-devices/discovery'],
-                ['Agent downloads', '/security-devices/agent-downloads'],
-                ['Integrations', '/security-devices/integrations'],
-                ['Settings & audit', '/security-devices/settings'],
-            ],
-        ]);
+        );
     });
 
-    it('removes destinations the actor cannot view without leaving empty groups', () => {
-        const groups = buildSecurityDevicesNavigationGroups({
+    it('removes destinations the actor cannot view and resolves permitted landing URLs', () => {
+        const devicesOnly = buildSecurityDevicesNavigationGroups({
             viewAny: true,
             devicesView: true,
         });
-
-        expect(groups.map((group) => group.label)).toEqual([
-            'Overview',
-            'Workspaces',
-        ]);
-        expect(groups[0]?.items.map((item) => item.title)).toEqual([
-            'Estate overview',
-            'Sites',
-            'All devices',
-        ]);
-        expect(groups[1]?.items.map((item) => item.title)).toEqual([
-            'Network & IT',
-            'Security',
-            'Healthcare',
-            'Tracking',
-            'Facilities & IoT',
+        expect(
+            devicesOnly[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([
+            ['Overview', '/security-devices'],
+            ['Devices', '/security-devices/devices'],
+            ['Sites', '/security-devices/sites'],
         ]);
 
-        const operationsOnly = buildSecurityDevicesNavigationGroups({
-            eventsView: true,
+        const maintenanceOnly = buildSecurityDevicesNavigationGroups({
             maintenanceView: true,
         });
-        expect(operationsOnly.map((group) => group.label)).toEqual([
-            'Operations',
-        ]);
-        expect(operationsOnly[0]?.items.map((item) => item.title)).toEqual([
-            'Monitoring',
-            'Maintenance',
-        ]);
+        expect(
+            maintenanceOnly[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([['Alerts & upkeep', '/security-devices/maintenance']]);
 
         const collectorManager = buildSecurityDevicesNavigationGroups({
             integrationsManage: true,
         });
-        expect(collectorManager.map((group) => group.label)).toEqual(['Setup']);
-        expect(collectorManager[0]?.items.map((item) => item.href)).toEqual([
-            '/security-devices/agent-downloads',
-        ]);
-
-        const commandAdminOnly = buildSecurityDevicesNavigationGroups({
-            commandsAdmin: true,
-        });
-        expect(commandAdminOnly.map((group) => group.label)).toEqual(['Setup']);
         expect(
-            commandAdminOnly[0]?.items.map((item) => [item.title, item.href]),
-        ).toEqual([
-            ['Agent downloads', '/security-devices/agent-downloads'],
-            ['Settings & audit', '/security-devices/settings'],
-        ]);
+            collectorManager[0]?.items.map((item) => [item.title, item.href]),
+        ).toEqual([['Setup', '/security-devices/agent-downloads']]);
 
         const monitoringManagerOnly = buildSecurityDevicesNavigationGroups({
             monitoringManage: true,
         });
-        expect(monitoringManagerOnly.map((group) => group.label)).toEqual([
-            'Setup',
-        ]);
         expect(
             monitoringManagerOnly[0]?.items.map((item) => [
                 item.title,
                 item.href,
             ]),
-        ).toEqual([['Settings & audit', '/security-devices/settings']]);
+        ).toEqual([['Setup', '/security-devices/settings']]);
     });
 
-    it('matches canonical and preserved legacy destinations without making the estate root greedy', () => {
+    it('matches hub pages and preserved legacy routes without making Overview greedy', () => {
         expect(
             isSecurityDevicesDestinationActive(
                 '/security-devices',
@@ -159,13 +120,25 @@ describe('Security & Devices navigation contract', () => {
         expect(
             isSecurityDevicesDestinationActive(
                 '/security-devices/security?tab=cctv',
-                '/security-devices/security',
+                '/security-devices/devices',
             ),
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
                 '/security-devices/cctv?site=4',
-                '/security-devices/security',
+                '/security-devices/devices',
+            ),
+        ).toBe(true);
+        expect(
+            isSecurityDevicesDestinationActive(
+                '/security-devices/devices/42',
+                '/security-devices/devices',
+            ),
+        ).toBe(true);
+        expect(
+            isSecurityDevicesDestinationActive(
+                '/security-devices/maintenance-health',
+                '/security-devices/monitoring',
             ),
         ).toBe(true);
         expect(
@@ -182,20 +155,32 @@ describe('Security & Devices navigation contract', () => {
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
-                '/security-devices/alerts-events',
-                '/security-devices/security',
-            ),
-        ).toBe(false);
-        expect(
-            isSecurityDevicesDestinationActive(
-                '/security-devices/devices/42',
-                '/security-devices/devices',
+                '/security-devices/integrations',
+                '/security-devices/discovery',
             ),
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
+                '/security-devices/settings',
+                '/security-devices/agent-downloads',
+            ),
+        ).toBe(true);
+        expect(
+            isSecurityDevicesDestinationActive(
+                '/security-devices/alerts-events',
+                '/security-devices/devices',
+            ),
+        ).toBe(false);
+        expect(
+            isSecurityDevicesDestinationActive(
                 '/security-devices/security',
                 '/security-devices',
+            ),
+        ).toBe(false);
+        expect(
+            isSecurityDevicesDestinationActive(
+                '/security-devices/scripts',
+                '/security-devices/devices',
             ),
         ).toBe(false);
     });

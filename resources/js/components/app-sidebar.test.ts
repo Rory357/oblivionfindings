@@ -259,7 +259,7 @@ describe('app sidebar workforce navigation', () => {
         },
     );
 
-    it('uses the grouped Security & Devices contract in application search', () => {
+    it('uses the simplified five-item Security & Devices contract in application search', () => {
         const catalog = buildNavSearchCatalog({
             can: {
                 securityDevices: {
@@ -277,29 +277,22 @@ describe('app sidebar workforce navigation', () => {
         }).filter((item) => item.section === 'Security & Devices');
 
         expect([...new Set(catalog.map((item) => item.group))]).toEqual([
-            'Overview',
-            'Workspaces',
-            'Operations',
-            'Setup',
+            'Security & Devices',
         ]);
         expect(catalog.map((item) => item.label)).toEqual([
-            'Estate overview',
+            'Overview',
+            'Devices',
             'Sites',
-            'All devices',
-            'Network & IT',
-            'Security',
-            'Healthcare',
-            'Tracking',
-            'Facilities & IoT',
-            'Monitoring',
-            'Maintenance',
-            'Discovery & collectors',
-            'Agent downloads',
-            'Integrations',
-            'Settings & audit',
+            'Alerts & upkeep',
+            'Setup',
         ]);
         expect(catalog.map((item) => item.label)).not.toEqual(
             expect.arrayContaining([
+                'Network & IT',
+                'Security',
+                'Healthcare',
+                'Tracking',
+                'Facilities & IoT',
                 'Tracking Devices',
                 'Smart IoT & Healthcare',
                 'IT Infrastructure',

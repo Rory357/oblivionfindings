@@ -115,7 +115,10 @@ import {
     useRef,
     useState,
 } from 'react';
-import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
+import {
+    buildSecurityDevicesNavigationGroups,
+    securityDevicesPrimaryLinkActive,
+} from './security-devices/security-devices-navigation';
 
 /* Event Horizon ink rail (APP_SHELL_STYLE_GUIDE.md §3). Sits below the
  * 58px command header; the two share the sidebar tokens so they read as one
@@ -389,6 +392,13 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     );
     if (workforceActive !== undefined)
         return workforceActive ? 2000 + item.length : -1;
+
+    const securityDevicesActive = securityDevicesPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (securityDevicesActive !== undefined)
+        return securityDevicesActive ? 2000 + item.length : -1;
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&

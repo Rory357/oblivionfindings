@@ -417,6 +417,52 @@ export default [
         },
     },
     {
+        // Security & Devices plain-language rule: keep system-design jargon out
+        // of user-facing copy while leaving backend payload keys and TypeScript
+        // identifiers untouched.
+        files: [
+            'resources/js/pages/security-devices/**/*.{ts,tsx}',
+            'resources/js/components/security-devices/**/*.{ts,tsx}',
+        ],
+        ignores: ['**/*.test.ts', '**/*.test.tsx', '**/*fixtures*.ts'],
+        plugins: {
+            'security-devices-copy': {
+                rules: {
+                    'no-jargon': builtinRules.get('no-restricted-syntax'),
+                },
+            },
+        },
+        rules: {
+            'security-devices-copy/no-jargon': [
+                'error',
+                {
+                    selector:
+                        'JSXText[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i]',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'JSXAttribute[name.name=/^(?:label|title|description|subline|caption|placeholder|aria-label|ariaLabel|empty|note|railTitle|railSub|blurb|text|confirmText)$/] :matches(Literal[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i], TemplateElement[value.raw=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i])',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'Property[key.name=/^(?:label|title|description|subline|caption|placeholder|empty|note|blurb|next|confirmText)$/] > :matches(Literal[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i], TemplateElement[value.raw=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i])',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+                {
+                    selector:
+                        'ArrayExpression > Literal:first-child[value=/\\b(?:canonical|governed|provenances?|evidence-backed|evidence backed|projections?)\\b/i]',
+                    message:
+                        'Security & Devices UI copy uses plain English instead of system-design jargon (avoid "canonical", "governed", "provenance", "evidence-backed", and "projection").',
+                },
+            ],
+        },
+    },
+    {
         // Node tooling (scripts/, tools/): run by node, not the browser bundle.
         files: ['**/*.{cjs,mjs}'],
         languageOptions: {
@@ -456,6 +502,7 @@ export default [
             // with several active worktrees. CI never has these.
             '.claude/worktrees/**',
             '.claude/**',
+            '.endpoint-tools/**',
         ],
     },
     prettier, // Turn off all rules that might conflict with Prettier

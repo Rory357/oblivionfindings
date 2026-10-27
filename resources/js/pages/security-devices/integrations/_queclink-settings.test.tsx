@@ -706,7 +706,7 @@ describe('Queclink advanced settings workflows', () => {
         next();
         expect(screen.getByText('Synthetic client')).toBeVisible();
         fireEvent.click(
-            screen.getByRole('button', { name: 'Continue to governed review' }),
+            screen.getByRole('button', { name: 'Continue to command review' }),
         );
         expect(mocks.post.mock.calls[0].slice(0, 2)).toEqual([
             '/security-devices/integrations/queclink/devices/2/presets/6/apply',

@@ -20,6 +20,7 @@ import {
     MonitoringPolicySettings,
     type MonitoringPolicyWorkspace,
 } from '@/components/security-devices/monitoring-policy-settings';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { SettingsNotice } from '@/components/settings/settings-notice';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -537,6 +538,10 @@ function SettingsAuditWorkspace(props: SettingsAuditProps) {
                             ariaLabel="Security & Devices settings views"
                         />
                     }
+                />
+                <SecurityDevicesSectionTabs
+                    section="setup"
+                    activeTab="settings"
                 />
                 {view === 'overview' && (
                     <>

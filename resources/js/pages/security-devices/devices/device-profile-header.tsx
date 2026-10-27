@@ -260,34 +260,38 @@ export function DeviceProfileHeader({
                 })}
             mobileSummary={`${header.health.label} · ${header.requiredAction.label}`}
             expandedContent={
-                <div className="text-caption space-y-1">
-                    <p>Device UID: {header.identity.uid}</p>
-                    <p>
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs leading-snug text-band-foreground/75">
+                    <span>Device UID: {header.identity.uid}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>
                         Observation freshness:{' '}
                         {header.freshness.state.replaceAll('_', ' ')}
-                    </p>
-                    <p>
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
                         Location:{' '}
                         {header.location?.href ? (
                             <Link
                                 href={header.location.href}
-                                className="underline underline-offset-2"
+                                className="font-medium text-band-foreground underline underline-offset-2 hover:text-band-foreground/90"
                             >
                                 {header.location.name}
                             </Link>
                         ) : (
                             (header.location?.name ?? 'Unassigned')
                         )}
-                    </p>
-                    <p>
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
                         Provider observation: {header.providerObservation.label}
-                    </p>
-                    <p>
+                    </span>
+                    <span aria-hidden="true">·</span>
+                    <span>
                         Read started{' '}
                         {formatDateTimeLong(asOf, 'at a time not recorded')}.
                         This is a dated read, not an atomic or live health
                         check.
-                    </p>
+                    </span>
                 </div>
             }
             rail={rail}

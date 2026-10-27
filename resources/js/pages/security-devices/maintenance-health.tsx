@@ -16,6 +16,7 @@ import {
     MaintenanceHealthWorkRecords,
 } from '@/components/security-devices/maintenance-health-records';
 import { maintenanceLabel } from '@/components/security-devices/maintenance-records';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -426,6 +427,12 @@ function MaintenanceHealthBody({
                         />
                     }
                 />
+                {visible ? (
+                    <SecurityDevicesSectionTabs
+                        section="alerts-upkeep"
+                        activeTab="maintenance-health"
+                    />
+                ) : null}
                 {!visible ? (
                     <p
                         role="status"

@@ -103,7 +103,7 @@ describe('monitoring policy settings', () => {
         const name = screen.getByLabelText('Profile name');
         fireEvent.change(name, { target: { value: 'Core reachability' } });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Save governed change' }),
+            screen.getByRole('button', { name: 'Save policy change' }),
         );
 
         await waitFor(() => {
@@ -150,7 +150,7 @@ describe('monitoring policy settings', () => {
             },
         );
         fireEvent.click(
-            screen.getByRole('button', { name: 'Save governed change' }),
+            screen.getByRole('button', { name: 'Save policy change' }),
         );
 
         await waitFor(() => {
@@ -182,7 +182,7 @@ describe('monitoring policy settings', () => {
             target: { value: 'Core network IT routing' },
         });
         fireEvent.click(
-            screen.getByRole('button', { name: 'Save governed change' }),
+            screen.getByRole('button', { name: 'Save policy change' }),
         );
 
         await waitFor(() => {
@@ -275,7 +275,9 @@ describe('monitoring policy settings', () => {
                 '/security-devices/settings/monitoring/effective-preview/91',
             );
         });
-        expect(await screen.findByText('Coast WAN latency')).toBeInTheDocument();
+        expect(
+            await screen.findByText('Coast WAN latency'),
+        ).toBeInTheDocument();
         expect(
             screen.getByText(/Upcoming: Sunday switch patching/),
         ).toBeInTheDocument();
@@ -312,7 +314,7 @@ describe('monitoring policy settings', () => {
             screen.getByText(/12 metric series and 3 configuration snapshots/),
         ).toBeInTheDocument();
         const save = screen.getByRole('button', {
-            name: 'Save governed change',
+            name: 'Save policy change',
         });
         expect(save).toBeDisabled();
 

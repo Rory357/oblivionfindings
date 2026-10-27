@@ -489,11 +489,15 @@ class SecurityWorkspacePresenter
             return ['state' => 'disabled', 'label' => 'Source disabled'];
         }
 
-        if ($source->provider === 'hikvision' || $source->stream_state === 'verified') {
+        if ($source->stream_state === 'verified' && $source->stream_verified_at !== null) {
             return ['state' => 'verified', 'label' => 'Live source verified'];
         }
 
-        return ['state' => 'configured', 'label' => 'Source configured'];
+        if ($source->stream_state === 'failed') {
+            return ['state' => 'failed', 'label' => 'Live check failed'];
+        }
+
+        return ['state' => 'configured', 'label' => 'Source configured (not verified)'];
     }
 
     private function mapDevice(
@@ -516,7 +520,7 @@ class SecurityWorkspacePresenter
             'subcategory' => $device->subcategory,
             'provider' => $device->provider,
             'status' => $device->status?->value,
-            'health' => $device->health_status?->value,
+            'health' => $device->effectiveHealthState(),
             'lastSeenAt' => $device->last_seen_at?->toISOString(),
             'deviceHref' => "/security-devices/devices/{$device->id}",
             'site' => $site,

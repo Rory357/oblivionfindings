@@ -45,7 +45,7 @@ if (is_string($encodedSigningKeys) && $encodedSigningKeys !== '') {
 
 return [
     'credentials' => [
-        'driver' => env('MONITORING_CREDENTIAL_DRIVER', 'unavailable'),
+        'driver' => env('MONITORING_CREDENTIAL_DRIVER', 'database'),
         'lease_ttl_seconds' => (int) env('MONITORING_CREDENTIAL_LEASE_TTL_SECONDS', 60),
         'vault' => [
             'url' => env('MONITORING_VAULT_URL'),

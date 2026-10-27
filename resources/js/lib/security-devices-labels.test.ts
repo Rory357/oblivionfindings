@@ -14,6 +14,7 @@ describe('Security & Devices readable labels', () => {
         expect(readableKey('DeviceMaintenanceRecord')).toBe(
             'Device maintenance record',
         );
+        expect(readableKey('evidence_backed')).toBe('Based on active checks');
     });
 
     it('keeps a fallback and a lowercase phrase form for mid-sentence use', () => {

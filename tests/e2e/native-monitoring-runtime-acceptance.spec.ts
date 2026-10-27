@@ -152,7 +152,7 @@ test.describe('native monitoring runtime desktop acceptance', () => {
             }),
         ).toBeVisible();
         await expect(page.getByText(/p95 86\.2/)).toBeVisible();
-        await expect(page.getByText(/Projection Not Configured/)).toBeVisible();
+        await expect(page.getByText(/Trend Not Configured/)).toBeVisible();
         await expectSafePage(page, rawSentinels);
 
         markCollectorOutage(fixture.collectorUuid);
@@ -234,7 +234,7 @@ test.describe('native monitoring runtime desktop acceptance', () => {
                 exact: true,
             })
             .click();
-        await expect(page.getByText('Latest governed snapshot')).toBeVisible();
+        await expect(page.getByText('Latest saved snapshot')).toBeVisible();
         await expect(page.getByText(/Approved read only/i)).toBeVisible();
         await expect(page.getByText(/2,048 bytes|2048 bytes/)).toBeVisible();
         await expectSafePage(page, rawSentinels);
