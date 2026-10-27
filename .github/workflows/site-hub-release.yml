@@ -137,8 +137,10 @@ jobs:
           PUBLISHER_CATALOGUE_PUBKEY: ${{ secrets.ENDPOINT_RELEASE_PUBLIC_KEY }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $version = if ($env:INPUT_VERSION) { $env:INPUT_VERSION } else { '0.2.0' }
-          $revision = [int](if ($env:INPUT_REVISION) { $env:INPUT_REVISION } else { '1' })
+          $version = '0.2.0'
+          if ($env:INPUT_VERSION) { $version = $env:INPUT_VERSION }
+          $revision = 1
+          if ($env:INPUT_REVISION) { $revision = [int]$env:INPUT_REVISION }
           $workRoot = Join-Path $env:RUNNER_TEMP 'oblivion-build'
           $stageCatalogue = Join-Path $env:RUNNER_TEMP 'catalogue-stage'
           New-Item -ItemType Directory -Force -Path $workRoot, $stageCatalogue | Out-Null
@@ -339,7 +341,9 @@ jobs:
             $parsed = $cat->catalogue();
             echo "Verified signed catalogue with " . count($parsed["artifacts"]) . " artifacts.\n";
           '
-          "UPLOAD_SIGNED_CATALOGUE=$(if (-not $usingEphemeralKeys) { 'true' } else { 'false' })" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          $uploadFlag = 'false'
+          if (-not $usingEphemeralKeys) { $uploadFlag = 'true' }
+          "UPLOAD_SIGNED_CATALOGUE=$uploadFlag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload signed release catalogue
         if: ${{ env.UPLOAD_SIGNED_CATALOGUE == 'true' }}
