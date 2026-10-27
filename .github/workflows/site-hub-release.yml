@@ -1,0 +1,352 @@
+name: site-hub-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version (e.g. 0.2.0)"
+        required: false
+        default: "0.2.0"
+      revision:
+        description: "Monotonic release & catalogue revision integer"
+        required: false
+        default: "1"
+  push:
+    branches:
+      - main
+      - "security-devices/phase-2*"
+    paths:
+      - "endpoint-agent/**"
+      - "collector/**"
+      - "scripts/package-linux-site-hub.sh"
+      - ".github/workflows/site-hub-release.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "endpoint-agent/**"
+      - "collector/**"
+      - "scripts/package-linux-site-hub.sh"
+      - ".github/workflows/site-hub-release.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux-packages:
+    name: Build Linux Site Hub (amd64 & arm64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: curl, json, mbstring, openssl, sodium, sockets
+          coverage: none
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: endpoint-agent/go.mod
+          cache-dependency-path: endpoint-agent/go.sum
+
+      - name: Install collector dependencies & run collector unit tests
+        working-directory: collector
+        run: |
+          composer install --no-interaction --prefer-dist
+          composer test
+          composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist
+
+      - name: Cross-compile Linux binaries & package NUC/Pi tarballs
+        run: |
+          chmod +x scripts/package-linux-site-hub.sh endpoint-agent/packaging/linux/install.sh
+          for ARCH in amd64 arm64; do
+            OUT_BIN="${RUNNER_TEMP}/linux-bin-${ARCH}"
+            mkdir -p "$OUT_BIN"
+            (
+              cd endpoint-agent
+              CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "${OUT_BIN}/oblivion-site-collector" ./cmd/oblivion-site-collector
+              CGO_ENABLED=0 GOOS=linux GOARCH="$ARCH" go build -trimpath -ldflags="-s -w" -o "${OUT_BIN}/oblivion-media" ./cmd/oblivion-media
+            )
+            ./scripts/package-linux-site-hub.sh "$ARCH" "$OUT_BIN" "${RUNNER_TEMP}/dist/oblivion-site-hub-linux-${ARCH}.tar.gz"
+          done
+
+      - name: Upload Linux Site Hub packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-site-hub-packages
+          path: ${{ runner.temp }}/dist/oblivion-site-hub-linux-*.tar.gz
+          if-no-files-found: error
+
+  windows-and-catalogue:
+    name: Build Windows Installer (amd64 & arm64) + Signed Catalogue
+    needs: linux-packages
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Linux Site Hub packages
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-site-hub-packages
+          path: ${{ runner.temp }}/catalogue-stage
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: endpoint-agent/go.mod
+          cache-dependency-path: endpoint-agent/go.sum
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: endpoint-agent/installer/global.json
+
+      - name: Setup PHP 8.4 (for collector vendor & Windows x64 runtime)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: curl, mbstring, openssl, sodium, sockets
+          coverage: none
+
+      - name: Prepare collector production vendor tree
+        working-directory: collector
+        shell: pwsh
+        run: |
+          composer install --no-dev --classmap-authoritative --no-interaction --prefer-dist
+
+      - name: Run Go unit tests
+        working-directory: endpoint-agent
+        shell: pwsh
+        run: |
+          go test ./...
+
+      - name: Build Windows binaries, unsigned Obli.Setup installer, and signed release manifests
+        shell: pwsh
+        env:
+          INPUT_VERSION: ${{ inputs.version || '0.2.0' }}
+          INPUT_REVISION: ${{ inputs.revision || '1' }}
+          PUBLISHER_PACKAGE_SEED: ${{ secrets.ENDPOINT_PACKAGE_SIGNING_SEED }}
+          PUBLISHER_CATALOGUE_SEED: ${{ secrets.ENDPOINT_CATALOGUE_SIGNING_SEED }}
+          PUBLISHER_PACKAGE_PUBKEY: ${{ secrets.ENDPOINT_PACKAGE_PUBLIC_KEY }}
+          PUBLISHER_CATALOGUE_PUBKEY: ${{ secrets.ENDPOINT_RELEASE_PUBLIC_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = if ($env:INPUT_VERSION) { $env:INPUT_VERSION } else { '0.2.0' }
+          $revision = [int](if ($env:INPUT_REVISION) { $env:INPUT_REVISION } else { '1' })
+          $workRoot = Join-Path $env:RUNNER_TEMP 'oblivion-build'
+          $stageCatalogue = Join-Path $env:RUNNER_TEMP 'catalogue-stage'
+          New-Item -ItemType Directory -Force -Path $workRoot, $stageCatalogue | Out-Null
+
+          $usingEphemeralKeys = (-not $env:PUBLISHER_PACKAGE_SEED) -or (-not $env:PUBLISHER_CATALOGUE_SEED)
+          if ($usingEphemeralKeys) {
+            $keysJson = php -r '
+              $pkgSeed = random_bytes(SODIUM_CRYPTO_SIGN_SEEDBYTES);
+              $pkgPair = sodium_crypto_sign_seed_keypair($pkgSeed);
+              $catSeed = random_bytes(SODIUM_CRYPTO_SIGN_SEEDBYTES);
+              $catPair = sodium_crypto_sign_seed_keypair($catSeed);
+              echo json_encode([
+                "pkg_seed" => base64_encode($pkgSeed),
+                "pkg_pub" => base64_encode(sodium_crypto_sign_publickey($pkgPair)),
+                "cat_seed" => base64_encode($catSeed),
+                "cat_pub" => base64_encode(sodium_crypto_sign_publickey($catPair)),
+              ]);
+            ' | ConvertFrom-Json
+            $pkgSeed = $keysJson.pkg_seed
+            $pkgPub = $keysJson.pkg_pub
+            $catSeed = $keysJson.cat_seed
+            $catPub = $keysJson.cat_pub
+          } else {
+            $pkgSeed = $env:PUBLISHER_PACKAGE_SEED.Trim()
+            $pkgPub = $env:PUBLISHER_PACKAGE_PUBKEY.Trim()
+            $catSeed = $env:PUBLISHER_CATALOGUE_SEED.Trim()
+            $catPub = $env:PUBLISHER_CATALOGUE_PUBKEY.Trim()
+          }
+
+          # 1. Build Obli tray helper (x64 & arm64)
+          $toolsOut = Join-Path $workRoot 'tools'
+          & ./endpoint-agent/tray/build.ps1 -OutputRoot $toolsOut
+
+          # 2. Build Go binaries for windows/amd64 and windows/arm64 + oblivion-release tool
+          Push-Location endpoint-agent
+          try {
+            go build -trimpath -o (Join-Path $workRoot 'oblivion-release.exe') ./cmd/oblivion-release
+            foreach ($arch in @('amd64', 'arm64')) {
+              $env:GOOS = 'windows'
+              $env:GOARCH = $arch
+              $env:CGO_ENABLED = '0'
+              $binDir = Join-Path $workRoot "go-win-$arch"
+              New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+              go build -trimpath -ldflags="-s -w -X main.version=$version" -o (Join-Path $binDir 'oblivion-agent.exe') ./cmd/oblivion-agent
+              go build -trimpath -ldflags="-s -w" -o (Join-Path $binDir 'oblivion-collector.exe') ./cmd/oblivion-collector
+              go build -trimpath -ldflags="-s -w" -o (Join-Path $binDir 'oblivion-media.exe') ./cmd/oblivion-media
+              go build -trimpath -ldflags="-s -w -X main.version=$version -X main.publisherPublicKey=$pkgPub" -o (Join-Path $binDir 'oblivion-setup-core.exe') ./cmd/oblivion-setup
+            }
+          } finally {
+            Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED -ErrorAction SilentlyContinue
+            Pop-Location
+          }
+
+          # 3. Build unsigned Obli.Setup graphical Windows installers (x64 & arm64) with pinned BackendSha256
+          & ./endpoint-agent/installer/build.ps1 `
+            -OutputRoot $toolsOut `
+            -BackendX64 (Join-Path $workRoot 'go-win-amd64\oblivion-setup-core.exe') `
+            -BackendArm64 (Join-Path $workRoot 'go-win-arm64\oblivion-setup-core.exe')
+
+          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-x64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-amd64.exe')
+          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-x64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-site-setup-windows-amd64.exe')
+          Copy-Item (Join-Path $toolsOut 'obli-setup-windows-arm64\oblivion-setup.exe') (Join-Path $stageCatalogue 'oblivion-setup-windows-arm64.exe')
+
+          # 4. Assemble & sign Windows release archives (OBLIVION-RELEASE-V1)
+          $phpExe = (Get-Command php).Source
+          $phpDir = Split-Path -Parent $phpExe
+          $publishedAt = (Get-Date).ToUniversalTime().AddMinutes(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
+          $expiresAt = (Get-Date).ToUniversalTime().AddDays(85).ToString('yyyy-MM-ddTHH:mm:ssZ')
+          $hasWinPhpRuntime = Test-Path (Join-Path $phpDir 'ext\php_curl.dll')
+
+          function Copy-WindowsSiteRuntime([string]$siteStage, [string]$arch) {
+            $runtimeStage = Join-Path $siteStage 'runtime'
+            $extStage = Join-Path $runtimeStage 'ext'
+            New-Item -ItemType Directory -Force -Path $extStage | Out-Null
+            Copy-Item (Join-Path $workRoot "go-win-$arch\oblivion-collector.exe") (Join-Path $siteStage 'oblivion-collector.exe')
+            Copy-Item (Join-Path $workRoot "go-win-$arch\oblivion-media.exe") (Join-Path $siteStage 'oblivion-media.exe')
+            Copy-Item -Recurse collector\bin, collector\src, collector\vendor $siteStage
+            Copy-Item collector\composer.json (Join-Path $siteStage 'composer.json')
+            Copy-Item $phpExe (Join-Path $runtimeStage 'php.exe')
+            Get-ChildItem -Path $phpDir -Filter '*.dll' -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $runtimeStage $_.Name) }
+            foreach ($ext in @('php_curl.dll', 'php_openssl.dll', 'php_sodium.dll', 'php_sockets.dll')) {
+              Copy-Item (Join-Path $phpDir "ext\$ext") (Join-Path $extStage $ext)
+            }
+            $caCandidate = @(
+              (Join-Path $phpDir 'extras\ssl\cacert.pem'),
+              (Join-Path $phpDir 'cacert.pem')
+            ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if (-not $caCandidate) {
+              Invoke-WebRequest -Uri 'https://curl.se/ca/cacert.pem' -OutFile (Join-Path $runtimeStage 'cacert.pem')
+            } else {
+              Copy-Item $caCandidate (Join-Path $runtimeStage 'cacert.pem')
+            }
+          }
+
+          function Invoke-BuildWindowsZip([string]$stageDir, [string]$arch, [string[]]$roles, [string]$outZip) {
+            $metaPath = Join-Path $workRoot ("release-meta-" + [IO.Path]::GetFileNameWithoutExtension($outZip) + ".json")
+            @{
+              version = $version
+              revision = $revision
+              architecture = $arch
+              roles = $roles
+              published_at = $publishedAt
+              expires_at = $expiresAt
+            } | ConvertTo-Json -Depth 4 | Set-Content -Path $metaPath -NoNewline -Encoding utf8
+            $pkgSeed | & (Join-Path $workRoot 'oblivion-release.exe') build `
+              --stage $stageDir `
+              --metadata $metaPath `
+              --output $outZip `
+              --publisher-key $pkgPub | Out-Host
+            if ($LASTEXITCODE -ne 0) { throw "oblivion-release build failed for $outZip" }
+          }
+
+          # Windows amd64 combined (Obli + computer agent + site monitoring)
+          $combinedAmd64Stage = Join-Path $workRoot 'pkg-combined-amd64'
+          New-Item -ItemType Directory -Force -Path (Join-Path $combinedAmd64Stage 'computer') | Out-Null
+          Copy-Item (Join-Path $toolsOut 'obli-windows-x64\obli.exe') (Join-Path $combinedAmd64Stage 'computer\obli.exe')
+          Copy-Item (Join-Path $workRoot 'go-win-amd64\oblivion-agent.exe') (Join-Path $combinedAmd64Stage 'computer\oblivion-agent.exe')
+          $combinedAmd64Roles = @('computer')
+          if ($hasWinPhpRuntime) {
+            $combinedAmd64Roles = @('computer', 'site')
+            Copy-WindowsSiteRuntime (Join-Path $combinedAmd64Stage 'site') 'amd64'
+          }
+          Invoke-BuildWindowsZip $combinedAmd64Stage 'amd64' $combinedAmd64Roles (Join-Path $stageCatalogue 'oblivion-windows-amd64.zip')
+
+          # Windows amd64 site-only archive (so Site-hub operators without commands.admin can also download Windows Site hub)
+          if ($hasWinPhpRuntime) {
+            $siteOnlyAmd64Stage = Join-Path $workRoot 'pkg-site-amd64'
+            Copy-WindowsSiteRuntime (Join-Path $siteOnlyAmd64Stage 'site') 'amd64'
+            Invoke-BuildWindowsZip $siteOnlyAmd64Stage 'amd64' @('site') (Join-Path $stageCatalogue 'oblivion-site-windows-amd64.zip')
+          }
+
+          # Windows arm64 computer archive
+          $arm64Stage = Join-Path $workRoot 'pkg-computer-arm64'
+          New-Item -ItemType Directory -Force -Path (Join-Path $arm64Stage 'computer') | Out-Null
+          Copy-Item (Join-Path $toolsOut 'obli-windows-arm64\obli.exe') (Join-Path $arm64Stage 'computer\obli.exe')
+          Copy-Item (Join-Path $workRoot 'go-win-arm64\oblivion-agent.exe') (Join-Path $arm64Stage 'computer\oblivion-agent.exe')
+          Invoke-BuildWindowsZip $arm64Stage 'arm64' @('computer') (Join-Path $stageCatalogue 'oblivion-windows-arm64.zip')
+
+          # 5. Assemble & sign OBLIVION-DOWNLOADS-V1 catalogue
+          function New-ArtifactEntry([string]$id, [string]$platform, [string]$arch, [string[]]$roles, [string]$filename) {
+            $item = Get-Item -LiteralPath (Join-Path $stageCatalogue $filename)
+            return @{
+              id = $id
+              platform = $platform
+              architecture = $arch
+              roles = $roles
+              version = $version
+              release_revision = $revision
+              filename = $filename
+              size = [int64]$item.Length
+              sha256 = (Get-FileHash -LiteralPath $item.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          }
+
+          $artifacts = @(
+            (New-ArtifactEntry 'windows-setup-amd64' 'windows' 'amd64' $combinedAmd64Roles 'oblivion-setup-windows-amd64.exe'),
+            (New-ArtifactEntry 'windows-package-amd64' 'windows' 'amd64' $combinedAmd64Roles 'oblivion-windows-amd64.zip'),
+            (New-ArtifactEntry 'windows-setup-arm64' 'windows' 'arm64' @('computer') 'oblivion-setup-windows-arm64.exe'),
+            (New-ArtifactEntry 'windows-package-arm64' 'windows' 'arm64' @('computer') 'oblivion-windows-arm64.zip'),
+            (New-ArtifactEntry 'linux-site-hub-amd64' 'linux' 'amd64' @('site') 'oblivion-site-hub-linux-amd64.tar.gz'),
+            (New-ArtifactEntry 'linux-site-hub-arm64' 'linux' 'arm64' @('site') 'oblivion-site-hub-linux-arm64.tar.gz')
+          )
+          if ($hasWinPhpRuntime) {
+            $artifacts += (New-ArtifactEntry 'windows-site-setup-amd64' 'windows' 'amd64' @('site') 'oblivion-site-setup-windows-amd64.exe')
+            $artifacts += (New-ArtifactEntry 'windows-site-package-amd64' 'windows' 'amd64' @('site') 'oblivion-site-windows-amd64.zip')
+          }
+
+          $catalogueMetaPath = Join-Path $workRoot 'catalogue-meta.json'
+          $catalogueExpiresAt = (Get-Date).ToUniversalTime().AddDays(80).ToString('yyyy-MM-ddTHH:mm:ssZ')
+          @{
+            revision = $revision
+            issued_at = $publishedAt
+            expires_at = $catalogueExpiresAt
+            artifacts = $artifacts
+          } | ConvertTo-Json -Depth 6 | Set-Content -Path $catalogueMetaPath -NoNewline -Encoding utf8
+
+          $catalogueOut = Join-Path $env:RUNNER_TEMP 'signed-catalogue'
+          $catSeed | & (Join-Path $workRoot 'oblivion-release.exe') catalogue `
+            --stage $stageCatalogue `
+            --metadata $catalogueMetaPath `
+            --output $catalogueOut `
+            --publisher-key $catPub `
+            --package-key $pkgPub | Out-Host
+          if ($LASTEXITCODE -ne 0) { throw 'oblivion-release catalogue failed' }
+
+          # Verify the built catalogue with the PHP EndpointReleaseCatalogue verifier!
+          $env:ENDPOINT_RELEASE_DIRECTORY = $catalogueOut
+          $env:ENDPOINT_RELEASE_PUBLIC_KEY = $catPub
+          php -r '
+            require "app/Support/Monitoring/StrictJsonObjectDecoder.php";
+            require "app/Domain/SecurityDevices/Endpoints/Services/EndpointReleaseUnavailable.php";
+            require "app/Domain/SecurityDevices/Endpoints/Services/EndpointReleaseCatalogue.php";
+            $cat = new App\Domain\SecurityDevices\Endpoints\Services\EndpointReleaseCatalogue(
+              getenv("ENDPOINT_RELEASE_DIRECTORY"),
+              getenv("ENDPOINT_RELEASE_PUBLIC_KEY"),
+              1
+            );
+            $parsed = $cat->catalogue();
+            echo "Verified signed catalogue with " . count($parsed["artifacts"]) . " artifacts.\n";
+          '
+
+      - name: Upload signed release catalogue
+        if: ${{ env.PUBLISHER_PACKAGE_SEED != '' && env.PUBLISHER_CATALOGUE_SEED != '' }}
+        env:
+          PUBLISHER_PACKAGE_SEED: ${{ secrets.ENDPOINT_PACKAGE_SIGNING_SEED }}
+          PUBLISHER_CATALOGUE_SEED: ${{ secrets.ENDPOINT_CATALOGUE_SIGNING_SEED }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-endpoint-and-site-hub-catalogue
+          path: ${{ runner.temp }}/signed-catalogue/*
+          if-no-files-found: error

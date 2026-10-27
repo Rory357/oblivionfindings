@@ -5,6 +5,7 @@ import type {
 export type NativeMonitorDraft = {
     deviceId: string;
     profileId: string;
+    collectorId: string;
     kind: string;
     name: string;
     target: string;
@@ -31,6 +32,7 @@ export type NativeMonitorAttempt = {
         name?: string;
         kind?: string;
         profile?: number;
+        collectorId?: number | null;
         availability?: boolean;
         enabled: boolean;
     };
@@ -41,6 +43,7 @@ export type SavedNativeMonitor = {
     kind: string;
     device_id: number;
     profile_id: number;
+    collector_id?: number | null;
     enabled: boolean;
     affects_availability: boolean;
     collection_mode: string;
@@ -93,6 +96,7 @@ export function initialNativeDraft(
                           (item) => item.name === 'Standard availability',
                       )?.id ?? '')),
         ),
+        collectorId: monitor?.collector_id ? String(monitor.collector_id) : '',
         kind:
             monitor?.kind ??
             (management.kinds.some((k) => k.value === 'icmp')
@@ -160,6 +164,28 @@ export function nativeDraftErrors(
         )
             errors.name =
                 'Use a name of 3 to 128 characters without control characters.';
+        if (d.collectorId !== '') {
+            const targetSiteId =
+                monitor?.device.site?.id ??
+                management.devices.find(
+                    (item) => String(item.id) === d.deviceId,
+                )?.site.id;
+            const collector = (management.collectors ?? []).find(
+                (item) => String(item.id) === d.collectorId,
+            );
+            if (
+                !integer(d.collectorId, 1, 999999999) ||
+                (management.collectors !== undefined &&
+                    (!collector ||
+                        (targetSiteId !== undefined &&
+                            !collector.authorised_site_ids.includes(
+                                targetSiteId,
+                            ))))
+            ) {
+                errors.collector_id =
+                    'Choose an active hub covering this Site, or run from server.';
+            }
+        }
     }
     if (through >= 2) {
         if (
@@ -251,6 +277,17 @@ export function nativePayload(
     if (!monitor) {
         body.device_id = Number(d.deviceId);
         body.kind = d.kind;
+        if (d.collectorId !== '') {
+            body.collector_id = Number(d.collectorId);
+        }
+    } else {
+        const previousCollectorId = monitor.collector_id
+            ? String(monitor.collector_id)
+            : '';
+        if (d.collectorId !== previousCollectorId) {
+            body.collector_id =
+                d.collectorId === '' ? null : Number(d.collectorId);
+        }
     }
     if (d.target.trim()) body.target = d.target.trim();
     if (d.port) body.port = Number(d.port);
@@ -283,6 +320,7 @@ export function nativeErrorStep(key: string) {
         : [
                 'device_id',
                 'profile_id',
+                'collector_id',
                 'name',
                 'expected_site_id',
                 'expected_device_id',
@@ -333,7 +371,7 @@ export function confirmedNativeMonitor(
         m.profile_id <= 0 ||
         typeof m.enabled !== 'boolean' ||
         typeof m.affects_availability !== 'boolean' ||
-        m.collection_mode !== 'central_direct' ||
+        !['central_direct', 'remote_collector'].includes(m.collection_mode) ||
         m.enabled !== attempt.expected.enabled
     )
         throw Error('The receipt does not match this saved monitor request.');
@@ -349,13 +387,18 @@ export function confirmedNativeMonitor(
         )
             throw Error('The saved monitor fields do not match this request.');
     if (
+        attempt.expected.collectorId !== undefined &&
+        (m.collector_id ?? null) !== attempt.expected.collectorId
+    )
+        throw Error('The saved monitor fields do not match this request.');
+    if (
         typeof c.name !== 'string' ||
         !nativeKinds.includes(c.kind as (typeof nativeKinds)[number]) ||
         !Number.isSafeInteger(c.profile_id) ||
         c.profile_id <= 0 ||
         typeof c.enabled !== 'boolean' ||
         typeof c.affects_availability !== 'boolean' ||
-        c.collection_mode !== 'central_direct'
+        !['central_direct', 'remote_collector'].includes(c.collection_mode)
     )
         throw Error('The current monitor context is incomplete.');
     if (

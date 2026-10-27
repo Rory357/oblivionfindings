@@ -23,6 +23,7 @@ import {
     PageHeaderViewToggle,
     PageLayout,
 } from '@/components/page';
+import { AddHubWizard } from '@/components/security-devices/add-hub-wizard';
 import { CollectorInstallationDialog } from '@/components/security-devices/collector-installation-dialog';
 import {
     CollectorEnrollmentDialog,
@@ -42,6 +43,10 @@ import {
     type DiscoveryScopeManagement,
     type GovernedDiscoveryScope,
 } from '@/components/security-devices/discovery-scope-dialogs';
+import {
+    EditHubDialog,
+    type EditHubTarget,
+} from '@/components/security-devices/edit-hub-dialog';
 import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -86,6 +91,7 @@ import {
     RefreshCw,
     RotateCcw,
     SearchCheck,
+    Server,
     ShieldCheck,
     ShieldX,
     type LucideIcon,
@@ -104,12 +110,17 @@ export type Collector = {
     site: { id: number; name: string; href: string } | null;
     reported_status: string;
     freshness_state: string;
+    software_version?: string | null;
     last_seen_at: string | null;
+    last_heartbeat_at?: string | null;
     heartbeat_lag_seconds: number | null;
     monitor_load: number;
+    scope_load?: number;
     device_load: number;
     affected_monitors: number;
     affected_devices: number;
+    covered_site_ids?: number[];
+    covered_sites?: Array<{ id: number; name: string; href: string }>;
     impact_note: string;
     runtime_state?: string | null;
     backlog_items?: number;
@@ -120,6 +131,7 @@ export type Collector = {
     revoked_at?: string | null;
     actions?: {
         can_manage: boolean;
+        update_url?: string | null;
         revoke_url: string | null;
         re_enrol_url: string | null;
     };
@@ -131,6 +143,9 @@ export type DiscoveryScopeRow = {
     status: string;
     site: { id: number; name: string; href: string } | null;
     collection_mode: string;
+    collector_id?: number | null;
+    collector_name?: string | null;
+    runs_from?: string;
     collector: { id: number; name: string; state: string } | null;
     protocols: string[];
     network_ranges: number;
@@ -155,6 +170,9 @@ export type DiscoveryRunRow = {
     scope_name: string | null;
     status: string;
     collection_mode: 'central' | 'remote_collector';
+    collector_id?: number | null;
+    collector_name?: string | null;
+    runs_from?: string;
     collector: { id: number; name: string; state: string } | null;
     trigger: string;
     planned: number;
@@ -226,6 +244,8 @@ export type DiscoveryWorkspace = {
     collector_management: {
         can_manage: boolean;
         issue_url: string | null;
+        wizard_options_url?: string | null;
+        wizard_issue_url?: string | null;
         sites: CollectorManagementSite[];
     };
     scope_management?: DiscoveryScopeManagement;
@@ -317,6 +337,7 @@ type DiscoveryEntry = {
     technical: Array<{ label: string; value: ReactNode }>;
     note?: string;
     deviceHref?: string;
+    coveredSiteIds?: number[];
     progress?: { returned: number; planned: number };
 };
 const discoveryPath = '/security-devices/discovery';
@@ -390,7 +411,7 @@ const scopeUrl = (id: number, url: string | null | undefined, suffix = '') =>
 const collectorUrl = (
     id: number,
     url: string | null | undefined,
-    suffix: string,
+    suffix = '',
 ) => (url === discoveryPath + '/collectors/' + id + suffix ? url : null);
 
 export default function DiscoveryCollectors(data: DiscoveryPageProps) {
@@ -568,6 +589,8 @@ function DiscoveryBody({
         navigate(view);
     };
     const [installationOpen, setInstallationOpen] = useState(false);
+    const [hubWizardOpen, setHubWizardOpen] = useState(false);
+    const [editingHub, setEditingHub] = useState<EditHubTarget | null>(null);
     // A snapshot, so a refreshed read (which follows issuing a token) cannot
     // close the one-time token before it is copied. Authority changes still
     // remount the body and clear it.
@@ -644,12 +667,31 @@ function DiscoveryBody({
                 (site) => site.id === collector.site?.id,
             ),
         );
+    const editHubTarget = (collector: Collector): EditHubTarget => ({
+        id: collector.id,
+        name: collector.name,
+        site: collector.site
+            ? { id: collector.site.id, name: collector.site.name }
+            : null,
+        covered_site_ids: collector.covered_site_ids ?? [],
+        update_url: collectorUrl(collector.id, collector.actions?.update_url),
+    });
     const collectorActions = (collector: Collector): MenuItem[] =>
         !mayManageCollectors ||
         !collector.actions?.can_manage ||
         !collectorSitePermitted(collector)
             ? []
             : [
+                  ...(collectorUrl(collector.id, collector.actions.update_url)
+                      ? [
+                            {
+                                label: 'Edit hub',
+                                icon: Pencil,
+                                onClick: () =>
+                                    setEditingHub(editHubTarget(collector)),
+                            },
+                        ]
+                      : []),
                   ...(collectorUrl(
                       collector.id,
                       collector.actions.re_enrol_url,
@@ -679,10 +721,31 @@ function DiscoveryBody({
                         ]
                       : []),
               ];
+    const scopeRunsFrom = (scope: DiscoveryScopeRow): string =>
+        scope.runs_from ??
+        (scope.collector
+            ? 'Runs from: hub ' + scope.collector.name
+            : scope.collector_name
+              ? 'Runs from: hub ' + scope.collector_name
+              : scope.collection_mode === 'remote_collector'
+                ? 'Runs from: hub'
+                : 'Runs from: server');
+    const runRunsFrom = (run: DiscoveryRunRow): string =>
+        run.runs_from ??
+        (run.collection_mode === 'remote_collector'
+            ? run.collector
+                ? 'Runs from: hub ' + run.collector.name
+                : run.collector_name
+                  ? 'Runs from: hub ' + run.collector_name
+                  : 'Runs from: hub'
+            : 'Runs from: server');
     const scopes: DiscoveryEntry[] = w.scopes.map((scope) => ({
         key: 'scope:' + scope.id,
         name: scope.name,
-        subline: scope.site?.name ?? 'Site unavailable',
+        subline:
+            (scope.site?.name ?? 'Site unavailable') +
+            ' · ' +
+            scopeRunsFrom(scope),
         state: scope.status,
         icon: Network,
         site: scope.site,
@@ -692,10 +755,7 @@ function DiscoveryBody({
             scope.protocols.length +
             ' protocols',
         actions:
-            !mayManageScopes ||
-            !scope.actions?.can_manage ||
-            !scope.site ||
-            scope.collection_mode !== 'direct'
+            !mayManageScopes || !scope.actions?.can_manage || !scope.site
                 ? []
                 : [
                       ...(scopeUrl(scope.id, scope.actions.update_url)
@@ -745,6 +805,7 @@ function DiscoveryBody({
         facts: [
             { label: 'Site', value: scope.site?.name },
             { label: 'Status', value: plain(scope.status) },
+            { label: 'Runs from', value: scopeRunsFrom(scope) },
             { label: 'Collection mode', value: plain(scope.collection_mode) },
             { label: 'Collector', value: scope.collector?.name },
             {
@@ -782,11 +843,7 @@ function DiscoveryBody({
     const runs: DiscoveryEntry[] = w.runs.map((run) => ({
         key: 'run:' + run.id,
         name: run.scope_name ?? 'Discovery run #' + run.id,
-        subline:
-            run.collection_mode === 'remote_collector'
-                ? 'Remote path' +
-                  (run.collector ? ' · ' + run.collector.name : '')
-                : 'Main application',
+        subline: runRunsFrom(run),
         state: run.status,
         icon: Activity,
         site: currentScope(run.scope_id)?.site ?? null,
@@ -802,6 +859,7 @@ function DiscoveryBody({
         facts: [
             { label: 'Run status', value: plain(run.status) },
             { label: 'Scope', value: run.scope_name },
+            { label: 'Runs from', value: runRunsFrom(run) },
             { label: 'Collection mode', value: plain(run.collection_mode) },
             { label: 'Collector', value: run.collector?.name },
             {
@@ -964,56 +1022,100 @@ function DiscoveryBody({
         ],
         note: 'Confidence and reasons help you review this match. They do not change the device record or identify a person.',
     }));
-    const collectors: DiscoveryEntry[] = w.collectors.map((collector) => ({
-        key: 'collector:' + collector.id,
-        name: collector.name,
-        subline: collector.site?.name ?? 'No Site assigned',
-        state: collector.freshness_state,
-        icon: RadioTower,
-        site: collector.site,
-        summary:
-            collector.device_load +
-            ' devices · ' +
-            collector.monitor_load +
-            ' checks',
-        actions: collectorActions(collector),
-        facts: [
-            { label: 'Site', value: collector.site?.name },
-            { label: 'Availability', value: plain(collector.freshness_state) },
-            {
-                label: 'Reported status',
-                value: plain(collector.reported_status),
-            },
-            { label: 'Last heartbeat', value: when(collector.last_seen_at) },
-            {
-                label: 'Heartbeat lag (seconds)',
-                value: collector.heartbeat_lag_seconds,
-            },
-            { label: 'Device load', value: collector.device_load },
-            { label: 'Monitor load', value: collector.monitor_load },
-            { label: 'Affected devices', value: collector.affected_devices },
-            { label: 'Affected monitors', value: collector.affected_monitors },
-        ],
-        technical: [
-            { label: 'Collector ID', value: collector.id },
-            { label: 'Runtime state', value: collector.runtime_state },
-            { label: 'Backlog items', value: collector.backlog_items },
-            { label: 'Spool bytes', value: collector.spool_bytes },
-            { label: 'Sequence gaps', value: collector.gap_count },
-            { label: 'Corrupt frames', value: collector.corrupted_frames },
-            {
-                label: 'Clock drift (seconds)',
-                value: collector.clock_drift_seconds,
-            },
-            {
-                label: 'Revoked at',
-                value: collector.revoked_at
-                    ? when(collector.revoked_at)
-                    : 'Not revoked',
-            },
-        ],
-        note: collector.impact_note,
-    }));
+    const collectors: DiscoveryEntry[] = w.collectors.map((collector) => {
+        const coveredSiteNames = (collector.covered_sites ?? [])
+            .map((covered) => covered.name)
+            .filter(Boolean);
+        return {
+            key: 'collector:' + collector.id,
+            name: collector.name,
+            subline:
+                (collector.site?.name ?? 'No Site assigned') +
+                (collector.software_version
+                    ? ' · v' + collector.software_version
+                    : '') +
+                (coveredSiteNames.length > 0
+                    ? ' · +' + coveredSiteNames.length + ' SD-WAN Sites'
+                    : ''),
+            state: collector.freshness_state,
+            icon: RadioTower,
+            site: collector.site,
+            coveredSiteIds: collector.covered_site_ids,
+            summary:
+                collector.device_load +
+                ' devices · ' +
+                collector.monitor_load +
+                ' checks' +
+                (collector.scope_load !== undefined
+                    ? ' · ' + collector.scope_load + ' scans'
+                    : ''),
+            actions: collectorActions(collector),
+            facts: [
+                { label: 'Site', value: collector.site?.name },
+                {
+                    label: 'Covered SD-WAN Sites',
+                    value:
+                        coveredSiteNames.length > 0
+                            ? coveredSiteNames.join(', ')
+                            : 'Home Site only',
+                },
+                {
+                    label: 'Availability',
+                    value: plain(collector.freshness_state),
+                },
+                {
+                    label: 'Reported status',
+                    value: plain(collector.reported_status),
+                },
+                {
+                    label: 'Software version',
+                    value: collector.software_version ?? 'Not reported',
+                },
+                {
+                    label: 'Last heartbeat',
+                    value: when(
+                        collector.last_heartbeat_at ?? collector.last_seen_at,
+                    ),
+                },
+                {
+                    label: 'Heartbeat lag (seconds)',
+                    value: collector.heartbeat_lag_seconds,
+                },
+                { label: 'Device load', value: collector.device_load },
+                { label: 'Monitor load', value: collector.monitor_load },
+                ...(collector.scope_load !== undefined
+                    ? [{ label: 'Assigned scans', value: collector.scope_load }]
+                    : []),
+                {
+                    label: 'Affected devices',
+                    value: collector.affected_devices,
+                },
+                {
+                    label: 'Affected monitors',
+                    value: collector.affected_monitors,
+                },
+            ],
+            technical: [
+                { label: 'Collector ID', value: collector.id },
+                { label: 'Runtime state', value: collector.runtime_state },
+                { label: 'Backlog items', value: collector.backlog_items },
+                { label: 'Spool bytes', value: collector.spool_bytes },
+                { label: 'Sequence gaps', value: collector.gap_count },
+                { label: 'Corrupt frames', value: collector.corrupted_frames },
+                {
+                    label: 'Clock drift (seconds)',
+                    value: collector.clock_drift_seconds,
+                },
+                {
+                    label: 'Revoked at',
+                    value: collector.revoked_at
+                        ? when(collector.revoked_at)
+                        : 'Not revoked',
+                },
+            ],
+            note: collector.impact_note,
+        };
+    });
     const paths: DiscoveryEntry[] = w.collection_paths.map((path) => ({
         key: 'path:' + path.collector_id,
         name: path.collector_name,
@@ -1069,7 +1171,9 @@ function DiscoveryBody({
         : 'all';
     const query = search.trim().toLocaleLowerCase();
     const inSite = (entry: DiscoveryEntry) =>
-        site === 'all' || String(entry.site?.id) === site;
+        site === 'all' ||
+        String(entry.site?.id) === site ||
+        Boolean(entry.coveredSiteIds?.some((id) => String(id) === site));
     const matches = (entry: DiscoveryEntry) =>
         inSite(entry) && (!query || searchText(entry).includes(query));
     const globalMatches = allRows.filter(matches);
@@ -1123,6 +1227,17 @@ function DiscoveryBody({
                                 >
                                     Refresh
                                 </PageHeaderGlassButton>
+                                {mayManageCollectors &&
+                                    w.collector_management.sites.length > 0 && (
+                                        <PageHeaderGlassButton
+                                            icon={RadioTower}
+                                            onClick={() =>
+                                                setHubWizardOpen(true)
+                                            }
+                                        >
+                                            Add a hub
+                                        </PageHeaderGlassButton>
+                                    )}
                                 {mayManageScopes &&
                                     scopeManagement.create_url ===
                                         discoveryPath + '/scopes' &&
@@ -1432,16 +1547,27 @@ function DiscoveryBody({
                         <>
                             {activeTab === 'collectors' &&
                                 mayManageCollectors &&
-                                w.collector_management.issue_url ===
-                                    discoveryPath + '/collectors/enrolments' &&
                                 w.collector_management.sites.length > 0 && (
-                                    <div className="flex justify-end">
+                                    <div className="flex flex-wrap justify-end gap-2">
+                                        {w.collector_management.issue_url ===
+                                            discoveryPath +
+                                                '/collectors/enrolments' && (
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    setInstallationOpen(true)
+                                                }
+                                            >
+                                                Set up collector
+                                            </Button>
+                                        )}
                                         <Button
                                             onClick={() =>
-                                                setInstallationOpen(true)
+                                                setHubWizardOpen(true)
                                             }
                                         >
-                                            Set up collector
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add a hub
                                         </Button>
                                     </div>
                                 )}
@@ -1515,12 +1641,37 @@ function DiscoveryBody({
                 </div>
             </PageLayout>
             {mayManageCollectors && (
-                <CollectorInstallationDialog
-                    open={installationOpen}
-                    onClose={() => setInstallationOpen(false)}
-                    sites={w.collector_management.sites}
-                    actorId={actor_id}
-                />
+                <>
+                    <CollectorInstallationDialog
+                        open={installationOpen}
+                        onClose={() => setInstallationOpen(false)}
+                        sites={w.collector_management.sites}
+                        actorId={actor_id}
+                    />
+                    <AddHubWizard
+                        open={hubWizardOpen}
+                        onClose={() => setHubWizardOpen(false)}
+                        onConnected={refresh}
+                        sites={w.collector_management.sites}
+                        defaultSiteId={site !== 'all' ? Number(site) : null}
+                        optionsUrl={
+                            w.collector_management.wizard_options_url ??
+                            undefined
+                        }
+                        issueUrl={
+                            w.collector_management.wizard_issue_url ?? undefined
+                        }
+                    />
+                    <EditHubDialog
+                        open={editingHub !== null}
+                        onOpenChange={(open) => {
+                            if (!open) setEditingHub(null);
+                        }}
+                        hub={editingHub}
+                        sites={w.collector_management.sites}
+                        onSaved={refresh}
+                    />
+                </>
             )}
             {mayManageCollectors &&
                 replacement &&
@@ -1923,6 +2074,9 @@ export function DiscoveryScopeWizard({
                 ? management.sites[0].id.toString()
                 : ''),
     );
+    const [collectorId, setCollectorId] = useState(
+        String(scope?.collector_id ?? scope?.collector?.id ?? ''),
+    );
     const [name, setName] = useState(scope?.name ?? '');
     const [cidrs, setCidrs] = useState('');
     const [seedHosts, setSeedHosts] = useState('');
@@ -1961,6 +2115,7 @@ export function DiscoveryScopeWizard({
     }, []);
     const values = {
         siteId,
+        collectorId,
         name,
         cidrs,
         seedHosts,
@@ -1997,6 +2152,32 @@ export function DiscoveryScopeWizard({
         );
     const validSite =
         editing || management.sites.some((site) => String(site.id) === siteId);
+    const selectedSiteNumeric = Number(
+        editing ? (scope?.site?.id ?? 0) : siteId,
+    );
+    const eligibleHubs = (management.collectors ?? []).filter(
+        (hub) =>
+            !selectedSiteNumeric ||
+            hub.authorised_site_ids.includes(selectedSiteNumeric),
+    );
+    const selectedHub = eligibleHubs.find(
+        (hub) => String(hub.id) === collectorId,
+    );
+    const handleSiteChange = (nextSiteId: string) => {
+        setSiteId(nextSiteId);
+        const numeric = Number(nextSiteId);
+        if (
+            collectorId !== '' &&
+            numeric > 0 &&
+            !(management.collectors ?? []).some(
+                (hub) =>
+                    String(hub.id) === collectorId &&
+                    hub.authorised_site_ids.includes(numeric),
+            )
+        ) {
+            setCollectorId('');
+        }
+    };
     const validName = name.trim().length >= 3;
     const validIdentity = validName && validSite;
     const validNetworks = editing || list(cidrs).length > 0;
@@ -2064,7 +2245,20 @@ export function DiscoveryScopeWizard({
             max_targets_per_run: Number(maxTargets),
             packets_per_second: Number(packetsPerSecond),
         };
-        if (!editing) payload.site_id = Number(siteId);
+        if (!editing) {
+            payload.site_id = Number(siteId);
+            if (collectorId !== '') {
+                payload.collector_id = Number(collectorId);
+            }
+        } else {
+            const initialCollectorId = String(
+                scope?.collector_id ?? scope?.collector?.id ?? '',
+            );
+            if (collectorId !== initialCollectorId) {
+                payload.collector_id =
+                    collectorId === '' ? null : Number(collectorId);
+            }
+        }
         if (cidrs.trim()) payload.cidrs = list(cidrs);
         if (seedHosts.trim()) payload.seed_hosts = list(seedHosts);
         if (exclusions.trim()) payload.exclusions = list(exclusions);
@@ -2151,11 +2345,19 @@ export function DiscoveryScopeWizard({
                 title={
                     editing
                         ? 'Update discovery scope'
-                        : 'Add direct discovery scope'
+                        : collectorId
+                          ? 'Add hub discovery scope'
+                          : 'Add direct discovery scope'
                 }
                 description="Save which networks discovery may check at one of your Sites. Saving does not start a scan."
                 railIcon={Network}
-                railTitle={editing ? 'Update scope' : 'Add direct scope'}
+                railTitle={
+                    editing
+                        ? 'Update scope'
+                        : collectorId
+                          ? 'Add hub scope'
+                          : 'Add direct scope'
+                }
                 railSub={scope?.name ?? 'Approved Site discovery'}
                 steps={[
                     {
@@ -2224,7 +2426,9 @@ export function DiscoveryScopeWizard({
                                 ? 'Saving…'
                                 : editing
                                   ? 'Apply scope update'
-                                  : 'Add direct scope'}
+                                  : collectorId
+                                    ? 'Add hub scope'
+                                    : 'Add direct scope'}
                         </Button>
                     )
                 }
@@ -2257,7 +2461,7 @@ export function DiscoveryScopeWizard({
                                             </Label>
                                             <Select
                                                 value={siteId}
-                                                onValueChange={setSiteId}
+                                                onValueChange={handleSiteChange}
                                             >
                                                 <SelectTrigger id="discovery-scope-site">
                                                     <SelectValue placeholder="Select an approved Site" />
@@ -2283,9 +2487,88 @@ export function DiscoveryScopeWizard({
                                                     'Site unavailable'}
                                             </strong>
                                             <p className="text-muted-foreground">
-                                                Main application over Site
-                                                connectivity
+                                                {collectorId
+                                                    ? 'Runs from: hub ' +
+                                                      (selectedHub?.name ??
+                                                          scope.collector
+                                                              ?.name ??
+                                                          '#' + collectorId)
+                                                    : 'Runs from: server'}
                                             </p>
+                                        </div>
+                                    )}
+                                    {(eligibleHubs.length > 0 ||
+                                        collectorId !== '') && (
+                                        <div className="space-y-2">
+                                            <Label>Runs from</Label>
+                                            <div className="grid gap-2 sm:grid-cols-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setCollectorId('')
+                                                    }
+                                                    className={`h-auto justify-start p-3 text-left whitespace-normal ${
+                                                        collectorId === ''
+                                                            ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-1.5 text-sm font-medium">
+                                                            <Server className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            Server (direct when
+                                                            routable)
+                                                        </div>
+                                                        <p className="text-xs font-normal text-muted-foreground">
+                                                            Runs directly from
+                                                            Oblivion Findings.
+                                                        </p>
+                                                    </div>
+                                                </Button>
+                                                {eligibleHubs.map((hub) => {
+                                                    const selected =
+                                                        collectorId ===
+                                                        String(hub.id);
+                                                    const remoteCover =
+                                                        selectedSiteNumeric >
+                                                            0 &&
+                                                        hub.site_id !==
+                                                            selectedSiteNumeric;
+                                                    return (
+                                                        <Button
+                                                            key={hub.id}
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                setCollectorId(
+                                                                    String(
+                                                                        hub.id,
+                                                                    ),
+                                                                )
+                                                            }
+                                                            className={`h-auto justify-start p-3 text-left whitespace-normal ${
+                                                                selected
+                                                                    ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                                                                    : ''
+                                                            }`}
+                                                        >
+                                                            <div className="space-y-1">
+                                                                <div className="flex items-center gap-1.5 text-sm font-medium">
+                                                                    <RadioTower className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                    Hub{' '}
+                                                                    {hub.name}
+                                                                </div>
+                                                                <p className="text-xs font-normal text-muted-foreground">
+                                                                    {remoteCover
+                                                                        ? 'Covers this Site over SD-WAN or MPLS.'
+                                                                        : 'Installed on this Site network.'}
+                                                                </p>
+                                                            </div>
+                                                        </Button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     )}
                                     <div className="space-y-2">
@@ -2544,6 +2827,18 @@ export function DiscoveryScopeWizard({
                                         <ReviewRow
                                             label="Scope name"
                                             value={name.trim()}
+                                        />
+                                        <ReviewRow
+                                            label="Runs from"
+                                            value={
+                                                collectorId
+                                                    ? 'Runs from: hub ' +
+                                                      (selectedHub?.name ??
+                                                          scope?.collector
+                                                              ?.name ??
+                                                          '#' + collectorId)
+                                                    : 'Runs from: server'
+                                            }
                                         />
                                     </ReviewCard>
                                     <ReviewCard

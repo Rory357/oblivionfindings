@@ -76,8 +76,9 @@ final class DiscoveryScopeValidator
         if ($scope->collector_id !== null) {
             $collector = MonitoringCollector::query()->find($scope->collector_id);
             if ($collector === null
-                || (int) $collector->site_id !== (int) $scope->site_id
-                || ! in_array(strtolower((string) $collector->status), ['online', 'offline', 'degraded', 'unavailable'], true)) {
+                || $collector->revoked_at !== null
+                || ! in_array((int) $scope->site_id, $collector->authorisedSiteIds(), true)
+                || ! in_array(strtolower((string) $collector->status), ['online', 'offline', 'degraded', 'unavailable', 'pending'], true)) {
                 return ['decision' => 'rejected', 'reason' => 'collector_scope_mismatch'];
             }
         }

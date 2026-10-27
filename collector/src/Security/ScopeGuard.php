@@ -82,7 +82,7 @@ final readonly class ScopeGuard
         if (! is_string($command['command_uuid']) || preg_match($uuid, $command['command_uuid']) !== 1
             || ! is_string($command['attempt_uuid']) || preg_match($uuid, $command['attempt_uuid']) !== 1
             || ! is_int($command['attempt_number']) || $command['attempt_number'] < 1
-            || $command['site_id'] !== $this->config->siteId
+            || ! is_int($command['site_id']) || ! in_array($command['site_id'], $this->config->allowedSiteIds(), true)
             || ! is_string($command['device_id']) || preg_match('/\A[1-9][0-9]{0,18}\z/', $command['device_id']) !== 1
             || $command['capability'] !== 'access.door.unlock_timed'
             || $command['provider'] !== 'unifi'
@@ -154,7 +154,8 @@ final readonly class ScopeGuard
             throw new ScopeViolation('Discovery run is not present exactly in the signed configuration.');
         }
         if ($this->config->revoked || $this->config->expiresAt <= $at
-            || ($run['site_id'] ?? null) !== $this->config->siteId) {
+            || ! is_int($run['site_id'] ?? null)
+            || ! in_array($run['site_id'], $this->config->allowedSiteIds(), true)) {
             throw new ScopeViolation('Signed collector discovery configuration is expired revoked or Site-mismatched.');
         }
         $this->rejectExecutableFields($run);
@@ -280,7 +281,6 @@ final readonly class ScopeGuard
     {
         $expected = [
             'collector_id' => $this->config->collectorId,
-            'site_id' => $this->config->siteId,
             'device_id' => $check['device_id'],
             'protocol' => $check['protocol'],
             'target' => $check['target'],
@@ -289,6 +289,9 @@ final readonly class ScopeGuard
             if (($lease[$field] ?? null) !== $value) {
                 throw new ScopeViolation('Credential lease scope does not match the signed check.');
             }
+        }
+        if (! is_int($lease['site_id'] ?? null) || ! in_array($lease['site_id'], $this->config->allowedSiteIds(), true)) {
+            throw new ScopeViolation('Credential lease scope does not match the signed check.');
         }
 
         $expiresAt = $lease['expires_at'] ?? null;

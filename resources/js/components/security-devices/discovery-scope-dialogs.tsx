@@ -19,14 +19,22 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import axios from 'axios';
-import { Play, ShieldX } from 'lucide-react';
+import { Play, RadioTower, Server, ShieldX } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
+
+export type DiscoveryScopeCollectorOption = {
+    id: number;
+    name: string;
+    site_id: number;
+    authorised_site_ids: number[];
+};
 
 export type DiscoveryScopeManagement = {
     can_manage: boolean;
     create_url: string | null;
     protocols: string[];
     sites: Array<{ id: number; name: string }>;
+    collectors?: DiscoveryScopeCollectorOption[];
 };
 
 export type GovernedDiscoveryScope = {
@@ -35,6 +43,8 @@ export type GovernedDiscoveryScope = {
     status: string;
     site: { id: number; name: string } | null;
     collection_mode: string;
+    collector_id?: number | null;
+    collector?: { id: number; name: string; state?: string } | null;
     protocols: string[];
     max_targets_per_run: number;
     packets_per_second: number;
@@ -100,6 +110,7 @@ export function DiscoveryScopeDialog({
 }) {
     const editing = scope !== null;
     const [siteId, setSiteId] = useState('');
+    const [collectorId, setCollectorId] = useState('');
     const [name, setName] = useState('');
     const [cidrs, setCidrs] = useState('');
     const [seedHosts, setSeedHosts] = useState('');
@@ -121,6 +132,9 @@ export function DiscoveryScopeDialog({
                 (management.sites.length === 1
                     ? management.sites[0].id.toString()
                     : ''),
+        );
+        setCollectorId(
+            String(scope?.collector_id ?? scope?.collector?.id ?? ''),
         );
         setName(scope?.name ?? '');
         setCidrs('');
@@ -168,7 +182,20 @@ export function DiscoveryScopeDialog({
             max_targets_per_run: Number(maxTargets),
             packets_per_second: Number(packetsPerSecond),
         };
-        if (!editing) payload.site_id = Number(siteId);
+        if (!editing) {
+            payload.site_id = Number(siteId);
+            if (collectorId !== '') {
+                payload.collector_id = Number(collectorId);
+            }
+        } else {
+            const initialCollectorId = String(
+                scope?.collector_id ?? scope?.collector?.id ?? '',
+            );
+            if (collectorId !== initialCollectorId) {
+                payload.collector_id =
+                    collectorId === '' ? null : Number(collectorId);
+            }
+        }
         if (cidrs.trim()) payload.cidrs = list(cidrs);
         if (seedHosts.trim()) payload.seed_hosts = list(seedHosts);
         if (exclusions.trim()) payload.exclusions = list(exclusions);
@@ -202,6 +229,33 @@ export function DiscoveryScopeDialog({
         }
     };
 
+    const selectedSiteNumeric = Number(
+        editing ? (scope?.site?.id ?? 0) : siteId,
+    );
+    const eligibleHubs = (management.collectors ?? []).filter(
+        (hub) =>
+            !selectedSiteNumeric ||
+            hub.authorised_site_ids.includes(selectedSiteNumeric),
+    );
+    const selectedHub = eligibleHubs.find(
+        (hub) => String(hub.id) === collectorId,
+    );
+    const handleSiteChange = (nextSiteId: string) => {
+        setSiteId(nextSiteId);
+        const numeric = Number(nextSiteId);
+        if (
+            collectorId !== '' &&
+            numeric > 0 &&
+            !(management.collectors ?? []).some(
+                (hub) =>
+                    String(hub.id) === collectorId &&
+                    hub.authorised_site_ids.includes(numeric),
+            )
+        ) {
+            setCollectorId('');
+        }
+    };
+
     return (
         <Dialog
             open={open}
@@ -220,18 +274,23 @@ export function DiscoveryScopeDialog({
                     <DialogTitle>
                         {editing
                             ? `Update ${scope.name}`
-                            : 'Add direct discovery scope'}
+                            : collectorId
+                              ? 'Add hub discovery scope'
+                              : 'Add direct discovery scope'}
                     </DialogTitle>
                     <DialogDescription>
-                        Central discovery over the main SD-WAN is the default.
-                        This workflow never assigns a remote collector.
+                        Server scans run directly when routable, or you can
+                        assign a Site hub covering this Site.
                     </DialogDescription>
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={submit}>
                     {!editing ? (
                         <div className="space-y-2">
                             <Label htmlFor="discovery-scope-site">Site</Label>
-                            <Select value={siteId} onValueChange={setSiteId}>
+                            <Select
+                                value={siteId}
+                                onValueChange={handleSiteChange}
+                            >
                                 <SelectTrigger id="discovery-scope-site">
                                     <SelectValue placeholder="Select an approved Site" />
                                 </SelectTrigger>
@@ -253,10 +312,70 @@ export function DiscoveryScopeDialog({
                                 {scope.site?.name ?? 'Site unavailable'}
                             </strong>
                             <p className="text-muted-foreground">
-                                Main application over Site connectivity
+                                {selectedHub
+                                    ? `Runs from: hub ${selectedHub.name}`
+                                    : 'Runs from: server'}
                             </p>
                         </div>
                     )}
+                    {eligibleHubs.length > 0 ? (
+                        <div className="space-y-2">
+                            <Label>Runs from</Label>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                                <Button
+                                    type="button"
+                                    variant={
+                                        collectorId === ''
+                                            ? 'secondary'
+                                            : 'outline'
+                                    }
+                                    aria-pressed={collectorId === ''}
+                                    className="h-auto flex-col items-start gap-1 p-3 text-left whitespace-normal"
+                                    onClick={() => setCollectorId('')}
+                                >
+                                    <span className="flex items-center gap-1.5 font-semibold">
+                                        <Server className="size-4" />
+                                        Server (direct when routable)
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">
+                                        Runs from: server
+                                    </span>
+                                </Button>
+                                {eligibleHubs.map((hub) => {
+                                    const active =
+                                        collectorId === String(hub.id);
+                                    const isSdWan =
+                                        selectedSiteNumeric > 0 &&
+                                        hub.site_id !== selectedSiteNumeric;
+                                    return (
+                                        <Button
+                                            key={hub.id}
+                                            type="button"
+                                            variant={
+                                                active ? 'secondary' : 'outline'
+                                            }
+                                            aria-pressed={active}
+                                            className="h-auto flex-col items-start gap-1 p-3 text-left whitespace-normal"
+                                            onClick={() =>
+                                                setCollectorId(String(hub.id))
+                                            }
+                                        >
+                                            <span className="flex items-center gap-1.5 font-semibold">
+                                                <RadioTower className="size-4" />
+                                                Hub {hub.name}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                Runs from: hub {hub.name}
+                                                {isSdWan
+                                                    ? ' · covers this Site over SD-WAN'
+                                                    : ''}
+                                            </span>
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    ) : null}
                     <div className="space-y-2">
                         <Label htmlFor="discovery-scope-name">Scope name</Label>
                         <Input
@@ -457,7 +576,9 @@ export function DiscoveryScopeDialog({
                                 ? 'Applying…'
                                 : editing
                                   ? 'Apply scope update'
-                                  : 'Add direct scope'}
+                                  : collectorId
+                                    ? 'Add hub scope'
+                                    : 'Add direct scope'}
                         </Button>
                     </DialogFooter>
                 </form>

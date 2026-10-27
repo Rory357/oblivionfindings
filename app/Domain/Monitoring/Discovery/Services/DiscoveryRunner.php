@@ -148,6 +148,7 @@ final class DiscoveryRunner
             throw new UnexpectedValueException('Collector discovery workload limit is invalid.');
         }
 
+        $authorisedSiteIds = $collector->authorisedSiteIds();
         $remaining = $maximumTargets;
         $work = [];
         $runs = DiscoveryRun::query()
@@ -155,7 +156,7 @@ final class DiscoveryRunner
             ->where('status', 'running')
             ->whereHas('scope', fn ($query) => $query
                 ->where('collector_id', $collector->id)
-                ->where('site_id', $collector->site_id)
+                ->whereIn('site_id', $authorisedSiteIds)
                 ->where('status', 'active'))
             ->orderBy('id')
             ->limit(16)
@@ -168,7 +169,7 @@ final class DiscoveryRunner
             $scope = $this->scopeFromSnapshot($run);
             $this->assertScope($scope);
             if ((int) $scope->collector_id !== (int) $collector->id
-                || (int) $scope->site_id !== (int) $collector->site_id) {
+                || ! in_array((int) $scope->site_id, $authorisedSiteIds, true)) {
                 continue;
             }
 
@@ -243,7 +244,7 @@ final class DiscoveryRunner
         }
 
         $run = DiscoveryRun::query()->with('scope')->where('run_uuid', $runUuid)->firstOrFail();
-        if ((int) data_get($run->scope_snapshot, 'site_id') !== (int) $collector->site_id) {
+        if (! in_array((int) data_get($run->scope_snapshot, 'site_id'), $collector->authorisedSiteIds(), true)) {
             throw new RuntimeSiteScopeViolation('Collector discovery Site does not match its enrolled Site.');
         }
         if ((int) data_get($run->scope_snapshot, 'collector_id') !== (int) $collector->id

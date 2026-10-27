@@ -29,7 +29,7 @@ final class MonitoringObservationScopeGuard
             throw new RuntimeSiteScopeViolation('Observation site does not match its canonical active assignment.');
         }
 
-        if ($monitor->collector !== null && (int) $monitor->collector->site_id !== $siteId) {
+        if ($monitor->collector !== null && ! in_array($siteId, $monitor->collector->authorisedSiteIds(), true)) {
             throw new RuntimeSiteScopeViolation('Observation collector site does not match its canonical device site.');
         }
     }

@@ -45,39 +45,58 @@ class DiscoveryOperationsPresenter
                 ->whereIn('device_id', $visibleDeviceIds)
                 ->with(['device:id,name', 'collector:id,name,site_id,status,last_seen_at', 'collector.site:id,name'])
                 ->get();
-        $collectorIds = $monitors->pluck('collector_id')->filter()->unique();
-        $collectors = MonitoringCollector::query()
-            ->with('site:id,name')
-            ->when(! $this->access->canViewAllSites($viewer), function (Builder $query) use ($viewer, $collectorIds): void {
-                $siteIds = $this->access->accessibleSiteIds($viewer);
-                $query->where(function (Builder $visibility) use ($siteIds, $collectorIds): void {
-                    if ($siteIds !== []) {
-                        $visibility->whereIn('site_id', $siteIds);
-                    } else {
-                        $visibility->whereRaw('1 = 0');
-                    }
-
-                    if ($collectorIds->isNotEmpty()) {
-                        $visibility->orWhereIn('id', $collectorIds);
-                    }
-                });
-            })
-            ->orderBy('name')
-            ->get();
-        $mappedCollectors = $collectors->map(fn (MonitoringCollector $collector): array => $this->mapCollector(
-            $collector,
-            $monitors->where('collector_id', $collector->id),
-            $canManageCollectors,
-        ));
-        $direct = $monitors->whereNull('collector_id');
-        $remote = $monitors->whereNotNull('collector_id');
         $scopes = DiscoveryScope::query()
             ->when(! $canViewAllSites, fn (Builder $query) => $siteIds === []
                 ? $query->whereRaw('1 = 0')
                 : $query->whereIn('site_id', $siteIds))
-            ->with(['site:id,name', 'collector:id,name,status,last_seen_at,last_heartbeat_at,runtime_state,backlog_items,gap_count,revoked_at'])
+            ->with([
+                'site:id,name',
+                'collector:id,name,site_id,status,config,last_seen_at,last_heartbeat_at,runtime_state,backlog_items,gap_count,revoked_at',
+            ])
             ->orderBy('name')
             ->get();
+        $activeSites = $siteIds === []
+            ? collect()
+            : Site::query()
+                ->whereIn('id', $siteIds)
+                ->where('is_active', true)
+                ->where('archived', false)
+                ->whereNull('archived_at')
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        $activeSitesById = $activeSites->keyBy('id');
+        $collectorIds = $monitors->pluck('collector_id')
+            ->merge($scopes->pluck('collector_id'))
+            ->filter()
+            ->unique();
+        $collectors = (! $canViewAllSites && $siteIds === [] && $collectorIds->isEmpty())
+            ? collect()
+            : MonitoringCollector::query()
+                ->with('site:id,name')
+                ->orderBy('name')
+                ->get()
+                ->filter(function (MonitoringCollector $collector) use ($canViewAllSites, $siteIds, $collectorIds): bool {
+                    if ($canViewAllSites || $collectorIds->contains($collector->id)) {
+                        return true;
+                    }
+
+                    return array_intersect($collector->authorisedSiteIds(), $siteIds) !== [];
+                })
+                ->values();
+        $scopeCountsByCollector = $scopes
+            ->where('status', 'active')
+            ->whereNotNull('collector_id')
+            ->countBy('collector_id');
+        $mappedCollectors = $collectors->map(fn (MonitoringCollector $collector): array => $this->mapCollector(
+            $collector,
+            $monitors->where('collector_id', $collector->id),
+            (int) ($scopeCountsByCollector->get($collector->id) ?? 0),
+            $activeSitesById,
+            $canViewAllSites || in_array((int) $collector->site_id, $siteIds, true),
+            $canManageCollectors,
+        ));
+        $direct = $monitors->whereNull('collector_id');
+        $remote = $monitors->whereNotNull('collector_id');
         $runQuery = $scopes->isEmpty()
             ? null
             : DiscoveryRun::query()
@@ -134,68 +153,90 @@ class DiscoveryOperationsPresenter
                 ->latest('id')
                 ->limit(200)
                 ->get();
-        $mappedScopes = $scopes->map(fn (DiscoveryScope $scope): array => [
-            'id' => $scope->id,
-            'name' => $scope->name,
-            'status' => $scope->status,
-            'site' => $scope->site ? [
-                'id' => $scope->site->id,
-                'name' => $scope->site->name,
-                'href' => "/security-devices/sites/{$scope->site->id}",
-            ] : null,
-            'collection_mode' => $scope->collector_id === null ? 'direct' : 'remote_collector',
-            'collector' => $scope->collector ? [
-                'id' => $scope->collector->id,
-                'name' => $scope->collector->name,
-                'state' => $this->collectorAvailability->state($scope->collector),
-            ] : null,
-            'protocols' => collect($scope->protocols ?? [])->filter(fn ($value): bool => is_string($value))->values(),
-            'network_ranges' => count($scope->cidrs ?? []),
-            'seed_hosts' => count($scope->seed_hosts ?? []),
-            'exclusions' => count($scope->exclusions ?? []),
-            'port_bounds' => count($scope->port_bounds ?? []),
-            'max_targets_per_run' => (int) $scope->max_targets_per_run,
-            'packets_per_second' => (int) $scope->packets_per_second,
-            'schedule' => $scope->schedule_cron,
-            'actions' => [
-                'can_manage' => $canManageScopes && $scope->collector_id === null,
-                'update_url' => $canManageScopes && $scope->collector_id === null && $scope->status === 'active'
-                    ? "/security-devices/discovery/scopes/{$scope->id}"
-                    : null,
-                'apply_url' => $canManageScopes && $scope->collector_id === null && $scope->status === 'active'
-                    ? "/security-devices/discovery/scopes/{$scope->id}/apply"
-                    : null,
-                'deactivate_url' => $canManageScopes && $scope->collector_id === null && $scope->status === 'active'
-                    ? "/security-devices/discovery/scopes/{$scope->id}/deactivate"
-                    : null,
-            ],
-        ])->values();
-        $mappedRuns = $runs->map(fn (DiscoveryRun $run): array => [
-            'id' => $run->id,
-            'run_uuid' => $run->run_uuid,
-            'scope_id' => $run->discovery_scope_id,
-            'scope_name' => $run->scope?->name,
-            'status' => $run->status,
-            'collection_mode' => $run->scope?->collector_id === null ? 'central' : 'remote_collector',
-            'collector' => $run->scope?->collector ? [
-                'id' => $run->scope->collector->id,
-                'name' => $run->scope->collector->name,
-                'state' => $this->collectorAvailability->state($run->scope->collector),
-            ] : null,
-            'trigger' => $run->trigger,
-            'planned' => $run->planned_targets,
-            'returned' => (int) $run->returned_count,
-            'pending' => (int) $run->pending_count,
-            'found' => $run->found_count,
-            'matched' => $run->matched_count,
-            'proposed' => $run->proposed_count,
-            'changed' => $run->changed_count,
-            'excluded' => $run->excluded_count,
-            'failed' => $run->failed_count,
-            'unresolved' => $run->unresolved_count,
-            'started_at' => $run->started_at?->toIso8601String(),
-            'completed_at' => $run->completed_at?->toIso8601String(),
-        ])->values();
+        $mappedScopes = $scopes->map(function (DiscoveryScope $scope) use ($canManageScopes, $canViewAllSites, $siteIds): array {
+            $canManageThisScope = $canManageScopes
+                && ($scope->collector_id === null
+                    || ($scope->collector !== null && ($canViewAllSites || in_array((int) $scope->collector->site_id, $siteIds, true))));
+            $runsFrom = $scope->collector_id === null
+                ? 'Runs from: server'
+                : 'Runs from: hub '.($scope->collector?->name ?? '#'.$scope->collector_id);
+
+            return [
+                'id' => $scope->id,
+                'name' => $scope->name,
+                'status' => $scope->status,
+                'site' => $scope->site ? [
+                    'id' => $scope->site->id,
+                    'name' => $scope->site->name,
+                    'href' => "/security-devices/sites/{$scope->site->id}",
+                ] : null,
+                'collection_mode' => $scope->collector_id === null ? 'direct' : 'remote_collector',
+                'collector_id' => $scope->collector_id === null ? null : (int) $scope->collector_id,
+                'collector_name' => $scope->collector?->name,
+                'runs_from' => $runsFrom,
+                'collector' => $scope->collector ? [
+                    'id' => $scope->collector->id,
+                    'name' => $scope->collector->name,
+                    'state' => $this->collectorAvailability->state($scope->collector),
+                ] : null,
+                'protocols' => collect($scope->protocols ?? [])->filter(fn ($value): bool => is_string($value))->values(),
+                'network_ranges' => count($scope->cidrs ?? []),
+                'seed_hosts' => count($scope->seed_hosts ?? []),
+                'exclusions' => count($scope->exclusions ?? []),
+                'port_bounds' => count($scope->port_bounds ?? []),
+                'max_targets_per_run' => (int) $scope->max_targets_per_run,
+                'packets_per_second' => (int) $scope->packets_per_second,
+                'schedule' => $scope->schedule_cron,
+                'actions' => [
+                    'can_manage' => $canManageThisScope,
+                    'update_url' => $canManageThisScope && $scope->status === 'active'
+                        ? "/security-devices/discovery/scopes/{$scope->id}"
+                        : null,
+                    'apply_url' => $canManageThisScope && $scope->status === 'active'
+                        ? "/security-devices/discovery/scopes/{$scope->id}/apply"
+                        : null,
+                    'deactivate_url' => $canManageThisScope && $scope->status === 'active'
+                        ? "/security-devices/discovery/scopes/{$scope->id}/deactivate"
+                        : null,
+                ],
+            ];
+        })->values();
+        $mappedRuns = $runs->map(function (DiscoveryRun $run): array {
+            $collectorId = $run->scope?->collector_id === null ? null : (int) $run->scope->collector_id;
+            $collectorName = $run->scope?->collector?->name;
+
+            return [
+                'id' => $run->id,
+                'run_uuid' => $run->run_uuid,
+                'scope_id' => $run->discovery_scope_id,
+                'scope_name' => $run->scope?->name,
+                'status' => $run->status,
+                'collection_mode' => $collectorId === null ? 'central' : 'remote_collector',
+                'collector_id' => $collectorId,
+                'collector_name' => $collectorName,
+                'runs_from' => $collectorId === null
+                    ? 'Runs from: server'
+                    : 'Runs from: hub '.($collectorName ?? '#'.$collectorId),
+                'collector' => $run->scope?->collector ? [
+                    'id' => $run->scope->collector->id,
+                    'name' => $run->scope->collector->name,
+                    'state' => $this->collectorAvailability->state($run->scope->collector),
+                ] : null,
+                'trigger' => $run->trigger,
+                'planned' => $run->planned_targets,
+                'returned' => (int) $run->returned_count,
+                'pending' => (int) $run->pending_count,
+                'found' => $run->found_count,
+                'matched' => $run->matched_count,
+                'proposed' => $run->proposed_count,
+                'changed' => $run->changed_count,
+                'excluded' => $run->excluded_count,
+                'failed' => $run->failed_count,
+                'unresolved' => $run->unresolved_count,
+                'started_at' => $run->started_at?->toIso8601String(),
+                'completed_at' => $run->completed_at?->toIso8601String(),
+            ];
+        })->values();
         $mappedCandidates = $candidates->map(function (DiscoveryCandidate $candidate) use (
             $canAdoptCandidates,
             $canSameAsCandidates,
@@ -297,11 +338,14 @@ class DiscoveryOperationsPresenter
                 'issue_url' => $canManageCollectors
                     ? '/security-devices/discovery/collectors/enrolments'
                     : null,
-                'sites' => $canManageCollectors && $siteIds !== []
-                    ? Site::query()
-                        ->whereIn('id', $siteIds)
-                        ->orderBy('name')
-                        ->get(['id', 'name'])
+                'wizard_options_url' => $canManageCollectors
+                    ? '/security-devices/discovery/collectors/hub-wizard/options'
+                    : null,
+                'wizard_issue_url' => $canManageCollectors
+                    ? '/security-devices/discovery/collectors/hub-wizard/issue'
+                    : null,
+                'sites' => $canManageCollectors
+                    ? $activeSites
                         ->map(fn (Site $site): array => [
                             'id' => (int) $site->id,
                             'name' => $site->name,
@@ -319,17 +363,29 @@ class DiscoveryOperationsPresenter
                 'protocols' => $canManageScopes
                     ? NativeMonitoringDefinitionService::discoveryProtocols()
                     : [],
-                'sites' => $canManageScopes && $siteIds !== []
-                    ? Site::query()
-                        ->whereIn('id', $siteIds)
-                        ->where('is_active', true)
-                        ->where('archived', false)
-                        ->whereNull('archived_at')
-                        ->orderBy('name')
-                        ->get(['id', 'name'])
+                'sites' => $canManageScopes
+                    ? $activeSites
                         ->map(fn (Site $site): array => [
                             'id' => (int) $site->id,
                             'name' => $site->name,
+                        ])
+                        ->values()
+                        ->all()
+                    : [],
+                'collectors' => $canManageScopes
+                    ? $collectors
+                        ->filter(fn (MonitoringCollector $collector): bool => $collector->revoked_at === null
+                            && ($canViewAllSites || in_array((int) $collector->site_id, $siteIds, true)))
+                        ->map(fn (MonitoringCollector $collector): array => [
+                            'id' => (int) $collector->id,
+                            'name' => $collector->name,
+                            'home_site_id' => (int) $collector->site_id,
+                            'home_site_name' => $collector->site?->name,
+                            'authorised_site_ids' => array_values(array_filter(
+                                $collector->authorisedSiteIds(),
+                                fn (int $id): bool => $canViewAllSites || in_array($id, $siteIds, true),
+                            )),
+                            'state' => $this->collectorAvailability->state($collector),
                         ])
                         ->values()
                         ->all()
@@ -361,9 +417,12 @@ class DiscoveryOperationsPresenter
                 'collector_name' => $collector['name'],
                 'site' => $collector['site'],
                 'state' => $collector['freshness_state'],
+                'software_version' => $collector['software_version'],
                 'monitor_load' => $collector['monitor_load'],
+                'scope_load' => $collector['scope_load'],
                 'device_load' => $collector['device_load'],
                 'affected_devices' => $collector['affected_devices'],
+                'covered_sites' => $collector['covered_sites'],
             ])->values(),
             'limitations' => [
                 'unsupported_state' => 'not_assessed',
@@ -374,27 +433,46 @@ class DiscoveryOperationsPresenter
         ];
     }
 
-    /** @param Collection<int, Monitor> $monitors @return array<string, mixed> */
+    /**
+     * @param  Collection<int, Monitor>  $monitors
+     * @param  Collection<int, Site>  $activeSitesById
+     * @return array<string, mixed>
+     */
     private function mapCollector(
         MonitoringCollector $collector,
         Collection $monitors,
+        int $scopeLoad,
+        Collection $activeSitesById,
+        bool $canViewHomeSite,
         bool $canManage,
     ): array {
         $state = $this->collectorAvailability->state($collector);
         $lastHeartbeat = $this->collectorAvailability->lastHeartbeat($collector);
+        $canManageHome = $canManage && $canViewHomeSite;
+        $coveredSites = collect($collector->coveredSiteIds())
+            ->map(fn (int $coveredId) => $activeSitesById->get($coveredId))
+            ->filter()
+            ->map(fn (Site $covered): array => [
+                'id' => (int) $covered->id,
+                'name' => $covered->name,
+                'href' => "/security-devices/sites/{$covered->id}",
+            ])
+            ->values();
 
         return [
             'id' => $collector->id,
             'name' => $collector->name,
-            'site' => $collector->site ? [
+            'site' => $canViewHomeSite && $collector->site ? [
                 'id' => $collector->site->id,
                 'name' => $collector->site->name,
                 'href' => "/security-devices/sites/{$collector->site->id}",
             ] : null,
             'reported_status' => $collector->status,
             'freshness_state' => $state,
+            'software_version' => $collector->softwareVersion(),
             'last_seen_at' => $lastHeartbeat?->toIso8601String(),
-            'heartbeat_lag_seconds' => $lastHeartbeat?->diffInSeconds(now()),
+            'last_heartbeat_at' => $collector->last_heartbeat_at?->toIso8601String(),
+            'heartbeat_lag_seconds' => $lastHeartbeat === null ? null : (int) round(max(0, $lastHeartbeat->diffInSeconds(now()))),
             'runtime_state' => $collector->runtime_state,
             'backlog_items' => (int) $collector->backlog_items,
             'spool_bytes' => (int) $collector->spool_bytes,
@@ -403,18 +481,24 @@ class DiscoveryOperationsPresenter
             'clock_drift_seconds' => $collector->last_clock_drift_seconds === null ? null : (int) $collector->last_clock_drift_seconds,
             'revoked_at' => $collector->revoked_at?->toIso8601String(),
             'monitor_load' => $monitors->count(),
+            'scope_load' => $scopeLoad,
             'device_load' => $monitors->pluck('device_id')->unique()->count(),
+            'covered_site_ids' => $coveredSites->pluck('id')->values()->all(),
+            'covered_sites' => $coveredSites->all(),
             'affected_monitors' => $state === MonitoringCollectorAvailabilityService::AVAILABLE ? 0 : $monitors->count(),
             'affected_devices' => $state === MonitoringCollectorAvailabilityService::AVAILABLE ? 0 : $monitors->pluck('device_id')->unique()->count(),
             'impact_note' => $state === MonitoringCollectorAvailabilityService::AVAILABLE
                 ? 'Collection path is reporting within the configured heartbeat window.'
                 : 'Downstream monitor results are uncertain until this collection path reports again.',
             'actions' => [
-                'can_manage' => $canManage,
-                'revoke_url' => $canManage && $collector->revoked_at === null
+                'can_manage' => $canManageHome,
+                'update_url' => $canManageHome && $collector->revoked_at === null
+                    ? "/security-devices/discovery/collectors/{$collector->id}"
+                    : null,
+                'revoke_url' => $canManageHome && $collector->revoked_at === null
                     ? "/security-devices/discovery/collectors/{$collector->id}/revoke"
                     : null,
-                're_enrol_url' => $canManage && $collector->revoked_at !== null
+                're_enrol_url' => $canManageHome && $collector->revoked_at !== null
                     ? "/security-devices/discovery/collectors/{$collector->id}/re-enrolment"
                     : null,
             ],

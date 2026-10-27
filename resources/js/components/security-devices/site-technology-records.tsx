@@ -36,6 +36,7 @@ import {
     Eye,
     FolderTree,
     Network,
+    Pencil,
     RadioTower,
     TicketCheck,
     Wrench,
@@ -264,6 +265,10 @@ export function SiteDevices({
         />
     );
 }
+const siteMonitorRunsFrom = (r: Monitor): string =>
+    r.runs_from ??
+    (r.collector_name ? `Runs from: hub ${r.collector_name}` : 'Runs from: server');
+
 export function SiteMonitors({
     rows,
     view,
@@ -282,7 +287,7 @@ export function SiteMonitors({
             identity={(r) => ({
                 icon: Activity,
                 name: r.name,
-                subline: r.device_name,
+                subline: `${r.device_name} · ${siteMonitorRunsFrom(r)}`,
             })}
             hrefFor={(r) => '/security-devices/devices/' + r.device_id}
             actionsFor={(r) => [
@@ -303,6 +308,7 @@ export function SiteMonitors({
                     <>
                         {state(r.state)}
                         <EntityChip>{technologyLabel(r.kind)}</EntityChip>
+                        <EntityChip>{siteMonitorRunsFrom(r)}</EntityChip>
                     </>
                 ),
                 footer: {
@@ -331,6 +337,12 @@ export function SiteMonitors({
                     ),
                 },
                 {
+                    key: 'runs_from',
+                    label: 'Runs from',
+                    width: '1.2fr',
+                    cell: (r) => siteMonitorRunsFrom(r),
+                },
+                {
                     key: 'observed',
                     label: 'Observed',
                     width: '1fr',
@@ -352,6 +364,7 @@ export function SiteMonitors({
                             items={[
                                 ['State', state(r.state)],
                                 ['Check', technologyLabel(r.kind)],
+                                ['Runs from', siteMonitorRunsFrom(r)],
                                 [
                                     'Observed',
                                     r.last_observation_at
@@ -384,14 +397,32 @@ export function SiteMonitors({
 export function SiteCollectors({
     rows,
     view,
+    onEditHub,
 }: {
     rows: Collector[];
     view: EvidenceRecordsView;
+    onEditHub?: (collector: Collector) => void;
 }) {
+    const collectorSubline = (r: Collector): string => {
+        const parts: string[] = [
+            r.is_home_site === false
+                ? 'Covers this Site over SD-WAN'
+                : 'Site hub',
+        ];
+        if (r.software_version) {
+            parts.push(`v${r.software_version}`);
+        }
+        if (r.monitor_load !== undefined || r.scope_load !== undefined) {
+            parts.push(
+                `${r.monitor_load ?? 0} checks · ${r.scope_load ?? 0} scans`,
+            );
+        }
+        return parts.join(' · ');
+    };
     return (
         <EvidenceRecords<Collector>
-            title="Site collectors"
-            description="Reported collector state and last contact. A local collector is optional; centrally reachable Sites can be polled centrally."
+            title="Site hubs and collectors"
+            description="Reported hub health, software version, and last heartbeat. A local hub is optional when the main server can reach this Site directly."
             rows={rows}
             view={view}
             icon={RadioTower}
@@ -399,24 +430,46 @@ export function SiteCollectors({
             identity={(r) => ({
                 icon: RadioTower,
                 name: r.name,
-                subline: 'Site monitoring collector',
+                subline: collectorSubline(r),
             })}
-            actionsFor={() => []}
+            actionsFor={(r) =>
+                onEditHub &&
+                r.update_url === `/security-devices/discovery/collectors/${r.id}`
+                    ? [
+                          {
+                              label: 'Edit hub',
+                              icon: Pencil,
+                              onClick: () => onEditHub(r),
+                          },
+                      ]
+                    : []
+            }
             cardFor={(r) => ({
                 icon: RadioTower,
                 name: r.name,
+                subline: collectorSubline(r),
                 meridian:
                     r.state === 'online'
                         ? 'success'
                         : r.state === 'stale'
                           ? 'warning'
                           : 'neutral',
-                chips: state(r.state),
+                chips: (
+                    <>
+                        {state(r.state)}
+                        {r.software_version ? (
+                            <EntityChip>v{r.software_version}</EntityChip>
+                        ) : null}
+                        {r.is_home_site === false ? (
+                            <EntityChip>Covers over SD-WAN</EntityChip>
+                        ) : null}
+                    </>
+                ),
                 footer: {
                     personIcon: Clock3,
                     primary: (
                         <SiteEvidenceTime
-                            value={r.last_seen_at}
+                            value={r.last_heartbeat_at ?? r.last_seen_at}
                             empty="No contact recorded"
                         />
                     ),
@@ -430,6 +483,17 @@ export function SiteCollectors({
                     cell: (r) => state(r.state),
                 },
                 {
+                    key: 'version',
+                    label: 'Version',
+                    width: '110px',
+                    cell: (r) =>
+                        r.software_version ? (
+                            <EntityChip>v{r.software_version}</EntityChip>
+                        ) : (
+                            'Not reported'
+                        ),
+                },
+                {
                     key: 'status',
                     label: 'Reported status',
                     width: '1fr',
@@ -439,11 +503,11 @@ export function SiteCollectors({
                 },
                 {
                     key: 'seen',
-                    label: 'Last contact',
+                    label: 'Last heartbeat',
                     width: '1fr',
                     cell: (r) => (
                         <SiteEvidenceTime
-                            value={r.last_seen_at}
+                            value={r.last_heartbeat_at ?? r.last_seen_at}
                             empty="No contact recorded"
                         />
                     ),
@@ -452,7 +516,7 @@ export function SiteCollectors({
             columns={[
                 {
                     key: 'state',
-                    label: 'Collection state',
+                    label: 'Hub health',
                     width: '1fr',
                     cell: (r) => (
                         <SiteEvidenceFields
@@ -460,10 +524,25 @@ export function SiteCollectors({
                                 ['State', state(r.state)],
                                 ['Reported status', technologyLabel(r.status)],
                                 [
-                                    'Last contact',
-                                    r.last_seen_at
-                                        ? formatDateTime(r.last_seen_at)
+                                    'Software version',
+                                    r.software_version ?? 'Not reported',
+                                ],
+                                [
+                                    'Last heartbeat',
+                                    (r.last_heartbeat_at ?? r.last_seen_at)
+                                        ? formatDateTime(
+                                              r.last_heartbeat_at ??
+                                                  r.last_seen_at,
+                                          )
                                         : 'No contact recorded',
+                                ],
+                                [
+                                    'Assigned checks',
+                                    r.monitor_load ?? 'Not reported',
+                                ],
+                                [
+                                    'Assigned scans',
+                                    r.scope_load ?? 'Not reported',
                                 ],
                             ]}
                         />
@@ -471,19 +550,33 @@ export function SiteCollectors({
                 },
                 {
                     key: 'identity',
-                    label: 'Collector identity',
+                    label: 'Hub coverage',
                     width: '1fr',
                     cell: (r) => (
                         <SiteEvidenceFields
                             items={[
                                 ['Name', r.name],
-                                ['Collector identifier', r.uuid],
+                                [
+                                    'Placement',
+                                    r.is_home_site === false
+                                        ? `Covers over SD-WAN${r.home_site ? ` from ${r.home_site.name}` : ''}`
+                                        : 'Installed at this Site',
+                                ],
+                                [
+                                    'Additional SD-WAN Sites',
+                                    (r.covered_sites ?? []).length > 0
+                                        ? (r.covered_sites ?? [])
+                                              .map((covered) => covered.name)
+                                              .join(', ')
+                                        : 'None',
+                                ],
+                                ['Hub identifier', r.uuid],
                             ]}
                         />
                     ),
                 },
             ]}
-            empty="No local collector configured."
+            empty="No local hub configured."
         />
     );
 }

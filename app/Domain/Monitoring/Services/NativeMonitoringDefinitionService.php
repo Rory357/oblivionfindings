@@ -10,12 +10,14 @@ use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorDependency;
+use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Protocols\RemoteInventory\InventoryQuery;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
 use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
 use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Models\Device;
+use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -46,6 +48,7 @@ final readonly class NativeMonitoringDefinitionService
         private EgressPolicy $egress,
         private DiscoveryScopeValidator $scopeValidator,
         private CidrMatcher $cidrMatcher,
+        private SecurityDevicesAccessService $access,
     ) {}
 
     /** @return list<array{value: string, label: string}> */
@@ -89,13 +92,14 @@ final readonly class NativeMonitoringDefinitionService
             $lockedDevice = Device::query()->whereKey($device->id)->lockForUpdate()->firstOrFail();
             $kind = $this->directKind($data['kind'] ?? null);
             $siteId = $this->canonicalSite((int) $lockedDevice->id);
+            $collector = $this->resolveCollectorForSite($actor, $data['collector_id'] ?? null, $siteId);
             $profile = $this->activeProfile($data['profile_id'] ?? null);
             [$target, $config] = $this->monitorDefinition($kind, $data, null, $siteId);
-            $this->authoriseTarget($siteId, (int) $lockedDevice->id, $kind, $target, $config);
+            $this->authoriseTarget($siteId, (int) $lockedDevice->id, $kind, $target, $config, $collector?->id);
             $monitor = Monitor::query()->create([
                 'device_id' => $lockedDevice->id,
                 'profile_id' => $profile->id,
-                'collector_id' => null,
+                'collector_id' => $collector?->id,
                 'kind' => $kind,
                 'name' => trim((string) $data['name']),
                 'target' => $target,
@@ -111,11 +115,12 @@ final readonly class NativeMonitoringDefinitionService
                 'device_id' => (int) $lockedDevice->id,
                 'profile_id' => (int) $profile->id,
                 'kind' => $kind->value,
-                'collection_mode' => 'central_direct',
+                'collection_mode' => $collector === null ? 'central_direct' : 'remote_collector',
+                ...($collector === null ? [] : ['collector_id' => (int) $collector->id]),
                 'affects_availability' => (bool) $monitor->affects_availability,
             ]);
 
-            return $monitor->fresh(['device', 'profile']);
+            return $monitor->fresh(['device', 'profile', 'collector']);
         }, 3);
     }
 
@@ -125,11 +130,13 @@ final readonly class NativeMonitoringDefinitionService
         return DB::transaction(function () use ($actor, $monitor, $data): Monitor {
             $locked = Monitor::query()
                 ->whereKey($monitor->id)
-                ->whereNull('collector_id')
                 ->whereIn('kind', self::directKindValues())
                 ->lockForUpdate()
                 ->firstOrFail();
             $siteId = $this->canonicalSite((int) $locked->device_id);
+            $collector = array_key_exists('collector_id', $data)
+                ? $this->resolveCollectorForSite($actor, $data['collector_id'], $siteId)
+                : ($locked->collector_id === null ? null : $this->resolveCollectorForSite($actor, $locked->collector_id, $siteId));
             $kind = $locked->kind instanceof MonitorKind
                 ? $locked->kind
                 : $this->directKind($locked->getRawOriginal('kind'));
@@ -137,10 +144,11 @@ final readonly class NativeMonitoringDefinitionService
                 ? $this->activeProfile($data['profile_id'])
                 : $this->activeProfile($locked->profile_id);
             [$target, $config] = $this->monitorDefinition($kind, $data, $locked, $siteId);
-            $this->authoriseTarget($siteId, (int) $locked->device_id, $kind, $target, $config);
+            $this->authoriseTarget($siteId, (int) $locked->device_id, $kind, $target, $config, $collector?->id);
             $targetChanged = ! hash_equals((string) $locked->target, $target);
             $locked->forceFill([
                 'profile_id' => $profile->id,
+                'collector_id' => $collector?->id,
                 'name' => array_key_exists('name', $data) ? trim((string) $data['name']) : $locked->name,
                 'target' => $target,
                 'config' => $config,
@@ -154,12 +162,13 @@ final readonly class NativeMonitoringDefinitionService
                 'device_id' => (int) $locked->device_id,
                 'profile_id' => (int) $profile->id,
                 'kind' => $kind->value,
-                'collection_mode' => 'central_direct',
+                'collection_mode' => $collector === null ? 'central_direct' : 'remote_collector',
+                ...($collector === null ? [] : ['collector_id' => (int) $collector->id]),
                 'target_changed' => $targetChanged,
                 'affects_availability' => (bool) $locked->affects_availability,
             ]);
 
-            return $locked->fresh(['device', 'profile']);
+            return $locked->fresh(['device', 'profile', 'collector']);
         }, 3);
     }
 
@@ -172,7 +181,6 @@ final readonly class NativeMonitoringDefinitionService
         return DB::transaction(function () use ($actor, $monitor, $reasonCode): Monitor {
             $locked = Monitor::query()
                 ->whereKey($monitor->id)
-                ->whereNull('collector_id')
                 ->whereIn('kind', self::directKindValues())
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -247,14 +255,14 @@ final readonly class NativeMonitoringDefinitionService
                 ->whereNull('archived_at')
                 ->lockForUpdate()
                 ->firstOrFail();
-            $attributes = $this->scopeAttributes($data, null, (int) $site->id);
+            $attributes = $this->scopeAttributes($actor, $data, null, (int) $site->id);
             $scope = new DiscoveryScope($attributes);
             $this->assertScopeValid($scope);
             $this->assertScopeNameAvailable((int) $site->id, $attributes['name']);
             $scope = DiscoveryScope::query()->create($attributes);
             $this->auditScope('monitoring.discovery.scope.created', $scope, $actor);
 
-            return $scope->fresh(['site']);
+            return $scope->fresh(['site', 'collector']);
         }, 3);
     }
 
@@ -264,10 +272,9 @@ final readonly class NativeMonitoringDefinitionService
         return DB::transaction(function () use ($actor, $scope, $data): DiscoveryScope {
             $locked = DiscoveryScope::query()
                 ->whereKey($scope->id)
-                ->whereNull('collector_id')
                 ->lockForUpdate()
                 ->firstOrFail();
-            $attributes = $this->scopeAttributes($data, $locked, (int) $locked->site_id);
+            $attributes = $this->scopeAttributes($actor, $data, $locked, (int) $locked->site_id);
             $this->assertScopeNameAvailable((int) $locked->site_id, $attributes['name'], (int) $locked->id);
             $candidate = $locked->replicate();
             $candidate->forceFill($attributes);
@@ -275,7 +282,7 @@ final readonly class NativeMonitoringDefinitionService
             $locked->forceFill($attributes)->save();
             $this->auditScope('monitoring.discovery.scope.updated', $locked, $actor);
 
-            return $locked->fresh(['site']);
+            return $locked->fresh(['site', 'collector']);
         }, 3);
     }
 
@@ -288,7 +295,6 @@ final readonly class NativeMonitoringDefinitionService
         return DB::transaction(function () use ($actor, $scope, $reasonCode): DiscoveryScope {
             $locked = DiscoveryScope::query()
                 ->whereKey($scope->id)
-                ->whereNull('collector_id')
                 ->lockForUpdate()
                 ->firstOrFail();
             $activeRun = DiscoveryRun::query()
@@ -413,8 +419,14 @@ final readonly class NativeMonitoringDefinitionService
     }
 
     /** @param array<string, mixed> $config */
-    private function authoriseTarget(int $siteId, int $deviceId, MonitorKind $kind, string $target, array $config): void
-    {
+    private function authoriseTarget(
+        int $siteId,
+        int $deviceId,
+        MonitorKind $kind,
+        string $target,
+        array $config,
+        ?int $collectorId = null,
+    ): void {
         try {
             $probe = match ($kind) {
                 MonitorKind::Icmp => ProbeTarget::icmp($target),
@@ -427,11 +439,59 @@ final readonly class NativeMonitoringDefinitionService
                 MonitorKind::WinRmInventory => ProbeTarget::winrm($target),
                 default => throw new \LogicException('Unsupported adapter.'),
             };
+        } catch (Throwable) {
+            throw ValidationException::withMessages([
+                'target' => 'The target is not inside an active central Site network scope and adapter allowlist.',
+            ]);
+        }
+
+        $protocol = match ($kind) {
+            MonitorKind::SshInventory, MonitorKind::WinRmInventory => 'tcp',
+            default => $kind->value,
+        };
+
+        if ($collectorId !== null) {
+            if (filter_var($probe->host, FILTER_VALIDATE_IP) === false) {
+                throw ValidationException::withMessages([
+                    'target' => 'Hub checks require a literal IPv4 or IPv6 target address inside an approved Site network scope.',
+                ]);
+            }
+            try {
+                $address = $this->cidrMatcher->canonicalAddress($probe->host);
+                $denyCidrs = (array) config('monitoring.egress.deny_cidrs', []);
+                foreach ($denyCidrs as $denyCidr) {
+                    if (is_string($denyCidr) && $denyCidr !== '' && $this->cidrMatcher->contains($denyCidr, $address)) {
+                        throw new UnexpectedValueException('Denied CIDR.');
+                    }
+                }
+                $scopes = DiscoveryScope::query()
+                    ->where('site_id', $siteId)
+                    ->where('status', 'active')
+                    ->where(fn ($query) => $query->whereNull('collector_id')->orWhere('collector_id', $collectorId))
+                    ->lockForUpdate()
+                    ->get();
+                $definitionIsAuthorised = $scopes->contains(
+                    fn (DiscoveryScope $scope): bool => $this->scopeAuthorisesAddress(
+                        $scope,
+                        $protocol,
+                        $probe->port,
+                        $address,
+                    ),
+                );
+                if (! $definitionIsAuthorised) {
+                    throw new UnexpectedValueException('Adapter scope mismatch.');
+                }
+            } catch (Throwable) {
+                throw ValidationException::withMessages([
+                    'target' => 'The target is not inside an active Site network scope and adapter allowlist.',
+                ]);
+            }
+
+            return;
+        }
+
+        try {
             $authorised = $this->egress->authorise($siteId, $deviceId, $probe);
-            $protocol = match ($kind) {
-                MonitorKind::SshInventory, MonitorKind::WinRmInventory => 'tcp',
-                default => $kind->value,
-            };
             $scopes = DiscoveryScope::query()
                 ->where('site_id', $siteId)
                 ->whereNull('collector_id')
@@ -494,12 +554,15 @@ final readonly class NativeMonitoringDefinitionService
     }
 
     /** @param array<string, mixed> $data @return array<string, mixed> */
-    private function scopeAttributes(array $data, ?DiscoveryScope $existing, int $siteId): array
+    private function scopeAttributes(User $actor, array $data, ?DiscoveryScope $existing, int $siteId): array
     {
         $value = fn (string $key, mixed $default): mixed => array_key_exists($key, $data)
             && $data[$key] !== null
                 ? $data[$key]
                 : ($existing?->{$key} ?? $default);
+        $collector = array_key_exists('collector_id', $data)
+            ? $this->resolveCollectorForSite($actor, $data['collector_id'], $siteId)
+            : ($existing?->collector_id === null ? null : $this->resolveCollectorForSite($actor, $existing->collector_id, $siteId));
         $protocols = collect($value('protocols', []))
             ->filter(fn (mixed $protocol): bool => is_string($protocol))
             ->map(fn (string $protocol): string => strtolower(trim($protocol)))
@@ -515,7 +578,7 @@ final readonly class NativeMonitoringDefinitionService
 
         return [
             'site_id' => $siteId,
-            'collector_id' => null,
+            'collector_id' => $collector?->id,
             'name' => trim((string) $value('name', '')),
             'cidrs' => $this->stringList($value('cidrs', []), 64, 2048, 'cidrs'),
             'seed_hosts' => $this->stringList($value('seed_hosts', []), 256, 253, 'seed_hosts'),
@@ -528,6 +591,31 @@ final readonly class NativeMonitoringDefinitionService
             'schedule_cron' => null,
             'status' => $existing?->status === 'inactive' ? 'inactive' : 'active',
         ];
+    }
+
+    private function resolveCollectorForSite(
+        User $actor,
+        mixed $collectorId,
+        int $siteId,
+        string $field = 'collector_id',
+    ): ?MonitoringCollector {
+        if ($collectorId === null || $collectorId === '') {
+            return null;
+        }
+        if (! is_numeric($collectorId) || (int) $collectorId < 1) {
+            throw ValidationException::withMessages([$field => 'Select an active hub covering this Site.']);
+        }
+
+        $collector = MonitoringCollector::query()->whereKey((int) $collectorId)->lockForUpdate()->first();
+        if ($collector === null
+            || $collector->revoked_at !== null
+            || ! in_array($siteId, $collector->authorisedSiteIds(), true)
+            || ! in_array(strtolower((string) $collector->status), ['online', 'offline', 'degraded', 'unavailable', 'pending'], true)) {
+            throw ValidationException::withMessages([$field => 'Select an active hub covering this Site.']);
+        }
+        $this->access->assertCanViewSite($actor, (int) $collector->site_id);
+
+        return $collector;
     }
 
     private function assertScopeValid(DiscoveryScope $scope): void
@@ -560,7 +648,8 @@ final readonly class NativeMonitoringDefinitionService
         AuditLogger::logOrFail($action, $scope, [
             'actor_id' => (int) $actor->id,
             'site_id' => (int) $scope->site_id,
-            'collection_mode' => 'central_direct',
+            'collection_mode' => $scope->collector_id === null ? 'central_direct' : 'remote_collector',
+            ...($scope->collector_id === null ? [] : ['collector_id' => (int) $scope->collector_id]),
             'protocols' => array_values($scope->protocols ?? []),
             'network_range_count' => count($scope->cidrs ?? []),
             'seed_host_count' => count($scope->seed_hosts ?? []),
