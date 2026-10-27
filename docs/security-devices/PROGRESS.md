@@ -40,9 +40,18 @@
 
 ---
 
-### Live `.com` fixture inventory (to remove after `mysqldump` backup)
+### Live `.com` fixture purge (`0.1` — executed 28 Oct 2026 NZDT)
 
-#### Release fixture packs to remove (2)
+- **Pre-deploy & pre-purge MySQL backups verified on `oblivionfindings.com` (stored outside `/var/www/oblivionfindings`):**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase0-20261027T133359Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK)
+  - `/home/oblivion/db-backups/oblivionfindings-pre-fixture-purge-20261027T134455Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK)
+- **Live execution result (`php artisan security-devices:purge-test-fixtures --force` at `254675f68`):**
+  - `Purge complete: 1 relationships unlinked, 19 devices hard-deleted, 3 devices soft-deleted (history retained), 5 Sites removed, 2 fixture packs removed.`
+  - Post-purge `--dry-run`: `Release fixture packs (0)`, `Test fixture devices to remove (0)`, `Test Sites to remove (0)`, `Real devices preserved (3)` (`1` `UX7`, `2` `Care tracker 867963069916998`, `95` `unif`).
+  - `php artisan database:verify-lifecycle-triggers postflight --json` → `"status": "verified"`, `16/16` triggers intact, `0` errors.
+  - `git -C /var/www/oblivionfindings status --porcelain` → empty.
+
+#### Release fixture packs removed (2)
 | ID | Pack key | State | Manifest records |
 | --- | --- | --- | --- |
 | 8 | `it-security-desktop-release-v1` | `ready` | 76 |
@@ -118,3 +127,23 @@
   ![Local Device Profile](screenshots/phase-0-local-device-profile.png)
 - **Settings › Server readiness:**
   ![Local Server Readiness](screenshots/phase-0-local-server-readiness.png)
+
+#### Live `oblivionfindings.com` walkthrough (`254675f68` — post-purge)
+- **Live Server readiness (`5` of `7` ready, `2` honestly flagged for Phase 2 keys):**
+  - `Redis`: **Ready** (`Connected and responding`)
+  - `Scheduler`: **Ready** (`Running every minute`)
+  - `Worker pools`: **Ready** (`9 of 9 pools running`)
+  - `Ping permission`: **Ready** (`Allowed · Local ping check succeeded`)
+  - `Credential store`: **Ready** (`Encrypted database store ready`)
+  - `Collector keys`: **Needs fix** (`Missing or unreadable: site hub configuration signing key, site hub certificate authority files` — scheduled for Phase 2 with server owner approval)
+  - `Release key`: **Needs fix** (`No valid 32-byte Ed25519 publisher public key is configured` — scheduled for Phase 2)
+- **Overview (`3` real devices, `0%` monitoring coverage, `First-run setup` `2 of 4 done`):**
+  ![Live Overview](screenshots/phase-0-live-overview.png)
+- **Devices list (`Care tracker 867963069916998`, `unif`, `UX7` — all 22 test devices removed, `Not monitored` shown honestly):**
+  ![Live Devices](screenshots/phase-0-live-devices.png)
+- **Device profile (`UX7` — `Not monitored`, `History & files` plain tab, fake configuration backup hidden):**
+  ![Live Device Profile](screenshots/phase-0-live-device-profile.png)
+- **Alerts & upkeep (`/security-devices/monitoring` — consolidated section tabs, `0` fixture checks remaining):**
+  ![Live Alerts & Upkeep](screenshots/phase-0-live-alerts-upkeep.png)
+- **Settings › Server readiness (live `oblivionfindings.com` checks):**
+  ![Live Server Readiness](screenshots/phase-0-live-server-readiness.png)
