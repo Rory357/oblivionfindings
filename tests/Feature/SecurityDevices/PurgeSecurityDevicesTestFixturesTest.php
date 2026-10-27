@@ -5,7 +5,9 @@ namespace Tests\Feature\SecurityDevices;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\ItCatalogItem;
 use App\Models\ItSecurityDesktopReleaseFixturePack;
+use App\Models\ItTicket;
 use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -158,5 +160,115 @@ class PurgeSecurityDevicesTestFixturesTest extends TestCase
         $this->assertDatabaseMissing('sites', ['id' => $testSiteAlpha->id]);
         $this->assertDatabaseMissing('sites', ['id' => $testSiteDemo->id]);
         $this->assertDatabaseMissing('it_security_desktop_release_fixture_packs', ['id' => $pack->id]);
+
+        // 3. Re-running --dry-run is idempotent and reports zero remaining fixtures.
+        $this->artisan('security-devices:purge-test-fixtures --dry-run')
+            ->expectsOutputToContain('Test fixture devices to remove (0)')
+            ->expectsOutputToContain('Test Sites to remove (0)')
+            ->expectsOutputToContain('Real devices preserved (3)')
+            ->assertSuccessful();
+    }
+
+    public function test_purge_handles_evidence_snapshots_catalog_versions_and_restricted_foreign_keys_safely(): void
+    {
+        $realAdmin = User::factory()->create(['approved_at' => now()]);
+        $fixtureUser = User::factory()->create([
+            'email' => 'release-v10-worker@acceptance.invalid',
+            'approved_at' => now(),
+        ]);
+
+        $restrictedSite = Site::factory()->create(['name' => 'RELEASE V10 Site Alpha', 'is_active' => true]);
+        $fixtureDevice = Device::factory()->create([
+            'device_uid' => 'CCT-REL-V10-SNAP',
+            'name' => 'RELEASE V10 Alpha Camera',
+            'provider' => 'manual',
+        ]);
+
+        $eventId = DB::table('device_events')->insertGetId([
+            'device_id' => $fixtureDevice->id,
+            'event_type' => 'offline',
+            'severity' => 'warn',
+            'occurred_at' => now(),
+            'created_at' => now(),
+        ]);
+
+        $ticket = ItTicket::factory()->create([
+            'requester_user_id' => $fixtureUser->id,
+        ]);
+
+        DB::table('monitoring_incident_evidence_snapshots')->insert([
+            'control_room_alert_id' => null,
+            'it_ticket_id' => $ticket->id,
+            'device_id' => $fixtureDevice->id,
+            'device_event_id' => $eventId,
+            'site_id' => $restrictedSite->id,
+            'evidence_version' => 1,
+            'captured_at' => now(),
+            'snapshot' => json_encode(['status' => 'offline'], JSON_THROW_ON_ERROR),
+            'checksum' => hash('sha256', 'snapshot-1'),
+            'created_at' => now(),
+        ]);
+
+        $catalogItem = ItCatalogItem::query()->create([
+            'name' => 'RELEASE V10 Access Request',
+            'slug' => 'release-v10-access-request',
+            'category' => 'access',
+            'is_published' => true,
+            'form_schema' => ['fields' => []],
+        ]);
+        $catalogItemId = (int) $catalogItem->id;
+        $catalogVersionId = (int) $catalogItem->fresh()->published_version_id;
+        $this->assertGreaterThan(0, $catalogVersionId);
+
+        // Create external RESTRICT foreign keys to both $fixtureUser and $restrictedSite.
+        DB::table('monitoring_collector_enrollments')->insert([
+            'site_id' => $restrictedSite->id,
+            'issued_by_user_id' => $fixtureUser->id,
+            'token_hash' => hash('sha256', 'tok-1'),
+            'expires_at' => now()->subHour(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $manifest = [
+            'schema_version' => 1,
+            'records' => [
+                ['type' => 'site', 'id' => $restrictedSite->id],
+                ['type' => 'user', 'id' => $fixtureUser->id],
+                ['type' => 'device', 'id' => $fixtureDevice->id],
+                ['type' => 'it_catalog_item', 'id' => $catalogItemId],
+                ['type' => 'it_ticket', 'id' => $ticket->id],
+            ],
+            'files' => [],
+        ];
+
+        $pack = ItSecurityDesktopReleaseFixturePack::query()->create([
+            'pack_key' => 'it-security-desktop-release-v10',
+            'release_revision' => str_repeat('b', 40),
+            'state' => 'ready',
+            'manifest' => $manifest,
+            'manifest_sha256' => hash('sha256', json_encode($manifest, JSON_THROW_ON_ERROR)),
+            'prepared_at' => now(),
+        ]);
+
+        $this->assertNotNull($realAdmin->id);
+
+        $this->artisan('security-devices:purge-test-fixtures --force')
+            ->assertSuccessful();
+
+        $this->assertDatabaseMissing('devices', ['id' => $fixtureDevice->id]);
+        $this->assertDatabaseMissing('it_catalog_items', ['id' => $catalogItemId]);
+        $this->assertDatabaseMissing('it_catalog_versions', ['id' => $catalogVersionId]);
+        $this->assertDatabaseMissing('it_security_desktop_release_fixture_packs', ['id' => $pack->id]);
+
+        // Restricted user is unapproved rather than violating RESTRICT FK.
+        $this->assertNull(User::find($fixtureUser->id)?->approved_at);
+
+        // Restricted Site is deactivated and soft-deleted rather than violating RESTRICT FK.
+        $this->assertNull(Site::find($restrictedSite->id));
+        $trashedSite = Site::withTrashed()->find($restrictedSite->id);
+        $this->assertNotNull($trashedSite);
+        $this->assertFalse((bool) $trashedSite->is_active);
+        $this->assertNotNull($trashedSite->deleted_at);
     }
 }
