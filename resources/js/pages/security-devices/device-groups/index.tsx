@@ -178,7 +178,7 @@ function GroupList({
                 <PageHeader
                     icon={GitBranch}
                     title="Device groups"
-                    subline="Organise approved devices for management, reporting and operational visibility."
+                    subline="Organise approved devices for management, reporting and operational visibility"
                     mobileSummary={`${groups.meta.total} matching groups · page ${groups.meta.current_page} of ${groups.meta.last_page}`}
                     actions={
                         <>

@@ -211,7 +211,7 @@ export function StatCard({
                     className={`rounded-lg p-2 ${variant === 'warning' && value > 0 ? 'bg-status-warning-bg' : 'bg-muted'}`}
                 >
                     <Icon
-                        className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning dark:text-status-warning' : 'text-muted-foreground'}`}
+                        className={`h-5 w-5 ${variant === 'warning' && value > 0 ? 'text-status-warning' : 'text-muted-foreground'}`}
                     />
                 </div>
                 <div>

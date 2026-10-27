@@ -754,7 +754,13 @@ export function BulkManagementWorkspace({
             ) : null}
 
             <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
-                <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl">
+                <DialogContent
+                    className="max-h-[92vh] overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 900px)',
+                        width: 'min(92vw, 900px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>Review governed bulk action</DialogTitle>
                         <DialogDescription>
@@ -931,7 +937,7 @@ export function BulkManagementWorkspace({
                                         Explicit exclusions
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Exclusions remain immutable evidence and
+                                        Exclusions remain permanent evidence and
                                         are never converted into successful
                                         child commands.
                                     </p>

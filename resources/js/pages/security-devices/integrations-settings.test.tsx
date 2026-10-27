@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { integrationsFixture } from './integrations-test-fixtures';
 
 import { CredentialReferenceManagement } from '@/components/security-devices/credential-reference-management';
+import { formatDateTime } from '@/lib/datetime';
 import { CredentialRotationStatus, type Provider } from './integrations';
 import {
     SiteCredentialsCard,
@@ -91,6 +92,9 @@ describe('Security & Devices integrations and settings', () => {
             screen.getByText('0 short-lived leases active'),
         ).toBeInTheDocument();
         expect(screen.getByText('No revocations pending')).toBeInTheDocument();
+        expect(
+            screen.getByText(formatDateTime('2026-07-24T01:00:00Z')),
+        ).toBeInTheDocument();
         expect(
             screen.queryByText('secret/data/sites/42/core-switch'),
         ).not.toBeInTheDocument();

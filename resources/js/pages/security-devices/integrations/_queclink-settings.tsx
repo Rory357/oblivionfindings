@@ -1027,6 +1027,7 @@ function SettingsEditor({
                     setDiscard(false);
                     setNextDefinition(null);
                 }}
+                variant="destructive"
                 title="Discard this settings draft?"
                 description="Your edits will be lost."
                 confirmText="Discard draft"
@@ -1307,6 +1308,7 @@ function SavePresetWizard({
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard this preset draft?"
                 description="Your preset name and section choices will be lost."
                 confirmText="Discard draft"
@@ -2803,6 +2805,7 @@ function SettingsWorkspaceBody({
                         );
                     setCancelling(null);
                 }}
+                variant="destructive"
                 title="Cancel this queued command?"
                 description={
                     cancellingCommand && target
@@ -2957,6 +2960,7 @@ function RetirePresetWizard({
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard this retirement draft?"
                 description="Your reason will be lost."
                 confirmText="Discard draft"

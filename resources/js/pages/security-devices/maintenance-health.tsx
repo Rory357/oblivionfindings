@@ -281,7 +281,7 @@ function MaintenanceHealthBody({
                 <PageHeader
                     icon={Wrench}
                     title="Maintenance & health"
-                    subline="Device work, recorded health and battery readings across your permitted Sites."
+                    subline="Device work, recorded health and battery readings across your permitted Sites"
                     mobileSummary={
                         visible
                             ? `${data.stats.overdue} overdue work record${data.stats.overdue === 1 ? '' : 's'} · ${data.stats.critical} critical device${data.stats.critical === 1 ? '' : 's'}`

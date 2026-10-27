@@ -143,7 +143,12 @@ export function CollectorEnrollmentDialog({
                 if (!next) close();
             }}
         >
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         {replacement
@@ -344,7 +349,12 @@ export function CollectorRevocationDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 480px)',
+                    width: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         Revoke {collector?.name ?? 'collector'}
@@ -372,7 +382,7 @@ export function CollectorRevocationDialog({
                             placeholder="Describe the outage, replacement, or compromise decision. Do not include credentials."
                         />
                         <p className="text-xs text-muted-foreground">
-                            This reason is written to immutable audit history.
+                            This reason is saved permanently in audit history.
                             Do not include a token, key, certificate, endpoint,
                             or other secret.
                         </p>

@@ -1200,6 +1200,7 @@ function Credentials({ data }: { data: AccessControlWorkspaceData }) {
                         }));
                     }
                 }}
+                variant="destructive"
                 title="Request provider credential revocation?"
                 description="This creates a governed provider request. The credential remains active until fresh provider evidence confirms revocation."
                 confirmText="Request revocation"

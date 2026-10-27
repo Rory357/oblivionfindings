@@ -30,23 +30,25 @@ export default function DeviceGroupForm({
             <Head
                 title={`${isEdit ? 'Edit' : 'Add'} device group - Security & Devices`}
             />
-            <PageHeader
-                icon={GitBranch}
-                title={isEdit ? 'Edit device group' : 'Add device group'}
-                subline="Group details and optional automatic membership rules."
-                actions={
-                    <PageHeaderGlassButton asChild>
-                        <Link href={destination}>
-                            Back to {isEdit ? 'group' : 'device groups'}
-                        </Link>
-                    </PageHeaderGlassButton>
-                }
-            />
-            <GroupWizard
-                open
-                group={isEdit ? group : undefined}
-                onClose={() => router.visit(destination)}
-            />
+            <div className="space-y-5">
+                <PageHeader
+                    icon={GitBranch}
+                    title={isEdit ? 'Edit device group' : 'Add device group'}
+                    subline="Group details and optional automatic membership rules"
+                    actions={
+                        <PageHeaderGlassButton asChild>
+                            <Link href={destination}>
+                                Back to {isEdit ? 'group' : 'device groups'}
+                            </Link>
+                        </PageHeaderGlassButton>
+                    }
+                />
+                <GroupWizard
+                    open
+                    group={isEdit ? group : undefined}
+                    onClose={() => router.visit(destination)}
+                />
+            </div>
         </AppLayout>
     );
 }

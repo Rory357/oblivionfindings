@@ -34,7 +34,12 @@ export function InstallationProfileDialog({
 }: Props) {
     return (
         <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-            <DialogContent className="sm:max-w-xl">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 {open && (
                     <InstallationBody
                         key={deviceId + ':' + actorId}

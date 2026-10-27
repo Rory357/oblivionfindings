@@ -1456,6 +1456,7 @@ function MilesightBody({
                         <ConfirmDialog
                             open={currentRemoval !== null}
                             onClose={() => setRemoving(null)}
+                            variant="destructive"
                             title={
                                 currentRemoval === 'key'
                                     ? 'Remove Milesight credentials?'
@@ -2054,6 +2055,7 @@ function CredentialWizard({
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard credential entries?"
                 description="These unsent entries are held only in this open form. Closing will clear them."
                 confirmText="Discard entries"
@@ -2108,7 +2110,13 @@ function SecretDialog({
                     if (!open) close();
                 }}
             >
-                <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+                <DialogContent
+                    className="max-h-[85vh] overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
                             {kind === 'rotate'
@@ -2229,6 +2237,7 @@ function SecretDialog({
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard secret entry?"
                 description="Closing clears the unsent secret from this form."
                 confirmText="Discard entry"
@@ -2458,6 +2467,7 @@ function MappingWizard({
                 open={discard}
                 onClose={() => setDiscard(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard Site selection?"
                 description="Closing clears this unsent mapping selection."
                 confirmText="Discard selection"

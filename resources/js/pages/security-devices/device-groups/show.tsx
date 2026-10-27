@@ -194,7 +194,7 @@ export default function DeviceGroupShow(props: GroupShowProps) {
                             title="Group access unavailable"
                             icon={Cpu}
                             backHref="/security-devices/device-groups"
-                            subline="Refresh the group to review current access."
+                            subline="Refresh the group to review current access"
                             actions={
                                 <PageHeaderGlassButton
                                     icon={RefreshCw}
@@ -1192,6 +1192,7 @@ function GroupProfile({
                         setAddError(null);
                         setAddOpen(false);
                     }}
+                    variant="destructive"
                     title="Discard this selection?"
                     description="The selected device has not been added to the group."
                     confirmText="Discard selection"
@@ -1204,6 +1205,7 @@ function GroupProfile({
                     }}
                     onConfirm={deleteGroup}
                     processing={deleting}
+                    variant="destructive"
                     title="Delete device group?"
                     description={
                         <>
@@ -1231,6 +1233,7 @@ function GroupProfile({
                     }}
                     onConfirm={removeMember}
                     processing={removing}
+                    variant="destructive"
                     title="Remove device from group?"
                     description={
                         <>

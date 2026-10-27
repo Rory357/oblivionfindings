@@ -226,7 +226,13 @@ function SavedRequestBody({
                 if (!value) onClose();
             }}
         >
-            <DialogContent className="max-h-[90vh] w-[94vw] overflow-x-hidden overflow-y-auto sm:max-w-2xl">
+            <DialogContent
+                className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Your saved monitor changes</DialogTitle>
                     <DialogDescription>

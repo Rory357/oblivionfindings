@@ -309,7 +309,7 @@ function ConfigurationDiffBody({
                                     </span>
                                 ) : null}
                             </div>
-                            <div className="max-h-56 overflow-y-auto rounded-lg border">
+                            <div className="max-h-56 overflow-auto rounded-lg border">
                                 <table className="w-full text-left text-xs">
                                     <thead className="border-b bg-muted/40 text-muted-foreground">
                                         <tr>
@@ -387,7 +387,7 @@ function ConfigurationDiffBody({
                                                     >
                                                         <td
                                                             colSpan={4}
-                                                            className="px-3 py-1 text-center text-[11px]"
+                                                            className="px-3 py-1 text-center text-xs"
                                                         >
                                                             ··· Unchanged lines omitted ···
                                                         </td>

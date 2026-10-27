@@ -675,7 +675,7 @@ export default function DeviceCommandBatchShow({
                     <PageHeader
                         icon={FileCheck2}
                         title="Command batch"
-                        subline="Batch records are restricted for the current access."
+                        subline="Batch records are restricted for the current access"
                         actions={
                             <PageHeaderGlassButton
                                 onClick={refresh}

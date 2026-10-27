@@ -326,7 +326,7 @@ export default function UnifiIntegration(data: UnifiProps) {
                     <PageHeader
                         icon={Plug}
                         title="UniFi integration"
-                        subline="Connection management is restricted."
+                        subline="Connection management is restricted"
                         actions={
                             <PageHeaderGlassButton onClick={refresh}>
                                 <RefreshCw className="size-4" />

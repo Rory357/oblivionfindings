@@ -886,7 +886,7 @@ export function AddDeviceDialog({
                             </div>
                         ) : null}
                         {providerManaged ? (
-                            <div className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning">
+                            <div className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning">
                                 <p className="font-medium">
                                     Provider-observed fields stay independently
                                     recorded
@@ -1110,6 +1110,7 @@ export function AddDeviceDialog({
                 open={discardDraft}
                 onClose={() => setDiscardDraft(false)}
                 onConfirm={discardAndClose}
+                variant="destructive"
                 title="Discard this device draft?"
                 description="Your unsaved device details will be cleared. Keep reviewing to continue working on them."
                 confirmText="Discard draft"

@@ -256,7 +256,7 @@ function IntegrationsBody({
                 <PageHeader
                     icon={Plug}
                     title="Integrations"
-                    subline="Connection, Site mapping, collected health and supported capabilities."
+                    subline="Connection, Site mapping, collected health and supported capabilities"
                     actions={
                         <>
                             <PageHeaderSearch

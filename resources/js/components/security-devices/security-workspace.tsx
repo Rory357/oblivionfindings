@@ -177,7 +177,7 @@ function plural(value: number, singular: string, pluralLabel?: string): string {
 
 function observedValue(value: unknown): string {
     if (typeof value === 'string') return headline(value);
-    if (typeof value === 'number') return value.toLocaleString();
+    if (typeof value === 'number') return value.toLocaleString('en-NZ');
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (value && typeof value === 'object') {
         return Object.entries(value)

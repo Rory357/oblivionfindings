@@ -392,7 +392,7 @@ function EventStream({
                             deviceHref(event) ? (
                                 <Link
                                     href={deviceHref(event)!}
-                                    className="frontline-focus rounded-sm text-primary hover:underline"
+                                    className="frontline-focus rounded-sm text-primary underline underline-offset-2"
                                 >
                                     Open device profile
                                 </Link>

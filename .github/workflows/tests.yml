@@ -116,6 +116,9 @@ jobs:
 
       - name: Check medication desktop types and workflows
         if: matrix.suite == 'foundation'
+        # Full-project typechecking needs more than Node's default ~4 GB heap.
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: |
           npx tsc --noEmit
           npx vitest run resources/js/pages/emar resources/js/lib/emar-navigation.test.ts resources/js/pages/settings/profile.test.tsx
