@@ -261,7 +261,7 @@ function MaintenanceBody({
                             ? workspace.summary.total + ' retained work records'
                             : 'Maintenance records restricted'
                     }
-                    subline="Device servicing, calibration and technical work across your permitted Sites."
+                    subline="Device servicing, calibration and technical work across your permitted Sites"
                     actions={
                         <>
                             <PageHeaderSearch

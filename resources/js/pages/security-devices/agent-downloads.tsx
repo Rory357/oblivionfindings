@@ -229,7 +229,7 @@ function AgentReleaseList({
             <PageHeader
                 icon={Download}
                 title="Agent downloads"
-                subline="Published computer support and Site monitoring packages in your permitted scope."
+                subline="Published computer support and Site monitoring packages in your permitted scope"
                 actions={
                     <>
                         <PageHeaderSearch

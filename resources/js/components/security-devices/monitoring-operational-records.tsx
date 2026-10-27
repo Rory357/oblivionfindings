@@ -127,7 +127,7 @@ function Owner({
     return allowed && href ? (
         <Link
             href={href}
-            className="frontline-focus rounded-sm text-primary hover:underline"
+            className="frontline-focus rounded-sm text-primary underline underline-offset-2"
             onClick={(event) => event.stopPropagation()}
         >
             {name}

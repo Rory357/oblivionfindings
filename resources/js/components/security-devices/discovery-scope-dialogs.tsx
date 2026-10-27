@@ -209,7 +209,13 @@ export function DiscoveryScopeDialog({
                 if (!next) close();
             }}
         >
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+            <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         {editing
@@ -506,7 +512,12 @@ export function DiscoveryScopeActionDialog({
     };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 480px)',
+                    width: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         {action === 'apply'

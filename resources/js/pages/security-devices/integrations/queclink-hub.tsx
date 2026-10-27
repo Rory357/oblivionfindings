@@ -1953,6 +1953,7 @@ function PendingTab({
                             },
                         );
                 }}
+                variant="destructive"
                 title="Reject tracker?"
                 description={
                     rejecting
@@ -2503,6 +2504,7 @@ export function ClaimDialog({
                 open={discardOpen}
                 onClose={() => setDiscardOpen(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard this draft?"
                 description="The unsent tracker assignment will be discarded."
                 confirmText="Discard draft"
@@ -2637,6 +2639,7 @@ function DevicesTab({
                             },
                         );
                 }}
+                variant="default"
                 title="Release tracker assignment?"
                 description={
                     releasing
@@ -3025,6 +3028,7 @@ function BulkActionDialog({
                 open={discardOpen}
                 onClose={() => setDiscardOpen(false)}
                 onConfirm={onClose}
+                variant="destructive"
                 title="Discard this draft?"
                 description="The unsent management choices will be discarded."
                 confirmText="Discard draft"
@@ -4059,7 +4063,7 @@ function FrameLine({ frame }: { frame: Frame }) {
     const isIn = frame.direction === 'inbound';
     return (
         <div className="flex items-start gap-2 px-3 py-1.5">
-            <div className="w-16 shrink-0 text-[10px] text-muted-foreground">
+            <div className="w-16 shrink-0 text-xs text-muted-foreground">
                 {formatTime(frame.created_at, '')}
             </div>
             <div className="w-4 shrink-0">
@@ -4069,7 +4073,7 @@ function FrameLine({ frame }: { frame: Frame }) {
                     <ArrowUpRight className="h-3 w-3 text-status-info" />
                 )}
             </div>
-            <div className="w-16 shrink-0 text-[10px] text-muted-foreground">
+            <div className="w-16 shrink-0 text-xs text-muted-foreground">
                 {frame.command_word ?? frame.frame_type}
             </div>
             <div className="flex-1 break-all">
@@ -4077,7 +4081,7 @@ function FrameLine({ frame }: { frame: Frame }) {
                     {frame.frame_type} frame received
                 </code>
                 {frame.failure_category && (
-                    <p className="mt-0.5 text-[10px] text-status-critical">
+                    <p className="mt-0.5 text-xs text-status-critical">
                         Frame parsing failed
                     </p>
                 )}
@@ -4320,6 +4324,7 @@ export function CloudIntegrationTab({
                         },
                     )
                 }
+                variant="destructive"
                 title="Remove legacy Queclink cloud credential?"
                 description="Remove the unused retired cloud credential? Native TCP monitoring and governed Device Management continue unchanged. This credential cannot be recovered from Oblivion Findings."
                 confirmText="Remove legacy credential"

@@ -4,7 +4,6 @@ import {
     PageHeaderGlassButton,
     PageHeaderViewToggle,
 } from '@/components/page';
-import PageShell from '@/components/page-shell';
 import { useGroupedProfileSearchShortcut } from '@/components/page/grouped-profile-nav';
 import { ReasonDialog } from '@/components/reason-dialog';
 import {
@@ -302,7 +301,7 @@ export default function DeviceShow(data: Props) {
                         }
                         icon={Cpu}
                         title="Device access required"
-                        subline="Device records are restricted."
+                        subline="Device records are restricted"
                     />
                     <div role="status">
                         <EmptyState
@@ -873,7 +872,7 @@ function DeviceShowBody({
         >
             <Head title={`${device.name} - Security & Devices`} />
 
-            <PageShell>
+            <div className="w-full space-y-5">
                 <DeviceProfileHeader
                     profile={profile}
                     asOf={as_of}
@@ -2063,7 +2062,7 @@ function DeviceShowBody({
                                     onChange={(e) =>
                                         setMaintNotes(e.target.value)
                                     }
-                                    placeholder="Optional notes..."
+                                    placeholder="Optional notes…"
                                 />
                             </div>
 
@@ -2085,7 +2084,7 @@ function DeviceShowBody({
                                 onClick={submitMaintenance}
                                 disabled={maintSubmitting || !maintDesc}
                             >
-                                {maintSubmitting ? 'Saving...' : 'Schedule'}
+                                {maintSubmitting ? 'Saving…' : 'Schedule'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>
@@ -2099,6 +2098,7 @@ function DeviceShowBody({
                             submitUnlink(pendingAssetUnlink.id);
                         }
                     }}
+                    variant="destructive"
                     title="Unlink asset from device?"
                     description={
                         pendingAssetUnlink
@@ -2192,11 +2192,12 @@ function DeviceShowBody({
                     onConfirm={() =>
                         router.delete(`/security-devices/devices/${device.id}`)
                     }
+                    variant="destructive"
                     title="Decommission device?"
                     description={`Decommission “${device.name}”? It will leave the active estate but its record and operational history remain available.`}
                     confirmText="Decommission device"
                 />
-            </PageShell>
+            </div>
             {endpoint_setup && (
                 <InstallationProfileDialog
                     open={installationOpen}

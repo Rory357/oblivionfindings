@@ -11,7 +11,9 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
+import { formatDateTime } from '@/lib/datetime';
 import { router } from '@inertiajs/react';
 import { Ban, KeyRound, Plus, RefreshCw, RotateCcw } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
@@ -65,12 +67,26 @@ const emptyForm = (siteId = 0): ReferenceForm => ({
 const readable = (value: string) => value.replaceAll('_', ' ');
 
 const timestamp = (value: string | null) =>
-    value ? new Date(value).toLocaleString() : 'Not yet';
+    value ? formatDateTime(value) : 'Not yet';
 
-const statusVariant = (status: CredentialReferenceRow['status']) => {
-    if (status === 'active') return 'default' as const;
-    if (status === 'revoked') return 'destructive' as const;
-    return 'secondary' as const;
+const statusVariant = (status: CredentialReferenceRow['status']): StatusVariant => {
+    if (status === 'active') return 'success';
+    if (status === 'revoked') return 'critical';
+    return 'warning';
+};
+
+const testVariant = (status: CredentialReferenceRow['test_status']): StatusVariant => {
+    if (status === 'passed') return 'success';
+    if (status === 'failed') return 'critical';
+    return 'neutral';
+};
+
+const rotationVariant = (
+    status: CredentialReferenceRow['rotation_status'],
+): StatusVariant => {
+    if (status === 'current') return 'success';
+    if (status === 'failed' || status === 'overdue') return 'critical';
+    return 'warning';
 };
 
 export function CredentialReferenceManagement({
@@ -185,15 +201,15 @@ export function CredentialReferenceManagement({
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
-                        <Badge
+                        <StatusBadge
                             variant={
                                 workspace.driver_state === 'configured'
-                                    ? 'default'
-                                    : 'secondary'
+                                    ? 'success'
+                                    : 'neutral'
                             }
                         >
                             Issuer {readable(workspace.driver_state)}
-                        </Badge>
+                        </StatusBadge>
                         <span className="text-muted-foreground">
                             {workspace.driver_note}
                         </span>
@@ -223,25 +239,33 @@ export function CredentialReferenceManagement({
                                             </p>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <Badge
+                                            <StatusBadge
                                                 variant={statusVariant(
                                                     reference.status,
                                                 )}
                                             >
                                                 {readable(reference.status)}
-                                            </Badge>
-                                            <Badge variant="outline">
+                                            </StatusBadge>
+                                            <StatusBadge
+                                                variant={testVariant(
+                                                    reference.test_status,
+                                                )}
+                                            >
                                                 Test{' '}
                                                 {readable(
                                                     reference.test_status,
                                                 )}
-                                            </Badge>
-                                            <Badge variant="outline">
+                                            </StatusBadge>
+                                            <StatusBadge
+                                                variant={rotationVariant(
+                                                    reference.rotation_status,
+                                                )}
+                                            >
                                                 Rotation{' '}
                                                 {readable(
                                                     reference.rotation_status,
                                                 )}
-                                            </Badge>
+                                            </StatusBadge>
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
@@ -266,7 +290,7 @@ export function CredentialReferenceManagement({
                                             active
                                         </Badge>
                                         {reference.pending_revoke_count > 0 ? (
-                                            <Badge variant="destructive">
+                                            <StatusBadge variant="critical">
                                                 {reference.pending_revoke_count}{' '}
                                                 revocation
                                                 {reference.pending_revoke_count ===
@@ -274,11 +298,11 @@ export function CredentialReferenceManagement({
                                                     ? ''
                                                     : 's'}{' '}
                                                 pending
-                                            </Badge>
+                                            </StatusBadge>
                                         ) : (
-                                            <Badge variant="secondary">
+                                            <StatusBadge variant="neutral">
                                                 No revocations pending
-                                            </Badge>
+                                            </StatusBadge>
                                         )}
                                     </div>
                                     <dl className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
@@ -360,7 +384,12 @@ export function CredentialReferenceManagement({
                     else closeCreate();
                 }}
             >
-                <DialogContent className="sm:max-w-xl">
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                >
                     <form onSubmit={submit} className="space-y-4">
                         <DialogHeader>
                             <DialogTitle>Add credential reference</DialogTitle>
@@ -527,7 +556,12 @@ export function CredentialReferenceManagement({
                     }
                 }}
             >
-                <DialogContent>
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
                     <form onSubmit={rotate} className="space-y-4">
                         <DialogHeader>
                             <DialogTitle>
@@ -574,6 +608,7 @@ export function CredentialReferenceManagement({
                 open={revokeReference !== null}
                 onClose={() => setRevokeReference(null)}
                 onConfirm={revoke}
+                variant="destructive"
                 title="Revoke credential reference?"
                 description="New monitoring and device-management leases will be blocked immediately. Existing audit and command history remains intact."
                 confirmText="Revoke reference"

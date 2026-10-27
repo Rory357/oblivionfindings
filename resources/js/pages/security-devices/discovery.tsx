@@ -2498,6 +2498,7 @@ export function DiscoveryScopeWizard({
                 open={discardOpen}
                 onClose={() => setDiscardOpen(false)}
                 onConfirm={discard}
+                variant="destructive"
                 title="Discard this discovery draft?"
                 description={
                     submitting

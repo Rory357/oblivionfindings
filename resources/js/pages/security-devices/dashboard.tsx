@@ -375,7 +375,7 @@ function DashboardBody({
                 <PageHeader
                     icon={Cctv}
                     title="Security & Devices estate"
-                    subline="Operational records and work across your approved Sites."
+                    subline="Operational records and work across your approved Sites"
                     mobileSummary={
                         visible
                             ? permission.devices

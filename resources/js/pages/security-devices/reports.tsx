@@ -236,7 +236,7 @@ function ReportsBody({
                 <PageHeader
                     icon={BarChart3}
                     title="Reports"
-                    subline="Download permitted device, event and maintenance records as CSV files."
+                    subline="Download permitted device, event and maintenance records as CSV files"
                     mobileSummary={
                         visible
                             ? '3 report types · counts at the last refresh'

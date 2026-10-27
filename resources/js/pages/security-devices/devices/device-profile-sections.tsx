@@ -2122,7 +2122,7 @@ function CommandDetail({
             <dt className="font-medium text-muted-foreground">{label}</dt>
             <dd className="mt-1">{value}</dd>
             {detail && (
-                <dd className="mt-1 text-[11px] text-muted-foreground">
+                <dd className="mt-1 text-xs text-muted-foreground">
                     {detail}
                 </dd>
             )}

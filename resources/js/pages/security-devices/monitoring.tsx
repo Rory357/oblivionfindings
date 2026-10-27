@@ -722,26 +722,28 @@ export default function Monitoring({
                 ]}
             >
                 <Head title="Monitoring - Security & Devices" />
-                <PageHeader
-                    icon={Activity}
-                    title="Monitoring"
-                    subline="Refresh to load evidence for your current approved access."
-                    actions={
-                        <PageHeaderGlassButton
-                            onClick={() =>
-                                router.visit('/security-devices/monitoring', {
-                                    preserveState: false,
-                                    preserveScroll: true,
-                                })
-                            }
-                        >
-                            Refresh monitoring
-                        </PageHeaderGlassButton>
-                    }
-                />
-                <p role="alert" className="text-sm text-muted-foreground">
-                    Monitoring is being refreshed for your current access.
-                </p>
+                <div className="space-y-5">
+                    <PageHeader
+                        icon={Activity}
+                        title="Monitoring"
+                        subline="Refresh to load evidence for your current approved access"
+                        actions={
+                            <PageHeaderGlassButton
+                                onClick={() =>
+                                    router.visit('/security-devices/monitoring', {
+                                        preserveState: false,
+                                        preserveScroll: true,
+                                    })
+                                }
+                            >
+                                Refresh monitoring
+                            </PageHeaderGlassButton>
+                        }
+                    />
+                    <p role="alert" className="text-sm text-muted-foreground">
+                        Monitoring is being refreshed for your current access.
+                    </p>
+                </div>
             </AppLayout>
         );
     const scope = JSON.stringify([auth?.user?.id, auth?.can, workspace]);
@@ -853,7 +855,7 @@ function MonitoringScreen({
                 <PageHeader
                     icon={Activity}
                     title="Monitoring"
-                    subline="Device checks, coverage and retained evidence across your permitted Sites."
+                    subline="Device checks, coverage and retained evidence across your permitted Sites"
                     mobileSummary={`${workspace.summary.total_monitors} checks · ${workspace.summary.active_findings} findings`}
                     actions={
                         <>

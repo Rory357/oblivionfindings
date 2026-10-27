@@ -601,7 +601,7 @@ export function AutoRuleBuilder({
                                             <li key={device.id}>
                                                 <Link
                                                     href={`/security-devices/devices/${device.id}`}
-                                                    className="frontline-focus rounded-sm text-primary hover:underline"
+                                                    className="frontline-focus rounded-sm text-primary underline underline-offset-2"
                                                 >
                                                     {device.name}
                                                 </Link>{' '}

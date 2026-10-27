@@ -206,7 +206,7 @@ export function SoftwareWorkspace(props: Props) {
                         />
                     }
                 />
-                <div className="space-y-4 pt-5">
+                <div className="space-y-5 pt-5">
                     {!valid ? (
                         <Alert>
                             <AlertDescription>

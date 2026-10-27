@@ -1269,7 +1269,12 @@ function NativeContextUnavailable({ onClose }: { onClose: () => void }) {
                 if (!open) onClose();
             }}
         >
-            <DialogContent>
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 480px)',
+                    width: 'min(92vw, 480px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Refresh monitor context</DialogTitle>
                     <DialogDescription>
@@ -1402,7 +1407,13 @@ function NativeMonitorDeactivateBody({
                     if (!open) close();
                 }}
             >
-                <DialogContent className="max-h-[90vh] w-[94vw] overflow-x-hidden overflow-y-auto sm:max-w-lg">
+                <DialogContent
+                    className="max-h-[90vh] overflow-x-hidden overflow-y-auto"
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
                             {commit.saved
