@@ -41,6 +41,7 @@ use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -187,7 +188,7 @@ final class PurgeSecurityDevicesTestFixtures extends Command
             }
         }
 
-        $devices = Device::withTrashed()
+        $devices = Device::query()
             ->where(function ($query) use ($packDeviceIds): void {
                 if ($packDeviceIds !== []) {
                     $query->orWhereIn('id', array_values(array_unique($packDeviceIds)));
@@ -204,7 +205,7 @@ final class PurgeSecurityDevicesTestFixtures extends Command
         $fixtureDeviceIds = $devices->pluck('id')->map(static fn (mixed $id): int => (int) $id)->values()->all();
         $retainedDeviceIds = $this->findRetainedHistoryDeviceIds($fixtureDeviceIds);
 
-        $candidateSites = Site::withTrashed()
+        $candidateSites = Site::query()
             ->where(function ($query) use ($packSiteIds): void {
                 if ($packSiteIds !== []) {
                     $query->orWhereIn('id', array_values(array_unique($packSiteIds)));
@@ -343,7 +344,7 @@ final class PurgeSecurityDevicesTestFixtures extends Command
             $this->deleteD01BrowserRecords($pack);
         }
 
-        $this->cleanMutableDeviceDependents($fixtureDeviceIds);
+        $this->cleanMutableDeviceDependents($fixtureDeviceIds, $fixtureSiteIds);
         $this->cleanMutableSiteDependents($fixtureSiteIds);
 
         foreach ($packs as $pack) {
@@ -368,16 +369,21 @@ final class PurgeSecurityDevicesTestFixtures extends Command
         foreach ($devices as $device) {
             $deviceId = (int) $device->id;
             if (in_array($deviceId, $retainedDeviceIds, true)) {
-                DB::table('devices')->where('id', $deviceId)->update([
-                    'status' => DeviceStatus::Decommissioned->value,
-                    'health_status' => HealthStatus::Unknown->value,
-                    'deleted_at' => $device->deleted_at ?? $now,
-                    'updated_at' => $now,
-                ]);
+                $this->softDeleteDevice($deviceId, $device->deleted_at, $now);
                 $devicesSoftDeleted++;
-            } else {
-                DB::table('devices')->where('id', $deviceId)->delete();
+
+                continue;
+            }
+
+            try {
+                DB::transaction(fn () => DB::table('devices')->where('id', $deviceId)->delete());
                 $devicesHardDeleted++;
+            } catch (QueryException $exception) {
+                if (! $this->isForeignKeyRestrictViolation($exception)) {
+                    throw $exception;
+                }
+                $this->softDeleteDevice($deviceId, $device->deleted_at, $now);
+                $devicesSoftDeleted++;
             }
         }
 
@@ -387,13 +393,19 @@ final class PurgeSecurityDevicesTestFixtures extends Command
         foreach ($sites as $site) {
             $siteId = (int) $site->id;
             if (in_array($siteId, $retainedSiteIds, true)) {
-                DB::table('sites')->where('id', $siteId)->update([
-                    'is_active' => false,
-                    'deleted_at' => $site->deleted_at ?? $now,
-                    'updated_at' => $now,
-                ]);
-            } else {
-                DB::table('sites')->where('id', $siteId)->delete();
+                $this->softDeleteSite($siteId, $site->deleted_at, $now);
+                $sitesRemoved++;
+
+                continue;
+            }
+
+            try {
+                DB::transaction(fn () => DB::table('sites')->where('id', $siteId)->delete());
+            } catch (QueryException $exception) {
+                if (! $this->isForeignKeyRestrictViolation($exception)) {
+                    throw $exception;
+                }
+                $this->softDeleteSite($siteId, $site->deleted_at, $now);
             }
             $sitesRemoved++;
         }
@@ -455,23 +467,58 @@ final class PurgeSecurityDevicesTestFixtures extends Command
         return $unlinked;
     }
 
-    /** @param list<int> $fixtureDeviceIds */
-    private function cleanMutableDeviceDependents(array $fixtureDeviceIds): void
+    /**
+     * @param  list<int>  $fixtureDeviceIds
+     * @param  list<int>  $fixtureSiteIds
+     */
+    private function cleanMutableDeviceDependents(array $fixtureDeviceIds, array $fixtureSiteIds = []): void
     {
-        if ($fixtureDeviceIds === []) {
+        if ($fixtureDeviceIds === [] && $fixtureSiteIds === []) {
             return;
         }
 
-        if (Schema::hasTable('monitoring_discovery_candidate_matches')) {
+        if ($fixtureDeviceIds !== [] && Schema::hasTable('monitoring_discovery_candidate_matches')) {
             DB::table('monitoring_discovery_candidate_matches')
                 ->whereIn('canonical_device_id', $fixtureDeviceIds)
                 ->delete();
         }
 
-        if (Schema::hasTable('monitoring_discovery_candidates')) {
+        if ($fixtureDeviceIds !== [] && Schema::hasTable('monitoring_discovery_candidates')) {
             DB::table('monitoring_discovery_candidates')
                 ->whereIn('canonical_device_id', $fixtureDeviceIds)
                 ->update(['canonical_device_id' => null]);
+        }
+
+        // Delete evidence snapshots before device_events and control_room_alerts
+        // to satisfy mon_incident_evidence_event_fk / alert FK RESTRICT rules.
+        if (Schema::hasTable('monitoring_incident_evidence_snapshots')) {
+            $eventIds = ($fixtureDeviceIds !== [] && Schema::hasTable('device_events'))
+                ? DB::table('device_events')->whereIn('device_id', $fixtureDeviceIds)->pluck('id')->all()
+                : [];
+            $alertIds = ($fixtureDeviceIds !== [] && Schema::hasTable('control_room_alerts') && Schema::hasColumn('control_room_alerts', 'canonical_device_id'))
+                ? DB::table('control_room_alerts')->whereIn('canonical_device_id', $fixtureDeviceIds)->pluck('id')->all()
+                : [];
+
+            DB::table('monitoring_incident_evidence_snapshots')
+                ->where(function ($query) use ($fixtureDeviceIds, $fixtureSiteIds, $eventIds, $alertIds): void {
+                    if ($fixtureDeviceIds !== [] && Schema::hasColumn('monitoring_incident_evidence_snapshots', 'device_id')) {
+                        $query->orWhereIn('device_id', $fixtureDeviceIds);
+                    }
+                    if ($fixtureSiteIds !== [] && Schema::hasColumn('monitoring_incident_evidence_snapshots', 'site_id')) {
+                        $query->orWhereIn('site_id', $fixtureSiteIds);
+                    }
+                    if ($eventIds !== [] && Schema::hasColumn('monitoring_incident_evidence_snapshots', 'device_event_id')) {
+                        $query->orWhereIn('device_event_id', $eventIds);
+                    }
+                    if ($alertIds !== [] && Schema::hasColumn('monitoring_incident_evidence_snapshots', 'control_room_alert_id')) {
+                        $query->orWhereIn('control_room_alert_id', $alertIds);
+                    }
+                })
+                ->delete();
+        }
+
+        if ($fixtureDeviceIds === []) {
+            return;
         }
 
         foreach ([
@@ -480,7 +527,6 @@ final class PurgeSecurityDevicesTestFixtures extends Command
             ['device_events', 'device_id'],
             ['cctv_camera_sources', 'device_id'],
             ['queclink_devices', 'device_id'],
-            ['monitoring_incident_evidence_snapshots', 'device_id'],
             ['control_room_alerts', 'canonical_device_id'],
             ['integration_events', 'canonical_device_id'],
         ] as [$table, $column]) {
@@ -660,6 +706,18 @@ final class PurgeSecurityDevicesTestFixtures extends Command
             return;
         }
 
+        if ($model instanceof ItCatalogItem) {
+            DB::table('it_catalog_items')
+                ->where('id', $model->id)
+                ->update(['published_version_id' => null]);
+            if (Schema::hasTable('it_catalog_submissions')) {
+                DB::table('it_catalog_submissions')->where('catalog_item_id', $model->id)->delete();
+            }
+            if (Schema::hasTable('it_catalog_versions')) {
+                DB::table('it_catalog_versions')->where('catalog_item_id', $model->id)->delete();
+            }
+        }
+
         if ($model instanceof User) {
             $model->roles()->detach();
             $model->permissionOverrides()->detach();
@@ -670,11 +728,105 @@ final class PurgeSecurityDevicesTestFixtures extends Command
             }
         }
 
-        if (in_array(SoftDeletes::class, class_uses_recursive($model), true)) {
-            $model->forceDelete();
-        } else {
-            $model->delete();
+        try {
+            DB::transaction(function () use ($model): void {
+                if (in_array(SoftDeletes::class, class_uses_recursive($model), true)) {
+                    $model->forceDelete();
+                } else {
+                    $model->delete();
+                }
+            });
+        } catch (QueryException $exception) {
+            if (! $this->isForeignKeyRestrictViolation($exception)) {
+                throw $exception;
+            }
+
+            $this->deactivateRestrictedManifestModel($model);
         }
+    }
+
+    private function deactivateRestrictedManifestModel(Model $model): void
+    {
+        $now = now();
+
+        if ($model instanceof User) {
+            DB::table('users')->where('id', $model->id)->update([
+                'approved_at' => null,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        if ($model instanceof HrEmployeeProfile) {
+            DB::table('hr_employee_profiles')->where('id', $model->id)->update([
+                'is_active' => false,
+                'primary_site_id' => null,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        if ($model instanceof Client) {
+            DB::table('clients')->where('id', $model->id)->update([
+                'site_id' => null,
+                'deleted_at' => $model->deleted_at ?? $now,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        if ($model instanceof Asset) {
+            DB::table('assets')->where('id', $model->id)->update([
+                'site_id' => null,
+                'home_site_id' => null,
+                'deleted_at' => $model->deleted_at ?? $now,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        if (in_array(SoftDeletes::class, class_uses_recursive($model), true)) {
+            DB::table($model->getTable())->where('id', $model->id)->update([
+                'deleted_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            return;
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Manifest record %s#%s cannot be hard-deleted or safely deactivated.',
+            $model::class,
+            (string) $model->getKey(),
+        ));
+    }
+
+    private function softDeleteDevice(int $deviceId, mixed $existingDeletedAt, mixed $now): void
+    {
+        DB::table('devices')->where('id', $deviceId)->update([
+            'status' => DeviceStatus::Decommissioned->value,
+            'health_status' => HealthStatus::Unknown->value,
+            'deleted_at' => $existingDeletedAt ?? $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function softDeleteSite(int $siteId, mixed $existingDeletedAt, mixed $now): void
+    {
+        DB::table('sites')->where('id', $siteId)->update([
+            'is_active' => false,
+            'deleted_at' => $existingDeletedAt ?? $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function isForeignKeyRestrictViolation(QueryException $exception): bool
+    {
+        return (int) ($exception->errorInfo[1] ?? 0) === 1451;
     }
 
     /**
