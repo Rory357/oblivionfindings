@@ -40,7 +40,14 @@ final class DeclaredDeviceCommandCapabilities
             $declared->push('tracking.location_refresh', 'configuration.refresh', 'configuration.apply', 'device.reboot');
         }
 
-        $declared = $declared->reject(fn (string $key): bool => in_array($key, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install', 'endpoint.script.run'], true));
+        // Network configuration backup is hidden until real vendor SSH drivers exist in Phase 5.
+        $declared = $declared->reject(fn (string $key): bool => in_array($key, [
+            'network.config.backup',
+            'endpoint.service.manage',
+            'endpoint.computer.restart',
+            'endpoint.software.install',
+            'endpoint.script.run',
+        ], true));
         if (app(EndpointScriptAuthority::class)->supports($device)) {
             $declared->push('endpoint.script.run');
         }

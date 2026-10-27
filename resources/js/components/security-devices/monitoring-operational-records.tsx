@@ -1276,7 +1276,7 @@ export function CapacityRecords({
             rows={rows}
             view={view}
             title="External history and retention"
-            description="Retained series evidence and measured capacity projections."
+            description="Retained series evidence and measured capacity trends."
             total={total}
             keyFor={(r) => r.series_id}
             name={(r) => `${r.device.name} · ${monitoringLabel(r.metric)}`}
@@ -1299,7 +1299,7 @@ export function CapacityRecords({
                         samples
                     </p>
                     <p>
-                        Projection {monitoringPhrase(r.projection.state)}
+                        Trend {monitoringPhrase(r.projection.state)}
                         {r.projection.threshold_at
                             ? ` · threshold ${stamp(r.projection.threshold_at)}`
                             : ''}
@@ -1332,7 +1332,7 @@ export function CapacityRecords({
                 },
                 {
                     key: 'projection',
-                    label: 'Projection',
+                    label: 'Trend',
                     width: '195px',
                     cell: (r) => <MonitoringState value={r.projection.state} />,
                 },
@@ -1367,12 +1367,12 @@ export function CapacityRecords({
                 ['Samples', r.sample_count],
                 ['Observed at', stamp(r.observed_at)],
                 ['Storage', <MonitoringState value={r.storage_state} />],
-                ['Projection', <MonitoringState value={r.projection.state} />],
+                ['Trend', <MonitoringState value={r.projection.state} />],
                 ['Threshold', r.projection.threshold ?? 'Not configured'],
                 ['Measured from', stamp(r.projection.measured_from)],
                 ['Measured to', stamp(r.projection.measured_to)],
                 ['History points', r.projection.sample_count],
-                ['Projection p95', r.projection.p95 ?? 'Insufficient data'],
+                ['Trend p95', r.projection.p95 ?? 'Insufficient data'],
                 [
                     'Slope per day',
                     r.projection.slope_per_day ?? 'Insufficient data',

@@ -202,8 +202,8 @@ class DeviceProfilePresenter
                 'expectedReturnAt' => $assignment->expected_return_at?->toISOString(),
             ] : null,
             'health' => [
-                'state' => $device->health_status?->value ?? HealthStatus::Unknown->value,
-                'label' => $device->health_status?->label() ?? HealthStatus::Unknown->label(),
+                'state' => $device->effectiveHealthState(),
+                'label' => $device->effectiveHealthLabel(),
                 'deviceState' => $device->status?->value,
                 'deviceStateLabel' => $device->status?->label(),
             ],
@@ -520,7 +520,7 @@ class DeviceProfilePresenter
         $enabled = $monitors->where('is_enabled', true);
 
         return [
-            'state' => $device->health_status?->value ?? 'unknown',
+            'state' => $device->effectiveHealthState(),
             'deviceState' => $device->status?->value,
             'lastSeenAt' => $device->last_seen_at?->toISOString(),
             'lastSignalAt' => $device->last_signal_at?->toISOString(),
@@ -752,10 +752,6 @@ class DeviceProfilePresenter
         ]);
         $snapshotService = $this->snapshots ?? app(ConfigurationSnapshotService::class);
         $canViewSnapshots = $snapshotService->canViewSnapshots($viewer);
-        $canBackup = $viewer->canDo('securityDevices.commands.manage')
-            && $canonicalSiteId !== null
-            && $this->declaredCommandCapabilities->supports($device, 'network.config.backup')
-            && $this->commandExecutionRoutes->resolve($device, $canonicalSiteId, 'network.config.backup')->available;
         $loadedSnapshots = $device->relationLoaded('configurationSnapshots')
             ? $device->configurationSnapshots
             : $device->configurationSnapshots()->latest('captured_at')->latest('id')->limit(12)->get();
@@ -771,9 +767,7 @@ class DeviceProfilePresenter
 
         return [
             'canViewSnapshots' => $canViewSnapshots,
-            'backupActionHref' => $canBackup
-                ? "/security-devices/devices/{$device->id}?section=management&action=network.config.backup"
-                : null,
+            'backupActionHref' => null,
             'latestSnapshot' => $snapshotHistory->first(),
             'snapshotHistory' => $snapshotHistory->all(),
             'snapshotHistoryTruncated' => $snapshotCandidates->count() > $snapshotHistory->count(),

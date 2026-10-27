@@ -23,10 +23,28 @@ import {
 } from '@/components/security-devices/estate-records';
 import type { EstateProps } from '@/components/security-devices/estate-types';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Cctv, Cpu, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react';
+import {
+    ArrowRight,
+    Cctv,
+    CheckCircle2,
+    Circle,
+    Cpu,
+    LayoutGrid,
+    List,
+    Plus,
+    RefreshCw,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type CurrentPermissions = {
@@ -193,6 +211,7 @@ function DashboardBody({
                 'overdueMaintenance',
                 'groupCount',
                 'operations',
+                'first_run_checklist',
                 'can',
                 'auth',
             ],
@@ -514,6 +533,104 @@ function DashboardBody({
                             </p>
                         ) : (
                             <>
+                                {view === 'overview' &&
+                                data.first_run_checklist &&
+                                !data.first_run_checklist.all_complete ? (
+                                    <Card aria-label="First-run setup">
+                                        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                            <div className="space-y-1">
+                                                <CardTitle>
+                                                    First-run setup
+                                                </CardTitle>
+                                                <CardDescription>
+                                                    Complete these steps to
+                                                    start monitoring devices
+                                                    across your Sites.
+                                                </CardDescription>
+                                            </div>
+                                            <StatusBadge variant="info">
+                                                {`${data.first_run_checklist.completed} of ${data.first_run_checklist.total} done`}
+                                            </StatusBadge>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <ul className="grid gap-5 md:grid-cols-2">
+                                                {data.first_run_checklist.steps.map(
+                                                    (step) => (
+                                                        <li
+                                                            key={step.key}
+                                                            className="flex flex-col justify-between gap-3 rounded-xl border border-border bg-card p-4"
+                                                        >
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-start justify-between gap-3">
+                                                                    <div className="flex items-center gap-2 font-medium text-foreground">
+                                                                        {step.done ? (
+                                                                            <CheckCircle2
+                                                                                aria-hidden="true"
+                                                                                className="size-4 shrink-0 text-status-success"
+                                                                            />
+                                                                        ) : (
+                                                                            <Circle
+                                                                                aria-hidden="true"
+                                                                                className="size-4 shrink-0 text-muted-foreground"
+                                                                            />
+                                                                        )}
+                                                                        <span>
+                                                                            {
+                                                                                step.title
+                                                                            }
+                                                                        </span>
+                                                                    </div>
+                                                                    <StatusBadge
+                                                                        size="sm"
+                                                                        variant={
+                                                                            step.done
+                                                                                ? 'success'
+                                                                                : 'neutral'
+                                                                        }
+                                                                    >
+                                                                        {step.done
+                                                                            ? 'Done'
+                                                                            : 'To do'}
+                                                                    </StatusBadge>
+                                                                </div>
+                                                                <p className="text-caption">
+                                                                    {
+                                                                        step.summary
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                            {step.href &&
+                                                            step.action_label ? (
+                                                                <div>
+                                                                    <Button
+                                                                        asChild
+                                                                        size="sm"
+                                                                        variant={
+                                                                            step.done
+                                                                                ? 'ghost'
+                                                                                : 'outline'
+                                                                        }
+                                                                    >
+                                                                        <Link
+                                                                            href={
+                                                                                step.href
+                                                                            }
+                                                                        >
+                                                                            {
+                                                                                step.action_label
+                                                                            }
+                                                                            <ArrowRight className="size-3.5" />
+                                                                        </Link>
+                                                                    </Button>
+                                                                </div>
+                                                            ) : null}
+                                                        </li>
+                                                    ),
+                                                )}
+                                            </ul>
+                                        </CardContent>
+                                    </Card>
+                                ) : null}
                                 <EstateRecords
                                     rows={rows}
                                     view={layout}

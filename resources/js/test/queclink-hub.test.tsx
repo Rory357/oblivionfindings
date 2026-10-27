@@ -202,11 +202,11 @@ describe('QueclinkHub debug console', () => {
         expect(screen.getByText('Pick a paired device…')).toBeVisible();
         expect(
             screen.getByRole('button', {
-                name: 'Review governed location refresh',
+                name: 'Review location refresh',
             }),
         ).toBeDisabled();
         expect(
-            screen.getByRole('button', { name: 'Review governed restart' }),
+            screen.getByRole('button', { name: 'Review device restart' }),
         ).toBeDisabled();
     });
 });
@@ -978,7 +978,7 @@ describe('QueclinkHub device settings', () => {
         expect(screen.getByText('Resident safety profile')).toBeVisible();
         expect(
             screen.getByText(
-                /configuration profiles governed through Device Management/i,
+                /configuration profiles managed through Device Management/i,
             ),
         ).toBeVisible();
         expect(
@@ -1091,7 +1091,7 @@ describe('QueclinkHub device settings', () => {
         );
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         fireEvent.click(
-            screen.getByRole('button', { name: 'Continue to governed review' }),
+            screen.getByRole('button', { name: 'Continue to command review' }),
         );
 
         expect(inertiaMocks.router.post).toHaveBeenCalledWith(
@@ -1129,10 +1129,10 @@ describe('QueclinkHub governed command handoff', () => {
             />,
         );
 
-        expect(screen.getByText('Governed device actions')).toBeVisible();
+        expect(screen.getByText('Protected device actions')).toBeVisible();
         expect(
             screen
-                .getByText('Governed device actions')
+                .getByText('Protected device actions')
                 .closest('[data-slot="card"]'),
         ).toHaveClass('order-first', '2xl:order-last');
         expect(screen.getByText(/Raw and configuration-change/)).toBeVisible();
@@ -1140,7 +1140,7 @@ describe('QueclinkHub governed command handoff', () => {
 
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'Review governed location refresh',
+                name: 'Review location refresh',
             }),
         );
 
@@ -1150,7 +1150,7 @@ describe('QueclinkHub governed command handoff', () => {
 
         fireEvent.click(
             screen.getByRole('button', {
-                name: 'Review governed restart',
+                name: 'Review device restart',
             }),
         );
         expect(inertiaMocks.formPost).toHaveBeenCalledTimes(2);

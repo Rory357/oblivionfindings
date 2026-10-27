@@ -82,7 +82,7 @@ function failureMessage(error: unknown): string {
         }
     }
 
-    return 'The discovery change could not be applied. Review the governed Site bounds and try again.';
+    return 'The discovery change could not be applied. Review the approved Site bounds and try again.';
 }
 
 export function DiscoveryScopeDialog({

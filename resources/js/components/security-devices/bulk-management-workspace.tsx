@@ -355,7 +355,7 @@ export function BulkManagementWorkspace({
                 onError: (errors) =>
                     setRequestError(
                         Object.values(errors)[0] ??
-                            'The governed bulk request could not be created.',
+                            'The bulk request could not be created.',
                     ),
                 onFinish: () => setSubmitting(false),
             },
@@ -373,7 +373,7 @@ export function BulkManagementWorkspace({
                         </p>
                         <p className="text-sm text-muted-foreground">
                             Your role can view Device inventory but cannot
-                            inspect governed management actions.
+                            inspect device management actions.
                         </p>
                     </div>
                 </CardContent>
@@ -396,14 +396,13 @@ export function BulkManagementWorkspace({
                                     className="flex items-center gap-2"
                                 >
                                     <Layers3 className="h-5 w-5 text-primary" />
-                                    Governed Device management
+                                    Bulk device management
                                 </h2>
                             </CardTitle>
                             <p className="max-w-3xl text-sm text-muted-foreground">
                                 Choose one provider-declared action, review
                                 every Device and Site, then create one
-                                independently governed child request per
-                                included target.
+                                independent child request per included target.
                             </p>
                         </div>
                         <Badge variant="outline">
@@ -479,7 +478,7 @@ export function BulkManagementWorkspace({
                             </div>
                         ) : (
                             <p className="text-sm text-muted-foreground">
-                                No provider has declared a governed management
+                                No provider has declared a bulk management
                                 action for the visible Devices in this
                                 workspace.
                             </p>
@@ -669,7 +668,7 @@ export function BulkManagementWorkspace({
                         <CardTitle>
                             <h2 className="flex items-center gap-2">
                                 <Clock3 className="h-5 w-5 text-primary" />
-                                Recent governed activity
+                                Recent bulk activity
                             </h2>
                         </CardTitle>
                         <p className="text-sm text-muted-foreground">
@@ -762,7 +761,7 @@ export function BulkManagementWorkspace({
                     }}
                 >
                     <DialogHeader>
-                        <DialogTitle>Review governed bulk action</DialogTitle>
+                        <DialogTitle>Review bulk action</DialogTitle>
                         <DialogDescription>
                             Confirm scope, Sites, exclusions, prerequisites and
                             expected state. Submission creates independent child
@@ -1192,7 +1191,7 @@ export function BulkManagementWorkspace({
                             }
                         >
                             {submitting
-                                ? 'Creating governed requests…'
+                                ? 'Creating requests…'
                                 : `Create ${includedDevices.length} child request${includedDevices.length === 1 ? '' : 's'}`}
                         </Button>
                     </DialogFooter>

@@ -607,7 +607,13 @@ class SettingsAuditPresenter
 
     private function credentialDriverState(): string
     {
-        if ((string) config('monitoring.credentials.driver', 'unavailable') !== 'vault') {
+        $driver = (string) config('monitoring.credentials.driver', 'database');
+
+        if ($driver === 'database') {
+            return trim((string) config('app.key')) !== '' ? 'configured' : 'misconfigured';
+        }
+
+        if ($driver !== 'vault') {
             return 'unavailable';
         }
 
@@ -619,10 +625,18 @@ class SettingsAuditPresenter
 
     private function credentialDriverNote(): string
     {
+        $driver = (string) config('monitoring.credentials.driver', 'database');
+
+        if ($driver === 'database') {
+            return $this->credentialDriverState() === 'configured'
+                ? 'Device passwords and API keys are stored encrypted in the Oblivion database. Each credential must still pass its check before use.'
+                : 'The encrypted database credential store needs APP_KEY configured before credentials can be used.';
+        }
+
         return match ($this->credentialDriverState()) {
-            'configured' => 'The external Vault lease issuer is configured. Each reference must still pass its own live test.',
-            'misconfigured' => 'Vault is selected but its HTTPS endpoint or bootstrap token is unavailable. References remain suspended.',
-            default => 'No external credential issuer is configured. References may be recorded, but tests and runtime leases fail closed.',
+            'configured' => 'The external Vault credential store is configured. Each credential must still pass its check before use.',
+            'misconfigured' => 'Vault is selected, but its HTTPS address or token is missing. Credentials stay paused.',
+            default => 'No credential store is active. Set MONITORING_CREDENTIAL_DRIVER=database in .env.',
         };
     }
 

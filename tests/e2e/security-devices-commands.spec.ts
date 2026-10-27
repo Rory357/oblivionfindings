@@ -29,7 +29,7 @@ test.describe('Security & Devices governed command batches', () => {
         await expect(
             page.getByRole('heading', { name: 'Security', level: 1 }),
         ).toBeVisible();
-        await expect(page.getByText('Governed Device management')).toBeVisible({
+        await expect(page.getByText('Bulk device management')).toBeVisible({
             timeout: 30_000,
         });
 
@@ -49,7 +49,7 @@ test.describe('Security & Devices governed command batches', () => {
             .click();
 
         const review = page.getByRole('dialog', {
-            name: /review governed bulk action/i,
+            name: /review bulk action/i,
         });
         await expect(review).toBeVisible();
         await expect(
@@ -62,9 +62,7 @@ test.describe('Security & Devices governed command batches', () => {
         if (await confirmIdentity.isVisible().catch(() => false)) {
             await confirmIdentity.click();
             await confirmPasswordIfAsked(page);
-            await expect(
-                page.getByText('Governed Device management'),
-            ).toBeVisible({
+            await expect(page.getByText('Bulk device management')).toBeVisible({
                 timeout: 30_000,
             });
             await page

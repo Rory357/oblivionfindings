@@ -62,10 +62,7 @@ import {
     TicketCheck,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type {
-    DeviceMaintenanceNotice,
-    DeviceProfile,
-} from './device-profile';
+import type { DeviceMaintenanceNotice, DeviceProfile } from './device-profile';
 
 function stateStatusVariant(state: string | null): StatusVariant {
     if (
@@ -567,7 +564,7 @@ function DeviceManagementWorkspace({
             <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                        <Settings2 className="h-4 w-4" /> Governed actions
+                        <Settings2 className="h-4 w-4" /> Device actions
                     </CardTitle>
                     <CardDescription>
                         Only exact capabilities declared by this Device and an
@@ -724,7 +721,7 @@ function DeviceManagementWorkspace({
                                                                 .breakGlassReviewers
                                                                 .length > 0 && (
                                                                 <span>
-                                                                    Governed
+                                                                    Emergency
                                                                     break glass
                                                                 </span>
                                                             )}
@@ -793,8 +790,7 @@ function DeviceManagementWorkspace({
                         </p>
                     ) : management.history.length === 0 ? (
                         <p className="text-sm text-muted-foreground">
-                            No governed command has been requested for this
-                            Device.
+                            No command has been requested for this Device.
                         </p>
                     ) : (
                         management.history.map((command) => (
@@ -2122,9 +2118,7 @@ function CommandDetail({
             <dt className="font-medium text-muted-foreground">{label}</dt>
             <dd className="mt-1">{value}</dd>
             {detail && (
-                <dd className="mt-1 text-xs text-muted-foreground">
-                    {detail}
-                </dd>
+                <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>
             )}
         </div>
     );
@@ -2257,7 +2251,7 @@ export function DeviceHealthSection({ profile }: { profile: DeviceProfile }) {
                     <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
                     <div>
                         <p className="text-sm font-semibold">
-                            Governed management boundary
+                            Management boundary
                         </p>
                         <p className="text-xs text-muted-foreground">
                             {profile.capabilities.control.reason}
@@ -2501,11 +2495,7 @@ export function DeviceInterfacesSensorsSection({
                                     View history
                                 </Button>
                                 {sensor.portActions?.bounceHref ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        asChild
-                                    >
+                                    <Button size="sm" variant="outline" asChild>
                                         <Link
                                             href={sensor.portActions.bounceHref}
                                         >
@@ -2518,11 +2508,7 @@ export function DeviceInterfacesSensorsSection({
                                     </Button>
                                 ) : null}
                                 {sensor.portActions?.enableHref ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        asChild
-                                    >
+                                    <Button size="sm" variant="outline" asChild>
                                         <Link
                                             href={sensor.portActions.enableHref}
                                         >
@@ -2535,11 +2521,7 @@ export function DeviceInterfacesSensorsSection({
                                     </Button>
                                 ) : null}
                                 {sensor.portActions?.disableHref ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        asChild
-                                    >
+                                    <Button size="sm" variant="outline" asChild>
                                         <Link
                                             href={
                                                 sensor.portActions.disableHref
@@ -2598,7 +2580,6 @@ export function DeviceConfigurationSection({
     const resolvedDeviceName = deviceName ?? profile.header.identity.name;
     const previousSnapshots = (snapshotHistory ?? []).slice(1);
     const showBackupsCard =
-        canViewSnapshots !== undefined ||
         Boolean(backupActionHref) ||
         Boolean(latestSnapshot) ||
         (snapshotHistory?.length ?? 0) > 0;
@@ -3087,7 +3068,7 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
             <EmptyState
                 icon={FileClock}
                 title="No audit entries"
-                description="Canonical device changes will appear here without exposing raw before-and-after payloads."
+                description="Device record changes will appear here without exposing raw before-and-after payloads."
                 variant="compact"
             />
         );
@@ -3100,8 +3081,8 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
                     <ClipboardList className="h-4 w-4" /> Device audit
                 </CardTitle>
                 <CardDescription>
-                    Who changed the canonical device record and which fields
-                    were involved. Raw values remain protected.
+                    Who changed the device record and which fields were
+                    involved. Raw values remain protected.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">

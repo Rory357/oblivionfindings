@@ -17,6 +17,7 @@ import {
     type IntegrationView,
 } from '@/components/security-devices/integration-records';
 import type { IntegrationsProps } from '@/components/security-devices/integration-types';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -338,6 +339,12 @@ function IntegrationsBody({
                         />
                     }
                 />
+                {visible ? (
+                    <SecurityDevicesSectionTabs
+                        section="setup"
+                        activeTab="integrations"
+                    />
+                ) : null}
                 {!visible ? (
                     <p
                         role="status"

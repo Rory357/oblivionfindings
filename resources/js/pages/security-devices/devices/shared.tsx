@@ -258,19 +258,39 @@ export function deviceHealthMeridian(device: DeviceListItem): EntityMeridian {
     if (device.health_status === 'critical') return 'critical';
     if (
         device.health_status === 'warning' ||
-        ['attention', 'unmonitored'].includes(device.monitoring_state ?? '')
+        device.monitoring_state === 'attention'
     )
         return 'warning';
-    if (device.health_status === 'healthy') return 'success';
+    if (
+        device.health_status === 'healthy' &&
+        device.monitoring_state !== 'unmonitored' &&
+        device.monitoring_state !== 'not_monitored' &&
+        device.monitoring_state !== 'unknown'
+    )
+        return 'success';
     return 'neutral';
 }
 
 export function deviceMonitoringVariant(state: string): StatusVariant {
     if (state === 'healthy') return 'success';
-    if (state === 'attention' || state === 'unmonitored') return 'warning';
+    if (state === 'attention') return 'warning';
     return 'neutral';
 }
+
+export function deviceMonitoringLabel(state: string): string {
+    if (state === 'unmonitored' || state === 'not_monitored') {
+        return 'Not monitored';
+    }
+    if (state === 'attention') {
+        return 'Needs attention';
+    }
+    return state.replaceAll('_', ' ');
+}
+
 function signalLabel(state: string) {
+    if (state === 'not_monitored' || state === 'unmonitored') {
+        return 'Not monitored';
+    }
     return state.replaceAll('_', ' ');
 }
 
@@ -337,21 +357,39 @@ export function DeviceCard({
                         : undefined
                 }
                 alerts={
-                    <>
-                        <StatusBadge
-                            status={device.health_status}
-                            label={`Health: ${signalLabel(device.health_status)}`}
-                        />
-                        {device.monitoring_state ? (
+                    device.monitoring_state === 'unmonitored' ||
+                    device.health_status === 'not_monitored' ? (
+                        <>
+                            {(device.health_status === 'critical' ||
+                                device.health_status === 'warning') && (
+                                <StatusBadge
+                                    status={device.health_status}
+                                    label={`Health: ${signalLabel(device.health_status)}`}
+                                />
+                            )}
                             <StatusBadge
-                                variant={deviceMonitoringVariant(
-                                    device.monitoring_state,
-                                )}
-                                label={`Monitoring: ${signalLabel(device.monitoring_state)}`}
-                                status={device.monitoring_state}
+                                variant="neutral"
+                                status="not_monitored"
+                                label="Not monitored"
                             />
-                        ) : null}
-                    </>
+                        </>
+                    ) : (
+                        <>
+                            <StatusBadge
+                                status={device.health_status}
+                                label={`Health: ${signalLabel(device.health_status)}`}
+                            />
+                            {device.monitoring_state ? (
+                                <StatusBadge
+                                    variant={deviceMonitoringVariant(
+                                        device.monitoring_state,
+                                    )}
+                                    label={`Monitoring: ${deviceMonitoringLabel(device.monitoring_state)}`}
+                                    status={device.monitoring_state}
+                                />
+                            ) : null}
+                        </>
+                    )
                 }
                 footer={{
                     personIcon:

@@ -92,7 +92,7 @@ test.describe('Security specialist workspace', () => {
             .click();
         await expect(
             page.getByRole('heading', {
-                name: 'Canonical device events',
+                name: 'Device events',
                 level: 2,
             }),
         ).toBeVisible();

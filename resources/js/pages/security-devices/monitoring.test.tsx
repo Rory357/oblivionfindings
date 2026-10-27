@@ -694,7 +694,7 @@ describe('Monitoring shared records and scope', () => {
             screen.getByText('Dependency model unavailable'),
         ).toBeInTheDocument();
         expect(
-            screen.queryByText('Canonical dependency model active'),
+            screen.queryByText('Dependency model active'),
         ).not.toBeInTheDocument();
         rerender(
             <MonitoringContent

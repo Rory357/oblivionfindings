@@ -2645,7 +2645,7 @@ function DevicesTab({
                     releasing
                         ? 'Release “' +
                           releasing.reference +
-                          '”? It will return to the pending tray and stop receiving governed commands until it is claimed again.'
+                          '”? It will return to the pending tray and stop receiving remote commands until it is claimed again.'
                         : ''
                 }
                 confirmText="Release tracker"
@@ -2750,7 +2750,7 @@ function BulkActionDialog({
                 open
                 onClose={close}
                 title="Review bulk management"
-                description="Choose the intended action, then continue to canonical Device Management for Site checks, change control, independent approval and protected verification."
+                description="Choose the intended action, then continue to Device Management for Site checks, change control, independent approval and protected verification."
                 railIcon={Send}
                 railTitle="Bulk management"
                 railSub={devices.length + ' selected trackers'}
@@ -4127,11 +4127,11 @@ export function GovernedCommandHandoff({
     return (
         <Card className="order-first 2xl:order-last">
             <CardHeader>
-                <CardTitle>Governed device actions</CardTitle>
+                <CardTitle>Protected device actions</CardTitle>
                 <CardDescription>
-                    Continue in the canonical Device Management workspace so
-                    identity confirmation, reason, approval or IT Change,
-                    provider delivery, fresh evidence, and audit stay together.
+                    Continue in the Device Management workspace so identity
+                    confirmation, reason, approval or IT Change, provider
+                    delivery, fresh evidence, and audit stay together.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -4173,7 +4173,7 @@ export function GovernedCommandHandoff({
 
                 <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
                     Raw and configuration-change commands are not exposed from
-                    this provider console. Only capabilities with a governed
+                    this provider console. Only capabilities with an approved
                     Device adapter appear in Management.
                 </div>
 
@@ -4203,8 +4203,8 @@ export function GovernedCommandHandoff({
                             );
                         }}
                     >
-                        <ShieldCheck className="mr-2 h-4 w-4" /> Review governed
-                        location refresh
+                        <ShieldCheck className="mr-2 h-4 w-4" /> Review location
+                        refresh
                     </Button>
                     <Button
                         type="button"
@@ -4224,7 +4224,7 @@ export function GovernedCommandHandoff({
                             );
                         }}
                     >
-                        <RefreshCw className="mr-2 h-4 w-4" /> Review governed
+                        <RefreshCw className="mr-2 h-4 w-4" /> Review device
                         restart
                     </Button>
                 </div>
@@ -4269,10 +4269,10 @@ export function CloudIntegrationTab({
                             Native operations remain available
                         </p>
                         <p className="mt-1 text-muted-foreground">
-                            Listener health, direct tracker telemetry, canonical
+                            Listener health, direct tracker telemetry, device
                             assignment, configuration reads, protected profiles,
-                            and governed Device Management continue through
-                            their existing native contracts.
+                            and Device Management continue through their
+                            existing native contracts.
                         </p>
                     </div>
 
@@ -4326,7 +4326,7 @@ export function CloudIntegrationTab({
                 }
                 variant="destructive"
                 title="Remove legacy Queclink cloud credential?"
-                description="Remove the unused retired cloud credential? Native TCP monitoring and governed Device Management continue unchanged. This credential cannot be recovered from Oblivion Findings."
+                description="Remove the unused retired cloud credential? Native TCP monitoring and Device Management continue unchanged. This credential cannot be recovered from Oblivion Findings."
                 confirmText="Remove legacy credential"
             />
         </>

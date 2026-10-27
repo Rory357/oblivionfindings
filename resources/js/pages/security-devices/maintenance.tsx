@@ -15,6 +15,7 @@ import {
     MaintenanceRecords,
     maintenanceLabel,
 } from '@/components/security-devices/maintenance-records';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { LayoutGrid, List, RefreshCw, Search, Wrench } from 'lucide-react';
@@ -240,7 +241,7 @@ function MaintenanceBody({
             label: 'Firmware & configuration',
             tab: 'firmware-configuration',
             value: workspace.summary.firmware_configuration,
-            caption: 'Governed technical work',
+            caption: 'Scheduled technical work',
         },
     ];
     return (
@@ -456,6 +457,12 @@ function MaintenanceBody({
                         />
                     }
                 />
+                {visible ? (
+                    <SecurityDevicesSectionTabs
+                        section="alerts-upkeep"
+                        activeTab="maintenance"
+                    />
+                ) : null}
                 {visible ? (
                     <MaintenanceRecords
                         rows={workspace.records}

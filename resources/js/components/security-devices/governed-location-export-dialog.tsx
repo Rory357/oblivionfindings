@@ -121,7 +121,7 @@ export function GovernedLocationExportDialog({
                     typeof validationMessage === 'string'
                         ? validationMessage
                         : payload?.message ||
-                              'The governed export could not be created.',
+                              'The location export could not be created.',
                 );
             }
 
@@ -145,7 +145,7 @@ export function GovernedLocationExportDialog({
             setError(
                 caught instanceof Error
                     ? caught.message
-                    : 'The governed export could not be created.',
+                    : 'The location export could not be created.',
             );
         } finally {
             setProcessing(false);

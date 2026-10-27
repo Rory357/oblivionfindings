@@ -8,7 +8,6 @@ use App\Domain\Monitoring\Contracts\SnapshotStore;
 use App\Domain\Monitoring\Data\AuthorizedProbeTarget;
 use App\Domain\Monitoring\Data\CredentialLease;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
-use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
 use App\Domain\Monitoring\Services\EgressPolicy;
@@ -405,28 +404,13 @@ it('dispatches and reconciles network port bounce and secret-redacted configurat
         ->and($http->calls[0]['method'])->toBe('POST')
         ->and($http->calls[0]['target']->path)->toContain('/interfaces/Gi1%2F0%2F48/bounce');
 
-    $backupCommand = app(DeviceCommandRequestService::class)->request($fixture['switch'], $requester, new CommandRequestInput(
+    expect(app(DeclaredDeviceCommandCapabilities::class)->supports($fixture['switch'], 'network.config.backup'))->toBeFalse();
+
+    expect(fn () => app(DeviceCommandRequestService::class)->request($fixture['switch'], $requester, new CommandRequestInput(
         capability: 'network.config.backup',
         parameters: [],
         reason: 'Capture verified pre-change switch configuration backup.',
         idempotencyKey: 'dispatch-config-backup-1',
         impactAcknowledged: true,
-    ));
-    expect($backupCommand->status)->toBe(CommandStatus::Ready);
-
-    app(GovernedCommandDispatchService::class)->dispatch($backupCommand, $requester);
-    $reconciledBackup = app(DeviceCommandReconciliationService::class)->reconcile($backupCommand->fresh(), $requester);
-
-    $snapshot = ConfigurationSnapshot::query()
-        ->where('device_id', $fixture['switch']->id)
-        ->where('source_kind', 'command')
-        ->sole();
-    $persistedBytes = $store->read($snapshot->storage_path);
-
-    expect($reconciledBackup->outcome)->toBe(CommandReconciliationOutcome::Matched)
-        ->and($backupCommand->fresh()->status)->toBe(CommandStatus::Reconciled)
-        ->and($persistedBytes)->toContain('harbour-core-sw01')
-        ->and($persistedBytes)->toContain('[REDACTED]')
-        ->and($persistedBytes)->not->toContain('RAW-CONTROLLER-ENABLE-SECRET')
-        ->and($persistedBytes)->not->toContain('RAW-SNMP-COMMUNITY');
+    )))->toThrow(Exception::class, 'This device does not declare support for that management action.');
 });

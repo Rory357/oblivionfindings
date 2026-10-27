@@ -475,3 +475,79 @@ describe('dashboard number owners', () => {
         ).toBeGreaterThan(0);
     });
 });
+
+describe('dashboard first-run checklist', () => {
+    it('renders incomplete first-run steps on Overview, hides when complete, and withholds when restricted', () => {
+        const incomplete = {
+            ...estateFixture(),
+            first_run_checklist: {
+                completed: 1,
+                total: 4,
+                all_complete: false,
+                steps: [
+                    {
+                        key: 'server_readiness',
+                        title: 'Check server readiness',
+                        summary:
+                            'Open Server readiness to check background workers, keys, and ping access.',
+                        done: false,
+                        href: '/settings/server-readiness',
+                        action_label: 'Open Server readiness',
+                    },
+                    {
+                        key: 'sites',
+                        title: 'Confirm your Sites',
+                        summary: '1 active Site is ready for devices.',
+                        done: true,
+                        href: '/security-devices/sites',
+                        action_label: 'View Sites',
+                    },
+                    {
+                        key: 'devices',
+                        title: 'Add or discover devices',
+                        summary:
+                            'Register a device manually or scan a network from Setup.',
+                        done: false,
+                        href: '/security-devices/discovery',
+                        action_label: 'Open Setup',
+                    },
+                    {
+                        key: 'monitoring',
+                        title: 'Turn on device checks',
+                        summary:
+                            'Assign checks so Oblivion can watch device reachability and alert you when something goes offline.',
+                        done: false,
+                        href: '/security-devices/monitoring',
+                        action_label: 'Open Alerts & upkeep',
+                    },
+                ],
+            },
+        };
+
+        const ui = render(<Dashboard {...incomplete} />);
+        expect(screen.getByText('First-run setup')).toBeInTheDocument();
+        expect(screen.getByText('1 of 4 done')).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: /Open Server readiness/i }),
+        ).toHaveAttribute('href', '/settings/server-readiness');
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Affected Sites' }));
+        expect(screen.queryByText('First-run setup')).not.toBeInTheDocument();
+
+        ui.rerender(
+            <Dashboard
+                {...incomplete}
+                first_run_checklist={{
+                    ...incomplete.first_run_checklist,
+                    completed: 4,
+                    all_complete: true,
+                }}
+            />,
+        );
+        expect(screen.queryByText('First-run setup')).not.toBeInTheDocument();
+
+        mocks.can.securityDevices.viewAny = false;
+        ui.rerender(<Dashboard {...incomplete} />);
+        expect(screen.queryByText('First-run setup')).not.toBeInTheDocument();
+    });
+});

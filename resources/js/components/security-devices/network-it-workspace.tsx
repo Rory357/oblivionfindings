@@ -363,7 +363,7 @@ function Overview({ data }: { data: NetworkItWorkspaceData }) {
                             }
                             value={overview.inventory.devices}
                             label={`${overview.inventory.devices} devices`}
-                            note="Visible canonical Network & IT inventory"
+                            note="Visible Network & IT devices"
                         />
                         <MetricCard
                             icon={
@@ -426,14 +426,14 @@ function Overview({ data }: { data: NetworkItWorkspaceData }) {
                     <CardHeader className="pb-3">
                         <h3 className="font-semibold">Required action</h3>
                         <p className="text-sm text-muted-foreground">
-                            Evidence-backed issues only.
+                            Confirmed issues only.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {overview.requiredActions.length === 0 ? (
                             <EmptyLine
                                 icon={<CheckCircle2 className="h-4 w-4" />}
-                                text="No current evidence-backed actions."
+                                text="No current actions needed."
                             />
                         ) : (
                             overview.requiredActions.map((action) => (
@@ -664,7 +664,7 @@ function TopologyPanel({
     return (
         <Panel
             title="Known topology evidence"
-            description="Latest native and provider snapshots are shown with source, confidence, changes, and inferred-versus-reviewed labels; only canonical visible Devices are linked."
+            description="Latest native and provider snapshots are shown with source, confidence, changes, and inferred-versus-reviewed labels; only registered visible Devices are linked."
         >
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
                 <StateBadge state={topology.state} />

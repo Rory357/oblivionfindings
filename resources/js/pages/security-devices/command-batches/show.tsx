@@ -16,7 +16,10 @@ import {
     PageHeaderStatusChip,
     PageHeaderViewToggle,
 } from '@/components/page';
-import { securityDevicesNavigationGroups } from '@/components/security-devices/security-devices-navigation';
+import {
+    securityDevicesNavigationGroups,
+    securityDevicesWorkspaceLabel,
+} from '@/components/security-devices/security-devices-navigation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
@@ -194,6 +197,8 @@ function humanise(value: string): string {
 }
 /** The workspace's own name from the Security & Devices navigation. */
 function workspaceName(slug: string): string {
+    const legacy = securityDevicesWorkspaceLabel(slug);
+    if (legacy) return legacy;
     const href = `/security-devices/${slug}`;
     const item = securityDevicesNavigationGroups
         .flatMap((group) => group.items)
@@ -825,7 +830,7 @@ function BatchWorkspace({
         {
             label: 'Ready',
             value: batch.summary.ready,
-            caption: 'Ready for governed queue dispatch',
+            caption: 'Ready for queue dispatch',
             view: 'ready' as const,
         },
         {
@@ -1368,7 +1373,7 @@ function BatchWorkspace({
                     onConfirm={dispatch}
                     processing={dispatching}
                     title="Queue ready child requests?"
-                    description={`Queue ${batch.summary.ready} independently governed child requests. Every Device is reauthorised and revalidated immediately before dispatch; changed targets close safely without execution.`}
+                    description={`Queue ${batch.summary.ready} independent child requests. Every Device is reauthorised and revalidated immediately before dispatch; changed targets close safely without execution.`}
                     confirmText={
                         dispatching ? 'Queueing…' : 'Queue ready requests'
                     }

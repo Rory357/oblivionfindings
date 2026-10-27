@@ -1024,7 +1024,7 @@ function DeviceShowBody({
                                                 Current assignment
                                             </CardTitle>
                                             <CardDescription>
-                                                The canonical owner or location
+                                                The assigned owner or location
                                                 used across Site, Client, Fleet,
                                                 HR, and IT context.
                                             </CardDescription>
@@ -1141,9 +1141,9 @@ function DeviceShowBody({
                                     <DialogHeader>
                                         <DialogTitle>Link asset</DialogTitle>
                                         <DialogDescription>
-                                            Connect this device to the canonical
-                                            asset register and record the
-                                            physical relationship.
+                                            Connect this device to the asset
+                                            register and record the physical
+                                            relationship.
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="space-y-4">

@@ -117,7 +117,7 @@ const steps: readonly WizardStep[] = [
     {
         key: 'review',
         label: 'Review & register',
-        blurb: 'Confirm the canonical record',
+        blurb: 'Confirm device details',
         icon: NotebookText,
     },
 ];
@@ -527,12 +527,12 @@ export function AddDeviceDialog({
                 title={mode === 'edit' ? 'Edit device' : 'Register device'}
                 description={
                     mode === 'edit'
-                        ? 'Update the canonical Security & Devices registry record.'
-                        : 'Create one canonical Security & Devices registry record.'
+                        ? 'Update this device record in Security & Devices.'
+                        : 'Add a device record to Security & Devices.'
                 }
                 railIcon={Cpu}
                 railTitle={mode === 'edit' ? 'Edit device' : 'Register device'}
-                railSub="Canonical inventory"
+                railSub="Device list"
                 steps={activeSteps}
                 stepIndex={stepIndex}
                 onStepClick={(index) => {
@@ -618,10 +618,10 @@ export function AddDeviceDialog({
                                 <>
                                     <strong>{completedName}</strong>{' '}
                                     {mode === 'edit'
-                                        ? 'has been updated in the canonical device registry.'
+                                        ? 'has been updated in the device list.'
                                         : prefillSiteName
                                           ? `is now registered and assigned to ${prefillSiteName}.`
-                                          : 'is now in the canonical device registry.'}
+                                          : 'is now in the device list.'}
                                 </>
                             }
                             actions={
@@ -878,9 +878,9 @@ export function AddDeviceDialog({
                                         Initial Site: {prefillSiteName}
                                     </p>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                        Registration and the canonical Site
-                                        assignment are saved together. If either
-                                        fails, neither record is created.
+                                        Registration and the Site assignment are
+                                        saved together. If either fails, neither
+                                        record is created.
                                     </p>
                                 </div>
                             </div>
@@ -894,10 +894,10 @@ export function AddDeviceDialog({
                                 <p className="mt-1 text-xs leading-5">
                                     Changing manufacturer, model, hardware IDs,
                                     firmware, IP address or status creates a
-                                    temporary governed override. Provider
-                                    linkage remains integration-owned. Later
-                                    observations remain visible and resume when
-                                    the override expires.
+                                    temporary override. Provider linkage remains
+                                    integration-owned. Later observations remain
+                                    visible and resume when the override
+                                    expires.
                                 </p>
                                 {options?.device?.field_ownership?.conflicts
                                     .length ? (
@@ -1016,7 +1016,7 @@ export function AddDeviceDialog({
                             title={
                                 mode === 'edit'
                                     ? 'Review the registry changes'
-                                    : 'Review the canonical record'
+                                    : 'Review device details'
                             }
                             description={
                                 mode === 'edit'

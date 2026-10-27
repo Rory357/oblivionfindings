@@ -35,6 +35,7 @@ import {
     type DiscoveryScopeManagement,
     type GovernedDiscoveryScope,
 } from '@/components/security-devices/discovery-scope-dialogs';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -1200,6 +1201,10 @@ function DiscoveryBody({
                 }
             >
                 <div className="space-y-5">
+                    <SecurityDevicesSectionTabs
+                        section="setup"
+                        activeTab="discovery"
+                    />
                     {notice && (
                         <Alert>
                             <AlertTitle>Records not refreshed</AlertTitle>

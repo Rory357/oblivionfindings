@@ -655,7 +655,7 @@ describe('Security & Devices operations workspaces', () => {
         );
 
         expect(screen.getByText(/p95 86.2/)).toBeInTheDocument();
-        expect(screen.getByText(/Projection forecast/)).toBeInTheDocument();
+        expect(screen.getByText(/Trend forecast/)).toBeInTheDocument();
         expect(screen.getByText(/91% confidence/)).toBeInTheDocument();
         expect(
             screen.getByText(/Measured history:.*1 Jul.*19 Jul/),

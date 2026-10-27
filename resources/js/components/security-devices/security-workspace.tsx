@@ -224,6 +224,7 @@ function Metric({ children }: { children: ReactNode }) {
 
 function cctvSourceVariant(state: string): StatusVariant {
     if (state === 'verified') return 'success';
+    if (state === 'failed') return 'critical';
     if (state === 'configured') return 'info';
     if (state === 'disabled') return 'warning';
     return 'neutral';
@@ -607,8 +608,8 @@ function EventsPanel({ data }: { data: SecurityWorkspaceData }) {
             <Card>
                 <CardHeader>
                     <h2 className="flex items-center gap-2 text-base font-semibold">
-                        <RadioTower className="h-4 w-4 text-primary" />{' '}
-                        Canonical device events
+                        <RadioTower className="h-4 w-4 text-primary" /> Device
+                        events
                     </h2>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -653,7 +654,7 @@ function EventsPanel({ data }: { data: SecurityWorkspaceData }) {
                         ))
                     ) : (
                         <p className="text-sm text-muted-foreground">
-                            No canonical security-device events are recorded.
+                            No security-device events are recorded.
                         </p>
                     )}
                 </CardContent>

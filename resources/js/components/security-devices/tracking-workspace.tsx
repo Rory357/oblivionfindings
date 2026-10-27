@@ -257,8 +257,7 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                             <p className="mt-2 text-xs font-medium text-status-warning">
                                 Counts below describe the first 100 visible
                                 candidates and may be incomplete. Open a purpose
-                                view or the canonical inventory to narrow the
-                                estate.
+                                view or the device list to narrow the estate.
                             </p>
                         ) : null}
                     </div>
@@ -299,8 +298,8 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                         Open by purpose
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                        Each view keeps its canonical Client, H&S, Fleet, or
-                        Asset workflow one click away.
+                        Each view keeps its Client, H&S, Fleet, or Asset
+                        workflow one click away.
                     </p>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-3">
@@ -475,7 +474,7 @@ function DeviceCard({ device }: { device: TrackingDevice }) {
                 ) : null}
                 {!device.person && !device.asset ? (
                     <p className="text-status-warning">
-                        Not assigned to a canonical subject
+                        Not assigned to a person, vehicle, or asset
                     </p>
                 ) : null}
             </div>
@@ -597,9 +596,8 @@ function DeviceGrid({ devices }: { devices: TrackingDevice[] }) {
                             No authorised trackers in this view
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            A tracker appears only when its canonical
-                            destination record and purpose boundary are visible
-                            to you.
+                            A tracker appears only when its linked destination
+                            record and purpose boundary are visible to you.
                         </p>
                     </div>
                 </CardContent>

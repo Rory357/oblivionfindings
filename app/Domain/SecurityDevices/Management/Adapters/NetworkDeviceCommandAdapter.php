@@ -4,7 +4,6 @@ namespace App\Domain\SecurityDevices\Management\Adapters;
 
 use App\Domain\Monitoring\Data\AuthorizedProbeTarget;
 use App\Domain\Monitoring\Data\ProbeTarget;
-use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
 use App\Domain\Monitoring\Services\EgressPolicy;
@@ -30,7 +29,6 @@ final class NetworkDeviceCommandAdapter implements CommandExecutionAdapter
         'network.port.enable',
         'network.port.disable',
         'network.port.bounce',
-        'network.config.backup',
     ];
 
     public function __construct(
@@ -40,7 +38,7 @@ final class NetworkDeviceCommandAdapter implements CommandExecutionAdapter
         private readonly CommandCredentialLeaseService $credentials,
         private readonly EgressPolicy $egress,
         private readonly CommandHttpTransport $http,
-        private readonly ConfigurationSnapshotService $snapshots,
+        private readonly ?ConfigurationSnapshotService $snapshots = null,
     ) {}
 
     public function supports(Device $device, string $capability): bool
@@ -78,10 +76,6 @@ final class NetworkDeviceCommandAdapter implements CommandExecutionAdapter
             $material = $lease->material();
             $token = $this->token($material);
 
-            if ($context->capability === 'network.config.backup') {
-                return $this->executeConfigurationBackup($context, $configuration, $token);
-            }
-
             return $this->executePortAction($context, $configuration, $token);
         } finally {
             $this->erase($material);
@@ -92,31 +86,6 @@ final class NetworkDeviceCommandAdapter implements CommandExecutionAdapter
     public function observe(CommandExecutionContext $context): CommandObservedState
     {
         $configuration = $this->assertContext($context);
-
-        if ($context->capability === 'network.config.backup') {
-            $snapshot = ConfigurationSnapshot::query()
-                ->where('device_id', $context->device->id)
-                ->where('site_id', $context->siteId)
-                ->where('source_kind', 'command')
-                ->where('storage_state', 'available')
-                ->whereNull('payload_deleted_at')
-                ->orderByDesc('captured_at')
-                ->orderByDesc('id')
-                ->first();
-
-            if (! $snapshot instanceof ConfigurationSnapshot) {
-                throw new RuntimeException('No verified configuration backup snapshot is available for reconciliation.');
-            }
-
-            return new CommandObservedState(
-                state: [
-                    'snapshot_available' => true,
-                ],
-                observedAt: CarbonImmutable::instance($snapshot->captured_at)->startOfSecond(),
-                observationReference: 'configuration-snapshot:'.$snapshot->id,
-                safeEvidenceSummary: 'Verified encrypted, secret-redacted configuration snapshot in private storage.',
-            );
-        }
 
         $interface = trim((string) ($context->parameters['interface'] ?? ''));
         $this->networkPolicy->assertInterfaceAllowed($context->device, $interface);
@@ -231,55 +200,6 @@ final class NetworkDeviceCommandAdapter implements CommandExecutionAdapter
                 'provider_state' => 'accepted',
             ],
             providerRequestReference: 'network-mgmt:'.$context->commandUuid,
-        );
-    }
-
-    /**
-     * @param  array{base_url: string, device_ref: string, provider: string}  $configuration
-     */
-    private function executeConfigurationBackup(
-        CommandExecutionContext $context,
-        array $configuration,
-        string $token,
-    ): CommandExecutionResult {
-        $target = $this->target(
-            $context->siteId,
-            (int) $context->device->id,
-            $configuration,
-            '/api/v1/network/devices/'.rawurlencode($configuration['device_ref']).'/configuration',
-        );
-
-        $response = $this->http->request($target, 'GET', $this->headers($token));
-        if ($response->location !== null || $response->status !== 200) {
-            return $this->failedResponse($response, 'configuration backup');
-        }
-
-        $payload = $response->json();
-        $configData = is_array($payload['data'] ?? null) ? $payload['data'] : $payload;
-        if (! is_array($configData) || $configData === []) {
-            return new CommandExecutionResult(
-                status: CommandAttemptStatus::Failed,
-                safeFailureReason: 'The network controller returned an empty or unsupported configuration payload.',
-            );
-        }
-
-        $snapshot = $this->snapshots->captureFromCommand(
-            device: $context->device,
-            siteId: $context->siteId,
-            source: $configuration['provider'],
-            payload: $configData,
-            capturedAt: CarbonImmutable::now('UTC')->startOfSecond(),
-        );
-
-        return new CommandExecutionResult(
-            status: CommandAttemptStatus::Succeeded,
-            safeSummary: [
-                'snapshot_id' => $snapshot->id,
-                'configuration_hash' => $snapshot->configuration_hash,
-                'redacted' => true,
-            ],
-            providerRequestReference: 'network-backup:'.$context->commandUuid,
-            evidenceReference: 'configuration-snapshot:'.$snapshot->id,
         );
     }
 

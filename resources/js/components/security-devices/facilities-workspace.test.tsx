@@ -305,7 +305,7 @@ describe('FacilitiesWorkspacePanels', () => {
 
         expect(
             screen.getByRole('heading', {
-                name: 'Canonical facility history',
+                name: 'Facility history',
             }),
         ).toBeInTheDocument();
         expect(
@@ -336,7 +336,10 @@ describe('FacilitiesWorkspacePanels', () => {
         expect(screen.getByText(/Filtered to:/)).toBeInTheDocument();
         expect(
             screen.getByRole('link', { name: 'Clear attention filter' }),
-        ).toHaveAttribute('href', '/security-devices/facilities-iot?tab=overview');
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/facilities-iot?tab=overview',
+        );
         expect(
             screen.getByRole('link', { name: 'Kauri cool room sensor' }),
         ).toBeInTheDocument();

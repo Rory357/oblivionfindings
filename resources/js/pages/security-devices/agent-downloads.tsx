@@ -10,6 +10,7 @@ import {
     PageHeaderSearch,
     PageHeaderViewToggle,
 } from '@/components/page';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { EmptySearch } from '@/components/ui/empty-state';
@@ -379,6 +380,12 @@ function AgentReleaseList({
                 }
             />
             <div className="mt-5 space-y-5">
+                {!restricted ? (
+                    <SecurityDevicesSectionTabs
+                        section="setup"
+                        activeTab="agent-downloads"
+                    />
+                ) : null}
                 <p className="text-caption">
                     {restricted
                         ? 'Download permission required.'

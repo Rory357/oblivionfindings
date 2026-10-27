@@ -544,7 +544,7 @@ describe('NetworkItWorkspacePanels', () => {
             ),
         ).toBeInTheDocument();
         expect(
-            within(drifted).getByText(/View previous governed snapshots \(1\)/),
+            within(drifted).getByText(/View previous saved snapshots \(1\)/),
         ).toBeInTheDocument();
         expect(
             within(drifted).getByText(
@@ -553,7 +553,7 @@ describe('NetworkItWorkspacePanels', () => {
         ).toBeInTheDocument();
         expect(
             within(drifted).getByRole('link', {
-                name: 'Download governed snapshot',
+                name: 'Download saved snapshot',
             }),
         ).toHaveAttribute(
             'href',

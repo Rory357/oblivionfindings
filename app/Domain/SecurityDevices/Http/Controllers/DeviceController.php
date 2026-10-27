@@ -138,8 +138,17 @@ class DeviceController extends Controller
             'scopeLabel' => $scopeLabel,
             'filterOptions' => [
                 'domains' => collect(DeviceDomain::cases())->map(fn ($d) => ['value' => $d->value, 'label' => self::domainLabel($d)]),
+                'categories' => self::categoryFilterOptions($request->input('domain')),
                 'statuses' => collect(DeviceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-                'healthStatuses' => collect(HealthStatus::cases())->map(fn ($h) => ['value' => $h->value, 'label' => $h->label()]),
+                'healthStatuses' => [
+                    ['value' => 'not_monitored', 'label' => 'Not monitored'],
+                    ...collect(HealthStatus::cases())
+                        ->reject(fn (HealthStatus $h) => $h === HealthStatus::Unknown)
+                        ->map(fn (HealthStatus $h) => ['value' => $h->value, 'label' => $h->label()])
+                        ->values()
+                        ->all(),
+                    ['value' => HealthStatus::Unknown->value, 'label' => HealthStatus::Unknown->label()],
+                ],
                 'providers' => $providers,
             ],
             'can' => [
@@ -207,6 +216,15 @@ class DeviceController extends Controller
             ->latest('captured_at')
             ->latest('id')
             ->limit(12);
+        $device->loadCount([
+            'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
+            'monitors as failing_monitors_count' => fn ($monitor) => $monitor
+                ->where('is_enabled', true)
+                ->whereIn('current_state', ['failed', 'degraded']),
+            'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
+                ->where('is_enabled', true)
+                ->whereIn('current_state', ['unknown', 'stale', 'pending']),
+        ]);
         $device->load($relations);
 
         $device->setRelation('assignments', $device->assignments
@@ -899,6 +917,37 @@ class DeviceController extends Controller
             DeviceDomain::Tracking => 'Tracking',
             DeviceDomain::Facilities => 'Facilities & IoT',
         };
+    }
+
+    /**
+     * @return list<array{value: string, label: string}>
+     */
+    private static function categoryFilterOptions(?string $domain): array
+    {
+        $taxonomy = DeviceTaxonomy::all();
+        $trees = is_string($domain) && $domain !== '' && $domain !== 'all' && isset($taxonomy[$domain])
+            ? [$taxonomy[$domain]]
+            : array_values($taxonomy);
+
+        $labels = [];
+        foreach ($trees as $categories) {
+            foreach (array_keys($categories) as $slug) {
+                $labels[$slug] = match ($slug) {
+                    'cctv' => 'CCTV',
+                    'it_environmental' => 'IT environmental',
+                    default => ucfirst(str_replace('_', ' ', $slug)),
+                };
+            }
+        }
+
+        asort($labels);
+
+        $options = [];
+        foreach ($labels as $value => $label) {
+            $options[] = ['value' => $value, 'label' => $label];
+        }
+
+        return $options;
     }
 
     private function deviceFormOptions(): array

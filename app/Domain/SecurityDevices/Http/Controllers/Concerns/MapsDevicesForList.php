@@ -33,7 +33,7 @@ trait MapsDevicesForList
             'manufacturer' => $d->manufacturer,
             'model' => $d->model,
             'status' => $d->status?->value,
-            'health_status' => $d->health_status?->value,
+            'health_status' => $d->effectiveHealthState(),
             'provider' => $d->provider,
             'last_seen_at' => $d->last_seen_at?->toISOString(),
             'last_changed_at' => $d->updated_at?->toISOString(),
@@ -88,7 +88,13 @@ trait MapsDevicesForList
         }
 
         if ($request->filled('health') && $request->input('health') !== 'all') {
-            $query->byHealth($request->input('health'));
+            if ($request->input('health') === 'not_monitored') {
+                $query->whereDoesntHave('monitors', fn ($m) => $m->where('is_enabled', true))
+                    ->whereNull('last_seen_at')
+                    ->whereNull('last_signal_at');
+            } else {
+                $query->byHealth($request->input('health'));
+            }
         }
 
         if ($request->filled('provider') && $request->input('provider') !== 'all') {

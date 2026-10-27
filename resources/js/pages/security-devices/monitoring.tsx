@@ -45,6 +45,7 @@ import {
     ControlRoomAlertAccessRequired,
     type ControlRoomAlertAccess,
 } from '@/components/security-devices/permission-destinations';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { ReviewCard } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -537,7 +538,7 @@ export function MonitoringContent({
                                     .canonical_model_available ? (
                                     <MonitoringState
                                         value="available"
-                                        label="Canonical dependency model active"
+                                        label="Dependency model active"
                                     />
                                 ) : (
                                     <MonitoringState
@@ -730,10 +731,13 @@ export default function Monitoring({
                         actions={
                             <PageHeaderGlassButton
                                 onClick={() =>
-                                    router.visit('/security-devices/monitoring', {
-                                        preserveState: false,
-                                        preserveScroll: true,
-                                    })
+                                    router.visit(
+                                        '/security-devices/monitoring',
+                                        {
+                                            preserveState: false,
+                                            preserveScroll: true,
+                                        },
+                                    )
                                 }
                             >
                                 Refresh monitoring
@@ -1090,6 +1094,10 @@ function MonitoringScreen({
                             }
                         />
                     }
+                />
+                <SecurityDevicesSectionTabs
+                    section="alerts-upkeep"
+                    activeTab="monitoring"
                 />
                 <ReviewCard icon={ShieldCheck} title={workspace.boundary.title}>
                     <p className="text-sm text-muted-foreground">

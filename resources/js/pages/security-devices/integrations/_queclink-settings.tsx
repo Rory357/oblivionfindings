@@ -1405,7 +1405,7 @@ function ApplicationWizard({
                         {request.busy && (
                             <Loader2 className="size-4 animate-spin" />
                         )}
-                        Continue to governed review
+                        Continue to command review
                     </Button>
                 )
             }
@@ -2241,7 +2241,7 @@ function SettingsWorkspaceBody({
                     <CardTitle>Device settings</CardTitle>
                     <CardDescription>
                         Protected GL30 readback and configuration profiles
-                        governed through Device Management.
+                        managed through Device Management.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

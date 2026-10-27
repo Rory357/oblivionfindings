@@ -22,6 +22,7 @@ use App\Models\SiteContact;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\System\ServerReadinessService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -76,7 +77,7 @@ class EstateOperationsPresenter
             return [
                 'status' => $status->value,
                 'label' => $status->label(),
-                'count' => $devices->filter(fn (Device $device) => $device->health_status?->value === $status->value)->count(),
+                'count' => $devices->filter(fn (Device $device) => $device->rollupHealthStatus() === $status)->count(),
             ];
         });
 
@@ -95,7 +96,7 @@ class EstateOperationsPresenter
                 'domain' => $device->domain,
                 'category' => $device->category,
                 'status' => $device->status?->value,
-                'health_status' => $device->health_status?->value,
+                'health_status' => $device->effectiveHealthState(),
                 'last_seen_at' => $device->last_seen_at?->toIso8601String(),
                 'battery_level' => $device->battery_level,
             ])
@@ -135,6 +136,8 @@ class EstateOperationsPresenter
             $groupQuery->whereHas('devices', fn ($query) => $query->whereIn('devices.id', $deviceIds));
         }
 
+        $operations = $this->estateOperations($context);
+
         return [
             'actor_id' => $viewer->id,
             'as_of' => $context['asOf']->toISOString(),
@@ -145,7 +148,8 @@ class EstateOperationsPresenter
             'recentEvents' => $recentEvents,
             'overdueMaintenance' => $overdueMaintenance,
             'groupCount' => $groupQuery->count(),
-            'operations' => $this->estateOperations($context),
+            'operations' => $operations,
+            'first_run_checklist' => $this->firstRunChecklist($viewer, $context, $stats, $operations),
             'can' => [
                 'create' => $viewer->canDo('securityDevices.devices.create'),
                 'export' => $viewer->canDo('securityDevices.reports.view'),
@@ -153,6 +157,122 @@ class EstateOperationsPresenter
                 'view_events' => $context['canViewEvents'],
                 'view_maintenance' => $context['canViewMaintenance'],
             ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  $stats
+     * @param  array<string, mixed>  $operations
+     * @return array{
+     *   completed: int,
+     *   total: int,
+     *   all_complete: bool,
+     *   steps: list<array{
+     *     key: string,
+     *     title: string,
+     *     summary: string,
+     *     done: bool,
+     *     href: ?string,
+     *     action_label: ?string
+     *   }>
+     * }
+     */
+    private function firstRunChecklist(User $viewer, array $context, array $stats, array $operations): array
+    {
+        $canManageSettings = $viewer->canDo('settings.access.manage');
+        $readiness = app(ServerReadinessService::class)->checklistSummary();
+        $serverReady = (bool) $readiness['ready'];
+
+        $siteCount = $context['sites']->count();
+        $hasSites = $siteCount > 0;
+
+        $deviceCount = (int) ($stats['totalDevices'] ?? 0);
+        $hasDevices = $context['canViewDevices'] && $deviceCount > 0;
+        $canViewDiscovery = $viewer->canDo('securityDevices.viewAny')
+            && $viewer->canDo('securityDevices.integrations.view');
+
+        $monitoredCount = (int) ($operations['coverage']['monitored_devices'] ?? 0);
+        $hasMonitoring = $context['canViewEvents'] && $monitoredCount > 0;
+
+        $steps = [
+            [
+                'key' => 'server_readiness',
+                'title' => 'Check server readiness',
+                'summary' => match (true) {
+                    $serverReady => 'All server checks are passing.',
+                    $canManageSettings && $readiness['passed_count'] !== null => sprintf(
+                        '%d of %d server checks passing — open Server readiness for plain fixes.',
+                        $readiness['passed_count'],
+                        $readiness['total_count'],
+                    ),
+                    $canManageSettings => 'Open Server readiness to check background workers, keys, and ping access.',
+                    default => 'Ask an administrator to check Settings › Server readiness.',
+                },
+                'done' => $serverReady,
+                'href' => $canManageSettings ? '/settings/server-readiness' : null,
+                'action_label' => $canManageSettings ? 'Open Server readiness' : null,
+            ],
+            [
+                'key' => 'sites',
+                'title' => 'Confirm your Sites',
+                'summary' => $hasSites
+                    ? ($siteCount === 1
+                        ? '1 active Site is ready for devices.'
+                        : sprintf('%d active Sites are ready for devices.', $siteCount))
+                    : 'Add at least one active Site before placing devices.',
+                'done' => $hasSites,
+                'href' => $context['canViewDevices'] ? '/security-devices/sites' : null,
+                'action_label' => $context['canViewDevices'] ? 'View Sites' : null,
+            ],
+            [
+                'key' => 'devices',
+                'title' => 'Add or discover devices',
+                'summary' => match (true) {
+                    ! $context['canViewDevices'] => 'Device access is required to view or register devices.',
+                    $hasDevices => $deviceCount === 1
+                        ? '1 device is registered.'
+                        : sprintf('%d devices are registered.', $deviceCount),
+                    default => 'Register a device manually or scan a network from Setup.',
+                },
+                'done' => $hasDevices,
+                'href' => match (true) {
+                    $hasDevices && $context['canViewDevices'] => '/security-devices/devices',
+                    $canViewDiscovery => '/security-devices/discovery',
+                    $context['canViewDevices'] => '/security-devices/devices',
+                    default => null,
+                },
+                'action_label' => match (true) {
+                    $hasDevices && $context['canViewDevices'] => 'Open Devices',
+                    $canViewDiscovery => 'Open Setup',
+                    $context['canViewDevices'] => 'Open Devices',
+                    default => null,
+                },
+            ],
+            [
+                'key' => 'monitoring',
+                'title' => 'Turn on device checks',
+                'summary' => match (true) {
+                    ! $context['canViewEvents'] => 'Monitoring access is required to view or manage device checks.',
+                    $hasMonitoring => $monitoredCount === 1
+                        ? '1 device has an active check.'
+                        : sprintf('%d devices have active checks.', $monitoredCount),
+                    default => 'Assign checks so Oblivion can watch device reachability and alert you when something goes offline.',
+                },
+                'done' => $hasMonitoring,
+                'href' => $context['canViewEvents'] ? '/security-devices/monitoring' : null,
+                'action_label' => $context['canViewEvents'] ? 'Open Alerts & upkeep' : null,
+            ],
+        ];
+
+        $completed = collect($steps)->where('done', true)->count();
+        $total = count($steps);
+
+        return [
+            'completed' => $completed,
+            'total' => $total,
+            'all_complete' => $completed === $total,
+            'steps' => $steps,
         ];
     }
 
@@ -546,6 +666,15 @@ class EstateOperationsPresenter
                         ? $query->where('is_enabled', true)
                         : $query->whereRaw('1 = 0'),
                 ])
+                ->withCount([
+                    'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
+                    'monitors as failing_monitors_count' => fn ($monitor) => $monitor
+                        ->where('is_enabled', true)
+                        ->whereIn('current_state', ['failed', 'degraded']),
+                    'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
+                        ->where('is_enabled', true)
+                        ->whereIn('current_state', ['unknown', 'stale', 'pending']),
+                ])
                 ->get();
         $deviceIds = $devices->pluck('id');
         $deviceSiteMap = $this->deviceSiteMap($devices, $sites->pluck('id')->all());
@@ -821,7 +950,7 @@ class EstateOperationsPresenter
             'manufacturer' => $device->manufacturer,
             'model' => $device->model,
             'status' => $device->status?->value,
-            'health_status' => $device->health_status?->value,
+            'health_status' => $device->effectiveHealthState(),
             'provider' => $device->provider,
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             'last_changed_at' => $device->updated_at?->toIso8601String(),

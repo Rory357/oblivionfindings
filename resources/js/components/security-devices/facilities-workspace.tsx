@@ -409,12 +409,12 @@ function Overview({ data }: { data: FacilitiesWorkspaceData }) {
                     <CardHeader>
                         <h3 className="font-semibold">Required action</h3>
                         <p className="text-sm text-muted-foreground">
-                            Evidence-backed items only.
+                            Confirmed issues only.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {overview.requiredActions.length === 0 ? (
-                            <Empty text="No current evidence-backed actions." />
+                            <Empty text="No current actions needed." />
                         ) : (
                             overview.requiredActions.map((action) => (
                                 <Link
@@ -645,7 +645,7 @@ function BuildingPanel({ rows, gap }: { rows: FacilityDevice[]; gap: number }) {
     return (
         <Panel
             title="Building systems and safety equipment"
-            description="Canonical device condition with maintenance kept in the shared maintenance register."
+            description="Recorded device condition with maintenance kept in the shared maintenance register."
             icon={<Building2 className="h-5 w-5" />}
         >
             {gap > 0 ? (
@@ -829,7 +829,7 @@ function AutomationsPanel({
             icon={<Settings2 className="h-5 w-5" />}
         >
             <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm">
-                Automation controls remain read-only until governed command
+                Automation controls remain read-only until approved command
                 workflows are available.
             </div>
             {gap > 0 ? (
@@ -987,7 +987,7 @@ function HistoryPanel({
 }) {
     return (
         <Panel
-            title="Canonical facility history"
+            title="Facility history"
             description="Filtered append-only device events and retained native observations."
             icon={<History className="h-5 w-5" />}
             action={
@@ -1146,8 +1146,7 @@ export function FacilitiesWorkspacePanels({
             {activeTab.inventoryTruncated ? (
                 <Gap>
                     This workspace shows the first 100 authorised facility
-                    devices. Narrow the canonical inventory before relying on
-                    counts.
+                    devices. Filter the device list before relying on counts.
                 </Gap>
             ) : null}
             {activeTab.key === 'environment' ? (

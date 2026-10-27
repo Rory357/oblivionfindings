@@ -51,6 +51,7 @@ import { useMemo, useState } from 'react';
 import {
     DeviceCard,
     deviceCategoryLabel,
+    deviceMonitoringLabel,
     deviceMonitoringVariant,
     formatTimeSince,
     type DeviceListItem,
@@ -71,6 +72,7 @@ export type DevicesIndexProps = {
     filters: Record<string, string>;
     filterOptions: {
         domains: FilterOption[];
+        categories?: FilterOption[];
         statuses: FilterOption[];
         healthStatuses: FilterOption[];
         providers: string[];
@@ -220,8 +222,17 @@ function DeviceInventory({
         {
             key: 'health',
             label: 'Health',
-            width: '110px',
-            cell: (device) => <StatusBadge status={device.health_status} />,
+            width: '130px',
+            cell: (device) => (
+                <StatusBadge
+                    status={device.health_status}
+                    label={
+                        device.health_status === 'not_monitored'
+                            ? 'Not monitored'
+                            : undefined
+                    }
+                />
+            ),
         },
         {
             key: 'type',
@@ -242,6 +253,7 @@ function DeviceInventory({
                             device.monitoring_state,
                         )}
                         status={device.monitoring_state}
+                        label={deviceMonitoringLabel(device.monitoring_state)}
                     />
                 ) : (
                     <EmptyValue />
@@ -398,6 +410,14 @@ function DeviceInventory({
                     filters={
                         <>
                             {filter('domain', 'Domains', filterOptions.domains)}
+                            {filterOptions.categories &&
+                            filterOptions.categories.length > 0
+                                ? filter(
+                                      'category',
+                                      'Types',
+                                      filterOptions.categories,
+                                  )
+                                : null}
                             {filter(
                                 'status',
                                 'Statuses',
@@ -449,15 +469,22 @@ function DeviceInventory({
                     }
                     rail={
                         <PageHeaderRail
-                            items={savedViews.map((view) => ({
-                                ...view,
-                                icon:
-                                    view.key === 'offline'
-                                        ? MonitorOff
-                                        : view.key === 'needs_attention'
-                                          ? AlertTriangle
-                                          : Activity,
-                            }))}
+                            items={savedViews
+                                .filter(
+                                    (view) =>
+                                        view.count > 0 ||
+                                        view.key === 'all' ||
+                                        view.key === currentView,
+                                )
+                                .map((view) => ({
+                                    ...view,
+                                    icon:
+                                        view.key === 'offline'
+                                            ? MonitorOff
+                                            : view.key === 'needs_attention'
+                                              ? AlertTriangle
+                                              : Activity,
+                                }))}
                             value={currentView}
                             onSelect={(view) => applyFilters({ view })}
                             ariaLabel="Saved device views"

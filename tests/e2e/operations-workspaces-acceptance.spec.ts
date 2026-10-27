@@ -112,13 +112,13 @@ test.describe('Monitoring, maintenance, and collector operations', () => {
 
         await selectMonitoringTab(page, 'Coverage', 'coverage');
         await expect(page.getByText('Known coverage limits')).toBeVisible();
-        await expect(page.getByText('Evidence backed').first()).toBeVisible();
+        await expect(
+            page.getByText('Based on active checks').first(),
+        ).toBeVisible();
         await expectNoPageOverflow(page);
 
         await selectMonitoringTab(page, 'Dependencies', 'dependencies');
-        await expect(
-            page.getByText('Canonical dependency model active'),
-        ).toBeVisible();
+        await expect(page.getByText('Dependency model active')).toBeVisible();
         await expectNoPageOverflow(page);
 
         await selectMonitoringTab(page, 'Trends', 'trends');
