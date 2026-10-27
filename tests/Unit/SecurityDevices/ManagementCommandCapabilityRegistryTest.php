@@ -13,7 +13,7 @@ uses(TestCase::class);
 it('defines the complete provider-neutral management catalogue with safe policy defaults', function () {
     $capabilities = app(CommandCapabilityRegistry::class)->all();
 
-    expect($capabilities)->toHaveCount(39)
+    expect($capabilities)->toHaveCount(41)
         ->and($capabilities->keys()->all())->toContain(
             'diagnostics.ping',
             'endpoint.script.run',
@@ -25,6 +25,8 @@ it('defines the complete provider-neutral management catalogue with safe policy 
             'device.wipe',
             'configuration.apply',
             'firmware.update',
+            'network.port.bounce',
+            'network.config.backup',
             'network.firewall_policy.apply',
             'access.door.unlock_timed',
             'access.door.lockdown',
@@ -73,7 +75,8 @@ it('defines the complete provider-neutral management catalogue with safe policy 
 
     expect($capabilities->get('diagnostics.ping')->requiresFreshObservation)->toBeFalse()
         ->and($capabilities->get('diagnostics.trace_route')->requiresFreshObservation)->toBeFalse()
-        ->and($capabilities->get('tracking.location_refresh')->requiresFreshObservation)->toBeFalse();
+        ->and($capabilities->get('tracking.location_refresh')->requiresFreshObservation)->toBeFalse()
+        ->and($capabilities->get('network.config.backup')->requiresFreshObservation)->toBeFalse();
 });
 
 it('declares workspace Device-class source-permission and sensitivity boundaries', function () {

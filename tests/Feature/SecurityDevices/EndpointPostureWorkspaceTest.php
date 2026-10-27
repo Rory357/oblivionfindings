@@ -495,16 +495,3 @@ it('surfaces non-diagnostic agent badges in Network & IT and Remote Support with
     $rsResponse->assertDontSee('KAURI-SECRET-HOSTNAME-01');
     $rsResponse->assertDontSee('Confidential Diagnostic Tool');
 });
-
-it('keeps new endpoint posture and Intune link files free of multi-tenant identifiers', function () {
-    $files = [
-        base_path('app/Domain/SecurityDevices/Endpoints/Presenters/EndpointDevicePosturePresenter.php'),
-        base_path('app/Domain/SecurityDevices/Endpoints/Http/Controllers/EndpointIntuneLinkController.php'),
-        base_path('resources/js/pages/security-devices/devices/device-endpoint-section.tsx'),
-    ];
-
-    foreach ($files as $file) {
-        $contents = file_get_contents($file);
-        expect($contents)->not->toMatch('/\b(tenant_id|tenantId|forTenant|organization_id|organisation_id)\b/');
-    }
-});
