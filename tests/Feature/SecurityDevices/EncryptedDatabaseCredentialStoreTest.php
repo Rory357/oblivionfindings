@@ -36,7 +36,9 @@ beforeEach(function (): void {
 });
 
 it('uses the encrypted database credential store by default while keeping Vault optional', function (): void {
-    expect(config('monitoring.credentials.driver'))->toBe('database');
+    expect(config('monitoring.credentials.driver'))->toBe('database')
+        ->and((string) file_get_contents(base_path('.env.example')))
+        ->toContain('MONITORING_CREDENTIAL_DRIVER=database');
 
     app()->forgetInstance(SecretManagerSecretStore::class);
     app()->forgetInstance(SecretManagerLeaseIssuer::class);
