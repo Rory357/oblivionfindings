@@ -212,3 +212,19 @@
   ![Local Discovery Candidates](screenshots/phase-1-local-discovery-candidates.png)
 - **Queclink unit console (masked IMEI, redacted command password, protocol citation, safe vs confirmation-gated commands):**
   ![Local Queclink Console](screenshots/phase-1-local-queclink-console.png)
+
+#### Live `oblivionfindings.com` walkthrough (`effbd5f8f` — 28 Oct 2026 NZDT)
+- **Pre-deploy MySQL backup verified on `oblivionfindings.com`:**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase1-20261027T185427Z.sql.gz` (`45 MB`, `0600`, `gzip -t` OK)
+- **Live deployment & migration verified:**
+  - `deploy done current=effbd5f8f813e9f0d5cf46475d044c77d145d7a4`, `2026_10_28_000001_seed_default_availability_profile .............. [227] Ran`, `git -C /var/www/oblivionfindings status --porcelain` empty.
+- **Register device (searchable Site combobox + IP address or hostname on live `.com`):**
+  ![Live Register Device](screenshots/phase-1-live-register-device.png)
+- **Edit device (`UX7` prefilling `Network & IT`, `Site: Kauri House`, `IP address or hostname: 172.16.0.1`):**
+  ![Live Edit Device](screenshots/phase-1-live-edit-device.png)
+- **`Ping now` (`1 ms` live reply on `UX7`) + one-switch `"Alert me if this goes offline"` + always-visible `Add check` with plain-English prerequisite note:**
+  ![Live Device Ping & Checks](screenshots/phase-1-live-device-ping-and-checks.png)
+- **Discovery & collectors › Candidates (`No candidates in this Site view`, `0` console/page errors):**
+  ![Live Discovery Candidates](screenshots/phase-1-live-discovery-candidates.png)
+- **Queclink unit console on live `Care tracker 867963069916998` (`Amelia Wilson` resident location consent enforced, masked IMEI `8679•••••••6998`, historical `AT+GTRTO=[REDACTED]` / `AT+GTCFG=[REDACTED]` passwords scrubbed):**
+  ![Live Queclink Console](screenshots/phase-1-live-queclink-console.png)
