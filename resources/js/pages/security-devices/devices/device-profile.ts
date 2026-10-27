@@ -1,4 +1,5 @@
 import type { CctvNavigation } from '@/components/security-devices/cctv-navigation-actions';
+import type { NativeMonitorManagement } from '@/components/security-devices/native-monitor-dialogs';
 import type { ControlRoomAlertAccess } from '@/components/security-devices/permission-destinations';
 import type { RestartRequest } from '@/pages/it/remote-support/restart-request-state';
 import type { SoftwareRequest } from '@/pages/it/remote-support/software-request-state';
@@ -10,6 +11,7 @@ export type DeviceProfileSectionKey =
     | 'interfaces-sensors'
     | 'configuration'
     | 'endpoint'
+    | 'console'
     | 'management'
     | 'assignments'
     | 'tickets'
@@ -550,6 +552,10 @@ export type DeviceProfile = {
         };
     };
     endpointPosture?: DeviceEndpointPosture | null;
+    ping?: DevicePingSummary;
+    offlineAlert?: DeviceOfflineAlertSummary;
+    monitorManagement?: NativeMonitorManagement;
+    queclinkConsole?: QueclinkUnitConsoleData | null;
     capabilities: {
         registry: Capability;
         assignment: Capability;
@@ -557,5 +563,115 @@ export type DeviceProfile = {
         maintenance: Capability;
         documents: Capability;
         control: Capability;
+    };
+};
+
+export type DevicePingSummary = {
+    url: string;
+    target: string | null;
+    canPing: boolean;
+    missingReason: string | null;
+};
+
+export type DeviceOfflineAlertSummary = {
+    url: string;
+    enabled: boolean;
+    canToggle: boolean;
+    monitorId: number | null;
+    state: string | null;
+    target: string | null;
+    missingReason: string | null;
+};
+
+export type QueclinkConsoleCommandSpec = {
+    key: string;
+    label: string;
+    description: string;
+    at_preview: string;
+    spec_ref: string;
+    risky: boolean;
+    enabled: boolean;
+};
+
+export type QueclinkUnitConsoleData = {
+    fetch_url: string;
+    command_url: string;
+    protocol_spec: string;
+    family: string;
+    unit: {
+        id: number;
+        imei_masked: string;
+        status: string;
+        connection_state: string;
+        model_hint: string | null;
+        protocol_version: string | null;
+        firmware_version: string | null;
+        first_seen_at: string | null;
+        last_seen_at: string | null;
+        last_frame_at: string | null;
+    } | null;
+    last_position: {
+        state: string;
+        message: string;
+        latitude: number | null;
+        longitude: number | null;
+        accuracy_m: number | null;
+        speed_kph: number | null;
+        heading_deg: number | null;
+        altitude_m: number | null;
+        battery_pct: number | null;
+        occurred_at: string | null;
+        address: string | null;
+        map_url: string | null;
+    };
+    settings: {
+        available: boolean;
+        received_at: string | null;
+        sections: string[];
+        summary: {
+            server: Record<string, unknown> | null;
+            global: Record<string, unknown> | null;
+            watchdog: Record<string, unknown> | null;
+            non_movement: Record<string, unknown> | null;
+            firmware: {
+                model: string | null;
+                firmware_version: string | null;
+                protocol_version: string | null;
+                configuration_version?: string | null;
+            };
+        };
+    };
+    raw_messages: Array<{
+        id: number;
+        direction: string;
+        frame_type: string | null;
+        command_word: string | null;
+        parse_ok: boolean;
+        parse_error: string | null;
+        raw_frame: string;
+        created_at: string | null;
+    }>;
+    recent_commands: Array<{
+        id: number;
+        command_word: string;
+        serial_number: string;
+        status: string;
+        raw_command: string;
+        ack_response: string | null;
+        failed_reason: string | null;
+        created_by: string | null;
+        created_at: string | null;
+        sent_at: string | null;
+        acked_at: string | null;
+        fulfilled_at: string | null;
+        expires_at: string | null;
+    }>;
+    commands: {
+        tracker_ready: boolean;
+        unavailable_reason: string | null;
+        can_send_safe: boolean;
+        can_send_risky: boolean;
+        supported: QueclinkConsoleCommandSpec[];
+        sections: string[];
     };
 };

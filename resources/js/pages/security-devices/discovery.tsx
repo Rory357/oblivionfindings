@@ -31,6 +31,13 @@ import {
     type CollectorManagementSite,
 } from '@/components/security-devices/collector-lifecycle-dialogs';
 import {
+    CandidateAdoptAllDialog,
+    CandidateAdoptDialog,
+    CandidateSameAsDialog,
+    type CandidateActionTarget,
+    type CandidateManagement,
+} from '@/components/security-devices/discovery-candidate-dialogs';
+import {
     DiscoveryScopeActionDialog,
     type DiscoveryScopeManagement,
     type GovernedDiscoveryScope,
@@ -66,7 +73,9 @@ import {
     Cable,
     CircleHelp,
     Eye,
+    EyeOff,
     LayoutGrid,
+    Link2,
     List,
     Network,
     Pencil,
@@ -167,11 +176,23 @@ export type DiscoveryCandidateRow = {
     candidate_uuid: string;
     run_id: number;
     scope_id: number | null;
+    scope_name?: string | null;
+    site_id?: number | null;
+    site_name?: string | null;
     decision: string;
     confidence: number;
+    hostname?: string | null;
+    ip_address?: string | null;
+    mac_address?: string | null;
+    provider?: string | null;
     reasons: string[];
     canonical_device: { id: number; name: string; href: string } | null;
     review: { action: string | null; reviewed_at: string | null };
+    actions?: {
+        adopt_url: string | null;
+        same_as_url: string | null;
+        ignore_url: string | null;
+    };
 };
 
 export type DiscoveryWorkspace = {
@@ -208,6 +229,7 @@ export type DiscoveryWorkspace = {
         sites: CollectorManagementSite[];
     };
     scope_management?: DiscoveryScopeManagement;
+    candidate_management?: CandidateManagement;
     scopes: DiscoveryScopeRow[];
     runs: DiscoveryRunRow[];
     candidates: DiscoveryCandidateRow[];
@@ -558,12 +580,28 @@ function DiscoveryBody({
         id: number;
         action: 'apply' | 'deactivate';
     } | null>(null);
+    const [adoptTarget, setAdoptTarget] =
+        useState<CandidateActionTarget | null>(null);
+    const [sameAsTarget, setSameAsTarget] =
+        useState<CandidateActionTarget | null>(null);
+    const [adoptAllOpen, setAdoptAllOpen] = useState(false);
     const scopeManagement = w.scope_management ?? {
         can_manage: false,
         create_url: null,
         protocols: [],
         sites: [],
     };
+    const candidateManagement: CandidateManagement =
+        w.candidate_management ?? {
+            can_adopt: false,
+            can_same_as: false,
+            can_ignore: false,
+            adopt_all_url: null,
+            adoptable_count: 0,
+            taxonomy: {},
+            domains: [],
+            devices_by_site: {},
+        };
     const mayManageScopes = canManage && scopeManagement.can_manage;
     const mayManageCollectors = canManage && w.collector_management.can_manage;
     const currentScope = (id: number) => w.scopes.find((row) => row.id === id);
@@ -801,6 +839,47 @@ function DiscoveryBody({
                 ? 'Some addresses are still waiting for the collector to report back, so this run is not finished yet.'
                 : 'This is what the run found at the time. It does not show whether devices can be reached now.',
     }));
+    const candidateTarget = (
+        candidate: DiscoveryCandidateRow,
+    ): CandidateActionTarget => ({
+        id: candidate.id,
+        hostname: candidate.hostname,
+        ip_address: candidate.ip_address,
+        mac_address: candidate.mac_address,
+        site_id: candidate.site_id,
+        site_name: candidate.site_name,
+        adopt_url: candidate.actions?.adopt_url ?? null,
+        same_as_url: candidate.actions?.same_as_url ?? null,
+    });
+    const candidateActions = (candidate: DiscoveryCandidateRow): MenuItem[] => {
+        if (!canManage || !candidate.actions) return [];
+        const items: MenuItem[] = [];
+        if (candidateManagement.can_adopt && candidate.actions.adopt_url) {
+            items.push({
+                label: 'Add as device',
+                icon: Plus,
+                onClick: () => setAdoptTarget(candidateTarget(candidate)),
+            });
+        }
+        if (candidateManagement.can_same_as && candidate.actions.same_as_url) {
+            items.push({
+                label: 'Same as…',
+                icon: Link2,
+                onClick: () => setSameAsTarget(candidateTarget(candidate)),
+            });
+        }
+        if (candidateManagement.can_ignore && candidate.actions.ignore_url) {
+            const ignoreUrl = candidate.actions.ignore_url;
+            items.push({
+                label: 'Ignore',
+                icon: EyeOff,
+                onClick: () => {
+                    void axios.post(ignoreUrl).then(() => refresh());
+                },
+            });
+        }
+        return items;
+    };
     const candidates: DiscoveryEntry[] = w.candidates.map((candidate) => ({
         key: 'candidate:' + candidate.id,
         name:
@@ -808,19 +887,31 @@ function DiscoveryBody({
                 ? candidate.canonical_device.name
                 : candidate.canonical_device
                   ? 'Matched device hidden'
-                  : 'Possible new device #' + candidate.id,
-        subline: 'Run #' + candidate.run_id,
+                  : (candidate.hostname ??
+                    candidate.ip_address ??
+                    'Possible new device #' + candidate.id),
+        subline:
+            candidate.ip_address && candidate.hostname
+                ? candidate.ip_address + ' · Run #' + candidate.run_id
+                : 'Run #' + candidate.run_id,
         state: candidate.decision,
         icon: SearchCheck,
         site: candidate.scope_id
-            ? (currentScope(candidate.scope_id)?.site ?? null)
+            ? (currentScope(candidate.scope_id)?.site ??
+              (candidate.site_id && candidate.site_name
+                  ? {
+                        id: candidate.site_id,
+                        name: candidate.site_name,
+                        href: '/security-devices/sites/' + candidate.site_id,
+                    }
+                  : null))
             : null,
         summary:
             candidate.confidence +
             '% decision confidence · ' +
             candidate.reasons.length +
             ' reasons',
-        actions: [],
+        actions: candidateActions(candidate),
         deviceHref:
             canViewDevices &&
             candidate.canonical_device !== null &&
@@ -829,6 +920,15 @@ function DiscoveryBody({
                 ? candidate.canonical_device.href
                 : undefined,
         facts: [
+            ...(candidate.hostname
+                ? [{ label: 'Hostname', value: candidate.hostname }]
+                : []),
+            ...(candidate.ip_address
+                ? [{ label: 'IP address', value: candidate.ip_address }]
+                : []),
+            ...(candidate.mac_address
+                ? [{ label: 'MAC address', value: candidate.mac_address }]
+                : []),
             { label: 'Decision', value: plain(candidate.decision) },
             { label: 'Decision confidence', value: candidate.confidence + '%' },
             {
@@ -1360,6 +1460,22 @@ function DiscoveryBody({
                                     </Alert>
                                 )}
                             {activeTab === 'candidates' &&
+                                canManage &&
+                                candidateManagement.can_adopt &&
+                                candidateManagement.adopt_all_url &&
+                                candidateManagement.adoptable_count > 0 && (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            onClick={() =>
+                                                setAdoptAllOpen(true)
+                                            }
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add all
+                                        </Button>
+                                    </div>
+                                )}
+                            {activeTab === 'candidates' &&
                                 w.summary.candidates_truncated && (
                                     <Alert>
                                         <AlertTitle>
@@ -1455,6 +1571,33 @@ function DiscoveryBody({
                         if (!open) setScopeAction(null);
                     }}
                     onApplied={refresh}
+                />
+            )}
+            {canManage && candidateManagement.can_adopt && (
+                <>
+                    <CandidateAdoptDialog
+                        candidate={adoptTarget}
+                        management={candidateManagement}
+                        onClose={() => setAdoptTarget(null)}
+                        onCompleted={refresh}
+                    />
+                    <CandidateAdoptAllDialog
+                        open={adoptAllOpen}
+                        adoptAllUrl={candidateManagement.adopt_all_url}
+                        count={candidateManagement.adoptable_count}
+                        siteId={site === 'all' ? null : Number(site)}
+                        siteName={siteName}
+                        onClose={() => setAdoptAllOpen(false)}
+                        onCompleted={refresh}
+                    />
+                </>
+            )}
+            {canManage && candidateManagement.can_same_as && (
+                <CandidateSameAsDialog
+                    candidate={sameAsTarget}
+                    management={candidateManagement}
+                    onClose={() => setSameAsTarget(null)}
+                    onCompleted={refresh}
                 />
             )}
         </AppLayout>

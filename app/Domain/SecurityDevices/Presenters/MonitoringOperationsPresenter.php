@@ -138,6 +138,50 @@ class MonitoringOperationsPresenter
             $runtime['queues'],
         );
 
+        $monitorProfiles = $canManageNativeMonitors
+            ? MonitoringProfile::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (MonitoringProfile $profile): array => [
+                    'id' => (int) $profile->id,
+                    'name' => $profile->name,
+                ])
+                ->values()
+                ->all()
+            : [];
+        $monitorDevices = $canManageNativeMonitors
+            ? $visibleDevices
+                ->filter(fn (Device $device): bool => $sitesByDevice->get($device->id) instanceof Site)
+                ->map(function (Device $device) use ($sitesByDevice): array {
+                    $site = $sitesByDevice->get($device->id);
+
+                    return [
+                        'id' => (int) $device->id,
+                        'name' => $device->name,
+                        'site' => ['id' => (int) $site->id, 'name' => $site->name],
+                    ];
+                })
+                ->values()
+                ->all()
+            : [];
+        $missingCheckReason = null;
+        $missingCheckFixHref = null;
+        $missingCheckFixLabel = null;
+        if (! $canManageNativeMonitors) {
+            $missingCheckReason = 'You need monitoring management permission to add checks.';
+        } elseif ($monitorDevices === []) {
+            $missingCheckReason = $visibleDevices->isEmpty()
+                ? 'Register a device and assign it to a Site first.'
+                : 'Assign a device to an active Site first so checks know where it lives.';
+            $missingCheckFixHref = '/security-devices/devices';
+            $missingCheckFixLabel = 'Open Devices';
+        } elseif ($monitorProfiles === []) {
+            $missingCheckReason = 'Create an active check schedule on Setup first.';
+            $missingCheckFixHref = '/security-devices/settings';
+            $missingCheckFixLabel = 'Open Setup';
+        }
+
         return [
             'actor_id' => (int) $viewer->id,
             'tabs' => [
@@ -152,7 +196,7 @@ class MonitoringOperationsPresenter
             'boundary' => [
                 'title' => 'Built-in monitoring',
                 'description' => 'The main application monitors SD-WAN reachable sites directly. Hardened collectors extend coverage only where a remote path requires local collection.',
-                'privacy_note' => 'Probe targets, credentials, configuration, raw messages, and metric dimensions are never projected into this workspace. Only bounded retained summaries and aggregate capacity projections are shown.',
+                'privacy_note' => 'Saved passwords, private targets, and raw device messages stay hidden on this overview. Only check results and health summaries are shown.',
                 'control_room_note' => 'This workspace explains technical evidence and coverage. Control Room remains the operational triage and escalation destination.',
             ],
             'can' => [
@@ -191,33 +235,11 @@ class MonitoringOperationsPresenter
                 'kinds' => $canManageNativeMonitors
                     ? NativeMonitoringDefinitionService::directKindOptions()
                     : [],
-                'profiles' => $canManageNativeMonitors
-                    ? MonitoringProfile::query()
-                        ->where('is_active', true)
-                        ->orderBy('name')
-                        ->get(['id', 'name'])
-                        ->map(fn (MonitoringProfile $profile): array => [
-                            'id' => (int) $profile->id,
-                            'name' => $profile->name,
-                        ])
-                        ->values()
-                        ->all()
-                    : [],
-                'devices' => $canManageNativeMonitors
-                    ? $visibleDevices
-                        ->filter(fn (Device $device): bool => $sitesByDevice->get($device->id) instanceof Site)
-                        ->map(function (Device $device) use ($sitesByDevice): array {
-                            $site = $sitesByDevice->get($device->id);
-
-                            return [
-                                'id' => (int) $device->id,
-                                'name' => $device->name,
-                                'site' => ['id' => (int) $site->id, 'name' => $site->name],
-                            ];
-                        })
-                        ->values()
-                        ->all()
-                    : [],
+                'profiles' => $monitorProfiles,
+                'devices' => $monitorDevices,
+                'missing_reason' => $missingCheckReason,
+                'fix_href' => $missingCheckFixHref,
+                'fix_label' => $missingCheckFixLabel,
             ],
             'inventory' => [
                 'total' => $filtered->count(),
@@ -233,7 +255,7 @@ class MonitoringOperationsPresenter
                 'stale' => (int) ($freshness['stale'] ?? 0),
                 'never_observed' => (int) ($freshness['never'] ?? 0),
                 'unsupported_state' => 'evidence_backed',
-                'unsupported_note' => 'Coverage is classified from enabled monitors and governed expectations. Missing checks remain visible instead of being inferred from vendor or model names.',
+                'unsupported_note' => 'Coverage is based on active checks. Devices without checks stay listed as unmonitored instead of guessing support from brand or model names.',
                 'by_kind' => $mapped->groupBy('kind')->map->count()->sortKeys(),
                 'by_site' => $this->coverageBySite($visibleDevices, $mapped, $sitesByDevice),
             ],

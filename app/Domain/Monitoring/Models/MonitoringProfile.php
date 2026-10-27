@@ -15,6 +15,8 @@ class MonitoringProfile extends Model
 {
     use HasFactory, WritesLegacyStorageContext;
 
+    public const DEFAULT_AVAILABILITY_NAME = 'Standard availability';
+
     protected static function newFactory(): MonitoringProfileFactory
     {
         return MonitoringProfileFactory::new();

@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
+use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
@@ -11,9 +12,11 @@ use App\Domain\SecurityDevices\Enums\RelationshipType;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
+use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceDocument;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Presenters\DeviceProfilePresenter;
+use App\Domain\SecurityDevices\Services\DeviceAssignmentService;
 use App\Domain\SecurityDevices\Services\DeviceFieldOwnershipService;
 use App\Domain\SecurityDevices\Services\DeviceLinkService;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
@@ -24,11 +27,14 @@ use App\Models\Site;
 use App\Models\SiteRoom;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class DeviceController extends Controller
@@ -37,6 +43,7 @@ class DeviceController extends Controller
 
     public function __construct(
         private readonly DeviceRegistryService $registry,
+        private readonly DeviceAssignmentService $assignments,
         private readonly DeviceLinkService $linkService,
         private readonly DeviceFieldOwnershipService $fieldOwnership,
         private readonly DeviceRelationshipLifecycleService $relationshipLifecycle,
@@ -735,7 +742,7 @@ class DeviceController extends Controller
         }
 
         if ($request->expectsJson()) {
-            return response()->json($this->deviceFormOptions());
+            return response()->json($this->deviceFormOptions($user));
         }
 
         return redirect()->route('security-devices.devices.index', array_filter([
@@ -761,13 +768,18 @@ class DeviceController extends Controller
             'imei' => ['nullable', 'string', 'max:20'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
             'firmware_version' => ['nullable', 'string', 'max:100'],
-            'ip_address' => ['nullable', 'string', 'max:45'],
+            'ip_address' => $this->ipOrHostnameRules(),
             'status' => ['nullable', 'string'],
             'provider' => ['nullable', 'string', 'max:100'],
             'location_description' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'site_id' => ['nullable', 'integer', 'min:1'],
         ]);
+
+        if (array_key_exists('ip_address', $validated)) {
+            $trimmedIp = trim((string) ($validated['ip_address'] ?? ''));
+            $validated['ip_address'] = $trimmedIp === '' ? null : $trimmedIp;
+        }
 
         $siteId = isset($validated['site_id']) ? (int) $validated['site_id'] : null;
         unset($validated['site_id']);
@@ -790,8 +802,8 @@ class DeviceController extends Controller
         $this->access->assertCanViewDevice($user, $device);
 
         $payload = [
-            'device' => $this->mapDeviceForDetail($device),
-            ...$this->deviceFormOptions(),
+            'device' => $this->mapDeviceForDetail($device, $user),
+            ...$this->deviceFormOptions($user),
         ];
 
         if ($request->expectsJson()) {
@@ -853,12 +865,13 @@ class DeviceController extends Controller
             'imei' => ['nullable', 'string', 'max:20'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
             'firmware_version' => ['nullable', 'string', 'max:100'],
-            'ip_address' => ['nullable', 'string', 'max:45'],
+            'ip_address' => $this->ipOrHostnameRules(),
             'status' => ['nullable', Rule::enum(DeviceStatus::class)],
             'health_status' => ['nullable', Rule::enum(HealthStatus::class)],
             'provider' => ['nullable', 'string', 'max:100'],
             'location_description' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'site_id' => ['nullable', 'integer', 'min:1'],
             'override_reason' => ['nullable', 'string', 'min:10', 'max:1000'],
             'override_expires_at' => [
                 'nullable',
@@ -868,19 +881,91 @@ class DeviceController extends Controller
             ],
         ]);
 
+        if (array_key_exists('ip_address', $validated)) {
+            $trimmedIp = trim((string) ($validated['ip_address'] ?? ''));
+            $validated['ip_address'] = $trimmedIp === '' ? null : $trimmedIp;
+        }
+
+        $siteFieldPresent = $request->exists('site_id');
+        $requestedSiteId = $siteFieldPresent && filled($validated['site_id'] ?? null)
+            ? (int) $validated['site_id']
+            : null;
+        unset($validated['site_id']);
+
         $overrideReason = $validated['override_reason'] ?? null;
         $overrideExpiresAt = filled($validated['override_expires_at'] ?? null)
             ? CarbonImmutable::parse((string) $validated['override_expires_at'])
             : null;
         unset($validated['override_reason'], $validated['override_expires_at']);
 
-        $device = $this->fieldOwnership->updateFromLocal(
+        $device = DB::transaction(function () use (
             $device,
             $validated,
             $user,
             $overrideReason,
             $overrideExpiresAt,
-        );
+            $siteFieldPresent,
+            $requestedSiteId,
+        ): Device {
+            $updated = $this->fieldOwnership->updateFromLocal(
+                $device,
+                $validated,
+                $user,
+                $overrideReason,
+                $overrideExpiresAt,
+            );
+
+            if ($siteFieldPresent) {
+                $currentAssignment = $updated->assignments()
+                    ->active()
+                    ->lockForUpdate()
+                    ->latest('assigned_at')
+                    ->first();
+                $currentSiteId = $currentAssignment && $currentAssignment->assignable_type === DeviceAssignment::TARGET_SITE
+                    ? (int) $currentAssignment->assignable_id
+                    : null;
+
+                if ($requestedSiteId !== $currentSiteId) {
+                    if ($currentAssignment !== null && $currentAssignment->assignable_type !== DeviceAssignment::TARGET_SITE) {
+                        throw ValidationException::withMessages([
+                            'site_id' => 'This device is currently assigned to a '.$currentAssignment->assignable_type.'. Use Assignments to transfer or release it so consent and custody rules stay intact.',
+                        ]);
+                    }
+
+                    abort_unless($user->canDo('securityDevices.devices.assign'), 403);
+
+                    if ($requestedSiteId !== null) {
+                        $this->access->assertCanViewSite($user, $requestedSiteId);
+                        $site = Site::query()
+                            ->whereKey($requestedSiteId)
+                            ->where('is_active', true)
+                            ->where('archived', false)
+                            ->whereNull('archived_at')
+                            ->first();
+                        if (! $site) {
+                            throw ValidationException::withMessages([
+                                'site_id' => 'Choose an active Site you can access.',
+                            ]);
+                        }
+
+                        $this->assignments->assign(
+                            device: $updated,
+                            assignableType: DeviceAssignment::TARGET_SITE,
+                            assignableId: (int) $site->id,
+                            assignedByUserId: (int) $user->id,
+                            assignmentType: AssignmentType::Permanent,
+                        );
+                    } elseif ($currentSiteId !== null) {
+                        $this->assignments->release(
+                            device: $updated,
+                            releasedByUserId: (int) $user->id,
+                        );
+                    }
+                }
+            }
+
+            return $updated;
+        }, 3);
 
         if ($request->boolean('_modal')) {
             return redirect()->back()
@@ -950,8 +1035,44 @@ class DeviceController extends Controller
         return $options;
     }
 
-    private function deviceFormOptions(): array
+    /**
+     * @return list<string|Closure>
+     */
+    private function ipOrHostnameRules(): array
     {
+        return [
+            'nullable',
+            'string',
+            'max:253',
+            function (string $attribute, mixed $value, Closure $fail): void {
+                if (! is_string($value)) {
+                    return;
+                }
+                $trimmed = trim($value);
+                if ($trimmed === '') {
+                    return;
+                }
+                if (filter_var($trimmed, FILTER_VALIDATE_IP) !== false) {
+                    return;
+                }
+                if (
+                    strlen($trimmed) <= 253
+                    && preg_match('/[a-z]/i', $trimmed) === 1
+                    && preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*$/i', $trimmed) === 1
+                ) {
+                    return;
+                }
+
+                $fail('Enter a valid IPv4 address, IPv6 address, or hostname.');
+            },
+        ];
+    }
+
+    private function deviceFormOptions(?User $user = null): array
+    {
+        $canAssign = $user !== null && $user->canDo('securityDevices.devices.assign');
+        $siteIds = $canAssign ? $this->access->accessibleSiteIds($user) : [];
+
         return [
             'taxonomy' => DeviceTaxonomy::all(),
             'domains' => collect(DeviceDomain::cases())->map(fn ($domain) => [
@@ -962,11 +1083,35 @@ class DeviceController extends Controller
                 'value' => $status->value,
                 'label' => $status->label(),
             ]),
+            'sites' => $siteIds === []
+                ? []
+                : Site::query()
+                    ->whereIn('id', $siteIds)
+                    ->where('is_active', true)
+                    ->where('archived', false)
+                    ->whereNull('archived_at')
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn (Site $site): array => [
+                        'id' => (int) $site->id,
+                        'name' => $site->name,
+                    ])
+                    ->values()
+                    ->all(),
+            'can_assign' => $canAssign,
         ];
     }
 
-    private function mapDeviceForDetail(Device $d): array
+    private function mapDeviceForDetail(Device $d, ?User $user = null): array
     {
+        $activeAssignment = $d->assignments()
+            ->active()
+            ->latest('assigned_at')
+            ->first();
+        if ($activeAssignment !== null && $user !== null && ! $this->access->canAccessCurrentAssignment($user, $activeAssignment)) {
+            $activeAssignment = null;
+        }
+
         return [
             'id' => $d->id,
             'device_uid' => $d->device_uid,
@@ -996,6 +1141,14 @@ class DeviceController extends Controller
             'provider' => $d->provider,
             'location_description' => $d->location_description,
             'notes' => $d->notes,
+            'site_id' => $activeAssignment && $activeAssignment->assignable_type === DeviceAssignment::TARGET_SITE
+                ? (int) $activeAssignment->assignable_id
+                : null,
+            'active_assignment' => $activeAssignment ? [
+                'assignable_type' => $activeAssignment->assignable_type,
+                'assignable_id' => (int) $activeAssignment->assignable_id,
+                'label' => $this->resolveAssignableName($activeAssignment),
+            ] : null,
             'field_ownership' => $this->fieldOwnership->snapshot($d),
             'created_at' => $d->created_at?->toISOString(),
             'created_by' => $d->createdBy ? ['id' => $d->createdBy->id, 'name' => $d->createdBy->name] : null,

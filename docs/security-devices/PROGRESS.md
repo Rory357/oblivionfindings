@@ -147,3 +147,68 @@
   ![Live Alerts & Upkeep](screenshots/phase-0-live-alerts-upkeep.png)
 - **Settings › Server readiness (live `oblivionfindings.com` checks):**
   ![Live Server Readiness](screenshots/phase-0-live-server-readiness.png)
+
+---
+
+## Phase 1 — The basics
+
+### Summary of changes
+
+1. **Edit device (`1.1`) & Register device (`1.2`)**
+   - Updated `AddDeviceDialog` / `EditDeviceDialog` (`resources/js/components/security-devices/add-device-dialog.tsx`) and `DeviceController` (`app/Domain/SecurityDevices/Http/Controllers/DeviceController.php`) so both registration and editing expose a searchable Site combobox (`Popover` + `Command`) and **IP address or hostname** on Step 1 (**Classification**), alongside name, workspace/category/type, manufacturer/model, and notes.
+   - `DeviceController::store` and `DeviceController::update` accept IPv4, IPv6, or RFC-1123 hostnames (`ipOrHostnameRules()`) and atomically assign, transfer, or release Site assignments (`DeviceAssignmentService`) while guarding non-Site person/room/vehicle assignments.
+
+2. **`Ping now` on device profiles (`1.3`)**
+   - Added `POST /security-devices/devices/{device}/ping` (`DevicePingController`) backed by `DnsResolver`, `EgressPolicy` (`deny_cidrs` SSRF protection preserved), and `IcmpTransport` (`NativeIcmpTransport`).
+   - Added the **Connection test** card on `Status › Health` (`resources/js/pages/security-devices/devices/device-profile-sections.tsx`) showing live reply time (`< 1 ms`, `X ms`) or a plain-English failure reason (`missing_address`, `dns_failed`, `address_blocked`, `unreachable`, `timeout`, `permission_denied`).
+
+3. **One-switch `"Alert me if this goes offline"` & seeded default profile (`1.4`)**
+   - Added migration `2026_10_28_000001_seed_default_availability_profile.php` (`MonitoringProfile::DEFAULT_AVAILABILITY_NAME = 'Standard availability'`: 60s interval, 3 failure confirmations, 2 recovery confirmations, 300s stale threshold).
+   - Added `POST /security-devices/devices/{device}/offline-alert` (`DeviceOfflineAlertController`) and the one-switch **Alert me if this goes offline** card on device profiles, auto-provisioning or toggling the Site's `'Registered device hosts'` scope (`/32` or `/128` host CIDR), `'Standard availability'` profile, and ICMP availability check.
+
+4. **Always-visible `"Add check"` with plain-English missing-prerequisite guidance (`1.5`)**
+   - Updated `DeviceProfilePresenter`, `MonitoringOperationsPresenter`, `device-profile-sections.tsx`, `monitoring.tsx`, and `native-monitor-dialogs.tsx` so **Add check** is always visible on device profiles and **Alerts & upkeep**, disabling cleanly with a plain-English explanation and shortcut button when a Site assignment, monitoring profile, or eligible device is missing.
+
+5. **Discovery candidate review actions (`1.6`)**
+   - Wired `DiscoveryCandidateService` (`adopt`, `sameAs`, `ignore`, `adoptAll`) to `DiscoveryCandidateReviewController`, `DiscoveryOperationsPresenter`, `discovery-candidate-dialogs.tsx`, and `discovery.tsx` (`Setup › Discovery & hubs › Candidates`).
+   - Supports **Add as device**, **Same as…** (searchable Site device combobox that fills missing IP/MAC/hostname on the existing device), **Ignore**, and **Add all** (`ConfirmDialog`), normalising 12-hex MACs to `AA:BB:CC:11:22:33` without leaking raw `evidence_snapshot` payloads.
+
+6. **Queclink unit console (`1.7`)**
+   - Added `QueclinkUnitConsoleService`, `QueclinkUnitConsoleController`, `CommandBuilder::watchdogReboot` (`AT+GTDOG`), `queclink-unit-console.tsx`, and `docs/security-devices/SUPPORTED-DEVICES.md` citing the official *Queclink GL30MEU @Track Air Interface Protocol Specification* (`GL30MEUR01`, Rev. 2.04) and *GL320MG User Manual* (`GL320MGUM001`).
+   - Renders on **Technology › Unit console** for Queclink trackers and via direct console links on `/security-devices/integrations/queclink`.
+   - Masks IMEIs (`8679•••••••6998`), scrubs command passwords (`[REDACTED]`), enforces `PersonalTrackingPrivacyService` + `device_assignment_id` historical frame privacy so prior unconsented resident coordinates never leak after reassignment, and separates read-only queries (`Request current location`, `Read configuration`, `Request device status`) from confirmation-and-audit-reason gated changes (`Update reporting interval`, `Update scheduled watchdog`, `Reboot tracker`).
+
+---
+
+### Verification & local walkthrough
+
+- **Laravel Pint:** 0 issues across all touched/new PHP files.
+- **TypeScript (`tsc --noEmit`):** 0 errors across the repository.
+- **ESLint (`--max-warnings=0`):** 0 errors and 0 warnings across all 16 touched/new TS/TSX files (including `security-devices-copy/no-jargon`).
+- **Vitest (`--maxWorkers=2`):** 4 test files / 55 tests passed (`add-device-dialog.test.tsx`, `queclink-unit-console.test.tsx`, `monitoring.test.tsx`, `discovery.test.tsx`).
+- **Pest:**
+  - Architecture (`ItSecuritySingleTenantBoundaryTest`, `DeviceCommandOperationalBoundaryTest`, `MonitoringProbeEgressBoundaryTest`, `MonitoringSingleTenantBoundaryTest`): all passed (48+ tests, 657+ assertions).
+  - Feature (`Phase1DeviceBasicsTest`, `DiscoveryCandidateActionsTest`, `QueclinkUnitConsoleTest`, `SettingsAuditTest`, `OperationsWorkspacesTest`, `DiscoveryIdentityTest`, `DiscoveryRunTest`): 69 passed (944 assertions).
+- **Home network walkthrough (`172.16.0.0/24`):**
+  - Registered `Home Gateway UX7` assigned to `Home Network Lab (172.16.0.0/24)` with IP `172.16.0.1` (`1.2`), verified `Edit device` prefill (`1.1`).
+  - `Ping now` on `172.16.0.1` → `< 1 ms` (`Replied in < 1 ms.`) + toggled **Alert me if this goes offline** ON (`Offline alerts are on for 172.16.0.1.`) (`1.3`, `1.4`).
+  - `Ping now` on `172.16.0.253` (unassigned LAN host) → `No reply` (`The network reported that this address is unreachable from the server.`) (`1.3`).
+  - Unassigned `Spare Shelf Switch` (no Site, no IP) → **Add check** remains visible (`disabled`) with `Assign this device to a Site first so checks know where it lives.` and **Edit device** shortcut (`1.5`).
+  - Exercised `Ignore`, `Same as…`, and `Add all` on Discovery › Candidates (`1.6`).
+  - Exercised `Request current location` (`AT+GTRTO=[REDACTED],1,,,,,,6CC5$`) on `Care tracker 867963069916998` unit console with masked IMEI `8679•••••••6998` (`1.7`).
+
+#### Local walkthrough screenshots
+- **Register device (searchable Site combobox + IP address on Step 1):**
+  ![Local Register Device](screenshots/phase-1-local-register-device.png)
+- **Edit device (prefilled Site + IP/hostname):**
+  ![Local Edit Device](screenshots/phase-1-local-edit-device.png)
+- **`Ping now` (`< 1 ms` reply on `172.16.0.1`) + one-switch `"Alert me if this goes offline"` ON:**
+  ![Local Ping Reply & Offline Switch](screenshots/phase-1-local-ping-reply-and-offline-switch.png)
+- **`Ping now` plain-English unreachable reason (`172.16.0.253`):**
+  ![Local Ping Unreachable](screenshots/phase-1-local-ping-unreachable.png)
+- **Always-visible `"Add check"` with plain-English missing-Site reason:**
+  ![Local Add Check Missing Reason](screenshots/phase-1-local-add-check-missing-reason.png)
+- **Discovery › Candidates (`Add all` + per-candidate review actions):**
+  ![Local Discovery Candidates](screenshots/phase-1-local-discovery-candidates.png)
+- **Queclink unit console (masked IMEI, redacted command password, protocol citation, safe vs confirmation-gated commands):**
+  ![Local Queclink Console](screenshots/phase-1-local-queclink-console.png)

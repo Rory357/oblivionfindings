@@ -1,6 +1,19 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import {
     Select,
     SelectContent,
@@ -16,11 +29,13 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
     Check,
+    ChevronsUpDown,
     Cpu,
     LoaderCircle,
     MapPin,
@@ -44,10 +59,20 @@ type DeviceFieldOwnership = {
     >;
 };
 
+type SiteOption = { id: number; name: string };
+
+type ActiveDeviceAssignment = {
+    assignable_type: string;
+    assignable_id: number;
+    label: string | null;
+};
+
 type DeviceFormOptions = {
     taxonomy: DeviceTaxonomy;
     domains: FilterOption[];
     statuses: FilterOption[];
+    sites?: SiteOption[];
+    can_assign?: boolean;
     device?: Partial<EditableDevice>;
 };
 
@@ -69,6 +94,8 @@ type EditableDevice = {
     provider: string | null;
     location_description: string | null;
     notes: string | null;
+    site_id?: number | null;
+    active_assignment?: ActiveDeviceAssignment | null;
     field_ownership?: DeviceFieldOwnership;
 };
 
@@ -184,7 +211,7 @@ function formFromDevice(device: Partial<EditableDevice>): AddDeviceForm {
         notes: device.notes ?? '',
         override_reason: '',
         override_expires_at: '',
-        site_id: null,
+        site_id: device.site_id ?? null,
         _modal: true,
     };
 }
@@ -336,6 +363,7 @@ export function AddDeviceDialog({
         emptyForm(prefillDomain, prefillSiteId),
     );
     const [discardDraft, setDiscardDraft] = useState(false);
+    const [sitePickerOpen, setSitePickerOpen] = useState(false);
     const { data, setData, post, put, processing, errors, clearErrors, reset } =
         useForm<AddDeviceForm>(emptyForm(prefillDomain, prefillSiteId));
     const activeSteps = useMemo(() => dialogSteps(mode), [mode]);
@@ -453,6 +481,7 @@ export function AddDeviceDialog({
                             'category',
                             'subcategory',
                             'status',
+                            'site_id',
                         ].includes(key),
                     )
                 ) {
@@ -486,6 +515,32 @@ export function AddDeviceDialog({
     const basicsComplete = Boolean(
         data.name.trim() && data.domain && data.category,
     );
+    const siteOptions = useMemo(() => {
+        const list = options?.sites ?? [];
+        if (
+            prefillSiteId &&
+            prefillSiteName &&
+            !list.some((site) => site.id === prefillSiteId)
+        ) {
+            return [{ id: prefillSiteId, name: prefillSiteName }, ...list];
+        }
+        return list;
+    }, [options?.sites, prefillSiteId, prefillSiteName]);
+    const activeNonSiteAssignment = useMemo(() => {
+        const current = options?.device?.active_assignment;
+        if (!current || current.assignable_type === 'site') return null;
+        return current;
+    }, [options?.device?.active_assignment]);
+    const canAssignSite =
+        !activeNonSiteAssignment &&
+        (options?.can_assign ?? siteOptions.length > 0);
+    const selectedSiteName = useMemo(() => {
+        if (data.site_id === null) return null;
+        return (
+            siteOptions.find((site) => site.id === data.site_id)?.name ??
+            (data.site_id === prefillSiteId ? prefillSiteName : null)
+        );
+    }, [data.site_id, prefillSiteId, prefillSiteName, siteOptions]);
     const providerManaged = Boolean(
         mode === 'edit' && options?.device?.field_ownership?.provider_managed,
     );
@@ -619,8 +674,8 @@ export function AddDeviceDialog({
                                     <strong>{completedName}</strong>{' '}
                                     {mode === 'edit'
                                         ? 'has been updated in the device list.'
-                                        : prefillSiteName
-                                          ? `is now registered and assigned to ${prefillSiteName}.`
+                                        : selectedSiteName
+                                          ? `is now registered and assigned to ${selectedSiteName}.`
                                           : 'is now in the device list.'}
                                 </>
                             }
@@ -797,6 +852,119 @@ export function AddDeviceDialog({
                                     </SelectContent>
                                 </Select>
                             </FormField>
+                            <FormField
+                                id="device-site"
+                                label="Site"
+                                error={errors.site_id}
+                            >
+                                <Popover
+                                    open={sitePickerOpen}
+                                    onOpenChange={setSitePickerOpen}
+                                >
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            id="device-site"
+                                            type="button"
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={sitePickerOpen}
+                                            aria-label="Site"
+                                            disabled={!canAssignSite}
+                                            className="w-full justify-between font-normal"
+                                        >
+                                            <span className="truncate">
+                                                {activeNonSiteAssignment
+                                                    ? `Assigned to ${humanise(activeNonSiteAssignment.assignable_type)}${activeNonSiteAssignment.label ? `: ${activeNonSiteAssignment.label}` : ''}`
+                                                    : (selectedSiteName ??
+                                                      'Unassigned (no Site)')}
+                                            </span>
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        className="w-72 p-0"
+                                        align="start"
+                                    >
+                                        <Command>
+                                            <CommandInput placeholder="Search Sites…" />
+                                            <CommandList>
+                                                <CommandEmpty>
+                                                    No matching Site found.
+                                                </CommandEmpty>
+                                                <CommandGroup>
+                                                    <CommandItem
+                                                        value="Unassigned (no Site)"
+                                                        onSelect={() => {
+                                                            setData(
+                                                                'site_id',
+                                                                null,
+                                                            );
+                                                            setSitePickerOpen(
+                                                                false,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                'mr-2 h-4 w-4',
+                                                                data.site_id ===
+                                                                    null
+                                                                    ? 'opacity-100'
+                                                                    : 'opacity-0',
+                                                            )}
+                                                        />
+                                                        Unassigned (no Site)
+                                                    </CommandItem>
+                                                    {siteOptions.map((site) => (
+                                                        <CommandItem
+                                                            key={site.id}
+                                                            value={`${site.name} ${site.id}`}
+                                                            onSelect={() => {
+                                                                setData(
+                                                                    'site_id',
+                                                                    site.id,
+                                                                );
+                                                                setSitePickerOpen(
+                                                                    false,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    'mr-2 h-4 w-4',
+                                                                    data.site_id ===
+                                                                        site.id
+                                                                        ? 'opacity-100'
+                                                                        : 'opacity-0',
+                                                                )}
+                                                            />
+                                                            {site.name}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                                {activeNonSiteAssignment ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Person, room, and vehicle assignments
+                                        are managed on the Assignments tab.
+                                    </p>
+                                ) : null}
+                            </FormField>
+                            <div className="sm:col-span-2">
+                                <TextField
+                                    id="device-ip-address-classification"
+                                    label="IP address or hostname"
+                                    value={data.ip_address}
+                                    error={errors.ip_address}
+                                    placeholder="e.g. 172.16.0.1 or switch-01.local"
+                                    onChange={(value) =>
+                                        setData('ip_address', value)
+                                    }
+                                />
+                            </div>
                         </div>
                     </WizardStepPane>
                 ) : stepIndex === 1 ? (
@@ -931,10 +1099,10 @@ export function AddDeviceDialog({
                             />
                             <TextField
                                 id="device-ip-address"
-                                label="IP address"
+                                label="IP address or hostname"
                                 value={data.ip_address}
                                 error={errors.ip_address}
-                                placeholder="192.168.1.1"
+                                placeholder="e.g. 172.16.0.1 or switch-01.local"
                                 onChange={(value) =>
                                     setData('ip_address', value)
                                 }
@@ -1046,6 +1214,10 @@ export function AddDeviceDialog({
                                 <ReviewRow
                                     label="Status"
                                     value={humanise(data.status)}
+                                />
+                                <ReviewRow
+                                    label="Site"
+                                    value={selectedSiteName ?? 'Unassigned'}
                                 />
                             </ReviewCard>
                             <ReviewCard

@@ -1710,16 +1710,29 @@ function TrackerReader({
                                 </p>
                             </ReviewCard>
                             {canViewDevices && device.canonical_device_id && (
-                                <Button asChild variant="outline">
-                                    <Link
-                                        href={
-                                            '/security-devices/devices/' +
-                                            device.canonical_device_id
-                                        }
-                                    >
-                                        Open device record
-                                    </Link>
-                                </Button>
+                                <div className="flex flex-wrap gap-2">
+                                    <Button asChild variant="outline">
+                                        <Link
+                                            href={
+                                                '/security-devices/devices/' +
+                                                device.canonical_device_id
+                                            }
+                                        >
+                                            Open device record
+                                        </Link>
+                                    </Button>
+                                    <Button asChild variant="outline">
+                                        <Link
+                                            href={
+                                                '/security-devices/devices/' +
+                                                device.canonical_device_id +
+                                                '?section=console'
+                                            }
+                                        >
+                                            Open unit console
+                                        </Link>
+                                    </Button>
+                                </div>
                             )}
                         </>
                     ) : (
