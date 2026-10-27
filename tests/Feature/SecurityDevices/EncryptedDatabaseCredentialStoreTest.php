@@ -55,6 +55,31 @@ it('uses the encrypted database credential store by default while keeping Vault 
     expect(app(SecretManagerSecretStore::class))->toBeInstanceOf(UnavailableSecretManagerSecretStore::class);
 });
 
+it('boots credential store bindings lazily when app.key is absent during asset builds', function (): void {
+    $previousKey = config('app.key');
+
+    try {
+        config()->set('app.key', '');
+        app()->forgetInstance('encrypter');
+        app()->forgetInstance(EncryptedDatabaseSecretStore::class);
+        app()->forgetInstance(EncryptedDatabaseSecretLeaseIssuer::class);
+        app()->forgetInstance(SecretManagerSecretStore::class);
+        app()->forgetInstance(SecretManagerLeaseIssuer::class);
+        app()->forgetInstance(SecretManagerRestoreProbe::class);
+
+        $store = app(SecretManagerSecretStore::class);
+        $issuer = app(SecretManagerLeaseIssuer::class);
+        $probe = app(SecretManagerRestoreProbe::class);
+
+        expect($store)->toBeInstanceOf(EncryptedDatabaseSecretStore::class)
+            ->and($issuer)->toBeInstanceOf(EncryptedDatabaseSecretLeaseIssuer::class)
+            ->and($probe->healthy())->toBeFalse();
+    } finally {
+        config()->set('app.key', $previousKey);
+        app()->forgetInstance('encrypter');
+    }
+});
+
 it('enforces compare-and-set versioning, soft deletion, restoration, and permanent destruction', function (): void {
     $store = app(EncryptedDatabaseSecretStore::class);
     $issuer = app(EncryptedDatabaseSecretLeaseIssuer::class);

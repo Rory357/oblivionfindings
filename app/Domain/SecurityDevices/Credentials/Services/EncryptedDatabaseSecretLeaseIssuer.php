@@ -7,6 +7,7 @@ use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Contracts\SecretManagerRestoreProbe;
 use App\Domain\SecurityDevices\Credentials\Data\SecretLeaseRequest;
 use App\Domain\SecurityDevices\Credentials\Models\MonitoringEncryptedSecret;
+use Closure;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -15,8 +16,9 @@ use Throwable;
 
 final class EncryptedDatabaseSecretLeaseIssuer implements SecretManagerLeaseIssuer, SecretManagerRestoreProbe
 {
+    /** @param (Closure(): Encrypter)|null $encrypterResolver */
     public function __construct(
-        private readonly Encrypter $encrypter,
+        private readonly ?Closure $encrypterResolver = null,
     ) {}
 
     public function issue(SecretLeaseRequest $request): CredentialLease
@@ -45,7 +47,7 @@ final class EncryptedDatabaseSecretLeaseIssuer implements SecretManagerLeaseIssu
         $material = [];
 
         try {
-            $decrypted = $this->encrypter->decryptString($record->encrypted_payload);
+            $decrypted = $this->encrypter()->decryptString($record->encrypted_payload);
             $decoded = json_decode($decrypted, true, 16, JSON_THROW_ON_ERROR);
             if (! is_array($decoded) || $decoded === []) {
                 throw new RuntimeException('Credential lease is unavailable.');
@@ -83,12 +85,22 @@ final class EncryptedDatabaseSecretLeaseIssuer implements SecretManagerLeaseIssu
                 return false;
             }
 
-            $probe = $this->encrypter->encryptString('oblivion-readiness-probe');
+            $encrypter = $this->encrypter();
+            $probe = $encrypter->encryptString('oblivion-readiness-probe');
 
-            return $this->encrypter->decryptString($probe) === 'oblivion-readiness-probe';
+            return $encrypter->decryptString($probe) === 'oblivion-readiness-probe';
         } catch (Throwable) {
             return false;
         }
+    }
+
+    private function encrypter(): Encrypter
+    {
+        if ($this->encrypterResolver instanceof Closure) {
+            return ($this->encrypterResolver)();
+        }
+
+        return app(Encrypter::class);
     }
 
     private function fingerprint(#[\SensitiveParameter] string $reference): string

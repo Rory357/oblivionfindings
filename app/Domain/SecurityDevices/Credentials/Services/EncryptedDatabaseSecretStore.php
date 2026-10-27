@@ -8,14 +8,16 @@ use App\Domain\SecurityDevices\Credentials\Data\SecretVersionRequest;
 use App\Domain\SecurityDevices\Credentials\Data\SecretWriteRequest;
 use App\Domain\SecurityDevices\Credentials\Data\StoredSecretVersion;
 use App\Domain\SecurityDevices\Credentials\Models\MonitoringEncryptedSecret;
+use Closure;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
 final class EncryptedDatabaseSecretStore implements SecretManagerSecretStore
 {
+    /** @param (Closure(): Encrypter)|null $encrypterResolver */
     public function __construct(
-        private readonly Encrypter $encrypter,
+        private readonly ?Closure $encrypterResolver = null,
     ) {}
 
     public function put(SecretWriteRequest $request): StoredSecretVersion
@@ -24,12 +26,13 @@ final class EncryptedDatabaseSecretStore implements SecretManagerSecretStore
         $expectedVersion = $request->expectedVersion();
         $referenceHash = $this->fingerprint($reference);
         $material = $request->consumeMaterial();
+        $encrypter = $this->encrypter();
         $json = '';
 
         try {
             $json = json_encode($material, JSON_THROW_ON_ERROR);
-            $encryptedPayload = $this->encrypter->encryptString($json);
-            $encryptedReference = $this->encrypter->encryptString($reference);
+            $encryptedPayload = $encrypter->encryptString($json);
+            $encryptedReference = $encrypter->encryptString($reference);
         } finally {
             $this->scrubArray($material);
             $this->scrubString($json);
@@ -148,6 +151,15 @@ final class EncryptedDatabaseSecretStore implements SecretManagerSecretStore
         }, 3);
 
         return new StoredSecretVersion($reference, $version, $referenceHash);
+    }
+
+    private function encrypter(): Encrypter
+    {
+        if ($this->encrypterResolver instanceof Closure) {
+            return ($this->encrypterResolver)();
+        }
+
+        return app(Encrypter::class);
     }
 
     private function fingerprint(#[\SensitiveParameter] string $reference): string
