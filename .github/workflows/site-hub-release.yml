@@ -239,7 +239,7 @@ jobs:
               version = $version
               revision = $revision
               architecture = $arch
-              roles = $roles
+              roles = @($roles)
               published_at = $publishedAt
               expires_at = $expiresAt
             } | ConvertTo-Json -Depth 4 | Set-Content -Path $metaPath -NoNewline -Encoding utf8
@@ -284,7 +284,7 @@ jobs:
               id = $id
               platform = $platform
               architecture = $arch
-              roles = $roles
+              roles = @($roles)
               version = $version
               release_revision = $revision
               filename = $filename
@@ -339,12 +339,10 @@ jobs:
             $parsed = $cat->catalogue();
             echo "Verified signed catalogue with " . count($parsed["artifacts"]) . " artifacts.\n";
           '
+          "UPLOAD_SIGNED_CATALOGUE=$(if (-not $usingEphemeralKeys) { 'true' } else { 'false' })" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Upload signed release catalogue
-        if: ${{ env.PUBLISHER_PACKAGE_SEED != '' && env.PUBLISHER_CATALOGUE_SEED != '' }}
-        env:
-          PUBLISHER_PACKAGE_SEED: ${{ secrets.ENDPOINT_PACKAGE_SIGNING_SEED }}
-          PUBLISHER_CATALOGUE_SEED: ${{ secrets.ENDPOINT_CATALOGUE_SIGNING_SEED }}
+        if: ${{ env.UPLOAD_SIGNED_CATALOGUE == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: signed-endpoint-and-site-hub-catalogue
