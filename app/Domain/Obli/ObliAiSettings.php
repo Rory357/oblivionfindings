@@ -2,6 +2,7 @@
 
 namespace App\Domain\Obli;
 
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Models\AppSetting;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -45,7 +46,7 @@ final class ObliAiSettings
     {
         return $this->current() + [
             'key_saved' => AppSetting::query()->where('key', self::SECRET)->exists(),
-            'helper_access_enabled' => (bool) (config('endpoint_management.enabled') && config('endpoint_management.obli.enabled')),
+            'helper_access_enabled' => app(EndpointRemoteSupportSettings::class)->obliHelperEnabled(),
         ];
     }
 

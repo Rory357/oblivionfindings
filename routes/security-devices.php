@@ -34,6 +34,7 @@ use App\Domain\SecurityDevices\Http\Controllers\DevicePingController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCandidateReviewController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryCollectorController;
 use App\Domain\SecurityDevices\Http\Controllers\DiscoveryScopeLifecycleController;
+use App\Domain\SecurityDevices\Http\Controllers\Integrations\IntuneController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
@@ -923,6 +924,28 @@ Route::middleware([
                 ->name('security-devices.integrations.milesight.applications.remove');
             Route::post('/devices/sync', [MilesightController::class, 'syncDevices'])
                 ->name('security-devices.integrations.milesight.devices.sync');
+        });
+
+    // ── Microsoft Intune (read-only Windows computer discovery & import) ──
+    Route::prefix('/integrations/intune')
+        ->middleware('permission:securityDevices.integrations.manage')
+        ->group(function () {
+            Route::get('/', [IntuneController::class, 'index'])
+                ->name('security-devices.integrations.intune');
+            Route::post('/key', [IntuneController::class, 'saveKey'])
+                ->name('security-devices.integrations.intune.key');
+            Route::post('/test', [IntuneController::class, 'testKey'])
+                ->name('security-devices.integrations.intune.test');
+            Route::post('/rotate', [IntuneController::class, 'rotateKey'])
+                ->name('security-devices.integrations.intune.rotate');
+            Route::delete('/key', [IntuneController::class, 'removeKey'])
+                ->name('security-devices.integrations.intune.remove');
+            Route::post('/discover', [IntuneController::class, 'discover'])
+                ->name('security-devices.integrations.intune.discover');
+            Route::post('/import', [IntuneController::class, 'importDevices'])
+                ->name('security-devices.integrations.intune.import');
+            Route::post('/sync', [IntuneController::class, 'syncLinked'])
+                ->name('security-devices.integrations.intune.sync');
         });
 
     // ── Reports ──────────────────────────────────────────────────

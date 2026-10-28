@@ -156,11 +156,9 @@ function DetailItem({
 }) {
     return (
         <div>
-            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dt className="text-caption">{label}</dt>
             <dd className="mt-0.5 font-medium break-words">{value}</dd>
-            {detail ? (
-                <dd className="text-xs text-muted-foreground">{detail}</dd>
-            ) : null}
+            {detail ? <dd className="text-caption">{detail}</dd> : null}
         </div>
     );
 }
@@ -570,7 +568,7 @@ export function DeviceEndpointSection({
                                         : 'Disabled'}
                                 </StatusBadge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="text-caption mt-1">
                                 {policies.service.consentMode === 'unattended'
                                     ? 'Unattended'
                                     : 'Attended consent'}{' '}
@@ -599,7 +597,7 @@ export function DeviceEndpointSection({
                                         : 'Disabled'}
                                 </StatusBadge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="text-caption mt-1">
                                 {policies.restart.consentMode === 'unattended'
                                     ? 'Unattended'
                                     : 'Attended consent'}{' '}
@@ -628,7 +626,7 @@ export function DeviceEndpointSection({
                                         : 'Disabled'}
                                 </StatusBadge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="text-caption mt-1">
                                 {policies.software.consentMode === 'unattended'
                                     ? 'Unattended'
                                     : 'Attended consent'}{' '}
@@ -645,7 +643,7 @@ export function DeviceEndpointSection({
                                     Disabled
                                 </StatusBadge>
                             </div>
-                            <p className="mt-1 text-xs text-muted-foreground">
+                            <p className="text-caption mt-1">
                                 Arbitrary and catalogue script execution remain
                                 turned off in this release.
                             </p>
@@ -751,7 +749,7 @@ export function DeviceEndpointSection({
 
                             {inventory.disks.length > 0 && (
                                 <div className="space-y-2 border-t pt-3">
-                                    <p className="text-xs font-medium text-muted-foreground">
+                                    <p className="text-caption font-medium">
                                         Local volumes
                                     </p>
                                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -772,7 +770,7 @@ export function DeviceEndpointSection({
                                                         <span className="font-medium">
                                                             {disk.name}
                                                         </span>
-                                                        <span className="text-xs text-muted-foreground">
+                                                        <span className="text-caption">
                                                             {disk.usedPercent !==
                                                             null
                                                                 ? `${disk.usedPercent}% used`
@@ -787,7 +785,7 @@ export function DeviceEndpointSection({
                                                             }}
                                                         />
                                                     </div>
-                                                    <p className="mt-1.5 text-xs text-muted-foreground">
+                                                    <p className="text-caption mt-1.5">
                                                         {formatBytes(
                                                             disk.freeBytes,
                                                         )}{' '}
@@ -887,7 +885,7 @@ export function DeviceEndpointSection({
                                                         {svc.label ?? svc.name}
                                                     </span>
                                                     {svc.label && (
-                                                        <span className="font-mono text-xs text-muted-foreground">
+                                                        <span className="text-caption font-mono">
                                                             {svc.name}
                                                         </span>
                                                     )}
@@ -992,12 +990,12 @@ export function DeviceEndpointSection({
                                                 <p className="truncate font-medium">
                                                     {item.name}
                                                 </p>
-                                                <p className="text-xs text-muted-foreground">
+                                                <p className="text-caption">
                                                     {item.publisher ??
                                                         'Publisher not recorded'}
                                                 </p>
                                             </div>
-                                            <span className="font-mono text-xs text-muted-foreground">
+                                            <span className="text-caption font-mono">
                                                 {item.version ??
                                                     'Version not recorded'}
                                             </span>

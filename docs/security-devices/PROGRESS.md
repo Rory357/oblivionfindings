@@ -499,5 +499,70 @@
 - **Network configuration diff (`Kauri MikroTik Core Router` — SSH backup line diff with WPA2, PPP, and SNMP community secrets redacted to `[REDACTED]`):**
   ![Local Network SSH Config Diff](screenshots/phase-5-local-network-ssh-diff.png)
 
+#### Live `oblivionfindings.com` walkthrough (`c221517a7` — 29 Oct 2026 NZDT)
+- **Pre-deploy MySQL backup verified on `172.16.0.232`:**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase5-20261028T115526Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK)
+- **Production release verified (`c221517a752503627b26bcc1dfac3ddc26db3780`):**
+  - `database:verify-lifecycle-triggers` preflight & postflight `16/16` verified, Inertia SSR & monitoring supervisors active, `oblivion-queclink.service` active, `git -C /var/www/oblivionfindings status --porcelain` empty, zero console/page/HTTP errors across `1440×920` desktop and `390×844` mobile viewports.
+- **Setup › Supported devices (`1440×920` desktop — `28` drivers across `26` brands & standards, `2` Tested on hardware, `18` Built from vendor docs, `8` Planned):**
+  ![Live Supported Devices](screenshots/phase-5-live-supported-devices.png)
+- **Setup › Supported devices — Cameras & video filter (`1440×920` desktop — `7` ONVIF Profile S/T & UniFi Protect drivers):**
+  ![Live Supported Devices Cameras](screenshots/phase-5-live-supported-devices-cameras.png)
+- **Setup › Supported devices — Alarms & intrusion filter (`390×844` mobile — `10` drivers with SIA DC-09 active & NZ `Planned` honesty):**
+  ![Live Supported Devices Alarms Mobile](screenshots/phase-5-live-supported-devices-alarms-mobile.png)
+- **Network profile (`UX7` `172.16.0.1` — `Technology › Configuration` on live `.com`):**
+  ![Live Network Configuration](screenshots/phase-5-live-network-configuration.png)
+
+---
+
+## Phase 6 — Computers & Obli
+
+### Summary of changes
+
+1. **Admin setting for Windows computer management & attended remote support (`6.1`)**
+   - Added `EndpointRemoteSupportSettings` (`app/Domain/SecurityDevices/Endpoints/Services/EndpointRemoteSupportSettings.php`) storing versioned settings in `app_settings` (`endpoint.remote_support.configuration`) and encrypted secrets (`endpoint.remote_support.relay_secret`, `endpoint.remote_support.command_signing_secret`) with `DB::transaction` authorization evidence locking and `AuditLogger::logOrFail` audit trail.
+   - Added `PUT /settings/obli/remote-support` and `POST /settings/obli/remote-support/verify-relay` (`ObliSettingsController`), verifying Coturn TURN REST HMAC-SHA1 credential signing (`RFC 5389` / `draft-uberti-behave-turn-rest`), Ed25519 command-signing readiness, and public HTTPS origin without exposing secret material.
+   - Added `ObliRemoteSupportCard` (`resources/js/pages/settings/obli-remote-support-card.tsx`) on `/settings/obli` with a one-time 64-character TURN shared secret generator, ready-to-paste Coturn `/etc/turnserver.conf` snippet, live **Test relay signing** verification, and plain-English explanation of the Windows **Allow / Decline** consent prompt and persistent **Stop** banner (`endpoint-agent/tray/Obli/RemoteSupport.cs`).
+   - Updated `technicianRelayGrant()` (`resources/js/pages/it/remote-support/remote-protocol.ts`) to unwrap `{ status, relay }` responses from `/it/remote-support/sessions/{uuid}/relay`.
+
+2. **Obli tray app in the Windows installer & `ofc1_` one-time computer setup code (`6.2`)**
+   - Extended `Obli.Setup` (`SetupWindow.xaml`, `SetupWindow.xaml.cs`, `Obli.Setup.Tests/Program.cs`) to accept `ofc1_...` base64url-encoded one-time computer setup codes directly in the computer profile box, writing a locked-down temporary `.json` profile under `%LocalAppData%\Oblivion\Setup\Profiles` and deleting it automatically on role switch, back navigation, window close, or installation completion.
+   - Updated `installation-profile.ts` (`encodeComputerSetupCode`), `_installation-dialog.tsx`, and `device-endpoint-section.tsx` so operators can copy an `ofc1_...` one-time setup code or save the `.json` installation profile, with clear plain-English guidance that computer setup installs both the Windows support service (`oblivion-agent.exe`) and the Obli staff tray helper (`obli.exe --tray`).
+   - Updated `.github/workflows/site-hub-release.yml` to compile and run `Obli.Setup.Tests` and Go binary builds on `"security-devices/phase-*"` push and pull request branches.
+
+3. **Microsoft Intune setup page & bulk Site import (`6.3`)**
+   - Registered `'intune'` in `IntegrationSecretManager` (`PURPOSE_PRIMARY => 'client_secret'`) and `IntegrationsWorkspacePresenter`.
+   - Extended `IntuneReadClient` (`app/Domain/SecurityDevices/Endpoints/Services/IntuneReadClient.php`) with Microsoft Graph `GET /v1.0/deviceManagement/managedDevices` discovery and Microsoft Entra OAuth 2.0 client-credentials authentication backed by `IntegrationProviderConnection` + `IntegrationSecretMaterialService` (retaining config fallback for pure unit tests).
+   - Added `IntuneAdapter`, `IntuneBulkImportService`, `IntuneController`, and `/security-devices/integrations/intune` (`resources/js/pages/security-devices/integrations/intune.tsx`) using single-tenant `Microsoft directory ID` (`directory_id`), connection health testing, secret rotation/removal (`ConfirmDialog`), searchable/filterable Windows computer discovery, idempotent bulk Site import (`Device` + `DeviceAssignment` + `IntuneDeviceLink` + `DeviceEvent` + `IntegrationSyncLog`), and 30-minute `endpoints:intune-sync` posture updates (`routes/console.php`).
+   - Added `WindowsEndpointObliDriver` and `MicrosoftIntuneDriver` (`Built from vendor docs`, `Computers & endpoints`) to `DeviceDriverRegistry` (`30` drivers across `28` brands & standards) and documented official Microsoft Learn specifications in `docs/security-devices/SUPPORTED-DEVICES.md`.
+
+4. **Arbitrary script execution remains OFF (`6.4`)**
+   - Preserved `config('endpoint_management.scripts.release_enabled') === false` and `app(EndpointScriptPolicy::class)->available() === false`, verified explicitly by `Phase6ComputersAndObliTest` and `EndpointScriptPolicyTest`.
+
+---
+
+### Verification & local walkthrough
+
+- **Laravel Pint:** `0` issues across all 38 touched PHP files.
+- **Prettier & ESLint (`--max-warnings=0`):** `0` errors and `0` warnings across all 13 touched TS/TSX files (including `security-devices-copy/no-jargon` and zero `tenant` copy).
+- **TypeScript (`npm run types`):** `0` errors across the repository.
+- **Vitest (`--maxWorkers=2`):** `5` test files / `22` tests passed (`remote-viewer.test.ts`, `installation-profile.test.tsx`, `obli-remote-support-card.test.tsx`, `intune.test.tsx`, `it-security-interaction-audit.test.ts`).
+- **Pest (Sequential):** `Phase6ComputersAndObliTest` (`3` passed, `110` assertions), `IntuneReadClientTest` (`15` passed), `IntegrationProviderSecretBoundaryTest`, `ItSecuritySingleTenantBoundaryTest` (`45` passed), `IntuneVisibilitySyncTest`, `IntegrationsHubTest`, `Phase5BrandsAndDriversTest`, `EndpointDownloadsTest`, `EndpointAgentLifecycleTest`, `EndpointScriptPolicyTest`, `ItRemoteSupportWorkspaceTest`, `ItRemoteSessionTest`, `ObliStaffHelperTest`, `ObliAiChatTest`, `ObliTechnicianChatTest`, `ObliTechnicianDiagnosticsTest` — all passed.
+- **Production Vite build (`npm run build`):** `6,378` modules transformed cleanly.
+- **Playwright desktop (`1440×920`) & mobile (`390×844`) walkthrough:** `0` console errors, `0` page errors, `0` HTTP `>= 400` responses, zero horizontal overflow, zero `tenant` words, and zero forbidden jargon across `/settings/obli`, `/it/remote-support`, `ofc1_` setup dialog, `/security-devices/integrations/intune`, and `/security-devices/supported-devices`.
+
+#### Local walkthrough screenshots
+- **Settings › Obli (`1440×920` desktop — `Attended remote support on`, Coturn TURN shared secret snippet, and `Relay verified`):**
+  ![Local Obli Remote Support](screenshots/phase-6-local-obli-remote-support.png)
+- **IT & Support › Remote support (`1440×920` desktop — `KAURI-RECEPTION-PC` support workspace enabled via database settings):**
+  ![Local Remote Support Workspace](screenshots/phase-6-local-remote-support-workspace.png)
+- **Computer profile › Set up Obli (`1440×920` desktop — one-time `ofc1_` setup code copied to clipboard + `Script execution: Disabled`):**
+  ![Local Computer Setup Code](screenshots/phase-6-local-computer-setup-code.png)
+- **Setup › Integrations › Microsoft Intune (`1440×920` desktop — `Microsoft directory ID`, discovered Windows computers, and bulk Site import):**
+  ![Local Microsoft Intune Desktop](screenshots/phase-6-local-intune-desktop.png)
+- **Setup › Integrations › Microsoft Intune (`390×844` mobile — responsive header meters & credential controls):**
+  ![Local Microsoft Intune Mobile](screenshots/phase-6-local-intune-mobile.png)
+- **Setup › Supported devices — Computers & endpoints (`1440×920` desktop — `30` total drivers across `28` brands & standards):**
+  ![Local Supported Devices Computers](screenshots/phase-6-local-supported-devices-computers.png)
 
 

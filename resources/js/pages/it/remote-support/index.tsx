@@ -53,6 +53,7 @@ interface Computer {
 export interface RemoteSupportProps {
     actor_id: number;
     can_manage_remote_policy: boolean;
+    can_manage_remote_support_settings?: boolean;
     can_manage_action_policy?: boolean;
     can_manage_restart_policy?: boolean;
     can_manage_software_policy?: boolean;
@@ -83,6 +84,7 @@ export default function RemoteSupport(props: RemoteSupportProps) {
 function RemoteSupportWorkspace({
     actor_id,
     can_manage_remote_policy,
+    can_manage_remote_support_settings,
     can_manage_action_policy,
     can_manage_restart_policy,
     can_manage_software_policy,
@@ -467,7 +469,7 @@ function RemoteSupportWorkspace({
                                 </div>
                             )}
                         </Card>
-                        {availability.remote_support && (
+                        {availability.remote_support ? (
                             <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
                                 <Monitor
                                     className="h-5 w-5 shrink-0 text-primary"
@@ -494,6 +496,32 @@ function RemoteSupportWorkspace({
                                     Connect
                                 </Button>
                             </Card>
+                        ) : (
+                            can_manage_remote_support_settings && (
+                                <Card className="gap-4 p-5 shadow-none sm:flex-row sm:items-center">
+                                    <Monitor
+                                        className="h-5 w-5 shrink-0 text-muted-foreground"
+                                        aria-hidden="true"
+                                    />
+                                    <div className="min-w-0 flex-1 space-y-1">
+                                        <h3 className="text-section-title">
+                                            Attended remote support is off
+                                        </h3>
+                                        <p className="text-subtle">
+                                            Turn on Windows computer management
+                                            and configure a TURN relay in Obli
+                                            settings. Staff on the computer
+                                            always see an Allow or Decline
+                                            prompt and a Stop button.
+                                        </p>
+                                    </div>
+                                    <Button variant="outline" asChild>
+                                        <Link href="/settings/obli">
+                                            Configure remote support
+                                        </Link>
+                                    </Button>
+                                </Card>
+                            )
                         )}
                         {selected && (
                             <TechnicianObli

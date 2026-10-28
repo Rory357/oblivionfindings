@@ -14,7 +14,7 @@ on:
   push:
     branches:
       - main
-      - "security-devices/phase-2*"
+      - "security-devices/phase-*"
     paths:
       - "endpoint-agent/**"
       - "collector/**"

@@ -31,7 +31,7 @@ final class EndpointAgentIdentity
     /** Raw enrolment material is returned once and never stored in an event. */
     public function issue(User $actor, Device $device, string $platform): array
     {
-        abort_unless(config('endpoint_management.enabled'), 404);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->endpointEnabled(), 404);
         $publicKey = $this->signer->publicKey();
 
         return DB::transaction(function () use ($actor, $device, $platform, $publicKey): array {
@@ -75,7 +75,7 @@ final class EndpointAgentIdentity
     /** Read-only installation context, with current authority and canonical assignment. */
     public function installationContext(User $actor, Device $device): array
     {
-        abort_unless(config('endpoint_management.enabled'), 404);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->endpointEnabled(), 404);
 
         return DB::transaction(function () use ($actor, $device): array {
             $device = Device::query()->lockForUpdate()->findOrFail($device->id);
@@ -104,7 +104,7 @@ final class EndpointAgentIdentity
     /** Retransmission is accepted only for the same client-generated credential. */
     public function enrol(string $token, string $credential, string $platform): array
     {
-        abort_unless(config('endpoint_management.enabled'), 404);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->endpointEnabled(), 404);
         abort_unless($platform === 'windows', 422);
         $this->assertToken($token);
         $this->assertToken($credential);
@@ -144,7 +144,7 @@ final class EndpointAgentIdentity
     /** Recheck identity under the same lock as the accepted report or delivery. */
     public function withAuthenticated(string $credential, Closure $operation): mixed
     {
-        abort_unless(config('endpoint_management.enabled'), 404);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->endpointEnabled(), 404);
         $this->assertToken($credential);
 
         return DB::transaction(function () use ($credential, $operation): mixed {

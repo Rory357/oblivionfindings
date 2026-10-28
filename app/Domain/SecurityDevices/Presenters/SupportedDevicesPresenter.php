@@ -32,9 +32,19 @@ final readonly class SupportedDevicesPresenter
             $classCounts[$deviceClass->value] = 0;
         }
 
+        $canManageIntegrations = $user->canDo('securityDevices.integrations.manage');
+        $canViewDevices = $user->canDo('securityDevices.devices.view');
+
         foreach ($drivers as $driver) {
             $meta = $driver->metadata();
-            $rows[] = $meta->toArray();
+            $row = $meta->toArray();
+            if (is_string($row['setup_href']) && str_starts_with($row['setup_href'], '/security-devices/integrations/') && ! $canManageIntegrations) {
+                $row['setup_href'] = null;
+            }
+            if ($row['setup_href'] === '/security-devices/agent-downloads' && ! $canViewDevices) {
+                $row['setup_href'] = null;
+            }
+            $rows[] = $row;
             $brands[strtolower($meta->brand)] = $meta->brand;
             $classCounts[$meta->deviceClass->value] = ($classCounts[$meta->deviceClass->value] ?? 0) + 1;
             $levelCounts[$meta->supportLevel->value] = ($levelCounts[$meta->supportLevel->value] ?? 0) + 1;

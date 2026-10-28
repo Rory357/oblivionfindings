@@ -7,12 +7,14 @@ use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
 use App\Domain\SecurityDevices\Endpoints\Models\IntuneDeviceLink;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointActionPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptContract;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCatalogue;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\IntuneReadClient;
 use App\Domain\SecurityDevices\Management\Services\CommandAssignmentFingerprint;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Models\User;
@@ -135,7 +137,7 @@ final class EndpointDevicePosturePresenter
             : null;
         $agentState = self::agentState($agent, $canonicalSiteId, $currentFingerprint, true);
         $canViewDiagnostics = $viewer->canDo('securityDevices.endpoints.diagnostics');
-        $canRevoke = (bool) config('endpoint_management.enabled')
+        $canRevoke = app(EndpointRemoteSupportSettings::class)->endpointEnabled()
             && $viewer->canDo('securityDevices.commands.admin')
             && $viewer->canDo('securityDevices.devices.update')
             && $agent !== null
@@ -417,7 +419,7 @@ final class EndpointDevicePosturePresenter
         $rawSnapshot = is_array($link?->snapshot) ? $link->snapshot : null;
 
         return [
-            'integrationEnabled' => (bool) config('endpoint_management.intune.enabled', false),
+            'integrationEnabled' => app(IntuneReadClient::class)->isConfigured(),
             'canManageLink' => $canManageLink,
             'linkHref' => $canManageLink ? "/security-devices/devices/{$device->id}/endpoint/intune-link" : null,
             'linked' => $link !== null,

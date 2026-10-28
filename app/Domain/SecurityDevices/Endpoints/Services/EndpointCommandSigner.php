@@ -36,7 +36,11 @@ final class EndpointCommandSigner
 
     private function secret(): string
     {
-        $secret = base64_decode((string) config('endpoint_management.command_signing_secret'), true);
+        $configured = (string) config('endpoint_management.command_signing_secret');
+        if ($configured === '') {
+            $configured = (string) (app(EndpointRemoteSupportSettings::class)->commandSigningSecret() ?? '');
+        }
+        $secret = base64_decode($configured, true);
         if (! is_string($secret) || strlen($secret) !== SODIUM_CRYPTO_SIGN_SECRETKEYBYTES) {
             throw new RuntimeException('Endpoint command signing is not configured.');
         }

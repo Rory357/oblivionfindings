@@ -645,6 +645,7 @@ class SettingsAuditPresenter
         return collect([
             $viewer->canDo('securityDevices.groups.manage') ? ['title' => 'Device groups', 'description' => 'Organise devices using current manual membership and reviewed rules.', 'href' => '/security-devices/device-groups'] : null,
             $viewer->canDo('securityDevices.integrations.view') ? ['title' => 'Integrations', 'description' => 'Review provider connections, site mappings, sync, and imported-device exceptions.', 'href' => '/security-devices/integrations'] : null,
+            ($viewer->canDo('settings.access.manage') && $viewer->canDo('integrations.manage_secrets')) ? ['title' => 'Computers, Obli & remote support', 'description' => 'Configure Windows computer management, Obli helper, and attended remote support relay.', 'href' => '/settings/obli'] : null,
             $viewer->canDo('securityDevices.reports.view') ? ['title' => 'Reports', 'description' => 'Review device, event, and maintenance reports with permission-gated exports.', 'href' => '/security-devices/reports'] : null,
         ])->filter()->values()->all();
     }

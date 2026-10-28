@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
@@ -335,7 +336,7 @@ class DeviceController extends Controller
         return Inertia::render('security-devices/devices/show', [
             'actor_id' => (int) $user->id,
             'as_of' => $asOf->toISOString(),
-            'endpoint_setup' => config('endpoint_management.enabled') && $canUpdate
+            'endpoint_setup' => app(EndpointRemoteSupportSettings::class)->endpointEnabled() && $canUpdate
                 && $user->canDo('securityDevices.commands.admin')
                 && $device->domain === 'it_infrastructure' && in_array($device->category, ['endpoint', 'server'], true)
                     ? ['actor_id' => (int) $user->id] : null,

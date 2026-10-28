@@ -34,7 +34,7 @@ final class EndpointSoftwarePolicy
 
     public function available(): bool
     {
-        if (! config('endpoint_management.enabled') || ! config('endpoint_management.software.release_enabled') || ! $this->schemaReady()) {
+        if (! app(EndpointRemoteSupportSettings::class)->endpointEnabled() || ! config('endpoint_management.software.release_enabled') || ! $this->schemaReady()) {
             return false;
         }
         try {
