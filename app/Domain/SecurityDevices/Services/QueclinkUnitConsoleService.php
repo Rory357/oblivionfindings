@@ -127,6 +127,19 @@ final class QueclinkUnitConsoleService
         ];
     }
 
+    /**
+     * Privacy-governed position summary for any tracking-domain device profile.
+     *
+     * @return array<string, mixed>
+     */
+    public function presentTrackerPosition(User $viewer, Device $device): array
+    {
+        $tracker = $this->resolveTracker($device);
+        $locationAccess = $this->resolveLocationAccess($viewer, $device);
+
+        return $this->presentLastPosition($device, $tracker, $locationAccess);
+    }
+
     /** @param array<string, mixed> $parameters */
     public function sendCommand(
         User $actor,

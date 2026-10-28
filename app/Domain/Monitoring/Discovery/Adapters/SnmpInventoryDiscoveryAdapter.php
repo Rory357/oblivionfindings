@@ -11,6 +11,7 @@ use App\Domain\Monitoring\Discovery\Data\DiscoveredIdentity;
 use App\Domain\Monitoring\Discovery\Data\DiscoveryTarget;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Discovery\Support\SnmpSystemProbe;
+use App\Domain\Monitoring\Discovery\Support\SnmpTopologyProbe;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Services\EgressPolicy;
@@ -23,6 +24,7 @@ final class SnmpInventoryDiscoveryAdapter
         private readonly SnmpV3ProbeAdapter $snmp,
         private readonly ?CredentialLeaseProvider $credentials = null,
         private readonly SnmpSystemProbe $snmpProbe = new SnmpSystemProbe,
+        private readonly SnmpTopologyProbe $topologyProbe = new SnmpTopologyProbe,
     ) {}
 
     public function discover(DiscoveryScope $scope, DiscoveryTarget $target): ?DiscoveredIdentity
@@ -100,7 +102,9 @@ final class SnmpInventoryDiscoveryAdapter
         foreach ($authorised->addresses as $address) {
             $system = $this->snmpProbe->probeV2c($address, 'public', 161, 0.35);
             if ($system !== null) {
-                return $this->identityFromSystemMib($system, array_values($authorised->addresses));
+                $topo = $this->topologyProbe->probeTopology($address, null, 161, 0.35);
+
+                return $this->identityFromSystemMib($system, array_values($authorised->addresses), $topo);
             }
         }
 
@@ -125,7 +129,9 @@ final class SnmpInventoryDiscoveryAdapter
                         ? $this->snmpProbe->probeV2c($address, $material['community'], 161, 0.5)
                         : null);
                 if ($system !== null) {
-                    return $this->identityFromSystemMib($system, $addresses);
+                    $topo = $this->topologyProbe->probeTopology($address, $material, 161, 0.35);
+
+                    return $this->identityFromSystemMib($system, $addresses, $topo);
                 }
             }
 
@@ -164,8 +170,9 @@ final class SnmpInventoryDiscoveryAdapter
     /**
      * @param  array{sys_descr: ?string, sys_object_id: ?string, sys_name: ?string}  $system
      * @param  list<string>  $addresses
+     * @param  array<string, mixed>  $topology
      */
-    private function identityFromSystemMib(array $system, array $addresses): DiscoveredIdentity
+    private function identityFromSystemMib(array $system, array $addresses, array $topology = []): DiscoveredIdentity
     {
         $objectId = is_string($system['sys_object_id'] ?? null) && trim($system['sys_object_id']) !== ''
             ? ltrim(trim($system['sys_object_id']), '.')
@@ -181,7 +188,8 @@ final class SnmpInventoryDiscoveryAdapter
             'snmp_sys_descr' => $sysDescr,
             'snmp_sys_object_id' => $objectId,
             'snmp_sys_name' => $sysName,
-        ], fn (mixed $value): bool => $value !== null && $value !== '');
+            ...$topology,
+        ], fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
 
         return new DiscoveredIdentity(
             provider: 'snmp',

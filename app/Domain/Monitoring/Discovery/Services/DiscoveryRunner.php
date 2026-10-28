@@ -18,6 +18,7 @@ use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
 use App\Domain\Monitoring\Jobs\CompleteDiscoveryRun;
 use App\Domain\Monitoring\Jobs\RunDiscoveryScope;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -295,7 +296,8 @@ final class DiscoveryRunner
 
     public function complete(int $runId): DiscoveryRun
     {
-        return DB::transaction(function () use ($runId): DiscoveryRun {
+        $justCompleted = false;
+        $completed = DB::transaction(function () use ($runId, &$justCompleted): DiscoveryRun {
             $run = DiscoveryRun::query()->lockForUpdate()->findOrFail($runId);
             if (in_array($run->status, self::TERMINAL_STATUSES, true)) {
                 return $run;
@@ -320,9 +322,25 @@ final class DiscoveryRunner
                 'completed_at' => now(),
                 'failure_summary' => $this->failureSummary($run),
             ])->save();
+            $justCompleted = true;
 
             return $run->fresh();
         }, 3);
+
+        if ($justCompleted) {
+            $siteId = (int) data_get($completed->scope_snapshot, 'site_id', 0);
+            if ($siteId > 0) {
+                $actorId = preg_match('/^manual:user:(\d+)$/', (string) $completed->trigger, $m) === 1
+                    ? (int) $m[1]
+                    : null;
+                try {
+                    app(SiteTopologyMapService::class)->reconcileSite($siteId, $actorId);
+                } catch (Throwable) {
+                }
+            }
+        }
+
+        return $completed;
     }
 
     public function cancel(int $runId, string $reason): DiscoveryRun
@@ -602,7 +620,7 @@ final class DiscoveryRunner
             }
         }
         $signals = $identity['signals'] ?? [];
-        if (! is_array($signals) || ($signals !== [] && array_is_list($signals)) || count($signals) > 32) {
+        if (! is_array($signals) || ($signals !== [] && array_is_list($signals)) || count($signals) > 48) {
             throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
         }
         try {

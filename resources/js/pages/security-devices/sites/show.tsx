@@ -37,6 +37,8 @@ import {
     SiteMonitors,
     technologyLabel,
 } from '@/components/security-devices/site-technology-records';
+import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
+import { Button } from '@/components/ui/button';
 import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -488,6 +490,40 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
                                     />
                                 </ReviewCard>
                             </div>
+                            {topology.tree &&
+                            (topology.tree.roots.length > 0 ||
+                                topology.tree.unplaced.length > 0) ? (
+                                <ReviewCard
+                                    icon={Network}
+                                    title="Site network map"
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <p className="text-sm text-muted-foreground">
+                                            {topology.tree.tier_counts.gateways}{' '}
+                                            gateways ·{' '}
+                                            {topology.tree.tier_counts.switches}{' '}
+                                            switches ·{' '}
+                                            {
+                                                topology.tree.tier_counts
+                                                    .access_points
+                                            }{' '}
+                                            access points ·{' '}
+                                            {topology.tree.tier_counts.devices}{' '}
+                                            connected devices
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                selectView('network')
+                                            }
+                                        >
+                                            Open Site network map
+                                        </Button>
+                                    </div>
+                                </ReviewCard>
+                            ) : null}
                             {monitoringReadable ? (
                                 <SiteCollectors
                                     rows={collectors}
@@ -508,6 +544,10 @@ function SiteTechnologyProfile(props: SiteTechnologyProps) {
                     ) : null}
                     {view === 'network' ? (
                         <>
+                            <SiteTopologyTreeCard
+                                tree={topology.tree}
+                                siteName={site.name}
+                            />
                             <div className="grid gap-5 lg:grid-cols-2">
                                 <ReviewCard icon={Network} title="WAN context">
                                     <ReviewRow

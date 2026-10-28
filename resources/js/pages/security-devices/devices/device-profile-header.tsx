@@ -161,11 +161,11 @@ export function DeviceProfileHeader({
             section: 'health',
         },
         {
-            label: 'Monitoring',
+            label: 'Checks',
             value: monitoring
                 ? `${monitoring.healthy}/${monitoring.enabled}`
                 : 'Unavailable',
-            caption: 'Healthy / enabled monitors; device health is separate',
+            caption: 'Healthy / enabled checks; device health is separate',
             section: 'monitors',
         },
         {

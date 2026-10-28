@@ -116,6 +116,43 @@ export type ContactItem = {
     is_primary: boolean;
 };
 
+export type SiteTopologyTreeNode = {
+    id: number;
+    device_uid: string;
+    name: string;
+    tier: 'gateway' | 'switch' | 'access_point' | 'device' | string;
+    domain: string | null;
+    category: string | null;
+    subcategory: string | null;
+    manufacturer: string | null;
+    model: string | null;
+    ip_address: string | null;
+    mac_address: string | null;
+    status: string;
+    health: string;
+    href: string;
+    uplink: {
+        protocol: string;
+        label: string;
+        port: string | null;
+    } | null;
+    children: SiteTopologyTreeNode[];
+};
+
+export type SiteTopologyTree = {
+    tier_counts: {
+        gateways: number;
+        switches: number;
+        access_points: number;
+        devices: number;
+    };
+    sources: string[];
+    last_captured_at: string | null;
+    mapped_count: number;
+    roots: SiteTopologyTreeNode[];
+    unplaced: SiteTopologyTreeNode[];
+};
+
 export type SiteTechnologyProps = {
     site: SiteTechnology;
     devices: DeviceListItem[];
@@ -136,6 +173,7 @@ export type SiteTechnologyProps = {
             type: string;
             port: string | null;
         }>;
+        tree?: SiteTopologyTree;
     };
     deviceGroups: DeviceGroup[];
     monitoring: {

@@ -17,6 +17,7 @@ use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Site;
@@ -403,6 +404,11 @@ class EstateOperationsPresenter
             ->values();
 
         $canManageCollectors = $viewer->canDo('securityDevices.integrations.manage');
+        $deviceRows = $devices
+            ->map(fn (Device $device) => $this->deviceRow($device, $context['canViewEvents']))
+            ->values();
+        $topologyTree = app(SiteTopologyMapService::class)
+            ->buildSiteTree($site, $devices, $deviceRows, $relationships);
 
         return [
             'site' => [
@@ -414,9 +420,7 @@ class EstateOperationsPresenter
                 'is_active' => (bool) $site->is_active,
             ],
             'summary' => $summary,
-            'devices' => $devices
-                ->map(fn (Device $device) => $this->deviceRow($device, $context['canViewEvents']))
-                ->values(),
+            'devices' => $deviceRows,
             'wan' => [
                 'known' => $wanDevices->isNotEmpty(),
                 'label' => $wanDevices->isNotEmpty()
@@ -426,8 +430,11 @@ class EstateOperationsPresenter
             ],
             'topology' => [
                 'device_count' => $devices->count(),
-                'edge_count' => $relationships->count(),
-                'is_complete' => $devices->count() > 0 && $relationships->count() >= max(0, $devices->count() - 1),
+                'edge_count' => max(
+                    $relationships->count(),
+                    max(0, (int) ($topologyTree['mapped_count'] ?? 0) - count($topologyTree['roots'] ?? [])),
+                ),
+                'is_complete' => $devices->count() > 0 && count($topologyTree['unplaced'] ?? []) === 0 && count($topologyTree['roots'] ?? []) > 0,
                 'edges' => $relationships->map(fn (DeviceRelationship $relationship) => [
                     'id' => $relationship->id,
                     'parent_device_id' => $relationship->parent_device_id,
@@ -437,6 +444,7 @@ class EstateOperationsPresenter
                     'type' => $relationship->relationship_type?->value,
                     'port' => $relationship->port,
                 ])->values(),
+                'tree' => $topologyTree,
             ],
             'deviceGroups' => $groups,
             'monitoring' => [

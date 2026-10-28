@@ -40,19 +40,25 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { TabsRoot as Tabs, TabsContent } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     ArrowRightLeft,
+    Clock,
     Cpu,
     Edit,
+    Loader2,
     MapPin,
     Minus,
     Plus,
+    Radar,
     RefreshCw,
     Trash2,
+    Wifi,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { InstallationProfileDialog } from './_installation-dialog';
@@ -79,11 +85,13 @@ import {
     DeviceAuditSection,
     DeviceConfigurationSection,
     DeviceHealthSection,
+    DeviceHistorySection,
     DeviceInterfacesSensorsSection,
     DeviceManagementSection,
     DeviceMonitorsSection,
     DeviceTicketsSection,
 } from './device-profile-sections';
+import { DeviceTypeOverview } from './device-type-overview';
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -862,6 +870,51 @@ function DeviceShowBody({
         );
     };
 
+    const [headerPinging, setHeaderPinging] = useState(false);
+    const [headerPingFeedback, setHeaderPingFeedback] = useState<{
+        reachable: boolean;
+        latency_label: string | null;
+        message: string;
+        checked_at: string | null;
+    } | null>(null);
+
+    const runHeaderPing = async () => {
+        if (!profile.ping?.url || !profile.ping.canPing || headerPinging) {
+            return;
+        }
+        setHeaderPinging(true);
+        try {
+            const response = await axios.post<{
+                reachable: boolean;
+                latency_label: string | null;
+                message: string;
+                checked_at: string | null;
+            }>(profile.ping.url);
+            setHeaderPingFeedback(response.data);
+        } catch (error: unknown) {
+            let message = 'Could not reach the server to test this device.';
+            if (axios.isAxiosError(error) && error.response?.data) {
+                const payload = error.response.data as { message?: string };
+                if (payload.message) message = payload.message;
+            }
+            setHeaderPingFeedback({
+                reachable: false,
+                latency_label: null,
+                message,
+                checked_at: new Date().toISOString(),
+            });
+        } finally {
+            setHeaderPinging(false);
+        }
+    };
+
+    const hasChecksSection = profile.sections.some(
+        (section) => section.key === 'monitors',
+    );
+    const hasHistorySection = profile.sections.some(
+        (section) => section.key === 'history',
+    );
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -886,6 +939,40 @@ function DeviceShowBody({
                                 navigation={profile.cctv}
                                 onDark
                             />
+                            {profile.ping && (
+                                <PageHeaderGlassButton
+                                    icon={headerPinging ? Loader2 : Wifi}
+                                    disabled={
+                                        !profile.ping.canPing || headerPinging
+                                    }
+                                    title={
+                                        profile.ping.missingReason ?? undefined
+                                    }
+                                    onClick={() => void runHeaderPing()}
+                                >
+                                    Ping now
+                                </PageHeaderGlassButton>
+                            )}
+                            {hasChecksSection && (
+                                <PageHeaderGlassButton
+                                    icon={Radar}
+                                    onClick={() =>
+                                        openProfileSection('monitors')
+                                    }
+                                >
+                                    Checks
+                                </PageHeaderGlassButton>
+                            )}
+                            {hasHistorySection && (
+                                <PageHeaderGlassButton
+                                    icon={Clock}
+                                    onClick={() =>
+                                        openProfileSection('history')
+                                    }
+                                >
+                                    History
+                                </PageHeaderGlassButton>
+                            )}
                             {endpoint_setup && (
                                 <PageHeaderGlassButton
                                     onClick={() => setInstallationOpen(true)}
@@ -951,6 +1038,46 @@ function DeviceShowBody({
                     onSearchClose={() => setProfileSearchOpen(false)}
                 />
 
+                {headerPingFeedback && (
+                    <Alert data-testid="header-ping-feedback">
+                        <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <StatusBadge
+                                    variant={
+                                        headerPingFeedback.reachable
+                                            ? 'success'
+                                            : 'critical'
+                                    }
+                                >
+                                    {headerPingFeedback.reachable
+                                        ? (headerPingFeedback.latency_label ??
+                                          'Reachable')
+                                        : 'No reply'}
+                                </StatusBadge>
+                                <span className="text-sm font-medium text-foreground">
+                                    {headerPingFeedback.message}
+                                </span>
+                                {headerPingFeedback.checked_at && (
+                                    <span className="text-caption">
+                                        Checked{' '}
+                                        {formatDateTime(
+                                            headerPingFeedback.checked_at,
+                                        )}
+                                    </span>
+                                )}
+                            </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setHeaderPingFeedback(null)}
+                            >
+                                Dismiss
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                )}
+
                 <div
                     id="device-profile-panel"
                     role="tabpanel"
@@ -964,6 +1091,16 @@ function DeviceShowBody({
                     >
                         {/* ── Overview tab ──────────────────────────── */}
                         <TabsContent value="health" className="space-y-6">
+                            <DeviceTypeOverview
+                                profile={profile}
+                                deviceId={device.id}
+                                deviceName={device.name}
+                                canSetupAgent={endpoint_setup !== null}
+                                onOpenSection={openProfileSection}
+                                onOpenInstallation={() =>
+                                    setInstallationOpen(true)
+                                }
+                            />
                             <DeviceHealthSection
                                 profile={profile}
                                 onEditDevice={
@@ -1734,6 +1871,10 @@ function DeviceShowBody({
                                     </DialogFooter>
                                 </DialogContent>
                             </Dialog>
+                        </TabsContent>
+
+                        <TabsContent value="history">
+                            <DeviceHistorySection profile={profile} />
                         </TabsContent>
 
                         <TabsContent value="audit">

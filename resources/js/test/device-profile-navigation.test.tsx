@@ -152,6 +152,12 @@ describe('DeviceProfileNavigation', () => {
                 count: 0,
             },
             {
+                key: 'history',
+                label: 'History',
+                group: 'records',
+                count: 0,
+            },
+            {
                 key: 'documents',
                 label: 'Documents',
                 group: 'records',
@@ -184,6 +190,9 @@ describe('DeviceProfileNavigation', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'History & files' }),
         );
+        expect(
+            screen.getByRole('tab', { name: 'History' }),
+        ).toBeInTheDocument();
         expect(
             screen.getByRole('tab', { name: 'Documents' }),
         ).toBeInTheDocument();

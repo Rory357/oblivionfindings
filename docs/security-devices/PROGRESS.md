@@ -364,5 +364,71 @@
 - **All devices after clicking `Add all` (`21` real `172.16.0.0/24` devices adopted with detected domain, category, sub-type, brand, and model):**
   ![Local Devices Adopted](screenshots/phase-3-local-devices-adopted.png)
 
+#### Live `oblivionfindings.com` walkthrough (`55bcbf9fe` — 28 Oct 2026 NZDT)
+- **Pre-deploy MySQL backup verified on `172.16.0.232`:**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase3-20261028T033727Z.sql.gz` (`45 MB`, `0600`, `gzip -t` OK)
+- **Live deployment & lifecycle triggers verified:**
+  - `HEAD`: `55bcbf9fe28e2dec5ffeab8204de1549cdf3e72a`, `database:verify-lifecycle-triggers postflight` `16/16` verified, `git -C /var/www/oblivionfindings status --porcelain` empty.
+- **Add hub discovery scope — Step 3 (`80 pps`, all 10 plain-English protocols, optional SNMP reference):**
+  ![Live Scope Protocols](screenshots/phase-3-live-scope-protocols.png)
+- **Discovery & collectors › Candidates (`13` real `172.16.0.0/24` hosts uploaded over mTLS from `172.16.0.93`, `UX7` matched `91%`, `+ Add all`, `0` console/HTTP errors):**
+  ![Live Candidates Review](screenshots/phase-3-live-candidates-review.png)
+- **Candidate details (`c120.localdomain` — `IP camera`, `TP-Link Tapo C120`, `82%`, MAC `78:20:51:68:A2:84 · TP-Link Systems Inc.`):**
+  ![Live Candidate Detail](screenshots/phase-3-live-candidate-detail.png)
+- **Pre-filled `Add as device` dialog on live `.com` (`Security › CCTV › IP Camera`, `TP-Link`, `Tapo C120`, `82% confidence`):**
+  ![Live Adopt Prefilled](screenshots/phase-3-live-adopt-prefilled.png)
 
+---
+
+## Phase 4 — Specific profiles and the map
+
+### Summary of changes
+
+1. **One profile layout per device type (`4.1` — 8 distinct layouts)**
+   - Added `DeviceProfilePresenter::resolveProfileLayout()` + `buildTypeProfile()` (`app/Domain/SecurityDevices/Presenters/DeviceProfilePresenter.php`) and `DeviceTypeOverview` (`resources/js/pages/security-devices/devices/device-type-overview.tsx`) rendering a tailored profile view for each device class:
+     - **`network`:** Upstream & downstream neighbours (LLDP, CDP, switch MAC tables, UniFi, LAN subnet), tracked interface summary, configuration state, firmware version, and shortcuts to **Interfaces**, **Topology**, and **Configuration**.
+     - **`camera`:** Honest stream verification state (`Live source verified` vs `Source configured (not verified)` vs `Stream not configured`), SSRF-guarded ONVIF Media live JPEG/PNG/WebP snapshot (`OnvifCameraProfileClient` + `DeviceCameraOnvifController`), and ONVIF PTZ directional & zoom controls (`ContinuousMove`, `Stop`, `GotoHomePosition`) with audit logging when supported.
+     - **`alarm_panel`:** Current panel state (`Armed`, `Disarmed`, `Triggered`, `Fault`, `Not reported`), per-zone status rows, and permission-, reason-, impact-acknowledgement-, and `type_device_name`-gated **Arm alarm** / **Disarm alarm** controls (honestly disabled with plain-English explanation when no alarm command adapter is active).
+     - **`door`:** Reported door state (`Locked`, `Unlocked`, `Forced`), recent badge/door events, and confirmation-and-audit-reason-gated **Unlock door (timed)** (`1`–`60` seconds).
+     - **`sensor`:** Latest environmental/healthcare metric tiles (`Temperature`, `Humidity`, `CO₂`, `Leak`, `Occupancy`, etc.), battery level & health band, and recent sensor readings.
+     - **`tracker`:** Resident-consent- and permission-gated OpenStreetMap `LeafletMap` (`PersonalTrackingPrivacyService` + `ConsentValidationService`), masked IMEI (`8679•••••••4001`), and direct **Unit console** shortcut.
+     - **`computer`:** Obli agent status (`Online`, `Awaiting first check-in`, `Not enrolled`), OS/hostname/version posture, and **Set up Obli** installer launcher.
+     - **`other`:** Generic hardware identity, IP/MAC/serial/firmware summary, and notes.
+
+2. **Universal profile controls (`4.2`)**
+   - Updated `show.tsx`, `device-profile-navigation.tsx`, `device-profile-sections.tsx`, and `DeviceProfilePresenter` so **every** device profile header exposes **Ping now** (with inline `<Alert data-testid="header-ping-feedback">`), **Checks** (`monitors` section renamed from `Monitors` to `Checks`), **History** (new unified chronological `DeviceHistorySection` combining events, commands, assignments, maintenance, and record changes with category filter pills), and **Edit**.
+
+3. **Automatic Site network map (`4.3` — LLDP, CDP, Bridge FDB, ARP, and UniFi local API)**
+   - Implemented pure-PHP ASN.1 BER `SnmpTopologyProbe` (`collector/src/Discovery/SnmpTopologyProbe.php` & `app/Domain/Monitoring/Discovery/Support/SnmpTopologyProbe.php`) querying IEEE 802.1AB `LLDP-MIB` (`1.0.8802.1.1.2.1`), Cisco `CISCO-CDP-MIB` (`1.3.6.1.4.1.9.9.23.1.2.1.1`), RFC 2863 `IF-MIB` (`ifName`), RFC 4188 `BRIDGE-MIB` (`dot1dTpFdbEntry`), RFC 4363 `Q-BRIDGE-MIB` (`dot1qTpFdbEntry`), and RFC 4293 `IP-MIB` (`ipNetToMediaPhysAddress`) over SNMPv2c and leased SNMPv3 USM.
+   - Implemented `UniFiLocalTopologyProbe` (`collector/src/Discovery/UniFiLocalTopologyProbe.php` & `app/Domain/Monitoring/Discovery/Support/UniFiLocalTopologyProbe.php`) querying Ubiquiti UniFi OS (`443` `/proxy/network/api/s/{site}/stat/device` & `stat/sta`) and classic controller (`8443`) uplink hierarchy and Wi-Fi client AP associations via leased credentials.
+   - Added `SiteTopologyMapService` (`app/Domain/SecurityDevices/Services/SiteTopologyMapService.php`) and `SiteTopologyTreeCard` (`resources/js/components/security-devices/site-topology-tree.tsx`) on **Sites › WAN & topology** (`#site-network`) and **Overview** preview, rendering `Gateway → Switches → Access points → Devices` with `<StatusBadge>` tier/protocol/health chips, expand/collapse controls, unplaced device section, and clickable device profile links while preserving `DeviceRelationship` immutability (`unlinked_at` + `unlink_reason` + `AuditLogger`).
+   - Documented all Phase 4 MIBs, ONVIF Media/PTZ WSDLs, and UniFi local controller endpoints with official specification URLs in `docs/security-devices/SUPPORTED-DEVICES.md`.
+
+---
+
+### Verification & local walkthrough
+
+- **Collector PHP runtime (`collector/`):** `php vendor/bin/pest` — `131` passed (`Phase4TopologyProbeTest`: live UDP BER SNMPv2c responder verifying LLDP, CDP, Bridge FDB, Q-Bridge FDB, and ARP table walks + UniFi OS `stat/device` & `stat/sta` parsing + credential scrubbing).
+- **Laravel Pint:** `0` issues across all 23 Phase 4 PHP files.
+- **TypeScript (`npm run types`):** `0` errors across the repository.
+- **ESLint (`--max-warnings=0`):** `0` errors and `0` warnings across all Security & Devices TS/TSX files (including `security-devices-copy/no-jargon` and plain sentence-case labels).
+- **Vitest (`--maxWorkers=2`):** `3` test files / `8` tests passed (`device-profile-navigation.test.tsx`, `site-topology-tree.test.tsx`, `device-type-overview.test.tsx`).
+- **Pest Feature & Architecture (Sequential):** `Phase4ProfilesAndTopologyTest`, `DeviceProfileWorkspaceTest`, `EstateSiteOperationsTest`, `UnifiTopologyCapabilityTest`, `DiscoveryCandidateActionsTest`, `Phase1DeviceBasicsTest`, `ItSecuritySingleTenantBoundaryTest`, `SecurityDevicesAccessBoundaryTest`, `DeviceCommandOperationalBoundaryTest` — `89` passed.
+- **Home network walkthrough (`172.16.0.0/24`):**
+  - Ran a real `172.16.0.0/24` Site-hub LAN sweep (`80 pps`), adopted `19` live hosts into `Home Network Lab`, and reconciled the automatic Site network map (`1` Ubiquiti `unifi.localdomain` gateway at `172.16.0.1` → `18` connected LAN devices including `c120.localdomain` TP-Link Tapo C120 camera at `172.16.0.78`, `cubo-ai`, `Google Nest Hub`, `Samsung TV`, `JBL BAR 500`, and `stephan-pc`).
+  - Verified all `8` device profile layouts (`network`, `camera`, `alarm_panel`, `door`, `sensor`, `tracker`, `computer`, `other`), universal header controls (`Ping now` `< 1 ms` live reply on `172.16.0.1`, `Checks`, `History`, `Edit`), resident location consent gate on `Queclink GL300 Safety Pendant`, and `390x844` responsive view with `0` console/page/HTTP errors.
+
+#### Local walkthrough screenshots
+- **Sites › WAN & topology — Automatic Site network map (`1` Gateway → `18` real `172.16.0.0/24` connected devices with clickable profile links):**
+  ![Local Site Topology Map](screenshots/phase-4-local-site-topology-map.png)
+- **Network profile (`unifi.localdomain` `172.16.0.1` — universal `Ping now` `< 1 ms` reply, downstream LAN neighbours, interfaces & configuration):**
+  ![Local Network Profile & Ping](screenshots/phase-4-local-network-profile-ping.png)
+- **Camera profile (`c120.localdomain` TP-Link Tapo C120 `172.16.0.78` — honest stream state, ONVIF snapshot card, universal header controls):**
+  ![Local Camera Profile](screenshots/phase-4-local-camera-profile.png)
+- **Alarm panel profile (`Armed`, `2` zones, honest adapter prerequisite state, universal header controls):**
+  ![Local Alarm Panel Profile](screenshots/phase-4-local-alarm-panel-profile.png)
+- **Tracker profile (`Queclink GL300 Safety Pendant` — masked IMEI `8679•••••••4001`, resident location consent gate hiding coordinates by default, `Unit console` shortcut):**
+  ![Local Tracker Profile](screenshots/phase-4-local-tracker-profile.png)
+- **Universal `History` tab (chronological timeline with category filter pills):**
+  ![Local History Timeline](screenshots/phase-4-local-history-timeline.png)
 
