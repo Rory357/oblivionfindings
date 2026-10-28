@@ -267,7 +267,9 @@ export function SiteDevices({
 }
 const siteMonitorRunsFrom = (r: Monitor): string =>
     r.runs_from ??
-    (r.collector_name ? `Runs from: hub ${r.collector_name}` : 'Runs from: server');
+    (r.collector_name
+        ? `Runs from: hub ${r.collector_name}`
+        : 'Runs from: server');
 
 export function SiteMonitors({
     rows,
@@ -434,7 +436,8 @@ export function SiteCollectors({
             })}
             actionsFor={(r) =>
                 onEditHub &&
-                r.update_url === `/security-devices/discovery/collectors/${r.id}`
+                r.update_url ===
+                    `/security-devices/discovery/collectors/${r.id}`
                     ? [
                           {
                               label: 'Edit hub',

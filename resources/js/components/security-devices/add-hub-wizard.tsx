@@ -272,14 +272,10 @@ function AddHubWizardBody({
                                   (item) => item.id === defaultSiteId,
                               )
                             : undefined) ??
-                        (loadedSites.length === 1
-                            ? loadedSites[0]
-                            : undefined);
+                        (loadedSites.length === 1 ? loadedSites[0] : undefined);
                     if (preferredSite) {
                         setSiteId((current) =>
-                            current === ''
-                                ? String(preferredSite.id)
-                                : current,
+                            current === '' ? String(preferredSite.id) : current,
                         );
                         setName((current) =>
                             current.trim() === ''
@@ -336,31 +332,34 @@ function AddHubWizardBody({
         );
     };
 
-    const checkConnection = useCallback(async (enrollmentId: number) => {
-        if (!mounted.current) return;
-        setPolling(true);
-        try {
-            const response = await axios.get<HubWizardStatusResponse>(
-                `/security-devices/discovery/collectors/enrolments/${enrollmentId}/status`,
-                { headers: { Accept: 'application/json' } },
-            );
+    const checkConnection = useCallback(
+        async (enrollmentId: number) => {
             if (!mounted.current) return;
-            setStatus(response.data);
-            if (
-                response.data.state === 'connected' &&
-                !notifiedConnected.current
-            ) {
-                notifiedConnected.current = true;
-                onConnected?.();
+            setPolling(true);
+            try {
+                const response = await axios.get<HubWizardStatusResponse>(
+                    `/security-devices/discovery/collectors/enrolments/${enrollmentId}/status`,
+                    { headers: { Accept: 'application/json' } },
+                );
+                if (!mounted.current) return;
+                setStatus(response.data);
+                if (
+                    response.data.state === 'connected' &&
+                    !notifiedConnected.current
+                ) {
+                    notifiedConnected.current = true;
+                    onConnected?.();
+                }
+            } catch {
+                /* Keep polling quietly through transient refreshes. */
+            } finally {
+                if (mounted.current) {
+                    setPolling(false);
+                }
             }
-        } catch {
-            /* Keep polling quietly through transient refreshes. */
-        } finally {
-            if (mounted.current) {
-                setPolling(false);
-            }
-        }
-    }, [onConnected]);
+        },
+        [onConnected],
+    );
 
     useEffect(() => {
         if (!issued) return;

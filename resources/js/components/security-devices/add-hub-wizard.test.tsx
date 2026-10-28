@@ -164,9 +164,7 @@ describe('AddHubWizard and EditHubDialog', () => {
                 headers: { Accept: 'application/json' },
             }),
         );
-        expect(
-            screen.getByRole('link', { name: 'Download' }),
-        ).toHaveAttribute(
+        expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute(
             'href',
             `/security-devices/agent-downloads/linux-amd64/${'b'.repeat(64)}`,
         );

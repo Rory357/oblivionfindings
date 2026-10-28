@@ -858,11 +858,11 @@ function MonitoringScreen({
     );
     const canAddCheck = Boolean(
         management.can_add_check ??
-            (management.can_manage &&
-                management.create_url ===
-                    '/security-devices/monitoring/native-monitors' &&
-                management.devices.length > 0 &&
-                management.profiles.length > 0),
+        (management.can_manage &&
+            management.create_url ===
+                '/security-devices/monitoring/native-monitors' &&
+            management.devices.length > 0 &&
+            management.profiles.length > 0),
     );
     return (
         <AppLayout

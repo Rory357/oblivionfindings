@@ -614,17 +614,16 @@ function DiscoveryBody({
         protocols: [],
         sites: [],
     };
-    const candidateManagement: CandidateManagement =
-        w.candidate_management ?? {
-            can_adopt: false,
-            can_same_as: false,
-            can_ignore: false,
-            adopt_all_url: null,
-            adoptable_count: 0,
-            taxonomy: {},
-            domains: [],
-            devices_by_site: {},
-        };
+    const candidateManagement: CandidateManagement = w.candidate_management ?? {
+        can_adopt: false,
+        can_same_as: false,
+        can_ignore: false,
+        adopt_all_url: null,
+        adoptable_count: 0,
+        taxonomy: {},
+        domains: [],
+        devices_by_site: {},
+    };
     const mayManageScopes = canManage && scopeManagement.can_manage;
     const mayManageCollectors = canManage && w.collector_management.can_manage;
     const currentScope = (id: number) => w.scopes.find((row) => row.id === id);
