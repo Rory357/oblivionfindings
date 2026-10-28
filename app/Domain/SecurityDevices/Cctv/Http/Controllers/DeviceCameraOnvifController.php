@@ -3,6 +3,7 @@
 namespace App\Domain\SecurityDevices\Cctv\Http\Controllers;
 
 use App\Domain\SecurityDevices\Cctv\Services\OnvifCameraProfileClient;
+use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -17,6 +18,7 @@ final class DeviceCameraOnvifController extends Controller
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly OnvifCameraProfileClient $onvif,
+        private readonly DeviceDriverRegistry $drivers,
     ) {}
 
     public function snapshot(Request $request, Device $device): JsonResponse
@@ -36,11 +38,48 @@ final class DeviceCameraOnvifController extends Controller
             404,
         );
 
-        $result = $this->onvif->captureSnapshot($device);
+        $driver = $this->drivers->resolveCameraDriver($device);
+        $result = $driver !== null
+            ? $driver->captureSnapshot($device)
+            : $this->onvif->captureSnapshot($device);
 
         AuditLogger::logOrFail('camera.onvif.snapshot', $device, [
             'actor_id' => (int) $user->id,
             'device_id' => (int) $device->id,
+            'driver_key' => $driver?->key() ?? 'camera-onvif-standard',
+            'ok' => $result['ok'],
+            'reason_code' => $result['reason_code'],
+        ]);
+
+        return response()->json($result)->header('Cache-Control', 'no-store');
+    }
+
+    public function streams(Request $request, Device $device): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless(
+            $user
+            && $user->canDo('securityDevices.devices.view')
+            && $user->canDo('securityDevices.cctv.media.view'),
+            403,
+        );
+        $this->access->assertCanViewDevice($user, $device);
+        abort_unless(
+            $device->domain === 'security'
+            && $device->category === 'cctv'
+            && $device->status !== DeviceStatus::Decommissioned,
+            404,
+        );
+
+        $driver = $this->drivers->resolveCameraDriver($device);
+        $result = $driver !== null
+            ? $driver->probeStreams($device)
+            : $this->onvif->probeStreams($device);
+
+        AuditLogger::logOrFail('camera.streams.probe', $device, [
+            'actor_id' => (int) $user->id,
+            'device_id' => (int) $device->id,
+            'driver_key' => $driver?->key() ?? 'camera-onvif-standard',
             'ok' => $result['ok'],
             'reason_code' => $result['reason_code'],
         ]);
@@ -89,11 +128,15 @@ final class DeviceCameraOnvifController extends Controller
         ]);
 
         $action = (string) $validated['action'];
-        $result = $this->onvif->performPtz($device, $action);
+        $driver = $this->drivers->resolveCameraDriver($device);
+        $result = $driver !== null
+            ? $driver->performPtz($device, $action)
+            : $this->onvif->performPtz($device, $action);
 
         AuditLogger::logOrFail('camera.onvif.ptz', $device, [
             'actor_id' => (int) $user->id,
             'device_id' => (int) $device->id,
+            'driver_key' => $driver?->key() ?? 'camera-onvif-standard',
             'ptz_action' => $action,
             'ok' => $result['ok'],
             'reason_code' => $result['reason_code'],

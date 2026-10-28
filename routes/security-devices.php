@@ -60,6 +60,7 @@ use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
+use App\Domain\SecurityDevices\Http\Controllers\SupportedDevicesController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchDecisionController;
@@ -215,6 +216,15 @@ Route::middleware([
             'throttle:20,1',
         ])
         ->name('security-devices.devices.camera.snapshot');
+
+    Route::get('/devices/{device}/camera/streams', [DeviceCameraOnvifController::class, 'streams'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.cctv.media.view',
+            'throttle:30,1',
+        ])
+        ->name('security-devices.devices.camera.streams');
 
     Route::post('/devices/{device}/camera/ptz', [DeviceCameraOnvifController::class, 'ptz'])
         ->whereNumber('device')
@@ -680,6 +690,9 @@ Route::middleware([
 
     Route::get('/settings', SettingsAuditController::class)
         ->name('security-devices.settings');
+
+    Route::get('/supported-devices', SupportedDevicesController::class)
+        ->name('security-devices.supported-devices');
 
     Route::get('/settings/monitoring/effective-preview/{monitor}', [MonitoringEffectivePolicyPreviewController::class, 'show'])
         ->whereNumber('monitor')

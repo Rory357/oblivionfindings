@@ -6,7 +6,7 @@ final class NetworkConfigurationRedactor
 {
     public const string REDACTED = '[REDACTED]';
 
-    public const int MAX_CONFIG_LINES = 1000;
+    public const int MAX_CONFIG_LINES = 20000;
 
     public const int MAX_LINE_LENGTH = 512;
 
@@ -88,6 +88,7 @@ final class NetworkConfigurationRedactor
             // SNMP community strings (Cisco / Aruba / HP / MikroTik / EdgeOS)
             '/^(\s*snmp-server\s+community)\s+\S+(\s+.*)?$/i' => '$1 '.self::REDACTED.'$2',
             '/^(\s*set\s+system\s+services\s+snmp\s+community)\s+\S+(\s+.*)?$/i' => '$1 '.self::REDACTED.'$2',
+            '/^(\s*\/snmp\s+community\s+(?:add|set)\b.*?\bname\s*=\s*)(?:"[^"]*"|\'[^\']*\'|\S+)/i' => '$1'.self::REDACTED,
             // SNMPv3 auth / priv passphrases on a single line
             '/(\b(?:auth|priv)\s+(?:md5|sha|sha256|sha512|des|3des|aes(?:\s+\d+)?))\s+\S+/i' => '$1 '.self::REDACTED,
             // RADIUS / TACACS / NTP / OSPF / BGP / HSRP / VRRP / ISAKMP / IPsec keys
@@ -102,8 +103,10 @@ final class NetworkConfigurationRedactor
             '/^(\s*set\s+(?:password|passwd|psksecret|secret|keylifeseconds-secret|auth-password\S*|priv-password\S*|private-key|api-key))\s+.+$/i' => '$1 '.self::REDACTED,
             // Junos: encrypted-password "..."; secret "..."; pre-shared-key ascii-text "...";
             '/(\b(?:encrypted-password|secret|pre-shared-key(?:\s+ascii-text)?|authentication-key)\s+)"[^"]*"(\s*;?)/i' => '$1"'.self::REDACTED.'"$2',
-            // Generic key=value or key: value assignments inside config lines
-            '/(\b(?:password|passwd|secret|api_token|api-token|access_token|private_key|pre_shared_key|wpa_psk|community)\s*[:=]\s*)(?:"[^"]*"|\'[^\']*\'|\S+)/i' => '$1'.self::REDACTED,
+            // Aruba AOS-CX / ArubaOS-Switch ciphertext secrets (e.g., "password ciphertext AQBap..." or "radius-server host 1.2.3.4 key ciphertext AQB...")
+            '/(\bciphertext)\s+\S+/i' => '$1 '.self::REDACTED,
+            // MikroTik RouterOS & generic key=value or key: value assignments inside config lines
+            '/(\b(?:password|passwd|passphrase|secret|api_token|api-token|access_token|private_key|private-key|pre_shared_key|pre-shared-key|preshared-key|wpa_psk|wpa-pre-shared-key|wpa2-pre-shared-key|authentication-password|encryption-password|shared-secret|community)\s*[:=]\s*)(?:"[^"]*"|\'[^\']*\'|\S+)/i' => '$1'.self::REDACTED,
             // Line-level password command inside console/vty stanza (e.g., " password 7 0822455D0A16")
             '/^(\s*password(?:\s+\d+)?)\s+\S+$/i' => '$1 '.self::REDACTED,
             // Authorization Bearer headers if echoed

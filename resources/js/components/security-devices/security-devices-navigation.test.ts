@@ -161,6 +161,12 @@ describe('Security & Devices navigation contract', () => {
         ).toBe(true);
         expect(
             isSecurityDevicesDestinationActive(
+                '/security-devices/supported-devices',
+                '/security-devices/discovery',
+            ),
+        ).toBe(true);
+        expect(
+            isSecurityDevicesDestinationActive(
                 '/security-devices/settings',
                 '/security-devices/agent-downloads',
             ),

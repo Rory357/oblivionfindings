@@ -468,7 +468,7 @@ final class ConfigurationSnapshotService
             if (! array_key_exists($key, $payload)) {
                 continue;
             }
-            $candidate = $this->sanitise($payload[$key], 1);
+            $candidate = $this->sanitise($payload[$key], 1, $key === 'running_config_lines' ? NetworkConfigurationRedactor::MAX_CONFIG_LINES : 1000);
             if ($candidate !== null) {
                 $safe[$key] = $candidate;
             }
@@ -479,7 +479,7 @@ final class ConfigurationSnapshotService
         return $safe;
     }
 
-    private function sanitise(mixed $value, int $depth): mixed
+    private function sanitise(mixed $value, int $depth, int $maxArrayItems = 1000): mixed
     {
         if ($depth > 16) {
             throw new InvalidArgumentException('Snapshot structure is too deep.');
@@ -495,7 +495,7 @@ final class ConfigurationSnapshotService
         if (is_float($value)) {
             return is_finite($value) ? $value : null;
         }
-        if (! is_array($value) || count($value) > 1000) {
+        if (! is_array($value) || count($value) > $maxArrayItems) {
             return null;
         }
 

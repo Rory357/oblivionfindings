@@ -154,6 +154,7 @@ const navigationGroups: SecurityDevicesNavigationGroup[] = [
                 aliases: [
                     '/security-devices/discovery',
                     '/security-devices/integrations',
+                    '/security-devices/supported-devices',
                     '/security-devices/agent-downloads',
                     '/security-devices/settings',
                     '/security-devices/reports',

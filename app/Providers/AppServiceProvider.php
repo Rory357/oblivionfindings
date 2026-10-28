@@ -75,11 +75,42 @@ use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\HashicorpVaultSecretStore;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerLeaseIssuer;
 use App\Domain\SecurityDevices\Credentials\Services\UnavailableSecretManagerSecretStore;
+use App\Domain\SecurityDevices\Drivers\Alarms\AjaxHubAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\ArrowheadEliteAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\BoschSolutionAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\DscPowerSeriesNeoDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\GallagherCommandCentreDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\IctProtegeAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\InnerRangeInceptionDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\InnerRangeIntegritiDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\ParadoxAlarmDriver;
+use App\Domain\SecurityDevices\Drivers\Alarms\SiaDc09AlarmReceiverDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\AxisOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\DahuaOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\HanwhaVisionOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\HikvisionOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\OnvifProfileCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\UniFiProtectCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Cameras\UniviewOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Network\ArubaAosConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\CiscoIosConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\FortinetFortiOsConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\MikroTikRouterOsConfigDriver;
+use App\Domain\SecurityDevices\Drivers\Network\UbiquitiUnifiNetworkDriver;
+use App\Domain\SecurityDevices\Drivers\Sensors\MilesightCloudSensorDriver;
+use App\Domain\SecurityDevices\Drivers\Sensors\MilesightLorawanGatewaySensorDriver;
+use App\Domain\SecurityDevices\Drivers\Sensors\MqttGenericSensorDriver;
+use App\Domain\SecurityDevices\Drivers\Services\DeviceDriverRegistry;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubNetflowTelemetryDriver;
+use App\Domain\SecurityDevices\Drivers\Telemetry\HubSyslogTelemetryDriver;
+use App\Domain\SecurityDevices\Drivers\Trackers\QueclinkTrackerDriver;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommandAdapter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommandAdapter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\AlarmPanelCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\DatabaseReleaseFixtureCommandRuntime;
 use App\Domain\SecurityDevices\Management\Adapters\NetworkDeviceCommandAdapter;
+use App\Domain\SecurityDevices\Management\Adapters\NetworkSshConfigBackupCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\QueclinkTrackingCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandAdapter;
 use App\Domain\SecurityDevices\Management\Adapters\ReleaseFixtureCommandRuntime;
@@ -90,6 +121,8 @@ use App\Domain\SecurityDevices\Management\Services\GovernedCommandDispatchServic
 use App\Domain\SecurityDevices\Management\Transports\NativeCommandHttpTransport;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
+use App\Domain\SecurityDevices\NetworkConfig\Contracts\NetworkCliSshTransport;
+use App\Domain\SecurityDevices\NetworkConfig\Services\PhpseclibNetworkCliTransport;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
 use App\Infrastructure\Monitoring\InfluxDbTimeSeriesStore;
@@ -242,15 +275,54 @@ class AppServiceProvider extends ServiceProvider
             ),
         );
         $this->app->bind(CommandHttpTransport::class, NativeCommandHttpTransport::class);
+        $this->app->bind(NetworkCliSshTransport::class, PhpseclibNetworkCliTransport::class);
         $this->app->tag([
             UnifiAccessCommandAdapter::class,
             QueclinkTrackingCommandAdapter::class,
             NetworkDeviceCommandAdapter::class,
+            NetworkSshConfigBackupCommandAdapter::class,
+            AlarmPanelCommandAdapter::class,
             ReleaseFixtureCommandAdapter::class,
             EndpointServiceCommandAdapter::class,
             EndpointRestartCommandAdapter::class,
             EndpointSoftwareCommandAdapter::class,
         ], 'device-command-adapters');
+        $this->app->tag([
+            UniFiProtectCameraDriver::class,
+            HikvisionOnvifCameraDriver::class,
+            DahuaOnvifCameraDriver::class,
+            UniviewOnvifCameraDriver::class,
+            AxisOnvifCameraDriver::class,
+            HanwhaVisionOnvifCameraDriver::class,
+            OnvifProfileCameraDriver::class,
+            GallagherCommandCentreDriver::class,
+            InnerRangeInceptionDriver::class,
+            SiaDc09AlarmReceiverDriver::class,
+            ArrowheadEliteAlarmDriver::class,
+            IctProtegeAlarmDriver::class,
+            InnerRangeIntegritiDriver::class,
+            BoschSolutionAlarmDriver::class,
+            AjaxHubAlarmDriver::class,
+            ParadoxAlarmDriver::class,
+            DscPowerSeriesNeoDriver::class,
+            MilesightLorawanGatewaySensorDriver::class,
+            MilesightCloudSensorDriver::class,
+            MqttGenericSensorDriver::class,
+            UbiquitiUnifiNetworkDriver::class,
+            MikroTikRouterOsConfigDriver::class,
+            CiscoIosConfigDriver::class,
+            ArubaAosConfigDriver::class,
+            FortinetFortiOsConfigDriver::class,
+            QueclinkTrackerDriver::class,
+            HubSyslogTelemetryDriver::class,
+            HubNetflowTelemetryDriver::class,
+        ], 'security-devices.drivers');
+        $this->app->singleton(
+            DeviceDriverRegistry::class,
+            fn ($app): DeviceDriverRegistry => new DeviceDriverRegistry(
+                $app->tagged('security-devices.drivers'),
+            ),
+        );
         $this->app->bind(ReleaseFixtureCommandRuntime::class, DatabaseReleaseFixtureCommandRuntime::class);
         $this->app->bind(CredentialLeaseProvider::class, GovernedCredentialLeaseBroker::class);
         $this->app->bind(
