@@ -565,4 +565,27 @@
 - **Setup › Supported devices — Computers & endpoints (`1440×920` desktop — `30` total drivers across `28` brands & standards):**
   ![Local Supported Devices Computers](screenshots/phase-6-local-supported-devices-computers.png)
 
+#### Live `oblivionfindings.com` walkthrough (`5fbca2693` — 29 Oct 2026 NZDT)
+- **Pre-deploy MySQL backup verified on `172.16.0.232`:**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase6-20261028T144800Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK)
+- **Production release verified (`5fbca2693f33b6e682edb25870bafb595ce1b36a`):**
+  - `database:verify-lifecycle-triggers` preflight & postflight `16/16` verified, Inertia SSR & monitoring supervisors active, `oblivion-queclink.service` active, signed Phase 6 Windows (`ofc1_` setup-code support) & Linux release catalogue (`run 40712127494`) published via `php artisan endpoint:publish-catalogue`, script execution confirmed `false` (`6.4`), `git -C /var/www/oblivionfindings status --porcelain` empty, zero console/page/HTTP errors across `1440×920` desktop and `390×844` mobile viewports.
+- **Settings › Obli (`1440×920` desktop — `Computer management & remote support` card on live `.com`):**
+  ![Live Obli Remote Support](screenshots/phase-6-live-obli-remote-support.png)
+- **Setup › Integrations (`1440×920` desktop — `4` providers including `Microsoft Intune`):**
+  ![Live Integrations Hub](screenshots/phase-6-live-integrations-hub.png)
+- **Setup › Integrations › Microsoft Intune (`1440×920` desktop — `Microsoft directory ID` & single-tenant read-only Graph setup):**
+  ![Live Microsoft Intune Desktop](screenshots/phase-6-live-intune-desktop.png)
+- **Setup › Integrations › Microsoft Intune (`390×844` mobile — responsive header meters & zero horizontal overflow):**
+  ![Live Microsoft Intune Mobile](screenshots/phase-6-live-intune-mobile.png)
+- **Setup › Supported devices — Computers & endpoints (`1440×920` desktop — `30` drivers across `28` brands & standards):**
+  ![Live Supported Devices Computers](screenshots/phase-6-live-supported-devices-computers.png)
+
+---
+
+## Delivery status — 100% complete (`Phases 0–6`)
+
+All seven phases of the Security & Devices delivery plan (**Phase 0** clean-up & honesty, **Phase 1** device basics & Queclink console, **Phase 2** multi-platform Site hub & SD-WAN coverage, **Phase 3** 10-protocol LAN discovery & fingerprinting, **Phase 4** type-specific profiles & automatic Site topology map, **Phase 5** 30-driver brand/protocol registry & clean-room decoders, and **Phase 6** Windows computer management, Obli tray installer `ofc1_` setup codes, attended remote support, and Microsoft Intune bulk Site import) are merged to `main`, deployed, and verified live on `https://oblivionfindings.com`.
+
+
 
