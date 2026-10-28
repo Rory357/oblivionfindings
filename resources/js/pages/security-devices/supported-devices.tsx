@@ -15,10 +15,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
-import {
-    StatusBadge,
-    type StatusVariant,
-} from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -160,10 +157,7 @@ export default function SupportedDevicesPage(props: SupportedDevicesProps) {
         >
             <Head title="Supported devices - Security & Devices" />
 
-            <div
-                className="space-y-5"
-                data-testid="supported-devices-page"
-            >
+            <div className="space-y-5" data-testid="supported-devices-page">
                 <PageHeader
                     icon={Cpu}
                     title="Supported devices"

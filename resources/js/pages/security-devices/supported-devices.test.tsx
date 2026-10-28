@@ -91,7 +91,8 @@ function fixture(): SupportedDevicesProps {
                 support_level: 'tested_on_hardware',
                 support_level_label: 'Tested on real hardware',
                 support_badge_variant: 'success',
-                transport_summary: 'ONVIF SOAP 1.2 + RTSP (Ports 80 / 2020 / 554)',
+                transport_summary:
+                    'ONVIF SOAP 1.2 + RTSP (Ports 80 / 2020 / 554)',
                 models: ['TP-Link Tapo C120', 'ONVIF Profile S & T cameras'],
                 capabilities: [
                     {

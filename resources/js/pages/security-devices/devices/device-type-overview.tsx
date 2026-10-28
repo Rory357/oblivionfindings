@@ -78,7 +78,9 @@ function humanise(value: string | null | undefined): string {
     return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
-function statusVariantForState(state: string | null | undefined): StatusVariant {
+function statusVariantForState(
+    state: string | null | undefined,
+): StatusVariant {
     switch (state) {
         case 'healthy':
         case 'active':
@@ -243,11 +245,11 @@ function NetworkNeighbourList({
 }) {
     return (
         <div className="space-y-2">
-            <p className="text-caption font-semibold uppercase tracking-wide">
+            <p className="text-caption font-semibold tracking-wide uppercase">
                 {title} ({items.length})
             </p>
             {items.length === 0 ? (
-                <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                <p className="text-caption rounded-lg bg-muted/30 p-3">
                     {emptyText}
                 </p>
             ) : (
@@ -269,10 +271,7 @@ function NetworkNeighbourList({
                                             {item.name}
                                         </Link>
                                         <p className="text-caption">
-                                            {[
-                                                item.ip_address,
-                                                item.port,
-                                            ]
+                                            {[item.ip_address, item.port]
                                                 .filter(Boolean)
                                                 .join(' · ') ||
                                                 'Port not reported'}
@@ -462,7 +461,7 @@ function NetworkProfileOverview({
 
                     {previewInterfaces.length > 0 ? (
                         <div className="space-y-1.5">
-                            <p className="text-caption font-semibold uppercase tracking-wide">
+                            <p className="text-caption font-semibold tracking-wide uppercase">
                                 Tracked interfaces
                             </p>
                             {previewInterfaces.map((iface) => (
@@ -488,7 +487,7 @@ function NetworkProfileOverview({
                             ))}
                         </div>
                     ) : (
-                        <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                        <p className="text-caption rounded-lg bg-muted/30 p-3">
                             No SNMP interface checks are configured on this
                             network device yet.
                         </p>
@@ -533,7 +532,8 @@ function CameraProfileOverview({
             );
             setSnapshot(response.data);
         } catch (error: unknown) {
-            let message = 'Could not capture an ONVIF snapshot from this camera.';
+            let message =
+                'Could not capture an ONVIF snapshot from this camera.';
             if (axios.isAxiosError(error) && error.response?.data) {
                 const data = error.response.data as { message?: string };
                 if (data.message) message = data.message;
@@ -611,7 +611,7 @@ function CameraProfileOverview({
                                 ? `Source type: ${humanise(typeProfile.sourceProvider)}`
                                 : 'No RTSP or ONVIF stream URL saved yet.'}
                         </p>
-                        <p className="mt-1 text-caption">
+                        <p className="text-caption mt-1">
                             {typeProfile.streamVerifiedAt
                                 ? `Last verified ${formatDateTime(typeProfile.streamVerifiedAt)}.`
                                 : 'Connect the camera stream source to watch live video inside Oblivion Findings.'}
@@ -653,9 +653,7 @@ function CameraProfileOverview({
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <Camera className="h-4 w-4" />
                                     ONVIF snapshot
-                                    {typeProfile.ptzSupported
-                                        ? ' & PTZ'
-                                        : ''}
+                                    {typeProfile.ptzSupported ? ' & PTZ' : ''}
                                 </CardTitle>
                                 <CardDescription>
                                     Capture a live still frame directly from the
@@ -682,12 +680,12 @@ function CameraProfileOverview({
                     </CardHeader>
                     <CardContent className="space-y-3">
                         {!typeProfile.canViewMedia ? (
-                            <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                            <p className="text-caption rounded-lg bg-muted/30 p-3">
                                 Camera media view permission is required to
                                 capture snapshots.
                             </p>
                         ) : !typeProfile.hasIpAddress ? (
-                            <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                            <p className="text-caption rounded-lg bg-muted/30 p-3">
                                 Add an IP address to this camera first to
                                 request an ONVIF snapshot.
                             </p>
@@ -696,7 +694,7 @@ function CameraProfileOverview({
                                 <img
                                     src={snapshot.data_uri}
                                     alt={`Snapshot from ${deviceName}`}
-                                    className="max-h-64 w-full rounded-lg border object-contain bg-muted/30"
+                                    className="max-h-64 w-full rounded-lg border bg-muted/30 object-contain"
                                 />
                                 <p className="text-caption">
                                     Captured{' '}
@@ -709,12 +707,12 @@ function CameraProfileOverview({
                                 <p className="font-medium text-foreground">
                                     Snapshot unavailable
                                 </p>
-                                <p className="mt-1 text-caption">
+                                <p className="text-caption mt-1">
                                     {snapshot.message}
                                 </p>
                             </div>
                         ) : (
-                            <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                            <p className="text-caption rounded-lg bg-muted/30 p-3">
                                 Select Capture snapshot to pull a fresh frame
                                 from the camera. Every snapshot request is
                                 recorded in the audit log.
@@ -927,7 +925,7 @@ function AlarmPanelProfileOverview({
                         <p className="font-medium">
                             Current state: {panelStateLabel}
                         </p>
-                        <p className="mt-1 text-caption">
+                        <p className="text-caption mt-1">
                             {typeProfile.panelStateAt
                                 ? `Last reported ${formatDateTime(typeProfile.panelStateAt)}.`
                                 : 'No arm, disarm, or alarm event has been received from this panel yet.'}
@@ -975,7 +973,7 @@ function AlarmPanelProfileOverview({
 
                     {(!typeProfile.armAction?.available ||
                         !typeProfile.disarmAction?.available) && (
-                        <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                        <p className="text-caption rounded-lg bg-muted/30 p-3">
                             {typeProfile.disarmAction?.reason ??
                                 typeProfile.armAction?.reason ??
                                 'Alarm control requires security control permission, recent panel state, and an active alarm adapter.'}
@@ -1092,14 +1090,11 @@ function AlarmPanelProfileOverview({
                                 type="checkbox"
                                 className="mt-1 h-4 w-4"
                                 checked={impactAck}
-                                onChange={(e) =>
-                                    setImpactAck(e.target.checked)
-                                }
+                                onChange={(e) => setImpactAck(e.target.checked)}
                             />
                             <span>
-                                I understand this request is permanently
-                                audited and changes physical alarm protection on
-                                site.
+                                I understand this request is permanently audited
+                                and changes physical alarm protection on site.
                             </span>
                         </label>
                         {dialogAction?.confirmationMode ===
@@ -1265,7 +1260,7 @@ function DoorProfileOverview({
                         <p className="font-medium">
                             Current door state: {doorStateLabel}
                         </p>
-                        <p className="mt-1 text-caption">
+                        <p className="text-caption mt-1">
                             {typeProfile.doorStateAt
                                 ? `Last reported ${formatDateTime(typeProfile.doorStateAt)}.`
                                 : 'No lock, unlock, or door-contact state has been reported yet.'}
@@ -1301,7 +1296,7 @@ function DoorProfileOverview({
                     </div>
 
                     {!typeProfile.unlockAction?.available && (
-                        <p className="rounded-lg bg-muted/30 p-3 text-caption">
+                        <p className="text-caption rounded-lg bg-muted/30 p-3">
                             {typeProfile.unlockAction?.reason ??
                                 'Timed unlock requires access control permission, recent door state, and an active door controller adapter.'}
                         </p>
@@ -1451,9 +1446,7 @@ function DoorProfileOverview({
                                 type="checkbox"
                                 className="mt-1 h-4 w-4"
                                 checked={impactAck}
-                                onChange={(e) =>
-                                    setImpactAck(e.target.checked)
-                                }
+                                onChange={(e) => setImpactAck(e.target.checked)}
                             />
                             <span>
                                 I confirm the doorway is safe to release and
@@ -1552,7 +1545,7 @@ function SensorProfileOverview({
                                     className="rounded-lg border p-3"
                                 >
                                     <div className="flex items-center justify-between gap-2">
-                                        <span className="truncate text-caption font-medium">
+                                        <span className="text-caption truncate font-medium">
                                             {reading.label}
                                         </span>
                                         {reading.state && (
@@ -1591,7 +1584,8 @@ function SensorProfileOverview({
                                 Battery &amp; recent triggers
                             </CardTitle>
                             <CardDescription>
-                                Wireless sensor battery health and recent alerts.
+                                Wireless sensor battery health and recent
+                                alerts.
                             </CardDescription>
                         </div>
                         <StatusBadge
@@ -1614,7 +1608,7 @@ function SensorProfileOverview({
                                 : 'Not reported (mains powered or awaiting first report)'}
                         </p>
                         {typeProfile.batteryUpdatedAt && (
-                            <p className="mt-1 text-caption">
+                            <p className="text-caption mt-1">
                                 Updated{' '}
                                 {formatDateTime(typeProfile.batteryUpdatedAt)}
                             </p>
@@ -1623,7 +1617,7 @@ function SensorProfileOverview({
 
                     {typeProfile.recentTriggers.length > 0 && (
                         <div className="space-y-1.5">
-                            <p className="text-caption font-semibold uppercase tracking-wide">
+                            <p className="text-caption font-semibold tracking-wide uppercase">
                                 Recent sensor events
                             </p>
                             {typeProfile.recentTriggers
@@ -1684,9 +1678,7 @@ function TrackerProfileOverview({
                         </CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <StatusBadge
-                            variant={statusVariantForState(pos.state)}
-                        >
+                        <StatusBadge variant={statusVariantForState(pos.state)}>
                             {humanise(pos.state)}
                         </StatusBadge>
                         {typeProfile.hasConsole && (
@@ -1773,7 +1765,7 @@ function TrackerProfileOverview({
                         <p className="font-medium text-foreground">
                             {pos.message}
                         </p>
-                        <p className="mt-1 text-caption">
+                        <p className="text-caption mt-1">
                             Coordinates are hidden unless assignment, active
                             consent, and viewer permissions all allow location
                             display.
