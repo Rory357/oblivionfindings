@@ -41,6 +41,13 @@ enum DriverCapability: string
     case TelemetrySyslog = 'telemetry.syslog';
     case TelemetryNetflow = 'telemetry.netflow';
 
+    case ComputerPosture = 'computer.posture';
+    case ComputerIntuneSync = 'computer.intune_sync';
+    case ComputerServiceControl = 'computer.service_control';
+    case ComputerRestart = 'computer.restart';
+    case ComputerSoftware = 'computer.software';
+    case ComputerAttendedRemote = 'computer.attended_remote';
+
     public function label(): string
     {
         return match ($this) {
@@ -71,6 +78,12 @@ enum DriverCapability: string
             self::NetworkReboot => 'Device restart',
             self::TelemetrySyslog => 'Syslog through Site hub',
             self::TelemetryNetflow => 'NetFlow & IPFIX through Site hub',
+            self::ComputerPosture => 'Health, disk & encryption posture',
+            self::ComputerIntuneSync => 'Microsoft Intune discovery & compliance sync',
+            self::ComputerServiceControl => 'Windows service restart',
+            self::ComputerRestart => 'Scheduled computer restart',
+            self::ComputerSoftware => 'Approved software install & update',
+            self::ComputerAttendedRemote => 'Attended screen help with on-screen approval',
         };
     }
 
@@ -83,6 +96,10 @@ enum DriverCapability: string
             self::NetworkConfigBackup,
             self::NetworkPoeCycle,
             self::NetworkReboot,
+            self::ComputerServiceControl,
+            self::ComputerRestart,
+            self::ComputerSoftware,
+            self::ComputerAttendedRemote,
         ], true);
     }
 }

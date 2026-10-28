@@ -30,6 +30,7 @@ final class IntegrationSecretManager
             self::PURPOSE_PRIMARY => 'client_secret',
             self::PURPOSE_WEBHOOK => 'webhook_secret',
         ],
+        'intune' => [self::PURPOSE_PRIMARY => 'client_secret'],
     ];
 
     public function __construct(
@@ -571,6 +572,7 @@ final class IntegrationSecretManager
             ['unifi', self::PURPOSE_PRIMARY] => 'api-key',
             ['milesight', self::PURPOSE_PRIMARY] => 'oauth',
             ['milesight', self::PURPOSE_WEBHOOK] => 'webhook',
+            ['intune', self::PURPOSE_PRIMARY] => 'oauth',
             default => throw new RuntimeException('Provider secret purpose is unsupported.'),
         };
 

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Domain\It\Exceptions\ItTicketCommandConflict;
 use App\Domain\Obli\ObliSignIn;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
@@ -21,7 +22,7 @@ final class ProtectObliResponses
 {
     public static function applies(Request $request): bool
     {
-        return $request->is('api/obli/*', 'api/endpoints/agent/obli/ticket-computer-context', 'obli/authorize', 'settings/obli');
+        return $request->is('api/obli/*', 'api/endpoints/agent/obli/ticket-computer-context', 'obli/authorize', 'settings/obli', 'settings/obli/*');
     }
 
     public function handle(Request $request, Closure $next): Response
@@ -29,11 +30,11 @@ final class ProtectObliResponses
         if (! self::applies($request)) {
             return $next($request);
         }
-        if (! $request->is('settings/obli')) {
-            abort_unless(config('endpoint_management.enabled') && config('endpoint_management.obli.enabled'), 404);
+        if (! $request->is('settings/obli', 'settings/obli/*')) {
+            abort_unless(app(EndpointRemoteSupportSettings::class)->obliHelperEnabled(), 404);
         }
         abort_unless($request->isSecure(), 400);
-        if (! $request->is('settings/obli')) {
+        if (! $request->is('settings/obli', 'settings/obli/*')) {
             abort_unless(strcasecmp($request->getSchemeAndHttpHost(), ObliSignIn::issuer()) === 0, 400);
         }
         abort_if(strlen($request->getContent()) > 131072, 413);

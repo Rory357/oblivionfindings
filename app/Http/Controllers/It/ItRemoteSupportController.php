@@ -7,6 +7,7 @@ use App\Domain\It\Services\ItWorkAccessService;
 use App\Domain\SecurityDevices\Endpoints\Models\EndpointAgent;
 use App\Domain\SecurityDevices\Endpoints\Presenters\EndpointDevicePosturePresenter;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointActionPolicy;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRemoteSupportSettings;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptPolicy;
 use App\Domain\SecurityDevices\Endpoints\Services\EndpointScripts;
@@ -70,8 +71,8 @@ final class ItRemoteSupportController extends Controller
         $computers = $paginator->through(
             fn (Device $device): array => $this->computer($device, $agents->get($device->id), $canViewEndpointPosture),
         );
-        // Read/suggest investigation is independently gated. Installed attended
-        // remote-control acceptance remains outstanding.
+        // Read/suggest investigation and attended remote support are independently gated.
+        $remoteSettings = app(EndpointRemoteSupportSettings::class);
         $response = Inertia::render('it/remote-support/index', [
             'actor_id' => $actor->id,
             'can_view_software_catalogue' => EndpointSoftwarePackages::canOpen($actor),
@@ -82,6 +83,7 @@ final class ItRemoteSupportController extends Controller
             'can_manage_restart_policy' => $actor->canDo(EndpointRestartPolicy::MANAGE),
             'can_manage_action_policy' => $actor->canDo(EndpointActionPolicy::MANAGE),
             'can_manage_remote_policy' => $actor->canDo('securityDevices.remote.managePolicy'),
+            'can_manage_remote_support_settings' => $remoteSettings->canManage($actor),
             'computers' => $computers,
             'selected' => $selected ? $this->computer($selected, $agents->get($selected->id), $canViewEndpointPosture) : null,
             'ticket' => $ticket ? ['id' => $ticket->id, 'reference' => $ticket->reference, 'href' => "/it/tickets/{$ticket->id}"] : null,
@@ -92,8 +94,8 @@ final class ItRemoteSupportController extends Controller
                 'servers' => (clone $query)->where('category', 'server')->count(),
             ],
             'availability' => [
-                'remote_support' => false,
-                'obli' => (bool) (config('endpoint_management.enabled') && config('endpoint_management.obli.technician_enabled') && ($actor->canDo('securityDevices.endpoints.diagnostics') || $actor->canDo('securityDevices.obli.assist'))),
+                'remote_support' => $remoteSettings->isAvailableFor($actor),
+                'obli' => (bool) ($remoteSettings->obliTechnicianEnabled() && ($actor->canDo('securityDevices.endpoints.diagnostics') || $actor->canDo('securityDevices.obli.assist'))),
                 'script_execution' => app(EndpointScriptPolicy::class)->available(),
             ],
         ]);

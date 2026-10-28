@@ -18,7 +18,7 @@ final class EndpointScriptReadiness
         if (DB::transactionLevel() < 1) {
             throw new LogicException('Script readiness requires the current command transaction.');
         }
-        abort_unless(config('endpoint_management.enabled') && Schema::hasColumn('endpoint_agents', 'script_actions'), 503);
+        abort_unless(app(EndpointRemoteSupportSettings::class)->endpointEnabled() && Schema::hasColumn('endpoint_agents', 'script_actions'), 503);
         $locked = Device::query()->whereKey($device->id)->lock('for update nowait')->firstOrFail();
         $agent = EndpointAgent::query()->where('device_id', $locked->id)->lock('for update nowait')->first();
         abort_unless($agent && $agent->enrolled_at && $agent->credential_hash && ! $agent->revoked_at, 409);

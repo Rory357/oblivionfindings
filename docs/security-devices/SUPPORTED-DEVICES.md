@@ -185,3 +185,17 @@ All SSH configuration backups run through the audited `network.config.backup` co
 - **IETF RFC 5424 & RFC 3164** — *The Syslog Protocol* (<https://datatracker.ietf.org/doc/html/rfc5424>, <https://datatracker.ietf.org/doc/html/rfc3164>).
 - **IETF RFC 3954 & RFC 7011** — *Cisco Systems NetFlow Services Export Version 9* and *IP Flow Information Export (IPFIX)* (<https://datatracker.ietf.org/doc/html/rfc3954>, <https://datatracker.ietf.org/doc/html/rfc7011>).
 - **sFlow.org** — *sFlow Version 5 Specification* (<https://sflow.org/sflow_version_5.txt>).
+
+---
+
+### 6. Windows Computers, Obli Tray Helper, & Microsoft Intune
+
+| Brand / Driver | Key | Transport & Enrolment | Capabilities & Safety Boundaries | Support level |
+| --- | --- | --- | --- | --- |
+| **Microsoft Windows (Computer Service & Obli Tray Helper)** | `computer.oblivion_windows_obli` | `Obli.Setup.exe` one-time setup code (`ofc1_`) or installation profile file -> Ed25519-signed HTTPS heartbeats (`oblivion-endpoint`) + local Obli tray IPC (`Obli.exe`) + WebRTC attended screen share | Disk, memory, BitLocker, and update posture; audited Windows service restarts, scheduled computer restarts, and approved software actions; attended screen help gated by an admin toggle in `/settings/obli` plus on-screen **Allow / Decline** consent and a persistent **Stop** banner. Arbitrary script execution remains disabled (`EndpointScriptPolicy::available() === false`). | **Built from vendor docs** |
+| **Microsoft Intune (Read-Only Discovery & Compliance)** | `computer.microsoft_intune_graph` | Microsoft Entra OAuth 2.0 client credentials (`directory_id`, `client_id`, `client_secret` via `IntegrationSecretManager`) -> Microsoft Graph v1.0 `GET /v1.0/deviceManagement/managedDevices` | Discovers Intune-enrolled Windows 10/11 PCs and Windows Servers from `/security-devices/integrations/intune`, bulk-imports selected computers into `Devices` assigned to an active Site, and refreshes compliance, OS version, and encryption posture every 30 minutes (`endpoints:intune-sync`). No remote wipe, policy editing, or script push. | **Built from vendor docs** |
+
+**Official Microsoft specifications cited:**
+- **Microsoft Graph REST API v1.0** — *List managedDevices* (<https://learn.microsoft.com/en-us/graph/api/intune-devices-manageddevice-list?view=graph-rest-1.0>).
+- **Microsoft Entra Identity Platform** — *OAuth 2.0 client credentials flow* (<https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-client-creds-grant-flow>).
+- **Microsoft Win32 & Graphics** — *Windows Services* (<https://learn.microsoft.com/en-us/windows/win32/services/services>) and *Desktop Duplication API* (<https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/desktop-dup-api>).

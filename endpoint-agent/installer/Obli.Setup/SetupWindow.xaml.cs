@@ -6,7 +6,7 @@ using Microsoft.Win32;
 namespace Oblivion.Setup;
 public partial class SetupWindow:Window {
  readonly IInstallerEngine engine;readonly IServiceRepairEngine? repairEngine;
- InstallationInput? input;InstallationReview? review;RepairInput? repairInput;RepairReview? repairReview;string? temporaryCollectorProfile;
+ InstallationInput? input;InstallationReview? review;RepairInput? repairInput;RepairReview? repairReview;string? temporaryComputerProfile;string? temporaryCollectorProfile;
  CancellationTokenSource? operation;bool busy,installing,closeAfterStop,closed;int step;
  readonly DispatcherTimer expiry=new(){Interval=TimeSpan.FromSeconds(1)};
  bool RepairMode=>((ComboBoxItem)ModeChoice.SelectedItem).Tag?.ToString()=="repair";
@@ -26,28 +26,36 @@ public partial class SetupWindow:Window {
    if(candidates.Length==1&&string.IsNullOrEmpty(PackagePath.Text))PackagePath.Text=candidates[0];
   }catch{}
  }
- void CleanupTemporaryProfile(){
+ void CleanupTemporaryComputerProfile(){
+  if(temporaryComputerProfile==null)return;
+  try{if(File.Exists(temporaryComputerProfile))File.Delete(temporaryComputerProfile);}catch{}
+  temporaryComputerProfile=null;
+ }
+ void CleanupTemporaryCollectorProfile(){
   if(temporaryCollectorProfile==null)return;
   try{if(File.Exists(temporaryCollectorProfile))File.Delete(temporaryCollectorProfile);}catch{}
   temporaryCollectorProfile=null;
  }
- string ResolveCollectorProfile(string raw){
+ void CleanupTemporaryProfile(){CleanupTemporaryComputerProfile();CleanupTemporaryCollectorProfile();}
+ static string ResolveEncodedProfile(string raw,string prefix,string filePrefix,Action cleanupBeforeWrite,Action<string> trackFile){
   string trimmed=raw.Trim();
-  if(!trimmed.StartsWith("ofh1_",StringComparison.Ordinal))return trimmed;
+  if(!trimmed.StartsWith(prefix,StringComparison.Ordinal))return trimmed;
   if(trimmed.Length>24576)throw new InvalidOperationException("The one-time setup code is too long.");
-  string encoded=trimmed[5..].Replace('-','+').Replace('_','/');
+  string encoded=trimmed[prefix.Length..].Replace('-','+').Replace('_','/');
   switch(encoded.Length%4){case 2:encoded+="==";break;case 3:encoded+="=";break;case 0:break;default:throw new InvalidOperationException("The one-time setup code is invalid. Copy it again from Oblivion.");}
   byte[] bytes;
   try{bytes=Convert.FromBase64String(encoded);}catch{throw new InvalidOperationException("The one-time setup code is invalid. Copy it again from Oblivion.");}
-  CleanupTemporaryProfile();
+  cleanupBeforeWrite();
   string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Oblivion","Setup","Profiles");
   Directory.CreateDirectory(dir);
-  string file=Path.Combine(dir,"site-"+Guid.NewGuid().ToString("N")+".json");
+  string file=Path.Combine(dir,filePrefix+Guid.NewGuid().ToString("N")+".json");
   using(var stream=new FileStream(file,FileMode.CreateNew,FileAccess.Write,FileShare.None)){stream.Write(bytes);stream.Flush(true);}
   Array.Clear(bytes,0,bytes.Length);
-  temporaryCollectorProfile=file;
+  trackFile(file);
   return file;
  }
+ internal string ResolveComputerProfile(string raw)=>ResolveEncodedProfile(raw,"ofc1_","computer-",CleanupTemporaryComputerProfile,file=>temporaryComputerProfile=file);
+ string ResolveCollectorProfile(string raw)=>ResolveEncodedProfile(raw,"ofh1_","site-",CleanupTemporaryCollectorProfile,file=>temporaryCollectorProfile=file);
  internal void CheckExpiry(){
   if(step==1&&!ReviewCurrent){ShowNotice(RepairMode?"The repair review expired. Review the installed connection again.":"The installation profile expired. Download a new profile and review the setup again.");PrimaryButton.IsEnabled=false;ConfirmDestination.IsChecked=false;}
  }
@@ -62,8 +70,8 @@ public partial class SetupWindow:Window {
  void RoleChanged(object? sender,SelectionChangedEventArgs e){
   if(!IsInitialized)return;bool computer=!RepairMode&&Role is "computer" or "both",site=!RepairMode&&Role is "site" or "both";
   ComputerFiles.Visibility=computer?Visibility.Visible:Visibility.Collapsed;CollectorFiles.Visibility=site?Visibility.Visible:Visibility.Collapsed;
-  if(!computer)ComputerPath.Text="";if(!site){CollectorPath.Text="";CleanupTemporaryProfile();}
-  RoleHelp.Text=RepairMode?"Restore Obli’s services and startup settings while keeping the existing device identity and monitoring data.":Role switch{"computer"=>"Obli helper, computer health and authorised remote support.","site"=>"Monitor approved devices on this site’s network.","both"=>"One setup, with separate computer support and site monitoring services.",_=>""};
+  if(!computer){ComputerPath.Text="";CleanupTemporaryComputerProfile();}if(!site){CollectorPath.Text="";CleanupTemporaryCollectorProfile();}
+  RoleHelp.Text=RepairMode?"Restore Obli’s services and startup settings while keeping the existing device identity and monitoring data.":Role switch{"computer"=>"Installs the Obli Windows tray helper, computer health service, and attended remote support.","site"=>"Monitor approved devices on this site’s network.","both"=>"One setup installing the Obli Windows tray helper, computer support service, and site monitoring.",_=>""};
  }
  void BrowsePackage(object sender,RoutedEventArgs e)=>Browse(PackagePath,"Installation package (*.zip)|*.zip");
  void BrowseComputer(object sender,RoutedEventArgs e)=>Browse(ComputerPath,"Computer profile (*.json)|*.json");
@@ -78,7 +86,7 @@ public partial class SetupWindow:Window {
   if(step==0){
    try {
     if(RepairMode){repairInput=new(PackagePath.Text);_=repairInput.ReviewArguments();if(repairEngine==null)throw new InvalidOperationException("Service repair is unavailable in this build.");}
-    else{string collectorProfile=Role is "site" or "both"?ResolveCollectorProfile(CollectorPath.Text):"";input=new(Role,PackagePath.Text,ComputerPath.Text,collectorProfile);_=input.Arguments("review");}
+    else{string computerProfile=Role is "computer" or "both"?ResolveComputerProfile(ComputerPath.Text):"";string collectorProfile=Role is "site" or "both"?ResolveCollectorProfile(CollectorPath.Text):"";input=new(Role,PackagePath.Text,computerProfile,collectorProfile);_=input.Arguments("review");}
    }catch(Exception error){ShowNotice(error.Message);return;}
    Start(false);
    try {
@@ -126,7 +134,7 @@ public partial class SetupWindow:Window {
   Row("Oblivion server",value.Server);if(value.CollectorServer!=""&&value.CollectorServer!=value.Server)Row("Collector server",value.CollectorServer);
   Row("Software",Software(value.Version,value.Architecture));Row("Profile expires",LocalExpiry(value.Expires));
   ConfirmDestination.IsChecked=false;ConfirmationCopy.Text="I have checked the organisation, server and installation details.";
-  TrayExplanation.Text=value.Role=="site"?"This installs site monitoring without a staff tray helper.":"Obli will start as an ordinary-user helper when someone next signs in.";
+  TrayExplanation.Text=value.Role=="site"?"This installs site monitoring without a staff tray helper.":"Computer support installs the Windows service and starts the Obli tray helper when staff sign in.";
   StepText.Text="2 · Review the connection";PrimaryButton.Content="Install";BackButton.Visibility=Visibility.Visible;SetPanes();
  }
  void ShowRepairReview(RepairReview value){

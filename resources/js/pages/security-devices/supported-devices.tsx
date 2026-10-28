@@ -161,7 +161,7 @@ export default function SupportedDevicesPage(props: SupportedDevicesProps) {
                 <PageHeader
                     icon={Cpu}
                     title="Supported devices"
-                    subline="Brands, open standards, and verification levels across cameras, alarms, sensors, trackers, and Site networks"
+                    subline="Brands, open standards, and verification levels across cameras, alarms, sensors, trackers, networks, and Windows computers"
                     actions={
                         <PageHeaderSearch
                             value={search}

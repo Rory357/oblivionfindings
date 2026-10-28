@@ -14,6 +14,7 @@ enum DriverDeviceClass: string
     case Tracker = 'tracker';
     case Network = 'network';
     case Telemetry = 'telemetry';
+    case Computer = 'computer';
 
     public function label(): string
     {
@@ -25,6 +26,7 @@ enum DriverDeviceClass: string
             self::Tracker => 'GPS & personal trackers',
             self::Network => 'Network & Wi-Fi',
             self::Telemetry => 'Hub logs & traffic',
+            self::Computer => 'Computers & endpoints',
         };
     }
 
@@ -38,6 +40,7 @@ enum DriverDeviceClass: string
             self::Tracker => 5,
             self::Network => 6,
             self::Telemetry => 7,
+            self::Computer => 8,
         };
     }
 }

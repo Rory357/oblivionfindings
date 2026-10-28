@@ -92,6 +92,8 @@ use App\Domain\SecurityDevices\Drivers\Cameras\HikvisionOnvifCameraDriver;
 use App\Domain\SecurityDevices\Drivers\Cameras\OnvifProfileCameraDriver;
 use App\Domain\SecurityDevices\Drivers\Cameras\UniFiProtectCameraDriver;
 use App\Domain\SecurityDevices\Drivers\Cameras\UniviewOnvifCameraDriver;
+use App\Domain\SecurityDevices\Drivers\Endpoints\MicrosoftIntuneDriver;
+use App\Domain\SecurityDevices\Drivers\Endpoints\WindowsEndpointObliDriver;
 use App\Domain\SecurityDevices\Drivers\Network\ArubaAosConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Network\CiscoIosConfigDriver;
 use App\Domain\SecurityDevices\Drivers\Network\FortinetFortiOsConfigDriver;
@@ -218,6 +220,7 @@ use App\Observers\WorkplaceInjuryObserver;
 use App\Services\AuditLogger;
 use App\Services\Catering\DeliveryProviders\DeliveryProviderManager;
 use App\Services\Fleet\FleetRealtimeAuthorizationService;
+use App\Services\Integration\Adapters\IntuneAdapter;
 use App\Services\Integration\Adapters\MilesightAdapter;
 use App\Services\Integration\Adapters\QueclinkAdapter;
 use App\Services\Integration\Adapters\UnifiAdapter;
@@ -316,6 +319,8 @@ class AppServiceProvider extends ServiceProvider
             QueclinkTrackerDriver::class,
             HubSyslogTelemetryDriver::class,
             HubNetflowTelemetryDriver::class,
+            WindowsEndpointObliDriver::class,
+            MicrosoftIntuneDriver::class,
         ], 'security-devices.drivers');
         $this->app->singleton(
             DeviceDriverRegistry::class,
@@ -491,6 +496,27 @@ class AppServiceProvider extends ServiceProvider
                     sensitivityLabels: ['provider_credentials', 'device_identifiers', 'operational_observations', 'event_metadata'],
                     pageLimit: 100,
                     minimumIntervalSeconds: 300,
+                    backfillLimit: 1000,
+                ),
+            );
+            $registry->register(
+                IntuneAdapter::PROVIDER_SLUG,
+                IntuneAdapter::class,
+                new IntegrationCapabilityManifest(
+                    provider: IntuneAdapter::PROVIDER_SLUG,
+                    version: '1.0',
+                    capabilities: [
+                        ConnectionHealthCapability::class,
+                        InventoryDiscoveryCapability::class,
+                        DeviceSyncCapability::class,
+                    ],
+                    requiredPermissions: [
+                        'securityDevices.integrations.view',
+                        'securityDevices.integrations.manage',
+                    ],
+                    sensitivityLabels: ['provider_credentials', 'device_identifiers', 'operational_observations'],
+                    pageLimit: 100,
+                    minimumIntervalSeconds: 1800,
                     backfillLimit: 1000,
                 ),
             );

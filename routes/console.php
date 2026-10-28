@@ -44,6 +44,7 @@ use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Domain\SecurityDevices\Credentials\Jobs\ReconcileCredentialLeases;
+use App\Domain\SecurityDevices\Endpoints\Services\IntuneReadClient;
 use App\Domain\SecurityDevices\Management\Jobs\RecoverCollectorCommands;
 use App\Jobs\AutoEscalateControlRoomQueues;
 use App\Jobs\CheckControlRoomSlaBreaches;
@@ -1044,9 +1045,11 @@ app(Schedule::class)->command('monitoring:prune-enrolment-recovery')
 app(Schedule::class)->command('endpoints:expire-service-actions')->everyMinute()->withoutOverlapping();
 
 // Read-only Intune visibility refreshes explicitly linked computer records only when configured.
-if (config('endpoint_management.intune.enabled', false)) {
-    app(Schedule::class)->command('endpoints:intune-sync')->everyThirtyMinutes()->withoutOverlapping()->onOneServer();
-}
+app(Schedule::class)->command('endpoints:intune-sync')
+    ->everyThirtyMinutes()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->when(static fn (): bool => app(IntuneReadClient::class)->isConfigured());
 
 // Media watchdogs enforce 15-second authority; this erases expired central signalling.
 Illuminate\Support\Facades\Schedule::command('cctv:expire-live-sessions')->everyMinute()->withoutOverlapping();
