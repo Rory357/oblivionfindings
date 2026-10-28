@@ -57,12 +57,16 @@ final class LocalLanDiscoveryScanner
 
     private ?string $localHostname = null;
 
+    private ?string $defaultGatewayIp = null;
+
     private bool $directlyAttachedSubnet = false;
 
     public function __construct(
         private readonly CidrMatcher $cidrs = new CidrMatcher,
         private readonly MacVendorLookup $macVendors = new MacVendorLookup,
         private readonly SnmpSystemProbe $snmpProbe = new SnmpSystemProbe,
+        private readonly SnmpTopologyProbe $topologyProbe = new SnmpTopologyProbe,
+        private readonly UniFiLocalTopologyProbe $unifiProbe = new UniFiLocalTopologyProbe,
     ) {}
 
     /**
@@ -86,6 +90,7 @@ final class LocalLanDiscoveryScanner
         $this->localHostIp = null;
         $this->localHostMac = null;
         $this->localHostname = null;
+        $this->defaultGatewayIp = null;
         $this->directlyAttachedSubnet = false;
 
         $protocols = array_map('strtolower', $protocols);
@@ -106,6 +111,9 @@ final class LocalLanDiscoveryScanner
         }
 
         $this->discoverLocalInterfaceAndDns($bindIp);
+        if ($this->defaultGatewayIp !== null && (! $this->directlyAttachedSubnet || ! $this->isAuthorisedAddress($this->defaultGatewayIp, $approvedCidrs, $exclusions))) {
+            $this->defaultGatewayIp = null;
+        }
 
         $isAllowedIp = fn (string $ip): bool => $this->isAuthorisedAddress($ip, $approvedCidrs, $exclusions);
 
@@ -177,6 +185,11 @@ final class LocalLanDiscoveryScanner
         }
 
         return null;
+    }
+
+    public function defaultGatewayIp(): ?string
+    {
+        return $this->defaultGatewayIp;
     }
 
     /**
@@ -467,6 +480,27 @@ final class LocalLanDiscoveryScanner
     }
 
     /**
+     * @param  array<string, scalar|null>|null  $material
+     * @return array<string, mixed>
+     */
+    public function probeSnmpTopology(string $ip, #[\SensitiveParameter] ?array $material = null, int $port = 161): array
+    {
+        return $this->topologyProbe->probeTopology($ip, $material, $port, 0.35);
+    }
+
+    /**
+     * @param  array<string, scalar|null>  $material
+     * @return array{
+     *     by_mac: array<string, array{uplink_mac: string, uplink_ip?: string, uplink_port?: string, kind: string, ssid?: string}>,
+     *     by_ip: array<string, array{uplink_mac: string, uplink_ip?: string, uplink_port?: string, kind: string, ssid?: string}>
+     * }
+     */
+    public function probeUniFiTopology(string $controllerIp, #[\SensitiveParameter] array $material, int $port = 443): array
+    {
+        return $this->unifiProbe->probeController($controllerIp, $material, $port, 2.0);
+    }
+
+    /**
      * @param  list<string>  $approvedCidrs
      * @param  list<string>  $exclusions
      */
@@ -604,6 +638,15 @@ final class LocalLanDiscoveryScanner
                                 break;
                             }
                         }
+
+                        $routeProc = new Process(['ip', '-4', 'route', 'show', 'default', 'dev', $ifaceForIp]);
+                        $routeProc->setTimeout(2);
+                        $routeProc->run();
+                        if ($routeProc->isSuccessful()
+                            && preg_match('/\bdefault\s+via\s+(\d+\.\d+\.\d+\.\d+)\b/', $routeProc->getOutput(), $rm) === 1
+                            && filter_var($rm[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                            $this->defaultGatewayIp = $rm[1];
+                        }
                     }
                 }
             } catch (Throwable) {
@@ -630,6 +673,10 @@ final class LocalLanDiscoveryScanner
                 }
                 if (preg_match('/DNS Servers[.\s]*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/i', $block, $dm) === 1) {
                     $this->dnsServers[] = $dm[1];
+                }
+                if (preg_match('/Default Gateway[.\s]*:(?:\s*[0-9a-fA-F:%]+)*\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/i', $block, $gm) === 1
+                    && filter_var($gm[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                    $this->defaultGatewayIp = $gm[1];
                 }
             }
         }

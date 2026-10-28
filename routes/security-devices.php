@@ -4,6 +4,7 @@ use App\Domain\SecurityDevices\AccessControl\Http\Controllers\AccessControlContr
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvLiveController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvRecordingReferenceController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\CctvSourceController;
+use App\Domain\SecurityDevices\Cctv\Http\Controllers\DeviceCameraOnvifController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionDiscoveryController;
 use App\Domain\SecurityDevices\Cctv\Http\Controllers\HikvisionSourceController;
 use App\Domain\SecurityDevices\Credentials\Http\Controllers\CredentialReferenceController;
@@ -205,6 +206,25 @@ Route::middleware([
             'throttle:20,1',
         ])
         ->name('security-devices.devices.offline-alert');
+
+    Route::post('/devices/{device}/camera/snapshot', [DeviceCameraOnvifController::class, 'snapshot'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.cctv.media.view',
+            'throttle:20,1',
+        ])
+        ->name('security-devices.devices.camera.snapshot');
+
+    Route::post('/devices/{device}/camera/ptz', [DeviceCameraOnvifController::class, 'ptz'])
+        ->whereNumber('device')
+        ->middleware([
+            'permission:securityDevices.devices.view',
+            'permission:securityDevices.cctv.media.view',
+            'permission:securityDevices.commands.operate|securityDevices.commands.manage|securityDevices.commands.control|securityDevices.commands.admin',
+            'throttle:30,1',
+        ])
+        ->name('security-devices.devices.camera.ptz');
 
     Route::get('/devices/{device}/queclink-console', [QueclinkUnitConsoleController::class, 'show'])
         ->whereNumber('device')

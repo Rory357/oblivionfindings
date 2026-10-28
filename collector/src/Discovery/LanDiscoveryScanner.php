@@ -50,6 +50,8 @@ final class LanDiscoveryScanner
         'onvif_types',
         'mdns_hostname',
         'mdns_model',
+        'arp_gateway_ip',
+        'arp_gateway_mac',
     ];
 
     /** @var list<string> */
@@ -89,11 +91,15 @@ final class LanDiscoveryScanner
 
     private ?string $localHostname = null;
 
+    private ?string $defaultGatewayIp = null;
+
     private bool $directlyAttachedSubnet = false;
 
     public function __construct(
         private readonly MacVendorLookup $macVendors = new MacVendorLookup,
         private readonly SnmpSystemProbe $snmpProbe = new SnmpSystemProbe,
+        private readonly SnmpTopologyProbe $topologyProbe = new SnmpTopologyProbe,
+        private readonly UniFiLocalTopologyProbe $unifiProbe = new UniFiLocalTopologyProbe,
     ) {}
 
     public static function scrubBannerString(mixed $value, int $maxLength = 160): ?string
@@ -170,6 +176,129 @@ final class LanDiscoveryScanner
             }
         }
 
+        if (is_bool($raw['is_subnet_gateway'] ?? null)) {
+            $clean['is_subnet_gateway'] = $raw['is_subnet_gateway'];
+        }
+
+        if (is_string($clean['arp_gateway_ip'] ?? null)
+            && filter_var($clean['arp_gateway_ip'], FILTER_VALIDATE_IP) === false) {
+            unset($clean['arp_gateway_ip']);
+        }
+        if (is_string($clean['arp_gateway_mac'] ?? null)) {
+            $normGwMac = MacVendorLookup::normaliseUnicastMac($clean['arp_gateway_mac']);
+            if ($normGwMac === null) {
+                unset($clean['arp_gateway_mac']);
+            } else {
+                $clean['arp_gateway_mac'] = $normGwMac;
+            }
+        }
+
+        if (is_array($raw['lldp_neighbors'] ?? null)) {
+            $rows = [];
+            foreach (array_slice($raw['lldp_neighbors'], 0, 32) as $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                $row = [];
+                foreach (['local_port' => 64, 'remote_port' => 64, 'remote_name' => 128] as $field => $len) {
+                    $val = self::scrubBannerString($entry[$field] ?? null, $len);
+                    if ($val !== null) {
+                        $row[$field] = $val;
+                    }
+                }
+                $mac = MacVendorLookup::normaliseUnicastMac(is_string($entry['remote_mac'] ?? null) ? $entry['remote_mac'] : null);
+                if ($mac !== null) {
+                    $row['remote_mac'] = $mac;
+                }
+                if ($row !== []) {
+                    $rows[] = $row;
+                }
+            }
+            if ($rows !== []) {
+                $clean['lldp_neighbors'] = $rows;
+            }
+        }
+
+        if (is_array($raw['cdp_neighbors'] ?? null)) {
+            $rows = [];
+            foreach (array_slice($raw['cdp_neighbors'], 0, 32) as $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                $row = [];
+                foreach (['local_port' => 64, 'remote_port' => 64, 'remote_name' => 128, 'platform' => 96] as $field => $len) {
+                    $val = self::scrubBannerString($entry[$field] ?? null, $len);
+                    if ($val !== null) {
+                        $row[$field] = $val;
+                    }
+                }
+                if (is_string($entry['remote_ip'] ?? null) && filter_var($entry['remote_ip'], FILTER_VALIDATE_IP) !== false) {
+                    $row['remote_ip'] = $entry['remote_ip'];
+                }
+                if ($row !== []) {
+                    $rows[] = $row;
+                }
+            }
+            if ($rows !== []) {
+                $clean['cdp_neighbors'] = $rows;
+            }
+        }
+
+        if (is_array($raw['bridge_fdb'] ?? null)) {
+            $rows = [];
+            foreach (array_slice($raw['bridge_fdb'], 0, 48) as $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                $port = self::scrubBannerString($entry['port'] ?? null, 64);
+                $mac = MacVendorLookup::normaliseUnicastMac(is_string($entry['mac'] ?? null) ? $entry['mac'] : null);
+                if ($port !== null && $mac !== null) {
+                    $rows[] = ['port' => $port, 'mac' => $mac];
+                }
+            }
+            if ($rows !== []) {
+                $clean['bridge_fdb'] = $rows;
+            }
+        }
+
+        if (is_array($raw['snmp_arp'] ?? null)) {
+            $rows = [];
+            foreach (array_slice($raw['snmp_arp'], 0, 48) as $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                $ip = is_string($entry['ip'] ?? null) && filter_var($entry['ip'], FILTER_VALIDATE_IP) !== false ? $entry['ip'] : null;
+                $mac = MacVendorLookup::normaliseUnicastMac(is_string($entry['mac'] ?? null) ? $entry['mac'] : null);
+                if ($ip !== null && $mac !== null) {
+                    $rows[] = ['ip' => $ip, 'mac' => $mac];
+                }
+            }
+            if ($rows !== []) {
+                $clean['snmp_arp'] = $rows;
+            }
+        }
+
+        if (is_array($raw['unifi_uplink'] ?? null)) {
+            $uplink = $raw['unifi_uplink'];
+            $mac = MacVendorLookup::normaliseUnicastMac(is_string($uplink['uplink_mac'] ?? null) ? $uplink['uplink_mac'] : null);
+            $kind = in_array($uplink['kind'] ?? null, ['ethernet', 'wireless'], true) ? $uplink['kind'] : 'ethernet';
+            if ($mac !== null) {
+                $u = ['uplink_mac' => $mac, 'kind' => $kind];
+                if (is_string($uplink['uplink_ip'] ?? null) && filter_var($uplink['uplink_ip'], FILTER_VALIDATE_IP) !== false) {
+                    $u['uplink_ip'] = $uplink['uplink_ip'];
+                }
+                $port = self::scrubBannerString($uplink['uplink_port'] ?? null, 64);
+                if ($port !== null) {
+                    $u['uplink_port'] = $port;
+                }
+                $ssid = self::scrubBannerString($uplink['ssid'] ?? null, 64);
+                if ($ssid !== null) {
+                    $u['ssid'] = $ssid;
+                }
+                $clean['unifi_uplink'] = $u;
+            }
+        }
+
         return $clean;
     }
 
@@ -192,6 +321,7 @@ final class LanDiscoveryScanner
         $this->localHostIp = null;
         $this->localHostMac = null;
         $this->localHostname = null;
+        $this->defaultGatewayIp = null;
         $this->directlyAttachedSubnet = false;
 
         $protocols = array_map('strtolower', $protocols);
@@ -209,6 +339,9 @@ final class LanDiscoveryScanner
         }
 
         $this->discoverLocalInterfaceAndDns($bindIp);
+        if ($this->defaultGatewayIp !== null && (! $this->directlyAttachedSubnet || ! $this->isAuthorisedAddress($this->defaultGatewayIp, $approvedCidrs, $exclusions))) {
+            $this->defaultGatewayIp = null;
+        }
 
         $isAllowedIp = fn (string $ip): bool => $this->isAuthorisedAddress($ip, $approvedCidrs, $exclusions);
 
@@ -280,6 +413,11 @@ final class LanDiscoveryScanner
         }
 
         return null;
+    }
+
+    public function defaultGatewayIp(): ?string
+    {
+        return $this->defaultGatewayIp;
     }
 
     /**
@@ -554,6 +692,27 @@ final class LanDiscoveryScanner
     }
 
     /**
+     * @param  array<string, scalar|null>|null  $material
+     * @return array<string, mixed>
+     */
+    public function probeSnmpTopology(string $ip, #[\SensitiveParameter] ?array $material = null, int $port = 161): array
+    {
+        return $this->topologyProbe->probeTopology($ip, $material, $port, 0.35);
+    }
+
+    /**
+     * @param  array<string, scalar|null>  $material
+     * @return array{
+     *     by_mac: array<string, array{uplink_mac: string, uplink_ip?: string, uplink_port?: string, kind: string, ssid?: string}>,
+     *     by_ip: array<string, array{uplink_mac: string, uplink_ip?: string, uplink_port?: string, kind: string, ssid?: string}>
+     * }
+     */
+    public function probeUniFiTopology(string $controllerIp, #[\SensitiveParameter] array $material, int $port = 443): array
+    {
+        return $this->unifiProbe->probeController($controllerIp, $material, $port, 2.0);
+    }
+
+    /**
      * @param  list<string>  $approvedCidrs
      * @param  list<string>  $exclusions
      */
@@ -787,6 +946,15 @@ final class LanDiscoveryScanner
                                 break;
                             }
                         }
+
+                        $routeProc = new Process(['ip', '-4', 'route', 'show', 'default', 'dev', $ifaceForIp]);
+                        $routeProc->setTimeout(2);
+                        $routeProc->run();
+                        if ($routeProc->isSuccessful()
+                            && preg_match('/\bdefault\s+via\s+(\d+\.\d+\.\d+\.\d+)\b/', $routeProc->getOutput(), $rm) === 1
+                            && filter_var($rm[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                            $this->defaultGatewayIp = $rm[1];
+                        }
                     }
                 }
             } catch (Throwable) {
@@ -813,6 +981,10 @@ final class LanDiscoveryScanner
                 }
                 if (preg_match('/DNS Servers[.\s]*:\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/i', $block, $dm) === 1) {
                     $this->dnsServers[] = $dm[1];
+                }
+                if (preg_match('/Default Gateway[.\s]*:(?:\s*[0-9a-fA-F:%]+)*\s*([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/i', $block, $gm) === 1
+                    && filter_var($gm[1], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false) {
+                    $this->defaultGatewayIp = $gm[1];
                 }
             }
         }

@@ -18,6 +18,10 @@ use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
 use App\Domain\Monitoring\Jobs\CompleteDiscoveryRun;
 use App\Domain\Monitoring\Jobs\RunDiscoveryScope;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -217,6 +221,22 @@ final class DiscoveryRunner
                 && trim($scope->snmp_credential_reference) !== '') {
                 $item['snmp_credential_reference'] = trim($scope->snmp_credential_reference);
             }
+            if (array_intersect(['provider', 'http', 'tls'], $scope->protocols ?? []) !== []) {
+                $unifiReference = CredentialReference::query()
+                    ->where('site_id', (int) $scope->site_id)
+                    ->where('provider', 'unifi')
+                    ->whereIn('purpose', ['monitoring', 'discovery', 'device_management'])
+                    ->where('status', CredentialReferenceStatus::Active->value)
+                    ->whereNotIn('rotation_status', [
+                        CredentialRotationStatus::Overdue->value,
+                        CredentialRotationStatus::Failed->value,
+                    ])
+                    ->orderByDesc('id')
+                    ->value('reference_key');
+                if (is_string($unifiReference) && trim($unifiReference) !== '') {
+                    $item['unifi_credential_reference'] = trim($unifiReference);
+                }
+            }
             $work[] = $item;
         }
 
@@ -295,7 +315,8 @@ final class DiscoveryRunner
 
     public function complete(int $runId): DiscoveryRun
     {
-        return DB::transaction(function () use ($runId): DiscoveryRun {
+        $justCompleted = false;
+        $completed = DB::transaction(function () use ($runId, &$justCompleted): DiscoveryRun {
             $run = DiscoveryRun::query()->lockForUpdate()->findOrFail($runId);
             if (in_array($run->status, self::TERMINAL_STATUSES, true)) {
                 return $run;
@@ -320,9 +341,25 @@ final class DiscoveryRunner
                 'completed_at' => now(),
                 'failure_summary' => $this->failureSummary($run),
             ])->save();
+            $justCompleted = true;
 
             return $run->fresh();
         }, 3);
+
+        if ($justCompleted) {
+            $siteId = (int) data_get($completed->scope_snapshot, 'site_id', 0);
+            if ($siteId > 0) {
+                $actorId = preg_match('/^manual:user:(\d+)$/', (string) $completed->trigger, $m) === 1
+                    ? (int) $m[1]
+                    : null;
+                try {
+                    app(SiteTopologyMapService::class)->reconcileSite($siteId, $actorId);
+                } catch (Throwable) {
+                }
+            }
+        }
+
+        return $completed;
     }
 
     public function cancel(int $runId, string $reason): DiscoveryRun
@@ -602,7 +639,7 @@ final class DiscoveryRunner
             }
         }
         $signals = $identity['signals'] ?? [];
-        if (! is_array($signals) || ($signals !== [] && array_is_list($signals)) || count($signals) > 32) {
+        if (! is_array($signals) || ($signals !== [] && array_is_list($signals)) || count($signals) > 48) {
             throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
         }
         try {

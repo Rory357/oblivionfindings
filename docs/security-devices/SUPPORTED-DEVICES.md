@@ -66,3 +66,26 @@ This document records the exact protocol specifications, supported capabilities,
 - **ONVIF** — *ONVIF Core Specification* & *WS-Discovery* (`http://www.onvif.org/ver10/network/wsdl`, `dn:NetworkVideoTransmitter` SOAP `Probe` on `239.255.255.250:3702`).
 - **IETF RFC 3416, RFC 3418, RFC 3414, RFC 3826, & RFC 7860** — *SNMPv2c Protocol Operations*, *Management Information Base (MIB-II `system` group)*, and *SNMPv3 User-based Security Model (HMAC-SHA-2 / CFB128-AES-128)*.
 - **IEEE Registration Authority** — Public *MA-L (OUI)* (`oui.csv`) and *MA-M* (`mam.csv`) registry assignments (<https://standards-oui.ieee.org/>).
+
+---
+
+## Automatic Site Topology & Camera ONVIF Controls (Phase 4)
+
+### Protocols & verification status
+
+| Protocol / Source | Transport & MIB / Endpoint | Purpose | Support level |
+| --- | --- | --- | --- |
+| **IEEE 802.1AB LLDP (`LLDP-MIB`)** | SNMPv2c / SNMPv3 `GetNextRequest-PDU` (`1.0.8802.1.1.2.1.3.7.1` & `1.0.8802.1.1.2.1.4.1.1`) | Discovers Layer-2 chassis MACs, port labels, and system names between gateways, switches, access points, and VoIP/camera endpoints | **Built from vendor docs** |
+| **Cisco Discovery Protocol (`CISCO-CDP-MIB`)** | SNMPv2c / SNMPv3 `GetNextRequest-PDU` (`1.3.6.1.4.1.9.9.23.1.2.1.1`) | Discovers Cisco & CDP-speaking switch/router/AP neighbours, remote IPv4s, platforms, and uplink port names | **Built from vendor docs** |
+| **SNMP Bridge Forwarding & ARP Tables (`IF-MIB`, `BRIDGE-MIB`, `Q-BRIDGE-MIB`, `IP-MIB`)** | SNMPv2c / SNMPv3 `GetNextRequest-PDU` (`1.3.6.1.2.1.31.1.1.1.1`, `1.3.6.1.2.1.17.4.3.1`, `1.3.6.1.2.1.17.7.1.2.2.1`, `1.3.6.1.2.1.4.22.1.2`) | Maps learned endpoint MAC addresses to switch bridge ports and resolves subnet ARP tables | **Built from vendor docs** |
+| **Ubiquiti UniFi Local Network API** | HTTPS `443` (`/proxy/network/api/s/{site}/stat/device` & `stat/sta` on UniFi OS, or `8443` `/api/s/{site}/...`) | Queries gateway, switch, and access-point uplink hierarchy (`uplink.uplink_mac`, `uplink_remote_port`) and wireless client AP associations (`ap_mac`, `essid`) via Site hub | **Built from vendor docs** (`UX7` LAN gateway topology verified on `172.16.0.0/24`) |
+| **ONVIF Media Snapshot & PTZ Service** | HTTP/HTTPS SOAP 1.2 + WS-UsernameToken Digest (`GetProfiles`, `GetSnapshotUri`, `ContinuousMove`, `Stop`, `GotoHomePosition`) | Captures SSRF-guarded live JPEG/PNG/WebP snapshots (`<= 2 MB`, same-IP verification) and operates pan/tilt/zoom cameras with full audit logging | **Built from vendor docs** |
+
+### Official specifications cited
+
+- **IEEE Std 802.1AB-2016** — *Station and Media Access Control Connectivity Discovery (LLDP)*, MIB root `iso(1).std(0).iso8802(8802).ieee802dot1(1).ieee802dot1mibs(1).lldpMIB(2)` (<https://standards.ieee.org/ieee/802.1AB/6047/>).
+- **Cisco Systems** — *CISCO-CDP-MIB* (`1.3.6.1.4.1.9.9.23.1.2.1.1` `cdpCacheEntry`: `cdpCacheAddress`, `cdpCacheDeviceId`, `cdpCacheDevicePort`, `cdpCachePlatform`) (<https://snmp.cloudapps.cisco.com/Support/SNMP/do/BrowseOID.do?local=en&translate=Translate&objectInput=1.3.6.1.4.1.9.9.23>).
+- **IETF RFC 2863 (`IF-MIB`), RFC 4188 (`BRIDGE-MIB`), RFC 4363 (`Q-BRIDGE-MIB`), & RFC 4293 (`IP-MIB`)** — Standard interface naming (`ifName`), transparent bridge forwarding database (`dot1dTpFdbEntry`), VLAN-aware forwarding database (`dot1qTpFdbEntry`), and IPv4 address-translation tables (<https://datatracker.ietf.org/doc/html/rfc4188>, <https://datatracker.ietf.org/doc/html/rfc4363>, <https://datatracker.ietf.org/doc/html/rfc2863>, <https://datatracker.ietf.org/doc/html/rfc4293>).
+- **Ubiquiti Inc.** — *UniFi Network Integration & Local Controller API* (<https://developer.ui.com/>).
+- **ONVIF** — *ONVIF Core Specification*, *ONVIF Media Service Specification* (`ver10/media/wsdl`: `GetProfiles`, `GetSnapshotUri`), and *ONVIF PTZ Service Specification* (`ver20/ptz/wsdl`: `ContinuousMove`, `Stop`, `GotoHomePosition`) (<https://www.onvif.org/profiles/specifications/>, <https://www.onvif.org/specs/core/ONVIF-Core-Specification.pdf>, <https://www.onvif.org/specs/srv/streaming/ONVIF-Streaming-Spec.pdf>, <https://www.onvif.org/specs/srv/ptz/ONVIF-PTZ-Service-Spec.pdf>).
+

@@ -17,8 +17,162 @@ export type DeviceProfileSectionKey =
     | 'tickets'
     | 'events'
     | 'maintenance'
+    | 'history'
     | 'documents'
     | 'audit';
+
+export type DeviceProfileLayout =
+    | 'network'
+    | 'camera'
+    | 'alarm_panel'
+    | 'door'
+    | 'sensor'
+    | 'tracker'
+    | 'computer'
+    | 'other';
+
+export type DeviceGovernedQuickAction = {
+    key: string;
+    label: string;
+    risk: 'low' | 'medium' | 'high' | 'critical' | string;
+    available: boolean;
+    allowed: boolean;
+    adapterAvailable: boolean;
+    state: string;
+    reason: string;
+    confirmationMode: 'none' | 'acknowledge_impact' | 'type_device_name' | string;
+    requiresStepUp: boolean;
+    requiresMfa: boolean;
+    requiresApproval: boolean;
+    impact: string;
+    expectedResult: string;
+};
+
+export type DeviceNetworkNeighbourItem = {
+    id: number;
+    name: string;
+    category: string | null;
+    subcategory: string | null;
+    ip_address: string | null;
+    status: string;
+    port: string | null;
+    protocol: string;
+    href: string;
+};
+
+export type DeviceTypeProfile =
+    | {
+          kind: 'network';
+          neighbours: {
+              upstream: DeviceNetworkNeighbourItem[];
+              downstream: DeviceNetworkNeighbourItem[];
+          };
+          interfaceCount: number;
+          configState: string;
+          latestSnapshotAt: string | null;
+          firmwareVersion: string | null;
+          ipAddress: string | null;
+          macAddress: string | null;
+      }
+    | {
+          kind: 'camera';
+          isRecorder: boolean;
+          streamState: 'verified' | 'configured_unverified' | 'not_configured';
+          sourceProvider: string | null;
+          streamVerifiedAt: string | null;
+          liveHref: string | null;
+          setupHref: string | null;
+          recordingReferencesHref: string | null;
+          canViewMedia: boolean;
+          hasIpAddress: boolean;
+          snapshotUrl: string | null;
+          ptzSupported: boolean;
+          canOperatePtz: boolean;
+          ptzUrl: string | null;
+      }
+    | {
+          kind: 'alarm_panel';
+          panelState: string;
+          panelStateAt: string | null;
+          zones: Array<{
+              zone: string;
+              label: string;
+              state: string;
+              observedAt: string | null;
+          }>;
+          commandStoreUrl: string;
+          armAction: DeviceGovernedQuickAction | null;
+          disarmAction: DeviceGovernedQuickAction | null;
+      }
+    | {
+          kind: 'door';
+          doorState: string;
+          doorStateAt: string | null;
+          recentEvents: Array<{
+              id: number;
+              eventType: string;
+              severity: string;
+              source: string | null;
+              occurredAt: string | null;
+          }>;
+          commandStoreUrl: string;
+          unlockAction: DeviceGovernedQuickAction | null;
+          lockAction: DeviceGovernedQuickAction | null;
+      }
+    | {
+          kind: 'sensor';
+          batteryLevel: number | null;
+          batteryUpdatedAt: string | null;
+          batteryState: 'not_reported' | 'critical' | 'low' | 'good' | string;
+          readings: Array<{
+              id: string;
+              label: string;
+              value: number | null;
+              unit: string | null;
+              state: string | null;
+              observedAt: string | null;
+          }>;
+          recentTriggers: Array<{
+              id: number;
+              eventType: string;
+              severity: string;
+              occurredAt: string | null;
+          }>;
+      }
+    | {
+          kind: 'tracker';
+          position: QueclinkUnitConsoleData['last_position'];
+          hasConsole: boolean;
+          imeiMasked: string | null;
+      }
+    | {
+          kind: 'computer';
+          agentEnrolled: boolean;
+          agentState: string;
+          hostname: string | null;
+          osVersion: string | null;
+          scriptExecutionAvailable: boolean;
+      }
+    | {
+          kind: 'other';
+          domainLabel: string;
+          categoryLabel: string;
+          ipAddress: string | null;
+          macAddress: string | null;
+          serialNumber: string | null;
+          firmwareVersion: string | null;
+          notes: string | null;
+      };
+
+export type DeviceHistoryTimelineItem = {
+    id: string;
+    kind: 'assignment' | 'event' | 'command' | 'maintenance' | 'audit' | string;
+    title: string;
+    detail: string | null;
+    severity: 'critical' | 'warning' | 'success' | 'info' | 'neutral' | string;
+    actor: string | null;
+    occurredAt: string;
+};
 
 export type DeviceProfileGroupKey =
     | 'status'
@@ -237,6 +391,9 @@ export type DeviceEndpointPosture = {
 };
 
 export type DeviceProfile = {
+    profileLayout?: DeviceProfileLayout;
+    typeProfile?: DeviceTypeProfile;
+    historyTimeline?: DeviceHistoryTimelineItem[];
     cctv?: CctvNavigation;
     header: {
         identity: {

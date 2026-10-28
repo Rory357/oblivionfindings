@@ -525,6 +525,21 @@ final class NetworkSeedDiscoveryAdapter implements DiscoveryAdapter
             $signalBag['open_ports'] = $openPorts;
         }
 
+        if ($primaryIp !== null && in_array('arp', $protocols, true)) {
+            $gatewayIp = $scanner->defaultGatewayIp();
+            if ($gatewayIp !== null) {
+                if ($primaryIp === $gatewayIp) {
+                    $signalBag['is_subnet_gateway'] = true;
+                } else {
+                    $signalBag['arp_gateway_ip'] = $gatewayIp;
+                    $gatewayMac = $scanner->macForIp($gatewayIp);
+                    if ($gatewayMac !== null) {
+                        $signalBag['arp_gateway_mac'] = $gatewayMac;
+                    }
+                }
+            }
+        }
+
         $resolvedHostname = $this->selectBestHostname([
             $snmpIdentity?->hostname,
             $seedHostname,

@@ -9,6 +9,7 @@ import {
     Bell,
     BookOpen,
     CalendarDays,
+    Clock,
     FileText,
     Gauge,
     GitBranch,
@@ -55,6 +56,7 @@ const sectionIcons: Record<DeviceProfileSectionKey, LucideIcon> = {
     tickets: Ticket,
     events: Bell,
     maintenance: CalendarDays,
+    history: Clock,
     documents: FileText,
     audit: History,
 };

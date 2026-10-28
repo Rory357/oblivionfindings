@@ -36,6 +36,13 @@ import {
 } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
@@ -608,7 +615,7 @@ function DeviceManagementWorkspace({
                                             <h3 className="text-sm font-semibold">
                                                 {group.label}
                                             </h3>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-caption">
                                                 {group.description}
                                             </p>
                                         </div>
@@ -623,7 +630,7 @@ function DeviceManagementWorkspace({
                                                             <p className="font-semibold">
                                                                 {action.label}
                                                             </p>
-                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                            <p className="mt-1 text-caption">
                                                                 {humanise(
                                                                     action.level,
                                                                 )}{' '}
@@ -662,7 +669,7 @@ function DeviceManagementWorkspace({
                                                     <p className="mt-3 text-sm text-muted-foreground">
                                                         {action.impact}
                                                     </p>
-                                                    <p className="mt-2 text-xs text-muted-foreground">
+                                                    <p className="mt-2 text-caption">
                                                         {action.reason}
                                                     </p>
                                                     <div className="mt-3 rounded-lg border bg-muted/40 p-3 text-xs">
@@ -685,7 +692,7 @@ function DeviceManagementWorkspace({
                                                             }
                                                         </p>
                                                     </div>
-                                                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                                    <div className="mt-3 flex flex-wrap gap-2 text-caption">
                                                         {action.requiresStepUp && (
                                                             <span>
                                                                 Identity
@@ -813,7 +820,7 @@ function DeviceManagementWorkspace({
                                         <p className="font-semibold">
                                             {command.label}
                                         </p>
-                                        <p className="mt-1 text-xs text-muted-foreground">
+                                        <p className="mt-1 text-caption">
                                             Requested by{' '}
                                             {command.requestedBy ?? 'System'} ·{' '}
                                             {formatDateTime(
@@ -914,7 +921,7 @@ function DeviceManagementWorkspace({
                                         )}
                                 </dl>
                                 {command.approvedBy && (
-                                    <p className="mt-2 text-xs text-muted-foreground">
+                                    <p className="mt-2 text-caption">
                                         Approved by {command.approvedBy}
                                     </p>
                                 )}
@@ -1119,7 +1126,7 @@ function DeviceManagementWorkspace({
                                     <div className="mt-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
                                         <p>{command.safeFailureReason}</p>
                                         {command.blockedReasonCode && (
-                                            <p className="mt-1 text-xs text-muted-foreground">
+                                            <p className="mt-1 text-caption">
                                                 Governance code:{' '}
                                                 {humanise(
                                                     command.blockedReasonCode,
@@ -1407,7 +1414,7 @@ function DeviceManagementWorkspace({
                                 <p className="mt-1 text-sm">
                                     {selectedAction?.impact}
                                 </p>
-                                <p className="mt-2 text-xs text-muted-foreground">
+                                <p className="mt-2 text-caption">
                                     Expected safe result:{' '}
                                     {selectedAction?.expectedResult}
                                 </p>
@@ -1453,7 +1460,7 @@ function DeviceManagementWorkspace({
                                             }
                                             autoComplete="off"
                                         />
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-caption">
                                             Critical actions require the exact
                                             Device name. This text is checked by
                                             the server and is not stored.
@@ -1493,26 +1500,37 @@ function DeviceManagementWorkspace({
                                         }
                                     />
                                 ) : parameter.options.length > 0 ? (
-                                    <select
-                                        id={`command-${parameter.name}`}
-                                        value={parameters[parameter.name] ?? ''}
-                                        onChange={(event) =>
+                                    <Select
+                                        value={
+                                            parameters[parameter.name] ??
+                                            parameter.options[0] ??
+                                            ''
+                                        }
+                                        onValueChange={(value) =>
                                             setParameters((current) => ({
                                                 ...current,
-                                                [parameter.name]:
-                                                    event.target.value,
+                                                [parameter.name]: value,
                                             }))
                                         }
-                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                     >
-                                        {parameter.options.map((option) => (
-                                            <option key={option} value={option}>
-                                                {parameter.optionLabels?.[
-                                                    option
-                                                ] ?? humanise(option)}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        <SelectTrigger
+                                            id={`command-${parameter.name}`}
+                                        >
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {parameter.options.map((option) => (
+                                                <SelectItem
+                                                    key={option}
+                                                    value={option}
+                                                >
+                                                    {parameter.optionLabels?.[
+                                                        option
+                                                    ] ?? humanise(option)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 ) : (
                                     <Input
                                         id={`command-${parameter.name}`}
@@ -1565,28 +1583,31 @@ function DeviceManagementWorkspace({
                                 >
                                     Approved IT Change
                                 </label>
-                                <select
-                                    id="command-it-change"
+                                <Select
                                     value={itChangeId}
-                                    onChange={(event) =>
-                                        setItChangeId(event.target.value)
-                                    }
-                                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                    onValueChange={setItChangeId}
                                 >
-                                    {management.changeOptions.map((change) => (
-                                        <option
-                                            key={change.id}
-                                            value={String(change.id)}
-                                        >
-                                            {change.reference} · {change.title}{' '}
-                                            · window ends{' '}
-                                            {formatDateTime(
-                                                change.maintenanceEndsAt,
-                                            )}
-                                        </option>
-                                    ))}
-                                </select>
-                                <p className="text-xs text-muted-foreground">
+                                    <SelectTrigger id="command-it-change">
+                                        <SelectValue placeholder="Choose an approved IT Change" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {management.changeOptions.map(
+                                            (change) => (
+                                                <SelectItem
+                                                    key={change.id}
+                                                    value={String(change.id)}
+                                                >
+                                                    {change.reference} ·{' '}
+                                                    {change.title} · window ends{' '}
+                                                    {formatDateTime(
+                                                        change.maintenanceEndsAt,
+                                                    )}
+                                                </SelectItem>
+                                            ),
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-caption">
                                     Only changes linked to this Device and Site,
                                     in an approved execution state and current
                                     maintenance window, are listed.
@@ -1640,30 +1661,33 @@ function DeviceManagementWorkspace({
                                             >
                                                 Designated post-use reviewer
                                             </label>
-                                            <select
-                                                id="command-break-glass-reviewer"
+                                            <Select
                                                 value={breakGlassReviewerId}
-                                                onChange={(event) =>
-                                                    setBreakGlassReviewerId(
-                                                        event.target.value,
-                                                    )
+                                                onValueChange={
+                                                    setBreakGlassReviewerId
                                                 }
-                                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                                             >
-                                                {management.breakGlassReviewers.map(
-                                                    (reviewer) => (
-                                                        <option
-                                                            key={reviewer.id}
-                                                            value={String(
-                                                                reviewer.id,
-                                                            )}
-                                                        >
-                                                            {reviewer.name}
-                                                        </option>
-                                                    ),
-                                                )}
-                                            </select>
-                                            <p className="text-xs text-muted-foreground">
+                                                <SelectTrigger id="command-break-glass-reviewer">
+                                                    <SelectValue placeholder="Choose a reviewer" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {management.breakGlassReviewers.map(
+                                                        (reviewer) => (
+                                                            <SelectItem
+                                                                key={
+                                                                    reviewer.id
+                                                                }
+                                                                value={String(
+                                                                    reviewer.id,
+                                                                )}
+                                                            >
+                                                                {reviewer.name}
+                                                            </SelectItem>
+                                                        ),
+                                                    )}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-caption">
                                                 This person is notified
                                                 immediately and must record a
                                                 permanent post-use review.
@@ -1959,26 +1983,25 @@ function DeviceManagementWorkspace({
                             >
                                 Review outcome
                             </label>
-                            <select
-                                id="command-break-glass-review-outcome"
+                            <Select
                                 value={breakGlassReviewOutcome}
-                                onChange={(event) =>
-                                    setBreakGlassReviewOutcome(
-                                        event.target.value,
-                                    )
-                                }
-                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                                onValueChange={setBreakGlassReviewOutcome}
                             >
-                                <option value="confirmed_appropriate">
-                                    Confirmed appropriate
-                                </option>
-                                <option value="follow_up_required">
-                                    Follow-up required
-                                </option>
-                                <option value="incident_required">
-                                    Incident required
-                                </option>
-                            </select>
+                                <SelectTrigger id="command-break-glass-review-outcome">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="confirmed_appropriate">
+                                        Confirmed appropriate
+                                    </SelectItem>
+                                    <SelectItem value="follow_up_required">
+                                        Follow-up required
+                                    </SelectItem>
+                                    <SelectItem value="incident_required">
+                                        Incident required
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="space-y-1.5">
                             <label
@@ -2026,7 +2049,9 @@ function DeviceManagementWorkspace({
 
 function humanise(value: string | null | undefined): string {
     if (!value) return 'Not recorded';
-    return value.replace(/[._-]+/g, ' ');
+    const spaced = value.replace(/[._-]+/g, ' ').trim();
+    if (!spaced) return 'Not recorded';
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function formatSafeState(state: Record<string, unknown>): string {
@@ -2128,7 +2153,7 @@ function CommandDetail({
             <dt className="font-medium text-muted-foreground">{label}</dt>
             <dd className="mt-1">{value}</dd>
             {detail && (
-                <dd className="mt-1 text-xs text-muted-foreground">{detail}</dd>
+                <dd className="mt-1 text-caption">{detail}</dd>
             )}
         </div>
     );
@@ -2153,7 +2178,7 @@ function Metric({
                 {value ?? 'Not recorded'}
             </p>
             {detail && (
-                <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+                <p className="mt-1 text-caption">{detail}</p>
             )}
         </div>
     );
@@ -2197,7 +2222,7 @@ function DeviceAddCheckAction({
             </Button>
             {!canAddCheck && missingReason && (
                 <>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-caption">
                         {missingReason}
                     </span>
                     {fixLabel === 'Edit device' && onEditDevice ? (
@@ -2547,7 +2572,7 @@ export function DeviceHealthSection({
                         <p className="text-sm font-semibold">
                             Management boundary
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-caption">
                             {profile.capabilities.control.reason}
                         </p>
                     </div>
@@ -2613,7 +2638,7 @@ export function DeviceMonitorsSection({
                                         <p className="truncate font-semibold">
                                             {monitor.name}
                                         </p>
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-caption">
                                             {monitor.kindLabel}
                                             {monitor.affectsAvailability
                                                 ? ' · affects availability'
@@ -3229,14 +3254,14 @@ export function DeviceConfigurationSection({
                                                                     `Snapshot #${snapshot.id}`,
                                                                 )}{' '}
                                                                 ·{' '}
-                                                                <span className="font-mono text-xs text-muted-foreground">
+                                                                <span className="font-mono text-caption">
                                                                     {shortHash(
                                                                         snapshot.configurationHash ??
                                                                             snapshot.contentHash,
                                                                     )}
                                                                 </span>
                                                             </p>
-                                                            <p className="text-xs text-muted-foreground">
+                                                            <p className="text-caption">
                                                                 {snapshotDiffLabel(
                                                                     snapshot,
                                                                 )}
@@ -3300,7 +3325,7 @@ export function DeviceConfigurationSection({
                                 ) : null}
 
                                 {snapshotHistoryTruncated ? (
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-caption">
                                         Showing the 11 most recent snapshots for
                                         this device.
                                     </p>
@@ -3380,12 +3405,12 @@ export function DeviceTicketsSection({ profile }: { profile: DeviceProfile }) {
                                 {ticket.title}
                             </p>
                             {ticket.nextAction && (
-                                <p className="mt-1 text-xs text-muted-foreground">
+                                <p className="mt-1 text-caption">
                                     Next: {ticket.nextAction}
                                 </p>
                             )}
                         </div>
-                        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex shrink-0 items-center gap-2 text-caption">
                             {ticket.workType ? humanise(ticket.workType) : null}
                             <ArrowRight className="h-4 w-4" />
                         </div>
@@ -3429,7 +3454,7 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
                             <p className="text-sm font-semibold">
                                 {humanise(entry.action)}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-caption">
                                 {entry.actor ?? 'System'}
                                 {entry.fields.length > 0
                                     ? ` · ${entry.fields.map(humanise).join(', ')}`
@@ -3437,13 +3462,127 @@ export function DeviceAuditSection({ profile }: { profile: DeviceProfile }) {
                             </p>
                         </div>
                         <span
-                            className="shrink-0 text-xs text-muted-foreground"
+                            className="shrink-0 text-caption"
                             title={formatDateTime(entry.createdAt)}
                         >
                             {formatRelative(entry.createdAt)}
                         </span>
                     </div>
                 ))}
+            </CardContent>
+        </Card>
+    );
+}
+
+const HISTORY_FILTERS: Array<{ key: string; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'event', label: 'Events' },
+    { key: 'command', label: 'Commands' },
+    { key: 'assignment', label: 'Assignments' },
+    { key: 'maintenance', label: 'Maintenance' },
+    { key: 'audit', label: 'Record changes' },
+];
+
+export function DeviceHistorySection({ profile }: { profile: DeviceProfile }) {
+    const [kindFilter, setKindFilter] = useState<string>('all');
+    const items = profile.historyTimeline ?? [];
+    const filtered =
+        kindFilter === 'all'
+            ? items
+            : items.filter((item) => item.kind === kindFilter);
+
+    return (
+        <Card data-testid="device-history-section">
+            <CardHeader className="space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <History className="h-4 w-4" /> Device history
+                        </CardTitle>
+                        <CardDescription>
+                            Chronological timeline of events, commands,
+                            assignments, maintenance, and record changes you are
+                            permitted to view.
+                        </CardDescription>
+                    </div>
+                    <StatusBadge variant="neutral">
+                        {filtered.length}{' '}
+                        {filtered.length === 1 ? 'entry' : 'entries'}
+                    </StatusBadge>
+                </div>
+                {items.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                        {HISTORY_FILTERS.map((filter) => (
+                            <Button
+                                key={filter.key}
+                                type="button"
+                                size="sm"
+                                variant={
+                                    kindFilter === filter.key
+                                        ? 'default'
+                                        : 'outline'
+                                }
+                                onClick={() => setKindFilter(filter.key)}
+                            >
+                                {filter.label}
+                            </Button>
+                        ))}
+                    </div>
+                )}
+            </CardHeader>
+            <CardContent>
+                {items.length === 0 ? (
+                    <EmptyState
+                        icon={History}
+                        title="No history recorded yet"
+                        description="Assignments, alerts, commands, maintenance, and record updates for this device will appear here automatically."
+                        variant="compact"
+                    />
+                ) : filtered.length === 0 ? (
+                    <EmptyState
+                        icon={History}
+                        title="No matching history entries"
+                        description="Choose another category filter above to see earlier activity."
+                        variant="compact"
+                    />
+                ) : (
+                    <div className="space-y-2">
+                        {filtered.map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between"
+                            >
+                                <div className="min-w-0 space-y-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <StatusBadge
+                                            variant={stateStatusVariant(
+                                                item.severity,
+                                            )}
+                                        >
+                                            {humanise(item.kind)}
+                                        </StatusBadge>
+                                        <span className="text-sm font-semibold">
+                                            {item.title}
+                                        </span>
+                                    </div>
+                                    {(item.detail || item.actor) && (
+                                        <p className="text-caption">
+                                            {[item.detail, item.actor]
+                                                .filter(Boolean)
+                                                .join(' · ')}
+                                        </p>
+                                    )}
+                                </div>
+                                <span
+                                    className="shrink-0 text-caption"
+                                    title={formatDateTime(item.occurredAt)}
+                                >
+                                    {formatRelative(item.occurredAt)}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

@@ -59,11 +59,16 @@ final class RemoteDiscoveryRunner
 
         $scanner = null;
         $snmpMaterial = null;
+        $unifiMaterial = null;
+        $unifiTopology = ['by_mac' => [], 'by_ip' => []];
 
         try {
             if ($this->probe === null) {
                 if (is_array($run['snmp_lease'] ?? null) && $this->credentials !== null) {
                     $snmpMaterial = $this->credentials->open(['credential_lease' => $run['snmp_lease']], $at);
+                }
+                if (is_array($run['unifi_lease'] ?? null) && $this->credentials !== null) {
+                    $unifiMaterial = $this->credentials->open(['credential_lease' => $run['unifi_lease']], $at);
                 }
                 $scanner = $this->scanner ?? new LanDiscoveryScanner;
                 $scanner->beginScope(
@@ -73,6 +78,20 @@ final class RemoteDiscoveryRunner
                     (int) $run['packets_per_second'],
                     fn () => $this->wait((int) $run['packets_per_second']),
                 );
+
+                if (is_array($unifiMaterial) && $unifiMaterial !== []) {
+                    $controllerIp = trim((string) ($unifiMaterial['controller_ip'] ?? $scanner->defaultGatewayIp() ?? ''));
+                    $controllerPort = is_numeric($unifiMaterial['port'] ?? null) ? (int) $unifiMaterial['port'] : 443;
+                    if (filter_var($controllerIp, FILTER_VALIDATE_IP) !== false
+                        && array_any($run['targets'], fn (array $t): bool => ($t['target'] ?? null) === $controllerIp)) {
+                        $unifiProto = in_array('tls', $run['protocols'], true)
+                            ? 'tls'
+                            : (in_array('http', $run['protocols'], true) ? 'http' : 'provider');
+                        $this->scope->assertDiscoveryConnection($run, $controllerIp, $controllerIp, $unifiProto, $at);
+                        $this->wait((int) $run['packets_per_second']);
+                        $unifiTopology = $scanner->probeUniFiTopology($controllerIp, $unifiMaterial, $controllerPort);
+                    }
+                }
             }
 
             $results = [];
@@ -87,7 +106,7 @@ final class RemoteDiscoveryRunner
                 } else {
                     try {
                         $result = $this->probe === null
-                            ? $this->probe($run, $target, $addresses, $at, $scanner ?? new LanDiscoveryScanner, $snmpMaterial)
+                            ? $this->probe($run, $target, $addresses, $at, $scanner ?? new LanDiscoveryScanner, $snmpMaterial, $unifiTopology)
                             : ($this->probe)($run, $target, $addresses, $at);
                     } catch (ScopeViolation $exception) {
                         throw $exception;
@@ -122,6 +141,9 @@ final class RemoteDiscoveryRunner
             if (is_array($snmpMaterial)) {
                 $this->destroyMaterial($snmpMaterial);
             }
+            if (is_array($unifiMaterial)) {
+                $this->destroyMaterial($unifiMaterial);
+            }
         }
     }
 
@@ -130,6 +152,7 @@ final class RemoteDiscoveryRunner
      * @param  array{target: string, source: string}  $target
      * @param  list<string>  $addresses
      * @param  array<string, scalar|null>|null  $snmpMaterial
+     * @param  array{by_mac: array<string, array<string, mixed>>, by_ip: array<string, array<string, mixed>>}  $unifiTopology
      * @return array{outcome: string, failure_code: ?string, identity: ?array<string, mixed>}
      */
     private function probe(
@@ -139,6 +162,7 @@ final class RemoteDiscoveryRunner
         DateTimeImmutable $at,
         LanDiscoveryScanner $scanner,
         ?array $snmpMaterial = null,
+        array $unifiTopology = ['by_mac' => [], 'by_ip' => []],
     ): array {
         $protocols = array_values(array_intersect(
             $run['protocols'],
@@ -295,6 +319,14 @@ final class RemoteDiscoveryRunner
                             $discoveredHostname = strtolower($snmpSys['sys_name']);
                         }
                     }
+
+                    $this->wait($rate);
+                    $snmpTopo = $scanner->probeSnmpTopology($address, $snmpMaterial, $snmpPort);
+                    foreach (['lldp_neighbors', 'cdp_neighbors', 'bridge_fdb', 'snmp_arp'] as $tk) {
+                        if (isset($snmpTopo[$tk]) && $snmpTopo[$tk] !== []) {
+                            $richSignals[$tk] = $snmpTopo[$tk];
+                        }
+                    }
                     break;
                 }
             }
@@ -322,6 +354,28 @@ final class RemoteDiscoveryRunner
             if ($vendor !== null) {
                 $richSignals['mac_vendor'] = $vendor;
             }
+        }
+
+        if (in_array('arp', $protocols, true)) {
+            $gatewayIp = $scanner->defaultGatewayIp();
+            if ($gatewayIp !== null) {
+                if ($primaryIp === $gatewayIp) {
+                    $richSignals['is_subnet_gateway'] = true;
+                } else {
+                    $richSignals['arp_gateway_ip'] = $gatewayIp;
+                    $gatewayMac = $scanner->macForIp($gatewayIp);
+                    if ($gatewayMac !== null) {
+                        $richSignals['arp_gateway_mac'] = $gatewayMac;
+                    }
+                }
+            }
+        }
+
+        $unifiUplink = ($macAddresses !== [] && isset($unifiTopology['by_mac'][$macAddresses[0]]))
+            ? $unifiTopology['by_mac'][$macAddresses[0]]
+            : ($unifiTopology['by_ip'][$primaryIp] ?? null);
+        if (is_array($unifiUplink)) {
+            $richSignals['unifi_uplink'] = $unifiUplink;
         }
 
         if (in_array('tls', $protocols, true)) {

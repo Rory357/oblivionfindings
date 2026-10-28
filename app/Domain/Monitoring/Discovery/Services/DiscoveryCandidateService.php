@@ -15,6 +15,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -117,6 +118,7 @@ final class DiscoveryCandidateService
                 'candidate_id' => $locked->id,
                 'site_id' => (int) $scope->site_id,
             ]);
+            app(SiteTopologyMapService::class)->reconcileSite((int) $scope->site_id, $actorId);
 
             return $device;
         }, 3);
@@ -178,6 +180,7 @@ final class DiscoveryCandidateService
                 'candidate_id' => $lockedCandidate->id,
                 'site_id' => $scopeSiteId,
             ]);
+            app(SiteTopologyMapService::class)->reconcileSite($scopeSiteId, $actorId);
 
             return $lockedTarget->fresh();
         }, 3);

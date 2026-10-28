@@ -195,6 +195,20 @@ final readonly class ScopeGuard
                 $at,
             );
         }
+        if (array_key_exists('unifi_lease', $run) && $run['unifi_lease'] !== null) {
+            if (array_intersect(['provider', 'http', 'tls'], $protocols) === [] || ! is_array($run['unifi_lease'])) {
+                throw new ScopeViolation('Discovery UniFi credential lease is invalid for this run.');
+            }
+            $this->assertCredentialLease(
+                $run['unifi_lease'],
+                [
+                    'device_id' => 'discovery:'.$run['id'],
+                    'protocol' => 'https',
+                    'target' => (string) ($cidrs[0] ?? ''),
+                ],
+                $at,
+            );
+        }
         $seen = [];
         foreach ($targets as $target) {
             $value = is_array($target) ? ($target['target'] ?? null) : null;
