@@ -153,7 +153,7 @@ final class ConfigurationSnapshotComparisonService
                 'provider' => 'Provider configuration inventory',
                 'ssh' => 'Read-only SSH inventory',
                 'winrm' => 'Read-only WinRM inventory',
-                'command' => 'Governed configuration backup',
+                'command' => 'SSH configuration backup',
                 default => 'Configuration snapshot',
             },
             'source' => $snapshot->source,

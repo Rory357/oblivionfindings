@@ -336,7 +336,7 @@ final class EventEnvelopeHandler implements RuntimeEnvelopeHandler
                 DeviceStatus::Offline->value,
             ])
             ->orderBy('id')
-            ->limit(3)
+            ->limit(100)
             ->get()
             ->filter(function (Device $device) use ($siteId): bool {
                 try {

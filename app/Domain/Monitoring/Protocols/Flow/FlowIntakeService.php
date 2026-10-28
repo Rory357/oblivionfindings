@@ -2,7 +2,10 @@
 
 namespace App\Domain\Monitoring\Protocols\Flow;
 
+use App\Domain\Monitoring\Data\RuntimeEnvelope;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
+use App\Domain\Monitoring\Exceptions\RuntimePayloadInvalid;
+use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringOutbox;
 use App\Domain\Monitoring\Protocols\InboundTelemetryScopeResolver;
 use App\Domain\Monitoring\Services\CidrMatcher;
@@ -23,6 +26,135 @@ final class FlowIntakeService
         private readonly FlowExporterSequenceGuard $sequences,
         private readonly MonitoringOutboxPublisher $outbox,
     ) {}
+
+    /**
+     * @return array{site_id: int, items: list<array{source: string, idempotency_key: string, payload: array<string, mixed>, envelope: RuntimeEnvelope}>}
+     */
+    public function buildCollectorEnvelopes(
+        MonitoringCollector $collector,
+        int $siteId,
+        string $packet,
+        string $senderAddress,
+        int $sequence,
+        string $itemId,
+    ): array {
+        $maximum = (int) config('monitoring.inbound.flow.max_datagram_bytes', 65_507);
+        if ($maximum !== 65_507 || $packet === '' || strlen($packet) > $maximum) {
+            throw new RuntimePayloadInvalid('Collector Flow datagram exceeds the configured limit.');
+        }
+
+        $scope = $this->scopes->resolveForCollector($collector, $siteId, $senderAddress, 'flow');
+        $canonicalSender = $this->cidrs->canonicalAddress($senderAddress);
+
+        try {
+            $datagram = $this->decode($packet, $canonicalSender);
+        } catch (Throwable $exception) {
+            throw new RuntimePayloadInvalid('Collector Flow datagram could not be decoded.', previous: $exception);
+        }
+
+        $packetHash = hash('sha256', $collector->collector_uuid.'|'.$itemId.'|'.$packet);
+        $health = $this->sequences->accept($scope->siteId, $canonicalSender, $datagram, $packetHash);
+        $items = [];
+        $sourceHash = substr(hash('sha256', $canonicalSender), 0, 24);
+        $source = "collector:{$collector->collector_uuid}:flow:site:{$scope->siteId}:{$sourceHash}";
+        $envelopeSequence = max(1, $sequence * 2 - 1);
+
+        if ($datagram->records !== []) {
+            $aggregate = $this->aggregator->aggregate($scope->siteId, $canonicalSender, $datagram);
+            $idempotencyKey = 'collector-flow-metric:'.$packetHash;
+            $payload = [
+                'event_family' => 'flow_metric',
+                'site_id' => $scope->siteId,
+                'source_address' => $canonicalSender,
+                'protocol_family' => $aggregate->family,
+                'source_id' => $aggregate->sourceId,
+                'sequence' => $aggregate->sequence,
+                'buckets' => $aggregate->buckets,
+            ];
+            $items[] = [
+                'source' => $source,
+                'idempotency_key' => $idempotencyKey,
+                'payload' => $payload,
+                'envelope' => RuntimeEnvelope::new(
+                    type: RuntimeMessageType::Event,
+                    source: $source,
+                    sequence: $envelopeSequence++,
+                    idempotencyKey: $idempotencyKey,
+                    payload: $payload,
+                ),
+            ];
+        }
+
+        if (in_array($health->status, ['gap', 'reset', 'out_of_order'], true)) {
+            $classification = match ($health->status) {
+                'reset' => ['exporter_reset', 'config_changed', 'info'],
+                'out_of_order' => ['sequence_out_of_order', 'signal', 'warning'],
+                default => ['sequence_gap', 'signal', 'warning'],
+            };
+            $idempotencyKey = 'collector-flow-health:'.$packetHash;
+            $payload = array_filter([
+                'event_family' => 'flow_health',
+                'site_id' => $scope->siteId,
+                'source_address' => $canonicalSender,
+                'protocol_family' => $datagram->family,
+                'source_id' => $datagram->sourceId,
+                'reason' => $classification[0],
+                'expected_sequence' => $health->expectedSequence,
+                'actual_sequence' => $health->actualSequence,
+                'gap_count' => $health->gapCount,
+                'event_type' => $classification[1],
+                'severity' => $classification[2],
+            ], static fn (mixed $value): bool => $value !== null);
+            $items[] = [
+                'source' => $source,
+                'idempotency_key' => $idempotencyKey,
+                'payload' => $payload,
+                'envelope' => RuntimeEnvelope::new(
+                    type: RuntimeMessageType::Event,
+                    source: $source,
+                    sequence: $envelopeSequence,
+                    idempotencyKey: $idempotencyKey,
+                    payload: $payload,
+                ),
+            ];
+        }
+
+        return [
+            'site_id' => $scope->siteId,
+            'items' => $items,
+        ];
+    }
+
+    /** @return list<MonitoringOutbox> */
+    public function ingestFromCollector(
+        MonitoringCollector $collector,
+        int $siteId,
+        string $packet,
+        string $senderAddress,
+        string $itemId,
+    ): array {
+        $built = $this->buildCollectorEnvelopes(
+            collector: $collector,
+            siteId: $siteId,
+            packet: $packet,
+            senderAddress: $senderAddress,
+            sequence: 1,
+            itemId: $itemId,
+        );
+
+        $outboxes = [];
+        foreach ($built['items'] as $item) {
+            $outboxes[] = $this->outbox->stage(
+                type: RuntimeMessageType::Event,
+                stream: (string) config('monitoring.queues.events', 'monitoring-events'),
+                source: $item['source'],
+                idempotencyKey: $item['idempotency_key'],
+                payload: $item['payload'],
+            );
+        }
+
+        return $outboxes;
+    }
 
     /** @return list<MonitoringOutbox> */
     public function ingest(string $packet, string $senderAddress): array

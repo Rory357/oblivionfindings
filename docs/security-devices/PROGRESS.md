@@ -432,3 +432,72 @@
 - **Universal `History` tab (chronological timeline with category filter pills):**
   ![Local History Timeline](screenshots/phase-4-local-history-timeline.png)
 
+#### Live `oblivionfindings.com` walkthrough (`5b2adeeb9`)
+- **Pre-deploy MySQL backup verified:** `/home/oblivion/db-backups/oblivionfindings-pre-phase4-20261028T081449Z.sql.gz` (`43 MB`, `0600`, `gzip -t` OK).
+- **Production release verified (`5b2adeeb9d2de65399a3a5fd6372f9b78381d124`):** `16/16` database lifecycle triggers verified preflight & postflight, Inertia SSR & monitoring supervisors active, Queclink systemd service active, zero console or HTTP errors across desktop (`1440×920`) and mobile (`390×844`) viewports.
+- **Sites › WAN & topology (`Kauri House` `#9003` — Automatic Site network map):**
+  ![Live Site Topology Map](screenshots/phase-4-live-site-topology-map.png)
+- **Network profile (`UX7` `172.16.0.1` — live `Ping now` `1 ms` reply + Network neighbours + Interfaces & configuration):**
+  ![Live Network Profile & Ping](screenshots/phase-4-live-network-profile-ping.png)
+- **Universal `History` timeline (`UX7` — chronological `All` / `Events` / `Commands` / `Assignments` / `Maintenance` / `Record changes`):**
+  ![Live History Timeline](screenshots/phase-4-live-history-timeline.png)
+- **Tracker profile (`Care tracker 867963069916998` — masked IMEI `8679•••••••6998` + active resident location consent gate + `Unit console`):**
+  ![Live Tracker Profile](screenshots/phase-4-live-tracker-profile.png)
+
+---
+
+## Phase 5 — Brands and drivers
+
+### Summary of changes
+
+1. **Home-Assistant-style driver registry & `Supported devices` catalogue (`5.1`)**
+   - Added typed driver contracts (`DeviceDriver`, `CameraDeviceDriver`, `AlarmPanelDriver`, `SensorDeviceDriver`, `NetworkConfigDriver`), capability & verification enums (`DriverCapability`, `DriverDeviceClass`, `DriverSupportLevel`), and `DeviceDriverRegistry` (`app/Domain/SecurityDevices/Drivers/`) registering `28` drivers across `26` brands and open standards.
+   - Added `SupportedDevicesController`, `SupportedDevicesPresenter`, and `/security-devices/supported-devices` (`resources/js/pages/security-devices/supported-devices.tsx`) under **Setup** tabs, displaying honest verification levels (`Tested on real hardware`, `Built from vendor docs`, `Planned`), search and device-class filters, confirmation-locked action indicators, hardware notes, and official vendor specification links.
+
+2. **Security cameras — ONVIF Profile S & T + UniFi Protect Local API (`5.2`)**
+   - Extended `OnvifCameraProfileClient` and `DeviceCameraOnvifController` to support ONVIF `devicemgmt` `GetServices`, Profile T `Media2` (`ver20/media/wsdl` H.265/HEVC + H.264), Profile S `Media1`, WS-UsernameToken Digest, IETF RFC 7616 HTTP Digest (`SHA-256` & `MD5`), custom ONVIF ports (`2020` for TP-Link Tapo), and sanitised RTSP stream URIs (stripping credentials and secret query tokens before returning or persisting).
+   - Added brand drivers for **Hikvision**, **Dahua**, **Uniview**, **Axis Communications**, **Hanwha Vision**, **Standard ONVIF & TP-Link Tapo**, and **Ubiquiti UniFi Protect** (`collector/src/Media/UniFiProtectLocalClient.php` + `UniFiProtectLocalCameraClient.php` targeting the official `/proxy/protect/integration/v1/*` API via `X-API-KEY`).
+
+3. **Alarms — ANSI/SIA DC-09 Contact ID receiver, NZ local REST drivers, and honest `Planned` roadmap (`5.3`)**
+   - Implemented `SiaDc09FrameDecoder`, `SiaDc09IntakeService`, and `php artisan security-devices:sia-dc09-listen` (`app/Domain/SecurityDevices/Alarms/SiaDc09/`) supporting TCP/UDP framing, CRC-16/ARC (`0x8005`), optional AES-128/256-CBC decryption, `ADM-CID` / `SIA-DCS` / `NULL` heartbeats, `ACK` responses, Site CIDR authorisation, and live `DeviceEvent` + runtime outbox projection.
+   - Implemented local HTTPS REST drivers and confirmation-, approval-, MFA-, and audit-reason-gated `alarm.arm` / `alarm.disarm` execution (`AlarmPanelCommandAdapter`) for **Gallagher Command Centre** and **Inner Range Inception**, alongside honest `Planned` entries for partner/NDA-gated native APIs (**Arrowhead AAP Elite S / ESL-2**, **ICT Protege GX/WX**, **Inner Range Integriti**, **Bosch Solution 2000/3000/6000**, **Ajax Hub**, **Paradox**, **DSC PowerSeries Neo**).
+
+4. **IoT & environmental sensors — OASIS MQTT v3.1.1 & Clean-Room Milesight LoRaWAN (`5.4`)**
+   - Implemented pure-PHP OASIS MQTT v3.1.1 TCP/TLS subscriber `MqttV311Client`, `MqttSensorIntakeService`, and `php artisan security-devices:mqtt-listen`.
+   - Implemented authenticated Milesight UG56/UG65/UG67 LoRaWAN gateway HTTP Push webhook (`POST /webhooks/milesight-gateway/{site}` with `X-Milesight-Signature` HMAC-SHA256) and 100% clean-room `MilesightLorawanPayloadDecoder` (zero GPL code) decoding AM103/AM307/AM319, EM300-TH/SLD/MCS, WS101, WS202, WS301, and VS121 binary TLV uplinks directly into Sensor profile readings and alerts.
+
+5. **Network SSH configuration backup & redacted version diff (`5.5`)**
+   - Implemented read-only SSH configuration export drivers (`PhpseclibNetworkCliTransport` + `NetworkSshConfigBackupCommandAdapter`) for **MikroTik RouterOS** (`/export terse show-sensitive=no`), **Cisco IOS / IOS-XE** (`show running-config`), **HPE Aruba AOS-CX & ArubaOS-Switch**, and **Fortinet FortiOS**, wired into `network.config.backup` with volatile timestamp stripping, `20,000`-line `NetworkConfigurationRedactor` secret scrubbing (including RouterOS `/snmp community` names, WPA PSKs, PPP secrets, Cisco Type 5/7/8/9 hashes, Aruba `ciphertext`, and FortiOS `ENC` secrets), SHA-256 reconciliation, and `ConfigurationDiffDialog`.
+
+6. **Site-Hub Syslog & NetFlow / IPFIX / sFlow telemetry (`5.6`)**
+   - Added `HubTelemetryReceiver` (`collector/src/Telemetry/HubTelemetryReceiver.php`), collector-scoped `InboundTelemetryScopeResolver::resolveForCollector()`, `SyslogIntakeService::buildCollectorEnvelope()`, `FlowIntakeService::buildCollectorEnvelopes()`, and `CollectorIngestService` handlers (`syslog_event`, `flow_datagram`) isolating overlapping private LAN subnets (`192.168.1.0/24`) per Site hub and dead-lettering cross-Site spoofing attempts.
+
+---
+
+### Verification & local walkthrough
+
+- **Laravel Pint:** `0` issues across all touched Phase 5 PHP files.
+- **Collector PHP runtime (`collector/`):** `134` passed (`Phase5ProtectAndTelemetryTest`: `3` passed, `41` assertions).
+- **ESLint (`--max-warnings=0`):** `0` errors and `0` warnings across all touched TS/TSX files.
+- **TypeScript (`npm run types`):** `0` errors across the repository.
+- **Vitest (`--maxWorkers=2`):** `10` passed (`supported-devices.test.tsx`, `device-type-overview.test.tsx`, `security-devices-navigation.test.ts`).
+- **Pest Feature & Architecture (Sequential):** `Phase5BrandsAndDriversTest` + `SecurityDevicesNavigationRoutesTest` (`28` passed, `445` assertions), `NetworkDevicePortAndBackupCommandsTest` + `Phase4ProfilesAndTopologyTest` (`29` passed), `ItSecuritySingleTenantBoundaryTest` + `DeviceCommandOperationalBoundaryTest` + `MonitoringSingleTenantBoundaryTest` (`49` passed).
+- **Production Vite build (`npm run build`):** `6,376` modules transformed cleanly.
+- **Playwright desktop (`1440×920`) & mobile (`390×844`) walkthrough:** `0` console errors, `0` page errors, `0` HTTP `>= 400` responses, zero leaked secrets, and zero forbidden jargon words.
+
+#### Local walkthrough screenshots
+- **Setup › Supported devices (`1440×920` desktop — `28` drivers across `26` brands & standards with honest verification levels):**
+  ![Local Supported Devices](screenshots/phase-5-local-supported-devices.png)
+- **Setup › Supported devices — Alarms & intrusion (`390×844` mobile — SIA DC-09 active + honest `Planned` NZ alarm roadmap):**
+  ![Local Supported Devices Mobile Alarms](screenshots/phase-5-local-supported-devices-alarms-mobile.png)
+- **Camera profile (`Tapo C120 Courtyard Camera` `172.16.0.78` — honest `Stream not configured` state & ONVIF snapshot controls):**
+  ![Local Camera ONVIF Tapo](screenshots/phase-5-local-camera-onvif-tapo.png)
+- **Alarm panel profile (`Kauri Front Alarm Panel` — `Triggered` state & Zone `003` from live SIA DC-09 Contact ID intake):**
+  ![Local Alarm SIA DC-09](screenshots/phase-5-local-alarm-sia-dc09.png)
+- **Sensor profile (`Kauri Lounge Air Quality AM307` — `804 ppm` CO2, `21.6 °C`, `44.5%` humidity, `92%` battery from live HMAC-signed Milesight LoRaWAN TLV webhook):**
+  ![Local Sensor Milesight & MQTT](screenshots/phase-5-local-sensor-milesight-mqtt.png)
+- **Network configuration diff (`Kauri MikroTik Core Router` — SSH backup line diff with WPA2, PPP, and SNMP community secrets redacted to `[REDACTED]`):**
+  ![Local Network SSH Config Diff](screenshots/phase-5-local-network-ssh-diff.png)
+
+
+

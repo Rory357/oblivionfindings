@@ -281,6 +281,39 @@ final readonly class ScopeGuard
         $this->assertScopedTarget($deviceId, $target);
     }
 
+    public function assertAddressInCidrs(string $address, DateTimeImmutable $at): void
+    {
+        if ($this->config->revoked || $this->config->expiresAt <= $at) {
+            throw new ScopeViolation('Signed collector configuration is expired or revoked.');
+        }
+
+        if (filter_var($address, FILTER_VALIDATE_IP) === false) {
+            throw new ScopeViolation('Target must be a pinned numeric address.');
+        }
+
+        foreach ($this->config->scope['cidrs'] as $cidr) {
+            if ($this->contains($cidr, $address)) {
+                return;
+            }
+        }
+
+        throw new ScopeViolation('Target is outside the signed network scope.');
+    }
+
+    public function assertInboundTelemetrySender(string $protocol, string $senderIp, DateTimeImmutable $at): void
+    {
+        if ($this->config->revoked || $this->config->expiresAt <= $at) {
+            throw new ScopeViolation('Signed collector configuration is expired or revoked.');
+        }
+
+        if (! in_array($protocol, ['syslog', 'flow'], true)
+            || ! in_array($protocol, $this->config->scope['protocols'], true)) {
+            throw new ScopeViolation('Inbound telemetry protocol is outside the signed scope.');
+        }
+
+        $this->assertAddressInCidrs($senderIp, $at);
+    }
+
     private function assertScopedTarget(string $deviceId, string $target): void
     {
         if (filter_var($target, FILTER_VALIDATE_IP) === false) {

@@ -14,6 +14,8 @@ use App\Domain\Monitoring\Models\CollectorCheckpoint;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringDeadLetter;
+use App\Domain\Monitoring\Protocols\Flow\FlowIntakeService;
+use App\Domain\Monitoring\Protocols\Syslog\SyslogIntakeService;
 use App\Domain\SecurityDevices\Management\Services\CollectorCommandResultService;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -28,6 +30,8 @@ final readonly class CollectorIngestService
         private DiscoveryRunner $discovery,
         private CollectorCommandResultService $commands,
         private CanonicalDeviceSiteResolver $sites,
+        private ?SyslogIntakeService $syslog = null,
+        private ?FlowIntakeService $flow = null,
     ) {}
 
     /**
@@ -161,6 +165,41 @@ final readonly class CollectorIngestService
 
             return;
         }
+        if ($itemType === 'syslog_event') {
+            $siteId = $this->positiveSiteId($payload['site_id'] ?? null);
+            $senderIp = $this->nonEmptyString($payload['sender_ip'] ?? null, 'Collector Syslog sender IP is invalid.');
+            $datagram = $this->decodeBase64Payload($payload['datagram_base64'] ?? null, 'Collector Syslog datagram is invalid.');
+            $built = ($this->syslog ?? app(SyslogIntakeService::class))->buildCollectorEnvelope(
+                collector: $collector,
+                siteId: $siteId,
+                datagram: $datagram,
+                senderAddress: $senderIp,
+                sequence: $sequence,
+                itemId: $id,
+            );
+            $this->handlers->for(RuntimeMessageType::Event)->handle($built['envelope'], $built['site_id']);
+
+            return;
+        }
+        if ($itemType === 'flow_datagram') {
+            $siteId = $this->positiveSiteId($payload['site_id'] ?? null);
+            $senderIp = $this->nonEmptyString($payload['sender_ip'] ?? null, 'Collector Flow sender IP is invalid.');
+            $packet = $this->decodeBase64Payload($payload['packet_base64'] ?? null, 'Collector Flow datagram is invalid.');
+            $built = ($this->flow ?? app(FlowIntakeService::class))->buildCollectorEnvelopes(
+                collector: $collector,
+                siteId: $siteId,
+                packet: $packet,
+                senderAddress: $senderIp,
+                sequence: $sequence,
+                itemId: $id,
+            );
+            $handler = $this->handlers->for(RuntimeMessageType::Event);
+            foreach ($built['items'] as $eventItem) {
+                $handler->handle($eventItem['envelope'], $built['site_id']);
+            }
+
+            return;
+        }
         if ($itemType !== 'observation') {
             throw new RuntimePayloadInvalid('Collector item type is invalid.');
         }
@@ -264,6 +303,40 @@ final readonly class CollectorIngestService
         }
 
         return (int) $value;
+    }
+
+    private function positiveSiteId(mixed $value): int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+        if (is_string($value) && preg_match('/\A[1-9][0-9]{0,18}\z/', $value) === 1) {
+            return (int) $value;
+        }
+
+        throw new RuntimePayloadInvalid('Collector telemetry Site identity is invalid.');
+    }
+
+    private function nonEmptyString(mixed $value, string $errorMessage): string
+    {
+        if (! is_string($value) || trim($value) === '' || strlen($value) > 128) {
+            throw new RuntimePayloadInvalid($errorMessage);
+        }
+
+        return trim($value);
+    }
+
+    private function decodeBase64Payload(mixed $value, string $errorMessage): string
+    {
+        if (! is_string($value) || $value === '' || strlen($value) > 131_072) {
+            throw new RuntimePayloadInvalid($errorMessage);
+        }
+        $decoded = base64_decode($value, true);
+        if (! is_string($decoded) || $decoded === '') {
+            throw new RuntimePayloadInvalid($errorMessage);
+        }
+
+        return $decoded;
     }
 
     private function protocol(Monitor $monitor): ?string

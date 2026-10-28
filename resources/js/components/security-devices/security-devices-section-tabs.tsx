@@ -8,6 +8,7 @@ import {
     Activity,
     BatteryWarning,
     Bell,
+    Cpu,
     Download,
     Plug,
     Radar,
@@ -25,6 +26,7 @@ export type SecurityDevicesAlertsTabKey =
 export type SecurityDevicesSetupTabKey =
     | 'discovery'
     | 'integrations'
+    | 'supported-devices'
     | 'agent-downloads'
     | 'settings'
     | 'server-readiness';
@@ -107,6 +109,16 @@ export function SecurityDevicesSectionTabs(
                                 label: 'Integrations',
                                 href: '/security-devices/integrations',
                                 icon: Plug,
+                            },
+                        ]
+                      : []),
+                  ...(sd.integrationsView || sd.integrationsManage
+                      ? [
+                            {
+                                key: 'supported-devices',
+                                label: 'Supported devices',
+                                href: '/security-devices/supported-devices',
+                                icon: Cpu,
                             },
                         ]
                       : []),

@@ -398,6 +398,34 @@ function NetworkProfileOverview({
                             >
                                 Configuration
                             </Button>
+                            {profile.management.actions.some(
+                                (action) =>
+                                    action.key === 'network.config.backup',
+                            ) && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (typeof window !== 'undefined') {
+                                            const url = new URL(
+                                                window.location.href,
+                                            );
+                                            url.searchParams.set(
+                                                'action',
+                                                'network.config.backup',
+                                            );
+                                            window.history.replaceState(
+                                                window.history.state,
+                                                '',
+                                                url.toString(),
+                                            );
+                                        }
+                                        onOpenSection('management');
+                                    }}
+                                >
+                                    Back up configuration
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </CardHeader>

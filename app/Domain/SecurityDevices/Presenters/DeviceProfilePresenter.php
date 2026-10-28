@@ -2305,7 +2305,7 @@ class DeviceProfilePresenter
             }
             $type = strtolower(trim((string) $event->event_type));
             if ($panelState === 'not_reported') {
-                if (in_array($type, ['alarm_triggered', 'alarm.triggered', 'intrusion', 'panic', 'duress'], true)) {
+                if (in_array($type, ['alarm_trigger', 'alarm_triggered', 'alarm.triggered', 'fire_alarm', 'medical_alarm', 'intrusion', 'panic', 'duress'], true)) {
                     $panelState = 'triggered';
                     $panelStateAt = $event->occurred_at?->toISOString();
                 } elseif (in_array($type, ['tamper', 'alarm_fault', 'alarm.fault', 'fault'], true)) {
@@ -2463,6 +2463,29 @@ class DeviceProfilePresenter
                     'state' => $monitor->current_state?->value,
                     'observedAt' => $obs?->observed_at?->toISOString(),
                 ]);
+            }
+
+            $observedReadings = data_get($device->meta, 'observed.sensor_readings');
+            if (is_array($observedReadings)) {
+                foreach ($observedReadings as $metricKey => $entry) {
+                    if (! is_string($metricKey) || ! is_array($entry)) {
+                        continue;
+                    }
+                    $numValue = $this->numeric($entry['value'] ?? null);
+                    if ($numValue === null) {
+                        continue;
+                    }
+                    $readings->push([
+                        'id' => 'observed-'.$metricKey,
+                        'label' => is_string($entry['label'] ?? null) && $entry['label'] !== ''
+                            ? $entry['label']
+                            : ucfirst(str_replace('_', ' ', $metricKey)),
+                        'value' => $numValue,
+                        'unit' => $this->safeUnit(is_string($entry['unit'] ?? null) ? $entry['unit'] : null),
+                        'state' => is_string($entry['state'] ?? null) ? $entry['state'] : 'healthy',
+                        'observedAt' => is_string($entry['observed_at'] ?? null) ? $entry['observed_at'] : null,
+                    ]);
+                }
             }
         }
 
