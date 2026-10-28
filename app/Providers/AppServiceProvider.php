@@ -32,9 +32,11 @@ use App\Domain\Monitoring\Contracts\TcpTransport;
 use App\Domain\Monitoring\Contracts\TimeSeriesStore;
 use App\Domain\Monitoring\Contracts\TlsTransport;
 use App\Domain\Monitoring\Discovery\Adapters\NetworkSeedDiscoveryAdapter;
+use App\Domain\Monitoring\Discovery\Adapters\SnmpInventoryDiscoveryAdapter;
 use App\Domain\Monitoring\Discovery\Contracts\DiscoveryAdapter;
 use App\Domain\Monitoring\Discovery\Contracts\DiscoveryThrottle;
 use App\Domain\Monitoring\Discovery\Services\NativeDiscoveryTokenBucket;
+use App\Domain\Monitoring\Discovery\Support\LocalLanDiscoveryScanner;
 use App\Domain\Monitoring\Enums\RuntimeMessageType;
 use App\Domain\Monitoring\Handlers\EventEnvelopeHandler;
 use App\Domain\Monitoring\Handlers\ObservationEnvelopeHandler;
@@ -287,6 +289,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CollectorCertificateIssuer::class, OpenSslCollectorCertificateIssuer::class);
         $this->app->bind(DnsResolver::class, NativeDnsResolver::class);
         $this->app->bind(DnsTransport::class, NativeDnsTransport::class);
+        $this->app->bind(NetworkSeedDiscoveryAdapter::class, fn ($app): NetworkSeedDiscoveryAdapter => new NetworkSeedDiscoveryAdapter(
+            $app->make(CidrMatcher::class),
+            $app->make(EgressPolicy::class),
+            $app->make(IcmpProbeAdapter::class),
+            $app->make(TcpProbeAdapter::class),
+            $app->make(TlsProbeAdapter::class),
+            $app->make(SnmpInventoryDiscoveryAdapter::class),
+            $app->make(DiscoveryThrottle::class),
+            $app->make(LocalLanDiscoveryScanner::class),
+        ));
         $this->app->bind(DiscoveryAdapter::class, NetworkSeedDiscoveryAdapter::class);
         $this->app->bind(DiscoveryThrottle::class, NativeDiscoveryTokenBucket::class);
         $this->app->bind(EnvelopeSigner::class, SodiumEnvelopeSigner::class);

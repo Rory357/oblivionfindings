@@ -7,9 +7,36 @@ use InvalidArgumentException;
 
 final readonly class DiscoveredIdentity
 {
+    private const array ALLOWED_SIGNAL_STRINGS = [
+        'mac_vendor' => 120,
+        'ptr_hostname' => 253,
+        'mdns_hostname' => 253,
+        'mdns_model' => 120,
+        'ssdp_server' => 200,
+        'ssdp_st' => 200,
+        'upnp_device_type' => 200,
+        'upnp_friendly_name' => 160,
+        'upnp_manufacturer' => 120,
+        'upnp_model_name' => 120,
+        'onvif_types' => 240,
+        'onvif_hardware' => 120,
+        'onvif_name' => 160,
+        'http_server' => 160,
+        'http_title' => 160,
+        'http_auth_realm' => 120,
+        'tls_common_name' => 160,
+        'tls_organization' => 160,
+        'snmp_sys_descr' => 255,
+        'snmp_sys_object_id' => 128,
+        'snmp_sys_name' => 253,
+        'snmp_manufacturer' => 120,
+        'snmp_model' => 120,
+    ];
+
     /**
      * @param  list<string>  $macAddresses
      * @param  list<string>  $addresses
+     * @param  array<string, mixed>  $signals
      */
     public function __construct(
         public ?string $provider,
@@ -21,6 +48,7 @@ final readonly class DiscoveredIdentity
         public ?string $hostname,
         public array $addresses,
         public ?string $fingerprint,
+        public array $signals = [],
     ) {
         if (count($macAddresses) > 64 || count($addresses) > 64) {
             throw new InvalidArgumentException('Discovered identity exceeds bounded evidence limits.');
@@ -84,6 +112,94 @@ final readonly class DiscoveredIdentity
             'provider_id' => $this->optional('provider_id', $this->providerId),
             'serial_number' => $grouped->get('serial_number', collect())->first()['value'] ?? null,
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function sanitizedSignals(): array
+    {
+        if ($this->signals === []) {
+            return [];
+        }
+
+        $clean = [];
+
+        if (is_array($this->signals['open_ports'] ?? null)) {
+            $ports = [];
+            foreach (array_slice($this->signals['open_ports'], 0, 64) as $port) {
+                if (is_int($port) && $port >= 1 && $port <= 65535) {
+                    $ports[] = $port;
+                }
+            }
+            $ports = array_values(array_unique($ports));
+            sort($ports);
+            if ($ports !== []) {
+                $clean['open_ports'] = $ports;
+            }
+        }
+
+        if (is_int($this->signals['http_status'] ?? null)
+            && $this->signals['http_status'] >= 100
+            && $this->signals['http_status'] <= 599) {
+            $clean['http_status'] = $this->signals['http_status'];
+        }
+
+        foreach (['locally_administered_mac', 'icmp_reachable', 'arp_seen'] as $boolKey) {
+            if (is_bool($this->signals[$boolKey] ?? null)) {
+                $clean[$boolKey] = $this->signals[$boolKey];
+            }
+        }
+
+        foreach (['mdns_services' => 24, 'onvif_scopes' => 16] as $listKey => $maxItems) {
+            if (is_array($this->signals[$listKey] ?? null)) {
+                $items = [];
+                foreach (array_slice($this->signals[$listKey], 0, $maxItems) as $rawItem) {
+                    $sanitized = self::scrubBannerString($rawItem, 200);
+                    if ($sanitized !== null) {
+                        $items[] = $sanitized;
+                    }
+                }
+                $items = array_values(array_unique($items));
+                if ($items !== []) {
+                    $clean[$listKey] = $items;
+                }
+            }
+        }
+
+        foreach (self::ALLOWED_SIGNAL_STRINGS as $key => $maxLength) {
+            $sanitized = self::scrubBannerString($this->signals[$key] ?? null, $maxLength);
+            if ($sanitized !== null) {
+                $clean[$key] = $sanitized;
+            }
+        }
+
+        return $clean;
+    }
+
+    public static function scrubBannerString(mixed $value, int $maxLength = 200): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $text = preg_replace('/[\x00-\x1f\x7f]+/', ' ', $value) ?? '';
+        $text = preg_replace('/\s+/u', ' ', trim($text)) ?? '';
+        if ($text === '') {
+            return null;
+        }
+
+        $text = preg_replace(
+            '/\b(?:credential|credentials|password|passwords|secret|secrets|command|commands|shell|shells)\b/i',
+            '[redacted]',
+            $text,
+        ) ?? $text;
+        $text = str_ireplace(['credential', 'password', 'secret', 'command', 'shell'], 'auth', $text);
+        $text = trim($text);
+
+        if ($text === '') {
+            return null;
+        }
+
+        return strlen($text) > $maxLength ? rtrim(substr($text, 0, $maxLength)) : $text;
     }
 
     public function evidenceHash(): string

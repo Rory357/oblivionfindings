@@ -30,6 +30,7 @@ final class DiscoveryCandidateService
         private readonly DeviceRegistryService $registry,
         private readonly CanonicalDeviceSiteResolver $siteResolver,
         private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceFingerprintService $fingerprinter = new DeviceFingerprintService,
     ) {}
 
     public function record(
@@ -42,9 +43,14 @@ final class DiscoveryCandidateService
         }
 
         $snapshot = $identity->snapshot();
+        $signals = $identity->sanitizedSignals();
+        if ($signals !== []) {
+            $snapshot['signals'] = $signals;
+        }
+        $snapshot['identification'] = $this->fingerprinter->identify($identity)->toArray();
         $hash = $identity->evidenceHash();
 
-        return DiscoveryCandidate::query()->createOrFirst([
+        $candidate = DiscoveryCandidate::query()->createOrFirst([
             'discovery_run_id' => $run->id,
             'evidence_hash' => $hash,
         ], [
@@ -55,6 +61,17 @@ final class DiscoveryCandidateService
             'reasons' => $match->reasons,
             'evidence_snapshot' => $snapshot,
         ]);
+
+        if (! $candidate->wasRecentlyCreated && $signals !== []) {
+            $existingSnapshot = is_array($candidate->evidence_snapshot) ? $candidate->evidence_snapshot : [];
+            if (($existingSnapshot['signals'] ?? null) !== $signals) {
+                $existingSnapshot['signals'] = $signals;
+                $existingSnapshot['identification'] = $snapshot['identification'];
+                $candidate->forceFill(['evidence_snapshot' => $existingSnapshot])->save();
+            }
+        }
+
+        return $candidate;
     }
 
     /** @param array<string, mixed> $attributes */
@@ -78,7 +95,6 @@ final class DiscoveryCandidateService
                 throw new UnexpectedValueException('Discovery candidate cannot be adopted.');
             }
             $identity = $this->identityFromSnapshot($locked->evidence_snapshot ?? []);
-            $snapshot = $identity->snapshot();
             $reviewedClassification = collect(array_intersect_key($attributes, array_flip([
                 'name',
                 'domain',
@@ -91,7 +107,7 @@ final class DiscoveryCandidateService
                 ->map(fn (string $value): string => trim($value))
                 ->all();
             $device = $this->registry->registerDiscoveredDevice([
-                ...$this->deviceAttributes($snapshot),
+                ...$this->deviceAttributes($identity),
                 ...$reviewedClassification,
             ], (int) $scope->site_id, $actorId);
             $this->attachEvidence($device, $identity);
@@ -479,25 +495,28 @@ final class DiscoveryCandidateService
             hostname: is_string($snapshot['hostname'] ?? null) ? $snapshot['hostname'] : null,
             addresses: $this->strings($snapshot['addresses'] ?? []),
             fingerprint: is_string($snapshot['fingerprint'] ?? null) ? $snapshot['fingerprint'] : null,
+            signals: is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : [],
         );
     }
 
-    /** @param array<string, mixed> $snapshot @return array<string, mixed> */
-    private function deviceAttributes(array $snapshot): array
+    /** @return array<string, mixed> */
+    private function deviceAttributes(DiscoveredIdentity $identity): array
     {
+        $snapshot = $identity->snapshot();
+        $identification = $this->fingerprinter->identify($identity);
         $provider = is_string($snapshot['provider'] ?? null) ? $snapshot['provider'] : null;
         $providerId = is_string($snapshot['provider_id'] ?? null) ? $snapshot['provider_id'] : null;
-        $hostname = is_string($snapshot['hostname'] ?? null) && trim($snapshot['hostname']) !== ''
-            ? trim($snapshot['hostname'])
-            : null;
         $firstAddress = is_string($snapshot['addresses'][0] ?? null) && trim($snapshot['addresses'][0]) !== ''
             ? trim($snapshot['addresses'][0])
             : null;
 
         return [
-            'name' => $hostname ?? ($firstAddress !== null ? "Device {$firstAddress}" : 'Discovered device'),
-            'domain' => 'it_infrastructure',
-            'category' => 'network',
+            'name' => $identification->suggestedName,
+            'domain' => $identification->domain,
+            'category' => $identification->category,
+            'subcategory' => $identification->subcategory,
+            'manufacturer' => $identification->manufacturer,
+            'model' => $identification->model,
             'serial_number' => $snapshot['serial_number'] ?? null,
             'mac_address' => $this->formatMacAddress($snapshot['mac_addresses'][0] ?? null),
             'ip_address' => $firstAddress,

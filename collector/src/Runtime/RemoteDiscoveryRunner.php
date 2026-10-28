@@ -4,19 +4,28 @@ namespace Oblivion\Collector\Runtime;
 
 use Closure;
 use DateTimeImmutable;
+use Oblivion\Collector\Discovery\LanDiscoveryScanner;
 use Oblivion\Collector\Exceptions\ScopeViolation;
+use Oblivion\Collector\Security\CredentialLeaseDecryptor;
 use Oblivion\Collector\Security\ScopeGuard;
 use RuntimeException;
 use Symfony\Component\Process\Process;
 
 final class RemoteDiscoveryRunner
 {
+    /** @var list<int> */
+    private const array DEFAULT_DISCOVERY_TCP_PORTS = [
+        22, 80, 443, 445, 515, 554, 631, 1883, 3389, 5000, 5985, 8000, 8080, 8443, 8554, 9100,
+    ];
+
     private int $nextProbeAt = 0;
 
     /** @param null|Closure(array<string, mixed>, array{target: string, source: string}, list<string>, DateTimeImmutable): array<string, mixed> $probe */
     public function __construct(
         private readonly ScopeGuard $scope,
         private readonly ?Closure $probe = null,
+        private readonly ?CredentialLeaseDecryptor $credentials = null,
+        private readonly ?LanDiscoveryScanner $scanner = null,
     ) {}
 
     /**
@@ -36,107 +45,256 @@ final class RemoteDiscoveryRunner
             throw new ScopeViolation('Collector discovery identity is invalid.');
         }
 
-        $results = [];
+        $pending = [];
         foreach ($run['targets'] as $target) {
             $itemId = hash('sha256', $collectorId.'|discovery|'.$run['id'].'|'.$target['target']);
             if (in_array($itemId, $completedIds, true)) {
                 continue;
             }
-            $addresses = $this->addresses($run, $target['target'], $at);
-            if ($addresses === []) {
-                $result = [
-                    'outcome' => 'unresolved',
-                    'failure_code' => 'dns_resolution_failed',
-                    'identity' => null,
-                ];
-            } else {
-                try {
-                    $result = $this->probe === null
-                        ? $this->probe($run, $target, $addresses, $at)
-                        : ($this->probe)($run, $target, $addresses, $at);
-                } catch (ScopeViolation $exception) {
-                    throw $exception;
-                } catch (\Throwable) {
-                    $result = [
-                        'outcome' => 'failed',
-                        'failure_code' => 'adapter_failure',
-                        'identity' => null,
-                    ];
-                }
-            }
-            $result = $this->normaliseResult($result, $addresses, $target['target']);
-            $payload = [
-                'item_type' => 'discovery_result',
-                'run_id' => $run['id'],
-                'target' => $target['target'],
-                'observed_at' => $at->format(DATE_ATOM),
-                'outcome' => $result['outcome'],
-                'failure_code' => $result['failure_code'],
-                'identity' => $result['identity'],
-            ];
-            if ($payload['outcome'] !== 'found') {
-                unset($payload['identity']);
-            } else {
-                unset($payload['failure_code']);
-            }
-            $results[] = ['item_id' => $itemId, 'payload' => $payload];
+            $pending[] = [$itemId, $target];
+        }
+        if ($pending === []) {
+            return [];
         }
 
-        return $results;
+        $scanner = null;
+        $snmpMaterial = null;
+
+        try {
+            if ($this->probe === null) {
+                if (is_array($run['snmp_lease'] ?? null) && $this->credentials !== null) {
+                    $snmpMaterial = $this->credentials->open(['credential_lease' => $run['snmp_lease']], $at);
+                }
+                $scanner = $this->scanner ?? new LanDiscoveryScanner;
+                $scanner->beginScope(
+                    $run['cidrs'],
+                    $run['protocols'],
+                    $run['exclusions'] ?? [],
+                    (int) $run['packets_per_second'],
+                    fn () => $this->wait((int) $run['packets_per_second']),
+                );
+            }
+
+            $results = [];
+            foreach ($pending as [$itemId, $target]) {
+                $addresses = $this->addresses($run, $target['target'], $at);
+                if ($addresses === []) {
+                    $result = [
+                        'outcome' => 'unresolved',
+                        'failure_code' => 'dns_resolution_failed',
+                        'identity' => null,
+                    ];
+                } else {
+                    try {
+                        $result = $this->probe === null
+                            ? $this->probe($run, $target, $addresses, $at, $scanner ?? new LanDiscoveryScanner, $snmpMaterial)
+                            : ($this->probe)($run, $target, $addresses, $at);
+                    } catch (ScopeViolation $exception) {
+                        throw $exception;
+                    } catch (\Throwable) {
+                        $result = [
+                            'outcome' => 'failed',
+                            'failure_code' => 'adapter_failure',
+                            'identity' => null,
+                        ];
+                    }
+                }
+                $result = $this->normaliseResult($result, $addresses, $target['target']);
+                $payload = [
+                    'item_type' => 'discovery_result',
+                    'run_id' => $run['id'],
+                    'target' => $target['target'],
+                    'observed_at' => $at->format(DATE_ATOM),
+                    'outcome' => $result['outcome'],
+                    'failure_code' => $result['failure_code'],
+                    'identity' => $result['identity'],
+                ];
+                if ($payload['outcome'] !== 'found') {
+                    unset($payload['identity']);
+                } else {
+                    unset($payload['failure_code']);
+                }
+                $results[] = ['item_id' => $itemId, 'payload' => $payload];
+            }
+
+            return $results;
+        } finally {
+            if (is_array($snmpMaterial)) {
+                $this->destroyMaterial($snmpMaterial);
+            }
+        }
     }
 
     /**
      * @param  array<string, mixed>  $run
      * @param  array{target: string, source: string}  $target
      * @param  list<string>  $addresses
+     * @param  array<string, scalar|null>|null  $snmpMaterial
      * @return array{outcome: string, failure_code: ?string, identity: ?array<string, mixed>}
      */
-    private function probe(array $run, array $target, array $addresses, DateTimeImmutable $at): array
-    {
-        $protocols = array_values(array_intersect($run['protocols'], ['icmp', 'tcp', 'dns', 'http', 'tls']));
+    private function probe(
+        array $run,
+        array $target,
+        array $addresses,
+        DateTimeImmutable $at,
+        LanDiscoveryScanner $scanner,
+        ?array $snmpMaterial = null,
+    ): array {
+        $protocols = array_values(array_intersect(
+            $run['protocols'],
+            ['icmp', 'arp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif'],
+        ));
         if ($protocols === []) {
             return ['outcome' => 'unresolved', 'failure_code' => 'capability_pending', 'identity' => null];
         }
 
+        $rate = (int) $run['packets_per_second'];
         $reachable = ! filter_var($target['target'], FILTER_VALIDATE_IP)
             && in_array('dns', $protocols, true);
-        $signals = $reachable ? ['dns'] : [];
+        $seenProtocols = $reachable ? ['dns'] : [];
         $openPorts = [];
+        $macAddresses = [];
+        $certificateFingerprint = null;
+        $discoveredHostname = filter_var($target['target'], FILTER_VALIDATE_IP) === false
+            ? strtolower(rtrim($target['target'], '.'))
+            : null;
+        $richSignals = [];
 
-        if (in_array('icmp', $protocols, true)) {
+        // 1. Pre-swept L2 ARP & multicast discovery evidence (ONVIF, SSDP/UPnP, mDNS)
+        foreach ($addresses as $address) {
+            if (in_array('arp', $protocols, true)) {
+                $mac = $scanner->macForIp($address);
+                if ($mac !== null) {
+                    $this->scope->assertDiscoveryConnection($run, $target['target'], $address, 'arp', $at);
+                    $macAddresses[] = $mac;
+                    $reachable = true;
+                    $seenProtocols[] = 'arp';
+                }
+            }
+
+            $mcast = $scanner->multicastSignalsForIp($address);
+            if ($mcast !== []) {
+                if (in_array('onvif', $protocols, true)
+                    && (isset($mcast['onvif_types']) || isset($mcast['onvif_scopes']) || isset($mcast['onvif_hardware']) || isset($mcast['onvif_name']))) {
+                    $this->scope->assertDiscoveryConnection($run, $target['target'], $address, 'onvif', $at);
+                    foreach (['onvif_types', 'onvif_scopes', 'onvif_hardware', 'onvif_name'] as $k) {
+                        if (isset($mcast[$k])) {
+                            $richSignals[$k] = $mcast[$k];
+                        }
+                    }
+                    $reachable = true;
+                    $seenProtocols[] = 'onvif';
+                }
+
+                if (in_array('ssdp', $protocols, true)
+                    && (isset($mcast['ssdp_server']) || isset($mcast['ssdp_st']) || isset($mcast['upnp_friendly_name']) || isset($mcast['upnp_manufacturer']) || isset($mcast['upnp_model_name']) || isset($mcast['upnp_device_type']))) {
+                    $this->scope->assertDiscoveryConnection($run, $target['target'], $address, 'ssdp', $at);
+                    foreach (['ssdp_server', 'ssdp_st', 'upnp_friendly_name', 'upnp_manufacturer', 'upnp_model_name', 'upnp_device_type'] as $k) {
+                        if (isset($mcast[$k])) {
+                            $richSignals[$k] = $mcast[$k];
+                        }
+                    }
+                    $reachable = true;
+                    $seenProtocols[] = 'ssdp';
+                }
+
+                if (in_array('mdns', $protocols, true)
+                    && (isset($mcast['mdns_services']) || isset($mcast['mdns_hostname']) || isset($mcast['mdns_model']))) {
+                    $this->scope->assertDiscoveryConnection($run, $target['target'], $address, 'mdns', $at);
+                    foreach (['mdns_services', 'mdns_hostname', 'mdns_model'] as $k) {
+                        if (isset($mcast[$k])) {
+                            $richSignals[$k] = $mcast[$k];
+                        }
+                    }
+                    if ($discoveredHostname === null && is_string($mcast['mdns_hostname'] ?? null)) {
+                        $discoveredHostname = strtolower($mcast['mdns_hostname']);
+                    }
+                    $reachable = true;
+                    $seenProtocols[] = 'mdns';
+                }
+            }
+        }
+
+        $attachedWithArp = $scanner->isDirectlyAttachedSubnet() && in_array('arp', $protocols, true);
+
+        // 2. ICMP Echo verification (run on reachable ARP hosts or whenever ARP prewarm cannot prove L2 absence)
+        if (in_array('icmp', $protocols, true) && ($reachable || ! $attachedWithArp)) {
             foreach ($addresses as $address) {
                 $this->scope->assertDiscoveryConnection($run, $target['target'], $address, 'icmp', $at);
-                $this->wait((int) $run['packets_per_second']);
+                $this->wait($rate);
+                $ipv6 = str_contains($address, ':');
                 $arguments = PHP_OS_FAMILY === 'Windows'
-                    ? ['ping', '-n', '1', '-w', '3000', $address]
-                    : ['ping', '-c', '1', '-W', '3', $address];
+                    ? ['ping', ...($ipv6 ? ['-6'] : ['-4']), '-n', '1', '-w', '400', $address]
+                    : ['ping', ...($ipv6 ? ['-6'] : []), '-n', '-c', '1', '-W', '1', $address];
                 $process = new Process($arguments);
-                $process->setTimeout(4);
+                $process->setTimeout(2);
                 $process->run();
-                if ($process->isSuccessful()) {
+                if ($process->isSuccessful() && ProbeRunner::hasGenuineEchoReply($address, $process->getOutput())) {
                     $reachable = true;
-                    $signals[] = 'icmp';
+                    $seenProtocols[] = 'icmp';
                     break;
                 }
             }
         }
 
-        foreach ($this->ports($run) as [$protocol, $port]) {
+        // 3. Fast async TCP port sweep across approved TCP/HTTP/TLS ports
+        $portMap = $this->portsByProtocol($run);
+        if ($portMap !== []) {
+            $allPorts = array_keys($portMap);
+            $skipSlowDeadL2 = $attachedWithArp && ! $reachable;
+            $portsToCheck = $skipSlowDeadL2
+                ? array_values(array_intersect($allPorts, [80, 443, 554]))
+                : $allPorts;
+            $tcpTimeout = $skipSlowDeadL2 ? 0.08 : 0.35;
+            if ($portsToCheck !== []) {
+                foreach ($addresses as $address) {
+                    foreach ($portsToCheck as $port) {
+                        foreach ($portMap[$port] ?? ['tcp'] as $proto) {
+                            $this->scope->assertDiscoveryConnection($run, $target['target'], $address, $proto, $at);
+                        }
+                    }
+                    $foundPorts = $scanner->probeTcpPorts(
+                        $address,
+                        $portsToCheck,
+                        fn () => $this->wait($rate),
+                        $tcpTimeout,
+                    );
+                    if ($foundPorts !== []) {
+                        $reachable = true;
+                        foreach ($foundPorts as $port) {
+                            $openPorts[] = $port;
+                            foreach ($portMap[$port] ?? ['tcp'] as $proto) {
+                                $seenProtocols[] = $proto;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. SNMPv2c / SNMPv3 system-MIB probe (runs on reachable hosts, or all hosts when not L2 ARP-filtered)
+        if (in_array('snmp', $protocols, true) && ($reachable || ! $attachedWithArp)) {
+            $snmpPorts = $run['port_bounds']['snmp'] ?? [161];
+            $snmpPort = (int) ($snmpPorts[0] ?? 161);
             foreach ($addresses as $address) {
-                $this->scope->assertDiscoveryConnection($run, $target['target'], $address, $protocol, $at);
-                $this->wait((int) $run['packets_per_second']);
-                $socket = @stream_socket_client(
-                    'tcp://'.$this->socketAddress($address).':'.$port,
-                    $errorNumber,
-                    $errorMessage,
-                    3,
-                    STREAM_CLIENT_CONNECT,
-                );
-                if (is_resource($socket)) {
-                    fclose($socket);
+                $this->scope->assertDiscoveryConnection($run, $target['target'], $address, 'snmp', $at);
+                $this->wait($rate);
+                $snmpSys = $scanner->probeSnmpSystem($address, $snmpMaterial, $snmpPort);
+                if ($snmpSys !== null) {
                     $reachable = true;
-                    $signals[] = $protocol;
-                    $openPorts[] = $port;
+                    $seenProtocols[] = 'snmp';
+                    if ($snmpSys['sys_descr'] !== null) {
+                        $richSignals['snmp_sys_descr'] = $snmpSys['sys_descr'];
+                    }
+                    if ($snmpSys['sys_object_id'] !== null) {
+                        $richSignals['snmp_sys_object_id'] = $snmpSys['sys_object_id'];
+                    }
+                    if ($snmpSys['sys_name'] !== null) {
+                        $richSignals['snmp_sys_name'] = $snmpSys['sys_name'];
+                        if ($discoveredHostname === null) {
+                            $discoveredHostname = strtolower($snmpSys['sys_name']);
+                        }
+                    }
                     break;
                 }
             }
@@ -145,29 +303,116 @@ final class RemoteDiscoveryRunner
         if (! $reachable) {
             return ['outcome' => 'unresolved', 'failure_code' => 'no_response', 'identity' => null];
         }
-        $signals = array_values(array_unique($signals));
-        sort($signals);
+
         $openPorts = array_values(array_unique($openPorts));
         sort($openPorts);
+        $primaryIp = $addresses[0];
+
+        // 5. Enrich reachable host with refreshed ARP + IEEE OUI MAC vendor, TLS cert, HTTP banner, and DNS PTR
+        if (in_array('arp', $protocols, true) && $macAddresses === []) {
+            $refreshedMac = $scanner->macForIp($primaryIp, allowRefresh: true);
+            if ($refreshedMac !== null) {
+                $macAddresses[] = $refreshedMac;
+                $seenProtocols[] = 'arp';
+            }
+        }
+        $macAddresses = array_values(array_unique($macAddresses));
+        if ($macAddresses !== []) {
+            $vendor = $scanner->lookupMacVendor($macAddresses[0]);
+            if ($vendor !== null) {
+                $richSignals['mac_vendor'] = $vendor;
+            }
+        }
+
+        if (in_array('tls', $protocols, true)) {
+            $tlsCandidates = array_values(array_intersect($openPorts, $run['port_bounds']['tls'] ?? [443, 8443]));
+            if ($tlsCandidates === [] && in_array(443, $openPorts, true)) {
+                $tlsCandidates = [443];
+            }
+            foreach (array_slice($tlsCandidates, 0, 2) as $tlsPort) {
+                $this->scope->assertDiscoveryConnection($run, $target['target'], $primaryIp, 'tls', $at);
+                $this->wait($rate);
+                $tlsInfo = $scanner->inspectTlsCertificate($primaryIp, $tlsPort);
+                if (isset($tlsInfo['certificate_fingerprint']) && $certificateFingerprint === null) {
+                    $certificateFingerprint = $tlsInfo['certificate_fingerprint'];
+                }
+                if (isset($tlsInfo['tls_common_name']) && ! isset($richSignals['tls_common_name'])) {
+                    $richSignals['tls_common_name'] = $tlsInfo['tls_common_name'];
+                }
+                if (isset($tlsInfo['tls_organization']) && ! isset($richSignals['tls_organization'])) {
+                    $richSignals['tls_organization'] = $tlsInfo['tls_organization'];
+                }
+            }
+        }
+
+        if (in_array('http', $protocols, true)) {
+            $webCandidates = array_values(array_intersect($openPorts, $run['port_bounds']['http'] ?? [80, 443, 8080, 8443, 8000, 5000]));
+            foreach (array_slice($webCandidates, 0, 2) as $webPort) {
+                $this->scope->assertDiscoveryConnection($run, $target['target'], $primaryIp, 'http', $at);
+                $this->wait($rate);
+                $isTlsPort = in_array($webPort, [443, 8443], true);
+                $banner = $scanner->inspectHttpBanner($primaryIp, $webPort, $isTlsPort);
+                foreach (['http_status', 'http_server', 'http_title', 'http_auth_realm'] as $bk) {
+                    if (isset($banner[$bk]) && ! isset($richSignals[$bk])) {
+                        $richSignals[$bk] = $banner[$bk];
+                    }
+                }
+                if (isset($richSignals['http_title']) || isset($richSignals['http_server']) || isset($richSignals['http_auth_realm'])) {
+                    break;
+                }
+            }
+        }
+
+        if ($discoveredHostname === null) {
+            $localName = $scanner->localHostnameForIp($primaryIp);
+            if ($localName !== null) {
+                $discoveredHostname = strtolower($localName);
+            } elseif (in_array('dns', $protocols, true)) {
+                $this->scope->assertDiscoveryConnection($run, $target['target'], $primaryIp, 'dns', $at);
+                $this->wait($rate);
+                $ptr = $scanner->reverseDnsPtr($primaryIp);
+                if ($ptr !== null) {
+                    $discoveredHostname = strtolower($ptr);
+                }
+            }
+        }
+
+        $seenProtocols = array_values(array_unique($seenProtocols));
+        sort($seenProtocols);
+
+        if ($openPorts !== []) {
+            $richSignals['open_ports'] = $openPorts;
+        }
+        if ($seenProtocols !== []) {
+            $richSignals['protocols_seen'] = $seenProtocols;
+        }
+
+        $cleanSignals = LanDiscoveryScanner::sanitizeSignals($richSignals);
+
+        $identity = [
+            'mac_addresses' => $macAddresses,
+            'certificate_fingerprint' => $certificateFingerprint,
+            'hostname' => $discoveredHostname,
+            'addresses' => $addresses,
+            'fingerprint' => 'network:'.implode(',', $seenProtocols)
+                .($openPorts === [] ? '' : ':'.implode(',', $openPorts)),
+        ];
+        if ($cleanSignals !== []) {
+            $identity['signals'] = $cleanSignals;
+        }
 
         return [
             'outcome' => 'found',
             'failure_code' => null,
-            'identity' => [
-                'mac_addresses' => [],
-                'certificate_fingerprint' => null,
-                'hostname' => filter_var($target['target'], FILTER_VALIDATE_IP) === false
-                    ? strtolower(rtrim($target['target'], '.'))
-                    : null,
-                'addresses' => $addresses,
-                'fingerprint' => 'network:'.implode(',', $signals)
-                    .($openPorts === [] ? '' : ':'.implode(',', $openPorts)),
-            ],
+            'identity' => $identity,
         ];
     }
 
-    /** @param array<string, mixed> $run @return list<array{string, int}> */
-    private function ports(array $run): array
+    /**
+     * @param  array<string, mixed>  $run
+     * @return array<int, list<string>>
+     */
+    private function portsByProtocol(array $run): array
     {
         $ports = [];
         foreach (['tcp', 'http', 'tls'] as $protocol) {
@@ -175,16 +420,19 @@ final class RemoteDiscoveryRunner
                 continue;
             }
             $defaults = match ($protocol) {
+                'tcp' => self::DEFAULT_DISCOVERY_TCP_PORTS,
                 'http' => [80, 443],
                 'tls' => [443],
-                default => [],
             };
             foreach ($run['port_bounds'][$protocol] ?? $defaults as $port) {
-                $ports[$protocol.':'.$port] = [$protocol, $port];
+                $ports[(int) $port] ??= [];
+                if (! in_array($protocol, $ports[(int) $port], true)) {
+                    $ports[(int) $port][] = $protocol;
+                }
             }
         }
 
-        return array_values($ports);
+        return $ports;
     }
 
     /** @param array<string, mixed> $run @return list<string> */
@@ -238,7 +486,7 @@ final class RemoteDiscoveryRunner
         }
 
         $identity = $result['identity'] ?? null;
-        $allowed = ['mac_addresses', 'certificate_fingerprint', 'hostname', 'addresses', 'fingerprint'];
+        $allowed = ['mac_addresses', 'certificate_fingerprint', 'hostname', 'addresses', 'fingerprint', 'signals'];
         if (! is_array($identity) || array_is_list($identity)
             || array_diff(array_keys($identity), $allowed) !== []) {
             throw new RuntimeException('Collector discovery identity is invalid.');
@@ -260,18 +508,45 @@ final class RemoteDiscoveryRunner
                 throw new RuntimeException('Collector discovery identity is invalid.');
             }
         }
+        if (array_key_exists('signals', $identity) && (! is_array($identity['signals']) || array_is_list($identity['signals']))) {
+            // Empty signals `[]` is allowed and normalised away; non-empty list is rejected.
+            if ($identity['signals'] !== []) {
+                throw new RuntimeException('Collector discovery identity is invalid.');
+            }
+        }
+        $cleanSignals = isset($identity['signals']) && is_array($identity['signals'])
+            ? LanDiscoveryScanner::sanitizeSignals($identity['signals'])
+            : [];
+
+        $normalisedIdentity = [
+            'mac_addresses' => array_values($macs),
+            'certificate_fingerprint' => $identity['certificate_fingerprint'] ?? null,
+            'hostname' => $identity['hostname'] ?? (filter_var($target, FILTER_VALIDATE_IP) ? null : $target),
+            'addresses' => array_values(array_unique($addresses)),
+            'fingerprint' => $identity['fingerprint'] ?? null,
+        ];
+        if ($cleanSignals !== []) {
+            $normalisedIdentity['signals'] = $cleanSignals;
+        }
 
         return [
             'outcome' => 'found',
             'failure_code' => null,
-            'identity' => [
-                'mac_addresses' => array_values($macs),
-                'certificate_fingerprint' => $identity['certificate_fingerprint'] ?? null,
-                'hostname' => $identity['hostname'] ?? (filter_var($target, FILTER_VALIDATE_IP) ? null : $target),
-                'addresses' => array_values(array_unique($addresses)),
-                'fingerprint' => $identity['fingerprint'] ?? null,
-            ],
+            'identity' => $normalisedIdentity,
         ];
+    }
+
+    /** @param array<string, scalar|null> $material */
+    private function destroyMaterial(#[\SensitiveParameter] array &$material): void
+    {
+        foreach ($material as &$value) {
+            if (is_string($value) && $value !== '') {
+                sodium_memzero($value);
+            }
+            $value = null;
+        }
+        unset($value);
+        $material = [];
     }
 
     private function wait(int $packetsPerSecond): void
@@ -282,10 +557,5 @@ final class RemoteDiscoveryRunner
             usleep((int) ceil($remaining / 1000));
         }
         $this->nextProbeAt = hrtime(true) + $interval;
-    }
-
-    private function socketAddress(string $address): string
-    {
-        return str_contains($address, ':') ? "[{$address}]" : $address;
     }
 }

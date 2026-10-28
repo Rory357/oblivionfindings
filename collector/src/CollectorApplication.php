@@ -5,6 +5,7 @@ namespace Oblivion\Collector;
 use DateTimeImmutable;
 use JsonException;
 use Oblivion\Collector\Config\SignedConfigLoader;
+use Oblivion\Collector\Discovery\LanDiscoveryScanner;
 use Oblivion\Collector\Enrollment\InstallationProfile;
 use Oblivion\Collector\Enrollment\RecoverableEnrollment;
 use Oblivion\Collector\Exceptions\CentralApiFailure;
@@ -382,7 +383,12 @@ final class CollectorApplication
                 }
             }
 
-            $discovery = new RemoteDiscoveryRunner($scope);
+            $discovery = new RemoteDiscoveryRunner(
+                $scope,
+                null,
+                $credentialDecryptor,
+                new LanDiscoveryScanner,
+            );
             $completedIds = $checkpoint->read()['acknowledged_ids'];
             foreach ($config->discoveryRuns as $run) {
                 foreach ($discovery->run($run, $config->collectorId, $completedIds) as $result) {

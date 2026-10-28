@@ -202,7 +202,7 @@ final class DiscoveryRunner
                 continue;
             }
 
-            $work[] = [
+            $item = [
                 'id' => (string) $run->run_uuid,
                 'site_id' => (int) $scope->site_id,
                 'cidrs' => array_values($scope->cidrs ?? []),
@@ -212,6 +212,12 @@ final class DiscoveryRunner
                 'packets_per_second' => (int) $scope->packets_per_second,
                 'targets' => $targets,
             ];
+            if (in_array('snmp', $scope->protocols ?? [], true)
+                && is_string($scope->snmp_credential_reference)
+                && trim($scope->snmp_credential_reference) !== '') {
+                $item['snmp_credential_reference'] = trim($scope->snmp_credential_reference);
+            }
+            $work[] = $item;
         }
 
         return $work;
@@ -576,7 +582,7 @@ final class DiscoveryRunner
         }
 
         $identity = $payload['identity'] ?? null;
-        $allowed = ['mac_addresses', 'certificate_fingerprint', 'hostname', 'addresses', 'fingerprint'];
+        $allowed = ['mac_addresses', 'certificate_fingerprint', 'hostname', 'addresses', 'fingerprint', 'signals'];
         if (! is_array($identity) || array_is_list($identity)
             || array_diff(array_keys($identity), $allowed) !== []) {
             throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
@@ -595,6 +601,10 @@ final class DiscoveryRunner
                 throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
             }
         }
+        $signals = $identity['signals'] ?? [];
+        if (! is_array($signals) || ($signals !== [] && array_is_list($signals)) || count($signals) > 32) {
+            throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');
+        }
         try {
             $discovered = new DiscoveredIdentity(
                 provider: null,
@@ -606,6 +616,7 @@ final class DiscoveryRunner
                 hostname: $identity['hostname'] ?? null,
                 addresses: array_values($identity['addresses'] ?? []),
                 fingerprint: $identity['fingerprint'] ?? null,
+                signals: $signals,
             );
         } catch (Throwable) {
             throw new RuntimePayloadInvalid('Collector discovery evidence is invalid.');

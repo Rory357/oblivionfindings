@@ -2,9 +2,11 @@
 
 namespace App\Domain\SecurityDevices\Presenters;
 
+use App\Domain\Monitoring\Discovery\Data\DiscoveredIdentity;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
+use App\Domain\Monitoring\Discovery\Services\DeviceFingerprintService;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
@@ -26,6 +28,7 @@ class DiscoveryOperationsPresenter
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
         private readonly MonitoringCollectorAvailabilityService $collectorAvailability,
+        private readonly DeviceFingerprintService $fingerprinter = new DeviceFingerprintService,
     ) {}
 
     /** @return array<string, mixed> */
@@ -247,6 +250,25 @@ class DiscoveryOperationsPresenter
             $safeIp = $this->safeIpAddress(($snapshot['addresses'] ?? [])[0] ?? null);
             $safeMac = $this->safeMacAddress(($snapshot['mac_addresses'] ?? [])[0] ?? null);
             $safeProvider = $this->safeProvider($snapshot['provider'] ?? null);
+            $identity = new DiscoveredIdentity(
+                provider: $safeProvider,
+                providerId: is_string($snapshot['provider_id'] ?? null) ? $snapshot['provider_id'] : null,
+                serialNumber: is_string($snapshot['serial_number'] ?? null) ? $snapshot['serial_number'] : null,
+                hardwareId: is_string($snapshot['hardware_id'] ?? null) ? $snapshot['hardware_id'] : null,
+                macAddresses: $safeMac !== null ? [$safeMac] : [],
+                certificateFingerprint: is_string($snapshot['certificate_fingerprint'] ?? null)
+                    ? $snapshot['certificate_fingerprint']
+                    : null,
+                hostname: $safeHostname,
+                addresses: $safeIp !== null ? [$safeIp] : [],
+                fingerprint: is_string($snapshot['fingerprint'] ?? null) ? $snapshot['fingerprint'] : null,
+                signals: is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : [],
+            );
+            $identification = $this->fingerprinter->identify($identity);
+            $sanitizedSignals = $identity->sanitizedSignals();
+            $openPorts = is_array($sanitizedSignals['open_ports'] ?? null)
+                ? array_values($sanitizedSignals['open_ports'])
+                : [];
             $unreviewedActionable = $candidate->reviewed_at === null
                 && in_array($candidate->decision, ['proposed', 'review'], true);
 
@@ -263,7 +285,19 @@ class DiscoveryOperationsPresenter
                 'hostname' => $safeHostname,
                 'ip_address' => $safeIp,
                 'mac_address' => $safeMac,
+                'mac_vendor' => $identification->macVendor,
                 'provider' => $safeProvider,
+                'type_label' => $identification->typeLabel,
+                'domain' => $identification->domain,
+                'category' => $identification->category,
+                'subcategory' => $identification->subcategory,
+                'manufacturer' => $identification->manufacturer,
+                'model' => $identification->model,
+                'suggested_name' => $identification->suggestedName,
+                'identification_confidence' => $identification->confidence,
+                'identification_confidence_band' => $identification->confidenceBand,
+                'identification_reason' => $identification->reason,
+                'open_ports' => $openPorts,
                 'reasons' => collect($candidate->reasons ?? [])
                     ->filter(fn ($reason): bool => is_string($reason))
                     ->take(10)

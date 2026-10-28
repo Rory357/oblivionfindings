@@ -15,7 +15,7 @@ final readonly class ScopeGuard
     private const array CREDENTIALED_PROTOCOLS = ['snmp', 'ssh', 'winrm'];
 
     private const array DISCOVERY_PROTOCOLS = [
-        'icmp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'syslog', 'flow', 'provider',
+        'icmp', 'arp', 'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif', 'syslog', 'flow', 'provider',
     ];
 
     public function __construct(private CollectorConfig $config) {}
@@ -180,6 +180,20 @@ final readonly class ScopeGuard
                 throw new ScopeViolation('Discovery network is outside the signed scope.');
             }
             $this->contains($cidr, explode('/', $cidr, 2)[0]);
+        }
+        if (array_key_exists('snmp_lease', $run) && $run['snmp_lease'] !== null) {
+            if (! in_array('snmp', $protocols, true) || ! is_array($run['snmp_lease'])) {
+                throw new ScopeViolation('Discovery SNMP credential lease is invalid for this run.');
+            }
+            $this->assertCredentialLease(
+                $run['snmp_lease'],
+                [
+                    'device_id' => 'discovery:'.$run['id'],
+                    'protocol' => 'snmp',
+                    'target' => (string) ($cidrs[0] ?? ''),
+                ],
+                $at,
+            );
         }
         $seen = [];
         foreach ($targets as $target) {

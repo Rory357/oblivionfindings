@@ -3,6 +3,7 @@
 namespace App\Domain\Monitoring\Services;
 
 use App\Domain\Monitoring\Contracts\CredentialLeaseProvider;
+use App\Domain\Monitoring\Data\CredentialLease;
 use App\Domain\Monitoring\Discovery\Services\DiscoveryRunner;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
@@ -54,9 +55,26 @@ final readonly class CollectorConfigurationService
                     512,
                 ))),
             );
-            foreach ($discoveryRuns as $run) {
+            foreach ($discoveryRuns as $index => $run) {
                 $cidrs = [...$cidrs, ...($run['cidrs'] ?? [])];
                 $protocols = [...$protocols, ...($run['protocols'] ?? [])];
+                $snmpReference = $run['snmp_credential_reference'] ?? null;
+                unset($discoveryRuns[$index]['snmp_credential_reference']);
+                if (is_string($snmpReference)
+                    && $snmpReference !== ''
+                    && is_string(($run['cidrs'] ?? [])[0] ?? null)) {
+                    $lease = $this->acquireDiscoverySnmpLease((int) $run['site_id'], $snmpReference);
+                    if ($lease !== null) {
+                        $discoveryRuns[$index]['snmp_lease'] = $this->credentialSealer->seal(
+                            $locked,
+                            'discovery:'.(string) $run['id'],
+                            'snmp',
+                            (string) $run['cidrs'][0],
+                            $lease,
+                            (int) $run['site_id'],
+                        );
+                    }
+                }
             }
             $authorisedSiteIds = $locked->authorisedSiteIds();
             $coveredSiteIds = $locked->coveredSiteIds();
@@ -279,6 +297,18 @@ final readonly class CollectorConfigurationService
         }
 
         return $check;
+    }
+
+    private function acquireDiscoverySnmpLease(int $siteId, string $reference): ?CredentialLease
+    {
+        foreach ([['monitoring.collector.snmp.read'], ['snmp:v3:auth_priv'], ['snmp:v2c:compatibility']] as $capabilities) {
+            try {
+                return $this->credentials->acquire($siteId, $reference, $capabilities);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed>|null $config */
