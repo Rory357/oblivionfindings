@@ -2654,15 +2654,19 @@ export function DeviceMonitorsSection({
                                         }
                                     />
                                 </div>
-                                {monitor.collector && (
-                                    <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                                        <span>{monitor.collector.name}</span>
-                                        <span className="text-muted-foreground">
-                                            Hub{' '}
-                                            {humanise(monitor.collector.status)}
-                                        </span>
-                                    </div>
-                                )}
+                                <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
+                                    <span>
+                                        {monitor.runsFrom ??
+                                            (monitor.collector
+                                                ? `Runs from: hub ${monitor.collector.name}`
+                                                : 'Runs from: server')}
+                                    </span>
+                                    <span className="text-muted-foreground">
+                                        {monitor.collector
+                                            ? `Hub ${humanise(monitor.collector.status)}`
+                                            : 'Direct when routable'}
+                                    </span>
+                                </div>
                                 <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                                     <Button
                                         type="button"

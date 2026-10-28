@@ -313,6 +313,9 @@ export type DeviceProfile = {
             intervalSeconds: number;
             staleAfterSeconds: number;
         } | null;
+        collectorId?: number | null;
+        collectorName?: string | null;
+        runsFrom?: string;
         collector: {
             name: string;
             status: string;

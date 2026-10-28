@@ -46,6 +46,9 @@ export type Monitor = {
     name: string;
     kind: string | null;
     state: string;
+    collector_id?: number | null;
+    collector_name?: string | null;
+    runs_from?: string;
     last_observation_at: string | null;
 };
 
@@ -89,7 +92,18 @@ export type Collector = {
     name: string;
     status: string;
     state: string;
+    freshness_state?: string;
+    software_version?: string | null;
     last_seen_at: string | null;
+    last_heartbeat_at?: string | null;
+    revoked_at?: string | null;
+    is_home_site?: boolean;
+    home_site?: { id: number; name: string; href: string } | null;
+    monitor_load?: number;
+    scope_load?: number;
+    covered_site_ids?: number[];
+    covered_sites?: Array<{ id: number; name: string; href: string }>;
+    update_url?: string | null;
 };
 
 export type ContactItem = {
@@ -136,6 +150,11 @@ export type SiteTechnologyProps = {
     itWork: ItWork[];
     maintenance: Maintenance[];
     collectors: Collector[];
+    hub_wizard?: {
+        options_url: string;
+        issue_url: string;
+        sites: Array<{ id: number; name: string }>;
+    } | null;
     changes: Array<{
         key: string;
         device_name: string | null;
@@ -148,6 +167,7 @@ export type SiteTechnologyProps = {
         view_control_room: boolean;
         view_it_work: boolean;
         view_site_profile: boolean;
+        manage_collectors?: boolean;
         export: boolean;
     };
 };

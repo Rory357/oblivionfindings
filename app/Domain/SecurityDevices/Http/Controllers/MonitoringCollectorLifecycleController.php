@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Services\CollectorEnrollmentService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -52,6 +53,48 @@ final class MonitoringCollectorLifecycleController extends Controller
             (int) $viewer->id,
             replacesCollectorId: (int) $record->id,
         ));
+    }
+
+    public function update(Request $request, int $collector): JsonResponse
+    {
+        $viewer = $request->user();
+        abort_unless($viewer->canDo('securityDevices.integrations.manage'), 403);
+
+        $record = $this->accessibleCollector($viewer, $collector);
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'min:2', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/'],
+            'covered_site_ids' => ['sometimes', 'array', 'max:64'],
+            'covered_site_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $submittedCoveredIds = array_values(array_unique(array_map(
+            static fn ($id): int => (int) $id,
+            $validated['covered_site_ids'] ?? [],
+        )));
+        foreach (array_unique(array_merge([(int) $record->site_id], $record->coveredSiteIds(), $submittedCoveredIds)) as $siteId) {
+            $this->access->assertCanViewSite($viewer, (int) $siteId);
+        }
+
+        try {
+            $updated = $this->enrollments->updateSettings(
+                $record,
+                (int) $viewer->id,
+                (string) $validated['name'],
+                $submittedCoveredIds,
+            );
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages([
+                'collector' => $exception->getMessage(),
+            ]);
+        }
+
+        return response()->json([
+            'collector' => [
+                'id' => (int) $updated->id,
+                'name' => (string) $updated->name,
+                'covered_site_ids' => $updated->coveredSiteIds(),
+            ],
+        ], 200, $this->sensitiveResponseHeaders());
     }
 
     public function revoke(Request $request, int $collector): JsonResponse

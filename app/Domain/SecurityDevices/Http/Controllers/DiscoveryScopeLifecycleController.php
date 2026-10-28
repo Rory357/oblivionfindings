@@ -92,7 +92,8 @@ final class DiscoveryScopeLifecycleController extends Controller
                     'run_uuid' => $run->run_uuid,
                     'run_status' => $run->status,
                     'planned_targets' => (int) $run->planned_targets,
-                    'collection_mode' => 'central_direct',
+                    'collection_mode' => $record->collector_id === null ? 'central_direct' : 'remote_collector',
+                    ...($record->collector_id === null ? [] : ['collector_id' => (int) $record->collector_id]),
                 ]);
 
                 return $run;
@@ -125,15 +126,21 @@ final class DiscoveryScopeLifecycleController extends Controller
     {
         $siteIds = $this->access->accessibleSiteIds($viewer);
 
-        return DiscoveryScope::query()
+        $scope = DiscoveryScope::query()
+            ->with('collector:id,site_id')
             ->whereKey($scopeId)
-            ->whereNull('collector_id')
             ->when(
                 $siteIds === [],
                 fn ($query) => $query->whereRaw('1 = 0'),
                 fn ($query) => $query->whereIn('site_id', $siteIds),
             )
             ->firstOrFail();
+
+        if ($scope->collector !== null) {
+            $this->access->assertCanViewSite($viewer, (int) $scope->collector->site_id);
+        }
+
+        return $scope;
     }
 
     /** @return array<string, mixed> */
@@ -144,6 +151,7 @@ final class DiscoveryScopeLifecycleController extends Controller
 
         return [
             'site_id' => $updating ? ['prohibited'] : ['required', 'integer', 'min:1'],
+            'collector_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'name' => [...$sometimes, 'string', 'min:3', 'max:128', 'not_regex:/[\x00-\x1F\x7F]/'],
             'cidrs' => [...$sometimes, 'array', 'min:1', 'max:64'],
             'cidrs.*' => ['string', 'max:2048', 'not_regex:/[\x00-\x1F\x7F]/'],
@@ -170,7 +178,8 @@ final class DiscoveryScopeLifecycleController extends Controller
             'name' => $scope->name,
             'site_id' => (int) $scope->site_id,
             'status' => $scope->status,
-            'collection_mode' => 'central_direct',
+            'collection_mode' => $scope->collector_id === null ? 'central_direct' : 'remote_collector',
+            ...($scope->collector_id === null ? [] : ['collector_id' => (int) $scope->collector_id]),
             'protocols' => array_values($scope->protocols ?? []),
             'network_range_count' => count($scope->cidrs ?? []),
             'seed_host_count' => count($scope->seed_hosts ?? []),

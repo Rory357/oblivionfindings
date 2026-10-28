@@ -27,6 +27,7 @@ final readonly class CollectorIngestService
         private RuntimeEnvelopeHandlerRegistry $handlers,
         private DiscoveryRunner $discovery,
         private CollectorCommandResultService $commands,
+        private CanonicalDeviceSiteResolver $sites,
     ) {}
 
     /**
@@ -167,10 +168,19 @@ final readonly class CollectorIngestService
         $monitorId = $this->positiveIntegerString($payload['check_id'] ?? null);
         $deviceId = $this->positiveIntegerString($payload['device_id'] ?? null);
         $monitor = Monitor::query()->with(['collector', 'device.assignments'])->findOrFail($monitorId);
+        $reportedTarget = (string) ($payload['target'] ?? '');
         if ((int) $monitor->collector_id !== (int) $collector->id || (int) $monitor->device_id !== $deviceId
-            || ! hash_equals((string) $monitor->target, (string) ($payload['target'] ?? ''))
+            || ! $this->matchesMonitorTarget($monitor, $reportedTarget)
             || $this->protocol($monitor) !== ($payload['protocol'] ?? null)) {
             throw new RuntimeScopeViolation('Collector item is outside its canonical monitor scope.');
+        }
+        try {
+            $monitorSiteId = $this->sites->resolve($deviceId);
+        } catch (\Throwable) {
+            throw new RuntimeSiteScopeViolation('Collector observation device does not resolve to an active Site.');
+        }
+        if (! in_array($monitorSiteId, $collector->authorisedSiteIds(), true)) {
+            throw new RuntimeSiteScopeViolation('Collector observation Site is outside its approved Site scope.');
         }
         $state = MonitorState::tryFrom((string) ($payload['state'] ?? ''));
         $observedAt = $payload['observed_at'] ?? null;
@@ -219,7 +229,7 @@ final readonly class CollectorIngestService
             payload: [
                 'monitor_id' => $monitorId,
                 'device_id' => $deviceId,
-                'site_id' => (int) $collector->site_id,
+                'site_id' => $monitorSiteId,
                 'collector_uuid' => (string) $collector->collector_uuid,
                 'source_key' => "collector:{$collector->collector_uuid}:{$sequence}",
                 'state' => $state->value,
@@ -229,7 +239,22 @@ final readonly class CollectorIngestService
                 'metrics' => [...$metrics, 'protocol' => (string) $payload['protocol'], 'reason_code' => $reason],
             ],
         );
-        $this->handlers->for(RuntimeMessageType::Observation)->handle($envelope, (int) $collector->site_id);
+        $this->handlers->for(RuntimeMessageType::Observation)->handle($envelope, $monitorSiteId);
+    }
+
+    private function matchesMonitorTarget(Monitor $monitor, string $reportedTarget): bool
+    {
+        if (hash_equals((string) $monitor->target, $reportedTarget)) {
+            return true;
+        }
+        $kind = $monitor->kind instanceof MonitorKind ? $monitor->kind : MonitorKind::tryFrom((string) $monitor->kind);
+        if (in_array($kind, [MonitorKind::Http, MonitorKind::WinRmInventory], true)) {
+            $host = trim((string) parse_url((string) $monitor->target, PHP_URL_HOST), '[]');
+
+            return $host !== '' && hash_equals($host, $reportedTarget);
+        }
+
+        return false;
     }
 
     private function positiveIntegerString(mixed $value): int

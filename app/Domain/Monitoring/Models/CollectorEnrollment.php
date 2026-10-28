@@ -20,6 +20,9 @@ final class CollectorEnrollment extends Model
         'consumed_at',
         'consumed_collector_id',
         'revoked_at',
+        'expected_collector_uuid',
+        'intended_name',
+        'intended_covered_site_ids',
     ];
 
     protected $hidden = ['token_hash', 'recovery_response', 'recovery_identity_fingerprint'];
@@ -28,6 +31,7 @@ final class CollectorEnrollment extends Model
         'expires_at' => 'immutable_datetime',
         'consumed_at' => 'immutable_datetime',
         'revoked_at' => 'immutable_datetime',
+        'intended_covered_site_ids' => 'array',
     ];
 
     public function site(): BelongsTo

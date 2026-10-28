@@ -285,6 +285,12 @@ function correlation(row: MonitorRow) {
         </div>
     );
 }
+const monitorRunsFrom = (r: MonitorRow): string =>
+    r.runs_from ??
+    (r.collection.mode === 'remote_collector'
+        ? `Runs from: hub ${r.collection.collector_name}`
+        : 'Runs from: server');
+
 export function MonitorRecords({
     rows,
     view,
@@ -345,10 +351,7 @@ export function MonitorRecords({
                         ) : null}
                     </p>
                     <p>
-                        {monitoringLabel(r.kind)} ·{' '}
-                        {r.collection.mode === 'remote_collector'
-                            ? r.collection.collector_name
-                            : r.collection.label}
+                        {monitoringLabel(r.kind)} · {monitorRunsFrom(r)}
                     </p>
                     {r.reported_state !== r.effective_state ? (
                         <EntityChip>
@@ -424,12 +427,9 @@ export function MonitorRecords({
                 },
                 {
                     key: 'collection',
-                    label: 'Collection',
-                    width: '155px',
-                    cell: (r) =>
-                        r.collection.mode === 'remote_collector'
-                            ? r.collection.collector_name
-                            : r.collection.label,
+                    label: 'Runs from',
+                    width: '175px',
+                    cell: (r) => monitorRunsFrom(r),
                 },
                 {
                     key: 'freshness',
@@ -578,6 +578,7 @@ export function MonitorRecords({
                         'No Site assigned'
                     ),
                 ],
+                ['Runs from', monitorRunsFrom(r)],
                 ['Collection mode', monitoringLabel(r.collection.mode)],
                 [
                     'Collection state',

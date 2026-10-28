@@ -57,6 +57,7 @@ use App\Domain\SecurityDevices\Http\Controllers\NativeMonitorLifecycleController
 use App\Domain\SecurityDevices\Http\Controllers\QueclinkUnitConsoleController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use App\Domain\SecurityDevices\Http\Controllers\SettingsAuditController;
+use App\Domain\SecurityDevices\Http\Controllers\SiteHubWizardController;
 use App\Domain\SecurityDevices\Http\Controllers\SiteTechnologyController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandApprovalController;
 use App\Domain\SecurityDevices\Management\Http\Controllers\DeviceCommandBatchController;
@@ -636,6 +637,25 @@ Route::middleware([
             Route::post('/{collector}/revoke', [MonitoringCollectorLifecycleController::class, 'revoke'])
                 ->whereNumber('collector')
                 ->name('security-devices.collectors.revoke');
+        });
+
+    Route::prefix('/discovery/collectors')
+        ->middleware('permission:securityDevices.integrations.manage')
+        ->group(function () {
+            Route::get('/hub-wizard/options', [SiteHubWizardController::class, 'options'])
+                ->middleware('throttle:30,1,security-device-hub-wizard-options:')
+                ->name('security-devices.collectors.hub-wizard.options');
+            Route::post('/hub-wizard/issue', [SiteHubWizardController::class, 'issue'])
+                ->middleware('throttle:10,1,security-device-hub-wizard-issue:')
+                ->name('security-devices.collectors.hub-wizard.issue');
+            Route::get('/enrolments/{enrollment}/status', [SiteHubWizardController::class, 'status'])
+                ->whereNumber('enrollment')
+                ->middleware('throttle:60,1,security-device-hub-wizard-status:')
+                ->name('security-devices.collectors.enrolments.status');
+            Route::patch('/{collector}', [MonitoringCollectorLifecycleController::class, 'update'])
+                ->whereNumber('collector')
+                ->middleware('throttle:20,1,security-device-collectors-update:')
+                ->name('security-devices.collectors.update');
         });
 
     Route::get('/settings', SettingsAuditController::class)

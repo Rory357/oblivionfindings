@@ -114,6 +114,9 @@ export type MonitorRow = {
     freshness_state: string;
     device: NamedLink & { domain: string | null; category: string | null };
     site: NamedLink | null;
+    collector_id?: number | null;
+    collector_name?: string | null;
+    runs_from?: string;
     collection:
         | {
               mode: 'remote_collector';
@@ -804,6 +807,11 @@ function MonitoringScreen({
         kind: monitor.kind,
         enabled: monitor.enabled,
         affects_availability: monitor.affects_availability,
+        collector_id:
+            monitor.collector_id ??
+            (monitor.collection.mode === 'remote_collector'
+                ? monitor.collection.collector_id
+                : null),
         profile: monitor.profile ?? null,
         device: {
             id: monitor.device.id,
@@ -850,11 +858,11 @@ function MonitoringScreen({
     );
     const canAddCheck = Boolean(
         management.can_add_check ??
-            (management.can_manage &&
-                management.create_url ===
-                    '/security-devices/monitoring/native-monitors' &&
-                management.devices.length > 0 &&
-                management.profiles.length > 0),
+        (management.can_manage &&
+            management.create_url ===
+                '/security-devices/monitoring/native-monitors' &&
+            management.devices.length > 0 &&
+            management.profiles.length > 0),
     );
     return (
         <AppLayout

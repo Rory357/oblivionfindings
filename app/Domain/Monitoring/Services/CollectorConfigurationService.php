@@ -58,29 +58,32 @@ final readonly class CollectorConfigurationService
                 $cidrs = [...$cidrs, ...($run['cidrs'] ?? [])];
                 $protocols = [...$protocols, ...($run['protocols'] ?? [])];
             }
+            $authorisedSiteIds = $locked->authorisedSiteIds();
+            $coveredSiteIds = $locked->coveredSiteIds();
             Monitor::query()
                 ->with(['profile:id,is_active,interval_seconds', 'device:id'])
                 ->where('collector_id', $locked->id)
                 ->where('is_enabled', true)
                 ->orderBy('id')
                 ->get()
-                ->each(function (Monitor $monitor) use ($locked, &$checks, &$devices, &$cidrs, &$protocols): void {
+                ->each(function (Monitor $monitor) use ($locked, $authorisedSiteIds, &$checks, &$devices, &$cidrs, &$protocols): void {
                     if ($monitor->profile === null || ! $monitor->profile->is_active) {
                         return;
                     }
                     try {
-                        if ($this->sites->resolve((int) $monitor->device_id) !== (int) $locked->site_id) {
+                        $monitorSiteId = $this->sites->resolve((int) $monitor->device_id);
+                        if (! in_array($monitorSiteId, $authorisedSiteIds, true)) {
                             return;
                         }
-                        $check = $this->check($locked, $monitor);
-                    } catch (RuntimeException) {
+                        $check = $this->check($locked, $monitor, $monitorSiteId);
+                    } catch (\Throwable) {
                         return;
                     }
                     if ($check === null) {
                         return;
                     }
                     $deviceId = (string) $monitor->device_id;
-                    $target = (string) $monitor->target;
+                    $target = (string) $check['target'];
                     $devices[$deviceId] ??= [];
                     $devices[$deviceId][] = $target;
                     $devices[$deviceId] = array_values(array_unique($devices[$deviceId]));
@@ -169,6 +172,7 @@ final readonly class CollectorConfigurationService
                             min(1000, (int) config('monitoring.collector.default_packets_per_second', 50)),
                         ),
                     ],
+                    ...($coveredSiteIds === [] ? [] : ['covered_site_ids' => $coveredSiteIds]),
                 ],
                 'checks' => $checks,
             ];
@@ -199,13 +203,21 @@ final readonly class CollectorConfigurationService
     }
 
     /** @return array<string, mixed>|null */
-    private function check(MonitoringCollector $collector, Monitor $monitor): ?array
+    private function check(MonitoringCollector $collector, Monitor $monitor, int $monitorSiteId): ?array
     {
-        $target = trim((string) $monitor->target);
+        $kind = $monitor->kind instanceof MonitorKind ? $monitor->kind : MonitorKind::tryFrom((string) $monitor->kind);
+        $rawTarget = trim((string) $monitor->target);
+        $target = $rawTarget;
+        if (filter_var($target, FILTER_VALIDATE_IP) === false
+            && in_array($kind, [MonitorKind::Http, MonitorKind::WinRmInventory], true)) {
+            $parsedHost = trim((string) parse_url($rawTarget, PHP_URL_HOST), '[]');
+            if ($parsedHost !== '') {
+                $target = $parsedHost;
+            }
+        }
         if (filter_var($target, FILTER_VALIDATE_IP) === false) {
             return null;
         }
-        $kind = $monitor->kind instanceof MonitorKind ? $monitor->kind : MonitorKind::tryFrom((string) $monitor->kind);
         $protocol = match ($kind) {
             MonitorKind::Icmp => 'icmp',
             MonitorKind::Tcp => 'tcp',
@@ -252,7 +264,7 @@ final readonly class CollectorConfigurationService
                 return null;
             }
             $lease = $this->credentials->acquire(
-                (int) $collector->site_id,
+                $monitorSiteId,
                 $reference,
                 ["monitoring.collector.{$protocol}.read"],
             );
@@ -262,6 +274,7 @@ final readonly class CollectorConfigurationService
                 $protocol,
                 $target,
                 $lease,
+                $monitorSiteId,
             );
         }
 

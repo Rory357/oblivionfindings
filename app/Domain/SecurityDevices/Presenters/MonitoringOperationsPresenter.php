@@ -71,6 +71,7 @@ class MonitoringOperationsPresenter
             $device->id => $this->siteForDevice($device, $siteContext),
         ]);
         $accessibleSiteIds = $this->access->accessibleSiteIds($viewer);
+        $canViewAllSites = $this->access->canViewAllSites($viewer);
         $canManageNativeMonitors = $viewer->canDo('securityDevices.monitoring.manage');
         $accessibleSites = $accessibleSiteIds === []
             ? collect()
@@ -112,6 +113,8 @@ class MonitoringOperationsPresenter
             $canManageNativeMonitors,
             (int) $viewer->id,
             $maintenanceWindows,
+            $canViewAllSites,
+            $accessibleSiteIds,
         ));
         $collectionPaths = $this->collectionPaths($allMonitors, $sitesByDevice);
         $monitorFindings = $mapped
@@ -162,6 +165,27 @@ class MonitoringOperationsPresenter
                         'site' => ['id' => (int) $site->id, 'name' => $site->name],
                     ];
                 })
+                ->values()
+                ->all()
+            : [];
+        $monitorCollectors = $canManageNativeMonitors && ($canViewAllSites || $accessibleSiteIds !== [])
+            ? MonitoringCollector::query()
+                ->with('site:id,name')
+                ->whereNull('revoked_at')
+                ->when(! $canViewAllSites, fn ($query) => $query->whereIn('site_id', $accessibleSiteIds))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (MonitoringCollector $collector): array => [
+                    'id' => (int) $collector->id,
+                    'name' => $collector->name,
+                    'home_site_id' => (int) $collector->site_id,
+                    'home_site_name' => $collector->site?->name,
+                    'authorised_site_ids' => array_values(array_filter(
+                        $collector->authorisedSiteIds(),
+                        fn (int $id): bool => $canViewAllSites || in_array($id, $accessibleSiteIds, true),
+                    )),
+                    'state' => $this->collectorState($collector),
+                ])
                 ->values()
                 ->all()
             : [];
@@ -237,6 +261,7 @@ class MonitoringOperationsPresenter
                     : [],
                 'profiles' => $monitorProfiles,
                 'devices' => $monitorDevices,
+                'collectors' => $monitorCollectors,
                 'missing_reason' => $missingCheckReason,
                 'fix_href' => $missingCheckFixHref,
                 'fix_label' => $missingCheckFixLabel,
@@ -417,7 +442,12 @@ class MonitoringOperationsPresenter
             ->map(fn (Collection $rows): Collection => $rows->take(10)->values());
     }
 
-    /** @param Collection<int, MonitorObservation> $observations @param Collection<int, MonitoringMaintenanceWindow> $maintenanceWindows @return array<string, mixed> */
+    /**
+     * @param  Collection<int, MonitorObservation>  $observations
+     * @param  Collection<int, MonitoringMaintenanceWindow>  $maintenanceWindows
+     * @param  array<int, int>  $accessibleSiteIds
+     * @return array<string, mixed>
+     */
     private function mapMonitor(
         Monitor $monitor,
         ?Site $site,
@@ -426,8 +456,12 @@ class MonitoringOperationsPresenter
         bool $canManage,
         int $actorId,
         Collection $maintenanceWindows,
+        bool $canViewAllSites,
+        array $accessibleSiteIds,
     ): array {
-        $nativeDirect = $monitor->collector_id === null
+        $collectorHomeVisible = $monitor->collector_id === null
+            || ($monitor->collector !== null && ($canViewAllSites || in_array((int) $monitor->collector->site_id, $accessibleSiteIds, true)));
+        $nativeManageable = $collectorHomeVisible
             && in_array(
                 $monitor->kind?->value ?? (string) $monitor->kind,
                 NativeMonitoringDefinitionService::directKindValues(),
@@ -491,6 +525,11 @@ class MonitoringOperationsPresenter
                 'name' => $site->name,
                 'href' => "/security-devices/sites/{$site->id}",
             ] : null,
+            'collector_id' => $monitor->collector_id === null ? null : (int) $monitor->collector_id,
+            'collector_name' => $monitor->collector?->name,
+            'runs_from' => $monitor->collector_id === null
+                ? 'Runs from: server'
+                : 'Runs from: hub '.($monitor->collector?->name ?? '#'.$monitor->collector_id),
             'collection' => $monitor->collector ? [
                 'mode' => 'remote_collector',
                 'collector_id' => $monitor->collector->id,
@@ -504,14 +543,14 @@ class MonitoringOperationsPresenter
             ],
             'actions' => [
                 'actor_id' => $actorId,
-                'can_manage' => $canManage && $nativeDirect,
-                'review_token' => $canManage && $nativeDirect && $site
+                'can_manage' => $canManage && $nativeManageable,
+                'review_token' => $canManage && $nativeManageable && $site
                     ? app(NativeMonitorCommandService::class)->reviewToken($monitor, (int) $site->id)
                     : null,
-                'update_url' => $canManage && $nativeDirect
+                'update_url' => $canManage && $nativeManageable
                     ? "/security-devices/monitoring/native-monitors/{$monitor->id}"
                     : null,
-                'deactivate_url' => $canManage && $nativeDirect && $monitor->is_enabled
+                'deactivate_url' => $canManage && $nativeManageable && $monitor->is_enabled
                     ? "/security-devices/monitoring/native-monitors/{$monitor->id}/deactivate"
                     : null,
             ],
@@ -829,7 +868,7 @@ class MonitoringOperationsPresenter
                     'state' => $this->collectorState($collector),
                     'reported_status' => $collector?->status ?? 'unknown',
                     'last_seen_at' => $lastHeartbeat?->toIso8601String(),
-                    'heartbeat_lag_seconds' => $lastHeartbeat?->diffInSeconds(now()),
+                    'heartbeat_lag_seconds' => $lastHeartbeat === null ? null : (int) round(max(0, $lastHeartbeat->diffInSeconds(now()))),
                     'site' => $site ? [
                         'id' => $site->id,
                         'name' => $site->name,

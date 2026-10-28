@@ -6,7 +6,7 @@ using Microsoft.Win32;
 namespace Oblivion.Setup;
 public partial class SetupWindow:Window {
  readonly IInstallerEngine engine;readonly IServiceRepairEngine? repairEngine;
- InstallationInput? input;InstallationReview? review;RepairInput? repairInput;RepairReview? repairReview;
+ InstallationInput? input;InstallationReview? review;RepairInput? repairInput;RepairReview? repairReview;string? temporaryCollectorProfile;
  CancellationTokenSource? operation;bool busy,installing,closeAfterStop,closed;int step;
  readonly DispatcherTimer expiry=new(){Interval=TimeSpan.FromSeconds(1)};
  bool RepairMode=>((ComboBoxItem)ModeChoice.SelectedItem).Tag?.ToString()=="repair";
@@ -16,24 +16,53 @@ public partial class SetupWindow:Window {
  public SetupWindow(IInstallerEngine engine,IServiceRepairEngine? repairEngine=null){
   this.engine=engine;this.repairEngine=repairEngine??engine as IServiceRepairEngine;
   InitializeComponent();((ComboBoxItem)ModeChoice.Items[1]).IsEnabled=this.repairEngine!=null;ModeChanged(null,null!);
-  Closing+=OnClosing;Closed+=(_,_)=>{closed=true;expiry.Stop();operation?.Cancel();operation?.Dispose();};
+  TryPopulateAdjacentPackage();
+  Closing+=OnClosing;Closed+=(_,_)=>{closed=true;expiry.Stop();operation?.Cancel();operation?.Dispose();CleanupTemporaryProfile();};
   expiry.Tick+=(_,_)=>CheckExpiry();expiry.Start();
+ }
+ void TryPopulateAdjacentPackage(){
+  try{
+   var candidates=Directory.GetFiles(AppContext.BaseDirectory,"oblivion-windows-*.zip");
+   if(candidates.Length==1&&string.IsNullOrEmpty(PackagePath.Text))PackagePath.Text=candidates[0];
+  }catch{}
+ }
+ void CleanupTemporaryProfile(){
+  if(temporaryCollectorProfile==null)return;
+  try{if(File.Exists(temporaryCollectorProfile))File.Delete(temporaryCollectorProfile);}catch{}
+  temporaryCollectorProfile=null;
+ }
+ string ResolveCollectorProfile(string raw){
+  string trimmed=raw.Trim();
+  if(!trimmed.StartsWith("ofh1_",StringComparison.Ordinal))return trimmed;
+  if(trimmed.Length>24576)throw new InvalidOperationException("The one-time setup code is too long.");
+  string encoded=trimmed[5..].Replace('-','+').Replace('_','/');
+  switch(encoded.Length%4){case 2:encoded+="==";break;case 3:encoded+="=";break;case 0:break;default:throw new InvalidOperationException("The one-time setup code is invalid. Copy it again from Oblivion.");}
+  byte[] bytes;
+  try{bytes=Convert.FromBase64String(encoded);}catch{throw new InvalidOperationException("The one-time setup code is invalid. Copy it again from Oblivion.");}
+  CleanupTemporaryProfile();
+  string dir=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Oblivion","Setup","Profiles");
+  Directory.CreateDirectory(dir);
+  string file=Path.Combine(dir,"site-"+Guid.NewGuid().ToString("N")+".json");
+  using(var stream=new FileStream(file,FileMode.CreateNew,FileAccess.Write,FileShare.None)){stream.Write(bytes);stream.Flush(true);}
+  Array.Clear(bytes,0,bytes.Length);
+  temporaryCollectorProfile=file;
+  return file;
  }
  internal void CheckExpiry(){
   if(step==1&&!ReviewCurrent){ShowNotice(RepairMode?"The repair review expired. Review the installed connection again.":"The installation profile expired. Download a new profile and review the setup again.");PrimaryButton.IsEnabled=false;ConfirmDestination.IsChecked=false;}
  }
  void ModeChanged(object? sender,SelectionChangedEventArgs e){
-  if(!IsInitialized||busy)return;input=null;review=null;repairInput=null;repairReview=null;ConfirmDestination.IsChecked=false;HideNotice();
+  if(!IsInitialized||busy)return;input=null;review=null;repairInput=null;repairReview=null;CleanupTemporaryProfile();ConfirmDestination.IsChecked=false;HideNotice();
   if(RepairMode){ComputerPath.Text="";CollectorPath.Text="";}
   RoleLabel.Visibility=RoleChoice.Visibility=RepairMode?Visibility.Collapsed:Visibility.Visible;
-  FilesIntroduction.Text=RepairMode?"Choose the same signed release package used for this installation. Obli will read the saved computer, site and server details.":"Use the installation package and profiles downloaded from your organisation’s Oblivion.";
+  FilesIntroduction.Text=RepairMode?"Choose the same signed release package used for this installation. Obli will read the saved computer, site and server details.":"Use the installation package and profile or one-time code from your organisation’s Oblivion.";
   PrimaryButton.Content=ReviewButton;StepText.Text=RepairMode?"1 · Repair installed services":"1 · Choose what to install";
   RoleChanged(null,null!);
  }
  void RoleChanged(object? sender,SelectionChangedEventArgs e){
   if(!IsInitialized)return;bool computer=!RepairMode&&Role is "computer" or "both",site=!RepairMode&&Role is "site" or "both";
   ComputerFiles.Visibility=computer?Visibility.Visible:Visibility.Collapsed;CollectorFiles.Visibility=site?Visibility.Visible:Visibility.Collapsed;
-  if(!computer)ComputerPath.Text="";if(!site)CollectorPath.Text="";
+  if(!computer)ComputerPath.Text="";if(!site){CollectorPath.Text="";CleanupTemporaryProfile();}
   RoleHelp.Text=RepairMode?"Restore Obli’s services and startup settings while keeping the existing device identity and monitoring data.":Role switch{"computer"=>"Obli helper, computer health and authorised remote support.","site"=>"Monitor approved devices on this site’s network.","both"=>"One setup, with separate computer support and site monitoring services.",_=>""};
  }
  void BrowsePackage(object sender,RoutedEventArgs e)=>Browse(PackagePath,"Installation package (*.zip)|*.zip");
@@ -42,14 +71,14 @@ public partial class SetupWindow:Window {
  void Browse(TextBox target,string filter){if(busy)return;var picker=new OpenFileDialog{Filter=filter,CheckFileExists=true,Multiselect=false};if(picker.ShowDialog(this)==true){target.Text=picker.FileName;HideNotice();}}
  void ShowNotice(string text){Notice.Text=text;NoticeBox.Visibility=Visibility.Visible;}
  void HideNotice(){Notice.Text="";NoticeBox.Visibility=Visibility.Collapsed;}
- void ConfirmationChanged(object? sender,RoutedEventArgs e){if(IsInitialized&&step==1)PrimaryButton.IsEnabled=!busy&&ReviewCurrent&&ConfirmDestination.IsChecked==true;}
+ void ConfirmationChanged(object sender,RoutedEventArgs e){if(IsInitialized&&step==1)PrimaryButton.IsEnabled=!busy&&ReviewCurrent&&ConfirmDestination.IsChecked==true;}
  async void PrimaryClicked(object sender,RoutedEventArgs e)=>await AdvanceAsync();
  public async Task AdvanceAsync(){
   if(busy)return;
   if(step==0){
    try {
     if(RepairMode){repairInput=new(PackagePath.Text);_=repairInput.ReviewArguments();if(repairEngine==null)throw new InvalidOperationException("Service repair is unavailable in this build.");}
-    else{input=new(Role,PackagePath.Text,ComputerPath.Text,CollectorPath.Text);_=input.Arguments("review");}
+    else{string collectorProfile=Role is "site" or "both"?ResolveCollectorProfile(CollectorPath.Text):"";input=new(Role,PackagePath.Text,ComputerPath.Text,collectorProfile);_=input.Arguments("review");}
    }catch(Exception error){ShowNotice(error.Message);return;}
    Start(false);
    try {
@@ -71,7 +100,8 @@ public partial class SetupWindow:Window {
     step=3;ResultTitle.Text="Services repaired";ResultBody.Text="The installed services are ready locally. Check their connection and latest reports in Oblivion before relying on monitoring or remote support. The existing device identity and monitoring data were retained.";
    }else{
     await engine.InstallAsync(input!,review!,operation!.Token);
-    step=3;ResultTitle.Text="Installation completed";ResultBody.Text="The selected services are installed. Check their connection and latest reports in Oblivion before relying on monitoring or remote support. Delete the downloaded installation profiles after confirming setup.";
+    CleanupTemporaryProfile();
+    step=3;ResultTitle.Text="Installation completed";ResultBody.Text="The selected services are installed. Check their connection and latest reports in Oblivion before relying on monitoring or remote support. Delete any downloaded installation profiles after confirming setup.";
    }
   }catch(OperationCanceledException){
    step=3;ResultTitle.Text=RepairMode?"Repair stopped":"Installation stopped";ResultBody.Text="Check the saved outcome with your IT team before retrying. Existing device identity and monitoring state are retained.";
@@ -115,7 +145,7 @@ public partial class SetupWindow:Window {
  }
  void SetPanes(){FilesPane.Visibility=step==0?Visibility.Visible:Visibility.Collapsed;ReviewPane.Visibility=step==1?Visibility.Visible:Visibility.Collapsed;WorkingPane.Visibility=step==2?Visibility.Visible:Visibility.Collapsed;ResultPane.Visibility=step==3?Visibility.Visible:Visibility.Collapsed;}
  void BackClicked(object sender,RoutedEventArgs e){
-  if(busy)return;step=0;review=null;input=null;repairReview=null;repairInput=null;ConfirmDestination.IsChecked=false;HideNotice();SetPanes();
+  if(busy)return;step=0;review=null;input=null;repairReview=null;repairInput=null;CleanupTemporaryProfile();ConfirmDestination.IsChecked=false;HideNotice();SetPanes();
   StepText.Text=RepairMode?"1 · Repair installed services":"1 · Choose what to install";BackButton.Visibility=Visibility.Collapsed;PrimaryButton.Content=ReviewButton;PrimaryButton.IsEnabled=true;
  }
  void CancelClicked(object sender,RoutedEventArgs e){if(!busy){Close();return;}RequestStop();}

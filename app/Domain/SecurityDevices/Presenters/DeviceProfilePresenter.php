@@ -8,11 +8,13 @@ use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringCollector;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitorObservation;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\ConfigurationSnapshotService;
+use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Cctv\Services\CctvNavigation;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
@@ -577,6 +579,11 @@ class DeviceProfilePresenter
                 'intervalSeconds' => $monitor->profile->interval_seconds,
                 'staleAfterSeconds' => $monitor->profile->stale_after_seconds,
             ] : null,
+            'collectorId' => $monitor->collector_id === null ? null : (int) $monitor->collector_id,
+            'collectorName' => $monitor->collector?->name,
+            'runsFrom' => $monitor->collector_id === null
+                ? 'Runs from: server'
+                : 'Runs from: hub '.($monitor->collector?->name ?? '#'.$monitor->collector_id),
             'collector' => $monitor->collector ? [
                 'name' => $monitor->collector->name,
                 'status' => $monitor->collector->status,
@@ -1921,18 +1928,52 @@ class DeviceProfilePresenter
                 ->all()
             : [];
 
-        $hasActiveCentralScope = false;
+        $collectors = [];
         if ($canManage && $site !== null) {
-            $hasActiveCentralScope = DiscoveryScope::query()
+            $accessibleSiteIds = $this->deviceAccess->accessibleSiteIds($viewer);
+            $canViewAllSites = $this->deviceAccess->canViewAllSites($viewer);
+            $availability = app(MonitoringCollectorAvailabilityService::class);
+            $collectors = ($canViewAllSites || $accessibleSiteIds !== [])
+                ? MonitoringCollector::query()
+                    ->with('site:id,name')
+                    ->whereNull('revoked_at')
+                    ->when(! $canViewAllSites, fn ($query) => $query->whereIn('site_id', $accessibleSiteIds))
+                    ->orderBy('name')
+                    ->get()
+                    ->filter(fn (MonitoringCollector $collector): bool => in_array((int) $site->id, $collector->authorisedSiteIds(), true))
+                    ->map(fn (MonitoringCollector $collector): array => [
+                        'id' => (int) $collector->id,
+                        'name' => $collector->name,
+                        'home_site_id' => (int) $collector->site_id,
+                        'home_site_name' => $collector->site?->name,
+                        'authorised_site_ids' => array_values(array_filter(
+                            $collector->authorisedSiteIds(),
+                            fn (int $id): bool => $canViewAllSites || in_array($id, $accessibleSiteIds, true),
+                        )),
+                        'state' => $availability->state($collector),
+                    ])
+                    ->values()
+                    ->all()
+                : [];
+        }
+
+        $hasActiveScope = false;
+        if ($canManage && $site !== null) {
+            $hasActiveScope = DiscoveryScope::query()
                 ->where('site_id', $site->id)
-                ->whereNull('collector_id')
                 ->where('status', 'active')
-                ->get(['cidrs', 'protocols', 'exclusions', 'port_bounds'])
-                ->contains(function (DiscoveryScope $scope): bool {
+                ->get(['collector_id', 'cidrs', 'protocols', 'exclusions', 'port_bounds'])
+                ->contains(function (DiscoveryScope $scope) use ($collectors): bool {
                     if (($scope->exclusions ?? []) !== [] || empty($scope->cidrs)) {
                         return false;
                     }
                     $protocols = array_map('strtolower', array_filter($scope->protocols ?? [], 'is_string'));
+                    if ($scope->collector_id !== null) {
+                        return $collectors !== [] && $protocols !== [];
+                    }
+                    if (in_array('icmp', $protocols, true) || $collectors !== []) {
+                        return true;
+                    }
 
                     return collect($scope->port_bounds ?? [])->contains(
                         fn (mixed $ports, mixed $protocol): bool => is_string($protocol)
@@ -1956,13 +1997,13 @@ class DeviceProfilePresenter
             $missingReason = 'Create an active check schedule on Setup first.';
             $fixHref = '/security-devices/settings';
             $fixLabel = 'Open Setup';
-        } elseif (! $hasActiveCentralScope) {
+        } elseif (! $hasActiveScope) {
             $missingReason = 'Add an approved Site subnet on Setup first (or switch on "Alert me if this goes offline" to cover this device\'s IP automatically).';
             $fixHref = '/security-devices/discovery?tab=scopes';
             $fixLabel = 'Add Site subnet';
         }
 
-        $canAddCheck = $canManage && $site !== null && $profiles !== [] && $hasActiveCentralScope;
+        $canAddCheck = $canManage && $site !== null && $profiles !== [] && $hasActiveScope;
 
         return [
             'actor_id' => (int) $viewer->id,
@@ -1980,6 +2021,7 @@ class DeviceProfilePresenter
                     'name' => $site->name,
                 ],
             ]] : [],
+            'collectors' => $collectors,
             'missing_reason' => $missingReason,
             'fix_href' => $fixHref,
             'fix_label' => $fixLabel,

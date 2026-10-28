@@ -38,7 +38,10 @@ func (s *catalogueSigner) Sign(_ io.Reader, message []byte, opt crypto.SignerOpt
 }
 func catalogueFixture(t *testing.T) (string, string, CatalogueSpec, ed25519.PrivateKey, ed25519.PrivateKey) {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	source := filepath.Join(root, "artifacts")
 	if err := os.Mkdir(source, 0700); err != nil {
 		t.Fatal(err)

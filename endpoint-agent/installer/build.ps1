@@ -1,4 +1,4 @@
-param([string]$DotNet='dotnet',[string]$OutputRoot='',[string]$BackendX64='',[string]$BackendArm64='')
+param([string]$DotNet='dotnet',[string]$OutputRoot='',[string]$BackendX64='',[string]$BackendArm64='',[switch]$RequireAuthenticode)
 $ErrorActionPreference='Stop'
 if (-not [OperatingSystem]::IsWindows()) { throw 'The graphical installer is Windows only.' }
 $projectRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
@@ -34,16 +34,18 @@ try {
   $destination=Join-Path $OutputRoot ("obli-setup-windows-"+$architecture)
   if ($backend) {
    $backend=(Resolve-Path -LiteralPath $backend).Path
-   if ((Get-AuthenticodeSignature -LiteralPath $backend).Status -ne 'Valid') {throw 'The installer backend must have a valid publisher signature.'}
+   if ($RequireAuthenticode -and (Get-AuthenticodeSignature -LiteralPath $backend).Status -ne 'Valid') {throw 'The installer backend must have a valid publisher signature.'}
    $expectedMachine=if ($architecture -eq 'x64') {0x8664} else {0xaa64}
    if ((Get-InstallerMachine $backend) -ne $expectedMachine) {throw 'The installer backend architecture does not match.'}
    $digest=(Get-FileHash -LiteralPath $backend -Algorithm SHA256).Hash.ToLowerInvariant()
   }
-  & $DotNet publish Obli.Setup/Obli.Setup.csproj --configuration Release --runtime ("win-"+$architecture) --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None ("-p:BackendSha256="+$digest) -o $destination --nologo
+  $publishArgs=@('publish','Obli.Setup/Obli.Setup.csproj','--configuration','Release','--runtime',("win-"+$architecture),'--self-contained','true','-p:PublishSingleFile=true','-p:IncludeNativeLibrariesForSelfExtract=true','-p:DebugType=None',("-p:BackendSha256="+$digest),'-o',$destination,'--nologo')
+  if ($backend) { $publishArgs+=("-p:BackendExecutablePath="+$backend) }
+  & $DotNet @publishArgs
   if ($LASTEXITCODE -ne 0) { throw ("Installer publish failed: "+$architecture) }
   if ($backend) {
    $target=Join-Path $destination 'oblivion-setup-core.exe'
-   Copy-Item -LiteralPath $backend -Destination $target
+   Copy-Item -LiteralPath $backend -Destination $target -Force
    if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -ne $digest) {throw 'Backend changed while being packaged.'}
   } elseif (Test-Path -LiteralPath (Join-Path $destination 'oblivion-setup-core.exe')) {
    throw 'Development output contains a previous backend; use a fresh output directory.'

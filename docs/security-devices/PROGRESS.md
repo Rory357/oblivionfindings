@@ -212,3 +212,80 @@
   ![Local Discovery Candidates](screenshots/phase-1-local-discovery-candidates.png)
 - **Queclink unit console (masked IMEI, redacted command password, protocol citation, safe vs confirmation-gated commands):**
   ![Local Queclink Console](screenshots/phase-1-local-queclink-console.png)
+
+#### Live `oblivionfindings.com` walkthrough (`effbd5f8f` — 28 Oct 2026 NZDT)
+- **Pre-deploy MySQL backup verified on `oblivionfindings.com`:**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase1-20261027T185427Z.sql.gz` (`45 MB`, `0600`, `gzip -t` OK)
+- **Live deployment & migration verified:**
+  - `deploy done current=effbd5f8f813e9f0d5cf46475d044c77d145d7a4`, `2026_10_28_000001_seed_default_availability_profile .............. [227] Ran`, `git -C /var/www/oblivionfindings status --porcelain` empty.
+- **Register device (searchable Site combobox + IP address or hostname on live `.com`):**
+  ![Live Register Device](screenshots/phase-1-live-register-device.png)
+- **Edit device (`UX7` prefilling `Network & IT`, `Site: Kauri House`, `IP address or hostname: 172.16.0.1`):**
+  ![Live Edit Device](screenshots/phase-1-live-edit-device.png)
+- **`Ping now` (`1 ms` live reply on `UX7`) + one-switch `"Alert me if this goes offline"` + always-visible `Add check` with plain-English prerequisite note:**
+  ![Live Device Ping & Checks](screenshots/phase-1-live-device-ping-and-checks.png)
+- **Discovery & collectors › Candidates (`No candidates in this Site view`, `0` console/page errors):**
+  ![Live Discovery Candidates](screenshots/phase-1-live-discovery-candidates.png)
+- **Queclink unit console on live `Care tracker 867963069916998` (`Amelia Wilson` resident location consent enforced, masked IMEI `8679•••••••6998`, historical `AT+GTRTO=[REDACTED]` / `AT+GTCFG=[REDACTED]` passwords scrubbed):**
+  ![Live Queclink Console](screenshots/phase-1-live-queclink-console.png)
+
+---
+
+## Phase 2 — Site hub
+
+### Summary of changes
+
+1. **Multi-platform build, unsigned Windows installer, Linux systemd service, and Ed25519 release manifest (`2.1`)**
+   - Added `.github/workflows/site-hub-release.yml` to build `windows/amd64`, `windows/arm64`, `linux/amd64`, and `linux/arm64` packages and sign `downloads.json` (`oblivion-endpoint-release-catalogue-v1`) with Ed25519.
+   - Updated the Windows WPF installer (`endpoint-agent/installer/Obli.Setup`) and `endpoint-agent/cmd/oblivion-setup` so unsigned Windows installers (`obli-setup-windows-amd64.exe`, `obli-setup-windows-arm64.exe`) let operators install **Obli + computer agent**, **Site monitoring**, or **both**, and accept `ofh1_...` one-time setup codes directly without requiring JSON profile files.
+   - Added `scripts/package-linux-site-hub.sh` and `endpoint-agent/packaging/linux/` (`install.sh --code 'ofh1_...'` + hardened `oblivion-site-collector.service` systemd unit with `AmbientCapabilities=CAP_NET_RAW`) for Linux x86_64 NUCs and ARM64 Raspberry Pi appliances.
+   - Added `php artisan endpoint:publish-catalogue` (`PublishEndpointReleaseCatalogueCommand`) to verify the Ed25519 catalogue signature and SHA-256 package digests before atomically publishing releases into `storage/app/private/endpoint-releases`.
+   - Fixed `OpenSslCollectorCertificateIssuer` on Windows hosts by passing the OpenSSL config path during private key export (`openssl_pkey_export`).
+
+2. **`"Add a hub"` wizard per Site (`2.2`)**
+   - Added migration `2026_10_28_090000_add_hub_metadata_to_collector_enrollments.php`, `SiteHubWizardController` (`options`, `issue`, `status`), `AddHubWizard` (`resources/js/components/security-devices/add-hub-wizard.tsx`), and `EditHubDialog` (`resources/js/components/security-devices/edit-hub-dialog.tsx`).
+   - Guides operators through selecting the Home Site, hub name, platform (**Windows PC or server** vs **Linux NUC or Raspberry Pi**), and optional SD-WAN/MPLS Sites, then provides verified installer downloads, a 15-minute `ofh1_...` one-time setup code (plus Linux `sudo bash install.sh --code '...'`), and live connection polling until **`Connected ✓`**.
+
+3. **Assign checks & scans to hubs, SD-WAN multi-Site coverage, server-direct scanning, and `"Runs from"` (`2.3`)**
+   - Extended `MonitoringCollector` (`coveredSiteIds()`, `authorisedSiteIds()`, `softwareVersion()`), `CollectorEnrollmentService`, `CollectorConfigurationService`, `CollectorIngestService`, `CollectorCredentialLeaseSealer`, `MonitoringObservationScopeGuard`, `MonitorScheduler`, `DiscoveryScopeValidator`, `DiscoveryRunner`, `NativeMonitoringDefinitionService`, `NativeMonitorCommandService`, and `collector/` (`CollectorConfig`, `ScopeGuard`, `CollectorApplication`) so one Site hub can run local checks and discovery scans for its Home Site **and** explicitly covered SD-WAN/MPLS Sites (`config.covered_site_ids`) while failing closed for unauthorised Sites.
+   - Server-direct monitors and scans (`collector_id = null`) continue to run directly from the application server when routable.
+   - Surfaced **`Runs from: server`** / **`Runs from: hub <Name>`** across Discovery scopes & runs, Alerts & upkeep (`/security-devices/monitoring`), Device profiles (and the `Add check` / `Add scope` wizards), and Site technology views.
+
+4. **Hub health on Discovery & collectors and Site technology (`2.4`)**
+   - Surfaced live hub status (`Online` / `Stale` / `Offline`), software version (`v0.2.0`), last heartbeat & integer lag seconds, active check & scan load, and SD-WAN covered Sites (including `Covers over SD-WAN` badges on remote Sites) on **Setup › Discovery & collectors** and **Sites › Site technology**.
+
+---
+
+### Verification & local walkthrough
+
+- **Go (`endpoint-agent/`):** `go test ./...` — passed.
+- **Windows WPF (`endpoint-agent/installer/Obli.Setup/`):** `dotnet build` — 0 errors, 0 warnings.
+- **Collector PHP runtime (`collector/`):** `php vendor/bin/pest --compact` — 122 passed (797 assertions).
+- **Laravel Pint:** 0 issues across all touched/new PHP files.
+- **TypeScript (`tsc --noEmit`):** 0 errors across the repository.
+- **ESLint (`--max-warnings=0`):** 0 errors and 0 warnings across all 15 touched/new TS/TSX files (including `security-devices-copy/no-jargon`).
+- **Vitest (`--maxWorkers=2`):** 8 test files / 76 tests passed (`add-hub-wizard.test.tsx`, `native-monitor-wizard.test.tsx`, `discovery.test.tsx`, `collector-lifecycle.test.tsx`, `monitoring.test.tsx`, `native-monitoring-workflows.test.tsx`, `sites/show.test.tsx`, `security-devices-confirmation-dialogs.test.ts`).
+- **Pest (Sequential):** `ItSecuritySingleTenantBoundaryTest`, `MonitoringSingleTenantBoundaryTest`, `NativeMonitoringOperatorWorkflowTest`, `MonitoringCollectorOperatorWorkflowTest`, `EndpointDownloadsTest`, `CollectorLifecycleTest`, `CollectorRecoverableEnrollmentTest`, `Phase2SiteHubTest` — 103 passed (2,898 assertions).
+- **Home network walkthrough (`172.16.0.0/24`):**
+  - Published a signed multi-platform `0.2.0` catalogue (`windows/amd64`, `windows/arm64`, `linux/amd64`, `linux/arm64`) via `php artisan endpoint:publish-catalogue` (`2.1`).
+  - Issued an `ofh1_...` setup code for `Home Network Lab Hub` (covering `Remote Branch SD-WAN` over SD-WAN), enrolled via `CollectorRecoverableEnrollment` with real OpenSSL mTLS client certificate issuance, and verified Step 3 transitioning live to **`Connected ✓`** on `v0.2.0` (`2.2`).
+  - Ran a rate-limited server-direct check against `172.16.0.1` (`Replied in < 1 ms.`, `Runs from: server`) alongside a hub-assigned SD-WAN scope (`172.16.0.128/28`) and check (`172.16.0.130`, `Runs from: hub Home Network Lab Hub`) (`2.3`, `2.4`) with `0` console/page/HTTP errors.
+
+#### Local walkthrough screenshots
+- **Add a Site hub — Step 1 (Home Site, Windows/Linux selector, SD-WAN Site coverage):**
+  ![Local Add Hub Step 1](screenshots/phase-2-local-add-hub-step1.png)
+- **Add a Site hub — Step 2 (Signed installer downloads + one-time `ofh1_...` setup code):**
+  ![Local Add Hub Code](screenshots/phase-2-local-add-hub-code.png)
+- **Add a Site hub — Step 3 (`Connected ✓` live heartbeat on `v0.2.0`):**
+  ![Local Add Hub Connected](screenshots/phase-2-local-add-hub-connected.png)
+- **Setup › Discovery & collectors — Hub health (`Online`, `v0.2.0`, check & scan load, `Remote Branch SD-WAN`):**
+  ![Local Discovery Hub Health](screenshots/phase-2-local-discovery-hub-health.png)
+- **Setup › Discovery & collectors — Scopes (`Runs from: server` & `Runs from: hub Home Network Lab Hub`):**
+  ![Local Discovery Scopes Runs From](screenshots/phase-2-local-discovery-scopes-runs-from.png)
+- **Alerts & upkeep — Monitors (`Runs from: server` & `Runs from: hub Home Network Lab Hub`):**
+  ![Local Monitoring Runs From](screenshots/phase-2-local-monitoring-runs-from.png)
+- **Device profile — Monitors (`Runs from: hub Home Network Lab Hub`):**
+  ![Local Device Runs From](screenshots/phase-2-local-device-runs-from.png)
+- **Site technology (`Remote Branch SD-WAN`) — `Covers over SD-WAN` hub card (`v0.2.0`):**
+  ![Local Site Hub Coverage](screenshots/phase-2-local-site-hub-coverage.png)
+

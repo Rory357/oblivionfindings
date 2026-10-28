@@ -172,6 +172,87 @@ it('revalidates target scope immediately before every probe and rejects expired 
     }
 });
 
+it('allows signed cross-Site SD-WAN discovery runs and credential leases only for covered Sites', function () {
+    $directory = collectorTempDirectory('covered-sites');
+    try {
+        $loader = new SignedConfigLoader(
+            new EnvelopeVerifier(collectorPublicKey()),
+            new CheckpointFile($directory.'/checkpoint.json'),
+            '2df1d87c-2d04-4e57-80ab-8a15f39c944d',
+            9,
+        );
+
+        $envelope = signedCollectorConfig([
+            'version' => 2,
+            'sequence' => 5,
+            'scope' => [
+                'cidrs' => ['10.44.0.0/24', '10.88.0.0/24'],
+                'covered_site_ids' => [14],
+                'devices' => [
+                    'edge-1' => ['10.44.0.10'],
+                    'sdwan-switch-1' => ['10.88.0.25'],
+                ],
+                'protocols' => ['icmp', 'snmp'],
+            ],
+            'checks' => [[
+                'id' => 'check-sdwan-snmp',
+                'device_id' => 'sdwan-switch-1',
+                'protocol' => 'snmp',
+                'target' => '10.88.0.25',
+                'credential_lease' => sealedCollectorCredentialLease(
+                    ['community' => 'sdwan-ro'],
+                    [
+                        'site_id' => 14,
+                        'device_id' => 'sdwan-switch-1',
+                        'protocol' => 'snmp',
+                        'target' => '10.88.0.25',
+                    ],
+                ),
+            ]],
+            'discovery_runs' => [[
+                'id' => '11111111-2222-4333-8444-555555555555',
+                'site_id' => 14,
+                'cidrs' => ['10.88.0.0/24'],
+                'protocols' => ['icmp'],
+                'exclusions' => [],
+                'port_bounds' => [],
+                'packets_per_second' => 25,
+                'targets' => [['target' => '10.88.0.25', 'source' => 'seed']],
+            ]],
+        ]);
+
+        $config = $loader->load($envelope, collectorNow());
+        expect($config->allowedSiteIds())->toBe([9, 14])
+            ->and($config->discoveryRuns)->toHaveCount(1)
+            ->and($config->discoveryRuns[0]['site_id'])->toBe(14);
+
+        $unapprovedRunEnvelope = signedCollectorConfig([
+            'version' => 2,
+            'sequence' => 6,
+            'scope' => [
+                'cidrs' => ['10.44.0.0/24', '10.99.0.0/24'],
+                'covered_site_ids' => [14],
+                'protocols' => ['icmp'],
+            ],
+            'discovery_runs' => [[
+                'id' => '22222222-3333-4444-8555-666666666666',
+                'site_id' => 99,
+                'cidrs' => ['10.99.0.0/24'],
+                'protocols' => ['icmp'],
+                'exclusions' => [],
+                'port_bounds' => [],
+                'packets_per_second' => 25,
+                'targets' => [['target' => '10.99.0.10', 'source' => 'seed']],
+            ]],
+        ]);
+
+        expect(fn () => $loader->load($unapprovedRunEnvelope, collectorNow()))
+            ->toThrow(ConfigurationRejected::class, 'discovery identity');
+    } finally {
+        removeCollectorDirectory($directory);
+    }
+});
+
 it('contains no command opcode shell field or arbitrary executable path', function () {
     $paths = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(__DIR__.'/../src'));
     $source = '';
