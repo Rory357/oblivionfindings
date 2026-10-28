@@ -98,6 +98,9 @@ final class SiteTopologyMapService
             return null;
         }
 
+        $siteDeviceIds = $devices->pluck('id')->map(fn ($id): int => (int) $id)->all();
+        $validActorId = $actorId !== null && User::query()->whereKey($actorId)->exists() ? $actorId : null;
+
         $indexes = $this->indexSiteDevices($devices);
         $candidates = DiscoveryCandidate::query()
             ->whereHas('run.scope', fn ($q) => $q->where('site_id', $siteId))
@@ -110,17 +113,19 @@ final class SiteTopologyMapService
         }
 
         $signalsByDeviceId = [];
+        $seenDeviceIds = [];
         foreach ($candidates as $candidate) {
             $snapshot = is_array($candidate->evidence_snapshot) ? $candidate->evidence_snapshot : [];
-            $signals = is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : [];
-            if ($signals === []) {
-                continue;
-            }
-
             $deviceId = $candidate->canonical_device_id !== null && $indexes['by_id']->has((int) $candidate->canonical_device_id)
                 ? (int) $candidate->canonical_device_id
                 : $this->matchDeviceFromSnapshot($snapshot, $indexes);
-            if ($deviceId === null || isset($signalsByDeviceId[$deviceId])) {
+            if ($deviceId === null || isset($seenDeviceIds[$deviceId])) {
+                continue;
+            }
+            $seenDeviceIds[$deviceId] = true;
+
+            $signals = is_array($snapshot['signals'] ?? null) ? $snapshot['signals'] : [];
+            if ($signals === []) {
                 continue;
             }
             $signalsByDeviceId[$deviceId] = [
@@ -130,7 +135,11 @@ final class SiteTopologyMapService
         }
 
         if ($signalsByDeviceId === []) {
-            return null;
+            if ($validActorId !== null) {
+                $this->syncAutoDeviceRelationships($siteId, $siteDeviceIds, [], $validActorId);
+            }
+
+            return $this->reconcileEmptyHubSnapshotIfNeeded($site);
         }
 
         /**
@@ -378,7 +387,11 @@ final class SiteTopologyMapService
         }
 
         if ($bestByChild === []) {
-            return null;
+            if ($validActorId !== null) {
+                $this->syncAutoDeviceRelationships($siteId, $siteDeviceIds, [], $validActorId);
+            }
+
+            return $this->reconcileEmptyHubSnapshotIfNeeded($site);
         }
 
         ksort($bestByChild);
@@ -406,7 +419,25 @@ final class SiteTopologyMapService
             ];
         }
 
-        $checkpoint = 'hub-discovery:'.hash('sha256', json_encode($checkpointPayload, JSON_THROW_ON_ERROR));
+        $baseCheckpoint = 'hub-discovery:'.hash('sha256', json_encode($checkpointPayload, JSON_THROW_ON_ERROR));
+        $latestHubSnapshot = TopologySnapshot::query()
+            ->where('site_id', $site->id)
+            ->where('source', 'hub:discovery')
+            ->where('status', 'completed')
+            ->orderByDesc('captured_at')
+            ->orderByDesc('id')
+            ->first();
+        $checkpoint = $baseCheckpoint;
+        if ($latestHubSnapshot !== null
+            && $latestHubSnapshot->source_checkpoint_hash !== hash('sha256', $baseCheckpoint)
+            && TopologySnapshot::query()
+                ->where('site_id', $site->id)
+                ->where('source', 'hub:discovery')
+                ->where('source_checkpoint_hash', hash('sha256', $baseCheckpoint))
+                ->exists()) {
+            $checkpoint = "{$baseCheckpoint}:after:{$latestHubSnapshot->id}";
+        }
+
         $snapshot = null;
         try {
             $snapshot = $this->snapshotBuilder->build(
@@ -419,8 +450,8 @@ final class SiteTopologyMapService
             $snapshot = null;
         }
 
-        if ($actorId !== null && User::query()->whereKey($actorId)->exists()) {
-            $this->syncAutoDeviceRelationships($siteId, $bestByChild, $actorId);
+        if ($validActorId !== null) {
+            $this->syncAutoDeviceRelationships($siteId, $siteDeviceIds, $bestByChild, $validActorId);
         }
 
         return $snapshot;
@@ -904,15 +935,45 @@ final class SiteTopologyMapService
         ];
     }
 
+    private function reconcileEmptyHubSnapshotIfNeeded(Site $site): ?TopologySnapshot
+    {
+        $latestHubSnapshot = TopologySnapshot::query()
+            ->where('site_id', $site->id)
+            ->where('source', 'hub:discovery')
+            ->where('status', 'completed')
+            ->orderByDesc('captured_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($latestHubSnapshot === null || (int) $latestHubSnapshot->edge_count === 0) {
+            return $latestHubSnapshot;
+        }
+
+        try {
+            return $this->snapshotBuilder->build(
+                $site,
+                [],
+                source: 'hub:discovery',
+                sourceCheckpoint: "hub-discovery:empty:after:{$latestHubSnapshot->id}",
+            );
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
     /**
+     * @param  list<int>  $siteDeviceIds
      * @param  array<int, array<string, mixed>>  $bestByChild
      */
-    private function syncAutoDeviceRelationships(int $siteId, array $bestByChild, int $actorId): void
+    private function syncAutoDeviceRelationships(int $siteId, array $siteDeviceIds, array $bestByChild, int $actorId): void
     {
+        $desiredChildIds = [];
+
         foreach ($bestByChild as $childId => $spec) {
             if (! ($spec['sync_relationship'] ?? false)) {
                 continue;
             }
+            $desiredChildIds[(int) $childId] = true;
             $parentId = (int) $spec['parent_id'];
             $desiredPort = $spec['port_summary'] !== null ? Str::limit($spec['port_summary'], 64, '') : null;
 
@@ -963,6 +1024,40 @@ final class SiteTopologyMapService
                 'child_device_id' => $childId,
                 'source' => $spec['source'],
                 'port' => $desiredPort,
+            ]);
+        }
+
+        if ($siteDeviceIds === []) {
+            return;
+        }
+
+        $staleAutoQuery = DeviceRelationship::query()
+            ->active()
+            ->whereIn('child_device_id', $siteDeviceIds);
+
+        if ($desiredChildIds !== []) {
+            $staleAutoQuery->whereNotIn('child_device_id', array_keys($desiredChildIds));
+        }
+
+        $staleAutoRelationships = $staleAutoQuery
+            ->get()
+            ->filter(
+                fn (DeviceRelationship $r): bool => is_string($r->notes)
+                    && str_starts_with($r->notes, self::AUTO_NOTE_PREFIX),
+            );
+
+        foreach ($staleAutoRelationships as $stale) {
+            $stale->update([
+                'unlinked_at' => now(),
+                'unlinked_by_user_id' => $actorId,
+                'unlink_reason' => 'Uplink no longer observed in latest Site hub topology scan.',
+            ]);
+
+            AuditLogger::logOrFail('security_devices.topology.relationship_unlinked', $stale, [
+                'actor_id' => $actorId,
+                'site_id' => $siteId,
+                'parent_device_id' => (int) $stale->parent_device_id,
+                'child_device_id' => (int) $stale->child_device_id,
             ]);
         }
     }

@@ -2,10 +2,19 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Monitoring\Contracts\CredentialLeaseProvider;
+use App\Domain\Monitoring\Data\CredentialLease;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryCandidate;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryRun;
 use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
+use App\Domain\Monitoring\Discovery\Services\DiscoveryRunner;
+use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\Monitoring\Services\CollectorConfigurationService;
 use App\Domain\Monitoring\Topology\Models\TopologySnapshot;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialTestStatus;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -23,11 +32,13 @@ use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
@@ -213,6 +224,36 @@ class Phase4ProfilesAndTopologyTest extends TestCase
         $this->assertSame($switch->id, $tree['roots'][0]['children'][0]['id']);
         $this->assertSame($ap->id, $tree['roots'][0]['children'][0]['children'][0]['id']);
         $this->assertSame($camera->id, $tree['roots'][0]['children'][0]['children'][0]['children'][0]['id']);
+
+        // When AP's bridge FDB uplink disappears on a subsequent scan, its stale auto relationship is unlinked
+        $switchCandidate->update([
+            'evidence_snapshot' => [
+                'addresses' => ['172.16.0.2'],
+                'mac_addresses' => ['24:5A:4C:00:00:02'],
+                'signals' => [
+                    'lldp_neighbors' => [[
+                        'local_port' => 'Gi1/0/1',
+                        'remote_mac' => '70:A7:41:00:00:01',
+                        'remote_port' => 'lan0',
+                        'remote_name' => 'Harbour UX7 Gateway',
+                    ]],
+                ],
+            ],
+        ]);
+
+        $service->reconcileSite($site->id, $this->admin->id);
+
+        $this->assertNotNull($currentApRel->fresh()->unlinked_at);
+        $this->assertFalse(
+            DeviceRelationship::query()->active()->where('child_device_id', $ap->id)->exists(),
+        );
+        $this->assertTrue(
+            DeviceRelationship::query()
+                ->active()
+                ->where('parent_device_id', $gateway->id)
+                ->where('child_device_id', $switch->id)
+                ->exists(),
+        );
     }
 
     public function test_device_profile_presenter_classifies_all_eight_layouts_and_surfaces_checks_and_history(): void
@@ -510,6 +551,107 @@ class Phase4ProfilesAndTopologyTest extends TestCase
 
         $this->assertTrue(AuditLog::query()->where('action', 'camera.onvif.snapshot')->exists());
         $this->assertTrue(AuditLog::query()->where('action', 'camera.onvif.ptz')->exists());
+
+        // 4. Out-of-scope private IP camera (outside Site's approved 172.16.0.0/24 DiscoveryScope) fails closed with zero HTTP calls
+        $outOfScopeCamera = $this->createAssignedSiteDevice($site, [
+            'name' => 'Unapproved Subnet Camera',
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'ip_camera',
+            'ip_address' => '10.55.0.10',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/security-devices/devices/{$outOfScopeCamera->id}/camera/snapshot")
+            ->assertOk()
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('reason_code', 'out_of_site_scope');
+
+        Http::assertNotSent(fn (HttpClientRequest $req): bool => str_contains($req->url(), '10.55.0.10'));
+    }
+
+    public function test_collector_configuration_seals_site_unifi_discovery_lease_into_signed_envelope(): void
+    {
+        $configPair = sodium_crypto_sign_seed_keypair(str_repeat("\x41", SODIUM_CRYPTO_SIGN_SEEDBYTES));
+        config()->set(
+            'monitoring.collector.signing_secret_key',
+            base64_encode(sodium_crypto_sign_secretkey($configPair)),
+        );
+
+        app()->instance(CredentialLeaseProvider::class, new class implements CredentialLeaseProvider
+        {
+            public function acquire(int $siteId, string $reference, array $capabilities): CredentialLease
+            {
+                return new CredentialLease(
+                    'unifi-discovery-fixture-lease',
+                    CarbonImmutable::now('UTC')->addMinute(),
+                    ['api_key' => 'UNIFI-LOCAL-TOPOLOGY-KEY', 'controller_ip' => '172.16.0.1'],
+                );
+            }
+        });
+
+        $site = Site::factory()->create(['name' => 'Pohutukawa House', 'is_active' => true, 'archived' => false]);
+        $collectorPair = sodium_crypto_sign_seed_keypair(str_repeat("\x42", SODIUM_CRYPTO_SIGN_SEEDBYTES));
+        $collectorPublic = sodium_crypto_sign_publickey($collectorPair);
+        $collector = MonitoringCollector::factory()->create([
+            'site_id' => $site->id,
+            'collector_uuid' => '4f8d2c79-67c3-4e0e-8873-77a9614b9e11',
+            'public_key' => base64_encode($collectorPublic),
+            'public_key_fingerprint' => hash('sha256', $collectorPublic),
+            'client_certificate_fingerprint' => hash('sha256', 'phase4-unifi-collector-cert'),
+            'status' => 'online',
+            'last_seen_at' => now(),
+        ]);
+
+        CredentialReference::query()->create([
+            'reference_key' => 'unifi:pohutukawa-controller',
+            'site_id' => $site->id,
+            'provider' => 'unifi',
+            'purpose' => 'monitoring',
+            'capabilities' => ['monitoring.collector.unifi.read'],
+            'secret_manager_reference' => 'monitoring/pohutukawa/unifi',
+            'secret_manager_reference_hash' => hash('sha256', 'monitoring/pohutukawa/unifi'),
+            'status' => CredentialReferenceStatus::Active,
+            'rotation_status' => CredentialRotationStatus::Current,
+            'test_status' => CredentialTestStatus::Passed,
+            'version' => 1,
+            'created_by_user_id' => $this->admin->id,
+        ]);
+
+        $scope = DiscoveryScope::factory()->create([
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'name' => 'Pohutukawa LAN',
+            'cidrs' => ['172.16.0.0/30'],
+            'seed_hosts' => ['172.16.0.1'],
+            'protocols' => ['icmp', 'tcp', 'tls'],
+            'exclusions' => [],
+            'port_bounds' => ['tcp' => [80, 443], 'tls' => [443]],
+            'max_targets_per_run' => 16,
+            'packets_per_second' => 20,
+            'status' => 'active',
+        ]);
+
+        Queue::fake();
+        $runner = app(DiscoveryRunner::class);
+        $queuedRun = $runner->start($scope, 'manual');
+        $run = $runner->execute((int) $queuedRun->id);
+
+        $envelopeJson = app(CollectorConfigurationService::class)->signedEnvelope($collector, 0);
+        $envelope = json_decode($envelopeJson, true, 512, JSON_THROW_ON_ERROR);
+        $payload = json_decode((string) base64_decode((string) $envelope['payload'], true), true, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertSame(2, $payload['version']);
+        $this->assertCount(1, $payload['discovery_runs']);
+        $this->assertArrayNotHasKey('unifi_credential_reference', $payload['discovery_runs'][0]);
+        $this->assertIsArray($payload['discovery_runs'][0]['unifi_lease'] ?? null);
+        $this->assertSame('https', $payload['discovery_runs'][0]['unifi_lease']['protocol']);
+        $this->assertSame('172.16.0.0/30', $payload['discovery_runs'][0]['unifi_lease']['target']);
+        $this->assertSame(
+            'discovery:'.strtolower((string) $run->run_uuid),
+            $payload['discovery_runs'][0]['unifi_lease']['device_id'],
+        );
     }
 
     /**

@@ -1,8 +1,12 @@
 <?php
 
+use Oblivion\Collector\Data\CollectorConfig;
 use Oblivion\Collector\Discovery\LanDiscoveryScanner;
 use Oblivion\Collector\Discovery\SnmpTopologyProbe;
 use Oblivion\Collector\Discovery\UniFiLocalTopologyProbe;
+use Oblivion\Collector\Exceptions\ConfigurationRejected;
+use Oblivion\Collector\Security\CredentialLeaseDecryptor;
+use Oblivion\Collector\Security\ScopeGuard;
 
 /**
  * Helper to encode ASN.1 BER TLVs for SNMPv2c GetResponse-PDU fixtures.
@@ -367,4 +371,61 @@ it('sanitizes topology discovery signals and strips malformed MACs, IPs, and sec
         ->and($sanitized['bridge_fdb'][0]['mac'])->toBe('44:19:B6:01:02:03')
         ->and($sanitized['unifi_uplink'])->not->toHaveKey('api_key')
         ->and($sanitized)->not->toHaveKey('community');
+});
+
+it('preserves and validates sealed unifi_lease in CollectorConfig, ScopeGuard, and CredentialLeaseDecryptor', function (): void {
+    $runId = '018f0000-0000-7000-8000-000000000901';
+    $sealedUnifiLease = sealedCollectorCredentialLease(
+        ['api_key' => 'unifi-local-api-token', 'controller_ip' => '10.44.0.1'],
+        [
+            'device_id' => 'discovery:'.$runId,
+            'protocol' => 'https',
+            'target' => '10.44.0.0/24',
+        ],
+    );
+
+    $basePayload = [
+        'version' => 2,
+        'collector_id' => '2df1d87c-2d04-4e57-80ab-8a15f39c944d',
+        'site_id' => 9,
+        'sequence' => 7,
+        'issued_at' => '2026-07-23T11:55:00+00:00',
+        'expires_at' => '2026-07-23T13:00:00+00:00',
+        'revoked' => false,
+        'scope' => [
+            'cidrs' => ['10.44.0.0/24'],
+            'devices' => [],
+            'protocols' => ['icmp', 'tcp', 'tls'],
+            'rate_limits' => ['max_checks_per_run' => 1, 'packets_per_second' => 20],
+        ],
+        'checks' => [],
+        'discovery_runs' => [[
+            'id' => $runId,
+            'site_id' => 9,
+            'cidrs' => ['10.44.0.0/24'],
+            'protocols' => ['icmp', 'tcp', 'tls'],
+            'exclusions' => [],
+            'port_bounds' => ['tcp' => [22], 'tls' => [443]],
+            'packets_per_second' => 20,
+            'targets' => [
+                ['target' => '10.44.0.1', 'source' => 'cidr'],
+            ],
+            'unifi_lease' => $sealedUnifiLease,
+        ]],
+    ];
+
+    $config = CollectorConfig::fromPayload($basePayload);
+    expect($config->discoveryRuns[0]['unifi_lease'])->toBe($sealedUnifiLease);
+
+    $guard = new ScopeGuard($config);
+    $guard->assertDiscoveryRun($config->discoveryRuns[0], collectorNow());
+
+    $decryptor = new CredentialLeaseDecryptor(collectorIdentitySecretKey());
+    $opened = $decryptor->open(['credential_lease' => $config->discoveryRuns[0]['unifi_lease']], collectorNow());
+    expect($opened['api_key'])->toBe('unifi-local-api-token')
+        ->and($opened['controller_ip'])->toBe('10.44.0.1');
+
+    $invalidPayload = $basePayload;
+    $invalidPayload['discovery_runs'][0]['unifi_lease'] = ['list-item-not-associative'];
+    expect(fn () => CollectorConfig::fromPayload($invalidPayload))->toThrow(ConfigurationRejected::class);
 });

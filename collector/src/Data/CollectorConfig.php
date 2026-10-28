@@ -204,7 +204,7 @@ final readonly class CollectorConfig
         foreach ($value as $run) {
             $allowed = [
                 'id', 'site_id', 'cidrs', 'protocols', 'exclusions', 'port_bounds',
-                'packets_per_second', 'targets', 'snmp_lease',
+                'packets_per_second', 'targets', 'snmp_lease', 'unifi_lease',
             ];
             if (! is_array($run) || array_is_list($run) || array_diff(array_keys($run), $allowed) !== []) {
                 throw new ConfigurationRejected('Configuration discovery run is invalid.');
@@ -226,6 +226,10 @@ final readonly class CollectorConfig
             $snmpLease = $run['snmp_lease'] ?? null;
             if ($snmpLease !== null && (! is_array($snmpLease) || array_is_list($snmpLease))) {
                 throw new ConfigurationRejected('Configuration discovery SNMP lease is invalid.');
+            }
+            $unifiLease = $run['unifi_lease'] ?? null;
+            if ($unifiLease !== null && (! is_array($unifiLease) || array_is_list($unifiLease))) {
+                throw new ConfigurationRejected('Configuration discovery UniFi lease is invalid.');
             }
             if (! is_int($rate) || $rate < 1 || $rate > 1000
                 || ! is_array($targets) || ! array_is_list($targets) || $targets === [] || count($targets) > 512) {
@@ -257,6 +261,9 @@ final readonly class CollectorConfig
             ];
             if (is_array($snmpLease)) {
                 $normalisedRun['snmp_lease'] = $snmpLease;
+            }
+            if (is_array($unifiLease)) {
+                $normalisedRun['unifi_lease'] = $unifiLease;
             }
             $runs[] = $normalisedRun;
         }

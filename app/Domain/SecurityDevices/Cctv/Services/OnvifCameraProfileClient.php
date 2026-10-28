@@ -5,6 +5,7 @@ namespace App\Domain\SecurityDevices\Cctv\Services;
 use App\Domain\Monitoring\Contracts\CredentialLeaseProvider;
 use App\Domain\Monitoring\Data\CredentialLease;
 use App\Domain\Monitoring\Data\ProbeTarget;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Exceptions\EgressDenied;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\Monitoring\Services\CidrMatcher;
@@ -475,11 +476,27 @@ final class OnvifCameraProfileClient
             $siteId = null;
         }
 
-        $hostCidr = str_contains($canonicalIp, ':') ? "{$canonicalIp}/128" : "{$canonicalIp}/32";
+        if ($siteId === null || $siteId < 1) {
+            return [
+                'ok' => false,
+                'reason_code' => 'missing_site_scope',
+                'message' => 'Assign this camera to an active Site with an approved discovery subnet before using ONVIF controls.',
+            ];
+        }
+
+        $approvedCidrs = $this->approvedSiteCidrsForAddress($siteId, $canonicalIp);
+        if ($approvedCidrs === []) {
+            return [
+                'ok' => false,
+                'reason_code' => 'out_of_site_scope',
+                'message' => 'Add this camera\'s subnet to an active discovery scope for its Site before using ONVIF controls.',
+            ];
+        }
+
         try {
             $this->egressPolicy->authoriseDiscovery(
-                siteId: max(1, $siteId ?? 1),
-                approvedCidrs: [$hostCidr],
+                siteId: $siteId,
+                approvedCidrs: $approvedCidrs,
                 allowedPorts: [$port],
                 target: ProbeTarget::tcp($canonicalIp, $port),
             );
@@ -528,6 +545,68 @@ final class OnvifCameraProfileClient
         }
 
         return preg_match('/^\/[A-Za-z0-9_.\/-]{1,120}$/', $trimmed) === 1 ? $trimmed : $fallback;
+    }
+
+    /**
+     * Return active approved discovery CIDRs for `$siteId` that cover `$canonicalIp` without excluding it.
+     *
+     * @return list<string>
+     */
+    private function approvedSiteCidrsForAddress(int $siteId, string $canonicalIp): array
+    {
+        $scopes = DiscoveryScope::query()
+            ->where('site_id', $siteId)
+            ->where('status', 'active')
+            ->orderBy('id')
+            ->limit(64)
+            ->get(['cidrs', 'exclusions']);
+
+        $approved = [];
+        foreach ($scopes as $scope) {
+            if ($this->addressExcludedByScope($canonicalIp, $scope->exclusions ?? [])) {
+                continue;
+            }
+            foreach ($scope->cidrs ?? [] as $cidr) {
+                if (! is_string($cidr) || trim($cidr) === '') {
+                    continue;
+                }
+                try {
+                    if ($this->cidrMatcher->contains($cidr, $canonicalIp)) {
+                        $approved[] = $cidr;
+                    }
+                } catch (Throwable) {
+                    continue;
+                }
+            }
+        }
+
+        return array_values(array_unique($approved));
+    }
+
+    /**
+     * @param  array<int, mixed>  $exclusions
+     */
+    private function addressExcludedByScope(string $canonicalIp, array $exclusions): bool
+    {
+        foreach ($exclusions as $exclusion) {
+            if (! is_string($exclusion) || trim($exclusion) === '') {
+                continue;
+            }
+            $trimmed = trim($exclusion);
+            try {
+                if (str_contains($trimmed, '/') && $this->cidrMatcher->contains($trimmed, $canonicalIp)) {
+                    return true;
+                }
+                if (! str_contains($trimmed, '/')
+                    && $this->cidrMatcher->canonicalAddress($trimmed) === $canonicalIp) {
+                    return true;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+        }
+
+        return false;
     }
 
     private function acquireOptionalCredential(Device $device, int $siteId): ?CredentialLease

@@ -8,6 +8,7 @@ use App\Domain\Monitoring\Discovery\Services\DiscoveryRunner;
 use App\Domain\Monitoring\Enums\MonitorKind;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
@@ -58,6 +59,7 @@ final readonly class CollectorConfigurationService
             foreach ($discoveryRuns as $index => $run) {
                 $cidrs = [...$cidrs, ...($run['cidrs'] ?? [])];
                 $protocols = [...$protocols, ...($run['protocols'] ?? [])];
+                $runDeviceId = 'discovery:'.strtolower((string) $run['id']);
                 $snmpReference = $run['snmp_credential_reference'] ?? null;
                 unset($discoveryRuns[$index]['snmp_credential_reference']);
                 if (is_string($snmpReference)
@@ -67,8 +69,26 @@ final readonly class CollectorConfigurationService
                     if ($lease !== null) {
                         $discoveryRuns[$index]['snmp_lease'] = $this->credentialSealer->seal(
                             $locked,
-                            'discovery:'.(string) $run['id'],
+                            $runDeviceId,
                             'snmp',
+                            (string) $run['cidrs'][0],
+                            $lease,
+                            (int) $run['site_id'],
+                        );
+                    }
+                }
+
+                $unifiReference = $run['unifi_credential_reference'] ?? null;
+                unset($discoveryRuns[$index]['unifi_credential_reference']);
+                if (is_string($unifiReference)
+                    && $unifiReference !== ''
+                    && is_string(($run['cidrs'] ?? [])[0] ?? null)) {
+                    $lease = $this->acquireDiscoveryUnifiLease((int) $run['site_id'], $unifiReference);
+                    if ($lease !== null) {
+                        $discoveryRuns[$index]['unifi_lease'] = $this->credentialSealer->seal(
+                            $locked,
+                            $runDeviceId,
+                            'https',
                             (string) $run['cidrs'][0],
                             $lease,
                             (int) $run['site_id'],
@@ -302,6 +322,38 @@ final readonly class CollectorConfigurationService
     private function acquireDiscoverySnmpLease(int $siteId, string $reference): ?CredentialLease
     {
         foreach ([['monitoring.collector.snmp.read'], ['snmp:v3:auth_priv'], ['snmp:v2c:compatibility']] as $capabilities) {
+            try {
+                return $this->credentials->acquire($siteId, $reference, $capabilities);
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
+    }
+
+    private function acquireDiscoveryUnifiLease(int $siteId, string $reference): ?CredentialLease
+    {
+        $candidateSets = [
+            ['monitoring.collector.unifi.read'],
+            ['unifi.network.read'],
+            ['monitoring.collector.https.read'],
+            ['discovery.topology.read'],
+        ];
+
+        $storedCapabilities = CredentialReference::query()
+            ->where('site_id', $siteId)
+            ->where('reference_key', $reference)
+            ->value('capabilities');
+        if (is_array($storedCapabilities)) {
+            foreach ($storedCapabilities as $capability) {
+                if (is_string($capability)
+                    && preg_match('/\b(unlock|disarm|arm|write|delete|reboot|exec)\b/i', $capability) !== 1) {
+                    $candidateSets[] = [$capability];
+                }
+            }
+        }
+
+        foreach ($candidateSets as $capabilities) {
             try {
                 return $this->credentials->acquire($siteId, $reference, $capabilities);
             } catch (\Throwable) {

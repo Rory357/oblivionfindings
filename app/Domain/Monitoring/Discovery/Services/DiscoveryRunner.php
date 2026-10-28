@@ -18,6 +18,9 @@ use App\Domain\Monitoring\Exceptions\RuntimeSiteScopeViolation;
 use App\Domain\Monitoring\Jobs\CompleteDiscoveryRun;
 use App\Domain\Monitoring\Jobs\RunDiscoveryScope;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialReferenceStatus;
+use App\Domain\SecurityDevices\Credentials\Enums\CredentialRotationStatus;
+use App\Domain\SecurityDevices\Credentials\Models\CredentialReference;
 use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -217,6 +220,22 @@ final class DiscoveryRunner
                 && is_string($scope->snmp_credential_reference)
                 && trim($scope->snmp_credential_reference) !== '') {
                 $item['snmp_credential_reference'] = trim($scope->snmp_credential_reference);
+            }
+            if (array_intersect(['provider', 'http', 'tls'], $scope->protocols ?? []) !== []) {
+                $unifiReference = CredentialReference::query()
+                    ->where('site_id', (int) $scope->site_id)
+                    ->where('provider', 'unifi')
+                    ->whereIn('purpose', ['monitoring', 'discovery', 'device_management'])
+                    ->where('status', CredentialReferenceStatus::Active->value)
+                    ->whereNotIn('rotation_status', [
+                        CredentialRotationStatus::Overdue->value,
+                        CredentialRotationStatus::Failed->value,
+                    ])
+                    ->orderByDesc('id')
+                    ->value('reference_key');
+                if (is_string($unifiReference) && trim($unifiReference) !== '') {
+                    $item['unifi_credential_reference'] = trim($unifiReference);
+                }
             }
             $work[] = $item;
         }
