@@ -31,6 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
@@ -60,13 +61,46 @@ export type CandidateActionTarget = {
     hostname?: string | null;
     ip_address?: string | null;
     mac_address?: string | null;
+    mac_vendor?: string | null;
+    type_label?: string | null;
+    domain?: string | null;
+    category?: string | null;
+    subcategory?: string | null;
+    manufacturer?: string | null;
+    model?: string | null;
+    suggested_name?: string | null;
+    identification_confidence?: number | null;
+    identification_confidence_band?: string | null;
+    identification_reason?: string | null;
     site_id?: number | null;
     site_name?: string | null;
     adopt_url: string | null;
     same_as_url: string | null;
 };
 
+function confidenceVariant(band?: string | null): StatusVariant {
+    if (band === 'high') return 'success';
+    if (band === 'medium') return 'info';
+    return 'neutral';
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+    cctv: 'CCTV',
+    access_control: 'Access control',
+    alarms: 'Alarms',
+    iot_sensors: 'Sensors',
+    tracking_devices: 'Trackers',
+    network: 'Network',
+    server: 'Server',
+    endpoint: 'Computers & displays',
+    power: 'Power & UPS',
+    storage: 'Storage & NAS',
+};
+
 function humaniseCategoryKey(value: string): string {
+    if (value in CATEGORY_LABELS) {
+        return CATEGORY_LABELS[value];
+    }
     const words = value.replace(/[_-]+/g, ' ').trim();
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -100,6 +134,7 @@ export function CandidateAdoptDialog({
     const [name, setName] = useState('');
     const [domain, setDomain] = useState(defaultDomain);
     const [category, setCategory] = useState('network');
+    const [subcategory, setSubcategory] = useState('');
     const [manufacturer, setManufacturer] = useState('');
     const [model, setModel] = useState('');
     const [submitting, setSubmitting] = useState(false);
@@ -107,26 +142,57 @@ export function CandidateAdoptDialog({
 
     useEffect(() => {
         if (!candidate) return;
-        const suggested =
-            candidate.hostname ??
-            candidate.ip_address ??
-            `Discovered device #${candidate.id}`;
+        const hasSpecificName =
+            Boolean(candidate.suggested_name) &&
+            candidate.suggested_name !== 'Discovered device' &&
+            Boolean(
+                candidate.hostname ||
+                candidate.ip_address ||
+                candidate.manufacturer ||
+                candidate.model,
+            );
+        const suggested = hasSpecificName
+            ? (candidate.suggested_name as string)
+            : (candidate.hostname ??
+              candidate.ip_address ??
+              `Discovered device #${candidate.id}`);
         setName(suggested);
         const initialDomain =
-            management.taxonomy.it_infrastructure
-                ? 'it_infrastructure'
-                : (management.domains[0]?.value ?? 'it_infrastructure');
+            candidate.domain && management.taxonomy[candidate.domain]
+                ? candidate.domain
+                : management.taxonomy.it_infrastructure
+                  ? 'it_infrastructure'
+                  : (management.domains[0]?.value ?? 'it_infrastructure');
         setDomain(initialDomain);
-        const categoryKeys = Object.keys(
+        const initialCategoryKeys = Object.keys(
             management.taxonomy[initialDomain] ?? {},
         );
-        setCategory(categoryKeys[0] ?? 'network');
-        setManufacturer('');
-        setModel('');
+        const initialCategory =
+            candidate.category &&
+            initialCategoryKeys.includes(candidate.category)
+                ? candidate.category
+                : (initialCategoryKeys[0] ?? 'network');
+        setCategory(initialCategory);
+        const initialSubMap =
+            management.taxonomy[initialDomain]?.[initialCategory] ?? {};
+        const initialSubcategory =
+            candidate.subcategory &&
+            Object.prototype.hasOwnProperty.call(
+                initialSubMap,
+                candidate.subcategory,
+            )
+                ? candidate.subcategory
+                : '';
+        setSubcategory(initialSubcategory);
+        setManufacturer(candidate.manufacturer ?? '');
+        setModel(candidate.model ?? '');
         setError(null);
     }, [candidate, management]);
 
     const categoryKeys = Object.keys(management.taxonomy[domain] ?? {});
+    const subcategoryEntries = Object.entries(
+        management.taxonomy[domain]?.[category] ?? {},
+    );
 
     const handleDomainChange = (nextDomain: string) => {
         setDomain(nextDomain);
@@ -134,6 +200,12 @@ export function CandidateAdoptDialog({
             management.taxonomy[nextDomain] ?? {},
         );
         setCategory(nextCategories[0] ?? '');
+        setSubcategory('');
+    };
+
+    const handleCategoryChange = (nextCategory: string) => {
+        setCategory(nextCategory);
+        setSubcategory('');
     };
 
     const submit = async () => {
@@ -145,6 +217,7 @@ export function CandidateAdoptDialog({
                 name: name.trim() || null,
                 domain: domain || null,
                 category: category || null,
+                subcategory: subcategory || null,
                 manufacturer: manufacturer.trim() || null,
                 model: model.trim() || null,
             });
@@ -169,7 +242,12 @@ export function CandidateAdoptDialog({
                 if (!open && !submitting) onClose();
             }}
         >
-            <DialogContent>
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 560px)',
+                    width: 'min(92vw, 560px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Add as device</DialogTitle>
                     <DialogDescription>
@@ -182,8 +260,34 @@ export function CandidateAdoptDialog({
 
                 {candidate && (
                     <div className="space-y-4 py-1">
-                        {(candidate.ip_address || candidate.mac_address) && (
-                            <div className="rounded-lg bg-muted/30 p-3 text-xs">
+                        {(candidate.ip_address ||
+                            candidate.mac_address ||
+                            candidate.type_label ||
+                            candidate.identification_reason) && (
+                            <div className="space-y-1.5 rounded-lg bg-muted/30 p-3 text-xs">
+                                {candidate.type_label && (
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <span className="font-medium text-foreground">
+                                            Detected: {candidate.type_label}
+                                        </span>
+                                        {typeof candidate.identification_confidence ===
+                                            'number' && (
+                                            <StatusBadge
+                                                variant={confidenceVariant(
+                                                    candidate.identification_confidence_band,
+                                                )}
+                                            >
+                                                {`${candidate.identification_confidence}% confidence`}
+                                            </StatusBadge>
+                                        )}
+                                    </div>
+                                )}
+                                {candidate.identification_reason && (
+                                    <p className="text-caption">
+                                        Why we think so:{' '}
+                                        {candidate.identification_reason}
+                                    </p>
+                                )}
                                 {candidate.ip_address && (
                                     <p>
                                         IP address:{' '}
@@ -193,11 +297,14 @@ export function CandidateAdoptDialog({
                                     </p>
                                 )}
                                 {candidate.mac_address && (
-                                    <p className="mt-1">
+                                    <p>
                                         MAC address:{' '}
                                         <span className="font-mono font-medium">
                                             {candidate.mac_address}
                                         </span>
+                                        {candidate.mac_vendor
+                                            ? ` · ${candidate.mac_vendor}`
+                                            : ''}
                                     </p>
                                 )}
                             </div>
@@ -243,7 +350,7 @@ export function CandidateAdoptDialog({
                                 <Label>Device type</Label>
                                 <Select
                                     value={category}
-                                    onValueChange={setCategory}
+                                    onValueChange={handleCategoryChange}
                                 >
                                     <SelectTrigger aria-label="Device type">
                                         <SelectValue />
@@ -258,6 +365,39 @@ export function CandidateAdoptDialog({
                                 </Select>
                             </div>
                         </div>
+
+                        {subcategoryEntries.length > 0 && (
+                            <div className="space-y-1.5">
+                                <Label>Sub-type (optional)</Label>
+                                <Select
+                                    value={subcategory || '__none__'}
+                                    onValueChange={(value) =>
+                                        setSubcategory(
+                                            value === '__none__' ? '' : value,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger aria-label="Sub-type (optional)">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">
+                                            Not specified
+                                        </SelectItem>
+                                        {subcategoryEntries.map(
+                                            ([subKey, subLabel]) => (
+                                                <SelectItem
+                                                    key={subKey}
+                                                    value={subKey}
+                                                >
+                                                    {subLabel}
+                                                </SelectItem>
+                                            ),
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
 
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1.5">
@@ -380,7 +520,12 @@ export function CandidateSameAsDialog({
                 if (!open && !submitting) onClose();
             }}
         >
-            <DialogContent>
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 560px)',
+                    width: 'min(92vw, 560px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle>Same as existing device</DialogTitle>
                     <DialogDescription>
@@ -468,7 +613,7 @@ export function CandidateSameAsDialog({
                                                                 <p className="truncate text-sm font-medium">
                                                                     {item.name}
                                                                 </p>
-                                                                <p className="truncate text-xs text-muted-foreground">
+                                                                <p className="text-caption truncate">
                                                                     {item.ip_address ??
                                                                         item.uid}
                                                                 </p>

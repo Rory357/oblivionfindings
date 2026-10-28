@@ -1091,3 +1091,193 @@ describe('Discovery one-time token, search and filters', () => {
         ).toBeVisible();
     });
 });
+
+describe('Phase 3 fingerprinted candidates and extended 10-protocol scopes', () => {
+    it('shows fingerprinted type, brand, MAC vendor and reason, and pre-fills Add as device', async () => {
+        mocks.post.mockResolvedValueOnce({
+            data: {
+                device_id: 404,
+                name: 'Hikvision DS-2CD2387G2 (172.16.0.55)',
+            },
+        });
+
+        render(
+            <DiscoveryCollectors
+                {...fixture({
+                    candidate_management: {
+                        can_adopt: true,
+                        can_same_as: true,
+                        can_ignore: true,
+                        adopt_all_url:
+                            '/security-devices/discovery/candidates/adopt-all',
+                        adoptable_count: 1,
+                        taxonomy: {
+                            it_infrastructure: {
+                                network: { router: 'Router' },
+                            },
+                            security: {
+                                cctv: {
+                                    ip_camera: 'IP Camera',
+                                    dome_camera: 'Dome Camera',
+                                },
+                            },
+                        },
+                        domains: [
+                            {
+                                value: 'it_infrastructure',
+                                label: 'IT Infrastructure',
+                            },
+                            { value: 'security', label: 'Security' },
+                        ],
+                        devices_by_site: { '1': [] },
+                    },
+                    candidates: [
+                        {
+                            id: 88,
+                            candidate_uuid:
+                                '019a29f0-0000-7000-8000-000000000088',
+                            run_id: 51,
+                            scope_id: 7,
+                            site_id: 1,
+                            site_name: 'Harbour House',
+                            decision: 'proposed',
+                            confidence: 65,
+                            hostname: 'driveway-cam.local',
+                            ip_address: '172.16.0.55',
+                            mac_address: '44:19:B6:11:22:33',
+                            mac_vendor: 'Hangzhou Hikvision Digital Technology',
+                            type_label: 'IP Camera',
+                            domain: 'security',
+                            category: 'cctv',
+                            subcategory: 'ip_camera',
+                            manufacturer: 'Hikvision',
+                            model: 'DS-2CD2387G2-LU',
+                            suggested_name:
+                                'Hikvision DS-2CD2387G2-LU (172.16.0.55)',
+                            identification_confidence: 92,
+                            identification_confidence_band: 'high',
+                            identification_reason: 'ONVIF camera, Hikvision',
+                            open_ports: [80, 554, 8000],
+                            reasons: ['new_address'],
+                            canonical_device: null,
+                            review: { action: null, reviewed_at: null },
+                            actions: {
+                                adopt_url:
+                                    '/security-devices/discovery/candidates/88/adopt',
+                                same_as_url:
+                                    '/security-devices/discovery/candidates/88/same-as',
+                                ignore_url:
+                                    '/security-devices/discovery/candidates/88/ignore',
+                            },
+                        },
+                    ],
+                })}
+            />,
+        );
+
+        view('Candidates');
+        expect(
+            screen.getByText('Hikvision DS-2CD2387G2-LU (172.16.0.55)'),
+        ).toBeVisible();
+        expect(
+            screen.getByText(
+                /IP Camera · ONVIF camera, Hikvision · 92% match confidence/,
+            ),
+        ).toBeVisible();
+
+        rowMenu('Hikvision DS-2CD2387G2-LU (172.16.0.55)');
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: 'Add as device' }),
+        );
+
+        expect(
+            screen.getByDisplayValue('Hikvision DS-2CD2387G2-LU (172.16.0.55)'),
+        ).toBeVisible();
+        expect(screen.getByDisplayValue('Hikvision')).toBeVisible();
+        expect(screen.getByDisplayValue('DS-2CD2387G2-LU')).toBeVisible();
+        expect(
+            screen.getByText(/Why we think so: ONVIF camera, Hikvision/),
+        ).toBeVisible();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Add device' }));
+        await act(async () => {});
+
+        expect(mocks.post).toHaveBeenCalledWith(
+            '/security-devices/discovery/candidates/88/adopt',
+            {
+                name: 'Hikvision DS-2CD2387G2-LU (172.16.0.55)',
+                domain: 'security',
+                category: 'cctv',
+                subcategory: 'ip_camera',
+                manufacturer: 'Hikvision',
+                model: 'DS-2CD2387G2-LU',
+            },
+        );
+    });
+
+    it('defaults extended 10-protocol discovery scopes with optional SNMP and no ARP port input', async () => {
+        mocks.post.mockResolvedValueOnce({
+            data: { scope: { id: 99, site_id: 1 } },
+        });
+
+        render(
+            <DiscoveryCollectors
+                {...fixture({
+                    scope_management: {
+                        can_manage: true,
+                        create_url: '/security-devices/discovery/scopes',
+                        protocols: [
+                            'icmp',
+                            'arp',
+                            'tcp',
+                            'dns',
+                            'http',
+                            'tls',
+                            'snmp',
+                            'mdns',
+                            'ssdp',
+                            'onvif',
+                        ],
+                        sites: [{ id: 1, name: 'Harbour House' }],
+                    },
+                })}
+            />,
+        );
+
+        beginCreate();
+        fillCreate();
+
+        expect(screen.queryByLabelText('ARP ports')).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Add direct scope' }),
+        );
+        await act(async () => {});
+
+        expect(mocks.post).toHaveBeenCalledWith(
+            '/security-devices/discovery/scopes',
+            expect.objectContaining({
+                name: 'Approved outreach network',
+                protocols: [
+                    'icmp',
+                    'arp',
+                    'tcp',
+                    'dns',
+                    'http',
+                    'tls',
+                    'snmp',
+                    'mdns',
+                    'ssdp',
+                    'onvif',
+                ],
+                site_id: 1,
+                cidrs: ['10.44.0.0/16'],
+            }),
+            expect.objectContaining({ signal: expect.any(AbortSignal) }),
+        );
+        const submittedPayload = mocks.post.mock.calls[0][1];
+        expect(submittedPayload.port_bounds.arp).toBeUndefined();
+        expect(submittedPayload.port_bounds.onvif).toEqual([3702]);
+        expect(submittedPayload.snmp_credential_reference).toBeUndefined();
+    });
+});

@@ -41,7 +41,18 @@ final readonly class NativeMonitoringDefinitionService
     ];
 
     /** @var list<string> */
-    private const array DISCOVERY_PROTOCOLS = ['icmp', 'tcp', 'dns', 'http', 'tls', 'snmp'];
+    private const array DISCOVERY_PROTOCOLS = [
+        'icmp',
+        'arp',
+        'tcp',
+        'dns',
+        'http',
+        'tls',
+        'snmp',
+        'mdns',
+        'ssdp',
+        'onvif',
+    ];
 
     public function __construct(
         private CanonicalDeviceSiteResolver $siteResolver,
@@ -572,9 +583,14 @@ final readonly class NativeMonitoringDefinitionService
         if ($protocols === [] || array_diff($protocols, self::DISCOVERY_PROTOCOLS) !== []) {
             throw ValidationException::withMessages(['protocols' => 'Select one or more supported native discovery protocols.']);
         }
+        $rawSnmpRef = array_key_exists('snmp_credential_reference', $data)
+            ? $data['snmp_credential_reference']
+            : ($existing?->snmp_credential_reference ?? null);
         $snmpReference = in_array('snmp', $protocols, true)
-            ? $this->credentialReference($siteId, $value('snmp_credential_reference', null), ['snmp:v3:auth_priv'])
-            : null;
+            && is_string($rawSnmpRef)
+            && trim($rawSnmpRef) !== ''
+                ? $this->snmpDiscoveryCredentialReference($siteId, $rawSnmpRef)
+                : null;
 
         return [
             'site_id' => $siteId,
@@ -755,6 +771,31 @@ final readonly class NativeMonitoringDefinitionService
         }
 
         return $bounds;
+    }
+
+    private function snmpDiscoveryCredentialReference(int $siteId, mixed $value): string
+    {
+        $reference = is_string($value) ? trim($value) : '';
+        if ($reference === '' || preg_match('/^[a-z][a-z0-9._-]{1,31}:[A-Za-z0-9._\/:@-]{1,158}$/', $reference) !== 1
+            || str_contains($reference, '://')) {
+            throw ValidationException::withMessages(['credential_reference' => 'Select an active Site credential reference.']);
+        }
+        $record = CredentialReference::query()
+            ->where('site_id', $siteId)
+            ->where('reference_key', $reference)
+            ->where('status', CredentialReferenceStatus::Active->value)
+            ->whereNotIn('rotation_status', [
+                CredentialRotationStatus::Overdue->value,
+                CredentialRotationStatus::Failed->value,
+            ])
+            ->lockForUpdate()
+            ->first(['id', 'capabilities']);
+        $accepted = ['snmp:v3:auth_priv', 'snmp:v2c:compatibility', 'monitoring.collector.snmp.read'];
+        if ($record === null || array_intersect($accepted, $record->capabilities ?? []) === []) {
+            throw ValidationException::withMessages(['credential_reference' => 'Select an active Site credential reference with the required capability.']);
+        }
+
+        return $reference;
     }
 
     /** @param list<string> $capabilities */

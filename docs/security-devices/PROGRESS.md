@@ -289,3 +289,80 @@
 - **Site technology (`Remote Branch SD-WAN`) — `Covers over SD-WAN` hub card (`v0.2.0`):**
   ![Local Site Hub Coverage](screenshots/phase-2-local-site-hub-coverage.png)
 
+#### Live `oblivionfindings.com` walkthrough (`a6eae4cfd` — 28 Oct 2026 NZDT)
+- **Pre-deploy MySQL backup verified on `oblivionfindings.com`:**
+  - `/home/oblivion/db-backups/oblivionfindings-pre-phase2-20261028T005600Z.sql.gz` (`45 MB`, `0600`, `gzip -t` OK)
+- **Live infrastructure & signed release catalogue (`7 of 7` Server readiness checks Ready):**
+  - Internal Site hub Root CA + Intermediate CA generated under `/etc/oblivion-collector-ca` (`0600` keys), Nginx `ssl_verify_client optional` header forwarding wired on `127.0.0.1:18443` (`/api/v1/monitoring/collector/`), and Ed25519 config-signing + release-verification keys added to live `.env`.
+  - GitHub Actions `Site Hub Release` (`40611595113`) built and Ed25519-signed `windows/amd64`, `windows/arm64`, `linux/amd64`, and `linux/arm64` `0.2.0` packages (`141.2 MB` / `151.0 MB` Windows installers + `7.3 MB` / `6.6 MB` Linux service archives), published atomically via `php artisan endpoint:publish-catalogue`.
+- **Settings › Server readiness (`All checks 7`, `Needs fix 0`, `Ready 7`):**
+  ![Live Server Readiness](screenshots/phase-2-live-server-readiness.png)
+- **Agent downloads (`8 Published releases`, `Version 0.2.0` signed Windows + Linux bundles):**
+  ![Live Agent Downloads](screenshots/phase-2-live-agent-downloads.png)
+- **Add a Site hub — Step 1 (`Kauri House` + `Rimu House` SD-WAN ticked):**
+  ![Live Add Hub Step 1](screenshots/phase-2-live-add-hub-step1.png)
+- **Add a Site hub — Step 2 (Signed `0.2.0` Windows installers + one-time `ofh1_...` setup code):**
+  ![Live Add Hub Code](screenshots/phase-2-live-add-hub-code.png)
+- **Add a Site hub — Step 3 (`Connected ✓` after real HTTPS + SPKI-pinned + mTLS enrolment & heartbeat from `172.16.0.93`):**
+  ![Live Add Hub Connected](screenshots/phase-2-live-add-hub-connected.png)
+- **Discovery & collectors — Remote collectors (`1/1` reporting, `Kauri House Live Walkthrough Hub` `v0.2.0 · +1 SD-WAN Sites`):**
+  ![Live Discovery Hub Health](screenshots/phase-2-live-discovery-hub-health.png)
+- **Site technology (`Rimu House`) — `Covers over SD-WAN` (`Online`, `v0.2.0`):**
+  ![Live Site Hub Coverage](screenshots/phase-2-live-site-hub-coverage.png)
+- **Device profile (`UX7`) — Live check status (`Replied in 1 ms.`):**
+  ![Live Device Runs From](screenshots/phase-2-live-device-runs-from.png)
+
+---
+
+## Phase 3 — Find & identify
+
+### Summary of changes
+
+1. **Multi-protocol rate-limited network discovery across both Site hubs and server-direct (`3.1`)**
+   - Built `LanDiscoveryScanner` (`collector/src/Discovery/LanDiscoveryScanner.php`) and `LocalLanDiscoveryScanner` (`app/Domain/Monitoring/Discovery/Support/LocalLanDiscoveryScanner.php`) so both the Site hub (`RemoteDiscoveryRunner`) and server-direct (`NetworkSeedDiscoveryAdapter`) sweep approved subnets with rate-limiting (`packets_per_second`) across all 10 native protocols:
+     - **ICMP (`icmp`):** Genuine echo-reply ping verification (hardened in `collector/src/Runtime/ProbeRunner.php` so Windows `Reply from <router>: Destination host unreachable` is rejected instead of falsely passing `exit 0`).
+     - **ARP / neighbour table (`arp`):** Rate-limited local L2 ARP prewarm + `arp -a` / `ipconfig /all` (Windows) and `/proc/net/arp` / `ip neigh` (Linux), plus locally-administered private MAC detection.
+     - **Async batched TCP (`tcp`) & HTTP/TLS (`http`, `tls`):** Concurrent `STREAM_CLIENT_ASYNC_CONNECT` port batching (`20` sockets per batch) with L2 dead-host fast-skip, scrubbed HTTP `Server` / `<title>` / `WWW-Authenticate` banners, and passive TLS X.509 SHA-256 fingerprint + certificate `CN` / `O` extraction.
+     - **Pure-PHP SNMP v2c & v3 (`snmp`):** Implemented `SnmpSystemProbe` (`collector/src/Discovery/SnmpSystemProbe.php` & `app/Domain/Monitoring/Discovery/Support/SnmpSystemProbe.php`) in pure PHP ASN.1 BER (zero `ext-snmp` dependency) supporting read-only SNMPv2c (`public`) and sealed-lease SNMPv3 USM (`authPriv` / `authNoPriv` SHA-1..SHA-512 + AES-128) for `sysDescr.0`, `sysObjectID.0`, and `sysName.0`; made `snmp_credential_reference` optional on `DiscoveryScope`.
+     - **Multicast & unicast naming (`mdns`, `ssdp`, `onvif`, `dns`):** RFC 6762 mDNS (`224.0.0.251:5353`), UPnP SSDP (`239.255.255.250:1900`) with SSRF-validated same-IP device description XML (`friendlyName`, `manufacturer`, `modelName`), ONVIF WS-Discovery (`239.255.255.250:3702` SOAP `ProbeMatches`), and unicast UDP 53 `IN PTR` reverse DNS.
+   - Bundled the public IEEE OUI + MA-M registry (`46,453` prefixes) into `MacVendorLookup` (`app` + `collector`) for instant offline MAC vendor resolution.
+
+2. **Device type, brand, model, confidence, and plain-English reason fingerprinting (`3.2`)**
+   - Added `DeviceFingerprintService` (`app/Domain/Monitoring/Discovery/Services/DeviceFingerprintService.php`) and `DeviceIdentification` (`app/Domain/Monitoring/Discovery/Data/DeviceIdentification.php`) to combine ONVIF scopes/types, SNMP enterprise PENs + `sysDescr`, SSDP/UPnP XML, mDNS service records, HTTP/TLS banners, open service ports, hostnames, and IEEE OUI MAC vendors into canonical `DeviceTaxonomy` (`domain`, `category`, `subcategory`), `type_label`, `manufacturer`, `model`, `suggested_name`, `confidence` (`20`–`99` + `high`/`medium`/`low` band), and plain-English `reason` (e.g. `"ONVIF camera, Hikvision — matched ONVIF WS-Discovery + IEEE MAC vendor"`).
+   - Extended `DeviceTaxonomy` with `media_display` and `mobile_device` under `it_infrastructure / endpoint` so discovered Smart TVs/Cast displays and Wi-Fi phones/tablets map cleanly without falling back to network switches.
+
+3. **Candidate review screen, `Add all`, and pre-filled `Add as device` (`3.3`)**
+   - Updated `DiscoveryCandidateService`, `DiscoveryOperationsPresenter`, `resources/js/pages/security-devices/discovery.tsx`, `resources/js/components/security-devices/discovery-candidate-dialogs.tsx`, and `resources/js/components/security-devices/discovery-scope-dialogs.tsx`:
+     - Candidate cards, table rows, and the `Discovery details` drawer show fingerprinted `type_label`, `manufacturer` & `model`, `mac_vendor`, `identification_confidence`, plain-English `Why we think so`, `ip_address`, `mac_address`, and `open_ports`.
+     - `Add as device` pre-fills `Device name`, `Device group` (`domain`), `Device type` (`category`), `Sub-type` (`subcategory`), `Brand` (`manufacturer`), and `Model` (`model`), while `Add all` adopts every unreviewed proposed candidate with its detected taxonomy, brand, and model.
+     - Scope creation & editing wizards surface all 10 protocols with plain-English labels, portless `icmp`/`arp` handling, optional SNMP credential reference, and `Packets per second` rate limits.
+   - Documented Phase 3 discovery protocols, official RFC/ONVIF/UPnP/IEEE citations, and real hardware verification in `docs/security-devices/SUPPORTED-DEVICES.md`.
+
+---
+
+### Verification & local walkthrough
+
+- **Collector PHP runtime (`collector/`):** `php vendor/bin/pest --compact` — 126 passed (`Phase3DiscoveryTest`: live UDP BER SNMPv2c responder, Windows `Destination host unreachable` rejection, OUI/MA-M lookup, signal scrubbing).
+- **Laravel Pint:** 0 issues across all touched/new PHP files.
+- **TypeScript (`npm run types`):** 0 errors across the repository.
+- **Prettier & ESLint (`--max-warnings=0`):** 0 errors and 0 warnings across `discovery.tsx`, `discovery-candidate-dialogs.tsx`, `discovery-scope-dialogs.tsx`, and `discovery.test.tsx` (including `security-devices-copy/no-jargon` and zero `text-xs text-muted-foreground`).
+- **Vitest (`--maxWorkers=2`):** `discovery.test.tsx` — 32 passed.
+- **Pest Unit & Architecture:** `MacVendorAndFingerprintTest` + all 5 Single-Tenant & Monitoring Architecture boundary suites — 57 passed (16,471 assertions).
+- **Pest Feature (Sequential):** `Phase3DiscoverySweepAndReviewTest`, `DiscoveryCandidateActionsTest`, `DiscoveryIdentityTest`, `DiscoveryRunTest`, `MonitoringPolicyAuthoringServiceTest` — 34 passed (272 assertions).
+- **Home network walkthrough (`172.16.0.0/24`):**
+  - Executed both a real Site-hub sweep (`LanDiscoveryScanner` + `RemoteDiscoveryRunner` + `DiscoveryRunner::recordCollectorResult()`) and a real server-direct sweep (`NetworkSeedDiscoveryAdapter` + `LocalLanDiscoveryScanner`) across Stephan's `172.16.0.0/24` LAN (`80 pps`), identifying 19 live hosts (`172.16.0.1` `Ubiquiti` `Network gateway` `91%`, `172.16.0.78` `TP-Link Tapo C120` `IP camera` `82%`, `172.16.0.25` `cubo-ai` `IP camera` `82%`, `172.16.0.51` `Samsung UA65CU8500SXNZ` `84%`, `172.16.0.53` `Google Nest Hub` `84%`, `172.16.0.93` `stephan-pc` `Windows computer` `84%`, `172.16.0.214` `JBL BAR 500` `84%`, `172.16.0.232` `oblivionfindings.com` `76%`) while rejecting negative-control `172.16.0.253` (`unresolved / no_response`), with `0` console/page/HTTP errors.
+
+#### Local walkthrough screenshots
+- **Discovery & collectors › Candidates (`21` real `172.16.0.0/24` candidates with fingerprinted type, brand/model, confidence, plain-English reason, and `Add all`):**
+  ![Local Candidates Review](screenshots/phase-3-local-candidates-review.png)
+- **Add direct discovery scope — Step 3 (10 plain-English discovery protocols, optional SNMP reference, and rate limits):**
+  ![Local Scope Protocols](screenshots/phase-3-local-scope-protocols.png)
+- **Candidate details (`c120.localdomain` — `IP camera`, `TP-Link Tapo C120`, `82%`, MAC `78:20:51:68:A2:84 · TP-Link Systems Inc.`, `Why we think so`):**
+  ![Local Candidate Detail](screenshots/phase-3-local-candidate-detail.png)
+- **Pre-filled `Add as device` dialog (`Security` › `CCTV` › `IP Camera`, `TP-Link` `Tapo C120`, `82% confidence`):**
+  ![Local Adopt Prefilled](screenshots/phase-3-local-adopt-prefilled.png)
+- **All devices after clicking `Add all` (`21` real `172.16.0.0/24` devices adopted with detected domain, category, sub-type, brand, and model):**
+  ![Local Devices Adopted](screenshots/phase-3-local-devices-adopted.png)
+
+
+

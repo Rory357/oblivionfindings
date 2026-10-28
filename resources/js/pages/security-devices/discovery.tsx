@@ -202,6 +202,18 @@ export type DiscoveryCandidateRow = {
     hostname?: string | null;
     ip_address?: string | null;
     mac_address?: string | null;
+    mac_vendor?: string | null;
+    type_label?: string | null;
+    domain?: string | null;
+    category?: string | null;
+    subcategory?: string | null;
+    manufacturer?: string | null;
+    model?: string | null;
+    suggested_name?: string | null;
+    identification_confidence?: number | null;
+    identification_confidence_band?: string | null;
+    identification_reason?: string | null;
+    open_ports?: number[];
     provider?: string | null;
     reasons: string[];
     canonical_device: { id: number; name: string; href: string } | null;
@@ -481,7 +493,11 @@ export default function DiscoveryCollectors(data: DiscoveryPageProps) {
         [denyAccess],
     );
     const refresh = () =>
-        router.reload({ only: readProps, preserveScroll: true });
+        router.reload({
+            only: readProps,
+            preserveState: true,
+            preserveScroll: true,
+        });
     const select = (view: DiscoveryView) => {
         setActiveTab(view);
         router.get(
@@ -903,6 +919,18 @@ function DiscoveryBody({
         hostname: candidate.hostname,
         ip_address: candidate.ip_address,
         mac_address: candidate.mac_address,
+        mac_vendor: candidate.mac_vendor,
+        type_label: candidate.type_label,
+        domain: candidate.domain,
+        category: candidate.category,
+        subcategory: candidate.subcategory,
+        manufacturer: candidate.manufacturer,
+        model: candidate.model,
+        suggested_name: candidate.suggested_name,
+        identification_confidence: candidate.identification_confidence,
+        identification_confidence_band:
+            candidate.identification_confidence_band,
+        identification_reason: candidate.identification_reason,
         site_id: candidate.site_id,
         site_name: candidate.site_name,
         adopt_url: candidate.actions?.adopt_url ?? null,
@@ -937,90 +965,180 @@ function DiscoveryBody({
         }
         return items;
     };
-    const candidates: DiscoveryEntry[] = w.candidates.map((candidate) => ({
-        key: 'candidate:' + candidate.id,
-        name:
-            candidate.canonical_device && canViewDevices
-                ? candidate.canonical_device.name
-                : candidate.canonical_device
-                  ? 'Matched device hidden'
-                  : (candidate.hostname ??
-                    candidate.ip_address ??
-                    'Possible new device #' + candidate.id),
-        subline:
-            candidate.ip_address && candidate.hostname
-                ? candidate.ip_address + ' · Run #' + candidate.run_id
-                : 'Run #' + candidate.run_id,
-        state: candidate.decision,
-        icon: SearchCheck,
-        site: candidate.scope_id
-            ? (currentScope(candidate.scope_id)?.site ??
-              (candidate.site_id && candidate.site_name
-                  ? {
-                        id: candidate.site_id,
-                        name: candidate.site_name,
-                        href: '/security-devices/sites/' + candidate.site_id,
-                    }
-                  : null))
-            : null,
-        summary:
-            candidate.confidence +
-            '% decision confidence · ' +
-            candidate.reasons.length +
-            ' reasons',
-        actions: candidateActions(candidate),
-        deviceHref:
-            canViewDevices &&
-            candidate.canonical_device !== null &&
-            candidate.canonical_device.href ===
-                '/security-devices/devices/' + candidate.canonical_device.id
-                ? candidate.canonical_device.href
-                : undefined,
-        facts: [
-            ...(candidate.hostname
-                ? [{ label: 'Hostname', value: candidate.hostname }]
+    const candidates: DiscoveryEntry[] = w.candidates.map((candidate) => {
+        const hasSpecificSuggestedName =
+            Boolean(candidate.suggested_name) &&
+            candidate.suggested_name !== 'Discovered device' &&
+            Boolean(
+                candidate.hostname ||
+                candidate.ip_address ||
+                candidate.manufacturer ||
+                candidate.model,
+            );
+        const brandModel = [candidate.manufacturer, candidate.model]
+            .filter(Boolean)
+            .join(' ');
+        const hardwareHint = brandModel || candidate.mac_vendor || '';
+        const sublineParts = [
+            ...(candidate.ip_address &&
+            (candidate.hostname || hasSpecificSuggestedName)
+                ? [candidate.ip_address]
                 : []),
-            ...(candidate.ip_address
-                ? [{ label: 'IP address', value: candidate.ip_address }]
-                : []),
-            ...(candidate.mac_address
-                ? [{ label: 'MAC address', value: candidate.mac_address }]
-                : []),
-            { label: 'Decision', value: plain(candidate.decision) },
-            { label: 'Decision confidence', value: candidate.confidence + '%' },
-            {
-                label: 'Reasons',
-                value: candidate.reasons.length
-                    ? plain(candidate.reasons.join(', '))
-                    : 'No decision reason recorded',
-            },
-            {
-                label: 'Matched device',
-                value: canViewDevices
-                    ? candidate.canonical_device?.name
-                    : 'You need permission to view devices',
-            },
-            {
-                label: 'Review action',
-                value: candidate.review.action
-                    ? plain(candidate.review.action)
-                    : 'Not reviewed',
-            },
-            {
-                label: 'Reviewed at',
-                value: candidate.review.reviewed_at
-                    ? when(candidate.review.reviewed_at)
-                    : 'Not reviewed',
-            },
-        ],
-        technical: [
-            { label: 'Candidate ID', value: candidate.id },
-            { label: 'Candidate reference', value: candidate.candidate_uuid },
-            { label: 'Run ID', value: candidate.run_id },
-            { label: 'Scope ID', value: candidate.scope_id },
-        ],
-        note: 'Confidence and reasons help you review this match. They do not change the device record or identify a person.',
-    }));
+            ...(hardwareHint ? [hardwareHint] : []),
+            'Run #' + candidate.run_id,
+        ];
+        const cleanReason =
+            candidate.identification_reason &&
+            candidate.identification_reason !==
+                'Reached on the network; no specific service banner reported'
+                ? candidate.identification_reason
+                : '';
+        const baseObservation = candidate.type_label
+            ? cleanReason &&
+              cleanReason
+                  .toLowerCase()
+                  .startsWith(candidate.type_label.toLowerCase())
+                ? cleanReason
+                : candidate.type_label +
+                  (cleanReason ? ' · ' + cleanReason : '')
+            : '';
+        const summary = baseObservation
+            ? baseObservation +
+              (typeof candidate.identification_confidence === 'number'
+                  ? ' · ' +
+                    candidate.identification_confidence +
+                    '% match confidence'
+                  : '')
+            : candidate.confidence +
+              '% decision confidence · ' +
+              candidate.reasons.length +
+              ' reasons';
+
+        return {
+            key: 'candidate:' + candidate.id,
+            name:
+                candidate.canonical_device && canViewDevices
+                    ? candidate.canonical_device.name
+                    : candidate.canonical_device
+                      ? 'Matched device hidden'
+                      : hasSpecificSuggestedName
+                        ? (candidate.suggested_name as string)
+                        : (candidate.hostname ??
+                          candidate.ip_address ??
+                          'Possible new device #' + candidate.id),
+            subline: sublineParts.join(' · '),
+            state: candidate.decision,
+            icon: SearchCheck,
+            site: candidate.scope_id
+                ? (currentScope(candidate.scope_id)?.site ??
+                  (candidate.site_id && candidate.site_name
+                      ? {
+                            id: candidate.site_id,
+                            name: candidate.site_name,
+                            href:
+                                '/security-devices/sites/' + candidate.site_id,
+                        }
+                      : null))
+                : null,
+            summary,
+            actions: candidateActions(candidate),
+            deviceHref:
+                canViewDevices &&
+                candidate.canonical_device !== null &&
+                candidate.canonical_device.href ===
+                    '/security-devices/devices/' + candidate.canonical_device.id
+                    ? candidate.canonical_device.href
+                    : undefined,
+            facts: [
+                ...(candidate.type_label
+                    ? [
+                          {
+                              label: 'Identified type',
+                              value: candidate.type_label,
+                          },
+                      ]
+                    : []),
+                ...(brandModel
+                    ? [{ label: 'Brand & model', value: brandModel }]
+                    : []),
+                ...(candidate.mac_vendor
+                    ? [{ label: 'MAC vendor', value: candidate.mac_vendor }]
+                    : []),
+                ...(typeof candidate.identification_confidence === 'number'
+                    ? [
+                          {
+                              label: 'Identification confidence',
+                              value: candidate.identification_confidence + '%',
+                          },
+                      ]
+                    : []),
+                ...(candidate.identification_reason
+                    ? [
+                          {
+                              label: 'Why we think so',
+                              value: candidate.identification_reason,
+                          },
+                      ]
+                    : []),
+                ...(candidate.hostname
+                    ? [{ label: 'Hostname', value: candidate.hostname }]
+                    : []),
+                ...(candidate.ip_address
+                    ? [{ label: 'IP address', value: candidate.ip_address }]
+                    : []),
+                ...(candidate.mac_address
+                    ? [{ label: 'MAC address', value: candidate.mac_address }]
+                    : []),
+                ...(candidate.open_ports && candidate.open_ports.length > 0
+                    ? [
+                          {
+                              label: 'Open ports',
+                              value: candidate.open_ports.join(', '),
+                          },
+                      ]
+                    : []),
+                { label: 'Decision', value: plain(candidate.decision) },
+                {
+                    label: 'Decision confidence',
+                    value: candidate.confidence + '%',
+                },
+                {
+                    label: 'Reasons',
+                    value: candidate.reasons.length
+                        ? plain(candidate.reasons.join(', '))
+                        : 'No decision reason recorded',
+                },
+                {
+                    label: 'Matched device',
+                    value: canViewDevices
+                        ? candidate.canonical_device?.name
+                        : 'You need permission to view devices',
+                },
+                {
+                    label: 'Review action',
+                    value: candidate.review.action
+                        ? plain(candidate.review.action)
+                        : 'Not reviewed',
+                },
+                {
+                    label: 'Reviewed at',
+                    value: candidate.review.reviewed_at
+                        ? when(candidate.review.reviewed_at)
+                        : 'Not reviewed',
+                },
+            ],
+            technical: [
+                { label: 'Candidate ID', value: candidate.id },
+                {
+                    label: 'Candidate reference',
+                    value: candidate.candidate_uuid,
+                },
+                { label: 'Run ID', value: candidate.run_id },
+                { label: 'Scope ID', value: candidate.scope_id },
+            ],
+            note: 'Confidence and reasons help you review this match. They do not change the device record or identify a person.',
+        };
+    });
     const collectors: DiscoveryEntry[] = w.collectors.map((collector) => {
         const coveredSiteNames = (collector.covered_sites ?? [])
             .map((covered) => covered.name)
@@ -2036,6 +2154,47 @@ const DEFAULT_PORTS: Record<string, string> = {
     snmp: '161',
 };
 
+const EXTENDED_DEFAULT_PORTS: Record<string, string> = {
+    tcp: '22, 80, 161, 443, 515, 554, 631, 1883, 3389, 5000, 5001, 5985, 5986, 8000, 8080, 8443, 9100',
+    dns: '53',
+    http: '80, 443, 5000, 5001, 8000, 8080, 8443',
+    tls: '443, 8443',
+    snmp: '161',
+    mdns: '5353',
+    ssdp: '1900',
+    onvif: '3702',
+};
+
+const PORTLESS_PROTOCOLS = new Set(['icmp', 'arp']);
+
+const EXTENDED_PROTOCOL_DEFAULTS = [
+    'icmp',
+    'arp',
+    'tcp',
+    'dns',
+    'http',
+    'tls',
+    'snmp',
+    'mdns',
+    'ssdp',
+    'onvif',
+];
+
+const LEGACY_PROTOCOL_DEFAULTS = ['icmp', 'tcp', 'dns', 'tls'];
+
+const PROTOCOL_LABELS: Record<string, string> = {
+    icmp: 'ICMP · Ping',
+    arp: 'ARP · Local MAC table',
+    tcp: 'TCP · Common ports',
+    dns: 'DNS · Hostnames',
+    http: 'HTTP · Web banners',
+    tls: 'TLS · Certificates',
+    snmp: 'SNMP · Network gear',
+    mdns: 'mDNS · Local services',
+    ssdp: 'SSDP · Plug and play',
+    onvif: 'ONVIF · Cameras',
+};
+
 function scopeFailureMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
         const errors = error.response?.data?.errors;
@@ -2067,6 +2226,10 @@ export function DiscoveryScopeWizard({
     onAccessDenied?: () => void;
 }) {
     const editing = scope !== null;
+    const hasExtendedDiscovery = management.protocols.includes('onvif');
+    const defaultPortMap = hasExtendedDiscovery
+        ? EXTENDED_DEFAULT_PORTS
+        : DEFAULT_PORTS;
     const [siteId, setSiteId] = useState(
         scope?.site?.id.toString() ??
             (management.sites.length === 1
@@ -2082,12 +2245,13 @@ export function DiscoveryScopeWizard({
     const [exclusions, setExclusions] = useState('');
     const [selectedProtocols, setSelectedProtocols] = useState<string[]>(
         scope?.protocols ??
-            ['icmp', 'tcp', 'dns', 'tls'].filter((protocol) =>
-                management.protocols.includes(protocol),
-            ),
+            (hasExtendedDiscovery
+                ? EXTENDED_PROTOCOL_DEFAULTS
+                : LEGACY_PROTOCOL_DEFAULTS
+            ).filter((protocol) => management.protocols.includes(protocol)),
     );
     const [allowedPorts, setAllowedPorts] = useState<Record<string, string>>(
-        editing ? {} : { ...DEFAULT_PORTS },
+        editing ? {} : { ...defaultPortMap },
     );
     const [snmpReference, setSnmpReference] = useState('');
     const [maxTargets, setMaxTargets] = useState(
@@ -2193,10 +2357,7 @@ export function DiscoveryScopeWizard({
         Number.isInteger(Number(packetsPerSecond)) &&
         Number(packetsPerSecond) >= 1 &&
         Number(packetsPerSecond) <= 1000;
-    const needsSnmpReference = !editing && selectedProtocols.includes('snmp');
-    const validSnmp = !needsSnmpReference || snmpReference.trim() !== '';
-    const validProtocols =
-        validProtocolChoice && validTargets && validRate && validSnmp;
+    const validProtocols = validProtocolChoice && validTargets && validRate;
     const ready = validIdentity && validNetworks && validProtocols;
     // Completeness counts the actual required entries for this form.
     const requirements = [
@@ -2206,7 +2367,6 @@ export function DiscoveryScopeWizard({
         validProtocolChoice,
         validTargets,
         validRate,
-        ...(needsSnmpReference ? [validSnmp] : []),
     ];
     const requirementsMet = requirements.filter(Boolean).length;
     const next = () => {
@@ -2265,7 +2425,7 @@ export function DiscoveryScopeWizard({
             selectedProtocols
                 .filter(
                     (protocol) =>
-                        protocol !== 'icmp' &&
+                        !PORTLESS_PROTOCOLS.has(protocol) &&
                         Boolean(allowedPorts[protocol]?.trim()),
                 )
                 .map((protocol) => [protocol, ports(allowedPorts[protocol])]),
@@ -2605,7 +2765,7 @@ export function DiscoveryScopeWizard({
                                             required={!editing}
                                             placeholder="10.44.0.0/16"
                                         />
-                                        <p className="text-xs text-muted-foreground">
+                                        <p className="text-caption">
                                             One CIDR per line. Existing ranges
                                             remain hidden; leave blank while
                                             editing to preserve them.
@@ -2655,7 +2815,7 @@ export function DiscoveryScopeWizard({
                                         <legend className="text-sm font-medium">
                                             Native discovery protocols
                                         </legend>
-                                        <div className="grid gap-2 sm:grid-cols-3">
+                                        <div className="grid gap-2 sm:grid-cols-2">
                                             {management.protocols.map(
                                                 (protocol) => (
                                                     <label
@@ -2677,7 +2837,12 @@ export function DiscoveryScopeWizard({
                                                                 )
                                                             }
                                                         />
-                                                        {protocol.toUpperCase()}
+                                                        <span>
+                                                            {PROTOCOL_LABELS[
+                                                                protocol
+                                                            ] ??
+                                                                protocol.toUpperCase()}
+                                                        </span>
                                                     </label>
                                                 ),
                                             )}
@@ -2688,7 +2853,7 @@ export function DiscoveryScopeWizard({
                                             <Label>
                                                 Protocol-specific allowed ports
                                             </Label>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="text-caption">
                                                 Each adapter is limited to its
                                                 own approved ports. Leave every
                                                 field blank while editing to
@@ -2699,7 +2864,9 @@ export function DiscoveryScopeWizard({
                                             {selectedProtocols
                                                 .filter(
                                                     (protocol) =>
-                                                        protocol !== 'icmp',
+                                                        !PORTLESS_PROTOCOLS.has(
+                                                            protocol,
+                                                        ),
                                                 )
                                                 .map((protocol) => (
                                                     <div
@@ -2733,7 +2900,7 @@ export function DiscoveryScopeWizard({
                                                                 )
                                                             }
                                                             placeholder={
-                                                                DEFAULT_PORTS[
+                                                                defaultPortMap[
                                                                     protocol
                                                                 ] ??
                                                                 'Approved ports'
@@ -2746,7 +2913,8 @@ export function DiscoveryScopeWizard({
                                     {selectedProtocols.includes('snmp') ? (
                                         <div className="space-y-2">
                                             <Label htmlFor="discovery-scope-snmp-reference">
-                                                SNMPv3 credential reference
+                                                SNMP credential reference
+                                                (optional)
                                             </Label>
                                             <Input
                                                 id="discovery-scope-snmp-reference"
@@ -2756,14 +2924,12 @@ export function DiscoveryScopeWizard({
                                                         event.target.value,
                                                     )
                                                 }
-                                                required={!editing}
                                                 autoComplete="off"
                                             />
-                                            <p className="text-xs text-muted-foreground">
-                                                Enter a Site reference only.
-                                                Secret material is leased at
-                                                execution and is never entered
-                                                here.
+                                            <p className="text-caption">
+                                                Leave blank to check standard
+                                                read-only system info, or enter
+                                                a Site reference for SNMPv3.
                                             </p>
                                         </div>
                                     ) : null}
@@ -2919,7 +3085,9 @@ export function DiscoveryScopeWizard({
                                                 value={
                                                     snmpReference
                                                         ? 'Site reference supplied'
-                                                        : 'Keep existing reference'
+                                                        : editing
+                                                          ? 'Keep existing reference'
+                                                          : 'Read-only system check (optional)'
                                                 }
                                             />
                                         )}

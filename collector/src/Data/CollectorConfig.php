@@ -204,7 +204,7 @@ final readonly class CollectorConfig
         foreach ($value as $run) {
             $allowed = [
                 'id', 'site_id', 'cidrs', 'protocols', 'exclusions', 'port_bounds',
-                'packets_per_second', 'targets',
+                'packets_per_second', 'targets', 'snmp_lease',
             ];
             if (! is_array($run) || array_is_list($run) || array_diff(array_keys($run), $allowed) !== []) {
                 throw new ConfigurationRejected('Configuration discovery run is invalid.');
@@ -223,6 +223,10 @@ final readonly class CollectorConfig
             $ports = self::portBounds($run['port_bounds'] ?? []);
             $rate = $run['packets_per_second'] ?? null;
             $targets = $run['targets'] ?? null;
+            $snmpLease = $run['snmp_lease'] ?? null;
+            if ($snmpLease !== null && (! is_array($snmpLease) || array_is_list($snmpLease))) {
+                throw new ConfigurationRejected('Configuration discovery SNMP lease is invalid.');
+            }
             if (! is_int($rate) || $rate < 1 || $rate > 1000
                 || ! is_array($targets) || ! array_is_list($targets) || $targets === [] || count($targets) > 512) {
                 throw new ConfigurationRejected('Configuration discovery bounds are invalid.');
@@ -241,7 +245,7 @@ final readonly class CollectorConfig
             if ($targetCount > 512) {
                 throw new ConfigurationRejected('Configuration discovery target limit is exceeded.');
             }
-            $runs[] = [
+            $normalisedRun = [
                 'id' => strtolower($id),
                 'site_id' => $runSiteId,
                 'cidrs' => $cidrs,
@@ -251,6 +255,10 @@ final readonly class CollectorConfig
                 'packets_per_second' => $rate,
                 'targets' => $normalisedTargets,
             ];
+            if (is_array($snmpLease)) {
+                $normalisedRun['snmp_lease'] = $snmpLease;
+            }
+            $runs[] = $normalisedRun;
         }
 
         return $runs;
@@ -274,14 +282,17 @@ final readonly class CollectorConfig
     /** @return array<string, list<int>> */
     private static function portBounds(mixed $value): array
     {
-        if (! is_array($value) || (array_is_list($value) && $value !== []) || count($value) > 9) {
+        if (! is_array($value) || (array_is_list($value) && $value !== []) || count($value) > 16) {
             throw new ConfigurationRejected('Configuration discovery ports are invalid.');
         }
         $normalised = [];
         $count = 0;
+        $allowedProtocols = [
+            'tcp', 'dns', 'http', 'tls', 'snmp', 'mdns', 'ssdp', 'onvif', 'syslog', 'flow', 'provider',
+        ];
         foreach ($value as $protocol => $ports) {
             if (! is_string($protocol)
-                || ! in_array($protocol, ['tcp', 'dns', 'http', 'tls', 'snmp', 'syslog', 'flow', 'provider'], true)
+                || ! in_array($protocol, $allowedProtocols, true)
                 || ! is_array($ports) || ! array_is_list($ports)) {
                 throw new ConfigurationRejected('Configuration discovery ports are invalid.');
             }

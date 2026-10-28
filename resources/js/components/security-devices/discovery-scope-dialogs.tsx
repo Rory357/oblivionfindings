@@ -78,6 +78,45 @@ const DEFAULT_PORTS: Record<string, string> = {
     snmp: '161',
 };
 
+const EXTENDED_DEFAULT_PORTS: Record<string, string> = {
+    tcp: '22, 80, 161, 443, 515, 554, 631, 1883, 3389, 5000, 5001, 5985, 5986, 8000, 8080, 8443, 9100',
+    dns: '53',
+    http: '80, 443, 5000, 5001, 8000, 8080, 8443',
+    tls: '443, 8443',
+    snmp: '161',
+    mdns: '5353',
+    ssdp: '1900',
+    onvif: '3702',
+};
+
+const PORTLESS_PROTOCOLS = new Set(['icmp', 'arp']);
+const EXTENDED_PROTOCOL_DEFAULTS = [
+    'icmp',
+    'arp',
+    'tcp',
+    'dns',
+    'http',
+    'tls',
+    'snmp',
+    'mdns',
+    'ssdp',
+    'onvif',
+];
+const LEGACY_PROTOCOL_DEFAULTS = ['icmp', 'tcp', 'dns', 'tls'];
+
+const PROTOCOL_LABELS: Record<string, string> = {
+    icmp: 'ICMP · Ping',
+    arp: 'ARP · Local MAC table',
+    tcp: 'TCP · Common ports',
+    dns: 'DNS · Hostnames',
+    http: 'HTTP · Web banners',
+    tls: 'TLS · Certificates',
+    snmp: 'SNMP · Network gear',
+    mdns: 'mDNS · Local services',
+    ssdp: 'SSDP · Plug and play',
+    onvif: 'ONVIF · Cameras',
+};
+
 function failureMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
         const errors = error.response?.data?.errors;
@@ -109,6 +148,9 @@ export function DiscoveryScopeDialog({
     onSaved: () => void;
 }) {
     const editing = scope !== null;
+    const defaultPortMap = management.protocols.includes('onvif')
+        ? EXTENDED_DEFAULT_PORTS
+        : DEFAULT_PORTS;
     const [siteId, setSiteId] = useState('');
     const [collectorId, setCollectorId] = useState('');
     const [name, setName] = useState('');
@@ -117,7 +159,7 @@ export function DiscoveryScopeDialog({
     const [exclusions, setExclusions] = useState('');
     const [selectedProtocols, setSelectedProtocols] = useState<string[]>([]);
     const [allowedPorts, setAllowedPorts] = useState<Record<string, string>>({
-        ...DEFAULT_PORTS,
+        ...defaultPortMap,
     });
     const [snmpReference, setSnmpReference] = useState('');
     const [maxTargets, setMaxTargets] = useState('1024');
@@ -127,6 +169,11 @@ export function DiscoveryScopeDialog({
 
     useEffect(() => {
         if (!open) return;
+        const extended = management.protocols.includes('onvif');
+        const nextPortMap = extended ? EXTENDED_DEFAULT_PORTS : DEFAULT_PORTS;
+        const nextProtocols = (
+            extended ? EXTENDED_PROTOCOL_DEFAULTS : LEGACY_PROTOCOL_DEFAULTS
+        ).filter((protocol) => management.protocols.includes(protocol));
         setSiteId(
             scope?.site?.id.toString() ??
                 (management.sites.length === 1
@@ -140,13 +187,13 @@ export function DiscoveryScopeDialog({
         setCidrs('');
         setSeedHosts('');
         setExclusions('');
-        setSelectedProtocols(scope?.protocols ?? ['icmp', 'tcp', 'dns', 'tls']);
-        setAllowedPorts(editing ? {} : { ...DEFAULT_PORTS });
+        setSelectedProtocols(scope?.protocols ?? nextProtocols);
+        setAllowedPorts(editing ? {} : { ...nextPortMap });
         setSnmpReference('');
         setMaxTargets(scope?.max_targets_per_run.toString() ?? '1024');
         setPacketsPerSecond(scope?.packets_per_second.toString() ?? '20');
         setError(null);
-    }, [open, scope, management.sites, editing]);
+    }, [open, scope, management.sites, management.protocols, editing]);
 
     const close = () => {
         setCidrs('');
@@ -203,7 +250,7 @@ export function DiscoveryScopeDialog({
             selectedProtocols
                 .filter(
                     (protocol) =>
-                        protocol !== 'icmp' &&
+                        !PORTLESS_PROTOCOLS.has(protocol) &&
                         Boolean(allowedPorts[protocol]?.trim()),
                 )
                 .map((protocol) => [protocol, ports(allowedPorts[protocol])]),
@@ -337,7 +384,7 @@ export function DiscoveryScopeDialog({
                                         <Server className="size-4" />
                                         Server (direct when routable)
                                     </span>
-                                    <span className="text-xs text-muted-foreground">
+                                    <span className="text-caption">
                                         Runs from: server
                                     </span>
                                 </Button>
@@ -364,7 +411,7 @@ export function DiscoveryScopeDialog({
                                                 <RadioTower className="size-4" />
                                                 Hub {hub.name}
                                             </span>
-                                            <span className="text-xs text-muted-foreground">
+                                            <span className="text-caption">
                                                 Runs from: hub {hub.name}
                                                 {isSdWan
                                                     ? ' · covers this Site over SD-WAN'
@@ -401,7 +448,7 @@ export function DiscoveryScopeDialog({
                             required={!editing}
                             placeholder="10.44.0.0/16"
                         />
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-caption">
                             One CIDR per line. Existing ranges remain hidden;
                             leave blank while editing to preserve them.
                         </p>
@@ -410,7 +457,7 @@ export function DiscoveryScopeDialog({
                         <legend className="text-sm font-medium">
                             Native discovery protocols
                         </legend>
-                        <div className="grid gap-2 sm:grid-cols-3">
+                        <div className="grid gap-2 sm:grid-cols-2">
                             {management.protocols.map((protocol) => (
                                 <label
                                     key={protocol}
@@ -427,7 +474,10 @@ export function DiscoveryScopeDialog({
                                             )
                                         }
                                     />
-                                    {protocol.toUpperCase()}
+                                    <span>
+                                        {PROTOCOL_LABELS[protocol] ??
+                                            protocol.toUpperCase()}
+                                    </span>
                                 </label>
                             ))}
                         </div>
@@ -435,7 +485,7 @@ export function DiscoveryScopeDialog({
                     <div className="space-y-3">
                         <div>
                             <Label>Protocol-specific allowed ports</Label>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-caption">
                                 Each adapter is limited to its own approved
                                 ports. Leave every field blank while editing to
                                 preserve the hidden allowlist.
@@ -443,7 +493,10 @@ export function DiscoveryScopeDialog({
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2">
                             {selectedProtocols
-                                .filter((protocol) => protocol !== 'icmp')
+                                .filter(
+                                    (protocol) =>
+                                        !PORTLESS_PROTOCOLS.has(protocol),
+                                )
                                 .map((protocol) => (
                                     <div key={protocol} className="space-y-2">
                                         <Label
@@ -462,7 +515,7 @@ export function DiscoveryScopeDialog({
                                                 }))
                                             }
                                             placeholder={
-                                                DEFAULT_PORTS[protocol] ??
+                                                defaultPortMap[protocol] ??
                                                 'Approved ports'
                                             }
                                         />
@@ -473,7 +526,7 @@ export function DiscoveryScopeDialog({
                     {selectedProtocols.includes('snmp') ? (
                         <div className="space-y-2">
                             <Label htmlFor="discovery-scope-snmp-reference">
-                                SNMPv3 credential reference
+                                SNMP credential reference (optional)
                             </Label>
                             <Input
                                 id="discovery-scope-snmp-reference"
@@ -481,12 +534,11 @@ export function DiscoveryScopeDialog({
                                 onChange={(event) =>
                                     setSnmpReference(event.target.value)
                                 }
-                                required={!editing}
                                 autoComplete="off"
                             />
-                            <p className="text-xs text-muted-foreground">
-                                Enter a Site reference only. Secret material is
-                                leased at execution and is never entered here.
+                            <p className="text-caption">
+                                Leave blank to check standard read-only system
+                                info, or enter a Site reference for SNMPv3.
                             </p>
                         </div>
                     ) : null}
