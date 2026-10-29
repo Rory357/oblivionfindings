@@ -199,10 +199,13 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
         Route::post('/plans/{plan}/approvals', [BehaviourSupportPlanWorkspaceController::class, 'decision'])->middleware('permission:restraints.approve|restraints.review|restraints.manage')->name('plans.approvals.store');
         Route::get('/events/{event}/attachments/{attachment}/download', [RestraintEventWorkspaceController::class, 'downloadEvidence'])->middleware('permission:restraints.view|restraints.review|restraints.manage')->name('events.attachments.download');
 
-        // Capture — record events, create plans, upload evidence.
-        Route::middleware('permission:restraints.create|restraints.manage')->group(function () {
+        // Report a restraint: also open to create-only reporters (restraints.report, MASTER for Stephan, 30 Oct).
+        Route::middleware('permission:restraints.create|restraints.manage|restraints.report')->group(function () {
             Route::get('/report', [RestraintEventWorkspaceController::class, 'report'])->name('report');
             Route::post('/events', [RestraintEventWorkspaceController::class, 'store'])->name('events.store');
+        });
+        // Capture — create plans, upload evidence.
+        Route::middleware('permission:restraints.create|restraints.manage')->group(function () {
             Route::post('/plans', [BehaviourSupportPlanWorkspaceController::class, 'store'])->name('plans.store');
             Route::post('/events/{event}/attachments', [RestraintEventWorkspaceController::class, 'addEvidence'])->name('events.attachments.store');
         });
@@ -470,7 +473,8 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/export', [ReturnToWorkController::class, 'export'])->name('export');
         });
 
-        Route::middleware('permission:hazards.manage|hazards.create')->group(function () {
+        // Report a workplace injury: also open to create-only reporters (injuries.report, MASTER for Stephan, 30 Oct).
+        Route::middleware('permission:hazards.manage|hazards.create|injuries.report')->group(function () {
             Route::get('/capture-options', [ReturnToWorkController::class, 'captureOptions'])->name('capture-options');
             Route::get('/create', [ReturnToWorkController::class, 'create'])->name('create');
             Route::post('/', [ReturnToWorkController::class, 'store'])->name('store');

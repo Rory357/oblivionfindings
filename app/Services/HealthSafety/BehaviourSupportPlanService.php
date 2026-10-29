@@ -300,7 +300,8 @@ final class BehaviourSupportPlanService
     public function resolveForEvent(Client $client, int $siteId, ?int $stayId, Carbon $startedAt, bool $assertedWithin, ?int $planId, ?int $versionId, User $current, CurrentAuthorizationReads $reads, array $sites): array
     {
         $reads->assertActive();
-        $operation = $current->canDo('restraints.create') || $current->canDo('restraints.manage') ? 'capture' : ($current->canDo('restraints.review') ? 'review' : 'respite_capture');
+        // restraints.report records a restraint against the person's plan too (create only, MASTER for Stephan, 30 Oct).
+        $operation = $current->canDo('restraints.create') || $current->canDo('restraints.manage') || $current->canDo('restraints.report') ? 'capture' : ($current->canDo('restraints.review') ? 'review' : 'respite_capture');
         $this->access->assertClient($client, $current, $reads, $sites, $operation);
         if ($stayId !== null) {
             $this->access->assertStay($stayId, (int) $client->id, $siteId, $current, $reads, $sites);

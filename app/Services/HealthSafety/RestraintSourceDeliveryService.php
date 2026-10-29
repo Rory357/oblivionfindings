@@ -159,7 +159,7 @@ class RestraintSourceDeliveryService
                 throw new RuntimeException('Legacy source handoff has no attributable current actor.');
             }
             $this->access->withCurrentViewer($actor, function ($current, $reads, $sites) use ($row, $changes, $handoffKey): void {
-                $operation = $changes === [] ? ($current->canDo('restraints.create') || $current->canDo('restraints.manage') ? 'capture' : 'respite_capture') : 'review';
+                $operation = $changes === [] ? ($current->canDo('restraints.create') || $current->canDo('restraints.manage') || $current->canDo('restraints.report') ? 'capture' : 'respite_capture') : 'review';
                 $this->access->assertEvent($row, $current, $reads, $sites, $operation);
                 if ($changes !== []) {
                     if (! $handoffKey || ! Str::isUuid($handoffKey)) {

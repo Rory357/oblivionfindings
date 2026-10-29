@@ -30,7 +30,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 /** Current operation authority and exact confidential source tuples, never a tenant boundary. */
 final class RestraintAccessService
 {
-    public const PERMISSIONS = ['hazards.view', 'restraints.view', 'restraints.create', 'restraints.review', 'restraints.manage', 'restraints.approve', 'respite.stays.manage', 'respite.viewAny', 'healthSafety.viewAllSites', 'clients.viewAny', 'clients.viewAssigned', 'clinical.accessAllSites', 'sites.viewAll', 'sites.view', 'incidents.viewAny', 'incidents.viewAssigned', 'incidents.update', 'incidents.create', 'incidents.submit', 'hr.cases.view', 'medications.controlled.view', 'controlRoom.viewAny', 'controlRoom.alerts.view', 'controlRoom.tasks.view'];
+    public const PERMISSIONS = ['hazards.view', 'restraints.view', 'restraints.create', 'restraints.report', 'restraints.review', 'restraints.manage', 'restraints.approve', 'respite.stays.manage', 'respite.viewAny', 'healthSafety.viewAllSites', 'clients.viewAny', 'clients.viewAssigned', 'clinical.accessAllSites', 'sites.viewAll', 'sites.view', 'incidents.viewAny', 'incidents.viewAssigned', 'incidents.update', 'incidents.create', 'incidents.submit', 'hr.cases.view', 'medications.controlled.view', 'controlRoom.viewAny', 'controlRoom.alerts.view', 'controlRoom.tasks.view'];
 
     public function __construct(private readonly UserSiteAccessService $sites, private readonly AuthorizationEvidenceLockService $authorization, private readonly HrCurrentStaffService $staff, private readonly ClientPolicy $clients, private readonly RespiteStayScope $stays, private readonly IncidentAccessService $incidents) {}
 
@@ -57,7 +57,9 @@ final class RestraintAccessService
         $allowed = match ($operation) {
             'view', 'export' => $current->canDo('restraints.view'),
             'workspace', 'review', 'link_incident', 'correct', 'assign_review', 'add_observation', 'add_debrief', 'add_followup', 'update_followup' => $current->canDo('restraints.review') || $current->canDo('restraints.manage'),
-            'capture', 'create', 'add_evidence' => $current->canDo('restraints.create') || $current->canDo('restraints.manage'),
+            // restraints.report: create only (MASTER for Stephan, 30 Oct) — never evidence afterwards, plans or review.
+            'capture', 'create' => $current->canDo('restraints.create') || $current->canDo('restraints.manage') || $current->canDo('restraints.report'),
+            'add_evidence' => $current->canDo('restraints.create') || $current->canDo('restraints.manage'),
             'respite_capture' => $current->canDo('respite.stays.manage'),
             'approve' => $current->canDo('restraints.approve'),
             'manage', 'edit', 'update', 'activate', 'submit_review', 'archive', 'remove_evidence' => $current->canDo('restraints.manage'),

@@ -28,7 +28,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 /** Current source authority; historical injured identity is not current employment or fitness. */
 final class InjuryAccessService
 {
-    public const PERMISSIONS = ['hazards.view', 'hazards.create', 'hazards.manage', 'hr.wellbeing.view',
+    public const PERMISSIONS = ['hazards.view', 'hazards.create', 'hazards.manage', 'injuries.report', 'hr.wellbeing.view',
         'healthSafety.viewAllSites', 'hr.documents.view', 'hr.documents.manage', 'hr.employees.viewAny',
         'hr.employees.viewAllSites', 'incidents.viewAny', 'incidents.viewAssigned', 'incidents.update',
         'incidents.create', 'hr.cases.view', 'clients.viewAny', 'clients.viewAssigned',
@@ -310,7 +310,8 @@ final class InjuryAccessService
     {
         $allowed = match ($operation) {
             'view' => $current->canDo('hazards.view') || $current->canDo('hr.wellbeing.view'),
-            'create' => $current->canDo('hazards.create') || $current->canDo('hazards.manage'),
+            // injuries.report: create only (MASTER for Stephan, 30 Oct) — no register, update, review or recovery work.
+            'create' => $current->canDo('hazards.create') || $current->canDo('hazards.manage') || $current->canDo('injuries.report'),
             'update', 'transition', 'assign', 'review', 'recovery', 'evidence' => $current->canDo('hazards.manage'),
             default => false,
         };
