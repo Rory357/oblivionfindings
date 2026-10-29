@@ -114,20 +114,25 @@ Each phase is one change and one merge. A phase may be split into smaller merges
 1. Open Setup › Supported devices. Expect: Ajax and the other 6 label-only alarm brands say "View only". Nothing says "tested on hardware" for UniFi PoE cycle or reboot.
 2. Open the Ajax alarm page. Expect: no Arm or Disarm button anywhere.
 3. Run the alarm receiver test with the reference messages. Expect: every sample is accepted and acknowledged, and encrypted samples get encrypted replies.
-4. **Optional:** in the Ajax PRO app, add Oblivion as a monitoring station on this PC's address, then arm and disarm. Expect: both events show on the Ajax device in Oblivion, view only. Stephan sets this up in his own Ajax account; Windows asks him once to allow the port.
-5. Stop the alarm receiver and the MQTT listener. Expect: both restart by themselves within 1 minute, and the server check is green.
-6. With settings cached, publish an MQTT reading, then restart the broker. Expect: the reading arrives, and the listener reconnects within 1 minute.
-7. Add a home camera or Protect console that has a self-signed certificate. Expect: "Trust this camera?" is asked once, and no plain Basic-auth password appears in the camera's log.
-8. Back up a home device's settings over SSH, then point the same device record at a different SSH device. Expect: the first backup asks to trust the key, and after the swap it is refused with a plain message.
-9. Settings › Remote support › Test relay, with no relay set up. Expect: "No relay set up", never "Verified".
-10. Run the hub's SNMP check from the CI-built hub runtime against the home UniFi switch, with SNMP turned on in UniFi. Expect: the switch's name and uptime come back.
-11. Open the pull request. Expect: CI is green.
+4. Stop the alarm receiver and the MQTT listener. Expect: both restart by themselves within 1 minute, and the server check is green.
+5. With settings cached, send an MQTT reading, then restart the broker. Expect: the reading arrives, and the listener reconnects within 1 minute. **On hold:** which broker this uses waits for the design session's answer (R8).
+6. Add your UniFi Protect console, which has a self-signed certificate. Expect: "Trust this camera?" is asked once, and no plain Basic-auth password appears in the console's log.
+7. Back up a home device's settings over SSH, then point the same device record at a different SSH device. Expect: the first backup asks to trust the key, and after the swap it is refused with a plain message.
+8. Settings › Remote support › Test relay, with no relay set up. Expect: "No relay set up", never "Verified".
+9. Open the pull request. Expect: CI is green, and the CI-built hub loads the SNMP module.
+
+Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax alarm (R7) and reading his UniFi switch over SNMP (R10). Both go on the end-review list as not proven on hardware.
 
 **Data and site steps**
 
 - **D9:** remove the 3 test Sites from the .com, with a full dump to `~/env-backups/` first and MASTER's OK at the time.
-- The supervisor programs for the alarm receiver and MQTT have to be added once on the .com. That needs root, so it is Stephan's job, or someone with sudo (see R6).
-- **MQTT broker settings** go in the .com `.env`. Stephan types the password himself.
+- **Supervisor (R6):** the programs for the alarm receiver and MQTT have to be added once on the .com. That needs root, so it is Stephan's job. The exact commands to copy and paste are in `ops/supervisor/README.md`, and MASTER hands them over when Phase A is ready to merge.
+- **MQTT broker settings** wait for R8. Any password is typed by Stephan himself.
+
+**CI for the hub (MASTER's OK, 30 Oct)**
+
+- The build branch may be pushed so GitHub builds the hub, because this PC has no Go. It is never pushed to main, and there is no pull request to main before the merge gate.
+- Only `main` signs with the real `ENDPOINT_*_SIGNING_SEED` keys. Every other branch uses throwaway keys and never uploads a signed catalogue. That change to `site-hub-release.yml` lands before the first push.
 
 ### Phase B · Windows app and hubs
 
@@ -374,19 +379,19 @@ Each item is ticked with the commit that fixed it and how it was proved.
 
 ### Judgement calls made for you
 
-- **R1. Phase A is engine only.** Hub approval, scoped logins, routing through hubs, scheduled hub scans, the code-signing check and the hub syslog/Protect code move to Phase B. The plan's engine table lists them, but they can only be walked with the new installer and hub, and the plan's Phase B walk already covers them.
-- **R2. The SSH walk swaps the target, not the key.** Step 8 points the device record at a second SSH device instead of changing your router's real key. It proves the same refusal without touching the router.
-- **R3. Alarm receiver samples.** The full SIA DC-09 standard isn't free. Its sample messages are copied from public receiver projects whose samples came from real panels, and are credited in the test. The strongest proof is your own Ajax hub reporting in (walk step 4).
+- **R1. Phase A is engine only** (MASTER agreed on 30 Oct). Hub approval, scoped logins, routing through hubs, scheduled hub scans, the code-signing check and the hub syslog/Protect code move to Phase B. The plan's engine table lists them, but they can only be walked with the new installer and hub, and the plan's Phase B walk already covers them.
+- **R2. The SSH walk swaps the target, not the key.** Step 7 points the device record at a second SSH device instead of changing your router's real key. It proves the same refusal without touching the router.
+- **R3. Alarm receiver samples.** The full SIA DC-09 standard isn't free. Its sample messages are copied from public receiver projects whose samples came from real panels, and are credited in the test. Your Ajax alarm doesn't report in during Phase A (R7), so these samples are the proof for now.
 - **R4. "Test relay"** does a real STUN/TURN check, not a full remote-support session. The full session is proved in Phase G.
 - **R5. Milesight webhook:** if Milesight's documents don't define a signature for gateway forwarding, it uses a per-Site secret that you set in the gateway.
 
 ### Needs your hardware, your accounts or your installer
 
-- **R6. Supervisor on the .com.** The alarm receiver and MQTT programs have to be added once on the .com. That needs root, which the build doesn't have.
-- **R7. Ajax.** You add Oblivion as a monitoring station in the Ajax PRO app. Ajax gives Oblivion no arm/disarm without Ajax's partner API, so it stays view only.
-- **R8. MQTT.** Which broker do your Milesight sensors use: the gateway's own broker, or one we run? You type its password yourself.
-- **R9. Cameras.** Which camera or Protect console to use for the "Trust this camera?" walk.
-- **R10. SNMP.** SNMP has to be turned on for your UniFi switch in UniFi Network. You type the community string or v3 login yourself.
+- **R6. Supervisor on the .com.** The alarm receiver and MQTT programs have to be added once on the .com. That needs root, so it's your job. The commands to copy and paste are in `ops/supervisor/README.md`.
+- **R7. Ajax: not proven on hardware.** You chose to skip the Ajax PRO monitoring-station step on 30 Oct. Ajax stays "View only" and is not proven on real hardware. Ajax gives Oblivion no arm or disarm without Ajax's partner API.
+- **R8. MQTT broker: open.** You said "I thought Oblivion is going to be the MQTT broker". MASTER is asking the design session whether the plan makes Oblivion or the hub the broker for the sensors, and how. Until then, A4 ships config(), reconnect and supervisor, and assumes no outside broker.
+- **R9. Cameras.** Your UniFi Protect console is used for the "Trust this camera?" walk (step 6).
+- **R10. SNMP: not walked on hardware.** You chose to skip the switch step on 30 Oct. A7 is proved by the CI-built hub loading the SNMP module and by collector tests, not by reading your switch.
 - **R11. Doors.** Your installer still has to confirm every door has an exit button and a handle. Connect UniFi Access requires the tick (pop-up 91).
 - **R12. Signing.** Before the first client install, the installer needs a code-signing certificate (D1).
 - **R13. Queclink.** Your tracker has been offline since 20 May. Queclink stays "Built from vendor docs" until one is walked.
@@ -395,13 +400,14 @@ Each item is ticked with the commit that fixed it and how it was proved.
 
 - Everything from Gemini's phases 0–6 that no walk has covered. That includes discovery, the maker lookup, switch-neighbour maps, SSH backup for MikroTik/Cisco/Aruba/Fortinet, and Intune. These are kept and labelled honestly until a walk proves them.
 - Brands nobody owns stay "Not tested on hardware" (D10).
+- Your Ajax alarm reporting through the alarm receiver (R7) and SNMP on your UniFi switch (R10), both skipped in the Phase A walk.
 
 ## 7. Progress
 
 | Phase | State | Commit | Gate | Stephan's walk | On main / .com |
 | --- | --- | --- | --- | --- | --- |
-| Finish line (this file) | Waiting for MASTER | | | | |
-| A · Honest and safe | Not started | | | | |
+| Finish line (this file) | Approved by MASTER, 30 Oct | 8b2cc254d | — | — | — |
+| A · Honest and safe | In progress (A1 and A3 first) | | | | |
 | B · Windows app and hubs | Not started | | | | |
 | C · Core screens | Not started | | | | |
 | D · Alerts | Not started | | | | |
