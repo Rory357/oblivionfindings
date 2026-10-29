@@ -8,7 +8,6 @@ import {
     Coffee,
     FileText,
     Heart,
-    ListPlus,
     MapPin,
     Pause,
     Pill,
@@ -20,7 +19,7 @@ import {
     Users,
     Utensils,
 } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 
 import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { PageHero } from '@/components/page/page-hero';
@@ -30,13 +29,6 @@ import { PageTabs } from '@/components/page/page-tabs';
 import { Button } from '@/components/ui/button';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
-import {
-    launcherWorkflows,
-    ReportLauncher,
-} from '@/pages/health-safety/components/report-launcher';
-import { reportPageFor } from '@/pages/health-safety/components/report-pages';
-import type { SharedData } from '@/types';
-import { router, usePage } from '@inertiajs/react';
 import { myDayIncidentHref } from '../lib/incident-navigation';
 import type {
     MyDayActiveSite,
@@ -315,22 +307,6 @@ export function MyDayHero({
             ? `/clients/${singleResident.id}?tab=observations`
             : null;
     const incidentHref = myDayIncidentHref({ shiftId: activeShiftId });
-    // "Report something" (MASTER for Stephan, 30 Oct, option A): the H&S chooser, showing only what this person may
-    // use. Offered beside "Report incident" when they can report more than an incident.
-    const [reportOpen, setReportOpen] = useState(false);
-    const reportCan = usePage<SharedData>().props.auth
-        ?.can as unknown as Parameters<typeof launcherWorkflows>[0];
-    const moreToReport = launcherWorkflows(reportCan).some(
-        (w) => w.key !== 'incident',
-    );
-    const openReport = (key: string) => {
-        setReportOpen(false);
-        if (key === 'incident') {
-            router.visit(incidentHref);
-            return;
-        }
-        router.visit(reportPageFor(key, '/my-day') ?? '/compliance/hazards');
-    };
 
     const quickActions = [
         {
@@ -369,15 +345,6 @@ export function MyDayHero({
             label: t('qa_report_incident'),
             href: incidentHref,
         },
-        ...(moreToReport
-            ? [
-                  {
-                      icon: ListPlus,
-                      label: 'Report something',
-                      onClick: () => setReportOpen(true),
-                  },
-              ]
-            : []),
         ...(availabilityHref
             ? [
                   {
@@ -629,16 +596,7 @@ export function MyDayHero({
                     </Button>
                 </>
             }
-            footer={
-                <>
-                    {footer}
-                    <ReportLauncher
-                        open={reportOpen}
-                        onClose={() => setReportOpen(false)}
-                        onWorkflow={openReport}
-                    />
-                </>
-            }
+            footer={footer}
         />
     );
 }

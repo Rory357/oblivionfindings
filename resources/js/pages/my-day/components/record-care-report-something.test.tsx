@@ -23,38 +23,24 @@ vi.mock('@inertiajs/react', () => ({
     usePage: () => ({ props: { auth: { can: state.can } } }),
 }));
 
-import MyDayHero from './my-day-hero';
+import { RecordCareActions } from './record-care-actions';
 
+const onIncident = vi.fn();
 const hero = () =>
     render(
-        <MyDayHero
-            workerFirstName="Mere"
-            site={null}
-            singleResident={null}
-            activeShiftId={12}
-            shiftStartLabel=""
-            shiftEndLabel=""
-            shiftDurationHours={8}
-            clockedLabel="Not clocked in"
-            tasksDone={0}
-            totalTasks={0}
-            medsGiven={0}
-            totalMeds={0}
-            medsOverdue={0}
-            openItemsCount={0}
-            overdueMeds={[]}
-            openItems={[]}
-            clockedIn={false}
-            onClockToggle={vi.fn()}
-            activeResidentId="all"
-            onResidentChange={vi.fn()}
-            residentTaskCounts={new Map()}
-            liveSinceLabel="Not clocked in"
+        <RecordCareActions
+            people={[]}
+            selectedPerson="all"
+            canRecordObservation={false}
+            onNote={vi.fn()}
+            onMeal={vi.fn()}
+            onObservation={vi.fn()}
+            onIncident={onIncident}
         />,
     );
 
-// MASTER for Stephan (30 Oct, option A): My Day offers the H&S "Report something" chooser, showing only what the
-// person may use, beside the one-tap "Report incident".
+// MASTER for Stephan (30 Oct, option A): My Day's Record care card offers the H&S "Report something" chooser,
+// showing only what the person may use, beside the one-tap "Report incident".
 describe('My Day: Report something', () => {
     it('is offered when the person can report more than an incident, and opens the chosen form', () => {
         state.can = {
@@ -63,7 +49,7 @@ describe('My Day: Report something', () => {
         };
         hero();
         expect(
-            screen.getByRole('link', { name: /Report incident/i }),
+            screen.getByRole('button', { name: /Report incident/i }),
         ).toBeVisible();
         fireEvent.click(
             screen.getByRole('button', { name: /Report something/i }),
@@ -82,6 +68,7 @@ describe('My Day: Report something', () => {
     });
 
     it('keeps an incident on My Day’s own report link with its shift', () => {
+        onIncident.mockClear();
         state.can = {
             incidents: { create: true },
             safeguarding: { create: true },
@@ -94,9 +81,8 @@ describe('My Day: Report something', () => {
         fireEvent.click(
             screen.getByRole('button', { name: 'Report an incident' }),
         );
-        expect(state.visit).toHaveBeenCalledWith(
-            '/incidents/create?shift_id=12&return_to=%2Fmy-day',
-        );
+        expect(onIncident).toHaveBeenCalledTimes(1);
+        expect(state.visit).not.toHaveBeenCalled();
     });
 
     it('is not offered when an incident is all the person can report', () => {

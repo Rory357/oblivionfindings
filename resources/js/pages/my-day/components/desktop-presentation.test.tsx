@@ -10,6 +10,7 @@ import { RecordCareActions } from './record-care-actions';
 import { ShiftSummary } from './shift-summary';
 
 vi.mock('@inertiajs/react', () => ({
+    usePage: () => ({ props: { auth: { can: {} } } }),
     Link: ({
         href,
         children,
