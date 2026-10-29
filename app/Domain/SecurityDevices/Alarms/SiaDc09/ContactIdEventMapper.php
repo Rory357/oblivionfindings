@@ -310,11 +310,19 @@ final class ContactIdEventMapper
     {
         $afterPipe = str_contains($data, '|') ? explode('|', $data, 2)[1] : $data;
         $partition = '01';
-        if (preg_match('/ri(\d{1,3})\b/i', $afterPipe, $pm) === 1) {
+        if (preg_match('/ri(\d{1,3})/i', $afterPipe, $pm) === 1) {
             $partition = str_pad($pm[1], 2, '0', STR_PAD_LEFT);
         }
 
-        if (preg_match('/(?:\/|\A|N)([A-Z]{2})(\d{0,4})\b/', strtoupper($afterPipe), $em) !== 1) {
+        // Phase A, item A3: a block reads `N` (new event), then optional `ti<hh:mm>`, `id<user>` and
+        // `ri<area>` parts, each optionally followed by `/`, then the two-letter event code and its zone
+        // or user number, e.g. `Nri1/CL501`. The earlier pattern read the `ri` marker itself as the event
+        // code, so a real closing (`Nri1/CL501`) was stored as an unknown event instead of "armed".
+        $block = strtoupper(trim($afterPipe));
+        $matched = preg_match('/\AN?(?:TI\d{2}:\d{2}\/?)?(?:ID\d*\/?)?(?:RI\d*\/?)?([A-Z]{2})(\d{0,4})/', $block, $em) === 1
+            || preg_match('/(?:\/|\A|N)([A-Z]{2})(\d{0,4})\b/', $block, $em) === 1;
+
+        if (! $matched) {
             return [
                 'ok' => false,
                 'event_type' => 'unknown',
