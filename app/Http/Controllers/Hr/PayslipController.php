@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
+use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\HrPayrollAccessService;
 use App\Domain\Hr\Services\HrPerformanceAccessService;
@@ -26,6 +27,8 @@ class PayslipController extends Controller
         private readonly HrPerformanceAccessService $performanceAccess,
         private readonly HrCurrentStaffService $currentStaff,
         private readonly HrPayrollAccessService $payrollAccess,
+        // The shared My HR shell counts kudos through it (BuildsMyHrShell).
+        private readonly FeedService $feedService,
     ) {}
 
     /**
