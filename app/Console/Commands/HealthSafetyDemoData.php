@@ -51,12 +51,17 @@ use Throwable;
  *  - up to 3 Sites without a first aider get one (a team lead or coordinator
  *    first) through the HR profile model; only profiles that were off are
  *    changed, and their ids are kept in FIRST_AIDERS_KEY;
+ *  - two chemicals (bleach, caustic oven cleaner) are added to the register
+ *    through ChemicalCommandService::create under UUIDv5 command keys; the
+ *    exact commands are kept in CHEMICALS_KEY so a re-run replays them. No
+ *    SDS is added: the SDS command only accepts an uploaded document;
  *  - up to 2 Sites without stored substances get a storage location through
  *    ChemicalCommandService::createStorage under a UUIDv5 command key; the
  *    exact command is kept in STORAGE_KEY so a re-run replays it.
  *
  * Re-running skips anything already there. `--remove` archives what the
- * services can archive (first aid, risk assessments, storage locations), turns
+ * services can archive (first aid, risk assessments, storage locations), marks
+ * its two chemicals "Removed" through the register's status command, turns
  * off exactly the first-aider flags this command turned on, and leaves
  * restraint and chemical exposure records (no archive command) in place.
  */
@@ -80,6 +85,9 @@ final class HealthSafetyDemoData extends Command
     /** Private app_settings row: storage command key → substance id and the exact command sent. */
     public const STORAGE_KEY = 'health_safety.demo_data.storage_locations';
 
+    /** Private app_settings row: chemical create command key → the exact command sent. */
+    public const CHEMICALS_KEY = 'health_safety.demo_data.chemicals';
+
     /** Sites that get a first aider / a storage location when they have none. */
     private const FIRST_AIDER_SITES = 3;
 
@@ -91,7 +99,7 @@ final class HealthSafetyDemoData extends Command
     /** A record removed with --remove is recreated under its next generation key. */
     private const MAX_GENERATIONS = 25;
 
-    private const KINDS = ['first_aider' => 'First aiders (HR flag)', 'storage' => 'Substance storage locations', 'first_aid' => 'First aid','chemical' => 'Chemical exposures', 'restraint' => 'Restraints', 'risk' => 'Risk assessments'];
+    private const KINDS = ['first_aider' => 'First aiders (HR flag)', 'substance' => 'Chemicals (register)', 'storage' => 'Substance storage locations', 'first_aid' => 'First aid', 'chemical' => 'Chemical exposures', 'restraint' => 'Restraints', 'risk' => 'Risk assessments'];
 
     /** @var array<string, array<string, int>> */
     private array $summary = [];
@@ -125,6 +133,7 @@ final class HealthSafetyDemoData extends Command
             $this->removeFirstAid();
             $this->removeRiskAssessments();
             $this->removeStorage();
+            $this->removeChemicals();
             $this->restoreFirstAiders();
             $this->countLeftInPlace();
         } else {
@@ -133,7 +142,8 @@ final class HealthSafetyDemoData extends Command
                 $this->warn('No active demo Sites this user can reach. Nothing was created.');
             } else {
                 $places = $this->prepareFirstAiders($places);
-                $places = $this->prepareStorage($places);
+                $planned = $this->prepareChemicals();
+                $places = $this->prepareStorage($places, $planned);
                 $this->noteGaps($places);
                 $this->seedFirstAid($places);
                 $this->seedChemicalExposures($places);
@@ -326,6 +336,134 @@ final class HealthSafetyDemoData extends Command
         }
     }
 
+    // ── Prepare: chemical register ────────────────────────────────────
+
+    private function substanceSpecs(): array
+    {
+        return [
+            ['substance-1', [
+                'name' => 'Sodium hypochlorite bleach', 'common_name' => 'Bleach', 'physical_form' => 'liquid',
+                'un_number' => 'UN1791', 'hsno_approval' => 'Cleaning Products (Corrosive) Group Standard 2020',
+                'hsno_classification' => 'Skin corrosion 1B; serious eye damage 1; hazardous to the aquatic environment, acute 1',
+                'hazard_classifications' => ['Corrosive', 'Eco-toxic'], 'ghs_pictograms' => ['GHS05', 'GHS09'], 'signal_word' => 'Danger',
+                'hazard_statements' => 'H314 Causes severe skin burns and eye damage. H400 Very toxic to aquatic life. EUH031 Contact with acids liberates toxic gas. Household-strength sodium hypochlorite solution, about 3–5%.',
+                'precautionary_statements' => 'P260 Do not breathe mist or vapour. P280 Wear protective gloves and eye protection. P301+P330+P331 If swallowed: rinse mouth, do not induce vomiting. P305+P351+P338 If in eyes: rinse cautiously with water for several minutes; remove contact lenses if easy to do. P273 Avoid release to the environment.',
+                'ppe_required' => 'Waterproof gloves (nitrile or PVC) and safety glasses. Add a plastic apron when decanting or mixing.',
+                'storage_requirements' => 'Keep in the original labelled container with the cap closed, upright, in a cool locked cupboard out of direct sun. Keep apart from acids (e.g. toilet and descaling cleaners) and ammonia-based cleaners — mixing releases toxic chlorine or chloramine gas.',
+                'handling_precautions' => 'Use in a well-ventilated room. Never mix with other cleaning products. Dilute by adding bleach to water, not water to bleach.',
+                'first_aid_measures' => 'Eyes: rinse immediately with clean running water for at least 15 minutes, holding the eyelids open, and get medical advice. Skin: remove contaminated clothing and wash the skin well with water. Swallowed: rinse the mouth and give a glass of water; do not induce vomiting. Breathed in: move to fresh air. For advice call the National Poisons Centre on 0800 POISON (0800 764 766); in an emergency call 111.',
+                'firefighting_measures' => 'Not flammable. Use an extinguishing agent suited to the surrounding fire. Heating can release chlorine gas — keep containers cool and stay upwind.',
+                'spill_procedures' => 'Ventilate the area and wear gloves and eye protection. Contain with absorbent material or old towels, then rinse the area with plenty of water. Keep spills out of drains and waterways where possible.',
+                'requires_tracking' => true, 'is_controlled_substance' => false,
+            ]],
+            ['substance-2', [
+                'name' => 'Caustic oven cleaner', 'common_name' => 'Oven cleaner (aerosol)', 'physical_form' => 'aerosol',
+                'un_number' => 'UN1950', 'hsno_approval' => 'Aerosols (Flammable) Group Standard 2020',
+                'hsno_classification' => 'Aerosol 1; skin corrosion 1A; serious eye damage 1',
+                'hazard_classifications' => ['Flammable', 'Corrosive'], 'ghs_pictograms' => ['GHS02', 'GHS05'], 'signal_word' => 'Danger',
+                'hazard_statements' => 'H222 Extremely flammable aerosol. H229 Pressurised container: may burst if heated. H314 Causes severe skin burns and eye damage. Contains sodium hydroxide.',
+                'precautionary_statements' => 'P210 Keep away from heat, sparks and open flames — no smoking. P211 Do not spray on an open flame or a hot oven. P251 Do not pierce or burn, even after use. P280 Wear protective gloves and eye protection. P410+P412 Protect from sunlight; do not expose to temperatures above 50 °C.',
+                'ppe_required' => 'Chemical-resistant gloves with long cuffs and safety glasses or goggles. Keep forearms covered.',
+                'storage_requirements' => 'Store below 50 °C in a locked cupboard away from the stove, heaters and direct sun. Keep apart from acids and aluminium. Keep the cap on.',
+                'handling_precautions' => 'Only use on a cold oven with the kitchen window open and the rangehood on. Spray away from the face; do not use near people with breathing difficulties.',
+                'exposure_limit_type' => 'WES-Ceiling', 'exposure_limit_value' => '2 mg/m³ (sodium hydroxide)',
+                'first_aid_measures' => 'Eyes: rinse immediately with clean running water for at least 15 minutes and get urgent medical help. Skin: wash off with plenty of water for 15 minutes and remove contaminated clothing. Swallowed: rinse the mouth and give a glass of water; do not induce vomiting. Breathed in: move to fresh air and rest. For advice call the National Poisons Centre on 0800 POISON (0800 764 766); in an emergency call 111.',
+                'firefighting_measures' => 'Extremely flammable aerosol. Containers may burst when heated — cool them with water spray from a distance. Use dry chemical, foam or carbon dioxide on the surrounding fire.',
+                'spill_procedures' => 'Ventilate the area and remove ignition sources. Wear gloves and eye protection, wipe up residue with damp paper towels and rinse the surface with water. Put leaking cans in a sealed bag outside for hazardous waste collection.',
+                'requires_tracking' => true, 'is_controlled_substance' => false,
+            ]],
+        ];
+    }
+
+    /**
+     * Adds the two chemicals to the register (or replays them if already there).
+     *
+     * @return Collection<int, HazardousSubstance> in a dry run, the unsaved chemicals that would be added
+     */
+    private function prepareChemicals(): Collection
+    {
+        $registry = $this->setting(self::CHEMICALS_KEY);
+        $planned = collect();
+        $added = false;
+        foreach ($this->substanceSpecs() as [$name, $fields]) {
+            [$state, $key] = $this->substanceSlot($name);
+            if ($state === 'present') {
+                $this->count('substance', 'present');
+                $stored = $registry[$key] ?? null;
+                if (! $this->dryRun && is_array($stored)) {
+                    try {
+                        app(ChemicalCommandService::class)->create($this->actor, $stored);
+                        $this->line("  = {$name}: already there (command replayed)");
+                    } catch (Throwable $error) {
+                        $this->line("  = {$name}: already there (replay not accepted: ".$this->reason($error).')');
+                    }
+                }
+
+                continue;
+            }
+            if ($state === 'exhausted') {
+                $this->skip('substance', $name, 'too many earlier copies were removed');
+
+                continue;
+            }
+            $command = ['idempotency_key' => $key, ...$fields];
+            $this->attempt('substance', $name, "{$fields['name']} in the chemical register", function () use ($command, $key, &$registry, &$added) {
+                app(ChemicalCommandService::class)->create($this->actor, $command);
+                $registry[$key] = $command;
+                $this->saveSetting(self::CHEMICALS_KEY, $registry);
+                $added = true;
+            });
+            if ($this->dryRun) {
+                $planned->push((new HazardousSubstance)->forceFill([...$fields, 'status' => 'active', 'source_revision' => 0]));
+                $added = true;
+            }
+        }
+        if ($added) {
+            $this->line('  · No safety data sheet added: the SDS command only accepts an uploaded document.');
+        }
+
+        return $planned;
+    }
+
+    /** @return array{0: string, 1: ?string} [create|present|exhausted, key] — "present" means an active chemical of ours. */
+    private function substanceSlot(string $name): array
+    {
+        for ($generation = 1; $generation <= self::MAX_GENERATIONS; $generation++) {
+            $key = self::key($name, $generation);
+            $receipt = ChemicalCommandReceipt::query()->where('idempotency_key', $key)->where('source_type', 'catalogue')->first(['root_id']);
+            if (! $receipt) {
+                return ChemicalCommandIntent::query()->where('idempotency_key', $key)->exists() ? ['present', $key] : ['create', $key];
+            }
+            $row = HazardousSubstance::withTrashed()->find($receipt->root_id, ['id', 'status', 'deleted_at']);
+            if ($row && $row->deleted_at === null && $row->status === 'active') {
+                return ['present', $key];
+            }
+        }
+
+        return ['exhausted', null];
+    }
+
+    /** Marks our chemicals "Removed" through the register's status command (run after their storage is archived). */
+    private function removeChemicals(): void
+    {
+        foreach ($this->substanceSpecs() as [$name]) {
+            for ($generation = 1; $generation <= self::MAX_GENERATIONS; $generation++) {
+                $receipt = ChemicalCommandReceipt::query()->where('idempotency_key', self::key($name, $generation))->where('source_type', 'catalogue')->first(['root_id']);
+                if (! $receipt) {
+                    break;
+                }
+                $row = HazardousSubstance::withTrashed()->find($receipt->root_id);
+                if (! $row || $row->deleted_at !== null || $row->status !== 'active') {
+                    continue;
+                }
+                $command = ['idempotency_key' => self::key($name.':remove', $generation), 'expected_version' => (int) $row->source_revision,
+                    'status' => 'removed', 'reason' => 'No longer used at our houses.'];
+                $this->removal('substance', $name, 'mark "'.$row->name.'" as Removed in the chemical register',
+                    fn () => app(ChemicalCommandService::class)->status((int) $row->id, $this->actor, $command));
+            }
+        }
+    }
+
     // ── Prepare: substance storage ────────────────────────────────────
 
     private function storageSpecs(): array
@@ -345,12 +483,13 @@ final class HealthSafetyDemoData extends Command
     }
 
     /** Gives up to STORAGE_SITES Sites without stored substances a storage location. */
-    private function prepareStorage(Collection $places): Collection
+    private function prepareStorage(Collection $places, Collection $planned): Collection
     {
         $places = $places->all();
         $registry = $this->setting(self::STORAGE_KEY);
-        $needy = collect($places)->filter(fn (array $p) => $p['staff']->isNotEmpty() && $p['substances']->isEmpty())->keys()->values();
-        $catalogue = HazardousSubstance::query()->where('status', 'active')->orderBy('id')->get();
+        $needy = collect($places)->filter(fn (array $p) => $p['staff']->isNotEmpty() && $p['substances']->isEmpty())->keys()->take(self::STORAGE_SITES)->values();
+        // In a dry run the chemicals prepareChemicals() would add are not saved yet; they stand in here.
+        $catalogue = HazardousSubstance::query()->where('status', 'active')->orderBy('id')->get()->concat($planned)->values();
         foreach ($this->storageSpecs() as $index => [$name, $words, $fields]) {
             [$state, $key] = $this->storageSlot($name);
             if ($state === 'present') {

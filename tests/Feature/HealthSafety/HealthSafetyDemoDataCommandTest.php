@@ -53,6 +53,8 @@ class HealthSafetyDemoDataCommandTest extends TestCase
 
     private SubstanceStorageLocation $fixtureStorage;
 
+    private HazardousSubstance $otherSubstance;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -85,11 +87,11 @@ class HealthSafetyDemoDataCommandTest extends TestCase
         }
         Client::factory()->create(['site_id' => $this->fixtureSite->id, 'status' => 'active']);
 
-        $bleach = $this->substance('Bleach (sodium hypochlorite)');
-        $this->substance('Oven cleaner');
-        // Stored only at the fixture Site, which the command ignores and must leave alone.
-        $result = app(ChemicalCommandService::class)->createStorage($bleach, $this->admin, ['idempotency_key' => (string) Str::uuid(),
-            'parent_expected_version' => $bleach->fresh()->source_revision, 'site_id' => $this->fixtureSite->id,
+        // Like the .com register before this command: nothing the houses use. One unrelated chemical, stored only at the
+        // fixture Site (which the command ignores), must be left alone.
+        $this->otherSubstance = $this->substance('Dishwasher detergent');
+        $result = app(ChemicalCommandService::class)->createStorage($this->otherSubstance, $this->admin, ['idempotency_key' => (string) Str::uuid(),
+            'parent_expected_version' => $this->otherSubstance->fresh()->source_revision, 'site_id' => $this->fixtureSite->id,
             'location_description' => 'Test shelf', 'current_quantity' => '1.00']);
         $this->fixtureStorage = SubstanceStorageLocation::findOrFail($result['source_id']);
     }
@@ -137,6 +139,7 @@ class HealthSafetyDemoDataCommandTest extends TestCase
             'chemical' => SubstanceExposureRecord::query()->count(),
             'risk' => HsRiskAssessment::withTrashed()->count(),
             'storage' => SubstanceStorageLocation::withTrashed()->count(),
+            'substances' => HazardousSubstance::withTrashed()->count(),
         ];
     }
 
@@ -144,7 +147,22 @@ class HealthSafetyDemoDataCommandTest extends TestCase
     {
         $this->artisan('health-safety:demo')->assertExitCode(0);
         $first = $this->counts();
-        $this->assertSame(['first_aid' => 6, 'restraint' => 3, 'chemical' => 3, 'risk' => 3, 'storage' => 3], $first);
+        $this->assertSame(['first_aid' => 6, 'restraint' => 3, 'chemical' => 3, 'risk' => 3, 'storage' => 3, 'substances' => 3], $first);
+
+        // Prepare: the two chemicals are in the register under their fixed command keys, with their safety facts.
+        $bleach = HazardousSubstance::where('name', 'Sodium hypochlorite bleach')->sole();
+        $ovenCleaner = HazardousSubstance::where('name', 'Caustic oven cleaner')->sole();
+        $this->assertSame(2, ChemicalCommandReceipt::whereIn('idempotency_key', [HealthSafetyDemoData::key('substance-1'), HealthSafetyDemoData::key('substance-2')])
+            ->where('source_type', 'catalogue')->whereIn('root_id', [$bleach->id, $ovenCleaner->id])->count());
+        $this->assertSame(['active', 'active'], [$bleach->status, $ovenCleaner->status]);
+        $this->assertSame(['GHS05', 'GHS09'], $bleach->ghs_pictograms);
+        $this->assertSame('aerosol', $ovenCleaner->physical_form);
+        $this->assertStringContainsString('0800 764 766', (string) $bleach->first_aid_measures);
+        $this->assertCount(2, AppSetting::where('key', HealthSafetyDemoData::CHEMICALS_KEY)->sole()->value);
+        // Storage and exposures used them in the same run.
+        $this->assertSame($bleach->id, (int) SubstanceStorageLocation::where('site_id', $this->site->id)->sole()->hazardous_substance_id);
+        $this->assertSame($ovenCleaner->id, (int) SubstanceStorageLocation::where('site_id', $this->secondSite->id)->sole()->hazardous_substance_id);
+        $this->assertEqualsCanonicalizing([$bleach->id, $ovenCleaner->id], SubstanceExposureRecord::distinct()->pluck('hazardous_substance_id')->map(fn ($id) => (int) $id)->all());
 
         // Prepare: the team lead at Kōwhai House is flagged; Tōtara House already had a first aider.
         $this->assertTrue($this->firstAiderFlag($this->teamLead));
@@ -157,7 +175,11 @@ class HealthSafetyDemoDataCommandTest extends TestCase
         $this->assertSame('Locked cleaning cupboard, laundry', SubstanceStorageLocation::where('site_id', $this->site->id)->sole()->location_description);
 
         $receipts = ChemicalCommandReceipt::count();
-        $this->artisan('health-safety:demo')->expectsOutputToContain('storage-1: already there (command replayed)')->assertExitCode(0);
+        $this->artisan('health-safety:demo')
+            ->expectsOutputToContain('substance-1: already there (command replayed)')
+            ->expectsOutputToContain('substance-2: already there (command replayed)')
+            ->expectsOutputToContain('storage-1: already there (command replayed)')
+            ->assertExitCode(0);
         $this->assertSame($first, $this->counts());
         $this->assertSame($receipts, ChemicalCommandReceipt::count());
         $this->assertSame([(int) $this->teamLead->hrEmployeeProfile->id], AppSetting::where('key', HealthSafetyDemoData::FIRST_AIDERS_KEY)->sole()->value);
@@ -205,6 +227,9 @@ class HealthSafetyDemoDataCommandTest extends TestCase
         $before = $this->counts();
         $this->artisan('health-safety:demo', ['--dry-run' => true])
             ->expectsOutputToContain('would mark Sione Taufa')
+            ->expectsOutputToContain('would add Sodium hypochlorite bleach in the chemical register')
+            ->expectsOutputToContain('would add Sodium hypochlorite bleach — Locked cleaning cupboard, laundry')
+            ->expectsOutputToContain('with Caustic oven cleaner at Tōtara House')
             ->assertExitCode(0);
         $this->assertSame($before, $this->counts());
         $this->assertSame($audits, AuditLog::count());
@@ -218,6 +243,7 @@ class HealthSafetyDemoDataCommandTest extends TestCase
         $this->assertSame(0, FirstAidRecord::onlyTrashed()->count());
         $this->assertSame(0, SubstanceStorageLocation::onlyTrashed()->count());
         $this->assertSame(0, HsRiskAssessment::where('status', 'archived')->count());
+        $this->assertSame(3, HazardousSubstance::where('status', 'active')->count());
         $this->assertTrue($this->firstAiderFlag($this->teamLead));
         $this->assertSame($before, $this->counts());
         $this->assertSame($audits, AuditLog::count());
@@ -248,6 +274,9 @@ class HealthSafetyDemoDataCommandTest extends TestCase
         // Our storage locations are archived through the chemical command; the fixture Site's is untouched.
         $this->assertSame($ourStorage, SubstanceStorageLocation::onlyTrashed()->orderBy('id')->pluck('id')->all());
         $this->assertFalse($this->fixtureStorage->fresh()->trashed());
+        // Our two chemicals are marked Removed through the status command; the other chemical stays active.
+        $this->assertSame(['removed', 'removed'], HazardousSubstance::whereIn('name', ['Sodium hypochlorite bleach', 'Caustic oven cleaner'])->orderBy('id')->pluck('status')->all());
+        $this->assertSame('active', $this->otherSubstance->fresh()->status);
         // No archive command exists for these registers: they stay.
         $this->assertSame(3, RestraintEvent::count());
         $this->assertSame(3, SubstanceExposureRecord::count());
@@ -256,12 +285,16 @@ class HealthSafetyDemoDataCommandTest extends TestCase
         $this->artisan('health-safety:demo', ['--remove' => true])->assertExitCode(0);
         $this->assertSame(6, FirstAidRecord::onlyTrashed()->count());
         $this->assertSame(2, SubstanceStorageLocation::onlyTrashed()->count());
+        $this->assertSame(2, HazardousSubstance::where('status', 'removed')->count());
 
         // A later run prepares again and puts the removed kinds back under fresh keys, without duplicating the rest.
         $this->artisan('health-safety:demo')->assertExitCode(0);
         $this->assertTrue($this->firstAiderFlag($this->teamLead));
         $this->assertCount(2, $this->houseStorage());
         $this->assertTrue(ChemicalCommandReceipt::where('idempotency_key', HealthSafetyDemoData::key('storage-1', 2))->exists());
+        $this->assertTrue(ChemicalCommandReceipt::where('idempotency_key', HealthSafetyDemoData::key('substance-1', 2))->exists());
+        $this->assertSame(1, HazardousSubstance::where('name', 'Sodium hypochlorite bleach')->where('status', 'active')->count());
+        $this->assertSame('active', $this->otherSubstance->fresh()->status);
         $this->assertSame(7, FirstAidRecord::count());
         $this->assertTrue(FirstAidRecord::where('creation_key', HealthSafetyDemoData::key('first-aid-1', 2))->exists());
         $this->assertSame(4, HsRiskAssessment::where('status', '!=', 'archived')->count());
