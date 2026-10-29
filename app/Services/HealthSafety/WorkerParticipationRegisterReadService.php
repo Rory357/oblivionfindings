@@ -3,6 +3,7 @@
 namespace App\Services\HealthSafety;
 
 use App\Models\User;
+use App\Support\HealthSafety\CurrentRecords;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Http\Request;
@@ -38,12 +39,12 @@ final class WorkerParticipationRegisterReadService
         $focus === null ? $request->query->remove('focus') : $request->query->set('focus', $focus);
         $filters = ['tab' => $tab, 'site_id' => isset($values['site_id']) ? (int) $values['site_id'] : null,
             'status' => ($values['status'] ?? null) ?: null, 'period' => $request->input('period', 'quarter'),
-            'q' => ($values['q'] ?? null) ?: null, 'focus' => $focus];
+            'q' => ($values['q'] ?? null) ?: null, 'focus' => $focus, 'records' => CurrentRecords::mode($request)];
 
         return $this->access->materialize($request->user(), function (User $current, $reads, HealthSafetyReadContext $active) use ($request, $values, $filters, $tab): array {
             $site = $filters['site_id'];
             $manage = $current->canDo('hazards.manage');
-            $metrics = $this->metrics($active, $site);
+            $metrics = $this->metrics($active, $site, $filters['records'] !== CurrentRecords::ALL);
             return ['filters' => $filters, 'tab' => $tab,
                 'tabCounts' => $metrics['tabCounts'],
                 'rows' => $this->rows($request, $filters, $active),
@@ -60,6 +61,25 @@ final class WorkerParticipationRegisterReadService
     private function query(string $kind, HealthSafetyReadContext $context, ?int $site): Builder
     {
         return $this->access->query($kind, $context, $site);
+    }
+
+    /** List and count rows: hide archived Sites unless ?records=all (MASTER for Stephan, 30 Oct). Details still open. */
+    private function listed(string $kind, HealthSafetyReadContext $context, ?int $site, bool $currentOnly): Builder
+    {
+        $query = $this->query($kind, $context, $site);
+        if (! $currentOnly) {
+            return $query;
+        }
+        if ($kind === 'meetings') {
+            // A meeting belongs to its committee's Site.
+            return $query->whereIn('hs_committee_meetings.hs_committee_id', fn (\Illuminate\Database\Query\Builder $committees) => $committees
+                ->select('hs_committees.id')->from('hs_committees')
+                ->where(fn (\Illuminate\Database\Query\Builder $site) => $site
+                    ->whereNull('hs_committees.site_id')
+                    ->orWhereIn('hs_committees.site_id', CurrentRecords::currentSiteIds())));
+        }
+
+        return CurrentRecords::onCurrentSites($query, $query->getModel()->getTable().'.site_id');
     }
 
     private function focus(Builder $query, ?string $focus): Builder
@@ -85,7 +105,7 @@ final class WorkerParticipationRegisterReadService
     private function rows(Request $request, array $filters, HealthSafetyReadContext $context): array
     {
         $kind = $filters['tab']; $site = $filters['site_id'];
-        $query = $this->focus($this->query($kind, $context, $site), $filters['focus'])
+        $query = $this->focus($this->listed($kind, $context, $site, $filters['records'] !== CurrentRecords::ALL), $filters['focus'])
             ->when($filters['status'], fn (Builder $rows, $status) => $rows->where('status', $status));
         if ($kind === 'representatives') {
             if ($filters['q']) {
@@ -172,22 +192,22 @@ final class WorkerParticipationRegisterReadService
     }
 
     /** Five guarded aggregate statements preserve all original operands without repeating each source count. */
-    private function metrics(HealthSafetyReadContext $context, ?int $site): array
+    private function metrics(HealthSafetyReadContext $context, ?int $site, bool $currentOnly = true): array
     {
         $quarter = $this->periodStart('quarter');
         $quarterEnd = $quarter->copy()->addQuarter()->utc()->format('Y-m-d H:i:s.u');
         $quarterStart = $quarter->utc()->format('Y-m-d H:i:s.u');
-        $reps = $this->query('representatives', $context, $site)->selectRaw('COUNT(*) AS tab_count,
+        $reps = $this->listed('representatives', $context, $site, $currentOnly)->selectRaw('COUNT(*) AS tab_count,
             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS active_reps,
             COUNT(DISTINCT CASE WHEN status = ? THEN site_id ELSE NULL END) AS covered_sites,
             SUM(CASE WHEN status = ? AND training_days_completed < 2 THEN 1 ELSE 0 END) AS training_below', ['active', 'active', 'active'])->get()->first();
-        $meetings = $this->query('meetings', $context, $site)->selectRaw('COUNT(*) AS tab_count,
+        $meetings = $this->listed('meetings', $context, $site, $currentOnly)->selectRaw('COUNT(*) AS tab_count,
             SUM(CASE WHEN status = ? AND (minutes_document_path IS NULL OR LENGTH(minutes_document_path) = 0) THEN 1 ELSE 0 END) AS missing_minutes,
             SUM(CASE WHEN status != ? AND actions_due_count > 0 THEN 1 ELSE 0 END) AS outstanding_meetings,
             SUM(CASE WHEN status != ? AND actions_due_count > 0 THEN actions_due_count ELSE 0 END) AS outstanding_actions,
             SUM(CASE WHEN scheduled_at >= ? AND scheduled_at < ? THEN 1 ELSE 0 END) AS quarter_meetings',
             ['completed', 'cancelled', 'cancelled', $quarterStart, $quarterEnd])->get()->first();
-        $consultations = $this->query('consultations', $context, $site)->selectRaw('COUNT(*) AS tab_count,
+        $consultations = $this->listed('consultations', $context, $site, $currentOnly)->selectRaw('COUNT(*) AS tab_count,
             SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS open_consultations,
             SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) AS awaiting_feedback', ['open', 'open', 'feedback_received'])->get()->first();
         $activeReps = (int) $reps->active_reps;
@@ -198,7 +218,7 @@ final class WorkerParticipationRegisterReadService
         return ['tabCounts' => ['representatives' => (int) $reps->tab_count, 'meetings' => (int) $meetings->tab_count, 'consultations' => (int) $consultations->tab_count],
             'hero' => ['clusters' => [
             'participation' => ['active_reps' => $activeReps, 'sites_without_rep' => max(0, $totalSites - $coveredSites),
-                'committees' => $this->query('committees', $context, $site)->where('status', 'active')->count(),
+                'committees' => $this->listed('committees', $context, $site, $currentOnly)->where('status', 'active')->count(),
                 'meetings_quarter' => (int) $meetings->quarter_meetings],
             'consultation' => ['open' => (int) $consultations->open_consultations,
                 'awaiting_feedback' => $awaiting, 'overdue_actions' => (int) $meetings->outstanding_actions,
