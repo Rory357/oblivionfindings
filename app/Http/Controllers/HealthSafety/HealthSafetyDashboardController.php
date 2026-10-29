@@ -53,6 +53,19 @@ class HealthSafetyDashboardController extends Controller
     ) {}
 
     /** Identifiable options require both the H&S Site audience and actual Client read authority. */
+    /** Which Overview start a person sees: the health and safety lead's queue, a site's needs, or a frontline start. */
+    public static function startFor(?User $user): string
+    {
+        if ($user === null) {
+            return 'frontline';
+        }
+        if ($user->canDo('healthSafety.viewAllSites') || $user->canDo('governance.view')) {
+            return 'governance';
+        }
+
+        return $user->canDo('hazards.manage') ? 'manager' : 'frontline';
+    }
+
     private function readableClientOptions(DashboardClientOptionsReadService $options, HealthSafetyReadContext $context, ?int $siteId): array
     {
         return $options->options($context, $siteId);
@@ -130,9 +143,11 @@ class HealthSafetyDashboardController extends Controller
         }
         $incidentCategories = $proof->protect($context->applyIncidentSourceScope($incidentCategories));
         $hsSiteBypass = self::HS_SITE_BYPASS_PERMISSIONS;
+        // The start follows the person's role (approved drawing D1, 30 Oct) instead of a "Lens" switch; an explicit
+        // ?lens= from an old link still works.
         $lens = in_array($request->input('lens'), ['governance', 'manager', 'frontline'], true)
             ? $request->input('lens')
-            : 'manager';
+            : self::startFor($user);
 
         // -- KPIs --
         $incidentSnapshot = $this->incidentOverviewSnapshot($user, $siteIds, $now, $context);

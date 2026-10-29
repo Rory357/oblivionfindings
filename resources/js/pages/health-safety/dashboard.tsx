@@ -41,6 +41,7 @@ import { HsFormWizard } from './components/form-wizard';
 import { ReportIncidentDialog } from './components/report-incident-dialog';
 import { ReportLauncher } from './components/report-launcher';
 import { reportPageFor } from './components/report-pages';
+import { RoleStart } from './components/role-start';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
@@ -211,6 +212,17 @@ export default function HealthSafetyDashboard({
     const [launcherOpen, setLauncherOpen] = useState(false);
     const [activeWizard, setActiveWizard] = useState<string | null>(null);
     const [search, setSearch] = useState('');
+    // First aid, chemicals, restraints, drills, injuries, lone-worker sessions and safeguarding
+    // open their own report pages; the incident opens its dialog here.
+    const openWorkflow = (key: string) => {
+        setLauncherOpen(false);
+        const reportPage = reportPageFor(key);
+        if (reportPage) {
+            router.visit(reportPage);
+            return;
+        }
+        setActiveWizard(key);
+    };
     const visibleWorklists = searchDashboardWorklists(worklists, search);
     const searchTerms = search
         .trim()
@@ -370,6 +382,7 @@ export default function HealthSafetyDashboard({
 
                     {tab === 'overview' && (
                         <>
+                            <RoleStart lens={filters.lens} onWorkflow={openWorkflow} />
                             {filters.lens !== 'governance' && incident_stages ? (
                                 <IncidentStagesFlow data={incident_stages} />
                             ) : null}
@@ -457,17 +470,7 @@ export default function HealthSafetyDashboard({
                     <ReportLauncher
                         open={launcherOpen}
                         onClose={() => setLauncherOpen(false)}
-                        onWorkflow={(key) => {
-                            setLauncherOpen(false);
-                            // First aid, chemicals, restraints, drills, injuries and lone-worker
-                            // sessions open their own drawn report pages (keyed commands).
-                            const reportPage = reportPageFor(key);
-                            if (reportPage) {
-                                router.visit(reportPage);
-                                return;
-                            }
-                            setActiveWizard(key);
-                        }}
+                        onWorkflow={openWorkflow}
                     />
                     {activeWizard === 'incident' ? (
                         <ReportIncidentDialog

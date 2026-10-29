@@ -20,11 +20,13 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { formatDateOnly, toDateInput, workerDayRange } from '@/lib/datetime';
-import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
+import {
+    BOARD_REPORTS_LABEL,
+    boardReportLinks,
+} from '@/lib/health-safety/board-reports';
 import type { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
-    BarChart3,
     CalendarDays,
     ChevronDown,
     FileText,
@@ -159,9 +161,12 @@ export function CommandCentreHero({
             return range.from === filters.from && range.to === filters.to;
         }) ?? 'custom';
     const activeSite = sites.find((site) => site.id === filters.site);
+    // Someone who can see only one house sees its name, not "All sites" (drawing D1).
     const siteLabel =
         filters.site === null
-            ? 'All sites'
+            ? sites.length === 1
+                ? sites[0].name
+                : 'All sites'
             : (activeSite?.name ?? 'Site access unconfirmed');
     const lagging = leadingLagging.lagging;
     const leading = leadingLagging.leading;
@@ -255,7 +260,7 @@ export function CommandCentreHero({
             frontline={filters.lens === 'frontline'}
             wrapTitle
             icon={ShieldCheck}
-            title="Health & safety"
+            title="Health and safety"
             subline={[
                 siteLabel,
                 formatDateOnly(filters.from) +
@@ -270,13 +275,10 @@ export function CommandCentreHero({
                         <PageHeaderSearch
                             value={search.value}
                             onChange={search.onChange}
-                            placeholder="Search current overview…"
-                            ariaLabel="Search current safety overview"
+                            placeholder="Search this overview…"
+                            ariaLabel="Search this overview"
                         />
                     )}
-                    <PageHeaderGlassButton asChild icon={BarChart3}>
-                        <Link href={analytics}>View analytics</Link>
-                    </PageHeaderGlassButton>
                     {canViewBoardReports && (
                         <Popover>
                             <PopoverTrigger asChild>
@@ -300,148 +302,155 @@ export function CommandCentreHero({
                     )}
                     {onReport && (
                         <PageHeaderPrimaryButton icon={Plus} onClick={onReport}>
-                            Report
+                            Report something
                         </PageHeaderPrimaryButton>
                     )}
                 </>
             }
             strip={
-                <PageHeaderNumbers>
-                    {headline.map((n) => (
-                        <PageHeaderNumber
-                            key={n.label}
-                            value={n.value}
-                            label={n.label}
-                            caption={n.caption}
-                            tone={n.tone}
-                            href={n.href}
-                        />
-                    ))}
-                </PageHeaderNumbers>
+                // The frontline start keeps the header to the title and Report something (drawing D1).
+                filters.lens === 'frontline' ? undefined : (
+                    <PageHeaderNumbers>
+                        {headline.map((n) => (
+                            <PageHeaderNumber
+                                key={n.label}
+                                value={n.value}
+                                label={n.label}
+                                caption={n.caption}
+                                tone={n.tone}
+                                href={n.href}
+                            />
+                        ))}
+                    </PageHeaderNumbers>
+                )
             }
             filters={
-                <>
-                    <PageHeaderFilterSelect
-                        label="Period"
-                        value={period}
-                        allValue="30d"
-                        options={[
-                            { value: 'week', label: 'This week' },
-                            { value: '30d', label: '30 days' },
-                            { value: 'quarter', label: '90 days' },
-                            { value: 'custom', label: 'Custom range' },
-                        ]}
-                        onChange={(value) => {
-                            if (value === 'custom') changeDatesOpen(true);
-                            else go(presetRange(value));
-                        }}
-                    />
-                    <Popover open={datesOpen} onOpenChange={changeDatesOpen}>
-                        <PopoverTrigger asChild>
-                            <PageHeaderGlassButton icon={CalendarDays}>
-                                Set dates
-                            </PageHeaderGlassButton>
-                        </PopoverTrigger>
-                        <PopoverContent
-                            className="date-picker-popover space-y-3"
-                            data-compact
-                            aria-label="Safety overview period picker"
-                            collisionPadding={16}
-                            align="start"
+                // The frontline start keeps the header to the title and Report something (drawing D1).
+                filters.lens === 'frontline' ? undefined : (
+                    <>
+                        <PageHeaderFilterSelect
+                            label="Period"
+                            value={period}
+                            allValue="30d"
+                            options={[
+                                { value: 'week', label: 'This week' },
+                                { value: '30d', label: '30 days' },
+                                { value: 'quarter', label: '90 days' },
+                                { value: 'custom', label: 'Custom range' },
+                            ]}
+                            onChange={(value) => {
+                                if (value === 'custom') changeDatesOpen(true);
+                                else go(presetRange(value));
+                            }}
+                        />
+                        <Popover
+                            open={datesOpen}
+                            onOpenChange={changeDatesOpen}
                         >
-                            <div
-                                role="group"
-                                aria-label="Safety overview period"
-                                className="space-y-3"
+                            <PopoverTrigger asChild>
+                                <PageHeaderGlassButton icon={CalendarDays}>
+                                    Set dates
+                                </PageHeaderGlassButton>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                className="date-picker-popover space-y-3"
+                                data-compact
+                                aria-label="Safety overview period picker"
+                                collisionPadding={16}
+                                align="start"
                             >
-                                <h3 className="text-section-title">
-                                    Safety overview period
-                                </h3>
-                                <p className="text-subtle">
-                                    Choose a start and end day. Select the same
-                                    day twice for one day. Both dates are
-                                    included.
-                                </p>
-                                <div className="date-time-calendar scrollbar-pretty overflow-x-auto [&_button[aria-pressed]]:min-h-11 [&_button[aria-pressed]]:min-w-11">
-                                    <div className="min-w-[308px]">
-                                        <LeaveCalendarRange
-                                            key={calendarRevision}
-                                            start={customFrom || null}
-                                            end={customTo || null}
-                                            required={false}
-                                            onChange={(start, end) => {
-                                                setCustomFrom(start ?? '');
-                                                setCustomTo(end ?? '');
-                                            }}
-                                        />
+                                <div
+                                    role="group"
+                                    aria-label="Safety overview period"
+                                    className="space-y-3"
+                                >
+                                    <h3 className="text-section-title">
+                                        Safety overview period
+                                    </h3>
+                                    <p className="text-subtle">
+                                        Choose a start and end day. Select the
+                                        same day twice for one day. Both dates
+                                        are included.
+                                    </p>
+                                    <div className="date-time-calendar scrollbar-pretty overflow-x-auto [&_button[aria-pressed]]:min-h-11 [&_button[aria-pressed]]:min-w-11">
+                                        <div className="min-w-[308px]">
+                                            <LeaveCalendarRange
+                                                key={calendarRevision}
+                                                start={customFrom || null}
+                                                end={customTo || null}
+                                                required={false}
+                                                onChange={(start, end) => {
+                                                    setCustomFrom(start ?? '');
+                                                    setCustomTo(end ?? '');
+                                                }}
+                                            />
+                                        </div>
                                     </div>
+                                    <p className="text-caption sm:hidden">
+                                        Scroll sideways to see more days if
+                                        needed.
+                                    </p>
+                                    <p
+                                        role="status"
+                                        aria-live="polite"
+                                        className="text-subtle"
+                                    >
+                                        {validRange
+                                            ? `${formatDateOnly(customFrom)} – ${formatDateOnly(customTo)} · inclusive`
+                                            : customFrom
+                                              ? `Starts ${formatDateOnly(customFrom)} · choose the end day`
+                                              : 'Choose the start day'}
+                                    </p>
                                 </div>
-                                <p className="text-caption sm:hidden">
-                                    Scroll sideways to see more days if needed.
-                                </p>
-                                <p
-                                    role="status"
-                                    aria-live="polite"
-                                    className="text-subtle"
-                                >
-                                    {validRange
-                                        ? `${formatDateOnly(customFrom)} – ${formatDateOnly(customTo)} · inclusive`
-                                        : customFrom
-                                          ? `Starts ${formatDateOnly(customFrom)} · choose the end day`
-                                          : 'Choose the start day'}
-                                </p>
-                            </div>
-                            <div className="flex flex-wrap justify-end gap-2">
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    className="frontline-tap"
-                                    onClick={() => setDatesOpen(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="button"
-                                    className="frontline-tap"
-                                    disabled={!validRange}
-                                    onClick={() => {
-                                        go({ from: customFrom, to: customTo });
-                                        setDatesOpen(false);
-                                    }}
-                                >
-                                    Apply range
-                                </Button>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
-                    <PageHeaderFilterSelect
-                        label="Site"
-                        value={
-                            filters.site === null ? 'all' : String(filters.site)
-                        }
-                        options={[
-                            { value: 'all', label: 'All approved sites' },
-                            ...sites.map((site) => ({
-                                value: String(site.id),
-                                label: site.name,
-                            })),
-                        ]}
-                        onChange={(value) =>
-                            go({ site: value === 'all' ? null : Number(value) })
-                        }
-                    />
-                    <PageHeaderFilterSelect
-                        label="Lens"
-                        value={filters.lens}
-                        allValue="manager"
-                        options={[
-                            { value: 'governance', label: 'Governance' },
-                            { value: 'manager', label: 'Manager' },
-                            { value: 'frontline', label: 'Frontline' },
-                        ]}
-                        onChange={(lens) => go({ lens })}
-                    />
-                </>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="frontline-tap"
+                                        onClick={() => setDatesOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        className="frontline-tap"
+                                        disabled={!validRange}
+                                        onClick={() => {
+                                            go({
+                                                from: customFrom,
+                                                to: customTo,
+                                            });
+                                            setDatesOpen(false);
+                                        }}
+                                    >
+                                        Apply range
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                        <PageHeaderFilterSelect
+                            label="Site"
+                            value={
+                                filters.site === null
+                                    ? 'all'
+                                    : String(filters.site)
+                            }
+                            options={[
+                                { value: 'all', label: 'All approved sites' },
+                                ...sites.map((site) => ({
+                                    value: String(site.id),
+                                    label: site.name,
+                                })),
+                            ]}
+                            onChange={(value) =>
+                                go({
+                                    site:
+                                        value === 'all' ? null : Number(value),
+                                })
+                            }
+                        />
+                    </>
+                )
             }
             mobileSummary="Safety overview · filters and measures"
             rail={rail}
@@ -495,7 +504,9 @@ export function CommandCentreAttention({
             label: 'WorkSafe reviews to do',
             sub: worksafePending === null ? 'Not confirmed' : undefined,
             tone: (worksafePending ?? 0) > 0 ? 'critical' : undefined,
-            href: register('/health-safety/events', { tab: 'worksafe_pending' }),
+            href: register('/health-safety/events', {
+                tab: 'worksafe_pending',
+            }),
         },
         {
             value: activeAlerts === null ? '—' : String(activeAlerts),
@@ -510,7 +521,10 @@ export function CommandCentreAttention({
                   {
                       value: String(exposureDeliveryProblems),
                       label: 'Exposures not on the H&S register yet',
-                      tone: exposureDeliveryProblems > 0 ? ('critical' as const) : undefined,
+                      tone:
+                          exposureDeliveryProblems > 0
+                              ? ('critical' as const)
+                              : undefined,
                       href: '/tasks?sources=chemical_exposure_delivery',
                   },
               ]),

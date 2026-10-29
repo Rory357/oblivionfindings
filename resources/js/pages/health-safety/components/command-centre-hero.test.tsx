@@ -126,7 +126,7 @@ describe('H&S shared header and source-aware attention', () => {
         ).not.toBeInTheDocument();
         expect(
             screen
-                .getByRole('heading', { level: 1, name: 'Health & safety' })
+                .getByRole('heading', { level: 1, name: 'Health and safety' })
                 .closest('header'),
         ).toHaveClass('eh-header');
     });
@@ -227,7 +227,7 @@ describe('H&S shared header and source-aware attention', () => {
         shared.governance = true;
         const onReport = vi.fn();
         render(<CommandCentreHero {...baseline} onReport={onReport} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Report' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Report something' }));
         expect(onReport).toHaveBeenCalledTimes(1);
         fireEvent.click(
             screen.getByRole('button', { name: /Board reports/ }),
@@ -298,7 +298,7 @@ describe('H&S shared header and source-aware attention', () => {
             />,
         );
         const field = screen.getByRole('searchbox', {
-            name: 'Search current safety overview',
+            name: 'Search this overview',
         });
         expect(field.closest('header')).toHaveClass('eh-header');
         fireEvent.change(field, { target: { value: 'Kauri fall' } });
