@@ -33,14 +33,21 @@ use Illuminate\Support\Str;
 /** A self-signed certificate and key in a temp folder, like a camera or console makes for itself. */
 function selfSignedCertificate(string $commonName): array
 {
-    $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
-    $csr = openssl_csr_new(['commonName' => $commonName], $key, ['digest_alg' => 'sha256']);
-    $certificate = openssl_csr_sign($csr, null, $key, 30, ['digest_alg' => 'sha256']);
-    openssl_x509_export($certificate, $certificatePem);
-    openssl_pkey_export($key, $keyPem);
-
     $folder = sys_get_temp_dir().DIRECTORY_SEPARATOR.'sd-camera-tls-'.Str::random(8);
     mkdir($folder);
+
+    // PHP on Windows has no default openssl.cnf, so give it the smallest one that works everywhere.
+    file_put_contents($folder.'/openssl.cnf', "[ req ]\ndistinguished_name = req_dn\n[ req_dn ]\n");
+    $options = ['config' => $folder.'/openssl.cnf', 'digest_alg' => 'sha256', 'private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA];
+
+    $key = openssl_pkey_new($options);
+    $csr = openssl_csr_new(['commonName' => $commonName], $key, $options);
+    $certificate = openssl_csr_sign($csr, null, $key, 30, $options);
+    openssl_x509_export($certificate, $certificatePem);
+    openssl_pkey_export($key, $keyPem, null, $options);
+    while (openssl_error_string() !== false) {
+        // Drain OpenSSL's notes about the missing default config so they don't leak into later checks.
+    }
     file_put_contents($folder.'/cert.pem', $certificatePem);
     file_put_contents($folder.'/key.pem', $keyPem);
 
