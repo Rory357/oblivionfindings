@@ -327,12 +327,13 @@ describe('Permanent incident workspace', () => {
         const sections = screen.getByRole('tablist', {
             name: 'Incident sections',
         });
-        expect(within(sections).getAllByRole('tab')).toHaveLength(6);
+        // Seven sections; with a real width the seventh folds under More (drawing D3).
+        expect(within(sections).getAllByRole('tab')).toHaveLength(7);
         expect(
             within(sections).getByRole('tab', { name: 'History' }),
         ).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByRole('tabpanel', { name: 'History' })).toBeVisible();
-        fireEvent.click(within(sections).getByRole('tab', { name: 'Evidence' }));
+        fireEvent.click(within(sections).getByRole('tab', { name: 'Files' }));
         expect(state.get).toHaveBeenCalledWith(
             '/incidents/42',
             { section: 'evidence', return_to: '/incidents?owner=me' },
@@ -340,17 +341,15 @@ describe('Permanent incident workspace', () => {
         );
     });
 
-    it('reads the older linked-records deep link as the overview', () => {
+    it('opens the linked-records deep link on its own tab (drawing D3)', () => {
         state.url = '/incidents/42?section=linked';
         render(<IncidentShow detail={detail()} />);
         expect(
             within(
                 screen.getByRole('tablist', { name: 'Incident sections' }),
-            ).getByRole('tab', { name: 'Overview' }),
+            ).getByRole('tab', { name: 'Linked records' }),
         ).toHaveAttribute('aria-selected', 'true');
-        expect(
-            screen.getByRole('region', { name: 'Incident summary' }),
-        ).toBeVisible();
+        expect(screen.getByRole('region', { name: 'Linked records' })).toBeVisible();
     });
 
     it('keeps an unsent follow-up while moving between tabs', () => {
@@ -404,7 +403,7 @@ describe('Permanent incident workspace', () => {
             'Overview, Incident',
             'Follow-ups, Incident',
             'Safety review, Incident',
-            'Evidence, Incident',
+            'Files, Incident',
             'History, Incident',
         ]) {
             expect(within(find).getByRole('button', { name })).toBeVisible();

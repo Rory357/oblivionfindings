@@ -10,6 +10,7 @@ import {
     FollowupsSection,
     incidentWorksafe,
     InvestigationSection,
+    LinkedSection,
     linkedRecordItems,
     PhotosSection,
     safeguardingEscalation,
@@ -99,6 +100,7 @@ import {
     Clock,
     FileText,
     HeartPulse,
+    LinkIcon,
     ListTodo,
     MapPin,
     Paperclip,
@@ -110,7 +112,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
-type Section = 'overview' | 'care' | 'followups' | 'investigation' | 'evidence' | 'history';
+type Section = 'overview' | 'care' | 'followups' | 'investigation' | 'evidence' | 'history' | 'linked';
 type IncidentWorkspaceDetail = IncidentDetail & {
     recording_evidence?: RecordingReferenceEvidenceData;
     recording_preview?: RecordingPreview;
@@ -122,11 +124,13 @@ const SECTIONS: (PageHeaderRailItem<Section> & { icon: typeof FileText })[] = [
     { key: 'care', label: 'Injury and first aid', icon: HeartPulse },
     { key: 'investigation', label: 'Safety review', icon: Search },
     { key: 'followups', label: 'Follow-ups', icon: ListTodo },
-    { key: 'evidence', label: 'Evidence', icon: Paperclip },
+    { key: 'evidence', label: 'Files', icon: Paperclip },
     { key: 'history', label: 'History', icon: Clock },
+    // Seventh tab: sits under More (drawing D3 keeps six on the rail).
+    { key: 'linked', label: 'Linked records', icon: LinkIcon },
 ];
-/** Older deep links: linked records now sit beside every tab. */
-const LEGACY_SECTIONS: Record<string, Section> = { linked: 'overview' };
+/** Older deep links. */
+const LEGACY_SECTIONS: Record<string, Section> = {};
 
 const SOURCE_STORY: Record<string, string> = {
     manual: 'Staff report',
@@ -539,6 +543,7 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                                 value={section}
                                 onSelect={onSection}
                                 onFind={openFind}
+                                maxVisible={6}
                                 ariaLabel="Incident sections"
                             />
                         }
@@ -627,6 +632,9 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                         </section>
                         <section hidden={section !== 'history'} aria-label="Incident history">
                             <TimelineSection d={d} />
+                        </section>
+                        <section hidden={section !== 'linked'} aria-label="Linked records">
+                            <LinkedSection d={d} clientName={person} />
                         </section>
                     </div>
                     <aside aria-label="Incident owner, closing checks and linked records">
