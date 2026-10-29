@@ -156,6 +156,8 @@ type Filters = {
         to?: string;
         tab?: string;
     } | null;
+    /** 'current' hides archived Sites and removed people (the default); 'all' shows them. */
+    records?: 'current' | 'all' | null;
 };
 
 type Props = {
@@ -303,7 +305,8 @@ export default function HsEventsIndex({
         filters.worksafe ||
         filters.from ||
         filters.to ||
-        filters.action_context
+        filters.action_context ||
+        filters.records === 'all'
     );
 
     const TABS: RosterTabItem[] = [
@@ -502,6 +505,7 @@ export default function HsEventsIndex({
         filters.source,
         filters.severity,
         filters.worksafe,
+        filters.records === 'all',
     ].filter(Boolean).length;
     // Four numbers that double as lenses; Open and Monitoring stay in the Review view filter.
     const numbers: {
@@ -777,6 +781,21 @@ export default function HsEventsIndex({
                                             }
                                         />
                                         WorkSafe-notifiable only
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox
+                                            checked={filters.records === 'all'}
+                                            onCheckedChange={(value) =>
+                                                go({
+                                                    records:
+                                                        value === true
+                                                            ? 'all'
+                                                            : null,
+                                                })
+                                            }
+                                        />
+                                        Include archived Sites and removed
+                                        people
                                     </label>
                                 </PopoverContent>
                             </Popover>

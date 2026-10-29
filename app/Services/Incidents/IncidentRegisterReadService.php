@@ -17,6 +17,7 @@ use App\Support\Incidents\IncidentOccurrencePeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use App\Support\Database\LockConflictRetry;
+use App\Support\HealthSafety\CurrentRecords;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
@@ -121,8 +122,14 @@ final class IncidentRegisterReadService
         // Shared parent refinements (everything EXCEPT the tab), applied once before
         // owner qualification; followups reuse the qualified parent-ID subquery,
         // so the tab counts stay mutually consistent.
-        $applyFilters = function ($query) use ($user, $reads, $q, $severity, $clientId, $siteId, $source, $from, $to, $kind) {
+        $currentOnly = ! CurrentRecords::includeArchived($request);
+        $applyFilters = function ($query) use ($user, $reads, $q, $severity, $clientId, $siteId, $source, $from, $to, $kind, $currentOnly) {
             return $query
+                // Hide archived Sites and removed clients unless ?records=all (MASTER for Stephan, 30 Oct).
+                ->when($currentOnly, fn (Builder $query) => CurrentRecords::onCurrentClients(
+                    CurrentRecords::onCurrentSites($query, 'client_incidents.site_id'),
+                    'client_incidents.client_id',
+                ))
                 ->tap(fn (Builder $query) => app(IncidentAccessService::class)->apply($query, $user, $reads))
                 ->when($q !== '', function ($query) use ($q) {
                     $term = '%'.$q.'%';
@@ -371,6 +378,7 @@ final class IncidentRegisterReadService
                 'kind' => $kind,
                 'from' => $from,
                 'to' => $to,
+                'records' => CurrentRecords::mode($request),
             ],
             'tab' => $tab,
             'tabCounts' => $tabCounts,
