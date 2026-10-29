@@ -384,3 +384,10 @@ Each case calls `markTestSkipped(Tests\Support\NotInThisBuild::reason(group, why
 - One each: X-Inertia JSON that the installed `assertInertia` can't read; a 422 whose only follow-up query is the actor's own sidebar badge; a simulated follow-up move that no code can make; the read context refusing raw models before the tamper check; a fixture deleting versions under a restrict-on-delete key; a fixture closing an event with a direct update, which main's closure trigger refuses.
 
 Still failing the same way on main (main's own tests, not skipped; same messages in a run on main `1f3a1e855`, 25 Oct evening): `ItSecuritySingleTenantBoundaryTest` (2), `NzsAssuranceStaticTruthBoundaryTest` (2: `tests/Architecture` isn't bound to the Laravel TestCase in `tests/Pest.php`, so `base_path()` fails), `HrCalendarFeedTest` reminder dispatch (1). Found by the job 1–4 runs, failing the same way on pre-merge main `1f3a1e855`: `MonitoringAvailabilityEpisodeTest` (3), `SettingsControllerTest` account deletion (1), `HrHubTabsRenderTest` (1, `PayslipController::$feedService`). Found by the job 3 runs, failing the same way on main `4e0590098` without job 3: `DismissedAlertScopeTest` lone-worker cases (6).
+
+## Found outside H&S (for after "H&S complete"; not fixed here)
+
+- **Sites list SSR error** (MASTER, 29 Oct): `/sites` logs `ReferenceError: window is not defined` from Inertia SSR on every render (seen since at least 21 Oct). The page still loads (client render). `/sites` imports nothing changed by the H&S branch. Owner: Sites/Assets.
+- **Incidents list shows incidents of archived Sites and deleted clients** (INC-2026-0142, INC-2026-0145 on the .com). Ease-of-use pass: lists hide archived Sites and deleted clients.
+- **Security & Devices** `device-profile-header.test.tsx` fails 2 cases on this branch and main alike (not touched here).
+- **Main's own Pest failures seen during these gates:** `SecurityAccessControlTest` "incident update cannot escalate portal visibility" (403), `ClientProfileFoundationTest` 2 cases (medical section shown to an assigned worker) — both fail the same way with main's code.
