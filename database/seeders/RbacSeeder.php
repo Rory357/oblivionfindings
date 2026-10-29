@@ -710,6 +710,9 @@ class RbacSeeder extends Seeder
             // Own-site operations dashboard; OperationsPermissionsSeeder creates the key
             // and grants it on a fresh install, this keeps it on a reseed (20 Oct 2026).
             'operations.dashboard.view',
+            // Read the H&S Overview and Safety reviews for their own Sites (Stephan, 30 Oct, option A). Reading only;
+            // Site scope still applies. Grant migration: 2026_10_30_120000_grant_provider_manager_hazards_view.
+            'hazards.view',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
