@@ -35,7 +35,7 @@ function CaptureWorkspace({ capture, return_to, chemical_exposure_confirmation, 
     const savedHref = confirmation && chemical_exposure_href === `${CHEMICAL_EXPOSURES}/${confirmation.root_id}` ? chemical_exposure_href : null;
     const finished = progress.saved || (!!confirmation && !withdrawn);
     const stages: PageHeaderStage[] = STEPS.map((label, index) => ({ label, state: finished || index < progress.step ? 'done' : index === progress.step ? 'now' : 'todo' }));
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
         { title: 'Private exposures', href: CHEMICAL_EXPOSURES }, { title: 'Record an exposure', href: exposureCaptureHref(capture.substance.id, returnTo) }]}>
         <Head title="Record an exposure" /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" title="Record an exposure" icon={LockKeyhole} backHref={returnTo}

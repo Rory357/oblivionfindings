@@ -42,11 +42,10 @@ const assuranceReader: Visibility = (can) => !!can?.governance?.view;
 export type SafetyHubKey =
     | 'overview'
     | 'concerns'
-    | 'actions'
+    | 'care'
     | 'prevention'
-    | 'registers'
+    | 'participation'
     | 'reports';
-export type SafetyRegisterGroup = 'people' | 'equipment' | 'participation';
 export interface SafetyView {
     key: string;
     label: string;
@@ -55,7 +54,6 @@ export interface SafetyView {
     description: string;
     visible: Visibility;
     keywords?: string[];
-    group?: SafetyRegisterGroup;
     /** Search/filter shortcuts don't add a third navigation tier. */
     shortcut?: boolean;
     exact?: boolean;
@@ -68,13 +66,18 @@ export interface SafetyHub {
     views: SafetyView[];
 }
 
-export const SAFETY_REGISTER_GROUPS = [
-    { key: 'people', label: 'People safety' },
-    { key: 'equipment', label: 'Equipment & substances' },
-    { key: 'participation', label: 'Participation' },
-] as const;
+/** The hubs that used to sit on the "Safety registers" card page (its address now lists them). */
+export const SAFETY_REGISTER_HUBS: SafetyHubKey[] = [
+    'care',
+    'prevention',
+    'participation',
+];
 
-/** All 21 former rail destinations retain their canonical URLs and search names. */
+/**
+ * Six hubs in the sidebar (approved drawing D4, MASTER for Stephan, 30 Oct). Inside a hub the sibling lists are tabs
+ * on the header rail, so people move sideways without going back. Every former destination keeps its address, its
+ * own permission check and its search name.
+ */
 export const SAFETY_HUBS: SafetyHub[] = [
     {
         key: 'overview',
@@ -96,7 +99,7 @@ export const SAFETY_HUBS: SafetyHub[] = [
     },
     {
         key: 'concerns',
-        label: 'Incidents & concerns',
+        label: 'Incidents and safety reviews',
         icon: ShieldAlert,
         views: [
             {
@@ -118,50 +121,6 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 shortcut: true,
             },
             {
-                key: 'safeguarding',
-                label: 'Safeguarding',
-                href: '/safeguarding',
-                icon: Shield,
-                description: 'Record and respond to safeguarding concerns.',
-                visible: (can) => !!can?.safeguarding?.viewAny,
-            },
-            {
-                key: 'report-safeguarding',
-                label: 'Report a safeguarding concern',
-                href: '/safeguarding/create',
-                icon: Shield,
-                description: 'Raise a concern with the safeguarding team.',
-                visible: (can) =>
-                    !!can?.safeguarding?.create && !can?.safeguarding?.viewAny,
-            },
-            {
-                key: 'fleet-incidents',
-                label: 'Fleet incidents',
-                href: '/fleet-assets/incidents',
-                icon: Truck,
-                description:
-                    'Follow up incidents involving vehicles and assets.',
-                visible: (can) =>
-                    !!(can?.fleet?.viewAny || can?.assets?.viewAny),
-            },
-        ],
-    },
-    {
-        key: 'actions',
-        label: 'Actions & reviews',
-        icon: ListChecks,
-        views: [
-            {
-                key: 'actions',
-                label: 'Actions',
-                href: '/health-safety/corrective-actions',
-                icon: ListChecks,
-                description:
-                    'Assign, complete and independently verify corrective actions.',
-                visible: safetyReader,
-                keywords: ['Corrective Actions'],
-            },
-            {
                 key: 'reviews',
                 label: 'Safety reviews',
                 href: '/health-safety/events',
@@ -180,11 +139,105 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 visible: safetyReader,
                 shortcut: true,
             },
+            {
+                key: 'actions',
+                label: 'Actions',
+                href: '/health-safety/corrective-actions',
+                icon: ListChecks,
+                description:
+                    'Assign, complete and independently verify corrective actions.',
+                visible: safetyReader,
+                keywords: ['Corrective Actions'],
+            },
+            {
+                key: 'notifications',
+                label: 'WorkSafe notifications',
+                href: '/health-safety/reports?view=notifications',
+                icon: FileText,
+                description:
+                    'Review recorded WorkSafe notification decisions and progress.',
+                visible: assuranceReader,
+            },
+            {
+                key: 'safeguarding',
+                label: 'Safeguarding concerns',
+                href: '/safeguarding',
+                icon: Shield,
+                description: 'Record and respond to safeguarding concerns.',
+                visible: (can) => !!can?.safeguarding?.viewAny,
+                keywords: ['Safeguarding'],
+            },
+            {
+                key: 'report-safeguarding',
+                label: 'Raise a safeguarding concern',
+                href: '/safeguarding/create',
+                icon: Shield,
+                description: 'Raise a concern with the safeguarding team.',
+                visible: (can) =>
+                    !!can?.safeguarding?.create && !can?.safeguarding?.viewAny,
+                keywords: ['Safeguarding'],
+            },
+            {
+                key: 'fleet-incidents',
+                label: 'Fleet incidents',
+                href: '/fleet-assets/incidents',
+                icon: Truck,
+                description:
+                    'Follow up incidents involving vehicles and assets.',
+                visible: (can) =>
+                    !!(can?.fleet?.viewAny || can?.assets?.viewAny),
+            },
+        ],
+    },
+    {
+        key: 'care',
+        label: 'Injuries and care',
+        icon: HeartPulse,
+        views: [
+            {
+                key: 'injuries',
+                label: 'Workplace injuries',
+                href: '/health-safety/injuries',
+                icon: Activity,
+                description: 'Support recovery and safe returns to work.',
+                visible: (can) =>
+                    !!(can?.hazards?.view || can?.hr?.wellbeing?.view),
+                keywords: ['Workplace Injuries', 'Injuries & recovery'],
+            },
+            {
+                key: 'first-aid',
+                label: 'First aid',
+                href: '/health-safety/first-aid',
+                icon: HeartPulse,
+                description:
+                    'Record first aid and check kits and trained responders.',
+                visible: safetyReader,
+                keywords: ['First Aid Register'],
+            },
+            {
+                key: 'restraints',
+                label: 'Restraints',
+                href: '/health-safety/restraints',
+                icon: Shield,
+                description:
+                    'Review restraint events and behaviour support safeguards.',
+                visible: (can) => !!can?.restraints?.view,
+                keywords: ['Restraints & Behaviour Support'],
+            },
+            {
+                key: 'chemical-exposures',
+                label: 'Chemical exposures',
+                href: '/health-safety/chemical-exposures',
+                icon: FlaskConical,
+                description:
+                    'Review chemical exposures and follow-up work. Identifiable records need wellbeing access.',
+                visible: safetyReader,
+            },
         ],
     },
     {
         key: 'prevention',
-        label: 'Risks & prevention',
+        label: 'Risks and prevention',
         icon: Target,
         views: [
             {
@@ -206,6 +259,26 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 keywords: ['Risks'],
             },
             {
+                key: 'chemicals',
+                label: 'Chemicals',
+                href: '/health-safety/substances',
+                icon: FlaskConical,
+                description:
+                    'Manage hazardous substances and safety data sheets.',
+                visible: safetyReader,
+                keywords: ['Chemical Register'],
+            },
+            {
+                key: 'ppe',
+                label: 'Protective gear',
+                href: '/health-safety/ppe',
+                icon: HardHat,
+                description:
+                    'Manage protective equipment (PPE), allocations and inspections.',
+                visible: safetyReader,
+                keywords: ['PPE & equipment'],
+            },
+            {
                 key: 'procedures',
                 label: 'Procedures',
                 href: '/health-safety/procedures',
@@ -217,115 +290,49 @@ export const SAFETY_HUBS: SafetyHub[] = [
             },
             {
                 key: 'drills',
-                label: 'Emergency drills',
+                label: 'Drills',
                 href: '/health-safety/drills',
                 icon: Siren,
                 description: 'Plan, record and learn from emergency exercises.',
                 visible: safetyReader,
+                keywords: ['Emergency drills'],
             },
-        ],
-    },
-    {
-        key: 'registers',
-        label: 'Safety registers',
-        icon: ClipboardCheck,
-        href: '/health-safety/registers',
-        views: [
             {
                 key: 'lone-workers',
-                label: 'Lone worker safety',
+                label: 'Working alone',
                 href: '/health-safety/lone-workers',
                 icon: PersonStanding,
                 description:
                     'Manage lone worker sessions, check-ins and safety devices.',
                 visible: safetyReader,
-                group: 'people',
+                keywords: ['Lone worker safety'],
             },
-            {
-                key: 'injuries',
-                label: 'Injuries & recovery',
-                href: '/health-safety/injuries',
-                icon: Activity,
-                description: 'Support recovery and safe returns to work.',
-                visible: (can) =>
-                    !!(can?.hazards?.view || can?.hr?.wellbeing?.view),
-                group: 'people',
-                keywords: ['Workplace Injuries'],
-            },
-            {
-                key: 'first-aid',
-                label: 'First aid',
-                href: '/health-safety/first-aid',
-                icon: HeartPulse,
-                description:
-                    'Record first aid and check kits and trained responders.',
-                visible: safetyReader,
-                group: 'people',
-                keywords: ['First Aid Register'],
-            },
-            {
-                key: 'restraints',
-                label: 'Restraint & behaviour support',
-                href: '/health-safety/restraints',
-                icon: Shield,
-                description:
-                    'Review restraint events and behaviour support safeguards.',
-                visible: (can) => !!can?.restraints?.view,
-                group: 'people',
-                keywords: ['Restraints & Behaviour Support'],
-            },
-            {
-                key: 'ppe',
-                label: 'PPE & equipment',
-                href: '/health-safety/ppe',
-                icon: HardHat,
-                description:
-                    'Manage protective equipment, allocations and inspections.',
-                visible: safetyReader,
-                group: 'equipment',
-            },
-            {
-                key: 'chemicals',
-                label: 'Chemicals',
-                href: '/health-safety/substances',
-                icon: FlaskConical,
-                description:
-                    'Manage hazardous substances and safety data sheets.',
-                visible: safetyReader,
-                group: 'equipment',
-                keywords: ['Chemical Register'],
-            },
-            {
-                key: 'chemical-exposures',
-                label: 'Chemical exposures',
-                href: '/health-safety/chemical-exposures',
-                icon: FlaskConical,
-                description:
-                    'Review chemical exposures and follow-up work. Identifiable records need wellbeing access.',
-                visible: safetyReader,
-                group: 'equipment',
-            },
+        ],
+    },
+    {
+        key: 'participation',
+        label: 'People and participation',
+        icon: Users,
+        views: [
             {
                 key: 'representatives',
-                label: 'Representatives',
+                label: 'Health and safety representatives',
                 href: '/health-safety/worker-participation?tab=representatives',
                 icon: Users,
                 description:
                     'Find health and safety representatives and their coverage.',
                 visible: safetyReader,
-                group: 'participation',
-                keywords: ['Worker Participation'],
+                keywords: ['Worker Participation', 'Representatives'],
             },
             {
                 key: 'meetings',
-                label: 'Committees & meetings',
+                label: 'Committees',
                 href: '/health-safety/worker-participation?tab=meetings',
                 icon: Users,
                 description:
                     'Record committee meetings, minutes and agreed actions.',
                 visible: safetyReader,
-                group: 'participation',
-                keywords: ['Worker Participation'],
+                keywords: ['Worker Participation', 'Committees & meetings'],
             },
             {
                 key: 'consultations',
@@ -335,14 +342,13 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 description:
                     'Involve workers in decisions that affect their safety.',
                 visible: safetyReader,
-                group: 'participation',
                 keywords: ['Worker Participation'],
             },
         ],
     },
     {
         key: 'reports',
-        label: 'Reports & assurance',
+        label: 'Reports',
         icon: BarChart3,
         href: '/health-safety/reports',
         views: [
@@ -357,22 +363,14 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 keywords: ['Analytics'],
             },
             {
-                key: 'notifications',
-                label: 'WorkSafe notifications',
-                href: '/health-safety/reports?view=notifications',
-                icon: FileText,
-                description:
-                    'Review recorded WorkSafe notification decisions and progress.',
-                visible: assuranceReader,
-            },
-            {
                 key: 'board',
-                label: 'Board safety summary',
+                label: 'Board reports',
                 href: '/health-safety/reports?view=board',
                 icon: ShieldCheck,
                 description:
                     'How we’re doing on health and safety, for the board.',
                 visible: assuranceReader,
+                keywords: ['Board safety summary'],
             },
             {
                 key: 'investigation-outcomes',
@@ -387,8 +385,7 @@ export const SAFETY_HUBS: SafetyHub[] = [
                 label: 'Actions and their safety reviews',
                 href: '/health-safety/reports?view=action-traceability',
                 icon: ListChecks,
-                description:
-                    'Each action and the safety review it came from.',
+                description: 'Each action and the safety review it came from.',
                 visible: assuranceReader,
             },
             {
@@ -449,16 +446,17 @@ export function safetyHubForUrl(url: string): SafetyHub | undefined {
     ) {
         return SAFETY_HUBS.find((hub) => hub.key === 'prevention');
     }
-    return SAFETY_HUBS.find(
-        (hub) =>
-            hub.href === path ||
-            hub.views.some((view) => {
-                const destination = view.href.split('?')[0];
-                return (
-                    path === destination ||
-                    (!view.exact && path.startsWith(`${destination}/`))
-                );
-            }),
+    // A hub that owns the address wins (the Reports page also holds the WorkSafe notifications view).
+    const owner = SAFETY_HUBS.find((hub) => hub.href === path);
+    if (owner) return owner;
+    return SAFETY_HUBS.find((hub) =>
+        hub.views.some((view) => {
+            const destination = view.href.split('?')[0];
+            return (
+                path === destination ||
+                (!view.exact && path.startsWith(`${destination}/`))
+            );
+        }),
     );
 }
 /** Only H&S-owned sidebar links opt in; shared Fleet/Compliance rails keep their matcher. */

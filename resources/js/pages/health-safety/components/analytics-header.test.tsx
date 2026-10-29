@@ -7,6 +7,7 @@ import {
 } from '@testing-library/react';
 import type { AnchorHTMLAttributes } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import { AnalyticsHeader, AnalyticsPeriodSummary } from './analytics-header';
 import { Scorecard } from './analytics-scorecard';
 
@@ -64,12 +65,7 @@ const props = {
         drills_total: 4,
     },
     worksafe_notifiable: { notified: 0, awaiting: 1 },
-    tab: 'overview',
-    tabs: [
-        { id: 'overview', label: 'Overview' },
-        { id: 'trends', label: 'Trends' },
-        { id: 'governance', label: 'Governance' },
-    ],
+    rail: <SafetyWorkspaceRail hub="reports" current="trends" />,
     exportHref:
         '/health-safety/analytics/export?period=custom&site_id=3&view=incidents',
     reports: [
@@ -82,18 +78,16 @@ const props = {
 };
 function setup(overrides = {}) {
     const onReload = vi.fn(),
-        onPeriod = vi.fn(),
-        onTabChange = vi.fn();
+        onPeriod = vi.fn();
     const view = render(
         <AnalyticsHeader
             {...props}
             {...overrides}
             onReload={onReload}
             onPeriod={onPeriod}
-            onTabChange={onTabChange}
         />,
     );
-    return { ...view, onReload, onPeriod, onTabChange };
+    return { ...view, onReload, onPeriod };
 }
 /** The tally entry that carries a measure's label (its number, label and sub-line live together). */
 function measure(label: string): HTMLElement {
@@ -101,7 +95,7 @@ function measure(label: string): HTMLElement {
 }
 
 describe('Analytics shared header', () => {
-    it('keeps the numbers out of the header; scoped export, the overview link and the connected view rail stay', () => {
+    it('keeps the numbers out of the header; scoped export, the overview link and the Reports hub rail stay', () => {
         setup();
         const header = screen
             .getByRole('heading', { name: 'Health & safety analytics' })
@@ -116,12 +110,16 @@ describe('Analytics shared header', () => {
             screen.getByRole('link', { name: 'Safety overview' }),
         ).toHaveAttribute('href', '/health-safety');
         expect(
-            within(header).getByRole('tablist', { name: 'Analytics views' }),
+            within(header).getByRole('tablist', { name: 'Reports views' }),
         ).toBeInTheDocument();
+        // The analysis views moved below the header as tier-two tabs (drawing D4).
+        expect(
+            screen.queryByRole('tablist', { name: 'Analytics views' }),
+        ).not.toBeInTheDocument();
     });
 
     it('switches lens and Site through the existing filter callbacks without silently clearing a withdrawn Site', () => {
-        const { onReload, rerender, onPeriod, onTabChange } = setup();
+        const { onReload, rerender, onPeriod } = setup();
         fireEvent.click(screen.getByRole('button', { name: 'Governance' }));
         fireEvent.click(screen.getByRole('button', { name: 'Manager' }));
         expect(onReload).toHaveBeenCalledWith({ lens: 'manager' });
@@ -131,8 +129,7 @@ describe('Analytics shared header', () => {
                 filters={{ ...props.filters, site_id: 999, lens: 'manager' }}
                 onReload={onReload}
                 onPeriod={onPeriod}
-                onTabChange={onTabChange}
-            />,
+                />,
         );
         expect(screen.getByText(/Site access unconfirmed/)).toBeInTheDocument();
         expect(onReload).toHaveBeenCalledTimes(1);
@@ -163,7 +160,7 @@ describe('Analytics shared header', () => {
     });
 
     it('cancels dates and refreshes the calendar month when authoritative filters change', () => {
-        const { rerender, onReload, onPeriod, onTabChange } = setup();
+        const { rerender, onReload, onPeriod } = setup();
         fireEvent.click(screen.getByRole('button', { name: 'Set dates' }));
         fireEvent.click(
             screen.getByRole('button', { name: 'Wed 8 July 2026' }),
@@ -188,8 +185,7 @@ describe('Analytics shared header', () => {
                 }}
                 onReload={onReload}
                 onPeriod={onPeriod}
-                onTabChange={onTabChange}
-            />,
+                />,
         );
         expect(screen.getByText('October 2026')).toBeInTheDocument();
         expect(
@@ -200,7 +196,7 @@ describe('Analytics shared header', () => {
     });
 
     it('only offers board exports with the supplied capability and retains dated safe links', () => {
-        const { rerender, onReload, onPeriod, onTabChange } = setup();
+        const { rerender, onReload, onPeriod } = setup();
         expect(
             screen.queryByRole('button', { name: 'Board reports' }),
         ).not.toBeInTheDocument();
@@ -210,8 +206,7 @@ describe('Analytics shared header', () => {
                 canViewBoardReports
                 onReload={onReload}
                 onPeriod={onPeriod}
-                onTabChange={onTabChange}
-            />,
+                />,
         );
         fireEvent.click(screen.getByRole('button', { name: 'Board reports' }));
         const report = screen.getByRole('link', { name: 'Board summary' });

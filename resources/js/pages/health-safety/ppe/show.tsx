@@ -187,7 +187,7 @@ function PpeWorkspace(props: (PpeRecord | PpeRepairRecord) & { return_to?: strin
 
     const inlineActive = !!command && !WIZARD_COMMANDS.includes(command) && (permitted || !!retained[commandKey]);
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' },
-        ...(own ? [] : [{ title: 'Safety registers', href: '/health-safety/registers' }]),
+        ...(own ? [] : [{ title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' }]),
         { title: 'PPE & equipment', href: own ? returnTo : PPE_REGISTER }, { title, href: ppeHref(record.kind, record.detail.id) }]}>
         <Head title={`${title} · PPE & equipment`} />
         <SafetyFormDraftContext.Provider value={drafts.register}>

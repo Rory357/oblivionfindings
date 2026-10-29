@@ -596,7 +596,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                 ...(workspace === 'view'
                     ? [
                           { title: 'Health & safety', href: '/health-safety' },
-                          { title: 'Safety registers', href: '/health-safety/registers' },
+                          { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
                           { title: 'Restraints', href: RESTRAINT_REGISTER },
                       ]
                     : []),

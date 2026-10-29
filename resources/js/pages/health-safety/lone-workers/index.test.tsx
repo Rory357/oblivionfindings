@@ -116,6 +116,13 @@ const exported = () =>
     });
 it('clears the unsupported worker filter when changing to Responses and does not offer an ignored selector', () => {
     const view = render(<Register {...props()} />);
+    // Drawing D4: the hub's views on the header rail, Sessions / Responses as tier-two tabs.
+    expect(
+        screen.getByRole('tablist', { name: 'Risks and prevention views' }),
+    ).toBeInTheDocument();
+    expect(
+        screen.getByRole('tablist', { name: 'Lone-worker views' }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: 'Responses' }));
     expect(state.get.mock.calls[0][1]).not.toHaveProperty('user_id');
     state.tab = 'alerts';

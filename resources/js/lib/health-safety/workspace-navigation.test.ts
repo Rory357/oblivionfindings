@@ -25,17 +25,17 @@ const manager: SafetyNavigationPermissions = {
 };
 
 describe('Health & Safety workspace navigation', () => {
-    it('has six destinations and keeps every former register discoverable', () => {
+    it('has the six approved hubs (drawing D4) and keeps every former register discoverable', () => {
         const items = buildSafetySubPanelGroups({ can: manager }).flatMap(
             (group) => group.items,
         );
         expect(items.map((item) => item.title)).toEqual([
             'Overview',
-            'Incidents & concerns',
-            'Actions & reviews',
-            'Risks & prevention',
-            'Safety registers',
-            'Reports & assurance',
+            'Incidents and safety reviews',
+            'Injuries and care',
+            'Risks and prevention',
+            'People and participation',
+            'Reports',
         ]);
         const oldPaths = [
             '/health-safety',
@@ -80,11 +80,12 @@ describe('Health & Safety workspace navigation', () => {
     it.each([
         [{ compliance: { view: true } }, ['reports']],
         [{ procedures: { view: true } }, ['prevention']],
-        [{ restraints: { view: true } }, ['registers']],
-        [{ hr: { wellbeing: { view: true } } }, ['registers']],
+        [{ restraints: { view: true } }, ['care']],
+        [{ hr: { wellbeing: { view: true } } }, ['care']],
         [{ incidents: { viewAssigned: true } }, ['concerns']],
         [{ safeguarding: { create: true } }, ['concerns']],
-        [{ governance: { view: true } }, ['reports']],
+        // WorkSafe notifications sit with incidents and safety reviews (drawing D4).
+        [{ governance: { view: true } }, ['concerns', 'reports']],
         [{}, []],
     ] as const)(
         'only shows destinations this viewer can use: %j',
@@ -124,16 +125,22 @@ describe('Health & Safety workspace navigation', () => {
         ['/incidents?site_id=3&tab=near_misses', 'concerns'],
         ['/safeguarding/9', 'concerns'],
         ['/fleet-assets/incidents/12', 'concerns'],
-        ['/health-safety/events/8?section=investigations', 'actions'],
-        ['/health-safety/corrective-actions/4?action=owner', 'actions'],
+        ['/health-safety/events/8?section=investigations', 'concerns'],
+        ['/health-safety/corrective-actions/4?action=owner', 'concerns'],
         ['/health-safety/procedures/6', 'prevention'],
         ['/hazards/8?section=actions', 'prevention'],
         ['/sites/3/hazards?tab=overdue', 'prevention'],
-        ['/health-safety/worker-participation?tab=consultations', 'registers'],
-        ['/health-safety/chemical-exposures?site_id=3', 'registers'],
-        ['/health-safety/chemical-exposures/22?section=connections', 'registers'],
-        ['/health-safety/chemical-exposures/capture?substance_id=9', 'registers'],
+        [
+            '/health-safety/worker-participation?tab=consultations',
+            'participation',
+        ],
+        ['/health-safety/chemical-exposures?site_id=3', 'care'],
+        ['/health-safety/chemical-exposures/22?section=connections', 'care'],
+        ['/health-safety/chemical-exposures/capture?substance_id=9', 'care'],
         ['/health-safety/reports?view=board', 'reports'],
+        ['/health-safety/reports?view=notifications', 'reports'],
+        ['/health-safety/lone-workers/5', 'prevention'],
+        ['/safeguarding/create', 'concerns'],
         ['/health-safety/analytics?tab=trends', 'reports'],
         ['/health-safety', 'overview'],
     ])('lights exactly one H&S entry for %s', (url, hub) => {
@@ -165,19 +172,17 @@ describe('Health & Safety workspace navigation', () => {
             safetySearchEntries(safety).find((entry) => entry.href === href),
         ).toMatchObject({
             label: 'Chemical exposures',
-            group: 'Safety registers',
+            group: 'Injuries and care',
         });
         expect(
             safetySearchEntries({ hr: { wellbeing: { view: true } } }).some(
                 (entry) => entry.href === href,
             ),
         ).toBe(false);
-        expect(safetySearchEntries({}).some((entry) => entry.href === href)).toBe(
-            false,
-        );
-        const registers = SAFETY_HUBS.find((hub) => hub.key === 'registers')!;
-        expect(registers.views.find((view) => view.href === href)?.group).toBe(
-            'equipment',
-        );
+        expect(
+            safetySearchEntries({}).some((entry) => entry.href === href),
+        ).toBe(false);
+        const care = SAFETY_HUBS.find((hub) => hub.key === 'care')!;
+        expect(care.views.some((view) => view.href === href)).toBe(true);
     });
 });

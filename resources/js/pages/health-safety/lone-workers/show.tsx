@@ -454,7 +454,7 @@ export default function LoneWorkerShow({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
                 { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
                 {
                     title: worker

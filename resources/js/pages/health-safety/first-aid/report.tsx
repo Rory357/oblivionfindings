@@ -73,8 +73,8 @@ export default function FirstAidReport({
                     ? [
                           { title: 'Health & safety', href: '/health-safety' },
                           {
-                              title: 'Safety registers',
-                              href: '/health-safety/registers',
+                              title: 'Injuries and care',
+                              href: '/health-safety/registers?view=care',
                           },
                           { title: 'First aid', href: FIRST_AID_REGISTER },
                       ]

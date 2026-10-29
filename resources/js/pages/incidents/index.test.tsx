@@ -165,12 +165,12 @@ describe('incident register header', () => {
             screen.queryByLabelText('Safety workflow'),
         ).not.toBeInTheDocument();
         const rail = screen.getByRole('tablist', {
-            name: 'Incidents & concerns views',
+            name: 'Incidents and safety reviews views',
         });
         expect(within(rail).getAllByRole('tab')).toHaveLength(3);
         fireEvent.click(
             within(rail).getByRole('tab', {
-                name: 'Safeguarding',
+                name: 'Safeguarding concerns',
             }),
         );
         expect(state.visit).toHaveBeenCalledWith('/safeguarding');

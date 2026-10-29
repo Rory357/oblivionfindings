@@ -121,7 +121,7 @@ const VIEWS: { key: RecoveryKind; label: string }[] = [{ key: 'uploads', label: 
 export default function PpeRecovery() {
     const [section, setSection] = useState<RecoveryKind>('uploads');
     const [checks, setChecks] = useState<Record<RecoveryKind, number>>({ uploads: 0, removals: 0, relocations: 0 });
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
         { title: 'PPE & equipment', href: '/health-safety/ppe' }, { title: 'File recovery', href: '/health-safety/ppe/recovery' }]}>
         <Head title="Equipment file recovery" />
         <PageLayout hero={<PageHeader title="Equipment file recovery" icon={History} subline="Files that didn’t finish uploading, and older evidence to move"

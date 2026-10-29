@@ -26,7 +26,7 @@ export default function ChemicalCreate({ capture, return_to, chemical_confirmati
     const returnTo = chemicalReturn(return_to);
     const finished = progress.saved || !!chemical_confirmation;
     const stages: PageHeaderStage[] = STEPS.map((label, index) => ({ label, state: finished || index < progress.step ? 'done' : index === progress.step ? 'now' : 'todo' }));
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
         { title: 'Chemical register', href: CHEMICAL_REGISTER }, { title: 'Add chemical', href: `${CHEMICAL_REGISTER}/create` }]}>
         <Head title="Add chemical" /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" title="Add chemical" icon={FlaskConical} backHref={returnTo} subline="Add the chemical, then its safety data sheets (SDS) and storage"

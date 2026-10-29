@@ -7,6 +7,7 @@
  * private wellbeing access (`exposure_access === 'readable'`, which needs hr.wellbeing.view); otherwise only the
  * restricted or unavailable line shows. The privacy, recovery and access lines keep the code's wording.
  */
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
 import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageLayout } from '@/components/page';
@@ -57,7 +58,7 @@ export default function ChemicalExposureIndex({ exposure_access, records, counts
     ];
     const noteTarget = { onClick: () => note.current?.focus() };
     const timeSet = Boolean(filters?.from || filters?.to);
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Private exposures', href: CHEMICAL_EXPOSURES }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Private exposures', href: CHEMICAL_EXPOSURES }]}>
         <Head title="Private chemical exposures" /><PageLayout hero={<PageHeader title="Private chemical exposures" icon={LockKeyhole} subline="Identifiable worker records · safety and private wellbeing access"
             actions={can.capture || can.recover ? <>
                 {can.recover ? <PageHeaderGlassButton icon={RefreshCw} onClick={() => router.get(CHEMICAL_EXPOSURES + '/recovery')}>Unfinished uploads</PageHeaderGlassButton> : null}
@@ -77,7 +78,8 @@ export default function ChemicalExposureIndex({ exposure_access, records, counts
                 {filters?.worker_id ? <PageHeaderFilterButton icon={X} active onClick={() => go({ worker_id: null, page: 1 })}>Clear worker filter</PageHeaderFilterButton> : null}
                 {filters?.substance_id ? <PageHeaderFilterButton icon={X} active onClick={() => go({ substance_id: null, page: 1 })}>Clear chemical filter</PageHeaderFilterButton> : null}
                 {timeSet ? <PageHeaderFilterButton icon={X} onClick={() => go({ from: null, to: null, page: 1 })}>Clear time range</PageHeaderFilterButton> : null}
-            </> : undefined} />}>
+            </> : undefined}
+            rail={<SafetyWorkspaceRail hub="care" current="chemical-exposures" />} />}>
             <div className="grid min-w-0 gap-5">
                 <div className="sg-note"><Info aria-hidden="true" className="size-4" />
                     <div ref={note} tabIndex={-1} className="grid min-w-0 gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">

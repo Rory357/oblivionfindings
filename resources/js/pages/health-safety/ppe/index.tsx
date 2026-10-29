@@ -1,7 +1,7 @@
 /**
  * PPE & equipment register (approved H&S drawings pg-hsn-120, 120b, 120c — Stephan 23 Oct 2026): one header with
- * search, Export, File recovery and Add equipment, the four filters and the register views as rail tabs (the
- * quieter views under More); then the matching table. Add type sits on the equipment types table. The damaged-record
+ * search, Export, File recovery and Add equipment, the four filters, the Risks and prevention hub on the rail and the
+ * register views as tier-two tabs (drawing D4); then the matching table. Add type sits on the equipment types table. The damaged-record
  * warning and the closing note are in plain words.
  */
 import {
@@ -10,10 +10,11 @@ import {
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { Note } from '@/components/signature/blocks';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { SafetyFormDraftContext, useSafetyWorkspaceDrafts } from '@/hooks/use-safety-workspace-drafts';
@@ -21,7 +22,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PPE_REGISTER, ppeHref, ppeReturn } from '@/lib/health-safety/ppe-navigation';
 import type { SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Download, HardHat, History, Info, Plus, X } from 'lucide-react';
+import { Ban, CalendarClock, ClipboardCheck, Download, HardHat, History, Hourglass, Info, Package, Plus, Tags, UserCheck, Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { PpeCatalogueForm } from './_catalogue-form';
 import type { CatalogueCommand, CatalogueDisplayRow, CatalogueRow } from './_catalogue-state';
@@ -33,9 +34,11 @@ type Filters = { site_id?: number | null; ppe_type_id?: number | null; category?
 type Props = { inventory: Paginator<InventoryDisplayRow>; allocations: Paginator<AllocationDisplayRow>; types: CatalogueDisplayRow[];
     filters: Filters; sites: { id: number; name: string }[]; tab: string; tabCounts: Record<string, number | null>;
     can: { view: boolean; manage: boolean }; source_integrity?: { inventory: 'intact' | 'legacy_unknown' | 'repair_required'; allocations: 'intact' | 'legacy_unknown' | 'repair_required' }; summary_scope?: string };
-const TABS = [{ key: 'inv_all', label: 'All equipment' }, { key: 'inv_available', label: 'In stock' }, { key: 'inv_allocated', label: 'Issued equipment' },
-    { key: 'inv_inspection', label: 'Inspections due' }, { key: 'inv_expiring', label: 'Expiring' }, { key: 'inv_condemned', label: 'Taken out of use' },
-    { key: 'alloc_active', label: 'Currently issued' }, { key: 'alloc_unack', label: 'Not yet confirmed by worker' }, { key: 'types', label: 'Equipment types' }];
+const TABS = [{ key: 'inv_all', label: 'All equipment', icon: HardHat }, { key: 'inv_available', label: 'In stock', icon: Package },
+    { key: 'inv_allocated', label: 'Issued equipment', icon: UserCheck }, { key: 'inv_inspection', label: 'Inspections due', icon: ClipboardCheck },
+    { key: 'inv_expiring', label: 'Expiring', icon: CalendarClock }, { key: 'inv_condemned', label: 'Taken out of use', icon: Ban },
+    { key: 'alloc_active', label: 'Currently issued', icon: Users }, { key: 'alloc_unack', label: 'Not yet confirmed by worker', icon: Hourglass },
+    { key: 'types', label: 'Equipment types', icon: Tags }];
 const STATUS_OPTIONS = STATUS_FILTER_OPTIONS;
 export function ppeRegisterQuery(filters: Filters, tab: string) {
     const query = new URLSearchParams({ tab });
@@ -73,7 +76,7 @@ export default function PpeRegister(props: Props) {
         <p className="text-subtle">Showing {page.data.length} of {page.total}</p>
         {page.last_page > 1 ? <LaravelPagination links={page.links} lastPage={page.last_page} /> : null}
     </>;
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'PPE & equipment', href: PPE_REGISTER }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' }, { title: 'PPE & equipment', href: PPE_REGISTER }]}>
         <Head title="PPE & equipment" />
         <SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader title="PPE & equipment" icon={HardHat} subline="Protective gear (PPE): stock, who has it, inspections and files"
@@ -85,8 +88,12 @@ export default function PpeRegister(props: Props) {
                     {filter('category', 'All categories', CATEGORY_OPTIONS)}{filter('status', 'Any status', STATUS_OPTIONS)}
                     {filter('ppe_type_id', 'Any equipment type', props.types.filter((row) => row.source_integrity !== 'repair_required').map((row) => ({ value: String(row.id), label: row.name! })))}
                     {narrowed ? <PageHeaderFilterButton icon={X} onClick={() => drafts.request(() => router.get(PPE_REGISTER, { tab: props.tab }))}>Clear filters</PageHeaderFilterButton> : null}</>}
-                rail={<PageHeaderRail items={TABS.map((tab) => ({ ...tab, count: props.tabCounts[tab.key] ?? undefined }))} value={props.tab} maxVisible={6} onSelect={(value) => visit({}, value)} ariaLabel="Equipment register views" />} />}>
-                <div className="grid min-w-0 gap-5">
+                rail={<SafetyWorkspaceRail hub="prevention" current="ppe" />} />}
+                tabs={<TierTwoTabs tabs={TABS.map((tab) => ({ ...tab, count: props.tabCounts[tab.key] ?? undefined }))} activeTab={props.tab} onTab={(value) => visit({}, value)}
+                    testIdPrefix="ppe-register" ariaLabel="Equipment register views" panelId="ppe-register-panel"
+                    // Views carry no href, so the strip renders its own buttons.
+                    renderLink={() => null} />}>
+                <div id="ppe-register-panel" role="tabpanel" aria-label={TABS.find((tab) => tab.key === props.tab)?.label ?? 'Equipment'} className="grid min-w-0 gap-5">
                 {showRepair && <div role="status"><Note tone="warning">Some equipment records are damaged. You can still see them, but you can’t change them and totals may be wrong. Export won’t work for these records until an administrator fixes them.</Note></div>}
                 {props.tab === 'types'
                     ? <PpeCatalogueTable rows={typeRows} canAdd={props.can.manage} onAdd={() => open('create_type')} onCommand={open} />

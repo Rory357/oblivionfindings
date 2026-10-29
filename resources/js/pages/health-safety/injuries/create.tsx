@@ -28,7 +28,7 @@ export default function InjuryCreate({ capture, return_to }: { capture: InjuryCa
         label: item.label, meta: item.blurb,
         state: progress.saved || index < progress.step ? 'done' : index === progress.step ? 'now' : 'todo',
     }));
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: 'Report workplace injury', href: `${INJURY_REGISTER}/create` }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: 'Report workplace injury', href: `${INJURY_REGISTER}/create` }]}>
         <Head title="Report workplace injury" /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" title="Report workplace injury" backHref={returnTo} icon={HeartPulse} subline="Tell us what happened, then choose who looks after it next"
                 actions={!open && capture.can.create ? <PageHeaderPrimaryButton icon={Plus} onClick={() => setOpen(true)}>Open injury form</PageHeaderPrimaryButton> : undefined}

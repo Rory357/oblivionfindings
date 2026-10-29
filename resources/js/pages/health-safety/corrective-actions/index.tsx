@@ -771,7 +771,7 @@ export default function CorrectiveActionsIndex({
                         </>
                     }
                     rail={
-                        <SafetyWorkspaceRail hub="actions" current="actions" />
+                        <SafetyWorkspaceRail hub="concerns" current="actions" />
                     }
                 />
 

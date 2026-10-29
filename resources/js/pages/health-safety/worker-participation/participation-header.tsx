@@ -1,7 +1,8 @@
 /**
  * Worker participation header (approved H&S drawings pg-hsn-104 … 104c): the
  * title row with search and the page's actions, four number boxes, the
- * filters, and the three views as rail tabs. Every number is a link to the
+ * filters, and the People and participation hub on the rail, whose three
+ * views are this page's tabs (drawing D4). Every number is a link to the
  * matching all-period view and keeps the code's careful captions — recorded
  * coverage, cumulative (not annual) training — so nothing claims more than
  * the records show. The two numbers beyond four lead the body as a tally
@@ -11,14 +12,12 @@ import {
     PageHeader,
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
-    PageHeaderRail,
     PageHeaderSearch,
 } from '@/components/page';
 import {
     PageHeaderNumber,
     PageHeaderNumbers,
 } from '@/components/page/page-header-strip';
-import type { RosterTabItem } from '@/components/rostering';
 import { Tally } from '@/components/signature/blocks';
 import { Users, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
@@ -77,23 +76,22 @@ export function ParticipationHeader({
     filters,
     hero,
     sites,
-    tabs,
     periods,
     statuses,
     actions,
+    rail,
     onFilters,
-    onTab,
     onClear,
 }: {
     filters: ParticipationFilters;
     hero: ParticipationHero;
     sites: { id: number; name: string }[];
-    tabs: RosterTabItem[];
     periods: { key: string; label: string }[];
     statuses: [string, string][];
     actions?: ReactNode;
+    /** The People and participation hub rail: its three views are this page's tabs. */
+    rail?: ReactNode;
     onFilters: (next: Partial<ParticipationFilters>) => void;
-    onTab: (tab: string) => void;
     onClear: () => void;
 }) {
     const [query, setQuery] = useState(filters.q ?? '');
@@ -241,20 +239,7 @@ export function ParticipationHeader({
                     )}
                 </>
             }
-            rail={
-                <PageHeaderRail
-                    items={tabs.map((item) => ({
-                        key: item.id,
-                        label: item.label,
-                        icon: item.icon,
-                        count: typeof item.badge === 'number' ? item.badge : undefined,
-                        alert: item.tone === 'critical',
-                    }))}
-                    value={filters.tab}
-                    onSelect={onTab}
-                    ariaLabel="Participation views"
-                />
-            }
+            rail={rail}
         />
     );
 }

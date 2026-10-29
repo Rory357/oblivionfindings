@@ -1,13 +1,15 @@
 /**
  * Restraints list (approved H&S drawings pg-hsn-100,
  * 100b — Stephan 23 Oct 2026): one header with the two numbers that need
- * someone, the filters (the quieter ones under More filters) and the status
- * views as rail tabs; then Restraints or Behaviour support plans as a
- * table. Every row opens its record; its kebab and right-click carry Open and,
+ * someone, the filters (the quieter ones under More filters) and the
+ * "Injuries and care" hub tabs on the rail (drawing D4); then the Restraints /
+ * Behaviour support plans switch and that list's status views as tier-two
+ * tabs, then the table. Every row opens its record; its kebab and right-click carry Open and,
  * for reviewers, Review. Restraint wording — reported plan use, injury, the
  * current source revision and its review — stays exactly as the records say it.
  */
 import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     RecordIdentity,
     RecordPerson,
@@ -21,7 +23,6 @@ import {
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
@@ -50,10 +51,19 @@ import {
 } from '@/lib/health-safety/restraint-navigation';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
+    Archive,
+    CalendarClock,
+    CalendarDays,
+    CircleCheck,
     ClipboardCheck,
     Download,
     Eye,
     FileText,
+    FileWarning,
+    HeartPulse,
+    List,
+    PencilLine,
     Plus,
     ShieldAlert,
     SlidersHorizontal,
@@ -117,21 +127,21 @@ type Props = {
 };
 type Next = Record<string, string | number | null>;
 
-const EVENT_TABS = [
-    { key: 'all', label: 'All restraints' },
-    { key: 'unreviewed', label: 'Needs review' },
-    { key: 'out_of_plan', label: 'Outside the plan' },
-    { key: 'injury', label: 'Injury recorded' },
-    { key: 'critical', label: 'Critical' },
-    { key: '30d', label: 'Last 30 days' },
+const EVENT_TABS: GroupedProfileNavTab[] = [
+    { key: 'all', label: 'All restraints', icon: List },
+    { key: 'unreviewed', label: 'Needs review', icon: ClipboardCheck },
+    { key: 'out_of_plan', label: 'Outside the plan', icon: FileWarning },
+    { key: 'injury', label: 'Injury recorded', icon: HeartPulse },
+    { key: 'critical', label: 'Critical', icon: AlertTriangle },
+    { key: '30d', label: 'Last 30 days', icon: CalendarDays },
 ];
-const PLAN_TABS = [
-    { key: 'all', label: 'Current plans' },
-    { key: 'active', label: 'In use' },
-    { key: 'draft', label: 'Drafts' },
-    { key: 'review_due', label: 'Review due' },
-    { key: 'under_review', label: 'Being reviewed' },
-    { key: 'archived', label: 'Archived' },
+const PLAN_TABS: GroupedProfileNavTab[] = [
+    { key: 'all', label: 'Current plans', icon: FileText },
+    { key: 'active', label: 'In use', icon: CircleCheck },
+    { key: 'draft', label: 'Drafts', icon: PencilLine },
+    { key: 'review_due', label: 'Review due', icon: CalendarClock },
+    { key: 'under_review', label: 'Being reviewed', icon: ClipboardCheck },
+    { key: 'archived', label: 'Archived', icon: Archive },
 ];
 const LENSES: GroupedProfileNavTab[] = [
     { key: 'events', label: 'Restraints', icon: ShieldAlert },
@@ -232,7 +242,7 @@ export default function RestraintWorkspaceIndex({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
                 { title: 'Restraints', href: RESTRAINT_REGISTER },
             ]}
         >
@@ -331,29 +341,34 @@ export default function RestraintWorkspaceIndex({
                                 ) : null}
                             </>
                         }
-                        rail={
-                            <PageHeaderRail
-                                value={tab}
-                                onSelect={(value) => go({ tab: value })}
-                                ariaLabel={lens === 'events' ? 'Restraint views' : 'Plan views'}
-                                items={tabs.map((item) => ({
-                                    ...item,
-                                    count: (tabCounts[lens] as Record<string, number>)[item.key],
-                                }))}
-                            />
-                        }
+                        rail={<SafetyWorkspaceRail hub="care" current="restraints" />}
                     />
                 }
                 tabs={
-                    <TierTwoTabs
-                        tabs={LENSES}
-                        activeTab={lens}
-                        onTab={(value) => go({ lens: value, tab: 'all', review_state: null })}
-                        testIdPrefix="restraint-register"
-                        ariaLabel="Show restraints or plans"
-                        panelId="restraint-register-panel"
-                        renderLink={() => null}
-                    />
+                    <div className="grid gap-3">
+                        <TierTwoTabs
+                            tabs={LENSES}
+                            activeTab={lens}
+                            onTab={(value) => go({ lens: value, tab: 'all', review_state: null })}
+                            testIdPrefix="restraint-register"
+                            ariaLabel="Show restraints or plans"
+                            panelId="restraint-register-panel"
+                            renderLink={() => null}
+                        />
+                        <TierTwoTabs
+                            tabs={tabs.map((item) => ({
+                                ...item,
+                                count: (tabCounts[lens] as Record<string, number>)[item.key],
+                            }))}
+                            activeTab={tab}
+                            onTab={(value) => go({ tab: value })}
+                            testIdPrefix="restraint-view"
+                            ariaLabel={lens === 'events' ? 'Restraint views' : 'Plan views'}
+                            panelId="restraint-register-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    </div>
                 }
             >
                 <div id="restraint-register-panel" role="tabpanel" className="grid min-w-0 gap-5">

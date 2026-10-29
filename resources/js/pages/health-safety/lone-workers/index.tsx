@@ -1,7 +1,8 @@
 /**
  * Lone-worker safety (approved H&S drawings pg-hsn-81, 81b — Stephan 23 Oct
  * 2026): one header with the three coverage numbers and the register filters,
- * Sessions / Responses on the rail, the safety caveat as a note, then the
+ * the Risks and prevention hub on the rail and Sessions / Responses as
+ * tier-two tabs (drawing D4), the safety caveat as a note, then the
  * register as a table. Two summaries (across your sites, the next 24 hours)
  * sit side by side under the sessions. The coverage and safety caveats keep
  * the code's wording.
@@ -21,6 +22,7 @@ import {
     words,
 } from '@/components/health-safety/lone-workers/session-panels';
 import { SessionStartForm } from '@/components/health-safety/lone-workers/session-start-form';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import type {
     SafetySession,
     SessionPickers,
@@ -42,10 +44,10 @@ import {
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import {
     PageHeaderNumber,
     PageHeaderNumbers,
@@ -336,7 +338,7 @@ export default function LoneWorkersIndex({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
                 { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
             ]}
         >
@@ -533,29 +535,47 @@ export default function LoneWorkersIndex({
                                 </>
                             }
                             rail={
-                                <PageHeaderRail
-                                    items={[
-                                        { key: 'sessions', label: 'Sessions' },
-                                        ...(can.view_control_room
-                                            ? [
-                                                  {
-                                                      key: 'alerts',
-                                                      label: 'Responses',
-                                                  },
-                                              ]
-                                            : []),
-                                    ]}
-                                    value={tab}
-                                    onSelect={(value) =>
-                                        go({ tab: value, status: null })
-                                    }
-                                    ariaLabel="Lone-worker views"
+                                <SafetyWorkspaceRail
+                                    hub="prevention"
+                                    current="lone-workers"
                                 />
                             }
                         />
                     }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={[
+                                {
+                                    key: 'sessions',
+                                    label: 'Sessions',
+                                    icon: ClipboardList,
+                                },
+                                ...(can.view_control_room
+                                    ? [
+                                          {
+                                              key: 'alerts',
+                                              label: 'Responses',
+                                              icon: Siren,
+                                          },
+                                      ]
+                                    : []),
+                            ]}
+                            activeTab={tab}
+                            onTab={(value) => go({ tab: value, status: null })}
+                            testIdPrefix="lone-worker"
+                            ariaLabel="Lone-worker views"
+                            panelId="lone-worker-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    }
                 >
-                    <div className="grid min-w-0 gap-5">
+                    <div
+                        id="lone-worker-panel"
+                        role="tabpanel"
+                        aria-label={tab === 'sessions' ? 'Sessions' : 'Responses'}
+                        className="grid min-w-0 gap-5"
+                    >
                         <Note
                             icon={coverage.state === 'unknown' ? AlertTriangle : Info}
                             tone={

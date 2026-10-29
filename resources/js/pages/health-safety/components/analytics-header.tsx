@@ -4,7 +4,6 @@ import {
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
 } from '@/components/page/page-header';
 import { Tally } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
@@ -23,7 +22,7 @@ import {
     FileText,
     LayoutDashboard,
 } from 'lucide-react';
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import type { AnalyticsProps } from '../analytics-types';
 
 const PERIODS = [
@@ -37,13 +36,8 @@ type HeaderProps = Pick<
     AnalyticsProps,
     'filters' | 'sites' | 'scorecard' | 'period_summary' | 'worksafe_notifiable'
 > & {
-    tab: string;
-    tabs: {
-        id: string;
-        label: string;
-        icon?: ComponentType<{ className?: string }>;
-    }[];
-    onTabChange: (tab: string) => void;
+    /** The Reports hub rail; the analysis views sit below as tier-two tabs. */
+    rail?: ReactNode;
     onPeriod: (period: string) => void;
     onReload: (next: Record<string, string | number | null>) => void;
     exportHref: string;
@@ -57,9 +51,7 @@ export function AnalyticsHeader({
     scorecard,
     period_summary,
     worksafe_notifiable,
-    tab,
-    tabs,
-    onTabChange,
+    rail,
     onPeriod,
     onReload,
     exportHref,
@@ -259,17 +251,7 @@ export function AnalyticsHeader({
                     />
                 </>
             }
-            rail={
-                <PageHeaderRail
-                    items={tabs.map(({ id, label }) => ({
-                        key: id,
-                        label,
-                    }))}
-                    value={tab}
-                    onSelect={onTabChange}
-                    ariaLabel="Analytics views"
-                />
-            }
+            rail={rail}
             mobileSummary="Analytics · reporting period and recorded measures"
         />
     );

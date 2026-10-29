@@ -38,6 +38,9 @@ function index(): ChemicalIndexProps {
 afterEach(() => { cleanup(); vi.resetAllMocks(); io.url = '/health-safety/substances/9?section=overview'; });
 it('opens permanent chemical records with exact filtered Back and source-backed Site meter destinations', () => {
     render(<ChemicalRegister {...index()} />);
+    // Drawing D4: the Risks and prevention hub on the header rail, the register views as tier-two tabs.
+    expect(screen.getByRole('tablist', { name: 'Risks and prevention views' })).toBeInTheDocument();
+    expect(screen.getByRole('tablist', { name: 'Chemical register views' })).toBeInTheDocument();
     // The whole row opens the record (drawing pg-hsn-125); its kebab and right-click carry the same action.
     fireEvent.click(screen.getByText('Recorded chemical'));
     const href = io.get.mock.calls[0][0] as string;

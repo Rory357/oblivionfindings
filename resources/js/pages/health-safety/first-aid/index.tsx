@@ -1,11 +1,13 @@
 /**
  * First aid (approved H&S drawings pg-hsn-83, 83b — Stephan 23 Oct 2026): one
- * header with the register filters and the five views on the rail, then the
- * treatments as a table. Each row leads with the person treated; the outcome
+ * header with the register filters and the "Injuries and care" hub tabs on the
+ * rail (drawing D4), the five views as tier-two tabs, then the treatments as a
+ * table. Each row leads with the person treated; the outcome
  * is a coloured state with "Ambulance called" under it; the date and first
  * aider share one cell. The Needs incident review line stays word for word.
  */
 import { FirstAidTreatmentWizard } from '@/components/health-safety/first-aid/treatment-wizard';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import type {
     FirstAidPickers,
     FirstAidRecord,
@@ -26,10 +28,13 @@ import {
     PageHeaderFilterSelect,
     PageHeaderGlassButton,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     PageHeaderSearch,
     PageLayout,
 } from '@/components/page';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
 import { Note, Ring } from '@/components/signature/blocks';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -53,12 +58,14 @@ import {
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Ambulance,
     ClipboardList,
     Download,
     Eye,
     FileText,
     HeartPulse,
     Link2,
+    List,
     Plus,
     SlidersHorizontal,
     X,
@@ -130,12 +137,12 @@ type Props = {
     can: { view: boolean; create: boolean; manage: boolean };
     report?: boolean;
 };
-const TABS = [
-    { key: 'all', label: 'All treatments' },
-    { key: 'ambulance', label: 'Ambulance called' },
-    { key: 'linked', label: 'Linked incidents' },
-    { key: 'reportable', label: 'Needs incident review' },
-    { key: 'followup', label: 'Open follow-ups' },
+const TABS: GroupedProfileNavTab[] = [
+    { key: 'all', label: 'All treatments', icon: List },
+    { key: 'ambulance', label: 'Ambulance called', icon: Ambulance },
+    { key: 'linked', label: 'Linked incidents', icon: Link2 },
+    { key: 'reportable', label: 'Needs incident review', icon: AlertTriangle },
+    { key: 'followup', label: 'Open follow-ups', icon: ClipboardList },
 ];
 const PERIODS = [
     { value: 'week', label: 'Last 7 days' },
@@ -348,7 +355,7 @@ export default function FirstAidIndex({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'Injuries and care', href: '/health-safety/registers?view=care' },
                 { title: 'First aid', href: FIRST_AID_REGISTER },
             ]}
         >
@@ -479,20 +486,38 @@ export default function FirstAidIndex({
                                 </>
                             }
                             rail={
-                                <PageHeaderRail
-                                    items={TABS.map((item) => ({
-                                        ...item,
-                                        count: tabCounts[item.key] ?? 0,
-                                    }))}
-                                    value={tab}
-                                    onSelect={(next) => go({ tab: next })}
-                                    ariaLabel="First-aid register views"
+                                <SafetyWorkspaceRail
+                                    hub="care"
+                                    current="first-aid"
                                 />
                             }
                         />
                     }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={TABS.map((item) => ({
+                                ...item,
+                                count: tabCounts[item.key] ?? 0,
+                            }))}
+                            activeTab={tab}
+                            onTab={(next) => go({ tab: next })}
+                            testIdPrefix="first-aid-register"
+                            ariaLabel="First-aid register views"
+                            panelId="first-aid-register-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    }
                 >
-                    <div className="grid min-w-0 gap-5">
+                    <div
+                        id="first-aid-register-panel"
+                        role="tabpanel"
+                        aria-label={
+                            TABS.find((item) => item.key === tab)?.label ??
+                            'First aid'
+                        }
+                        className="grid min-w-0 gap-5"
+                    >
                         {tab === 'reportable' ? (
                             <Note tone="warning" icon={AlertTriangle}>
                                 Check these: an incident was reported, an

@@ -5,7 +5,6 @@ import {
     screen,
     within,
 } from '@testing-library/react';
-import { Calendar, MessageSquare, Users } from 'lucide-react';
 import type { AnchorHTMLAttributes, ComponentProps } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -13,6 +12,8 @@ import {
     ParticipationTally,
     type ParticipationHero,
 } from './participation-header';
+import { router } from '@inertiajs/react';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 
 vi.mock('@inertiajs/react', () => ({
     Link: ({
@@ -23,7 +24,8 @@ vi.mock('@inertiajs/react', () => ({
         preserveState?: boolean;
         preserveScroll?: boolean;
     }) => <a {...props} />,
-    router: { get: vi.fn() },
+    router: { get: vi.fn(), visit: vi.fn() },
+    usePage: () => ({ props: { auth: { can: { hazards: { view: true } } } } }),
 }));
 afterEach(cleanup);
 beforeEach(() => vi.clearAllMocks());
@@ -67,26 +69,6 @@ const props: ComponentProps<typeof ParticipationHeader> = {
         { id: 3, name: 'House Three' },
         { id: 4, name: 'House Four' },
     ],
-    tabs: [
-        {
-            id: 'representatives',
-            label: 'Representatives',
-            icon: Users,
-            tone: 'info',
-        },
-        {
-            id: 'meetings',
-            label: 'Committee meetings',
-            icon: Calendar,
-            tone: 'info',
-        },
-        {
-            id: 'consultations',
-            label: 'Consultations',
-            icon: MessageSquare,
-            tone: 'warning',
-        },
-    ],
     periods: [
         { key: 'quarter', label: 'Quarter' },
         { key: 'week', label: 'This week' },
@@ -96,7 +78,6 @@ const props: ComponentProps<typeof ParticipationHeader> = {
         ['resigned', 'Resigned'],
     ] as [string, string][],
     onFilters: vi.fn(),
-    onTab: vi.fn(),
     onClear: vi.fn(),
 };
 
@@ -133,36 +114,27 @@ describe('Participation shared header', () => {
         expect(target.searchParams.has('focus')).toBe(false);
         expect(target.searchParams.get('site_id')).toBe('3');
     });
-    it('preserves nonzero badges and the selected identity when mapping into the connected rail', () => {
-        const tabs = props.tabs.map((item) => ({
-            ...item,
-            badge: item.id === 'representatives' ? 8 : 3,
-        }));
-        const view = render(<ParticipationHeader {...props} tabs={tabs} />);
-        const representatives = screen.getByRole('tab', {
-            name: /Representatives/,
-        });
-        expect(representatives).toHaveTextContent('8');
-        expect(representatives).toHaveAttribute('aria-selected', 'true');
-        expect(
-            screen.getByRole('tab', { name: /Committee meetings/ }),
-        ).toHaveTextContent('3');
-        view.rerender(
+    it('shows the People and participation hub rail, whose three views are the page tabs', () => {
+        render(
             <ParticipationHeader
                 {...props}
-                tabs={tabs}
                 filters={{ ...filters, tab: 'meetings' }}
+                rail={<SafetyWorkspaceRail hub="participation" current="meetings" />}
             />,
         );
+        const rail = screen.getByRole('tablist', {
+            name: 'People and participation views',
+        });
         expect(
-            screen.getByRole('tab', { name: /Representatives/ }),
-        ).toHaveTextContent('8');
-        expect(
-            screen.getByRole('tab', { name: /Representatives/ }),
-        ).toHaveAttribute('aria-selected', 'false');
-        expect(
-            screen.getByRole('tab', { name: /Committee meetings/ }),
+            within(rail).getByRole('tab', { name: /Committees/ }),
         ).toHaveAttribute('aria-selected', 'true');
+        expect(
+            screen.queryByRole('tablist', { name: 'Participation views' }),
+        ).not.toBeInTheDocument();
+        fireEvent.click(within(rail).getByRole('tab', { name: /Consultations/ }));
+        expect(router.visit).toHaveBeenCalledExactlyOnceWith(
+            '/health-safety/worker-participation?tab=consultations',
+        );
     });
     it('retains the recorded counts and linked views without claiming all work is compliant', () => {
         // Four number boxes in the header; the other two lead the body as a tally.
@@ -291,7 +263,7 @@ describe('Participation shared header', () => {
         expect(props.onClear).toHaveBeenCalledOnce();
     });
 
-    it('keeps Site, period, status and the connected views interactive through the real shared controls', () => {
+    it('keeps Site, period and status interactive through the real shared controls', () => {
         render(<ParticipationHeader {...props} />);
         fireEvent.click(screen.getByRole('button', { name: 'Clear Site' }));
         expect(props.onFilters).toHaveBeenLastCalledWith({ site_id: null });
@@ -311,10 +283,6 @@ describe('Participation shared header', () => {
         expect(props.onFilters).toHaveBeenLastCalledWith({
             status: 'resigned',
         });
-        fireEvent.click(
-            screen.getByRole('tab', { name: 'Committee meetings' }),
-        );
-        expect(props.onTab).toHaveBeenCalledExactlyOnceWith('meetings');
     });
 
     it('shows unavailable coverage when no Site denominator exists and retains readable zero values', () => {

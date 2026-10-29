@@ -24,9 +24,18 @@ import { useState } from 'react';
 export function SafetyWorkspaceRail({
     hub,
     current,
+    counts,
+    onSelect,
 }: {
     hub: SafetyHubKey;
     current: string;
+    /** Optional counts per view key (shown on the tab). */
+    counts?: Partial<Record<string, number>>;
+    /**
+     * Optional: a page whose views share one address (Worker participation) switches itself, keeping its filters.
+     * Return false to fall back to the view's own address.
+     */
+    onSelect?: (key: string) => boolean;
 }) {
     const can = usePage<SharedData>().props.auth.can;
     const group = SAFETY_HUBS.find((item) => item.key === hub)!;
@@ -35,11 +44,15 @@ export function SafetyWorkspaceRail({
     );
     return (
         <PageHeaderRail
-            items={views}
+            items={views.map((view) => ({
+                ...view,
+                count: counts?.[view.key] || undefined,
+            }))}
             value={current}
             ariaLabel={`${group.label} views`}
             showFind={views.length > 2}
             onSelect={(key) => {
+                if (onSelect?.(key)) return;
                 const view = views.find((view) => view.key === key);
                 if (view) router.visit(view.href);
             }}

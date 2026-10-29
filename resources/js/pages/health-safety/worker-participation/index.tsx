@@ -1,12 +1,14 @@
 /**
  * Worker participation (approved H&S drawings pg-hsn-104 … 104d): one header
- * with four number boxes, the filters and the three views as rail tabs; then
+ * with four number boxes, the filters and the People and participation hub
+ * on the rail, whose three views are this page's tabs (drawing D4); then
  * representatives as people cards, committee meetings as two logs and
  * consultations as a table. The detail dialogs and create wizards are
  * unchanged. Every record's kebab and right-click come from one actionsFor
  * list, so eligibility stays in one place. The viewer boundary masks the page
  * if the signed-in account changes.
  */
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
     EntityContextMenu,
     type MenuItem,
@@ -18,7 +20,6 @@ import {
 } from '@/components/page';
 import {
     ShiftContextMenu,
-    type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
@@ -62,7 +63,6 @@ import {
     Slash,
     Upload,
     UserPlus,
-    Users,
     XCircle,
 } from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent } from 'react';
@@ -183,12 +183,6 @@ function ParticipationWorkspace({
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true, replace: true },
         );
-    const setTab = (id: string) =>
-        router.get(
-            BASE,
-            { ...filters, tab: id, status: null, focus: null },
-            { preserveState: true, preserveScroll: true },
-        );
     const openDetail = (
         param: 'representative' | 'meeting' | 'consultation',
         id: number,
@@ -216,29 +210,12 @@ function ParticipationWorkspace({
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'representatives',
-            label: 'Representatives',
-            icon: Users,
-            tone: 'info',
-            badge: tabCounts.representatives || undefined,
-        },
-        {
-            id: 'meetings',
-            label: 'Committee meetings',
-            icon: Calendar,
-            tone: 'info',
-            badge: tabCounts.meetings || undefined,
-        },
-        {
-            id: 'consultations',
-            label: 'Consultations',
-            icon: MessageSquare,
-            tone: 'warning',
-            badge: tabCounts.consultations || undefined,
-        },
-    ];
+    // The three views are the People and participation hub's tabs on the header rail.
+    const TAB_LABELS: Record<Props['tab'], string> = {
+        representatives: 'Representatives',
+        meetings: 'Committee meetings',
+        consultations: 'Consultations',
+    };
 
     const PERIOD = [
         { key: 'week', label: 'This week' },
@@ -536,7 +513,7 @@ function ParticipationWorkspace({
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Safety registers', href: '/health-safety/registers' },
+                { title: 'People and participation', href: '/health-safety/registers?view=participation' },
                 { title: 'Worker participation', href: BASE },
             ]}
         >
@@ -548,20 +525,34 @@ function ParticipationWorkspace({
                             filters={filters}
                             hero={hero}
                             sites={sites}
-                            tabs={TABS}
                             periods={PERIOD}
                             statuses={STATUS_OPTS[tab]}
                             onFilters={go}
-                            onTab={setTab}
                             onClear={clearFilters}
                             actions={pageActions}
+                            rail={
+                                <SafetyWorkspaceRail
+                                    hub="participation"
+                                    current={tab}
+                                    counts={tabCounts}
+                                    // The three views share this page: switching keeps the Site, period and search.
+                                    onSelect={(id) => {
+                                        router.get(
+                                            BASE,
+                                            { ...filters, tab: id, status: null, focus: null },
+                                            { preserveState: true, preserveScroll: true },
+                                        );
+                                        return true;
+                                    }}
+                                />
+                            }
                         />
                     </div>
                 }
             >
                 <div
                     role="tabpanel"
-                    aria-label={TABS.find((item) => item.id === tab)?.label ?? 'Participation records'}
+                    aria-label={TAB_LABELS[tab] ?? 'Participation records'}
                     className="grid min-w-0 gap-5"
                 >
                     {tab === 'representatives' ? (

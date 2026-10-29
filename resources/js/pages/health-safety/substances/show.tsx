@@ -53,7 +53,7 @@ function ChemicalWorkspace({ detail, return_to, chemical_confirmation }: Chemica
     const counted = (count: number | null | undefined) => (count === null || count === undefined ? {} : { count });
     const rail = damaged ? [SECTIONS[0]] : SECTIONS.map((item) => item.key === 'sds' ? { ...item, ...counted(detail.counts.sds) } : item.key === 'storage' ? { ...item, ...counted(detail.counts.storage) } : item);
     const side = damaged ? null : <ChemicalRecordSide detail={detail} section={section} onStorage={() => move('storage')} />;
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' },
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
         { title: 'Chemical register', href: CHEMICAL_REGISTER }, { title, href: chemicalHref(detail.id) }]}>
         <Head title={`${title} · Chemical register`} /><SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle title={title} icon={FlaskConical} backHref={returnTo}

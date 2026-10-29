@@ -81,8 +81,8 @@ export default function RestraintReport({
                     ? [
                           { title: 'Health & safety', href: '/health-safety' },
                           {
-                              title: 'Safety registers',
-                              href: '/health-safety/registers',
+                              title: 'Injuries and care',
+                              href: '/health-safety/registers?view=care',
                           },
                           {
                               title: 'Restraints',

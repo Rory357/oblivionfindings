@@ -2,10 +2,13 @@
  * Health & Safety Analytics — trend / root-cause / governance explorer.
  *
  * Read-only analyse/explore/export surface (no create wizards — those live on
- * the dashboard). Shares the dashboard's hero/tab/filter idiom. NZ-only:
+ * the dashboard). The Reports hub sits on the header rail and the analysis
+ * views below it as tier-two tabs (drawing D4). NZ-only:
  * LTIFR / TRIFR, WorkSafe notifiable events, Nga Paerewa NZS 8134:2021, ACC.
  */
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import { PageLayout } from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { Note, Surface } from '@/components/signature/blocks';
 import type {
     RosterTabItem,
@@ -950,7 +953,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
-                { title: 'Reports & assurance', href: '/health-safety/reports' },
+                { title: 'Reports', href: '/health-safety/reports' },
                 { title: 'Health & safety analytics', href: '/health-safety/analytics' },
             ]}
         >
@@ -964,9 +967,12 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                         scorecard={scorecard}
                         period_summary={period_summary}
                         worksafe_notifiable={worksafe_notifiable}
-                        tab={tab}
-                        tabs={TABS}
-                        onTabChange={setTab}
+                        rail={
+                            <SafetyWorkspaceRail
+                                hub="reports"
+                                current="trends"
+                            />
+                        }
                         onPeriod={setPeriod}
                         onReload={reload}
                         exportHref={queryFor(
@@ -979,8 +985,32 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                         }))}
                     />
                 }
+                tabs={
+                    <TierTwoTabs
+                        tabs={TABS.map(({ id, label, icon }) => ({
+                            key: id,
+                            label,
+                            icon,
+                        }))}
+                        activeTab={tab}
+                        onTab={setTab}
+                        testIdPrefix="analytics"
+                        ariaLabel="Analytics views"
+                        panelId="analytics-panel"
+                        // Views carry no href, so the strip renders its own buttons.
+                        renderLink={() => null}
+                    />
+                }
             >
-                <div className="flex min-w-0 flex-col gap-5">
+                <div
+                    id="analytics-panel"
+                    role="tabpanel"
+                    aria-label={
+                        TABS.find((item) => item.id === tab)?.label ??
+                        'Analytics'
+                    }
+                    className="flex min-w-0 flex-col gap-5"
+                >
                     <AnalyticsPeriodSummary
                         summary={period_summary}
                         sdsExpiring={sds_expiring}

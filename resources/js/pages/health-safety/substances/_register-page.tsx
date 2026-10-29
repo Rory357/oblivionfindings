@@ -1,7 +1,8 @@
 /**
  * Chemical register (approved H&S drawing pg-hsn-125 — Stephan 23 Oct 2026): one header with search, Reports and
  * Add chemical, one number box (current safety data sheets — the other numbers are the tab counts), Site, form and
- * status filters with the quieter ones under More filters, and the register views as rail tabs; then one table.
+ * status filters with the quieter ones under More filters, the Risks and prevention hub on the rail and the register
+ * views as tier-two tabs (drawing D4); then one table.
  * A current sheet reads green so a sheet due for review or missing stands out. The safe-use and wellbeing-access
  * line and the source-repair note keep the code's wording; identifiable exposures are never counted here.
  */
@@ -9,7 +10,9 @@ import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-naviga
 import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
-import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderSearch, PageLayout } from '@/components/page';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderSearch, PageLayout } from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
 import { PageHeaderNumber, PageHeaderNumbers } from '@/components/page/page-header-strip';
 import { Note } from '@/components/signature/blocks';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -72,7 +75,7 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
         <p className="text-subtle">Showing {rows.data.length} of {rows.total}</p>
         {rows.last_page > 1 ? <LaravelPagination links={links} lastPage={rows.last_page} /> : null}
     </>;
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Chemical register', href: CHEMICAL_REGISTER }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' }, { title: 'Chemical register', href: CHEMICAL_REGISTER }]}>
         <Head title="Chemical register" /><PageLayout hero={<PageHeader title="Chemical register" icon={FlaskConical} subline="Chemicals, their safety data sheets and where each is stored"
             actions={<><PageHeaderSearch value={search} onChange={setSearch} ariaLabel="Search chemical references" placeholder="Search references…" onKeyDown={(event) => { if (event.key === 'Enter') go({ q: search, page: 1 }); }} />
                 {shared.auth.can?.governance?.view && <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={FileText}>{BOARD_REPORTS_LABEL}</PageHeaderGlassButton></DropdownMenuTrigger>
@@ -92,8 +95,12 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
                 <PageHeaderFilterSelect label="All statuses" value={filters.status ?? 'all'} options={[{ value: 'all', label: 'All statuses' }, ...STATUS_OPTIONS]} onChange={(value) => go({ status: value === 'all' ? null : value, page: 1 })} />
                 <MoreFilters filters={filters} active={moreActive} onChange={(patch) => go({ ...patch, page: 1 })} />
                 {narrowed ? <PageHeaderFilterButton icon={X} onClick={() => go({ q: null, site_id: null, physical_form: null, status: null, controlled: null, sds_state: null, page: 1 })}>Clear filters</PageHeaderFilterButton> : null}
-            </>} rail={<PageHeaderRail items={TABS.map((tab) => ({ ...tab, count: tabCounts[tab.key] ?? undefined }))} value={filters.tab} onSelect={(tab) => go({ tab, page: 1 })} ariaLabel="Chemical register views" />} />}>
-            <div className="grid min-w-0 gap-5">
+            </>} rail={<SafetyWorkspaceRail hub="prevention" current="chemicals" />} />}
+            tabs={<TierTwoTabs tabs={TABS.map((tab) => ({ ...tab, count: tabCounts[tab.key] ?? undefined }))} activeTab={filters.tab} onTab={(tab) => go({ tab, page: 1 })}
+                testIdPrefix="chemical-register" ariaLabel="Chemical register views" panelId="chemical-register-panel"
+                // Views carry no href, so the strip renders its own buttons.
+                renderLink={() => null} />}>
+            <div id="chemical-register-panel" role="tabpanel" aria-label={TABLE_TITLE[filters.tab] ?? 'Chemicals'} className="grid min-w-0 gap-5">
                 {props.source_integrity === 'repair_required' && <div role="status"><Note tone="warning">Some source history needs review. Those records remain visible with their details and changes withheld. A missing measure is unconfirmed.</Note></div>}
                 <RecordTable title={TABLE_TITLE[filters.tab] ?? 'Chemicals'} sub={`${rows.data.length ? `Showing ${from}–${to} of ${rows.total} · ` : ''}${SAFE_USE}`}
                     ariaLabel="Chemical references" columns={columns} rows={rows.data} rowKey={(row) => row.id} onOpen={(row) => router.get(recordHref(row))}

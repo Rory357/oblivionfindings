@@ -104,7 +104,7 @@ function InjuryWorkspace({ detail: d, return_to }: Props) {
         ? { label: 'Next step', text: 'Choose who coordinates this injury', tone: 'critical', meta: 'Recovery, the on-the-day response and the safety review each have their own owner' }
         : NEXT_STEP[d.status] ? { label: 'Next step', text: `${owner} ${NEXT_STEP[d.status]}`, meta: `Recovery coordinator${d.coordination.next_review_date ? ` · next review ${dateWithYear(d.coordination.next_review_date)}` : ''}` } : null;
 
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: `${d.injury_type_label} · ${d.reference}`, href: injuryHref(d.id) }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: `${d.injury_type_label} · ${d.reference}`, href: injuryHref(d.id) }]}>
         <Head title={`Workplace injury · ${d.reference}`} />
         <SafetyFormDraftContext.Provider value={drafts.register}>
             <PageLayout hero={<PageHeader variant="profile" wrapTitle backHref={returnTo} title={`${d.injury_type_label} — ${d.worker?.name ?? 'Name hidden'}`} icon={HeartPulse}

@@ -1,13 +1,16 @@
 /**
  * Workplace injuries (approved H&S drawings pg-hsn-86, 86b — Stephan 23 Oct
  * 2026): one header with the register filters (the quieter ones under More
- * filters) and the views on the rail, then the injuries as a table with each
+ * filters) and the "Injuries and care" hub tabs on the rail (drawing D4), the
+ * views as tier-two tabs, then the injuries as a table with each
  * injury's five stage dots. The WorkSafe wording keeps its meaning: the flag
  * only says someone marked the injury notifiable.
  */
 import { severityLabel, statusLabel } from '@/components/health-safety/injury-constants';
 import { InjuryRegisterList, type InjuryRegisterRow } from '@/components/health-safety/injury-register-list';
-import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderSearch, PageLayout } from '@/components/page';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderSearch, PageLayout } from '@/components/page';
+import { TierTwoTabs, type GroupedProfileNavTab } from '@/components/page/grouped-profile-nav';
 import { Note } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,12 +21,12 @@ import AppLayout from '@/layouts/app-layout';
 import { INJURY_REGISTER, injuryReturn } from '@/lib/health-safety/injury-navigation';
 import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Download, HeartPulse, Lock, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { Archive, Briefcase, CircleCheck, Download, FileText, Flag, HeartPulse, List, Lock, Plus, ShieldAlert, SlidersHorizontal, Stethoscope, X } from 'lucide-react';
 import { useState } from 'react';
 
 type Filters = { q: string; site_id: number | null; severity: string | null; status: string | null; treatment: string | null; acc_open: boolean | null; worksafe: boolean | null; period: string; from: string | null; to: string | null; type: string | null; body_part: string | null };
 type Props = { injuries: { data: InjuryRegisterRow[]; total: number; links: { url: string | null; label: string; active: boolean }[]; last_page: number }; tab: string; tabCounts: Record<string, number>; filters: Filters; sites: { id: number; name: string }[]; options: { injury_types: Record<string, string>; treatments: Record<string, string> | null; severities: string[]; statuses: string[]; periods: string[] }; medical_access: 'readable' | 'restricted'; can: { create: boolean; read_medical: boolean } };
-const TABS = [{ key: 'all', label: 'All injuries' }, { key: 'reported', label: 'Reported' }, { key: 'under_treatment', label: 'Under treatment' }, { key: 'return_to_work', label: 'Return to work' }, { key: 'recovered', label: 'Recovered' }, { key: 'closed', label: 'Closed' }, { key: 'worksafe', label: 'Marked notifiable' }, { key: 'acc', label: 'ACC claim recorded' }];
+const TABS: GroupedProfileNavTab[] = [{ key: 'all', label: 'All injuries', icon: List }, { key: 'reported', label: 'Reported', icon: Flag }, { key: 'under_treatment', label: 'Under treatment', icon: Stethoscope }, { key: 'return_to_work', label: 'Return to work', icon: Briefcase }, { key: 'recovered', label: 'Recovered', icon: CircleCheck }, { key: 'closed', label: 'Closed', icon: Archive }, { key: 'worksafe', label: 'Marked notifiable', icon: ShieldAlert }, { key: 'acc', label: 'ACC claim recorded', icon: FileText }];
 const PERIODS: Record<string, string> = { all: 'All time', week: 'Last 7 days', '30d': 'Last 30 days', quarter: 'Last 3 months', year: 'Last 12 months' };
 function query(filters: Filters, tab: string) {
     const value = new URLSearchParams({ tab });
@@ -47,7 +50,7 @@ export default function InjuryRegister({ injuries, tab, tabCounts, filters, site
     const filtered = !!filters.q || !!filters.site_id || !!filters.severity || (filters.period && filters.period !== 'all') || moreActive > 0;
     const currentQuery = query(filters, tab);
     const restricted = medical_access === 'restricted';
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Workplace injuries', href: INJURY_REGISTER }]}>
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Injuries and care', href: '/health-safety/registers?view=care' }, { title: 'Workplace injuries', href: INJURY_REGISTER }]}>
         <Head title="Workplace injuries" />
         <PageLayout hero={<PageHeader title="Workplace injuries" icon={HeartPulse} subline="Staff injuries, who is coordinating and the recovery work" actions={<>
             <PageHeaderSearch value={search} onChange={setSearch} onKeyDown={(event) => { if (event.key === 'Enter') visit({ q: search }); }} placeholder="Find an injury…" ariaLabel="Search workplace injuries" />
@@ -70,8 +73,12 @@ export default function InjuryRegister({ injuries, tab, tabCounts, filters, site
                     <Button onClick={() => { setAdvancedOpen(false); visit({ from: extra.from || null, to: extra.to || null, body_part: extra.body_part || null }); }}>Apply filters</Button>
                 </PopoverContent></Popover>
             {filtered && <PageHeaderFilterButton icon={X} onClick={() => router.get(INJURY_REGISTER)}>Clear filters</PageHeaderFilterButton>}
-        </>} rail={<PageHeaderRail items={TABS.map((item) => ({ ...item, count: tabCounts[item.key] }))} value={tab} onSelect={(next) => visit({}, next)} ariaLabel="Injury views" />} />}>
-            <div className="grid min-w-0 gap-5">
+        </>} rail={<SafetyWorkspaceRail hub="care" current="injuries" />} />}
+            tabs={<TierTwoTabs tabs={TABS.map((item) => ({ ...item, count: tabCounts[item.key] }))} activeTab={tab} onTab={(next) => visit({}, next)}
+                testIdPrefix="injury-register" ariaLabel="Injury views" panelId="injury-register-panel"
+                // Views carry no href, so the strip renders its own buttons.
+                renderLink={() => null} />}>
+            <div id="injury-register-panel" role="tabpanel" aria-label={TABS.find((item) => item.key === tab)?.label ?? 'Workplace injuries'} className="grid min-w-0 gap-5">
                 {restricted && <Note icon={Lock}>You can see the injury details. Medical details are hidden — ask a health and safety manager if you need them.</Note>}
                 <InjuryRegisterList rows={injuries.data} total={injuries.total} returnTo={returnTo} medical={!restricted && can.read_medical}
                     sub="Newest first · ‘Notifiable’ means someone marked it for WorkSafe — open the injury to see the decision"

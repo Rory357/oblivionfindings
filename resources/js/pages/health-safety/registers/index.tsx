@@ -4,17 +4,17 @@ import {
     SafetyDirectorySearch,
     type SafetyDirectoryStatus,
 } from '@/components/health-safety/workspace-directory';
-import { Log, type SgTone } from '@/components/signature/blocks';
 import {
     PageHeader,
     PageHeaderGlassButton,
     PageHeaderRail,
     PageLayout,
 } from '@/components/page';
+import { Log, type SgTone } from '@/components/signature/blocks';
 import AppLayout from '@/layouts/app-layout';
 import {
     SAFETY_HUBS,
-    SAFETY_REGISTER_GROUPS,
+    SAFETY_REGISTER_HUBS,
     visibleSafetyViews,
 } from '@/lib/health-safety/workspace-navigation';
 import { type SharedData } from '@/types';
@@ -45,13 +45,18 @@ export default function SafetyRegisters({
 }) {
     const { props, url } = usePage<SharedData>();
     const [query, setQuery] = useState('');
-    const views = visibleSafetyViews(
-        SAFETY_HUBS.find((hub) => hub.key === 'registers')!,
-        props.auth.can,
-    );
-    const groups = SAFETY_REGISTER_GROUPS.filter((group) =>
-        views.some((view) => view.group === group.key),
-    );
+    // The sidebar now opens these lists through three hubs (drawing D4); this address stays as their directory.
+    const hubs = SAFETY_HUBS.filter((hub) =>
+        SAFETY_REGISTER_HUBS.includes(hub.key),
+    )
+        .map((hub) => ({
+            key: hub.key as string,
+            label: hub.label,
+            views: visibleSafetyViews(hub, props.auth.can),
+        }))
+        .filter((hub) => hub.views.length > 0);
+    const views = hubs.flatMap((hub) => hub.views);
+    const groups = hubs.map(({ key, label }) => ({ key, label }));
     const requested = new URL(url, 'https://safety.local').searchParams.get(
         'view',
     );
@@ -59,7 +64,7 @@ export default function SafetyRegisters({
         groups.find((group) => group.key === requested) ?? groups[0];
     const items = query.trim()
         ? views
-        : views.filter((view) => view.group === selected?.key);
+        : (hubs.find((hub) => hub.key === selected?.key)?.views ?? []);
     return (
         <AppLayout
             breadcrumbs={[
@@ -74,7 +79,7 @@ export default function SafetyRegisters({
                     <PageHeader
                         title="Safety registers"
                         icon={ClipboardCheck}
-                        subline="People, equipment and worker participation"
+                        subline="Injuries and care, risks and prevention, people and participation"
                         wrapTitle
                         frontline
                         actions={

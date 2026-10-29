@@ -156,7 +156,7 @@ it('uses one review header, four linked numbers and the shared sibling rail', ()
     expect(document.querySelectorAll('header.eh-header')).toHaveLength(1);
     expect(screen.queryByLabelText('Safety workflow')).not.toBeInTheDocument();
     expect(
-        screen.getByRole('tablist', { name: 'Actions & reviews views' }),
+        screen.getByRole('tablist', { name: 'Incidents and safety reviews views' }),
     ).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: /^View / })).toHaveLength(4);
     fireEvent.click(

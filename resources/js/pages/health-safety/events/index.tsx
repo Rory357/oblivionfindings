@@ -888,7 +888,7 @@ export default function HsEventsIndex({
                         </>
                     }
                     rail={
-                        <SafetyWorkspaceRail hub="actions" current="reviews" />
+                        <SafetyWorkspaceRail hub="concerns" current="reviews" />
                     }
                 />
 
