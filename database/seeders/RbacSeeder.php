@@ -585,6 +585,10 @@ class RbacSeeder extends Seeder
             ['key' => 'restraints.manage', 'description' => 'Manage restraint events & behaviour support plan lifecycle', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.review', 'description' => 'Review restraint events & sign off plan reviews', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.approve', 'description' => 'Explicitly designated behaviour support plan approval authority, subject to current source access and policy', 'group' => 'restraints', 'module' => 'Compliance'],
+            // Create-only reporting (MASTER for Stephan, 30 Oct): open the report form and save it. No register, no
+            // evidence afterwards, no plans, no review or approval.
+            ['key' => 'restraints.report', 'description' => 'Report a restraint (create only; no register, review or plans)', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'injuries.report', 'description' => 'Report a workplace injury (create only; no register or recovery work)', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Safe Work Procedures (controlled SWMS document library)
             ['key' => 'procedures.view', 'description' => 'View safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
@@ -839,6 +843,8 @@ class RbacSeeder extends Seeder
 
         // Support Worker
         $syncPermissions($supportWorker, [
+            // Create-only reporting of restraints and workplace injuries (MASTER for Stephan, 30 Oct).
+            'restraints.report', 'injuries.report',
             'clients.viewAssigned', 'medications.view', 'timeline.create',
             'progress_notes.viewAny', 'progress_notes.create',
             'shifts.viewAssigned', 'shifts.tasks.updateSelf', 'shifts.tasks.createSelf',
@@ -958,6 +964,9 @@ class RbacSeeder extends Seeder
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct). Not incidents.create: an
+            // incident report needs a client the reporter can read, and team leads hold no client read access.
+            'safeguarding.create',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
@@ -1001,6 +1010,8 @@ class RbacSeeder extends Seeder
             'healthSafety.closureExceptions.request',
             // Stephan 25 Oct 2026: H&S officers read incidents (Site and privacy rules still apply).
             'incidents.create', 'incidents.viewAny',
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
+            'safeguarding.create',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',

@@ -45,7 +45,7 @@ class RestraintService
     private function capture(User $actor, array $input, ?RespiteStay $entry): array
     {
         return $this->transaction(fn () => $this->access->withCurrentViewer($actor, function ($current, $reads, $sites) use ($input, $entry): array {
-            abort_unless($entry ? $current->canDo('respite.stays.manage') : ($current->canDo('restraints.create') || $current->canDo('restraints.manage')), 403);
+            abort_unless($entry ? $current->canDo('respite.stays.manage') : ($current->canDo('restraints.create') || $current->canDo('restraints.manage') || $current->canDo('restraints.report')), 403);
             $values = $this->eventValues($input, true);
             $key = $values['idempotency_key'];
             $fingerprint = RestraintCommandValues::digest(['event', 'create', $current->id, $entry?->id, Arr::except($values, ['idempotency_key'])]);
@@ -358,7 +358,8 @@ class RestraintService
 
             return $this->access->withCurrentViewer($actor, function ($current, $reads, $sites) use ($row, $verb, $input, $normalize, $operation): array {
                 $op = match ($verb) {
-                    'add_evidence' => 'capture','remove_evidence' => 'remove_evidence','complete_followup' => 'complete_followup',default => 'review'
+                    // Evidence keeps its own rule: create-only reporters (restraints.report) may capture but never add evidence.
+                    'add_evidence' => 'add_evidence','remove_evidence' => 'remove_evidence','complete_followup' => 'complete_followup',default => 'review'
                 };
                 $this->access->assertEvent($row, $current, $reads, $sites, $op);
                 if ($verb === 'remove_evidence') {
@@ -420,7 +421,7 @@ class RestraintService
                 if ($confirmation === null) {
                     return null;
                 }
-                $op = $receipt->command === 'create' ? (($receipt->accepted_result['capture_entry'] ?? null) === 'respite' ? 'respite_capture' : 'capture') : ($receipt->command === 'complete_followup' ? 'complete_followup' : ($receipt->command === 'remove_evidence' ? 'remove_evidence' : ($receipt->command === 'add_evidence' ? 'capture' : 'review')));
+                $op = $receipt->command === 'create' ? (($receipt->accepted_result['capture_entry'] ?? null) === 'respite' ? 'respite_capture' : 'capture') : ($receipt->command === 'complete_followup' ? 'complete_followup' : ($receipt->command === 'remove_evidence' ? 'remove_evidence' : ($receipt->command === 'add_evidence' ? 'add_evidence' : 'review')));
                 $this->access->assertEvent($row, $current, $reads, $sites, $op);
                 if ($receipt->command === 'create' && $row->related_incident_id) {
                     $this->connections->incidentForCapture($row, (int) $row->related_incident_id, $current, $reads, $sites, $op);

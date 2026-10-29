@@ -45,6 +45,22 @@ describe('Report something', () => {
         );
     });
 
+    it('offers create-only reporters the injury and restraint forms, nothing more', () => {
+        expect(
+            labels({
+                incidents: { create: true },
+                safeguarding: { create: true },
+                injuries: { report: true },
+                restraints: { report: true },
+            }),
+        ).toEqual([
+            'A person was hurt, or nearly hurt',
+            'A staff member was hurt at work',
+            'A person’s movement or freedom was limited',
+            'You’re worried a person is being harmed',
+        ]);
+    });
+
     it('names the main button after the form it opens and says what the chosen form will ask', () => {
         page.can = { incidents: { create: true }, safeguarding: { create: true } };
         const onWorkflow = vi.fn();

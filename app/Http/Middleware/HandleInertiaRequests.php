@@ -872,6 +872,12 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('restraints.create'),
                 'manage' => $user->canDo('restraints.manage'),
                 'review' => $user->canDo('restraints.review'),
+                // Create-only reporting (MASTER for Stephan, 30 Oct).
+                'report' => $user->canDo('restraints.report'),
+            ],
+
+            'injuries' => [
+                'report' => $user->canDo('injuries.report'),
             ],
 
             'procedures' => [

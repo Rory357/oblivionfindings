@@ -55,7 +55,8 @@ const WORKFLOWS: Workflow[] = [
         opens: 'Report a workplace injury',
         asks: 'Who was hurt, the injury, and any time off or ACC claim.',
         group: 'hurt',
-        allowed: hazardCapture,
+        // injuries.report: create-only reporters (MASTER for Stephan, 30 Oct).
+        allowed: (can) => hazardCapture(can) || Boolean(can?.injuries?.report),
     },
     {
         key: 'first_aid',
@@ -74,7 +75,11 @@ const WORKFLOWS: Workflow[] = [
         asks: 'What led to it, what you tried first, and how the person is now.',
         group: 'hurt',
         allowed: (can) =>
-            Boolean(can?.restraints?.create || can?.restraints?.manage),
+            Boolean(
+                can?.restraints?.create ||
+                    can?.restraints?.manage ||
+                    can?.restraints?.report,
+            ),
     },
     {
         key: 'hazard',
