@@ -390,6 +390,8 @@ Still failing the same way on main (main's own tests, not skipped; same messages
 - **Sites list SSR error** (MASTER, 29 Oct): `/sites` logs `ReferenceError: window is not defined` from Inertia SSR on every render (seen since at least 21 Oct). The page still loads (client render). `/sites` imports nothing changed by the H&S branch. Owner: Sites/Assets.
 - **Incidents list shows incidents of archived Sites and deleted clients** (INC-2026-0142, INC-2026-0145 on the .com). Ease-of-use pass: lists hide archived Sites and deleted clients.
 - **Security & Devices** `device-profile-header.test.tsx` fails 2 cases on this branch and main alike (not touched here).
+- **Control Room lifecycle outbox: 4 failed jobs on the .com** (29 Oct 10:38 UTC, failed_jobs 1439–1442). `DispatchIncidentLifecycleSignalOutbox` throws "The canonical H&S event is no longer closed." Signals 14–20 were created at 10:38 for older demo incidents (effective Apr–Jul 2026) whose client incident is closed but whose H&S event is not. The guard is right to refuse. The data needs a decision: close those H&S events through the app, or drop the stale signals. Owner: Control Room. Not the demo command (that ran at 11:29).
+- **`DismissedAlertScopeTest` lone-worker cases (6) fail on this branch alone and in lanes (30 Oct).** The branch's committed PHP matches main, and none of the Part 2 PHP touches lone workers or the Control Room. Expected `ack` but got `open`; `tabCounts.alerts` 0 instead of 1. Owner: Control Room / lone worker.
 - **Main's own Pest failures seen during these gates:** `SecurityAccessControlTest` "incident update cannot escalate portal visibility" (403), `ClientProfileFoundationTest` 2 cases (medical section shown to an assigned worker) — both fail the same way with main's code.
 
 ## Part 2 drawings — reviewed by MASTER (30 Oct, for Stephan)
@@ -416,3 +418,26 @@ Drawings: `docs/health-safety-build/drawings/` (`63f658209`, updated after revie
   - It's built **last** in Part 2, in its own commit, so it can be vetoed.
 
 **Build order:** D2 Report something → D1 Overview header and role starts → D4 hubs with tabs → D3 one accident record → the support-worker create permission (own commit).
+
+## Part 2 build (30 Oct)
+
+- **D2 Report something:** one chooser in three plain-words groups. Each choice shows only to people allowed to use it (the same permission its page checks), and the main button names the form it opens.
+  - **Open question for MASTER:** "keep safeguarding and *A person was hurt* for everyone" can't be met by showing alone. On the .com, `team_lead` has neither `incidents.create` nor `safeguarding.create`, and `health_safety_officer` lacks `safeguarding.create`. Showing those choices would open a form that refuses them. Built as "permitted only" until MASTER decides whether to grant those create keys (a grant migration).
+- **D1 Overview:**
+  - The header is trimmed: "Health and safety", search, Board reports (only with board access), and Report something. The Lens switch and View analytics are gone.
+  - The start follows the role (`HealthSafetyDashboardController::startFor`): "Your queue" (all-sites H&S or board access), "Your site" (`hazards.manage`), "Your start" (everyone else).
+  - The frontline start lists what the person may report, opening the form directly. It has no number strip or filters. The subline names their own house when they can see only one.
+  - The safeguarding choice is on every start for anyone allowed to raise one.
+- **D4 six hubs:**
+  - The hubs are Overview · Incidents and safety reviews · Injuries and care · Risks and prevention · People and participation · Reports.
+  - Inside a hub, the sibling lists are tabs on the header rail. Each page's own status views sit in the second tier (`TierTwoTabs`).
+  - Breadcrumbs name the hub. `/health-safety/registers` stays as a directory of the three register hubs (`?view=care|prevention|participation`).
+  - Worker participation keeps its filters and counts when switching tabs.
+- **D3 one accident record, privacy part:**
+  - The incident page now lists a linked restraint's details only if the viewer can open that restraint (`restraints.view` plus the restraint's own client, Site and plan checks). Before this, any incident reader saw the reference, type, severity and injury.
+  - First aid already followed its own access check.
+  - Linked records the viewer can't open show only "A health record — hidden, you don't have access", and the timeline shows "Health record added — hidden". The payload carries only when each was added.
+  - Readable first aid and restraints now join the one timeline.
+  - Tests: `IncidentHiddenHealthRecordsTest` (viewer without access; viewer with restraint access) and `hidden-health-records.test.ts`.
+  - Tab regrouping for D3 is still to come.
+- **Incidental fix:** `attachment-remove-confirmation-contracts.test.ts` still listed five dialogs removed in Part 1 (`b3090e6bc`). Their replacement record pages ask before removing a file, through their own "Remove evidence" pop-ups.
