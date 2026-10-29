@@ -15,9 +15,16 @@ const REPORT_PAGES: Record<string, string> = {
     safeguarding: '/safeguarding/create',
 };
 
-/** The report page for a Report-menu item, or null when it opens in place. */
-export function reportPageFor(key: string): string | null {
-    return Object.prototype.hasOwnProperty.call(REPORT_PAGES, key)
-        ? REPORT_PAGES[key]
-        : null;
+/**
+ * The report page for a Report-menu item, or null when it opens in place. `returnTo` replaces the page it comes
+ * back to (My Day sends people back to My Day: support workers can't open the H&S Overview).
+ */
+export function reportPageFor(key: string, returnTo?: string): string | null {
+    if (!Object.prototype.hasOwnProperty.call(REPORT_PAGES, key)) return null;
+    const page = REPORT_PAGES[key];
+    if (!returnTo || !page.includes('return_to=')) return page;
+    const [path, query] = page.split('?');
+    const params = new URLSearchParams(query);
+    params.set('return_to', returnTo);
+    return path + '?' + params.toString();
 }
