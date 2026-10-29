@@ -7,6 +7,7 @@ import {
     waitFor,
     within,
 } from '@testing-library/react';
+import { type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const inertia = vi.hoisted(() => ({
@@ -34,6 +35,7 @@ vi.mock('@inertiajs/react', async () => {
     const ReactModule = await import('react');
 
     return {
+        Head: () => null,
         usePage: () => ({ props: inertia.pageProps }),
         router: { visit: vi.fn() },
         useForm: <T extends Record<string, unknown>>(initial: T) => {
@@ -89,8 +91,13 @@ vi.mock('@inertiajs/react', async () => {
     };
 });
 
+vi.mock('@/layouts/app-layout', () => ({
+    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+}));
+
 import { ReportIncidentDialog } from '../../pages/health-safety/components/report-incident-dialog';
 import { ReportLauncher } from '../../pages/health-safety/components/report-launcher';
+import IncidentReportPage from '../../pages/incidents/report';
 import {
     IncidentReportDialog,
     type IncidentReportDefaults,
@@ -1210,5 +1217,46 @@ describe('IncidentReportDialog truthful incident intent', () => {
         expect(status).toBeInTheDocument();
         expect(status.parentElement?.querySelector('svg')).not.toBeNull();
         expect(screen.queryByText('INC-42')).not.toBeInTheDocument();
+    });
+});
+
+describe('IncidentReportPage — standalone page for reporters without register access', () => {
+    it('lays the same wizard out as a page and offers no way into the incident', () => {
+        inertia.nextResult = {
+            result: 'submitted',
+            incident_reference: 'INC-2026-0042',
+            incident_url: '/incidents/42',
+        };
+        render(
+            <IncidentReportPage
+                mode="incident"
+                clients={clients}
+                sites={sites}
+                staff={[]}
+                canManageFollowups={false}
+                canOpenIncident={false}
+                defaults={defaults}
+                returnUrl="/my-day"
+            />,
+        );
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Close reporting' }),
+        ).toBeInTheDocument();
+        openReviewStep();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Submit incident' }),
+        );
+
+        expect(
+            screen.getByRole('heading', { name: 'Incident submitted' }),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: 'Open incident' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('button', { name: 'Back to My Day' }),
+        ).toBeInTheDocument();
     });
 });

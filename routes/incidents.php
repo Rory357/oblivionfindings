@@ -19,6 +19,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Incident creation (must come before /incidents/{incident})
     Route::middleware('permission:incidents.create')->group(function () {
         Route::get('/incidents/create', [IncidentController::class, 'create'])->name('incidents.create');
+        // Standalone report page for reporters who can't open the register.
+        Route::get('/incidents/report', [IncidentController::class, 'report'])->name('incidents.report');
         Route::get('/incidents/drafts/{requestUuid}', [IncidentReportDraftController::class, 'show'])
             ->whereUuid('requestUuid')
             ->name('incidents.drafts.show');

@@ -964,9 +964,11 @@ class RbacSeeder extends Seeder
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
-            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct). Not incidents.create: an
-            // incident report needs a client the reporter can read, and team leads hold no client read access.
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
             'safeguarding.create',
+            // Report incidents (Stephan, 30 Oct): read the clients at their sites, report from /incidents/report.
+            // No incident register. Grant migration: 2026_10_30_110000_grant_team_lead_incident_reporting.
+            'incidents.create', 'clients.viewAny',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',

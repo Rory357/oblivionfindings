@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { WizardPageShell } from '@/components/wizard/page-shell';
 import {
     Field,
     FieldErr,
@@ -247,6 +248,7 @@ export function IncidentReportDialog({
     canManageFollowups = false,
     onOpenIncident,
     doneLabel = 'Done',
+    presentation = 'dialog',
 }: {
     open: boolean;
     onClose: () => void;
@@ -259,8 +261,11 @@ export function IncidentReportDialog({
     canManageFollowups?: boolean;
     onOpenIncident?: (url: string) => void;
     doneLabel?: string;
+    /** 'page' lays the same wizard out as a full page, for reporters without register access. */
+    presentation?: 'dialog' | 'page';
 }) {
     const isNearMiss = mode === 'near_miss';
+    const Shell = presentation === 'page' ? WizardPageShell : WizardShell;
     const page = usePage();
     const userId = Number(
         (page.props as { auth?: { user?: { id?: number } } }).auth?.user?.id ??
@@ -780,7 +785,7 @@ export function IncidentReportDialog({
 
     return (
         <>
-            <WizardShell
+            <Shell
                 open={open}
                 onClose={requestClose}
                 title={isNearMiss ? 'Report a near miss' : 'Report an incident'}
@@ -980,7 +985,7 @@ export function IncidentReportDialog({
                         </>
                     ) : null}
                 </WizardStepPane>
-            </WizardShell>
+            </Shell>
 
             <AlertDialog
                 open={closePrompt}

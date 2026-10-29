@@ -499,16 +499,97 @@ class IncidentController extends Controller
             return redirect()->route('incidents.index', ['incident' => (int) $request->query('incident'), ...$source]);
         }
 
-        $params = ['report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident', ...$source];
+        $params = [
+            'report' => $request->query('type') === 'near_miss' ? 'near_miss' : 'incident',
+            ...$source,
+            ...$this->reportPrefill(
+                $user,
+                $request->filled('shift_id') ? (int) $request->query('shift_id') : null,
+                $request->filled('client_id') ? (int) $request->query('client_id') : null,
+            ),
+        ];
 
-        if ($request->filled('shift_id')) {
+        // Reporters who can't open the register report from the standalone page.
+        return redirect()->route($this->canReadIncidentRegister($user) ? 'incidents.index' : 'incidents.report', $params);
+    }
+
+    /**
+     * Report an incident as a full page (the shared reporting page shell), for
+     * people allowed to report who can't open the incident register. Lists
+     * only the people the register's report form would offer them.
+     */
+    public function report(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user?->canDo('incidents.create'), 403);
+
+        $siteIds = app(UserSiteAccessService::class)->accessibleSiteIds($user, $this->incidentReportSiteBypassPermissions());
+        $clientQuery = Client::query()->whereIn('site_id', $siteIds);
+        if (! $this->canReportAcrossHealthSafety($user) && ! $user->canDo('clients.viewAny')) {
+            $clientQuery->whereHas('supportWorkers', fn ($s) => $s->whereKey($user->id));
+        }
+        $clients = $clientQuery->orderBy('first_name')->orderBy('id')->get(['id', 'first_name', 'last_name', 'site_id']);
+        $sites = Site::query()
+            ->whereIn('id', $clients->pluck('site_id')->filter()->unique()->values())
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $prefill = $this->reportPrefill(
+            $user,
+            $request->filled('report_shift_id') ? (int) $request->query('report_shift_id') : null,
+            $request->filled('report_client_id') ? (int) $request->query('report_client_id') : null,
+        );
+        $prefillClient = isset($prefill['report_client_id'])
+            ? $clients->firstWhere('id', $prefill['report_client_id'])
+            : null;
+
+        $canManageFollowups = $user->canDo('incidents.followups.manage');
+        $response = Inertia::render('incidents/report', [
+            'mode' => $request->query('report') === 'near_miss' ? 'near_miss' : 'incident',
+            'clients' => $clients->toArray(),
+            'sites' => $sites->toArray(),
+            'staff' => $canManageFollowups
+                ? app(HrCurrentStaffService::class)->currentUsersQuery()->orderBy('name')->orderBy('id')->get(['id', 'name'])->toArray()
+                : [],
+            'canManageFollowups' => $canManageFollowups,
+            'canOpenIncident' => $this->canReadIncidentRegister($user),
+            'defaults' => [
+                'client_id' => $prefillClient ? (int) $prefillClient->id : null,
+                'shift_id' => $prefillClient && isset($prefill['report_shift_id']) ? (int) $prefill['report_shift_id'] : null,
+                'site_id' => $prefillClient?->site_id ? (int) $prefillClient->site_id : null,
+            ],
+            'returnUrl' => $request->query('return_to') === '/my-day' || ! $this->canReadIncidentRegister($user)
+                ? '/my-day'
+                : '/incidents',
+        ])->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+        $response->headers->set('Referrer-Policy', 'no-referrer');
+
+        return $response;
+    }
+
+    private function canReadIncidentRegister(User $user): bool
+    {
+        return $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
+    }
+
+    /**
+     * The shift and person a report may start with: a shift the reporter worked
+     * (or may report across), else a person they may report for.
+     *
+     * @return array{report_shift_id?: int, report_client_id?: int}
+     */
+    private function reportPrefill(User $user, ?int $shiftId, ?int $clientId): array
+    {
+        $params = [];
+        if ($shiftId) {
             $shiftQuery = Shift::query()->with('client:id,site_id');
             app(UserSiteAccessService::class)->applyShiftScope(
                 $shiftQuery,
                 $user,
                 $this->incidentReportSiteBypassPermissions(),
             );
-            $shift = $shiftQuery->find((int) $request->query('shift_id'));
+            $shift = $shiftQuery->find($shiftId);
 
             if (
                 $shift
@@ -524,14 +605,14 @@ class IncidentController extends Controller
                 }
             }
         }
-        if ($request->filled('client_id') && ! isset($params['report_shift_id'])) {
+        if ($clientId && ! isset($params['report_shift_id'])) {
             $clientQuery = Client::query();
             app(UserSiteAccessService::class)->applyClientScope(
                 $clientQuery,
                 $user,
                 $this->incidentReportSiteBypassPermissions(),
             );
-            $client = $clientQuery->find((int) $request->query('client_id'));
+            $client = $clientQuery->find($clientId);
             if ($client
                 && ($user->can('view', $client) || $this->canReportAcrossHealthSafety($user))
             ) {
@@ -539,7 +620,7 @@ class IncidentController extends Controller
             }
         }
 
-        return redirect()->route('incidents.index', $params);
+        return $params;
     }
 
     public function store(

@@ -298,6 +298,10 @@ class HealthcareWorkspaceTest extends TestCase
 
     public function test_client_tab_is_restricted_without_client_context_permission_and_leaks_no_counts(): void
     {
+        // Team leads read the clients at their sites since 30 Oct (Stephan); this case needs a viewer without
+        // client context, so it takes that one key off the role for this test.
+        Role::query()->where('name', 'team_lead')->firstOrFail()->permissions()
+            ->detach(\App\Models\Permission::query()->where('key', 'clients.viewAny')->value('id'));
         $viewer = $this->viewerWithRole('team_lead');
         $client = Client::factory()->create();
         $device = $this->healthcareDevice('Restricted client device');

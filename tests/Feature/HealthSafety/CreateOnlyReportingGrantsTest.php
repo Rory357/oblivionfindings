@@ -15,7 +15,7 @@ use Tests\TestCase;
 /**
  * Create-only reporting grants (MASTER for Stephan, 30 Oct; one yes/no for Stephan): team leads and H&S officers raise
  * safeguarding concerns, support workers report restraints and workplace injuries. Each grant opens a form; none adds
- * reading beyond today's rules. Team leads don't get incidents.create: a report needs a client they can read.
+ * reading beyond today's rules. Team leads' incident reporting (with client reading) is TeamLeadIncidentReportingTest.
  */
 class CreateOnlyReportingGrantsTest extends TestCase
 {
@@ -35,8 +35,7 @@ class CreateOnlyReportingGrantsTest extends TestCase
 
         $lead = $keys('team_lead');
         $this->assertContains('safeguarding.create', $lead);
-        // Not incidents.create: an incident report needs a client the reporter can read; team leads read none.
-        foreach (['incidents.create', 'incidents.viewAny', 'incidents.viewAssigned', 'safeguarding.viewAny', 'clients.viewAny', 'clients.viewAssigned'] as $notGranted) {
+        foreach (['incidents.viewAny', 'incidents.viewAssigned', 'safeguarding.viewAny'] as $notGranted) {
             $this->assertNotContains($notGranted, $lead, 'team_lead must not gain '.$notGranted);
         }
 
