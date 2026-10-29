@@ -307,24 +307,41 @@ final readonly class ProbeRunner
         ];
     }
 
-    /** @param array<string, mixed> $check @return array{state: string, reason_code: string, metrics: array<string, mixed>} */
+    /**
+     * SNMP v3 (authPriv) or, when the saved login is a community string, v2c (Phase A, item A7).
+     * Hubs now ship the SNMP module; a runtime without it still reports "unknown", never "healthy".
+     *
+     * @param array<string, mixed> $check @return array{state: string, reason_code: string, metrics: array<string, mixed>}
+     */
     private function snmp(array $check, #[\SensitiveParameter] array $material): array
     {
-        if (! function_exists('snmp3_get')) {
+        $community = is_string($material['community'] ?? null) ? trim($material['community']) : '';
+        $useV2c = $community !== '' && trim((string) ($material['username'] ?? '')) === '';
+
+        if (! function_exists($useV2c ? 'snmp2_get' : 'snmp3_get')) {
             return ['state' => 'unknown', 'reason_code' => 'snmp_runtime_unavailable', 'metrics' => []];
         }
-        $response = @snmp3_get(
-            $check['target'],
-            (string) ($material['username'] ?? ''),
-            'authPriv',
-            (string) ($material['auth_protocol'] ?? 'SHA'),
-            (string) ($material['auth_passphrase'] ?? ''),
-            (string) ($material['privacy_protocol'] ?? 'AES'),
-            (string) ($material['privacy_passphrase'] ?? ''),
-            self::SNMP_INVENTORY_OIDS,
-            $this->timeout($check) * 1_000_000,
-            0,
-        );
+
+        $response = $useV2c
+            ? @snmp2_get(
+                $check['target'],
+                $community,
+                self::SNMP_INVENTORY_OIDS,
+                $this->timeout($check) * 1_000_000,
+                0,
+            )
+            : @snmp3_get(
+                $check['target'],
+                (string) ($material['username'] ?? ''),
+                'authPriv',
+                (string) ($material['auth_protocol'] ?? 'SHA'),
+                (string) ($material['auth_passphrase'] ?? ''),
+                (string) ($material['privacy_protocol'] ?? 'AES'),
+                (string) ($material['privacy_passphrase'] ?? ''),
+                self::SNMP_INVENTORY_OIDS,
+                $this->timeout($check) * 1_000_000,
+                0,
+            );
 
         return [
             'state' => $response === false ? 'failed' : 'healthy',

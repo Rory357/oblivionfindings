@@ -55,7 +55,8 @@ func resolvePhpRuntime(root string) (php string, workDir string, envPath string,
 			return "", "", "", nil, false, unavailable
 		}
 		args := []string{"-n", "-d", "date.timezone=UTC", "-d", "log_errors=0", "-d", "display_errors=stderr"}
-		for _, ext := range []string{"curl", "openssl", "sodium", "sockets"} {
+		// snmp: Phase A, item A7 — hubs read switches over SNMP v2c/v3 (docs/security-devices/GOAL.md).
+		for _, ext := range []string{"curl", "openssl", "sodium", "sockets", "snmp"} {
 			extPath := filepath.Join(runtimeDir, "ext", ext+".so")
 			if protected(extPath, false) != nil {
 				return "", "", "", nil, false, unavailable

@@ -34,7 +34,7 @@ final class MilesightLorawanGatewaySensorDriver implements DeviceDriver
             name: 'LoRaWAN Gateway Push & Clean-Room TLV Decoder',
             deviceClass: DriverDeviceClass::Sensor,
             supportLevel: DriverSupportLevel::BuiltFromDocs,
-            transportSummary: 'LoRaWAN via UG56 / UG65 / UG67 · HTTPS Webhook (HMAC-SHA256 / Bearer) & MQTT v3.1.1 · Binary TLV',
+            transportSummary: 'LoRaWAN via UG56 / UG65 / UG67 · HTTPS webhook with the Site’s secret (Bearer, token header or password) & MQTT v3.1.1 · Binary TLV',
             models: [
                 'AM103 / AM307 / AM319 (Temp, Humidity, CO2)',
                 'EM300-TH / EM300-SLD (Leak) / EM300-MCS (Door)',

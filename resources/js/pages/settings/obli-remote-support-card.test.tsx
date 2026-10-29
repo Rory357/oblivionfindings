@@ -90,9 +90,9 @@ describe('ObliRemoteSupportCard', () => {
                 actor_id: 7,
                 verification: {
                     ok: true,
-                    status: 'verified',
+                    status: 'relay_answered',
                     message:
-                        'Verified Coturn TURN REST HMAC-SHA1 credential signing across 1 relay URL.',
+                        'The relay answered: turns:turn.oblivionfindings.com:5349?transport=tcp (12 ms).',
                 },
             },
         });
@@ -154,9 +154,7 @@ describe('ObliRemoteSupportCard', () => {
             screen.getByLabelText('Generated TURN shared secret'),
         ).toBeTruthy();
 
-        fireEvent.click(
-            screen.getByRole('button', { name: 'Test relay signing' }),
-        );
+        fireEvent.click(screen.getByRole('button', { name: 'Test relay' }));
 
         await waitFor(() => {
             expect(axios.post).toHaveBeenCalledWith(
@@ -166,6 +164,6 @@ describe('ObliRemoteSupportCard', () => {
             );
         });
 
-        expect(await screen.findByText('Relay verified')).toBeTruthy();
+        expect(await screen.findByText('Relay answered')).toBeTruthy();
     });
 });

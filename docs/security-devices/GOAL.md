@@ -114,7 +114,7 @@ Each phase is one change and one merge. A phase may be split into smaller merges
 1. Open Setup › Supported devices. Expect: Ajax and the other 6 label-only alarm brands say "View only". Nothing says "tested on hardware" for UniFi PoE cycle or reboot.
 2. Open the Ajax alarm page. Expect: no Arm or Disarm button anywhere.
 3. Run the alarm receiver test with the reference messages. Expect: every sample is accepted and acknowledged, and encrypted samples get encrypted replies.
-4. Stop the alarm receiver and the MQTT listener. Expect: both restart by themselves within 1 minute, and the server check is green.
+4. Stop the alarm receiver and the MQTT listener. Expect: both restart by themselves within 1 minute, and the server check is green. Supervisor runs only on the .com, so this step is walked there right after the merge, once Stephan has added the programs (`ops/supervisor/README.md`, step 4). Before the merge, the restart is shown on this PC by stopping and starting the command.
 5. With settings cached, send an MQTT reading, then restart the broker. Expect: the reading arrives, and the listener reconnects within 1 minute. **On hold:** which broker this uses waits for the design session's answer (R8).
 6. Add your UniFi Protect console, which has a self-signed certificate. Expect: "Trust this camera?" is asked once, and no plain Basic-auth password appears in the console's log.
 7. Back up a home device's settings over SSH, then point the same device record at a different SSH device. Expect: the first backup asks to trust the key, and after the swap it is refused with a plain message.
@@ -346,18 +346,18 @@ Each item is ticked with the commit that fixed it and how it was proved.
 
 | Audit item | Phase | Fixed in | Proved by |
 | --- | --- | --- | --- |
-| Broken: alarm receiver (SIA DC-09) | A3 | | |
-| Broken: SNMP on hubs | A7 | | |
-| Broken: MQTT password and reconnect | A4 | | |
-| Broken: camera passwords over plain HTTP | A5 | | |
-| Broken: SSH accepts any key | A6 | | |
+| Broken: alarm receiver (SIA DC-09) | A3 | Phase A | 17 checks against pysiaalarm reference frames (7 real CRCs, one real encrypted frame); intake, NAK, DUH, encrypted ACK and socket tests; supervisor walk on the .com after merge |
+| Broken: SNMP on hubs | A7 | Phase A | Collector v2c/v3 tests; CI build fails unless the hub runtime loads SNMP (not walked on hardware, R10) |
+| Broken: MQTT password and reconnect | A4 | Phase A | Listener tests: password from cached config, reconnect with back-off after drop and silent broker; broker walk waits for R8 |
+| Broken: camera passwords over plain HTTP | A5 | Phase A | Real local TLS server: no password before trust, pinned key only, impostor refused before any byte; no Basic password ever sent |
+| Broken: SSH accepts any key | A6 | Phase A | Backup sends no login to an untrusted key; changed key refused until an IT admin replaces it; audit-logged |
 | Fake: hub syslog/NetFlow and Protect never called | B | | |
-| Fake: 7 label-only alarm brands show Arm/Disarm | A1 | | |
-| Fake: UniFi PoE cycle and reboot "tested on hardware" | A1 | | |
-| Fake: "Test relay" says Verified | A2 | | |
-| Fake: Milesight signature header | A8 | | |
+| Fake: 7 label-only alarm brands show Arm/Disarm | A1 | Phase A | Driver honesty guard test; Arm/Disarm never taken from saved settings; Supported devices shows "View only" |
+| Fake: UniFi PoE cycle and reboot "tested on hardware" | A1 | Phase A | Claims removed; port actions not offered (made-up controller path); guard test |
+| Fake: "Test relay" says Verified | A2 | Phase A | Real STUN check; "No relay set up" / "No answer from …"; never "Verified" |
+| Fake: Milesight signature header | A8 | Phase A | Header dropped (not in Milesight docs); Site secret as Bearer, token header or Basic password |
 | Fake: code-signing check deleted | B | | |
-| Fake: progress notes overclaim | A1 | | |
+| Fake: progress notes overclaim | A1 | Phase A | PROGRESS.md and SUPPORTED-DEVICES.md corrected; HARDWARE-WALKS.md + guard test |
 | Missing: scheduled scans on hubs | B | | |
 | Missing: ping and offline alerts from a hub | B | | |
 | Missing: routing through the hub | B | | |
@@ -384,6 +384,11 @@ Each item is ticked with the commit that fixed it and how it was proved.
 - **R3. Alarm receiver samples.** The full SIA DC-09 standard isn't free. Its sample messages are copied from public receiver projects whose samples came from real panels, and are credited in the test. Your Ajax alarm doesn't report in during Phase A (R7), so these samples are the proof for now.
 - **R4. "Test relay"** does a real STUN/TURN check, not a full remote-support session. The full session is proved in Phase G.
 - **R5. Milesight webhook:** if Milesight's documents don't define a signature for gateway forwarding, it uses a per-Site secret that you set in the gateway.
+- **R14. A wrong length field doesn't stop an alarm.** The alarm receiver accepts a report whose check-sum is right even if its length field is wrong. The check-sum already proves the report arrived intact, and refusing a real alarm over a length quirk is worse. The open receiver Home Assistant uses does the same.
+- **R15. Port on/off/restart are gone, not just hidden.** The code behind them called a made-up web address that no switch or controller has, so they can't be offered at all until Phase G builds a real UniFi version. The approval rules for uplink and camera ports stay in place for it, and their tests come back with it.
+- **R16. Alarm keys are read both ways.** Ajax-style panels take the encryption key as 16, 24 or 32 characters. Some installers store the same key as hex digits. The receiver tries both and uses whichever decrypts a valid report.
+- **R17. Strangers get no reply.** An alarm report from an address outside the Site's network gets no answer at all. A known panel with a bad report gets NAK, so it can correct and resend.
+- **R18. Replies follow the open receiver.** The SIA DC-09 standard isn't free to read, so the reply format (ACK with no time, NAK with our time, encrypted ACK padded with `0`) follows pysiaalarm. Home Assistant users run that receiver with Ajax and other panels.
 
 ### Needs your hardware, your accounts or your installer
 
@@ -395,19 +400,27 @@ Each item is ticked with the commit that fixed it and how it was proved.
 - **R11. Doors.** Your installer still has to confirm every door has an exit button and a handle. Connect UniFi Access requires the tick (pop-up 91).
 - **R12. Signing.** Before the first client install, the installer needs a code-signing certificate (D1).
 - **R13. Queclink.** Your tracker has been offline since 20 May. Queclink stays "Built from vendor docs" until one is walked.
+- **R19. Opening the alarm receiver to the network.** The receiver only listens on the server itself until you set `SIA_DC09_BIND_HOST=0.0.0.0` and open port 51100 in the server's firewall. That opens a port, so it's your call, made when a panel is ready to report in.
+- **R20. The two "Trust this…?" pop-ups weren't drawn.** v7 has no drawing for "Trust this camera?" or "Trust this device's SSH key?", so both use the kit's small confirm pop-up (480 px, Cancel first) and a notice on the existing page. The design session can draw them for Phase C or E, and they'll be matched then.
+- **R21. One trust per camera address.** A camera or Protect console is trusted per Site, address and port. Trusting your Protect console once covers all its cameras.
+- **R22. Who may trust.** First trust of a camera or SSH key: anyone who can run device management (`securityDevices.commands.manage`). Replacing a trusted key after it changed: IT admins only (`securityDevices.commands.admin`). This reuses existing permissions, so Phase A adds no new permission key and no grant migration.
+- **R23. SSH backups for your kit.** Settings backups only run for MikroTik, Cisco, Aruba and Fortinet, and your network is UniFi. So walk step 7 uses a test device record pointed at a real SSH machine on your network. A UniFi settings backup is Phase G's job.
+- **R24. The SNMP module is required in Windows hub releases.** The CI build now fails if the hub runtime can't load SNMP. On the old Linux (apt) install it's installed but optional, because Phase B replaces that install.
 
 ### Not proven yet
 
 - Everything from Gemini's phases 0–6 that no walk has covered. That includes discovery, the maker lookup, switch-neighbour maps, SSH backup for MikroTik/Cisco/Aruba/Fortinet, and Intune. These are kept and labelled honestly until a walk proves them.
 - Brands nobody owns stay "Not tested on hardware" (D10).
 - Your Ajax alarm reporting through the alarm receiver (R7) and SNMP on your UniFi switch (R10), both skipped in the Phase A walk.
+- **The Milesight cloud integration's signature check.** This is a separate, older integration, not in the audit. It checks an `X-Msc-Request-Signature` header that Milesight's public webhook pages don't describe. It needs checking against a real Milesight cloud webhook, logged for Phase E.
+- **Hub syslog/NetFlow ingest.** Its existing test (`Phase5…collector ingest isolates site hub syslog…`) fails, and Phase A doesn't touch that code. It is the audit's "never called" item, fixed or removed in Phase B.
 
 ## 7. Progress
 
 | Phase | State | Commit | Gate | Stephan's walk | On main / .com |
 | --- | --- | --- | --- | --- | --- |
 | Finish line (this file) | Approved by MASTER, 30 Oct | 8b2cc254d | — | — | — |
-| A · Honest and safe | In progress (A1 and A3 first) | | | | |
+| A · Honest and safe | Built (A1–A8); gate running | see git log | | | |
 | B · Windows app and hubs | Not started | | | | |
 | C · Core screens | Not started | | | | |
 | D · Alerts | Not started | | | | |

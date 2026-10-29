@@ -145,7 +145,8 @@ class Phase5BrandsAndDriversTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('security-devices/supported-devices')
                 ->where('summary.total_drivers', count($all))
-                ->where('summary.tested_on_hardware', fn (int $count): bool => $count >= 2)
+                // Phase A: nothing is walked on real hardware yet (docs/security-devices/HARDWARE-WALKS.md).
+                ->where('summary.tested_on_hardware', 0)
                 ->where('summary.built_from_docs', fn (int $count): bool => $count >= 16)
                 ->where('summary.planned', fn (int $count): bool => $count >= 7));
     }
@@ -301,34 +302,14 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         $this->assertStringNotContainsString('MUST_STRIP', json_encode($json));
     }
 
-    public function test_sia_dc09_decoder_aes_encryption_and_live_tcp_listener_ingest_contact_id_events_into_alarm_profile(): void
+    /**
+     * Phase A: the decoder and socket checks moved to tests/Unit/SecurityDevices/SiaDc09FrameDecoderTest.php
+     * and tests/Feature/SecurityDevices/SiaDc09ReceiverTest.php, which use reference frames from outside
+     * this codebase. The frames built with our own encoder used the wrong encrypted layout. This test keeps
+     * the panel-state checks on the alarm page.
+     */
+    public function test_sia_dc09_contact_id_events_set_the_alarm_profile_panel_state(): void
     {
-        $decoder = new SiaDc09FrameDecoder;
-
-        // 1. Plaintext ADM-CID frame + tamper rejection
-        $plainFrame = SiaDc09FrameDecoder::wrapBody('"ADM-CID"0042R1L0#1234[#1234|3401 01 005]_10:15:00,10-28-2026');
-        $decoded = $decoder->decode($plainFrame);
-        $this->assertTrue($decoded['ok']);
-        $this->assertSame('ADM-CID', $decoded['token']);
-        $this->assertSame('1234', $decoded['account']);
-
-        $tamperedFrame = str_replace('3401', '1401', $plainFrame);
-        $this->assertSame('crc_mismatch', $decoder->decode($tamperedFrame)['reason_code']);
-
-        // 2. AES-128-CBC encrypted *ADM-CID frame (ANSI/SIA DC-09 §5.4.1 zero IV + random pad + `|`)
-        $aesKey = str_repeat("\x4B", 16);
-        $zeroIv = str_repeat("\x00", 16);
-        $plaintextBlock = str_pad('A1B2C3|#1234|1130 01 003]_10:16:00,10-28-2026', 48, "\x00");
-        $cipherHex = strtoupper(bin2hex((string) openssl_encrypt($plaintextBlock, 'aes-128-cbc', $aesKey, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $zeroIv)));
-        $encryptedFrame = SiaDc09FrameDecoder::wrapBody('"*ADM-CID"0043R1L0#1234['.$cipherHex.']');
-
-        $this->assertSame('encryption_key_required', $decoder->decode($encryptedFrame)['reason_code']);
-        $decrypted = $decoder->decode($encryptedFrame, $aesKey);
-        $this->assertTrue($decrypted['ok']);
-        $this->assertTrue($decrypted['encrypted']);
-        $this->assertStringContainsString('1130 01 003', (string) $decrypted['data']);
-
-        // 3. End-to-end TCP socket listener (`security-devices:sia-dc09-listen --once`) -> DeviceEvent + Alarm profile
         $site = $this->createActiveSite('Kauri House');
         DiscoveryScope::factory()->create([
             'site_id' => $site->id,
@@ -359,12 +340,7 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         $this->assertFalse($unauth['accepted']);
         $this->assertSame('sender_out_of_scope', $unauth['reason_code']);
 
-        // Authorised closing (arm) followed by burglary alarm over live loopback TCP
-        $probeSock = stream_socket_server('tcp://127.0.0.1:0', $errno, $errstr);
-        $this->assertIsResource($probeSock);
-        $addr = stream_socket_get_name($probeSock, false);
-        $port = (int) substr((string) $addr, (int) strrpos((string) $addr, ':') + 1);
-        fclose($probeSock);
+        // Authorised closing (arm) followed by a burglary alarm
 
         // Ingest arm via service, then burglary via SIA DC-09 intake
         $armFrame = SiaDc09FrameDecoder::wrapBody('"ADM-CID"0007R1L0#4815[#4815|3401 01 002]');
@@ -402,7 +378,6 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
         ]);
         $presentedTriggered = app(DeviceProfilePresenter::class)->present($this->admin, $panelTriggered, $panelTriggered->assignments->first());
         $this->assertSame('triggered', $presentedTriggered['typeProfile']['panelState']);
-        $this->assertGreaterThan(0, $port);
     }
 
     public function test_gallagher_and_inception_alarm_drivers_execute_and_reconcile_governed_arm_and_disarm_commands(): void
@@ -617,28 +592,32 @@ XML, 200, ['Content-Type' => 'application/soap+xml']);
             'data' => base64_encode((string) hex2bin('01755c0367ec0004686e077d5802')),
         ], JSON_THROW_ON_ERROR);
 
-        // Invalid signature rejected with 401
+        // Phase A, item A8: Milesight gateways don't sign requests, so the invented X-Milesight-Signature
+        // header is no longer accepted, even with a "correct" HMAC. A wrong secret is refused too.
+        $this->call('POST', "/webhooks/milesight-gateway/{$siteA->id}", [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_X_MILESIGHT_SIGNATURE' => 'sha256='.hash_hmac('sha256', $uplinkBody, $webhookSecret),
+        ], $uplinkBody)->assertStatus(401);
+
         $this->postJson(
             "/webhooks/milesight-gateway/{$siteA->id}",
             json_decode($uplinkBody, true),
-            ['X-Milesight-Signature' => 'sha256=deadbeef'],
+            ['Authorization' => 'Bearer not-the-site-secret'],
         )->assertStatus(401);
 
-        // Valid HMAC-SHA256 signature accepted and updates Sensor profile readings
-        $validSig = 'sha256='.hash_hmac('sha256', $uplinkBody, $webhookSecret);
-        $this->call(
-            'POST',
-            "/webhooks/milesight-gateway/{$siteA->id}",
-            [],
-            [],
-            [],
-            [
+        // The Site's secret, typed into the gateway's HTTP header settings, in each accepted form.
+        foreach ([
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$webhookSecret],
+            ['HTTP_X_OBLIVION_WEBHOOK_TOKEN' => $webhookSecret],
+            ['PHP_AUTH_USER' => 'gateway', 'PHP_AUTH_PW' => $webhookSecret],
+        ] as $credential) {
+            $this->call('POST', "/webhooks/milesight-gateway/{$siteA->id}", [], [], [], [
                 'CONTENT_TYPE' => 'application/json',
                 'HTTP_ACCEPT' => 'application/json',
-                'HTTP_X_MILESIGHT_SIGNATURE' => $validSig,
-            ],
-            $uplinkBody,
-        )->assertOk()->assertJsonPath('accepted', true);
+                ...$credential,
+            ], $uplinkBody)->assertOk()->assertJsonPath('accepted', true);
+        }
 
         $sensorFresh = $lorawanSensor->fresh()->load([
             'monitors.profile',

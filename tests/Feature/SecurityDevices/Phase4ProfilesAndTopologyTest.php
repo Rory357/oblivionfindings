@@ -434,7 +434,10 @@ class Phase4ProfilesAndTopologyTest extends TestCase
             ])
             ->assertForbidden();
 
-        // Admin submitting alarm.disarm WITH wrong confirmation_text is rejected by validation
+        // Phase A (docs/security-devices/GOAL.md): this panel has no real alarm driver, so Disarm is not
+        // offered at all, even though its saved settings list it. The governed disarm checks (confirm
+        // text, MFA, approval) are covered with a real driver in
+        // Phase5BrandsAndDriversTest::test_gallagher_and_inception_alarm_drivers_execute_and_reconcile_governed_arm_and_disarm_commands.
         $this->actingAs($this->admin)
             ->withSession(['auth.password_confirmed_at' => time()])
             ->from("/security-devices/devices/{$alarm->id}")
@@ -445,9 +448,9 @@ class Phase4ProfilesAndTopologyTest extends TestCase
                 'reason' => 'Scheduled technician entry to foyer.',
                 'idempotency_key' => 'cmd_admin_wrong_name_1',
                 'impact_acknowledged' => true,
-                'confirmation_text' => 'Wrong Name',
+                'confirmation_text' => 'Nikau Main Alarm Panel',
             ])
-            ->assertSessionHasErrors('confirmation_text');
+            ->assertSessionHasErrors(['capability' => 'This device does not declare support for that management action.']);
     }
 
     public function test_camera_onvif_snapshot_and_ptz_enforce_permissions_ssrf_and_audit_logging(): void

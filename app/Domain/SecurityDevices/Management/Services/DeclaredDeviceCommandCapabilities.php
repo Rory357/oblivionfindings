@@ -15,6 +15,13 @@ use Illuminate\Support\Collection;
 
 final class DeclaredDeviceCommandCapabilities
 {
+    /** Port actions with no real vendor driver behind them yet (see the reject list in forDevice()). */
+    public const array UNBUILT_PORT_ACTIONS = [
+        'network.port.enable',
+        'network.port.disable',
+        'network.port.bounce',
+    ];
+
     /** @return Collection<int, string> */
     public function forDevice(Device $device): Collection
     {
@@ -44,12 +51,22 @@ final class DeclaredDeviceCommandCapabilities
         }
 
         // Gate driver-backed & endpoint-backed capabilities on real verified authorities/drivers.
+        // A device record may list any capability in its saved settings, so these are never taken
+        // from the record; each is added back below only when real code can carry it out.
         $declared = $declared->reject(fn (string $key): bool => in_array($key, [
             'network.config.backup',
             'endpoint.service.manage',
             'endpoint.computer.restart',
             'endpoint.software.install',
             'endpoint.script.run',
+            // Arm and disarm only with a real alarm driver (added back below). Report-only panels
+            // such as Ajax are view only (Phase A, docs/security-devices/GOAL.md).
+            'alarm.arm',
+            'alarm.disarm',
+            // Port on/off/restart: NetworkDeviceCommandAdapter calls a made-up controller path that
+            // no switch or controller has, so it is never offered until a real driver is built and
+            // walked (Phase G).
+            ...self::UNBUILT_PORT_ACTIONS,
         ], true));
 
         $driverRegistry = app(DeviceDriverRegistry::class);

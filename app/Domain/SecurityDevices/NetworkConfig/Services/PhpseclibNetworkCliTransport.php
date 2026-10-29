@@ -67,20 +67,30 @@ final class PhpseclibNetworkCliTransport implements NetworkCliSshTransport
             }
 
             $fingerprint = 'SHA256:'.PublicKeyLoader::load($serverKey)->getFingerprint('sha256');
-            $pinned = false;
-            if (is_string($expectedHostKeyFingerprint) && trim($expectedHostKeyFingerprint) !== '') {
-                $expected = trim($expectedHostKeyFingerprint);
-                if (! hash_equals($expected, $fingerprint)) {
-                    return new NetworkCliCommandResult(
-                        ok: false,
-                        reasonCode: 'host_key_mismatch',
-                        output: '',
-                        hostKeyFingerprint: $fingerprint,
-                        hostKeyPinned: true,
-                    );
-                }
-                $pinned = true;
+
+            // Phase A, item A6: the saved login is only sent to a device whose key someone has trusted.
+            // A device with no trusted key gets no login at all; the offered key is reported back so a
+            // person can check it and choose "Trust this key".
+            if (! is_string($expectedHostKeyFingerprint) || trim($expectedHostKeyFingerprint) === '') {
+                return new NetworkCliCommandResult(
+                    ok: false,
+                    reasonCode: 'host_key_unconfirmed',
+                    output: '',
+                    hostKeyFingerprint: $fingerprint,
+                    hostKeyPinned: false,
+                );
             }
+
+            if (! hash_equals(trim($expectedHostKeyFingerprint), $fingerprint)) {
+                return new NetworkCliCommandResult(
+                    ok: false,
+                    reasonCode: 'host_key_mismatch',
+                    output: '',
+                    hostKeyFingerprint: $fingerprint,
+                    hostKeyPinned: true,
+                );
+            }
+            $pinned = true;
 
             if (! $this->authenticate($ssh, trim($username), $credentialMaterial)) {
                 return new NetworkCliCommandResult(

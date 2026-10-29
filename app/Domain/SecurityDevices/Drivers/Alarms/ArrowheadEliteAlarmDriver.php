@@ -32,19 +32,18 @@ final class ArrowheadEliteAlarmDriver implements DeviceDriver
             name: 'AAP Elite S & ESL-2 Direct Control',
             deviceClass: DriverDeviceClass::AlarmPanel,
             supportLevel: DriverSupportLevel::Planned,
-            transportSummary: 'SIA DC-09 IP (available now) · AAP IP-MODULE direct control (planned)',
+            transportSummary: 'Alarm reports (SIA DC-09) to Oblivion’s alarm receiver · no direct control',
             models: ['AAP Elite S', 'AAP ESL-2', 'ESL-APP POD'],
             capabilities: [
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
-                DriverCapability::AlarmArm,
-                DriverCapability::AlarmDisarm,
             ],
-            summary: 'Live IP alarm & zone events work today through the SIA DC-09 & Contact ID IP Receiver driver (ESL-APP POD / IP-MODULE). Direct local arm & disarm is planned pending Arrowhead integrator protocol access.',
+            summary: 'An Arrowhead panel with an IP module can send its alarm reports to Oblivion’s alarm receiver. View only: Oblivion can’t arm or disarm it. Not tested on real hardware.',
             officialDocs: [
                 ['label' => 'Arrowhead Alarm Products NZ', 'url' => 'https://www.aap.co.nz/'],
             ],
             limitationsNote: 'Arrowhead does not publish an open local REST API; configure SIA DC-09 IP reporting on the ESL IP module for immediate live event intake.',
+            viewOnly: true,
         );
     }
 

@@ -38,11 +38,12 @@ final class SiaDc09AlarmReceiverDriver implements DeviceDriver
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
             ],
-            summary: 'Receives live arm, disarm, burglary, fire, medical, panic, duress, tamper, bypass, and battery events from any NZ or international alarm panel supporting SIA DC-09 IP reporting.',
+            summary: 'Oblivion’s alarm receiver: answers alarm reports (arm, disarm, burglary, fire, medical, panic, duress, tamper, bypass and battery) from panels that send SIA DC-09, plain or encrypted. Checked against reference reports from real panels; not tested on real hardware yet.',
             officialDocs: [
                 ['label' => 'ANSI/SIA DC-09 Standard', 'url' => 'https://www.securityindustry.org/standards/dc-09/'],
             ],
             limitationsNote: 'SIA DC-09 is a one-way panel-to-receiver reporting standard; remote arming and disarming require a brand-specific local API driver.',
+            viewOnly: true,
         );
     }
 

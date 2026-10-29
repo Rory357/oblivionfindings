@@ -417,7 +417,7 @@ export function ObliRemoteSupportCard({
                                 className="h-3.5 w-3.5"
                                 aria-hidden="true"
                             />
-                            {verifying ? 'Testing…' : 'Test relay signing'}
+                            {verifying ? 'Testing…' : 'Test relay'}
                         </Button>
                         <Button
                             size="sm"
@@ -522,7 +522,7 @@ export function ObliRemoteSupportCard({
                                     }
                                 >
                                     {verification.ok
-                                        ? 'Relay verified'
+                                        ? 'Relay answered'
                                         : 'Needs attention'}
                                 </StatusBadge>
                                 <span>{verification.message}</span>

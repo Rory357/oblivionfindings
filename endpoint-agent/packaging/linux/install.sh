@@ -75,8 +75,9 @@ ensure_php() {
 
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -y >&2
-    apt-get install -y ca-certificates php8.4-cli php8.4-curl php8.4-mbstring >&2 || \
-        apt-get install -y ca-certificates php-cli php-curl php-mbstring >&2
+    # php-snmp: Phase A, item A7 (SNMP checks on hubs). Without it, SNMP checks report "unknown".
+    apt-get install -y ca-certificates php8.4-cli php8.4-curl php8.4-mbstring php8.4-snmp >&2 || \
+        apt-get install -y ca-certificates php-cli php-curl php-mbstring php-snmp >&2
 
     for bin in /usr/bin/php8.4 /usr/bin/php; do
         if [[ -x "$bin" ]] && "$bin" -r 'exit(PHP_VERSION_ID >= 80400 && PHP_VERSION_ID < 90000 && extension_loaded("curl") && extension_loaded("openssl") && extension_loaded("sodium") && extension_loaded("sockets") ? 0 : 1);' 2>/dev/null; then

@@ -45,6 +45,9 @@ final class UniFiProtectLocalCameraClient
         private readonly ?Closure $httpTransport = null,
     ) {}
 
+    /** The trusted public-key pin for the console, set per operation (Phase A, item A5). */
+    private ?string $tlsPin = null;
+
     /**
      * @return array{
      *     ok: bool,
@@ -65,8 +68,10 @@ final class UniFiProtectLocalCameraClient
                 'message' => $endpoint['message'],
                 'data_uri' => null,
                 'captured_at' => $capturedAt,
+                'tls_trust' => $endpoint['tls_trust'] ?? null,
             ];
         }
+        $this->tlsPin = $endpoint['tls_pin'] ?? null;
 
         $lease = null;
         $material = [];
@@ -203,8 +208,10 @@ final class UniFiProtectLocalCameraClient
                 'message' => $endpoint['message'],
                 'profiles' => [],
                 'device_info' => $emptyInfo,
+                'tls_trust' => $endpoint['tls_trust'] ?? null,
             ];
         }
+        $this->tlsPin = $endpoint['tls_pin'] ?? null;
 
         $lease = null;
         $material = [];
@@ -372,6 +379,18 @@ final class UniFiProtectLocalCameraClient
             ];
         }
 
+        // Phase A, item A5: the API key goes only to a console whose certificate is publicly valid or
+        // has been trusted ("Trust this camera?"); later requests accept only the trusted key.
+        $gate = app(CameraEndpointTrustService::class)->gate($siteId, $canonicalIp, $port);
+        if (! $gate['ok']) {
+            return [
+                'ok' => false,
+                'reason_code' => $gate['reason_code'],
+                'message' => str_replace('This camera’s certificate', 'This Protect console’s certificate', $gate['message']),
+                'tls_trust' => $gate['trust'],
+            ];
+        }
+
         $hostOut = str_contains($canonicalIp, ':') ? "[{$canonicalIp}]" : $canonicalIp;
         $baseUrl = 'https://'.$hostOut.($port === 443 ? '' : ':'.$port);
 
@@ -382,6 +401,7 @@ final class UniFiProtectLocalCameraClient
             'ip' => $canonicalIp,
             'site_id' => $siteId,
             'base_url' => $baseUrl,
+            'tls_pin' => $gate['pin'],
         ];
     }
 
@@ -562,11 +582,12 @@ final class UniFiProtectLocalCameraClient
         }
 
         try {
+            // Phase A, item A5: certificate checks stay on; a trusted self-signed console is pinned.
             $pending = Http::withHeaders($headers)
                 ->timeout(max(1, (int) ceil($timeoutMs / 1000)))
                 ->connectTimeout(2)
                 ->withoutRedirecting()
-                ->withoutVerifying();
+                ->withOptions(CameraEndpointTrustService::httpOptions($this->tlsPin));
 
             $response = strtoupper($method) === 'POST'
                 ? $pending->withBody((string) $body, $headers['Content-Type'] ?? 'application/json')->post($url)

@@ -1,4 +1,8 @@
 import LeafletMap from '@/components/leaflet-map';
+import {
+    CameraCertificateNotice,
+    type CameraCertificateTrust,
+} from '@/components/security-devices/camera-certificate-notice';
 import { Button } from '@/components/ui/button';
 import {
     Card,
@@ -506,6 +510,8 @@ type SnapshotPayload = {
     data_uri?: string | null;
     captured_at?: string | null;
     source?: string | null;
+    /** Phase A, item A5: set when the camera's certificate needs trusting first. */
+    tls_trust?: CameraCertificateTrust | null;
 };
 
 function CameraProfileOverview({
@@ -534,11 +540,13 @@ function CameraProfileOverview({
         } catch (error: unknown) {
             let message =
                 'Could not capture an ONVIF snapshot from this camera.';
+            let tlsTrust: CameraCertificateTrust | null = null;
             if (axios.isAxiosError(error) && error.response?.data) {
-                const data = error.response.data as { message?: string };
+                const data = error.response.data as SnapshotPayload;
                 if (data.message) message = data.message;
+                tlsTrust = data.tls_trust ?? null;
             }
-            setSnapshot({ ok: false, message });
+            setSnapshot({ ok: false, message, tls_trust: tlsTrust });
         } finally {
             setCapturing(false);
         }
@@ -702,6 +710,15 @@ function CameraProfileOverview({
                                     {snapshot.source ?? 'ONVIF Media'}
                                 </p>
                             </div>
+                        ) : snapshot &&
+                          !snapshot.ok &&
+                          snapshot.tls_trust?.offered ? (
+                            <CameraCertificateNotice
+                                trust={snapshot.tls_trust}
+                                onTrusted={(message) =>
+                                    setSnapshot({ ok: false, message })
+                                }
+                            />
                         ) : snapshot && !snapshot.ok ? (
                             <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-sm">
                                 <p className="font-medium text-foreground">

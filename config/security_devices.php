@@ -417,4 +417,34 @@ return [
     'command_observation_stale_after_seconds' => 900,
     'reconciliation_grace_seconds' => 5,
     'command_capabilities' => $capabilities,
+
+    /*
+     * Long-running listeners that supervisor keeps alive (ops/supervisor/oblivion-sd-listeners.conf).
+     * Each is off until switched on here; when on, Settings › Server readiness checks its heartbeat.
+     */
+    'listeners' => [
+        // A heartbeat older than this means the listener has stopped.
+        'heartbeat_stale_seconds' => (int) env('SECURITY_DEVICES_LISTENER_STALE_SECONDS', 120),
+
+        // Alarm receiver for SIA DC-09 reports (Phase A, item A3). Listens on this server only unless
+        // SIA_DC09_BIND_HOST is set (for example 0.0.0.0 so panels on the network can reach it).
+        'sia_dc09' => [
+            'enabled' => (bool) env('SIA_DC09_ENABLED', false),
+            'bind_host' => (string) env('SIA_DC09_BIND_HOST', '127.0.0.1'),
+            'port' => (int) env('SIA_DC09_PORT', 51100),
+        ],
+
+        // MQTT sensor listener (Phase A, item A4). Read here, not with env() in the command, so the
+        // password still works once settings are cached. Which broker it uses waits for review item R8.
+        'mqtt_sensors' => [
+            'enabled' => (bool) env('MQTT_SENSORS_ENABLED', false),
+            'site_id' => (int) env('MQTT_SENSORS_SITE_ID', 0),
+            'host' => (string) env('MQTT_SENSORS_HOST', ''),
+            'port' => (int) env('MQTT_SENSORS_PORT', 1883),
+            'tls' => (bool) env('MQTT_SENSORS_TLS', false),
+            'username' => env('MQTT_SENSORS_USERNAME'),
+            'password' => env('MQTT_BROKER_PASSWORD'),
+            'topic' => (string) env('MQTT_SENSORS_TOPIC', 'oblivion/sensors/#'),
+        ],
+    ],
 ];

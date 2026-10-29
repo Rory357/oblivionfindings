@@ -44,6 +44,7 @@ use App\Domain\SecurityDevices\Management\Services\DeviceManagementAuthorization
 use App\Domain\SecurityDevices\Management\Services\NetworkDeviceCommandPolicyService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\NetworkConfig\Services\SshHostKeyTrust;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Domain\SecurityDevices\Services\QueclinkUnitConsoleService;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -830,6 +831,11 @@ class DeviceProfilePresenter
         return [
             'canViewSnapshots' => $canViewSnapshots,
             'backupActionHref' => null,
+            // Phase A, item A6: which SSH key is trusted, and any key waiting to be checked.
+            'sshHostKey' => [
+                ...app(SshHostKeyTrust::class)->present($viewer, $device),
+                'trust_url' => route('security-devices.devices.ssh-host-key.trust', ['device' => $device->id], false),
+            ],
             'latestSnapshot' => $snapshotHistory->first(),
             'snapshotHistory' => $snapshotHistory->all(),
             'snapshotHistoryTruncated' => $snapshotCandidates->count() > $snapshotHistory->count(),

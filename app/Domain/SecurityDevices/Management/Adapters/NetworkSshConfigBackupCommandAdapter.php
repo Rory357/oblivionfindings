@@ -20,6 +20,7 @@ use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
 use App\Domain\SecurityDevices\Management\Services\DeclaredDeviceCommandCapabilities;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\NetworkConfig\Contracts\NetworkCliSshTransport;
+use App\Domain\SecurityDevices\NetworkConfig\Services\SshHostKeyTrust;
 use Carbon\CarbonImmutable;
 use RuntimeException;
 use Throwable;
@@ -98,7 +99,7 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
 
                 if (! $result->ok) {
                     $lastReason = $result->reasonCode;
-                    if (in_array($result->reasonCode, ['auth_failed', 'host_key_mismatch', 'host_key_unavailable', 'invalid_credentials'], true)) {
+                    if (in_array($result->reasonCode, ['auth_failed', 'host_key_mismatch', 'host_key_unconfirmed', 'host_key_unavailable', 'invalid_credentials'], true)) {
                         break;
                     }
 
@@ -119,9 +120,14 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
             }
 
             if ($capturedOutput === null) {
+                // Phase A, item A6: keep the key the device offered so a person can check and trust it.
+                if (in_array($lastReason, ['host_key_unconfirmed', 'host_key_mismatch'], true) && is_string($hostKeyFingerprint)) {
+                    app(SshHostKeyTrust::class)->recordOffered($context->device, $hostKeyFingerprint);
+                }
+
                 return new CommandExecutionResult(
                     status: CommandAttemptStatus::Failed,
-                    safeFailureReason: $this->humanFailureReason($lastReason),
+                    safeFailureReason: $this->humanFailureReason($lastReason, $hostKeyFingerprint),
                 );
             }
 
@@ -230,14 +236,7 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
 
     private function configuredHostKeyFingerprint(Device $device): ?string
     {
-        $pin = data_get($device->config ?? [], 'ssh.host_key_fingerprint')
-            ?? data_get($device->meta ?? [], 'ssh_host_key_fingerprint');
-
-        if (! is_string($pin) || trim($pin) === '') {
-            return null;
-        }
-
-        return trim($pin);
+        return app(SshHostKeyTrust::class)->trusted($device);
     }
 
     /**
@@ -255,11 +254,18 @@ final class NetworkSshConfigBackupCommandAdapter implements CommandExecutionAdap
         return false;
     }
 
-    private function humanFailureReason(string $reasonCode): string
+    private function humanFailureReason(string $reasonCode, ?string $offeredFingerprint = null): string
     {
         return match ($reasonCode) {
             'auth_failed' => 'The network device rejected the SSH username, password, or key.',
-            'host_key_mismatch' => 'SSH host key did not match the pinned device fingerprint; connection refused.',
+            'host_key_unconfirmed' => sprintf(
+                'This device’s SSH key isn’t trusted yet (%s), so no login was sent. Check the key and choose Trust this key on the device page, then back up again.',
+                $offeredFingerprint ?? 'key not shown',
+            ),
+            'host_key_mismatch' => sprintf(
+                'Backup refused: this device’s SSH key has changed since it was trusted (it now shows %s). If the change was planned, an IT admin can replace the trusted key on the device page.',
+                $offeredFingerprint ?? 'a different key',
+            ),
             'host_key_unavailable' => 'The network device did not present a valid SSH host key.',
             'cli_rejected_command' => 'The network device CLI rejected the read-only export command (check user privilege level).',
             'output_exceeded_limit' => 'Running configuration output exceeded the 2 MB safety limit.',

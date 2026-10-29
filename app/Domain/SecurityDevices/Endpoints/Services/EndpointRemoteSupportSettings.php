@@ -392,18 +392,31 @@ final class EndpointRemoteSupportSettings
         });
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * "Test relay" (Phase A, item A2). It used to say "Verified" without contacting any relay. Now it
+     * sends each relay a STUN Binding Request and reports only what answered. It can't prove the shared
+     * secret matches; a real remote-support session proves that (Phase G).
+     *
+     * @return array<string, mixed>
+     */
     public function verifyRelay(User $actor): array
     {
         DB::transaction(fn () => $this->administrator($actor));
 
         $urls = $this->relayUrls();
         $secret = $this->relaySecret();
-        if ($urls === [] || ! is_string($secret) || strlen($secret) < 32 || strlen($secret) > 512) {
+        if ($urls === []) {
             return [
                 'ok' => false,
                 'status' => 'not_configured',
-                'message' => 'Save at least one turn: or turns: relay URL and a 32+ character shared secret before testing.',
+                'message' => 'No relay set up. Save a relay address and its shared secret, then test again.',
+            ];
+        }
+        if (! is_string($secret) || strlen($secret) < 32 || strlen($secret) > 512) {
+            return [
+                'ok' => false,
+                'status' => 'not_configured',
+                'message' => 'The relay has no shared secret yet. Save one (at least 32 characters), then test again.',
             ];
         }
 
@@ -414,6 +427,18 @@ final class EndpointRemoteSupportSettings
                     'status' => 'invalid_url',
                     'message' => "Relay URL '{$url}' is not a valid turn: or turns: address.",
                 ];
+            }
+        }
+
+        $probe = app(StunRelayProbe::class);
+        $answered = [];
+        $silent = [];
+        foreach ($urls as $url) {
+            $result = $probe->probe($url);
+            if ($result['answered']) {
+                $answered[] = sprintf('%s (%d ms)', $url, (int) $result['milliseconds']);
+            } else {
+                $silent[] = sprintf('%s (%s)', $url, (string) $result['problem']);
             }
         }
 
@@ -438,22 +463,34 @@ final class EndpointRemoteSupportSettings
             $httpsReady = false;
         }
 
-        $ok = $credentialValid && $signingReady && $httpsReady;
+        $relaysAnswered = $silent === [];
+        $ok = $relaysAnswered && $credentialValid && $signingReady && $httpsReady;
+
+        $problems = [];
+        if ($silent !== []) {
+            $problems[] = sprintf('No answer from %s.', implode(', ', $silent));
+        }
+        if (! $httpsReady) {
+            $problems[] = 'Set the server’s public https:// address.';
+        }
+        if (! $signingReady || ! $credentialValid) {
+            $problems[] = 'The command-signing key isn’t ready.';
+        }
 
         return [
             'ok' => $ok,
-            'status' => $ok ? 'verified' : 'attention',
+            'status' => $ok ? 'relay_answered' : ($relaysAnswered ? 'attention' : 'unreachable'),
             'relay_url_count' => count($urls),
+            'relays_answered' => count($answered),
             'turn_rest_hmac_ready' => $credentialValid,
             'command_signing_ready' => $signingReady,
             'https_origin_ready' => $httpsReady,
             'message' => $ok
                 ? sprintf(
-                    'Verified Coturn TURN REST HMAC-SHA1 credential signing across %d relay %s, Ed25519 command signing, and public HTTPS origin.',
-                    count($urls),
-                    count($urls) === 1 ? 'URL' : 'URLs',
+                    'The relay answered: %s. This shows the relay can be reached; a real remote-support session shows the shared secret matches.',
+                    implode(', ', $answered),
                 )
-                : 'Relay credentials validated, but either the public HTTPS server address or Ed25519 command-signing key still needs attention.',
+                : implode(' ', $problems),
         ];
     }
 

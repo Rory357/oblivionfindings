@@ -12,7 +12,9 @@ use App\Domain\SecurityDevices\Models\Device;
 /**
  * Ubiquiti UniFi Network (Local Gateway / Cloud Key / Site Manager) driver.
  *
- * Hardware-verified on live UniFi OS hardware (UX7, USW-Lite-8-PoE, U6+) on Kauri House LAN.
+ * Not proven on real hardware yet. An earlier note claimed tests on UX7, USW-Lite-8-PoE and U6+
+ * with no recorded walk-through, so the claim was removed in Phase A (docs/security-devices/GOAL.md).
+ * PoE power-cycle and restart are not built; they come back only when built and walked.
  */
 final class UbiquitiUnifiNetworkDriver implements DeviceDriver
 {
@@ -30,21 +32,18 @@ final class UbiquitiUnifiNetworkDriver implements DeviceDriver
             brand: 'Ubiquiti',
             name: 'UniFi Network Local & Site Manager API',
             deviceClass: DriverDeviceClass::Network,
-            supportLevel: DriverSupportLevel::TestedOnHardware,
-            transportSummary: 'UniFi OS HTTPS API via Site hub · LLDP · SNMP v2c/v3',
+            supportLevel: DriverSupportLevel::BuiltFromDocs,
+            transportSummary: 'UniFi OS local HTTPS API · LLDP · SNMP',
             models: ['UniFi Express 7 (UX7)', 'USW-Lite-8-PoE', 'U6+ / U7 Pro', 'UDM Pro / SE'],
             capabilities: [
                 DriverCapability::NetworkDiscovery,
                 DriverCapability::NetworkTopology,
                 DriverCapability::NetworkHealth,
-                DriverCapability::NetworkPoeCycle,
-                DriverCapability::NetworkReboot,
             ],
-            summary: 'Discovers UniFi gateways, PoE switches, Wi-Fi access points, port states, uplinks, and client neighbours directly from a local UniFi OS console through the Site hub or Site Manager.',
+            summary: 'Reads UniFi gateways, switches, Wi-Fi points, port states, uplinks and connected devices from a UniFi OS console. It only reads: power-cycling a port and restarting a device aren’t built yet. Not tested on real hardware yet.',
             officialDocs: [
                 ['label' => 'Ubiquiti Developer Documentation', 'url' => 'https://developer.ui.com/'],
             ],
-            hardwareEvidence: 'Tested live on UniFi Express 7 (UX7, 172.16.0.1), USW-Lite-8-PoE (172.16.0.132), and U6+ access points (172.16.0.141 / 172.16.0.168).',
             setupHref: '/security-devices/integrations',
         );
     }

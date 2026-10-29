@@ -57,6 +57,8 @@ export interface SupportedDriverRecord {
     hardware_evidence: string | null;
     official_docs: OfficialDocLink[];
     setup_href: string | null;
+    /** Oblivion can only read this kind of device; it never offers controls for it. */
+    view_only: boolean;
 }
 
 export interface SupportedDevicesProps {
@@ -403,13 +405,25 @@ export default function SupportedDevicesPage(props: SupportedDevicesProps) {
                                                         {driver.name}
                                                     </CardTitle>
                                                 </div>
-                                                <StatusBadge
-                                                    variant={
-                                                        driver.support_badge_variant
-                                                    }
-                                                >
-                                                    {driver.support_level_label}
-                                                </StatusBadge>
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    {driver.view_only ? (
+                                                        <StatusBadge
+                                                            variant="neutral"
+                                                            data-testid={`driver-view-only-${driver.key}`}
+                                                        >
+                                                            View only
+                                                        </StatusBadge>
+                                                    ) : null}
+                                                    <StatusBadge
+                                                        variant={
+                                                            driver.support_badge_variant
+                                                        }
+                                                    >
+                                                        {
+                                                            driver.support_level_label
+                                                        }
+                                                    </StatusBadge>
+                                                </div>
                                             </div>
                                             <p className="text-caption text-muted-foreground">
                                                 Connection:{' '}

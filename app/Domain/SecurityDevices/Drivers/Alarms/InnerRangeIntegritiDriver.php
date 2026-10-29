@@ -32,20 +32,18 @@ final class InnerRangeIntegritiDriver implements DeviceDriver
             name: 'Integriti Enterprise XML/REST API',
             deviceClass: DriverDeviceClass::AlarmPanel,
             supportLevel: DriverSupportLevel::Planned,
-            transportSummary: 'SIA DC-09 IP (available now) · Integriti Integration API (planned)',
+            transportSummary: 'Alarm reports (SIA DC-09) to Oblivion’s alarm receiver · no direct control',
             models: ['Integriti ISC Controller', 'Integriti IAC Controller'],
             capabilities: [
                 DriverCapability::AlarmEventsSiaDc09,
                 DriverCapability::AlarmZoneStatus,
-                DriverCapability::AlarmArm,
-                DriverCapability::AlarmDisarm,
-                DriverCapability::AccessDoorUnlock,
             ],
-            summary: 'Live IP alarm reporting works today via SIA DC-09, and Inner Range Inception is supported via local REST. Direct Integriti Integration Server XML/REST control is planned pending licensed Integriti SDK schema validation.',
+            summary: 'An Integriti controller can send its alarm reports to Oblivion’s alarm receiver. View only: Oblivion can’t arm, disarm or unlock doors on it. (Inner Range Inception is a separate driver.) Not tested on real hardware.',
             officialDocs: [
                 ['label' => 'Inner Range Integriti Platform', 'url' => 'https://www.innerrange.com/products/integriti/'],
             ],
             limitationsNote: 'Requires an Integriti Professional/Business server licence with REST/XML Inbound Integration enabled.',
+            viewOnly: true,
         );
     }
 

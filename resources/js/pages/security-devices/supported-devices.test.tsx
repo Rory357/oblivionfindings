@@ -118,6 +118,7 @@ function fixture(): SupportedDevicesProps {
                     },
                 ],
                 setup_href: '/security-devices/discovery',
+                view_only: false,
             },
             {
                 key: 'alarm.gallagher_command_centre',
@@ -154,6 +155,7 @@ function fixture(): SupportedDevicesProps {
                     },
                 ],
                 setup_href: null,
+                view_only: false,
             },
             {
                 key: 'alarm.arrowhead_elite',
@@ -185,6 +187,7 @@ function fixture(): SupportedDevicesProps {
                     },
                 ],
                 setup_href: null,
+                view_only: true,
             },
         ],
     };
@@ -246,6 +249,24 @@ describe('SupportedDevicesPage', () => {
         ]) {
             expect(text).not.toContain(forbidden);
         }
+    });
+
+    it('marks report-only alarm brands "View only" and nothing else', () => {
+        render(<SupportedDevicesPage {...fixture()} />);
+
+        expect(
+            screen.getByTestId('driver-view-only-alarm.arrowhead_elite')
+                .textContent,
+        ).toBe('View only');
+        expect(
+            screen.queryByTestId(
+                'driver-view-only-alarm.gallagher_command_centre',
+            ),
+        ).toBeNull();
+        expect(
+            screen.queryByTestId('driver-view-only-camera.onvif_standard'),
+        ).toBeNull();
+        expect(screen.getAllByText('View only')).toHaveLength(1);
     });
 
     it('filters drivers by search text, device class, and verification status and resets cleanly', () => {

@@ -23,6 +23,14 @@ use Carbon\CarbonImmutable;
 use RuntimeException;
 use Throwable;
 
+/**
+ * Not offered (Phase A, docs/security-devices/GOAL.md).
+ *
+ * This adapter calls `/api/v1/network/devices/{ref}/interfaces/{name}/{operation}`, a path no
+ * real switch or controller has (UniFi included). DeclaredDeviceCommandCapabilities therefore
+ * never declares the port actions, so supports() is always false in practice. Phase G replaces
+ * this with a real, walked vendor driver; until then don't re-enable it.
+ */
 final class NetworkDeviceCommandAdapter implements CommandExecutionAdapter
 {
     public const array CAPABILITIES = [
