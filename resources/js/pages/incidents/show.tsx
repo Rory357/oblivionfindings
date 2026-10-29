@@ -98,6 +98,7 @@ import {
     CheckCircle2,
     Clock,
     FileText,
+    HeartPulse,
     ListTodo,
     MapPin,
     Paperclip,
@@ -109,7 +110,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
-type Section = 'overview' | 'followups' | 'investigation' | 'evidence' | 'history';
+type Section = 'overview' | 'care' | 'followups' | 'investigation' | 'evidence' | 'history';
 type IncidentWorkspaceDetail = IncidentDetail & {
     recording_evidence?: RecordingReferenceEvidenceData;
     recording_preview?: RecordingPreview;
@@ -117,8 +118,10 @@ type IncidentWorkspaceDetail = IncidentDetail & {
 
 const SECTIONS: (PageHeaderRailItem<Section> & { icon: typeof FileText })[] = [
     { key: 'overview', label: 'Overview', icon: FileText },
-    { key: 'followups', label: 'Follow-ups', icon: ListTodo },
+    // One accident, one place (approved drawing D3): first aid, restraints and other linked health records.
+    { key: 'care', label: 'Injury and first aid', icon: HeartPulse },
     { key: 'investigation', label: 'Safety review', icon: Search },
+    { key: 'followups', label: 'Follow-ups', icon: ListTodo },
     { key: 'evidence', label: 'Evidence', icon: Paperclip },
     { key: 'history', label: 'History', icon: Clock },
 ];
@@ -356,11 +359,18 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
             { preserveScroll: true },
         );
 
+    // Linked health records: readable first aid and restraints, and the ones this viewer may not open (D3 privacy).
+    const careItems = linkedRecordItems(d, person).filter((item) =>
+        /^(fa|re|hidden)-/.test(String(item.key)),
+    );
     const railItems: PageHeaderRailItem<Section>[] = SECTIONS.map((item) => ({
         key: item.key,
         label: item.label,
         ...(item.key === 'followups' && openFollowups
             ? { count: openFollowups }
+            : {}),
+        ...(item.key === 'care' && careItems.length
+            ? { count: careItems.length }
             : {}),
         ...(item.key === 'evidence' && d.attachments.length
             ? { count: d.attachments.length }
@@ -382,8 +392,8 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                   tone: SEVERITY_VARIANT[d.potential_severity],
               }
             : {
-                  value: SEVERITY_LABELS[d.severity] ?? d.severity,
-                  label: 'Severity',
+                  // One chip, e.g. "Medium harm" (approved drawing D3 wording).
+                  value: (SEVERITY_LABELS[d.severity] ?? d.severity) + ' harm',
                   tone: SEVERITY_VARIANT[d.severity],
               },
         needed
@@ -550,6 +560,14 @@ export function IncidentWorkspace({ detail: d }: { detail: IncidentWorkspaceDeta
                                 readOnly={readOnly}
                                 linkedList={readOnly ? linkedList : null}
                                 onHistory={() => onSection('history')}
+                            />
+                        </section>
+                        <section hidden={section !== 'care'} aria-label="Injury and first aid" className="grid min-w-0 gap-5">
+                            <RowList
+                                title="Injury and first aid"
+                                sub="First aid, restraints and other health records linked to this incident. Each keeps its own record and who can see it."
+                                items={careItems}
+                                empty="No first aid, restraint or other health record is linked to this incident."
                             />
                         </section>
                         <section hidden={section !== 'followups'} aria-label="Incident follow-ups">

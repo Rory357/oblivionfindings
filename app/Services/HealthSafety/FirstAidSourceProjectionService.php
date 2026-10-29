@@ -80,6 +80,20 @@ final class FirstAidSourceProjectionService
         });
     }
 
+    /**
+     * First-aid records linked to this incident that the incident page doesn't show this viewer (approved drawing D3).
+     * Only when each was added is returned: no kind, person, injury or reference.
+     *
+     * @param  array<int, int>  $shownIds
+     * @return array<int, array{at: ?string}>
+     */
+    public function hiddenForIncident(ClientIncident $incident, array $shownIds): array
+    {
+        return FirstAidRecord::query()->where('related_incident_id', $incident->id)->whereNotIn('id', $shownIds)
+            ->orderBy('created_at')->orderBy('id')->pluck('created_at')
+            ->map(fn ($at) => ['at' => $at?->toIso8601String()])->values()->all();
+    }
+
     public function forMyDay(User $viewer): array
     {
         return $this->available($viewer, function ($current, $reads, $sites) {

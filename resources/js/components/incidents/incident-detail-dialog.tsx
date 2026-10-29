@@ -53,6 +53,7 @@ import {
     Image as ImageIcon,
     LinkIcon,
     ListTodo,
+    Lock,
     Paperclip,
     Pencil,
     Pill,
@@ -249,7 +250,13 @@ export type IncidentDetail = {
         severity: string;
         within_support_plan: boolean;
         injury_occurred: boolean;
+        started_at?: string | null;
     }>;
+    /**
+     * Linked health records this viewer may not read (approved drawing D3). Only the time is sent: no kind, title or
+     * summary, so the page can say a record exists without saying anything about it.
+     */
+    hidden_health_records?: Array<{ at: string | null }>;
     first_aid_records?: Array<{
         id: number;
         reference: string;
@@ -1490,6 +1497,10 @@ export function OverviewSection({
 /* ------------------------------------------------------------------ */
 
 /** Every dated change to the incident, oldest first (drawing pg-hsn-2f). */
+/** What a viewer without access sees of a linked health record (approved drawing D3, MASTER, 30 Oct). */
+export const HIDDEN_HEALTH_RECORD = 'A health record — hidden, you don’t have access';
+export const HIDDEN_HEALTH_RECORD_ADDED = 'Health record added — hidden';
+
 export function incidentHistoryItems(d: IncidentDetail): (LogItem & {
     at: string;
 })[] {
@@ -1564,6 +1575,16 @@ export function incidentHistoryItems(d: IncidentDetail): (LogItem & {
                 followup.assigned_to,
             );
         }
+    }
+    // Linked records join the one timeline (drawing D3); ones this viewer can't read say only that they exist.
+    for (const r of d.first_aid_records ?? []) {
+        push(r.treatment_date, 'First aid given', 'success', r.reference);
+    }
+    for (const r of d.restraint_events ?? []) {
+        push(r.started_at, 'Restraint recorded', 'warning', r.reference);
+    }
+    for (const r of d.hidden_health_records ?? []) {
+        push(r.at, HIDDEN_HEALTH_RECORD_ADDED, 'none');
     }
     push(d.reopened_at, 'Reopened', 'warning', d.reopened_reason);
     push(d.closed_at, 'Closed', 'success', d.closed_outcome);
@@ -2610,6 +2631,13 @@ export function linkedRecordItems(
             href: r.href,
         });
     }
+    (d.hidden_health_records ?? []).forEach((_, index) => {
+        items.push({
+            key: 'hidden-' + index,
+            leading: lead(Lock),
+            title: HIDDEN_HEALTH_RECORD,
+        });
+    });
     if (d.client) {
         items.push({
             key: 'client',

@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\CurrentAuthorizationReads;
 use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\RestraintAccessService;
 use App\Services\HealthSafety\HsCorrectiveActionService;
 use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\HealthSafety\HsVisibilityService;
@@ -48,6 +49,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class IncidentController extends Controller
 {
@@ -139,7 +141,8 @@ class IncidentController extends Controller
                 'controlRoomAlert:id,status,severity,alert_type,triggered_at,resolved_at',
                 'safeguardingConcerns',
                 'fleetIncident:id,incident_type',
-                'restraintEvents:id,reference_number,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at',
+                // The extra columns are what the restraint access check reads before any detail is shown (drawing D3).
+                'restraintEvents:id,reference_number,related_incident_id,restraint_type,severity,within_support_plan,injury_occurred,started_at,created_at,client_id,site_id,stay_id,source_schema_version,recorded_client_id,recorded_site_id,recorded_stay_id,behaviour_support_plan_id,behaviour_support_plan_version_id',
             ])
             ->find($incidentId);
 
@@ -295,6 +298,15 @@ class IncidentController extends Controller
             ->whereHas('client', fn ($q) => $q->where('site_id', $incident->site_id))
             ->first();
 
+        // Linked health records (approved drawing D3): details only for a viewer who can open each record;
+        // the rest are listed by when they were added and nothing else.
+        $firstAidRecords = app(FirstAidSourceProjectionService::class)->forIncident($user, $incident);
+        $readableRestraintIds = $this->readableRestraintIds($user, $incident);
+        $hiddenHealthRecords = collect(app(FirstAidSourceProjectionService::class)->hiddenForIncident($incident, array_column($firstAidRecords, 'id')))
+            ->concat($incident->restraintEvents->reject(fn ($e) => in_array((int) $e->id, $readableRestraintIds, true))
+                ->map(fn ($e) => ['at' => $e->created_at?->toIso8601String()]))
+            ->sortBy('at')->values()->all();
+
         return [
             'id' => $incident->id,
             'ref' => $incident->reference_number,
@@ -429,17 +441,19 @@ class IncidentController extends Controller
             ] : null,
             // Reciprocal of the restraint→incident link: restraint events recorded
             // against this incident (RestraintEvent.related_incident_id).
-            'restraint_events' => $incident->restraintEvents->map(fn ($e) => [
+            'restraint_events' => $incident->restraintEvents->filter(fn ($e) => in_array((int) $e->id, $readableRestraintIds, true))->map(fn ($e) => [
                 'id' => $e->id,
                 'reference' => $e->reference_number ?? 'RE-'.str_pad((string) $e->id, 3, '0', STR_PAD_LEFT),
                 'restraint_type' => $e->restraint_type,
                 'severity' => $e->severity,
                 'within_support_plan' => (bool) $e->within_support_plan,
                 'injury_occurred' => (bool) $e->injury_occurred,
+                'started_at' => $e->started_at?->toIso8601String(),
             ])->values()->all(),
+            'hidden_health_records' => $hiddenHealthRecords,
             // First-aid treatments escalated to / linked with this incident — reciprocal
             // of the first-aid register's incident link (FirstAidRecord.related_incident_id).
-            'first_aid_records' => app(FirstAidSourceProjectionService::class)->forIncident($user, $incident),
+            'first_aid_records' => $firstAidRecords,
             'can' => [
                 'update' => $user->can('update', $incident),
                 'submit' => $user->can('submit', $incident),
@@ -1060,6 +1074,45 @@ class IncidentController extends Controller
                 'include_managers' => false,
             ],
         );
+    }
+
+    /**
+     * Restraint events linked to this incident that this viewer may open (restraints.view plus the restraint's own
+     * client, Site and plan checks). Anything else shows only as a hidden health record.
+     *
+     * @return array<int, int>
+     */
+    private function readableRestraintIds(User $user, ClientIncident $incident): array
+    {
+        // The restraint service reloads this viewer's own permissions (restraints.view and the rest); the incident
+        // page's user carries only the incident permission set, so it can't answer this itself.
+        if ($incident->restraintEvents->isEmpty()) {
+            return [];
+        }
+        $access = app(RestraintAccessService::class);
+        try {
+            return $access->withCurrentViewer($user, function ($current, $reads, $sites) use ($access, $incident) {
+                $ids = [];
+                foreach ($incident->restraintEvents as $event) {
+                    try {
+                        $access->assertEvent($event, $current, $reads, $sites);
+                        $ids[] = (int) $event->id;
+                    } catch (HttpException $denied) {
+                        if (! in_array($denied->getStatusCode(), [403, 404], true)) {
+                            throw $denied;
+                        }
+                    }
+                }
+
+                return $ids;
+            });
+        } catch (HttpException $denied) {
+            if (! in_array($denied->getStatusCode(), [403, 404], true)) {
+                throw $denied;
+            }
+
+            return [];
+        }
     }
 
     private function canReportAcrossHealthSafety(User $user): bool

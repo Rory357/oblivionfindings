@@ -327,7 +327,7 @@ describe('Permanent incident workspace', () => {
         const sections = screen.getByRole('tablist', {
             name: 'Incident sections',
         });
-        expect(within(sections).getAllByRole('tab')).toHaveLength(5);
+        expect(within(sections).getAllByRole('tab')).toHaveLength(6);
         expect(
             within(sections).getByRole('tab', { name: 'History' }),
         ).toHaveAttribute('aria-selected', 'true');
@@ -507,7 +507,7 @@ describe('Permanent incident workspace', () => {
         ];
         render(<IncidentShow detail={incident} />);
         const header = screen.getByRole('banner');
-        expect(within(header).getByText('Severity')).toBeVisible();
+        expect(within(header).getByText('High harm')).toBeVisible();
         expect(within(header).getByText('Overdue follow-up')).toBeVisible();
         const stages = within(header).getByRole('list', {
             name: /Where the incident is up to/,
