@@ -391,3 +391,28 @@ Still failing the same way on main (main's own tests, not skipped; same messages
 - **Incidents list shows incidents of archived Sites and deleted clients** (INC-2026-0142, INC-2026-0145 on the .com). Ease-of-use pass: lists hide archived Sites and deleted clients.
 - **Security & Devices** `device-profile-header.test.tsx` fails 2 cases on this branch and main alike (not touched here).
 - **Main's own Pest failures seen during these gates:** `SecurityAccessControlTest` "incident update cannot escalate portal visibility" (403), `ClientProfileFoundationTest` 2 cases (medical section shown to an assigned worker) — both fail the same way with main's code.
+
+## Part 2 drawings — reviewed by MASTER (30 Oct, for Stephan)
+
+Drawings: `docs/health-safety-build/drawings/` (`63f658209`, updated after review). **Approved with changes**, all made in the drawings:
+- D3 (one accident record), privacy, must:
+  - a hidden linked record shows only "A health record — hidden, you don't have access", with no title;
+  - timeline entries from records the viewer can't read show only "Health record added — hidden", with no summary;
+  - build needs a test for both with a viewer without access.
+- D3, wording: "Moderate harm" instead of "Moderate · How bad".
+- D1 (Overview starts):
+  - the support worker's subline shows their own house;
+  - "You're about to work alone" (matches D2);
+  - the safeguarding choice "You're worried a person is being harmed" is on every start;
+  - Board reports only for board access;
+  - built lists use the standard row patterns (row click, kebab, right-click).
+- D2 (Report something): approved as drawn. After the decision below, it shows only the choices the person may use, but safeguarding and "A person was hurt" stay for everyone.
+- D4 (hubs):
+  - Safeguarding concerns is a tab in "Incidents and safety reviews";
+  - Working alone moves to "Risks and prevention" (a hazard control; seventh tab, under More); "People and participation" keeps representatives, committees and consultations.
+- **Decision (MASTER for Stephan to confirm in the morning):** support workers may **report** (create only) workplace injuries and restraints, because prompt reporting is safer and Ngā Paerewa expects every restraint recorded.
+  - They may not review, approve or close them.
+  - They see only what they reported, plus their own injury.
+  - It's built **last** in Part 2, in its own commit, so it can be vetoed.
+
+**Build order:** D2 Report something → D1 Overview header and role starts → D4 hubs with tabs → D3 one accident record → the support-worker create permission (own commit).

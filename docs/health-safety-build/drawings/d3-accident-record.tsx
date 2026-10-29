@@ -31,7 +31,7 @@ export default function DrawingAccidentRecord() {
                         subline={`${ACCIDENT.site} · ${ACCIDENT.when} · Ref ${ACCIDENT.ref}`}
                         actions={<PageHeaderGlassButton icon={FileText}>Print summary</PageHeaderGlassButton>}
                         facts={<PageHeaderFacts items={[
-                            { value: 'Moderate', label: 'How bad', tone: 'warning' },
+                            { value: 'Moderate harm', tone: 'warning' },
                             { value: 'Jordan Peri', label: 'Owner' },
                             { value: 'Not notifiable', label: 'WorkSafe, decided Tue 27 Oct', tone: 'success' },
                             { value: 'Bruised left hip', label: 'Injury' },
@@ -98,7 +98,7 @@ export default function DrawingAccidentRecord() {
                             items={[
                                 { key: 1, title: 'First aid — cold pack on the left hip', sub: 'Given by Mere Tane · Mon 26 Oct, 7:50 pm', badge: <StatusBadge variant="success">Recorded</StatusBadge>, leading: <HeartPulse className="size-4" /> },
                                 { key: 2, title: 'Falls risk assessment for Aroha', sub: 'Review brought forward to Fri 6 Nov', badge: <StatusBadge variant="warning">Review due</StatusBadge>, leading: <FileText className="size-4" /> },
-                                { key: 3, title: 'GP visit notes', sub: 'Health record', badge: <StatusBadge variant="neutral">Hidden — you don’t have access</StatusBadge>, leading: <Lock className="size-4" /> },
+                                { key: 3, title: 'A health record — hidden, you don’t have access', leading: <Lock className="size-4" /> },
                             ]}
                         />
                     </div>
@@ -115,7 +115,7 @@ export default function DrawingAccidentRecord() {
                                 { key: 6, time: 'Wed 28 Oct', tone: 'info', title: 'Rāwiri Ngata gave his account', sub: 'Investigation' },
                                 { key: 5, time: 'Tue 27 Oct', tone: 'success', title: 'Decided: WorkSafe doesn’t need to be told', sub: 'Jordan Peri · not a serious injury' },
                                 { key: 4, time: 'Tue 27 Oct', tone: 'success', title: 'Passed to Health and safety', sub: 'Rāwiri Ngata → Jordan Peri' },
-                                { key: 3, time: 'Mon 26 Oct', tone: 'success', title: 'GP checked Aroha — no fracture', sub: 'Health record' },
+                                { key: 3, time: 'Mon 26 Oct', tone: 'none', title: 'Health record added — hidden' },
                                 { key: 2, time: 'Mon 26 Oct', tone: 'success', title: 'First aid given', sub: 'Mere Tane' },
                                 { key: 1, time: 'Mon 26 Oct', tone: 'success', title: 'Reported', sub: 'Mere Tane, 7:55 pm' },
                             ]}

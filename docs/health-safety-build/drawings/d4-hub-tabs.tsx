@@ -12,14 +12,14 @@ import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import { AlertOctagon, MapPin, Plus } from 'lucide-react';
 
-type Tab = 'hazards' | 'risk' | 'chemicals' | 'ppe' | 'procedures' | 'drills';
+type Tab = 'hazards' | 'risk' | 'chemicals' | 'ppe' | 'procedures' | 'drills' | 'lone';
 
 const HUBS: [string, string][] = [
     ['Overview', 'Your start · the numbers that matter'],
-    ['Incidents and safety reviews', 'Incidents · Safety reviews · Actions · WorkSafe notifications'],
+    ['Incidents and safety reviews', 'Incidents · Safety reviews · Actions · WorkSafe notifications · Safeguarding concerns'],
     ['Injuries and care', 'Workplace injuries · First aid · Restraints · Chemical exposures'],
-    ['Risks and prevention', 'Hazards · Risk assessments · Chemicals · Protective gear (PPE) · Procedures · Drills'],
-    ['People and participation', 'Health and safety representatives · Committees · Consultations · Working alone'],
+    ['Risks and prevention', 'Hazards · Risk assessments · Chemicals · Protective gear (PPE) · Procedures · Drills · Working alone (under More)'],
+    ['People and participation', 'Health and safety representatives · Committees · Consultations'],
     ['Reports', 'Trends · Board reports'],
 ];
 
@@ -55,7 +55,9 @@ export default function DrawingHub() {
                                 { key: 'ppe', label: 'Protective gear' },
                                 { key: 'procedures', label: 'Procedures' },
                                 { key: 'drills', label: 'Drills' },
+                                { key: 'lone', label: 'Working alone' },
                             ]}
+                            maxVisible={6}
                         />}
                     />
                 }

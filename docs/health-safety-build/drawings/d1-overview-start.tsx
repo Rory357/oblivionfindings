@@ -22,7 +22,8 @@ function Start({ role }: { role: Role }) {
                             ['Someone was hurt or nearly hurt', 'Report an incident'],
                             ['Something could hurt someone', 'Report a hazard'],
                             ['You gave first aid', 'Record first aid'],
-                            ['You’re working alone tonight', 'Start working alone'],
+                            ['You’re about to work alone', 'Start working alone'],
+                            ['You’re worried a person is being harmed', 'Raise a safeguarding concern'],
                         ].map(([q, a]) => (
                             <div key={q} className="rounded-xl border border-border bg-card p-3">
                                 <div className="text-sm font-semibold text-foreground">{q}</div>
@@ -132,7 +133,7 @@ export default function DrawingOverview({ role = 'hs_manager' as Role }: { role?
                         subline={`${scope} · last 30 days · showing the start for ${ROLE_LABEL[role]}`}
                         actions={
                             <>
-                                {role !== 'support_worker' ? <PageHeaderGlassButton icon={FileText}>Board reports</PageHeaderGlassButton> : null}
+                                {role === 'hs_manager' ? <PageHeaderGlassButton icon={FileText}>Board reports</PageHeaderGlassButton> : null}
                                 <PageHeaderPrimaryButton icon={Plus}>Report something</PageHeaderPrimaryButton>
                             </>
                         }
