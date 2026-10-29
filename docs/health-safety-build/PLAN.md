@@ -441,3 +441,17 @@ Drawings: `docs/health-safety-build/drawings/` (`63f658209`, updated after revie
   - Tests: `IncidentHiddenHealthRecordsTest` (viewer without access; viewer with restraint access) and `hidden-health-records.test.ts`.
   - Tab regrouping for D3 is still to come.
 - **Incidental fix:** `attachment-remove-confirmation-contracts.test.ts` still listed five dialogs removed in Part 1 (`b3090e6bc`). Their replacement record pages ask before removing a file, through their own "Remove evidence" pop-ups.
+- **D3 tabs (30 Oct):**
+  - The tabs are Overview · Injury and first aid · Safety review · Follow-ups · Files · History · Linked records. Linked records is the seventh, so it sits under More.
+  - The Overview already tells what happened, so a separate "What happened" tab would only repeat it.
+  - "Safety review" keeps the agreed wording, rather than the drawing's "Investigation".
+- **My Day "Report something" (MASTER, option A):** an extra button beside "Report incident" that opens the same chooser.
+  - It shows only when the person can report more than an incident. Today that means support workers, through safeguarding.
+  - Report pages opened from it return to My Day.
+- **Held for Stephan's yes, on its own branch (not on main):** create-only reporting.
+  - New `restraints.report` and `injuries.report` for support_worker.
+  - `safeguarding.create` for team_lead and health_safety_officer.
+  - A grant migration and tests.
+  - **Not** `incidents.create` for team_lead. An incident report needs a client the reporter can read, and team leads hold no client read access, so it would only work by widening their reading. MASTER to decide.
+- **Follow-up after that yes:** a support worker can see their own workplace injury. This needs a new read path for injury records, so it's not in the held change.
+- **Follow-up:** `/incidents/create` and My Day's "Report incident" open the form on the incident register, so anyone allowed to report but not to read the register would be refused. A standalone report page would fix that for report-only roles.
