@@ -12,7 +12,9 @@ class RestraintCreateOnlyReporterTest extends RestraintEventCommandTestCase
     public function test_a_create_only_reporter_records_a_restraint_and_reads_nothing_back(): void
     {
         $reporter = $this->staff(['restraints.report', 'clients.viewAny']);
-        $this->actingAs($reporter)->getJson(route('health-safety.restraints.report'))->assertOk();
+        // The form opens ready to record (found in the 30 Oct user test: it said "You can't make this change any more").
+        $this->actingAs($reporter)->getJson(route('health-safety.restraints.report'))->assertOk()
+            ->assertJsonPath('can.capture', true)->assertJsonPath('can.create_plan', false);
 
         $response = $this->postJson(route('health-safety.restraints.events.store'), $this->capture());
         $response->assertOk()->assertJsonPath('status', 'accepted')->assertJsonPath('event_href', null)

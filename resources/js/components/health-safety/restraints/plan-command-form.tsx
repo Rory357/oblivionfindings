@@ -323,6 +323,14 @@ export function BehaviourSupportPlanCommandForm({
                         }))}
                         placeholder={label}
                         listLabel={label}
+                        searchLabel={
+                            key === 'client_id' ? 'Search people' : undefined
+                        }
+                        emptyLabel={
+                            key === 'client_id'
+                                ? 'No one matches this search.'
+                                : undefined
+                        }
                     />
                     <Button
                         type="button"
@@ -530,7 +538,8 @@ export function BehaviourSupportPlanCommandForm({
                 {...source}
                 checking={source.checking || choices.checking}
                 currentFacts={currentFacts}
-                canCheck
+                // A new record has no saved version to load; only offer it once something changed underneath.
+                canCheck={command !== 'create' || source.stale}
                 onCheck={() => void source.checkCurrent()}
                 onReview={source.useCurrent}
                 onDone={() => onDone(source.confirmedHref)}

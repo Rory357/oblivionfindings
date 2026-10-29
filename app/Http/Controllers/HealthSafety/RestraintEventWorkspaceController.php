@@ -63,8 +63,13 @@ class RestraintEventWorkspaceController extends Controller
     private function reportPage(Request $request, ?array $context = null): Response|JsonResponse
     {
         $origin = RestraintReturn::sanitize($request->input('return_to'));
-        $capture = $this->access->withCurrentViewer($request->user(), fn ($current) => $current->canDo('restraints.create') || $current->canDo('restraints.manage'));
-        abort_if($request->input('kind') === 'plan' && ! ($context['can_create_plan'] ?? $capture), 403);
+        [$capture, $createPlan] = $this->access->withCurrentViewer($request->user(), fn ($current) => [
+            // Recording a restraint includes the create-only reporter (restraints.report, Stephan 30 Oct);
+            // a behaviour support plan stays with create/manage.
+            $current->canDo('restraints.create') || $current->canDo('restraints.manage') || $current->canDo('restraints.report'),
+            $current->canDo('restraints.create') || $current->canDo('restraints.manage'),
+        ]);
+        abort_if($request->input('kind') === 'plan' && ! ($context['can_create_plan'] ?? $createPlan), 403);
         $eventHint = $request->session()->get('restraint_confirmation');
         $planHint = $request->session()->get('behaviour_support_plan_confirmation');
         // First-create recovery is direct JSON only, never an Inertia URL or history entry.
@@ -103,7 +108,7 @@ class RestraintEventWorkspaceController extends Controller
         $props = [
             'pickers' => $context['pickers'] ?? $this->register->pickers($request->user(), $request->only(['client_id', 'site_id'])),
             'capture_context' => $context ? array_intersect_key($context, array_flip(['client_id', 'site_id', 'respite_stay_id', 'store_href'])) : null,
-            'can' => ['capture' => $context !== null || $capture, 'create_plan' => $context['can_create_plan'] ?? $capture],
+            'can' => ['capture' => $context !== null || $capture, 'create_plan' => $context['can_create_plan'] ?? $createPlan],
             'return_to' => $origin,
             'restraint_confirmation' => $eventReceipt,
             'behaviour_support_plan_confirmation' => $planReceipt,
