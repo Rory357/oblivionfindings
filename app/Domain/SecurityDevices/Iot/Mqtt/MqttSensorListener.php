@@ -108,13 +108,15 @@ final class MqttSensorListener
                         continue;
                     }
 
-                    $this->intake->ingest(
+                    $result = $this->intake->ingest(
                         siteId: $settings['site_id'],
                         topic: $message['topic'],
                         rawPayload: $message['payload'],
                         receivedAt: CarbonImmutable::now('UTC'),
                     );
                     $handled++;
+                    // One line per reading (topic and outcome only, never the payload), so a walk can see it arrive.
+                    $say(sprintf('Reading on %s: %s.', $message['topic'], (string) ($result['reason_code'] ?? 'received')));
                     if ($maxMessages > 0 && $handled >= $maxMessages) {
                         return $handled;
                     }

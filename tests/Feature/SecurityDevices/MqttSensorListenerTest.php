@@ -125,6 +125,7 @@ it('reconnects after the broker restarts and keeps receiving readings', function
         ->and($sleeps)->toBe([1, 1, 1])
         ->and($lines)->toContain('The MQTT broker closed the connection. Reconnecting.')
         ->and($lines)->toContain('The MQTT broker stopped answering. Reconnecting.')
+        ->and($lines)->toContain('Reading on oblivion/sensors/lounge: unmatched_sensor.')
         ->and(app(ListenerHeartbeat::class)->lastBeat(ListenerHeartbeat::MQTT_SENSORS))->not->toBeNull();
 });
 
