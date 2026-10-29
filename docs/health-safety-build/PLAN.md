@@ -293,6 +293,16 @@ Stephan (29 Oct, via MASTER): "also you are in control of health and safety". MA
   - #10 evidence recovery routes and Codex's recovery page (`/health-safety/chemical-exposures/recovery`);
   - #11 safeguarding register read checks.
 - **Part 3 clean-up approved by MASTER (29 Oct):** take a full .com database dump first (outside `/var/www/oblivionfindings`), send MASTER the list and the dump path, then delete only test and demo-fixture records, then add realistic NZ data.
+  - **Done on the .com, 29 Oct ~10:40 UTC.** Dump: `/home/oblivion/env-backups/oblivion_findings-pre-part3-20261029T103217Z.sql.gz`. Manifest with every id and before-value: `/home/oblivion/env-backups/oblivion_findings-part3-manifest-20261029T103403Z.json`.
+    - G1: 3 "[TEST]" committees and 8 test H&S events soft-deleted; 11 test incidents deleted.
+    - G2: 7 test Sites archived; 29 clients soft-deleted; 33 test users unapproved (15 changed; the rest already were); 15 HR profiles ended.
+    - G3: 4 workplace injuries moved from family members or a test login to real demo staff; 7 demo incidents completed (immediate action, or the client's own Site).
+    - G4: "[H&S-DEMO-SEED]" stripped from 58 records.
+  - **Kept by design:** incidents INC-2026-0142 and INC-2026-0145 (ids 261, 264) have append-only lifecycle signals that a database trigger refuses to delete. Their H&S events are soft-deleted, and their Site and client are archived, but the Incidents list still shows them: it doesn't filter on archived Sites or deleted clients. Not forced (MASTER, 29 Oct). A later fix belongs to Incidents: hide incidents of archived Sites or deleted clients from the default list.
+  - **Follow-up (MASTER, 29 Oct):** the Control Room signal sync stopped at a later check for 4 completed demo incidents: closed incidents whose H&S reviews were still open.
+    - HS-2026-0005, 0010 and 0044 (low falls) were closed through the app's own path as "Demo H&S Officer": handover accepted, signed WorkSafe decision "not notifiable" with its reason, then the normal close. Before-rows are in the manifest (`g5_close_reviews`).
+    - HS-2026-0078 (high-severity behaviour) stays open. It has an undecided investigation recommendation and unverified actions, and closing it wouldn't be realistic, so its sync error stays logged (rate-limited).
+  - **Ease-of-use pass:** lists should hide archived Sites and deleted clients (the two kept incidents above still show).
 
 ## Jobs after the H&S merge (each its own tested change, pushed and deploy-checked)
 
