@@ -18,6 +18,12 @@ final class MilesightGatewayWebhookController extends Controller
         Site $site,
         MilesightGatewayIntakeService $intake,
     ): JsonResponse {
+        // D23 (Stephan, 30 Oct): Milesight's HTTPS push is answered only over the private network, so
+        // sensor readings never cross the public internet. Anyone else gets a plain 404.
+        if (! self::fromPrivateNetwork($request)) {
+            return response()->json(['message' => 'Not Found'], 404);
+        }
+
         $secretRow = IntegrationSiteSecret::query()
             ->where('site_id', $site->id)
             ->whereIn('provider', ['milesight', 'milesight_lorawan'])
@@ -51,6 +57,45 @@ final class MilesightGatewayWebhookController extends Controller
         $result = $intake->ingestUplink((int) $site->id, $payload);
 
         return response()->json($result, $result['accepted'] ? 200 : 422);
+    }
+
+    /**
+     * Whether the sender is on a private network: 10/8, 172.16/12, 192.168/16, loopback, or IPv6
+     * unique-local (fc00::/7).
+     *
+     * On the .com, nginx terminates TLS and hands every request to PHP from 127.0.0.1, setting
+     * `X-Real-IP` to the true sender (its `proxy_set_header` always overwrites anything the sender
+     * sent). So when PHP's caller is loopback and `X-Real-IP` is present, that header is the sender;
+     * otherwise the caller itself is. A public sender is never treated as private.
+     */
+    public static function fromPrivateNetwork(Request $request): bool
+    {
+        $caller = (string) $request->server('REMOTE_ADDR', '');
+        if (filter_var($caller, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+
+        $sender = $caller;
+        $forwarded = trim((string) $request->headers->get('X-Real-IP', ''));
+        if (self::isLoopback($caller) && $forwarded !== '') {
+            if (filter_var($forwarded, FILTER_VALIDATE_IP) === false) {
+                return false;
+            }
+            $sender = $forwarded;
+        }
+
+        if (self::isLoopback($sender)) {
+            return true;
+        }
+
+        // FILTER_FLAG_NO_PRIV_RANGE fails for RFC 1918 and fc00::/7, which is exactly what is wanted.
+        return filter_var($sender, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE) === false
+            && filter_var($sender, FILTER_VALIDATE_IP, FILTER_FLAG_NO_RES_RANGE) !== false;
+    }
+
+    private static function isLoopback(string $ip): bool
+    {
+        return $ip === '::1' || str_starts_with($ip, '127.');
     }
 
     /**

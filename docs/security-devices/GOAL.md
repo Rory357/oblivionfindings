@@ -21,7 +21,7 @@ This file replaces `PROGRESS.md` as the record of where S&D stands. `PROGRESS.md
 
 All of these are true:
 
-1. **Every drawing is built.** All 69 page views and 79 pop-up drawings in version 7 exist in the app, view for view.
+1. **Every drawing is built.** All 71 page views and 80 pop-up drawings in the approved plan exist in the app, view for view. Version 8 (30 Oct) added the sensor broker: Setup › Sensor broker, the sensor gateway page, and pop-up 98 "Add a sensor gateway".
    - Each one is compared with its drawing at 1440 px wide, in light and dark.
    - Pages follow `DESIGN.md`: semantic colours only, the Event Horizon header rules, the right layout shell, and `<StatusBadge>` for every state.
    - Pop-ups use the kit in `resources/js/components/popup/`: widths 480, 720 and 900, wizards 1100, Cancel first, and the main button named for what it does.
@@ -76,6 +76,8 @@ All of these are true:
 - Data steps on the .com need a full dump in `~/env-backups/` and MASTER's OK at the time. Never leave a file in `/var/www/oblivionfindings`.
 - **Hands off two shared paths until MASTER says the slowness fix has landed:** `SignalProcessingService`, and the path that turns a device signal into a Control Room alert. In Phase A that covers the alarm receiver's outbox publishing (`SiaDc09IntakeService` → `MonitoringOutboxPublisher`). Phase A changes only how messages are read, answered and kept running, not where they go.
 - Ask MASTER before editing shared files outside S&D.
+- **Sensor traffic never crosses the public internet (D21–D23).** The .com never opens an MQTT port and gets no broker.
+- **Demo Sites are fictional.** Stephan, 30 Oct: "We will be testing on my local sites, all data is fictional, we are still developing." Don't design around a demo Site's network details, and don't ask him demo-Site questions. Walks use his home network.
 
 ## 4. Phases, in the plan's order
 
@@ -94,7 +96,7 @@ Each phase is one change and one merge. A phase may be split into smaller merges
 | A5 | **Camera passwords are safe.** Only WS-Security digest and HTTP Digest are used, never plain Basic. Certificate checks are on. A camera is trusted on first use with "Trust this camera?" (a small kit confirm) and refused if its certificate later changes. | `OnvifCameraProfileClient.php:1326, 1594` and its callers |
 | A6 | **SSH keys are pinned.** The first connect asks "Trust this device's key?" and remembers the key. A changed key is refused with a plain message, and only an IT admin can replace a trusted key; the replacement is logged. | `PhpseclibNetworkCliTransport.php:70-83` and its callers |
 | A7 | **SNMP works on hubs.** The SNMP module is bundled in the Windows hub runtime and added to the Linux package. SNMP v2c is supported next to v3. | `collector/src/Runtime/ProbeRunner.php:313-325`, `endpoint-agent/internal/collectorhost/installed_windows.go:216`, `endpoint-agent/cmd/oblivion-site-collector/run_linux.go:58`, `site-hub-release.yml` |
-| A8 | **The Milesight webhook check is real.** The invented `X-Milesight-Signature` header is replaced by what Milesight's own documents say, or by a per-Site secret that you set in the gateway. | `MilesightGatewayWebhookController.php:58` |
+| A8 | **The Milesight push is checked properly and stays private (D23).** The invented `X-Milesight-Signature` header is gone. The gateway proves itself with the Site's secret, typed in the way Milesight documents: an HTTP header, or an account and password. The push is answered only from the private network; a public sender gets a plain 404. | `MilesightGatewayWebhookController.php:58` |
 
 **Moved out of Phase A.** The plan's engine-fix table also lists hub approval, scoped logins, routing through the hub, scheduled hub scans, the code-signing check and the hub syslog/Protect code. Those need the new installer and hub, so they ship in Phase B with that phase's walk. See review item R1.
 
@@ -120,6 +122,9 @@ Each phase is one change and one merge. A phase may be split into smaller merges
 7. Back up a home device's settings over SSH, then point the same device record at a different SSH device. Expect: the first backup asks to trust the key, and after the swap it is refused with a plain message.
 8. Settings › Remote support › Test relay, with no relay set up. Expect: "No relay set up", never "Verified".
 9. Open the pull request. Expect: CI is green, and the CI-built hub loads the SNMP module.
+10. Send a Milesight push to the public website, then to the local copy from a private address. Expect: public refused (404); private accepted, but only with the Site's secret (D23).
+   - The local copy runs the branch, so the private half is walked before the merge.
+   - The public half is walked on the .com after the merge, from outside the home network (a phone on mobile data, say). From inside the home network, the .com's public address loops back through the router and looks private.
 
 Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax alarm (R7) and reading his UniFi switch over SNMP (R10). Both go on the end-review list as not proven on hardware.
 
@@ -145,6 +150,7 @@ Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax a
 - **Pi or Linux hub:** a one-line command that brings its own runtime and installs nothing from apt.
 - **Routing through hubs:** cameras, SSH, alarms, web pages and the terminal go through the hub that covers the Site.
 - **Hub scans and checks:** scheduled scans on hubs, and ping and offline alerts run from the covering hub.
+- **Sensor relay (D21):** a house's hub relays its sensor readings to the central broker and keeps 24 hours of them if its link drops.
 - **Code-signing check:** restored behind an explicit unsigned-test switch (D1).
 - **Hub syslog/NetFlow and Protect client:** wired in, or deleted.
 - **Screens:** Setup › Hubs & networks › Hubs, the Add a hub wizard, and the Hubs and downloads pop-ups.
@@ -227,6 +233,14 @@ Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax a
 - **Sensor:** includes Hemi's bed sensor linked to his care plan, and the hot-water sensor that raises an H&S hazard over 45 °C.
 - **Care tracker:** Location, Console, and the consent-blocked state.
 - **Live camera view through the hub.**
+- **The sensor broker (D21–D23):** one central Mosquitto 2 broker beside Oblivion, listening only on its private SD-WAN/MPLS address, never public.
+  - Each gateway or plug gets its own login through the broker's dynamic security, stored encrypted, and may only publish to `oblivion/<site>/<device>/…`.
+  - Encrypted (8883) by default. Plain 1883 is allowed only on private links or through a hub, behind a flagged Setup switch (D22).
+  - Oblivion's listener (A4) reads from the broker on localhost with its own login. A reading's Site and device come from the topic, never from the message.
+  - 5 failed logins in 10 minutes alert IT.
+  - A daily check from a hub proves the .com's public 1883 and 8883 refuse.
+  - Screens: Setup › Sensor broker, "Add a sensor gateway" (pop-up 98), and the sensor gateway page.
+  - Tests start a real broker inside the test run. Walks use Mosquitto for Windows on the local copy, bound to the home address. The .com never opens an MQTT port.
 - **Permissions:** `cctv.live.watch`, `alarms.arm`, `alarms.disarm`, `doors.unlock`, `people.link`, `trackers.command`.
 
 **Tests**
@@ -355,7 +369,7 @@ Each item is ticked with the commit that fixed it and how it was proved.
 | Fake: 7 label-only alarm brands show Arm/Disarm | A1 | Phase A | Driver honesty guard test; Arm/Disarm never taken from saved settings; Supported devices shows "View only" |
 | Fake: UniFi PoE cycle and reboot "tested on hardware" | A1 | Phase A | Claims removed; port actions not offered (made-up controller path); guard test |
 | Fake: "Test relay" says Verified | A2 | Phase A | Real STUN check; "No relay set up" / "No answer from …"; never "Verified" |
-| Fake: Milesight signature header | A8 | Phase A | Header dropped (not in Milesight docs); Site secret as Bearer, token header or Basic password |
+| Fake: Milesight signature header | A8 | Phase A | Header dropped (not in Milesight docs); Site secret as Bearer, token header or Basic password; private network only (D23), public 404 incl. via the local proxy |
 | Fake: code-signing check deleted | B | | |
 | Fake: progress notes overclaim | A1 | Phase A | PROGRESS.md and SUPPORTED-DEVICES.md corrected; HARDWARE-WALKS.md + guard test |
 | Missing: scheduled scans on hubs | B | | |
@@ -398,7 +412,7 @@ Each item is ticked with the commit that fixed it and how it was proved.
   - **Your answer:** one central broker beside Oblivion, reachable only over the private network (SD-WAN/MPLS), never from the public internet: "I don't want to expose to internet ever". Plain (unencrypted) MQTT is allowed only on those private paths. Houses without a hub may push Milesight readings, also over the private network.
   - **Phase A:** A4 is Oblivion's side (config(), reconnect with back-off, heartbeat). No MQTT port is opened and no broker is installed on the .com.
   - **Walk:** the MQTT check runs on this PC with a local test broker bound to this PC or the home network only.
-  - **Later phase:** the central private broker itself. The design session is redrawing it, and the details are added here when they arrive.
+  - **Settled in plan v8 as D21–D23 (your calls):** one central Mosquitto 2 broker on Oblivion's private address, with per-device logins and encrypted by default (D21, D22). Milesight's HTTPS push is answered only on the private address (D23, in Phase A as A8). The hub relay is Phase B; the broker, its logins and its screens are Phase E. See section 4.
 - **R9. Cameras.** Your UniFi Protect console is used for the "Trust this camera?" walk (step 6).
 - **R10. SNMP: not walked on hardware.** You chose to skip the switch step on 30 Oct. A7 is proved by the CI-built hub loading the SNMP module and by collector tests, not by reading your switch.
 - **R11. Doors.** Your installer still has to confirm every door has an exit button and a handle. Connect UniFi Access requires the tick (pop-up 91).
@@ -410,6 +424,18 @@ Each item is ticked with the commit that fixed it and how it was proved.
 - **R22. Who may trust.** First trust of a camera or SSH key: anyone who can run device management (`securityDevices.commands.manage`). Replacing a trusted key after it changed: IT admins only (`securityDevices.commands.admin`). This reuses existing permissions, so Phase A adds no new permission key and no grant migration.
 - **R23. SSH backups for your kit.** Settings backups only run for MikroTik, Cisco, Aruba and Fortinet, and your network is UniFi. So walk step 7 uses a test device record pointed at a real SSH machine on your network. A UniFi settings backup is Phase G's job.
 - **R24. The SNMP module is required in Windows hub releases.** The CI build now fails if the hub runtime can't load SNMP. On the old Linux (apt) install it's installed but optional, because Phase B replaces that install.
+
+- **R25. "Private" is judged from the sender's address.** The Milesight push counts as private when it comes from 10/8, 172.16/12, 192.168/16, loopback or IPv6 unique-local. Carrier-grade NAT (100.64/10) is treated as public.
+  - On the .com, nginx passes the webhook straight to PHP with the true sender. Only the hub API goes through the local proxy, which sets `X-Real-IP`.
+  - The production server's proxy must keep this rule: never forward that route through localhost without `X-Real-IP`.
+
+### Before go-live
+
+1. **How Oblivion's production server joins SD-WAN/MPLS.** Either it sits on the private network at head office, or it has a site-to-site VPN into the SD-WAN. Until then the .com never opens an MQTT port, and broker walks run on the local copy at home.
+2. **Care trackers on 4G** need a private APN. Otherwise they reach Oblivion over the mobile internet.
+3. **The MQTT menu on your UG65's firmware.** This gets checked in Phase E.
+4. **Doors.** Each client's installer confirms an exit button and a handle on every door (also R11).
+5. **D24: a real house without a private link (waiting for you).** Either its hub sends readings encrypted and outbound only, inside the link it already uses, or it gets no sensors until it joins SD-WAN, MPLS or a VPN.
 
 ### Not proven yet
 
