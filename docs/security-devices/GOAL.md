@@ -115,7 +115,7 @@ Each phase is one change and one merge. A phase may be split into smaller merges
 2. Open the Ajax alarm page. Expect: no Arm or Disarm button anywhere.
 3. Run the alarm receiver test with the reference messages. Expect: every sample is accepted and acknowledged, and encrypted samples get encrypted replies.
 4. Stop the alarm receiver and the MQTT listener. Expect: both restart by themselves within 1 minute, and the server check is green. Supervisor runs only on the .com, so this step is walked there right after the merge, once Stephan has added the programs (`ops/supervisor/README.md`, step 4). Before the merge, the restart is shown on this PC by stopping and starting the command.
-5. With settings cached, send an MQTT reading, then restart the broker. Expect: the reading arrives, and the listener reconnects within 1 minute. **On hold:** which broker this uses waits for the design session's answer (R8).
+5. On this PC, with a local test broker bound to this PC or the home network only (never the .com) and settings cached, send an MQTT reading, then restart the broker. Expect: the reading arrives, and the listener reconnects within 1 minute (R8).
 6. Add your UniFi Protect console, which has a self-signed certificate. Expect: "Trust this camera?" is asked once, and no plain Basic-auth password appears in the console's log.
 7. Back up a home device's settings over SSH, then point the same device record at a different SSH device. Expect: the first backup asks to trust the key, and after the swap it is refused with a plain message.
 8. Settings › Remote support › Test relay, with no relay set up. Expect: "No relay set up", never "Verified".
@@ -126,8 +126,8 @@ Two steps were dropped at Stephan's request on 30 Oct: reporting from his Ajax a
 **Data and site steps**
 
 - **D9:** remove the 3 test Sites from the .com, with a full dump to `~/env-backups/` first and MASTER's OK at the time.
-- **Supervisor (R6):** the programs for the alarm receiver and MQTT have to be added once on the .com. That needs root, so it is Stephan's job. The exact commands to copy and paste are in `ops/supervisor/README.md`, and MASTER hands them over when Phase A is ready to merge.
-- **MQTT broker settings** wait for R8. Any password is typed by Stephan himself.
+- **Supervisor (R6):** the alarm receiver program has to be added once on the .com. That needs root, so it is Stephan's job. The exact commands to copy and paste are in `ops/supervisor/README.md`, and MASTER hands them over when Phase A is ready to merge.
+- **MQTT on the .com:** nothing in Phase A. Its listener program waits for the central private broker (R8, later phase). There is no broker and no MQTT port on the .com, ever on the public internet. Any broker password is typed by Stephan himself.
 
 **CI for the hub (MASTER's OK, 30 Oct)**
 
@@ -394,7 +394,11 @@ Each item is ticked with the commit that fixed it and how it was proved.
 
 - **R6. Supervisor on the .com.** The alarm receiver and MQTT programs have to be added once on the .com. That needs root, so it's your job. The commands to copy and paste are in `ops/supervisor/README.md`.
 - **R7. Ajax: not proven on hardware.** You chose to skip the Ajax PRO monitoring-station step on 30 Oct. Ajax stays "View only" and is not proven on real hardware. Ajax gives Oblivion no arm or disarm without Ajax's partner API.
-- **R8. MQTT broker: open.** You said "I thought Oblivion is going to be the MQTT broker". MASTER is asking the design session whether the plan makes Oblivion or the hub the broker for the sensors, and how. Until then, A4 ships config(), reconnect and supervisor, and assumes no outside broker.
+- **R8. MQTT broker: answered 30 Oct.**
+  - **Your answer:** one central broker beside Oblivion, reachable only over the private network (SD-WAN/MPLS), never from the public internet: "I don't want to expose to internet ever". Plain (unencrypted) MQTT is allowed only on those private paths. Houses without a hub may push Milesight readings, also over the private network.
+  - **Phase A:** A4 is Oblivion's side (config(), reconnect with back-off, heartbeat). No MQTT port is opened and no broker is installed on the .com.
+  - **Walk:** the MQTT check runs on this PC with a local test broker bound to this PC or the home network only.
+  - **Later phase:** the central private broker itself. The design session is redrawing it, and the details are added here when they arrive.
 - **R9. Cameras.** Your UniFi Protect console is used for the "Trust this camera?" walk (step 6).
 - **R10. SNMP: not walked on hardware.** You chose to skip the switch step on 30 Oct. A7 is proved by the CI-built hub loading the SNMP module and by collector tests, not by reading your switch.
 - **R11. Doors.** Your installer still has to confirm every door has an exit button and a handle. Connect UniFi Access requires the tick (pop-up 91).

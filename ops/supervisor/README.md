@@ -86,5 +86,7 @@ must print nothing.
 
 ## MQTT sensor listener (Phase A, item A4)
 
-Not here yet. Its program is added once it's settled whether Oblivion or the hub is the sensors' MQTT
-broker (GOAL.md, review item R8).
+Not on the .com. Stephan's call (30 Oct, GOAL.md R8): one central MQTT broker beside Oblivion, reachable
+only over the private network (SD-WAN/MPLS), never from the internet. The listener's supervisor
+program is added in the later phase that builds that broker. Until then, open no MQTT port and install
+no broker on this server.

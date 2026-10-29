@@ -63,7 +63,8 @@ final class MilesightGatewayWebhookController extends Controller
      * - `X-Oblivion-Webhook-Token: <secret>`;
      * - HTTP Basic, with the secret as the password (any account name).
      *
-     * Only https should carry it; the secret is checked in constant time.
+     * Only https should carry it; the secret is checked in constant time. In production this route is
+     * reached over the private network only (Stephan, 30 Oct, GOAL.md R8), never from the internet.
      */
     private function verifyAuthentication(Request $request, #[\SensitiveParameter] string $sharedSecret): bool
     {
