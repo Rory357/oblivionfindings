@@ -60,6 +60,9 @@ class SignalProcessingService
 
     private const TRUSTED_INCIDENT_SOURCE_SLUGS = ['medication'];
 
+    /** Normalized-data key naming a standing condition; see openConditionAlert(). */
+    public const CONDITION_KEY = 'condition_key';
+
     public function __construct(
         protected ControlRoomNotificationService $notifications,
         protected ?ShiftSignalService $shiftSignals = null,
@@ -258,6 +261,22 @@ class SignalProcessingService
 
             // Find matching rules
             $rules = SignalRule::findMatchingRules($signal);
+
+            // A standing condition (an item that stays overdue) is one alert
+            // while that alert is open: each later check refreshes it rather
+            // than opening another. Once it is resolved, the next check alerts
+            // again. Applies with or without a rule; never across Sites,
+            // people, assets or devices.
+            if ($incident === null) {
+                $conditionAlert = $this->openConditionAlert($signal, $rules->first());
+                if ($conditionAlert !== null) {
+                    $this->assertAlertCanGroupSignal($signal, $conditionAlert);
+                    $signal->markCorrelated($conditionAlert);
+                    $this->addSignalToAlert($signal, $conditionAlert);
+
+                    return $conditionAlert;
+                }
+            }
 
             if ($rules->isEmpty()) {
                 // No rules match - create alert with defaults
@@ -1089,6 +1108,43 @@ class SignalProcessingService
     }
 
     /**
+     * The key a producer puts in a signal's normalized data to say "this is
+     * the same standing condition as before" (for example one corrective
+     * action that is still overdue). See openConditionAlert().
+     */
+    public static function conditionKey(string $signalType, string $itemType, int|string $itemId): string
+    {
+        return $signalType.'|'.$itemType.':'.$itemId;
+    }
+
+    /**
+     * The open alert for the same standing condition as this signal: same
+     * condition key, source, alert type, Site, person, asset and device. The
+     * dedup window does not apply — a daily check must find yesterday's
+     * alert. A resolved, closed or dismissed alert is never reused.
+     */
+    protected function openConditionAlert(Signal $signal, ?SignalRule $rule): ?ControlRoomAlert
+    {
+        $key = data_get($signal->normalized_data, self::CONDITION_KEY);
+        if (! is_string($key) || $key === '' || strlen($key) > 255) {
+            return null;
+        }
+
+        $query = ControlRoomAlert::query()
+            ->unresolved()
+            ->where('source', $signal->signalSource?->slug ?? 'unknown')
+            ->where('alert_type', $this->resolveAlertType($signal, $rule))
+            ->where('context->normalized_data->'.self::CONDITION_KEY, $key);
+
+        foreach (['site_id', 'client_id', 'asset_id', 'device_id'] as $column) {
+            $id = $this->canonicalPositiveId($signal->{$column});
+            $id === null ? $query->whereNull($column) : $query->where($column, $id);
+        }
+
+        return $query->latest('triggered_at')->latest('id')->lockForUpdate()->first();
+    }
+
+    /**
      * Find an existing alert that this signal should correlate with.
      */
     protected function findCorrelatedAlert(Signal $signal, SignalRule $rule): ?ControlRoomAlert
@@ -1744,6 +1800,12 @@ class SignalProcessingService
             }
             $siteId = $recordedSiteId;
         }
+        // A vehicle whose home Site no longer exists can't be routed to anyone
+        // at that Site. Say so once (unroutable, shown under delivery
+        // problems) instead of failing three times into the dead-letter queue.
+        if ($siteId !== null && ! Site::query()->whereKey($siteId)->exists()) {
+            throw new SafetySignalUnroutable('Fleet safety signal Site no longer exists; manual verification is required.');
+        }
         $fleetContext = $isAvailability ? [] : $this->buildFleetContext($fleetSignal);
         $privacyBlocked = (bool) data_get($fleetSignal->payload, 'privacy_blocked', false);
         if ($privacyBlocked) {
@@ -1775,6 +1837,10 @@ class SignalProcessingService
                 'fleet_context' => $fleetContext,
             ],
         ];
+        $conditionKey = data_get($fleetSignal->payload, self::CONDITION_KEY);
+        if (! $isAvailability && is_string($conditionKey) && $conditionKey !== '') {
+            $data['normalized_data'][self::CONDITION_KEY] = $conditionKey;
+        }
 
         return $this->ingest($data);
     }
