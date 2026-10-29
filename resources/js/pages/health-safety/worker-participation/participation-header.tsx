@@ -29,6 +29,8 @@ export type ParticipationFilters = {
     period: string;
     q: string | null;
     focus?: string | null;
+    /** 'current' hides archived Sites (the default); 'all' shows them. */
+    records?: 'current' | 'all' | null;
 };
 
 export type ParticipationHero = {

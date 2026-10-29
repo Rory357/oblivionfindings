@@ -55,6 +55,7 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use App\Support\HealthSafety\QueryPaging;
+use App\Support\HealthSafety\CurrentRecords;
 
 class HsEventController extends Controller
 {
@@ -246,6 +247,7 @@ class HsEventController extends Controller
                 'from' => $request->input('from'),
                 'to' => $request->input('to'),
                 'action_context' => $request->input('action_context'),
+                'records' => CurrentRecords::mode($request),
             ],
             'actionReturnUrl' => $request->filled('action_context')
                 ? '/health-safety/corrective-actions?'.http_build_query($request->input('action_context'), '', '&', PHP_QUERY_RFC3986)
@@ -328,6 +330,10 @@ class HsEventController extends Controller
 
     private function applyEventRefinements(Builder $query, Request $request, ?HealthSafetyReadContext $context = null): void
     {
+        // Hide archived Sites and removed clients unless ?records=all (MASTER for Stephan, 30 Oct).
+        if (! CurrentRecords::includeArchived($request)) {
+            CurrentRecords::onCurrentClients(CurrentRecords::onCurrentSites($query, 'hs_events.site_id'), 'hs_events.client_id');
+        }
         if ($request->filled('severity')) {
             $query->where('severity', $request->input('severity'));
         }

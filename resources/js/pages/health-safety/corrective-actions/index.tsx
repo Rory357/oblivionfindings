@@ -406,6 +406,14 @@ export default function CorrectiveActionsIndex({
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
+    // An empty view or filter is not an empty register (found in the 30 Oct user test).
+    const showAll = () =>
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...keepView },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
+
     const hasFilters = !!(
         filters.q ||
         filters.priority ||
@@ -807,6 +815,8 @@ export default function CorrectiveActionsIndex({
                                 canViewReports={!!can.viewReports}
                                 onOpen={openAction}
                                 onMenu={openMenu}
+                                narrowed={tab !== 'all' || hasFilters}
+                                onShowAll={showAll}
                             />
                         </Surface>
                     )
@@ -822,6 +832,8 @@ export default function CorrectiveActionsIndex({
                                     canViewReports={!!can.viewReports}
                                     onOpen={openAction}
                                     onMenu={openMenu}
+                                    narrowed={tab !== 'all' || hasFilters}
+                                    onShowAll={showAll}
                                 />
                             </div>
                         </Surface>
@@ -1417,15 +1429,40 @@ export function ActionTable({
     canViewReports,
     onOpen,
     onMenu,
+    narrowed = false,
+    onShowAll,
 }: {
     rows: ActionRow[];
     canViewReports: boolean;
+    /** True when a view (tab) or filter is narrowing the list. */
+    narrowed?: boolean;
+    onShowAll?: () => void;
     onOpen: (
         id: number,
         opts?: { section?: EventSectionKey; action?: EventActionKey },
     ) => void;
     onMenu: (action: ActionRow, x: number, y: number) => void;
 }) {
+    if (!rows.length && narrowed) {
+        return (
+            <div className="px-4 py-16 text-center">
+                <Wrench className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                <p className="font-semibold text-foreground">
+                    Nothing in this view
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                    No actions match this view or your filters right now.
+                </p>
+                {onShowAll ? (
+                    <div className="mt-4 flex justify-center">
+                        <Button size="sm" variant="outline" onClick={onShowAll}>
+                            Show all actions
+                        </Button>
+                    </div>
+                ) : null}
+            </div>
+        );
+    }
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
@@ -1435,17 +1472,17 @@ export function ActionTable({
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
                     Corrective and preventive actions are raised from a safety
-                    event — open an event in the register and add an action, or
-                    promote an investigation recommendation. They'll appear here
-                    to drive, verify and close.
+                    review — open a review and add an action, or promote an
+                    investigation recommendation. They'll appear here to drive,
+                    verify and close.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     <Button
                         size="sm"
                         onClick={() => router.visit('/health-safety/events')}
                     >
-                        <ListChecks className="mr-1.5 h-4 w-4" /> Go to Events
-                        register
+                        <ListChecks className="mr-1.5 h-4 w-4" /> Go to safety
+                        reviews
                     </Button>
                     {canViewReports ? (
                         <Button

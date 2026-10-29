@@ -167,6 +167,8 @@ type Filters = {
     kind?: 'all' | 'incidents' | 'near_misses';
     from: string | null;
     to: string | null;
+    /** 'current' hides archived Sites and removed people (the default); 'all' shows them. */
+    records?: 'current' | 'all' | null;
 };
 
 type Props = {
@@ -394,6 +396,7 @@ function CurrentActorIncidentsIndex({
         !!filters.client_id,
         !!filters.source,
         !!filters.severity,
+        filters.records === 'all',
     ].filter(Boolean).length;
     const hasFilters = !!(
         filters.q ||
@@ -404,7 +407,8 @@ function CurrentActorIncidentsIndex({
         (!!filters.owner && filters.owner !== 'all') ||
         filters.from ||
         filters.to ||
-        (!!filters.kind && filters.kind !== 'all')
+        (!!filters.kind && filters.kind !== 'all') ||
+        filters.records === 'all'
     );
 
     const p = hero.period;
@@ -923,6 +927,23 @@ function MoreFilters({
                         options={[
                             { value: 'all', label: 'All sources' },
                             ...Object.entries(SOURCE_LABELS).map(([value, label]) => ({ value, label })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Records">
+                    <SelectInput
+                        ariaLabel="Records"
+                        placeholder="Current records"
+                        value={filters.records ?? 'current'}
+                        onChange={(value) =>
+                            onChange({ records: value === 'all' ? 'all' : null })
+                        }
+                        options={[
+                            { value: 'current', label: 'Current records' },
+                            {
+                                value: 'all',
+                                label: 'Include archived Sites and removed people',
+                            },
                         ]}
                     />
                 </FilterField>
