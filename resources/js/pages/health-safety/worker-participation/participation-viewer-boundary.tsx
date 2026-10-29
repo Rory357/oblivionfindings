@@ -46,8 +46,8 @@ export function ParticipationViewerBoundary({
                 >
                     <EmptyState
                         icon={ShieldAlert}
-                        title="Participation is unavailable"
-                        description="Your account or access has changed. Reload to confirm what you can view."
+                        title="You can’t see this page right now"
+                        description="You’ve signed in as someone else, or your access has changed. Reload the page to see what you can view."
                         action={
                             <Button
                                 className="frontline-tap frontline-focus"
@@ -62,7 +62,7 @@ export function ParticipationViewerBoundary({
                                     )
                                 }
                             >
-                                Reload participation
+                                Reload page
                             </Button>
                         }
                     />

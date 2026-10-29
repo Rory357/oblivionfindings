@@ -5,6 +5,7 @@
  * global register, the per-Site register and the Site profile link-through;
  * domain commands stay on the hazard page (rows open it, menus deep-link a pane).
  */
+import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { HazardCreateDialog } from '@/components/health-safety/hazard-create-dialog';
 import {
     RiskChip,
@@ -143,28 +144,7 @@ export type HazardRegisterData = {
     recommendedBySiteType: Record<string, Chip[]>;
 };
 
-const BOARD_REPORTS = [
-    {
-        label: 'Board safety summary',
-        href: '/health-safety/reports?view=board',
-    },
-    {
-        label: 'WorkSafe register',
-        href: '/health-safety/reports?view=notifications',
-    },
-    {
-        label: 'Investigation outcomes',
-        href: '/health-safety/reports?view=investigation-outcomes',
-    },
-    {
-        label: 'Corrective-action traceability',
-        href: '/health-safety/reports?view=action-traceability',
-    },
-    {
-        label: 'Risk-assessment register',
-        href: '/health-safety/reports?view=risk-register',
-    },
-];
+const BOARD_REPORTS = boardReportLinks();
 
 /**
  * The register's views. The five drawn ones are the tier-two strip ("Open"
@@ -458,7 +438,7 @@ export function HazardRegister({
                                 >
                                     <PopoverTrigger asChild>
                                         <PageHeaderGlassButton>
-                                            Reports
+                                            {BOARD_REPORTS_LABEL}
                                         </PageHeaderGlassButton>
                                     </PopoverTrigger>
                                     <PopoverContent

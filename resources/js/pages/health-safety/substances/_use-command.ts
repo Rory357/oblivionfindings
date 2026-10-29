@@ -71,7 +71,7 @@ export function useChemicalCommand(target: ChemicalCommandTarget, dirty: boolean
                 if (submission) setRejected(true);
             }
         }
-        setMessage('This submission is unconfirmed. Your entries are retained. Check it or retry the exact submission before starting another.');
+        setMessage('We can’t tell if this saved. Your entries are kept. Select Check if it saved, or Try saving again.');
     };
     const send = async (original: Attempt, recovery = false) => {
         if (request.current || receipt || withdrawn || !(recovery ? target.canRecover ?? target.allowed : target.allowed)) return;
@@ -80,7 +80,7 @@ export function useChemicalCommand(target: ChemicalCommandTarget, dirty: boolean
             const response = await axios.request({ method: original.target.method, url: original.target.path,
                 data: original.multipart ? chemicalMultipart(original.values) : original.values,
                 headers: { Accept: 'application/json' }, signal: controller.signal });
-            if (mounted.current && !controller.signal.aborted && !accept(response.data, original)) setMessage('The response did not confirm this submission. Keep these entries and check before sending again.');
+            if (mounted.current && !controller.signal.aborted && !accept(response.data, original)) setMessage('We can’t tell if this saved. Your entries are kept — select Check if it saved before sending again.');
         } catch (error) { if (mounted.current && !controller.signal.aborted) failure(error, true); }
         finally { if (request.current === controller) { request.current = null; if (mounted.current) setBusy(false); } }
     };
@@ -102,7 +102,7 @@ export function useChemicalCommand(target: ChemicalCommandTarget, dirty: boolean
         try {
             const response = await axios.get(path, { params: recoverUpload ? {} : { source_type: original.target.sourceType, source_id: original.target.sourceId },
                 headers: { Accept: 'application/json' }, signal: controller.signal });
-            if (mounted.current && !controller.signal.aborted && !accept(response.data, original)) setMessage('No accepted submission was confirmed. This does not prove that nothing was saved. The exact original submission is retained.');
+            if (mounted.current && !controller.signal.aborted && !accept(response.data, original)) setMessage('We couldn’t find your save, but it may still have gone through. Check the chemical before trying again — your entries are kept.');
         } catch (error) { if (mounted.current && !controller.signal.aborted) failure(error); }
         finally { if (request.current === controller) { request.current = null; if (mounted.current) setBusy(false); } }
     };

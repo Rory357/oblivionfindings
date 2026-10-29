@@ -258,16 +258,16 @@ export default function FirstAidIndex({
                         <Link
                             href={firstAidHref(record.id, { returnTo })}
                             onClick={(event) => event.stopPropagation()}
-                            aria-label={`Open ${reference(record)} · ${record.treated_person_name}`}
+                            aria-label={`Open first aid for ${record.treated_person_name} · ${reference(record)}`}
                             className={titleLink}
                         >
                             {record.treated_person_name}
                         </Link>
                     }
                     sub={[
-                        reference(record),
                         personTypeLabel(record.treated_person_type),
                         record.site?.name ?? 'Site not recorded',
+                        reference(record),
                     ].join(' · ')}
                 />
             ),
@@ -495,10 +495,11 @@ export default function FirstAidIndex({
                     <div className="grid min-w-0 gap-5">
                         {tab === 'reportable' ? (
                             <Note tone="warning" icon={AlertTriangle}>
-                                Reported incidents, ambulance calls and recorded
-                                hospital referrals need review; this list does
-                                not determine statutory notification
-                                requirements.
+                                Check these: an incident was reported, an
+                                ambulance was called, or the person went to
+                                hospital. This list doesn’t tell you whether
+                                WorkSafe must be notified — check that on the
+                                incident.
                             </Note>
                         ) : null}
                         <RecordTable
@@ -510,7 +511,7 @@ export default function FirstAidIndex({
                             onOpen={open}
                             actionsFor={actionsFor}
                             menuTitle={(record) =>
-                                `${reference(record)} · ${record.treated_person_name}`
+                                `${record.treated_person_name} · ${reference(record)}`
                             }
                             menuIcon={HeartPulse}
                             columns={columns}

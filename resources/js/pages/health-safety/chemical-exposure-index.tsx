@@ -9,7 +9,7 @@
  */
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
-import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderPrimaryButton, PageLayout } from '@/components/page';
+import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageLayout } from '@/components/page';
 import { PageHeaderNumber, PageHeaderNumbers } from '@/components/page/page-header-strip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +23,7 @@ import { CHEMICAL_EXPOSURES, exposureHref, exposureReturn } from '@/lib/health-s
 import type { ExposureIndexProps } from '@/lib/health-safety/chemical-exposure-read-contract';
 import { CHEMICAL_REGISTER } from '@/lib/health-safety/chemical-navigation';
 import { Head, router } from '@inertiajs/react';
-import { CalendarClock, Eye, FlaskConical, Info, LockKeyhole, MapPin, UserRound, X } from 'lucide-react';
+import { CalendarClock, Eye, FlaskConical, Info, LockKeyhole, MapPin, RefreshCw, UserRound, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 type Row = NonNullable<ExposureIndexProps['records']>[number];
@@ -59,7 +59,10 @@ export default function ChemicalExposureIndex({ exposure_access, records, counts
     const timeSet = Boolean(filters?.from || filters?.to);
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Private exposures', href: CHEMICAL_EXPOSURES }]}>
         <Head title="Private chemical exposures" /><PageLayout hero={<PageHeader title="Private chemical exposures" icon={LockKeyhole} subline="Identifiable worker records · safety and private wellbeing access"
-            actions={can.capture ? <PageHeaderPrimaryButton icon={FlaskConical} onClick={() => router.get(CHEMICAL_REGISTER)}>Choose a chemical to report exposure</PageHeaderPrimaryButton> : undefined}
+            actions={can.capture || can.recover ? <>
+                {can.recover ? <PageHeaderGlassButton icon={RefreshCw} onClick={() => router.get(CHEMICAL_EXPOSURES + '/recovery')}>Unfinished uploads</PageHeaderGlassButton> : null}
+                {can.capture ? <PageHeaderPrimaryButton icon={FlaskConical} onClick={() => router.get(CHEMICAL_REGISTER)}>Choose a chemical to report exposure</PageHeaderPrimaryButton> : null}
+            </> : undefined}
             strip={<PageHeaderNumbers>
                 <PageHeaderNumber label="Exposures" value={admitted ? counts?.exposures ?? 'Unconfirmed' : restricted ? 'Restricted' : 'Unconfirmed'}
                     caption={admitted ? 'Current approved Site and filter scope' : restricted ? 'Private wellbeing access required' : 'Original source access could not be confirmed'}

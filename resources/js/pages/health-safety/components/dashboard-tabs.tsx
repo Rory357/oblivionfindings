@@ -5,6 +5,7 @@
 import type { RosterTabItem } from '@/components/rostering';
 import { RingCard, RowList, SectionHead, Tally, type TallyItem } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { BOARD_REPORTS_LABEL, boardReportLinks, type BoardReportKey } from '@/lib/health-safety/board-reports';
 import { type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
@@ -319,13 +320,15 @@ export function CompliancePanel({
 /*  Reports for the board and WorkSafe                                 */
 /* ------------------------------------------------------------------ */
 
-const GOVERNANCE_REPORTS: Array<{ label: string; desc: string; icon: LucideIcon; href: string }> = [
-    { label: 'Board summary', desc: 'How we’re doing on health and safety', icon: FileText, href: '/health-safety/reports/board-summary' },
-    { label: 'WorkSafe register', desc: 'Notifiable events', icon: ShieldAlert, href: '/health-safety/reports/worksafe-register' },
-    { label: 'Investigation outcomes', desc: 'Findings & lessons', icon: Search, href: '/health-safety/reports/investigation-outcomes' },
-    { label: 'Corrective action trail', desc: 'Each action and its safety review', icon: ClipboardCheck, href: '/health-safety/reports/corrective-action-traceability' },
-    { label: 'Risk assessment register', desc: 'Active risk assessments', icon: Target, href: '/health-safety/reports/risk-assessment-register' },
-];
+// Same list and names as every other board-report menu; each opens its readable report page.
+const REPORT_ICONS: Record<BoardReportKey, LucideIcon> = {
+    board: FileText,
+    notifications: ShieldAlert,
+    'investigation-outcomes': Search,
+    'action-traceability': ClipboardCheck,
+    'risk-register': Target,
+};
+const GOVERNANCE_REPORTS = boardReportLinks().map((report) => ({ ...report, desc: report.description, icon: REPORT_ICONS[report.key] }));
 
 export function GovernanceExports() {
     // Every export here links to a governance.view-gated report route; hide the
@@ -334,7 +337,7 @@ export function GovernanceExports() {
     if (!canViewBoardReports) return null;
     return (
         <section>
-            <SectionHead title="Reports for the board and WorkSafe" sub="Ready-made reports to download for the board and WorkSafe NZ" />
+            <SectionHead title={BOARD_REPORTS_LABEL} sub="Reports for the board and for WorkSafe, ready to read or print" />
             <ul className="sg-cards" style={{ ['--cols' as string]: 3 }}>
                 {GOVERNANCE_REPORTS.map((r) => (
                     <li key={r.href} className="sg-surface sg-p">

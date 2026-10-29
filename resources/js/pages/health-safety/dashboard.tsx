@@ -10,6 +10,7 @@ import {
     type TallyItem,
 } from '@/components/signature/blocks';
 import { formatDateTimeLong } from '@/lib/datetime';
+import { hsLabel, hsVariant } from '@/lib/health-safety/hs-labels';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useState } from 'react';
@@ -47,6 +48,8 @@ import type { ParticipationCoverage } from './participation-source-state';
 type Props = {
     /** Exposure managers only: how many exposures haven't reached the H&S register (job 3). */
     exposure_delivery_problems?: number | null;
+    /** Safeguarding's own read: the open-concerns link, or restricted without safeguarding access. */
+    safeguarding_source?: { access: 'readable' | 'restricted'; href: string | null };
     source_scope?: 'readable_subset';
     source_completeness?: 'unknown';
     kpis: Record<string, number | null>;
@@ -172,6 +175,7 @@ const EMPTY_RESTRAINTS: RestraintDashboardData = {
 export default function HealthSafetyDashboard({
     source_completeness,
     exposure_delivery_problems,
+    safeguarding_source,
     kpis,
     incident_trends,
     backbone,
@@ -240,8 +244,9 @@ export default function HealthSafetyDashboard({
                   {
                       value: openSafeguarding === null ? '—' : String(openSafeguarding),
                       label: 'Safeguarding',
-                      sub: openSafeguarding === null ? 'Not confirmed' : 'Open concerns now',
-                      href: destination('/safeguarding', { tab: 'open' }),
+                      sub: openSafeguarding === null ? 'Not available' : 'Open concerns now',
+                      // Safeguarding's own read decides the count and the link (Stephan, 26 Oct: hidden without access).
+                      href: safeguarding_source?.href ?? undefined,
                   },
                   {
                       value: fleetUnresolved === null ? '—' : String(fleetUnresolved),
@@ -589,7 +594,7 @@ function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
             title: `Corrective action overdue — ${c.title ?? c.reference ?? `#${c.id}`}`,
             sub: [
                 c.reference,
-                c.priority ? c.priority.charAt(0).toUpperCase() + c.priority.slice(1) : null,
+                c.priority ? `${hsLabel('action_priority', c.priority)} priority` : null,
                 c.owner,
                 c.days_overdue != null ? `${c.days_overdue} days overdue` : 'Overdue',
             ]
@@ -730,11 +735,9 @@ function RestraintSection({ data }: { data: RestraintDashboardData }) {
             ? [{ value: n(s.with_injury), label: 'With injury', sub: nc(s.with_injury, 'Harm occurred'), tone: (s.with_injury ?? 0) > 0 ? ('critical' as const) : undefined, href: '/health-safety/restraints?lens=events&tab=injury' }]
             : []),
         { value: n(s.unreviewed), label: 'Not reviewed', sub: nc(s.unreviewed, 'Need a review'), tone: (s.unreviewed ?? 0) > 0 ? 'warning' : undefined, href: '/health-safety/restraints?lens=events&tab=unreviewed' },
-        { value: n(s.active_plans), label: 'Behaviour-support plans', sub: nc(s.active_plans, 'Active'), href: '/health-safety/restraints?lens=plans&tab=active' },
+        { value: n(s.active_plans), label: 'Behaviour support plans', sub: nc(s.active_plans, 'In use'), href: '/health-safety/restraints?lens=plans&tab=active' },
         { value: n(s.plans_review_due), label: 'Plan reviews due', sub: nc(s.plans_review_due, 'In the next 30 days'), tone: (s.plans_review_due ?? 0) > 0 ? 'warning' : undefined, href: '/health-safety/restraints?lens=plans&tab=review_due' },
     ];
-    const sevVariant = (sev: string | null): 'neutral' | 'warning' | 'critical' =>
-        sev === 'critical' || sev === 'high' ? 'critical' : sev === 'medium' ? 'warning' : 'neutral';
     return (
         <>
             <Tally
@@ -755,19 +758,19 @@ function RestraintSection({ data }: { data: RestraintDashboardData }) {
                 action={{ label: 'View all', href: '/health-safety/restraints?lens=events&tab=unreviewed' }}
                 empty={
                     data.unreviewed === null
-                        ? 'The review queue is not available.'
-                        : 'No matching readable restraint events awaiting review.'
+                        ? 'The list of restraints to review isn’t available right now.'
+                        : 'No restraints are waiting for review.'
                 }
                 items={(data.unreviewed ?? []).map((e) => ({
                     key: e.id,
                     title: e.client ?? 'Client details unavailable',
-                    sub: [e.reference, e.restraint_type].filter(Boolean).join(' · '),
+                    sub: [e.reference, e.restraint_type ? hsLabel('restraint_type', e.restraint_type) : null].filter(Boolean).join(' · '),
                     href: `/health-safety/restraints?lens=events&tab=unreviewed&event=${e.id}`,
                     badge: (
                         <span className="inline-flex flex-wrap justify-end gap-1.5">
                             {!e.within_support_plan ? (
                                 <StatusBadge variant="critical" size="sm">
-                                    Out of plan
+                                    Outside the plan
                                 </StatusBadge>
                             ) : null}
                             {e.injury_occurred ? (
@@ -776,7 +779,7 @@ function RestraintSection({ data }: { data: RestraintDashboardData }) {
                                 </StatusBadge>
                             ) : null}
                             {e.severity ? (
-                                <StatusBadge variant={sevVariant(e.severity)} status={e.severity} size="sm" />
+                                <StatusBadge variant={hsVariant('severity', e.severity)} size="sm">{hsLabel('severity', e.severity)}</StatusBadge>
                             ) : null}
                         </span>
                     ),

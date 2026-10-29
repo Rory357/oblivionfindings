@@ -10,6 +10,7 @@ import {
     ActualEventTimeField,
     actualEventInstant,
 } from '@/components/clinical/actual-event-time-field';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -194,12 +195,17 @@ export function MeetingDetailDialog({
         </div>
     );
 
-    const cancelMeeting = () =>
-        router.put(
-            `${WP_BASE}/meetings/${d.id}/cancel`,
-            {},
-            { preserveScroll: true },
-        );
+    // Cancelling asks first: a cancelled meeting stays on the record and can't be held or edited.
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [cancelling, setCancelling] = useState(false);
+    const cancelMeeting = () => setConfirmCancel(true);
+    const runCancel = () => {
+        setCancelling(true);
+        router.put(`${WP_BASE}/meetings/${d.id}/cancel`, {}, {
+            preserveScroll: true,
+            onFinish: () => { setCancelling(false); setConfirmCancel(false); },
+        });
+    };
 
     // Gated Options bar — only when the viewer can manage and the meeting isn't
     // cancelled. Suppressed while an action pane owns the body (it renders its own row).
@@ -317,6 +323,17 @@ export function MeetingDetailDialog({
                     ) : null}
                 </>
             )}
+            <ConfirmDialog
+                open={confirmCancel}
+                onClose={() => { if (!cancelling) setConfirmCancel(false); }}
+                onConfirm={runCancel}
+                processing={cancelling}
+                variant="destructive"
+                title="Cancel this meeting?"
+                description={`The ${d.committee?.name ?? 'committee'} meeting on ${fmtDateTime(d.scheduled_at)} stays on the record as cancelled and can’t be held or edited. This can’t be undone.`}
+                confirmText="Cancel meeting"
+                cancelText="Keep meeting"
+            />
         </WizardShell>
     );
 }

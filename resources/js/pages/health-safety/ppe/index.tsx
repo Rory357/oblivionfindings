@@ -1,8 +1,8 @@
 /**
  * PPE & equipment register (approved H&S drawings pg-hsn-120, 120b, 120c — Stephan 23 Oct 2026): one header with
  * search, Export, File recovery and Add equipment, the four filters and the register views as rail tabs (the
- * quieter views under More); then the matching table. Add type sits on the catalogue table. The source-repair
- * warning and the closing caveat keep the code's wording.
+ * quieter views under More); then the matching table. Add type sits on the equipment types table. The damaged-record
+ * warning and the closing note are in plain words.
  */
 import {
     PageHeader,
@@ -33,11 +33,10 @@ type Filters = { site_id?: number | null; ppe_type_id?: number | null; category?
 type Props = { inventory: Paginator<InventoryDisplayRow>; allocations: Paginator<AllocationDisplayRow>; types: CatalogueDisplayRow[];
     filters: Filters; sites: { id: number; name: string }[]; tab: string; tabCounts: Record<string, number | null>;
     can: { view: boolean; manage: boolean }; source_integrity?: { inventory: 'intact' | 'legacy_unknown' | 'repair_required'; allocations: 'intact' | 'legacy_unknown' | 'repair_required' }; summary_scope?: string };
-const TABS = [{ key: 'inv_all', label: 'All equipment' }, { key: 'inv_available', label: 'Available' }, { key: 'inv_allocated', label: 'Issued equipment' },
-    { key: 'inv_inspection', label: 'Inspections due' }, { key: 'inv_expiring', label: 'Expiring' }, { key: 'inv_condemned', label: 'Condemned' },
-    { key: 'alloc_active', label: 'Active issues' }, { key: 'alloc_unack', label: 'Awaiting acknowledgement' }, { key: 'types', label: 'Catalogue' }];
-/** The service-state filter keeps the register's word for equipment out with a worker. */
-const STATUS_OPTIONS = STATUS_FILTER_OPTIONS.map((option) => (option.value === 'allocated' ? { ...option, label: 'Issued' } : option));
+const TABS = [{ key: 'inv_all', label: 'All equipment' }, { key: 'inv_available', label: 'In stock' }, { key: 'inv_allocated', label: 'Issued equipment' },
+    { key: 'inv_inspection', label: 'Inspections due' }, { key: 'inv_expiring', label: 'Expiring' }, { key: 'inv_condemned', label: 'Taken out of use' },
+    { key: 'alloc_active', label: 'Currently issued' }, { key: 'alloc_unack', label: 'Not yet confirmed by worker' }, { key: 'types', label: 'Equipment types' }];
+const STATUS_OPTIONS = STATUS_FILTER_OPTIONS;
 export function ppeRegisterQuery(filters: Filters, tab: string) {
     const query = new URLSearchParams({ tab });
     Object.entries(filters).forEach(([key, value]) => { if (value != null && value !== '') query.set(key, String(value)); });
@@ -77,24 +76,24 @@ export default function PpeRegister(props: Props) {
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'PPE & equipment', href: PPE_REGISTER }]}>
         <Head title="PPE & equipment" />
         <SafetyFormDraftContext.Provider value={drafts.register}>
-            <PageLayout hero={<PageHeader title="PPE & equipment" icon={HardHat} subline="Stock, issues, inspections and evidence"
+            <PageLayout hero={<PageHeader title="PPE & equipment" icon={HardHat} subline="Protective gear (PPE): stock, who has it, inspections and files"
                 actions={<><PageHeaderSearch value={search} onChange={setSearch} onKeyDown={(event) => { if (event.key === 'Enter') visit({ search: search.trim() || null }); }} placeholder="Find equipment…" ariaLabel="Search equipment" />
                     <PageHeaderGlassButton icon={Download} asChild><a href={PPE_REGISTER + '/export?' + query.toString()}>Export</a></PageHeaderGlassButton>
-                    {props.can.manage && <><PageHeaderGlassButton icon={History} asChild><Link href="/health-safety/ppe/recovery">File recovery</Link></PageHeaderGlassButton>
+                    {props.can.manage && <><PageHeaderGlassButton icon={History} asChild><Link href="/health-safety/ppe/recovery">Files to tidy up</Link></PageHeaderGlassButton>
                         <PageHeaderPrimaryButton icon={Plus} onClick={() => open('create_inventory')}>Add equipment</PageHeaderPrimaryButton></>}</>}
                 filters={<>{filter('site_id', 'All sites', props.sites.map((site) => ({ value: String(site.id), label: site.name })))}
                     {filter('category', 'All categories', CATEGORY_OPTIONS)}{filter('status', 'Any status', STATUS_OPTIONS)}
-                    {filter('ppe_type_id', 'Any catalogue type', props.types.filter((row) => row.source_integrity !== 'repair_required').map((row) => ({ value: String(row.id), label: row.name! })))}
+                    {filter('ppe_type_id', 'Any equipment type', props.types.filter((row) => row.source_integrity !== 'repair_required').map((row) => ({ value: String(row.id), label: row.name! })))}
                     {narrowed ? <PageHeaderFilterButton icon={X} onClick={() => drafts.request(() => router.get(PPE_REGISTER, { tab: props.tab }))}>Clear filters</PageHeaderFilterButton> : null}</>}
                 rail={<PageHeaderRail items={TABS.map((tab) => ({ ...tab, count: props.tabCounts[tab.key] ?? undefined }))} value={props.tab} maxVisible={6} onSelect={(value) => visit({}, value)} ariaLabel="Equipment register views" />} />}>
                 <div className="grid min-w-0 gap-5">
-                {showRepair && <div role="status"><Note tone="warning">Some saved equipment facts need source repair. Those rows remain visible, their actions are withheld, and affected factual totals are not confirmed. Export is unavailable when matching facts cannot be proved.</Note></div>}
+                {showRepair && <div role="status"><Note tone="warning">Some equipment records are damaged. You can still see them, but you can’t change them and totals may be wrong. Export won’t work for these records until an administrator fixes them.</Note></div>}
                 {props.tab === 'types'
                     ? <PpeCatalogueTable rows={typeRows} canAdd={props.can.manage} onAdd={() => open('create_type')} onCommand={open} />
                     : props.tab.startsWith('alloc')
                         ? <PpeAllocationTable rows={props.allocations.data} total={props.allocations.total} returnTo={returnTo} footer={pager(props.allocations)} />
                         : <PpeInventoryTable rows={props.inventory.data} total={props.inventory.total} returnTo={returnTo} footer={pager(props.inventory)} />}
-                <Note icon={Info}>Recorded quantities, fit-test completion and training completion do not confirm complete inventory, current competence or fitness for work. Catalogue definitions are organisation references; inventory records are restricted to approved Sites.</Note>
+                <Note icon={Info}>Numbers here are what people recorded. They don’t prove every item is on the shelf, or that a worker is trained and fit for work. Equipment types are shared across the organisation; you only see equipment at your sites.</Note>
                 </div>
             </PageLayout>
             {opened && <PpeCatalogueForm key={opened.command + ':' + (opened.type?.id ?? 'new')} command={opened.command} type={opened.type} actorId={auth.user.id} onClose={close} onDone={done} />}

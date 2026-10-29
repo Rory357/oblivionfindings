@@ -1,5 +1,5 @@
 /**
- * Behaviour-support plan (approved H&S drawings pg-hsn-101 … 101i — Stephan
+ * Behaviour support plan (approved H&S drawings pg-hsn-101 … 101i — Stephan
  * 23 Oct 2026): one record header — the plan's title and status, the current
  * candidate, published version and review date as facts, and where the plan
  * is up to with its next step — then each section as signature blocks.
@@ -103,7 +103,8 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { Fragment, useEffect, useRef, type ReactNode } from 'react';
-import { PLAN_STATUS_META, titleCase } from '../shared';
+import { hsLabel, humaniseHsValue } from '@/lib/health-safety/hs-labels';
+import { PLAN_REVIEW_OUTCOME_RESULT, PLAN_STATUS_META } from '../shared';
 
 const SECTIONS = [
     { key: 'overview', label: 'Overview', icon: BookOpen },
@@ -112,7 +113,7 @@ const SECTIONS = [
     { key: 'approval', label: 'Approval', icon: ShieldCheck },
     { key: 'versions', label: 'Versions', icon: GitBranch },
     { key: 'history', label: 'History', icon: History },
-    { key: 'connections', label: 'Connected work', icon: Link2 },
+    { key: 'connections', label: 'Linked records', icon: Link2 },
 ] as const;
 const COMMAND_ICONS: Record<RestraintPlanCommand, LucideIcon> = {
     edit: Pencil,
@@ -131,8 +132,46 @@ type Props = {
 };
 const time = (value: string | null | undefined) =>
     value ? formatDateTimeLong(value) : 'Not recorded';
-const words = (value: string | null | undefined) =>
-    value ? value.replaceAll('_', ' ') : null;
+/** Plain words for a stored value: the map's label, else the value made readable. */
+const label = (map: Record<string, string>, value: string | null | undefined) =>
+    value ? (map[value.toLowerCase()] ?? humaniseHsValue(value)) : null;
+const DECISION_LABEL: Record<string, string> = {
+    approve: 'Approved',
+    decline: 'Declined',
+    revoke: 'Approval withdrawn',
+};
+const ORIGIN_LABEL: Record<string, string> = {
+    internal_specialist: 'Specialist on our staff',
+    external_specialist: 'Outside specialist',
+    authorised_reviewer: 'Authorised reviewer',
+};
+const HISTORY_LABEL: Record<string, string> = {
+    create: 'Plan created',
+    update: 'Plan edited',
+    submit_review: 'Sent for review',
+    'submit-review': 'Sent for review',
+    activate: 'Put into use',
+    archive: 'Archived',
+    review: 'Plan reviewed',
+    approval: 'Approval decision recorded',
+};
+const DISPOSITION_LABEL: Record<string, string> = {
+    draft_replacement: 'New draft made',
+    submitted_for_review: 'Sent for review',
+    archived: 'Archived',
+    approval_pending: 'Waiting for approval',
+    activated: 'Put into use',
+};
+const VERSION_KIND_LABEL: Record<string, string> = {
+    candidate: 'draft',
+    published: 'put into use',
+};
+const EVIDENCE_AVAILABILITY_LABEL: Record<string, string> = {
+    available: 'Available',
+    unavailable: 'Not available',
+    removed: 'Removed',
+    inaccessible: 'Hidden — you don’t have access',
+};
 const lines = (value: string | null | undefined) =>
     (value ?? '')
         .split('\n')
@@ -140,9 +179,9 @@ const lines = (value: string | null | undefined) =>
         .filter(Boolean);
 
 function versionLabel(versions: PlanVersion[], id: number | null | undefined): string {
-    if (!id) return 'Version not retained';
+    if (!id) return 'Version not known';
     const found = versions.find((item) => item.id === id);
-    return found ? `Version ${found.sequence}` : `Candidate ${id}`;
+    return found ? `Version ${found.sequence}` : 'Draft version';
 }
 
 /** A version's content as the drawing reads it: a story, then what may and may not be used. */
@@ -159,10 +198,10 @@ function ContentBlocks({ value, sub }: { value: PlanContent; sub?: string }) {
                         icon: ShieldAlert,
                         text: (
                             <>
-                                Restrictive practice type:{' '}
+                                Restraint type:{' '}
                                 <b>
                                     {value.restrictive_practice_type
-                                        ? titleCase(value.restrictive_practice_type)
+                                        ? hsLabel('restraint_type', value.restrictive_practice_type)
                                         : 'Not recorded'}
                                 </b>
                             </>
@@ -191,7 +230,7 @@ function ContentBlocks({ value, sub }: { value: PlanContent; sub?: string }) {
                 lines
                 items={[
                     {
-                        name: 'Proposed interventions',
+                        name: 'Interventions the plan allows',
                         facts: proposed.length
                             ? proposed.map((text) => ({ tone: 'brand' as SgTone, text }))
                             : [{ tone: 'none' as SgTone, text: 'Not recorded' }],
@@ -246,7 +285,7 @@ function planStages(d: PlanDetail): PageHeaderStage[] | null {
                 ? `Since ${formatDate(d.published_version.published_at)}`
                 : d.published_version
                   ? `Version ${d.published_version.sequence}`
-                  : 'No retained publication',
+                  : 'Not in use yet',
             state: 'done',
         },
     ];
@@ -255,10 +294,13 @@ function planStages(d: PlanDetail): PageHeaderStage[] | null {
 function planNextStep(d: PlanDetail, reviewOverdue: boolean): PageHeaderNextStep | undefined {
     const mode = APPROVAL_MODES.find((item) => item.key === d.current_policy?.mode);
     if (d.status === 'under_review') {
+        const explanation = mode?.description ?? d.approval_explanation;
         return {
             label: 'Next step · approval',
             text: `${mode ? mode.label : 'Approval decision'}${d.candidate ? ` on version ${d.candidate.sequence}` : ''}`,
-            meta: mode?.description ?? d.approval_explanation,
+            meta: d.can.approve
+                ? explanation
+                : [explanation, 'You can’t approve this plan — it’s waiting for the approver named above'].filter(Boolean).join(' · '),
             tone: 'warning',
         };
     }
@@ -387,13 +429,13 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
     const statusMeta = PLAN_STATUS_META[d.status];
     const facts: PageHeaderFact[] = [
         {
-            value: d.candidate ? `Version ${d.candidate.sequence}` : 'Not retained',
-            label: 'Current candidate',
+            value: d.candidate ? `Version ${d.candidate.sequence}` : 'None',
+            label: 'Draft being approved',
             tone: d.status === 'under_review' ? 'warning' : undefined,
         },
         {
-            value: d.published_version ? `Version ${d.published_version.sequence}` : 'Not retained',
-            label: d.legacy_approval_unknown ? 'Published · approval provenance unknown' : 'Published version',
+            value: d.published_version ? `Version ${d.published_version.sequence}` : 'None',
+            label: d.legacy_approval_unknown ? 'In use · approval details missing (older record)' : 'Version in use',
         },
         {
             value: d.content.review_date ? formatDateOnly(d.content.review_date) : 'Not set',
@@ -405,13 +447,13 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
     const selected = d.selected_version;
 
     const people: PersonCardItem[] = [{ name: d.client.name, sub: `The person · ${d.site?.name ?? 'Site not recorded'}` }];
-    if (d.developer?.name) people.push({ name: d.developer.name, sub: 'Recorded developer' });
+    if (d.developer?.name) people.push({ name: d.developer.name, sub: 'Wrote the plan' });
     const latestApproval = d.approvals.at(-1);
     if (latestApproval?.approver?.name && !people.some((item) => item.name === latestApproval.approver!.name)) {
         people.push({
             name: latestApproval.approver.name,
-            sub: [latestApproval.approver.role, latestApproval.approver.organisation].filter(Boolean).join(' · ') || 'Recorded approver',
-            foot: `${titleCase(latestApproval.decision)} · ${versionLabel(d.versions, latestApproval.plan_version_id)}${latestApproval.recorder?.name ? ` · entered by ${latestApproval.recorder.name}` : ''}`,
+            sub: [latestApproval.approver.role, latestApproval.approver.organisation].filter(Boolean).join(' · ') || 'Approver',
+            foot: `${label(DECISION_LABEL, latestApproval.decision)} · ${versionLabel(d.versions, latestApproval.plan_version_id)}${latestApproval.recorder?.name ? ` · entered by ${latestApproval.recorder.name}` : ''}`,
         });
     }
 
@@ -433,11 +475,14 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
     ) : section === 'content' ? (
         <>
             {d.candidate && !d.candidate.integrity_valid ? (
-                <Note tone="critical">The retained candidate needs an integrity review before signoff.</Note>
+                <Note tone="critical">
+                    This draft needs fixing before anyone can approve it — it may have changed after it was saved. Ask an
+                    administrator.
+                </Note>
             ) : null}
             <ContentBlocks
                 value={d.candidate?.content ?? d.content}
-                sub={d.candidate ? `Version ${d.candidate.sequence} · candidate` : 'Current content'}
+                sub={d.candidate ? `Version ${d.candidate.sequence} · draft for approval` : 'Current plan'}
             />
         </>
     ) : section === 'review' ? (
@@ -450,12 +495,12 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                     key: item.id,
                     time: formatDate(item.reviewed_at),
                     tone: 'success',
-                    title: `${titleCase(item.outcome)} · ${versionLabel(d.versions, item.plan_version_id)}`,
+                    title: `${label(PLAN_REVIEW_OUTCOME_RESULT, item.outcome)} · ${versionLabel(d.versions, item.plan_version_id)}`,
                     sub: [
                         formatTime(item.reviewed_at),
-                        `Actual reviewer: ${item.reviewer?.name ?? 'Identity not available'}`,
-                        `Recorded status: ${words(item.resulting_status) ?? 'Unchanged'}${item.requested_resulting_status && item.requested_resulting_status !== item.resulting_status ? ` · Requested: ${words(item.requested_resulting_status)}` : ''}`,
-                        words(item.approval_disposition),
+                        `Reviewed by ${item.reviewer?.name ?? 'Name hidden'}`,
+                        `Plan status after review: ${item.resulting_status ? hsLabel('plan_status', item.resulting_status) : 'Unchanged'}${item.requested_resulting_status && item.requested_resulting_status !== item.resulting_status ? ` · Asked for: ${hsLabel('plan_status', item.requested_resulting_status)}` : ''}`,
+                        label(DISPOSITION_LABEL, item.approval_disposition),
                         item.notes,
                     ]
                         .filter(Boolean)
@@ -463,7 +508,7 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                 }))}
             />
         ) : (
-            <QuietLine title="Reviews" text="No reviews recorded." />
+            <QuietLine title="Reviews" text="No reviews yet." />
         )
     ) : section === 'approval' ? (
         <>
@@ -473,10 +518,13 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                 <QuietLine
                     title="Approval decisions"
                     sub={d.current_policy ? approvalModeLabel(d.current_policy.mode) : undefined}
-                    text="No approval decisions retained."
+                    text="No approval decisions yet."
                 />
             )}
-            <Note>A recorded decision does not establish verified professional competence, consent or medication authority.</Note>
+            <Note>
+                Recording a decision here doesn’t prove the approver is qualified, that consent was given, or that
+                medication was authorised — check those separately.
+            </Note>
         </>
     ) : section === 'versions' ? (
         <>
@@ -486,7 +534,7 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                         title="Versions"
                         sub="Versions can’t be changed · open one to read it"
                         steps={d.versions.map((item) => ({
-                            label: `Version ${item.sequence} · ${item.kind}`,
+                            label: `Version ${item.sequence} · ${label(VERSION_KIND_LABEL, item.kind)}`,
                             meta: item.recorded_at ? formatDate(item.recorded_at) : undefined,
                             state: item.id === d.candidate?.id && d.status === 'under_review' ? 'now' : 'done',
                         }))}
@@ -498,16 +546,18 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                             key: item.id,
                             time: item.recorded_at ? formatDate(item.recorded_at) : '',
                             tone: item.id === d.published_version?.id ? 'success' : item.id === d.candidate?.id ? 'warning' : 'none',
-                            title: `Version ${item.sequence} · ${item.kind}${item.id === selected?.id ? ' · open below' : ''}`,
-                            sub: [time(item.recorded_at), item.integrity_valid ? null : 'Needs an integrity review'].filter(Boolean).join(' · '),
+                            title: `Version ${item.sequence} · ${label(VERSION_KIND_LABEL, item.kind)}${item.id === selected?.id ? ' · open below' : ''}`,
+                            sub: [time(item.recorded_at), item.integrity_valid ? null : 'Needs fixing — may have changed after saving'].filter(Boolean).join(' · '),
                             action: { label: 'Open', onClick: () => drafts.request(() => router.get(href('versions', null, item.id))) },
                         }))}
                     />
                 </>
             ) : (
-                <QuietLine title="Versions" text="No immutable versions retained." />
+                <QuietLine title="Versions" text="No saved versions yet." />
             )}
-            {selected ? <ContentBlocks value={selected.content} sub={`Version ${selected.sequence} · ${selected.kind}`} /> : null}
+            {selected ? (
+                <ContentBlocks value={selected.content} sub={`Version ${selected.sequence} · ${label(VERSION_KIND_LABEL, selected.kind)}`} />
+            ) : null}
         </>
     ) : section === 'history' ? (
         d.history.length ? (
@@ -520,18 +570,18 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                         key: item.id,
                         time: formatDate(item.recorded_at),
                         tone: 'info',
-                        title: titleCase(item.command),
-                        sub: `${formatTime(item.recorded_at)} · ${item.actor?.name ?? 'Identity retained'} · source version ${item.version}`,
+                        title: label(HISTORY_LABEL, item.command) ?? 'Change recorded',
+                        sub: `${formatTime(item.recorded_at)} · ${item.actor?.name ?? 'Name hidden'} · version ${item.version}`,
                     }),
                 )}
             />
         ) : (
-            <QuietLine title="History" text="No command history retained." />
+            <QuietLine title="History" text="No changes recorded yet." />
         )
     ) : section === 'connections' ? (
         <>
             <RowList
-                title="Connected work"
+                title="Linked records"
                 items={(
                     [
                         ['client', 'Person'],
@@ -541,17 +591,17 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                 )
                     .filter(([key]) => d.connections[key])
                     .map(([key, label]) => ({ key, title: label, href: d.connections[key]!.href }))}
-                empty="No connected records you can open."
+                empty="No linked records you can open."
             />
             {d.connections.events.length ? (
                 <Log
-                    title="Connected interventions"
-                    sub="Interventions keep their own review owners, follow-ups and completion steps."
+                    title="Linked restraints"
+                    sub="Each restraint has its own review owner and follow-ups"
                     limit={d.connections.events.length}
                     items={d.connections.events.map((item) => ({
                         key: item.id,
                         tone: 'none',
-                        title: `Intervention ${item.id}`,
+                        title: `Restraint · RE-${item.id}`,
                         action: {
                             label: 'Open',
                             href: `${item.href}${item.href.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(restraintHref('plans', d.id, { workspace, section: 'connections' }))}`,
@@ -559,20 +609,21 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                     }))}
                 />
             ) : (
-                <QuietLine title="Connected interventions" text="Interventions keep their own review owners, follow-ups and completion steps." />
+                <QuietLine title="Linked restraints" text="No restraints linked to this plan." />
             )}
         </>
     ) : (
         <>
             {d.legacy_approval_unknown ? (
                 <Note tone="warning">
-                    Historical status does not establish current approval. No missing specialist decision has been invented.
+                    This plan’s status comes from before the current system, so it doesn’t show the plan is approved now. No
+                    approval decision has been added that wasn’t recorded at the time.
                 </Note>
             ) : null}
             {d.current_policy ? (
                 <PlaceCards
                     title="Who approves this plan"
-                    sub="Set in Health & safety settings"
+                    sub="Set in Health and safety settings"
                     cols={2}
                     items={APPROVAL_MODES.map((mode) => ({
                         name: mode.label,
@@ -590,18 +641,20 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
             <FactRows
                 title="On record"
                 rows={[
-                    ['Plan status', statusMeta?.label ?? words(d.status)],
+                    ['Plan status', statusMeta?.label ?? hsLabel('plan_status', d.status)],
                     [
-                        'Recorded developer',
-                        d.developer?.name ?? (d.developer ? 'Identity retained; current directory access unavailable' : 'Not recorded'),
+                        'Written by',
+                        d.developer?.name ?? (d.developer ? 'Name hidden — you don’t have access' : 'Not recorded'),
                     ],
                     [
-                        'Current approval workflow',
-                        d.current_policy ? approvalModeLabel(d.current_policy.mode) : 'Shown in the authorised review or approval workspace',
+                        'Who approves it',
+                        d.current_policy
+                            ? approvalModeLabel(d.current_policy.mode)
+                            : 'Hidden — only reviewers and approvers can see who approves this plan',
                     ],
                     [
-                        'Current publication',
-                        d.published_version ? `Version ${d.published_version.sequence}` : 'No retained publication provenance',
+                        'Version in use',
+                        d.published_version ? `Version ${d.published_version.sequence}` : 'None in use yet',
                     ],
                 ]}
             />
@@ -617,13 +670,13 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                     ? [
                           { title: 'Health & safety', href: '/health-safety' },
                           { title: 'Safety registers', href: '/health-safety/registers' },
-                          { title: 'Restrictive interventions', href: RESTRAINT_REGISTER + '?lens=plans' },
+                          { title: 'Restraints', href: RESTRAINT_REGISTER + '?lens=plans' },
                       ]
                     : []),
                 { title: d.title, href: href('overview') },
             ]}
         >
-            <Head title={`${reference} · Behaviour-support plan`} />
+            <Head title={`Behaviour support plan · ${reference}`} />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
@@ -637,7 +690,7 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                                 <PageHeaderStatusChip
                                     variant={d.status === 'under_review' ? 'warning' : d.status === 'active' ? 'success' : 'neutral'}
                                 >
-                                    {statusMeta?.label ?? words(d.status)}
+                                    {statusMeta?.label ?? hsLabel('plan_status', d.status)}
                                 </PageHeaderStatusChip>
                             }
                             subline={`${reference} · ${d.site?.name ?? 'Site not recorded'} · ${d.client.name}`}
@@ -653,7 +706,7 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
                                     items={[...SECTIONS]}
                                     value={section}
                                     onSelect={(next) => move(next)}
-                                    ariaLabel="Behaviour-support plan sections"
+                                    ariaLabel="Behaviour support plan sections"
                                 />
                             }
                         />
@@ -682,27 +735,27 @@ function PlanWorkspace({ detail: d, workspace, pickers, return_to, section: prov
     );
 }
 
-/** One approval decision with everything on record: the exact version, who, under which workflow, when it applies, why, and its evidence. */
+/** One approval decision with everything on record: the exact version, who, under which process, when it applies, why, and its files. */
 function ApprovalCard({ item, versions }: { item: PlanApproval; versions: PlanVersion[] }) {
     return (
         <section id={`plan-approval-${item.id}`} tabIndex={-1} className="outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <FactRows
-                title={`${titleCase(item.decision)} · ${versionLabel(versions, item.plan_version_id)}`}
+                title={`${label(DECISION_LABEL, item.decision)} · ${versionLabel(versions, item.plan_version_id)}`}
                 sub={time(item.approved_at)}
                 rows={[
-                    ['Exact candidate', item.plan_version_id],
-                    ['Recorded approver', item.approver?.name ?? 'Protected identity'],
+                    ['Version decided on', versionLabel(versions, item.plan_version_id)],
+                    ['Decided by', item.approver?.name ?? 'Name hidden'],
                     ...(item.approver?.role ? ([['Approver’s role', item.approver.role]] as [ReactNode, ReactNode][]) : []),
                     ...(item.approver?.organisation ? ([['Organisation', item.approver.organisation]] as [ReactNode, ReactNode][]) : []),
                     ...(item.approver?.decision_reference
                         ? ([['Their decision reference', item.approver.decision_reference]] as [ReactNode, ReactNode][])
                         : []),
-                    ['Decision origin', words(item.origin)],
-                    ['Workflow at decision', item.applied_policy ? approvalModeLabel(item.applied_policy.mode) : 'Not retained'],
-                    ['Effective from', time(item.effective_from)],
-                    ['Effective until', item.effective_to ? time(item.effective_to) : 'No end date recorded'],
+                    ['Who made the decision', label(ORIGIN_LABEL, item.origin) ?? 'Not recorded'],
+                    ['Approval process used', item.applied_policy ? approvalModeLabel(item.applied_policy.mode) : 'Not known'],
+                    ['Applies from', time(item.effective_from)],
+                    ['Applies until', item.effective_to ? time(item.effective_to) : 'No end date recorded'],
                     ...(item.recorder?.name ? ([['Entered by', item.recorder.name]] as [ReactNode, ReactNode][]) : []),
-                    ...(item.basis ? ([['Decision basis', <span className="whitespace-pre-wrap">{item.basis}</span>]] as [ReactNode, ReactNode][]) : []),
+                    ...(item.basis ? ([['Reason for the decision', <span className="whitespace-pre-wrap">{item.basis}</span>]] as [ReactNode, ReactNode][]) : []),
                     ...(item.evidence.length
                         ? ([
                               [
@@ -712,11 +765,12 @@ function ApprovalCard({ item, versions }: { item: PlanApproval; versions: PlanVe
                                           <Fragment key={index}>
                                               {evidence.href ? (
                                                   <Button asChild variant="outline" size="sm">
-                                                      <a href={evidence.href}>{evidence.label ?? 'Open decision evidence'}</a>
+                                                      <a href={evidence.href}>{evidence.label ?? 'Open supporting file'}</a>
                                                   </Button>
                                               ) : (
                                                   <span className="text-muted-foreground">
-                                                      {evidence.label ?? 'Evidence identity concealed'} · {evidence.availability ?? 'Unavailable'}
+                                                      {evidence.label ?? 'File hidden'} ·{' '}
+                                                      {label(EVIDENCE_AVAILABILITY_LABEL, evidence.availability) ?? 'Not available'}
                                                   </span>
                                               )}
                                           </Fragment>

@@ -99,7 +99,7 @@ describe('Participation chart and accessible source state', () => {
             ),
         ).toBeInTheDocument();
         expect(screen.getByRole('table')).not.toHaveTextContent(
-            'Access restricted',
+            'Hidden — you don’t have access',
         );
         expect(screen.getByRole('table')).not.toHaveTextContent('97');
         view.unmount();
@@ -179,8 +179,8 @@ describe('Participation chart and accessible source state', () => {
             expect(
                 within(table).getAllByText(
                     access === 'restricted'
-                        ? 'Access restricted'
-                        : 'Not confirmed',
+                        ? 'Hidden — you don’t have access'
+                        : 'Not available',
                 ),
             ).toHaveLength(2);
         },
@@ -258,8 +258,8 @@ describe('Participation chart and accessible source state', () => {
             expect(
                 within(table).getAllByText(
                     change === 'permission'
-                        ? 'Access restricted'
-                        : 'Not confirmed',
+                        ? 'Hidden — you don’t have access'
+                        : 'Not available',
                 ),
             ).toHaveLength(2);
         },

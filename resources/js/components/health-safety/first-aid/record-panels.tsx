@@ -65,6 +65,7 @@ import {
     UserRound,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import type { FirstAidFollowup, FirstAidLink, FirstAidRecord } from './types';
 
 export const firstAidTime = (value: string | null | undefined) =>
@@ -72,36 +73,59 @@ export const firstAidTime = (value: string | null | undefined) =>
 const outcomeKinds: Record<string, string> = {
     action: 'Action',
     contact: 'Contact',
-    claim_followup: 'Claim follow-up',
+    claim_followup: 'ACC claim follow-up',
     observation: 'Observation',
 };
 const outcomeResults: Record<string, string> = {
     recorded: 'Recorded',
-    contacted: 'Contact recorded',
-    attempted: 'Attempt recorded',
+    contacted: 'Contact made',
+    attempted: 'Attempt made',
     unable_to_contact: 'Unable to make contact',
-    not_required: 'Recorded as not required',
+    not_required: 'Not required',
     other: 'Other',
 };
 const firstAidOutcomeKind = (value: string | null) =>
     value
-        ? (outcomeKinds[value] ?? value.replaceAll('_', ' '))
+        ? (outcomeKinds[value] ?? humaniseHsValue(value))
         : 'Not recorded';
 const firstAidOutcomeResult = (value: string | null) =>
     value
-        ? (outcomeResults[value] ?? value.replaceAll('_', ' '))
+        ? (outcomeResults[value] ?? humaniseHsValue(value))
         : 'Not recorded';
 const deliveryLabels: Record<string, string> = {
-    pending: 'Pending delivery',
+    pending: 'Waiting to send',
     failed: 'Delivery failed',
     delivered: 'Delivered',
-    skipped: 'Not delivered',
-    suppressed: 'Suppressed',
+    skipped: 'Not sent',
+    suppressed: 'Not sent (switched off)',
 };
 export const firstAidDeliveryLabel = (status: string | null | undefined) =>
-    deliveryLabels[status ?? ''] ?? 'Not confirmed';
-const words = (value: string) =>
-    value.replace(/[_-]/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
+    deliveryLabels[status ?? ''] ?? 'Unknown';
+/** Plain words for a linked record's stored status (incident, safety review, action, control room response). */
+const linkStatusLabels: Record<string, string> = {
+    open: 'Open',
+    ack: 'Acknowledged',
+    acknowledged: 'Acknowledged',
+    triaging: 'Being checked',
+    confirmed: 'Confirmed as real',
+    resolved: 'Resolved',
+    closed: 'Closed',
+    dismissed: 'Dismissed',
+    pending: 'Waiting',
+    draft: 'Draft',
+    completed: 'Done',
+    verified: 'Checked',
+    archived: 'Archived',
+    investigating: 'Being investigated',
+    in_progress: 'In progress',
+};
+const linkStatusLabel = (value: string) =>
+    linkStatusLabels[value] ?? humaniseHsValue(value);
+const attachmentKindLabels: Record<string, string> = {
+    photo: 'Photo',
+    document: 'Document',
+    other: 'Other',
+};
 
 /** A record time: the time alone on the treatment's NZ day, otherwise with its date. */
 export function firstAidClock(
@@ -181,7 +205,7 @@ export function FirstAidOverview({ detail: d }: { detail: FirstAidRecord }) {
             at: event.occurred_at,
             tone: 'info' as SgTone,
             title: event.title,
-            sub: event.actor?.name ?? 'Operator not recorded',
+            sub: event.actor?.name ?? 'Name not recorded',
         })),
         ...(delivery?.delivered_at
             ? [
@@ -281,7 +305,7 @@ export function FirstAidInjury({ detail: d }: { detail: FirstAidRecord }) {
                 },
                 { h: 'Treatment given', t: d.treatment_given || 'Not recorded' },
                 {
-                    h: 'First-aider notes',
+                    h: 'First aider notes',
                     t: d.first_aider_notes || 'Not recorded',
                 },
             ]}
@@ -306,7 +330,7 @@ function linkBadge(status: string | null | undefined): ReactNode {
             )
           ? 'neutral'
           : 'info';
-    return <StatusBadge variant={variant}>{words(status)}</StatusBadge>;
+    return <StatusBadge variant={variant}>{linkStatusLabel(status)}</StatusBadge>;
 }
 
 function linkRow(
@@ -337,9 +361,9 @@ export function FirstAidIncident({ detail: d }: { detail: FirstAidRecord }) {
             label: 'Incident reported',
             meta: d.incident_reported
                 ? incident
-                    ? `Yes · ${incident.reference ?? incident.reference_number ?? `Incident ${incident.id}`}`
+                    ? `Yes · ${incident.reference ?? incident.reference_number ?? `Incident report · Ref ${incident.id}`}`
                     : 'Yes'
-                : 'Not recorded here',
+                : 'No incident reported',
             state: d.incident_reported ? 'done' : 'todo',
         },
         {
@@ -361,10 +385,10 @@ export function FirstAidIncident({ detail: d }: { detail: FirstAidRecord }) {
                       : undefined,
         },
         {
-            label: 'Health & safety accepts it',
+            label: 'Health and safety reviews it',
             meta: reviews[0]
-                ? `${linkName(reviews[0])}${reviews[0].status ? ` · ${words(reviews[0].status).toLowerCase()}` : ''}`
-                : 'No review you can view',
+                ? `${linkName(reviews[0])}${reviews[0].status ? ` · ${linkStatusLabel(reviews[0].status).toLowerCase()}` : ''}`
+                : 'No review you can see',
             state:
                 reviews[0] && reviews[0].status && reviews[0].status !== 'open'
                     ? 'done'
@@ -378,26 +402,26 @@ export function FirstAidIncident({ detail: d }: { detail: FirstAidRecord }) {
             <Journey title="How it reaches a safety review" steps={steps} />
             <RowList
                 title="Linked incident"
-                sub="The incident keeps its own owner, review and closure. Recording treatment does not complete that work."
+                sub="The incident still needs its own review — recording first aid doesn’t close it."
                 items={incident ? [linkRow(incident)] : []}
-                empty="No linked record is available to view here."
+                empty="Nothing linked that you can see."
             />
             {delivery ? (
                 <FactRows
                     aria-label="Safety review delivery"
                     title="Safety review delivery"
-                    sub="Delivery records processing of the treatment report. It does not confirm that someone has reviewed it."
+                    sub="This shows the report was sent to health and safety — not that someone has reviewed it yet."
                     rows={[
-                        ['Delivery', firstAidDeliveryLabel(delivery.status)],
-                        ['Delivered at', firstAidTime(delivery.delivered_at)],
-                        ['Next attempt', firstAidTime(delivery.next_attempt_at)],
+                        ['Sending', firstAidDeliveryLabel(delivery.status)],
+                        ['Sent', firstAidTime(delivery.delivered_at)],
+                        ['Next try', firstAidTime(delivery.next_attempt_at)],
                     ]}
                 />
             ) : null}
             <RowList
                 title="Safety reviews"
                 items={reviews.map((record) => linkRow(record))}
-                empty="No linked record is available to view here."
+                empty="Nothing linked that you can see."
             />
         </>
     );
@@ -424,31 +448,31 @@ function dueCell(item: FirstAidFollowup) {
 function RecordedOutcome({ item }: { item: FirstAidFollowup }) {
     return (
         <Surface
-            aria-label={`Follow-up ${item.id} recorded outcome`}
-            title={`Follow-up ${item.id} · recorded outcome`}
+            aria-label={`Follow-up outcome · Ref ${item.id}`}
+            title="Follow-up · outcome"
             sub={item.notes}
         >
             <div className="grid gap-3 px-[18px] pt-1 pb-4">
                 <p className="text-sm whitespace-pre-wrap">
                     {item.completion_notes?.trim()
                         ? item.completion_notes
-                        : 'No completion outcome was captured in this record.'}
+                        : 'No outcome was written down.'}
                 </p>
                 <dl className="grid gap-4 sm:grid-cols-2">
-                    <FirstAidFact label="Completion recorded">
+                    <FirstAidFact label="Marked done">
                         {firstAidTime(item.completed_at)}
                     </FirstAidFact>
-                    <FirstAidFact label="Completed by">
-                        {item.completed_by?.name ?? 'Operator not recorded'}
+                    <FirstAidFact label="Done by">
+                        {item.completed_by?.name ?? 'Name not recorded'}
                     </FirstAidFact>
                     {item.completion_outcome && (
                         <>
-                            <FirstAidFact label="Action occurred">
+                            <FirstAidFact label="Done on">
                                 {firstAidTime(
                                     item.completion_outcome.occurred_at,
                                 )}
                             </FirstAidFact>
-                            <FirstAidFact label="Factual result">
+                            <FirstAidFact label="Result">
                                 {firstAidOutcomeResult(
                                     item.completion_outcome.result,
                                 )}
@@ -484,7 +508,7 @@ function RecordedOutcome({ item }: { item: FirstAidFollowup }) {
                                     </a>
                                 ) : (
                                     <span className="text-subtle">
-                                        {file.original_name} · File unavailable
+                                        {file.original_name} · File missing
                                     </span>
                                 )}
                             </li>
@@ -511,13 +535,13 @@ export function FirstAidFollowups({
         return (
             <QuietLine
                 title="Follow-up work"
-                text="No follow-up work is recorded here."
+                text="No follow-ups yet."
             />
         );
     const actionsFor = (item: FirstAidFollowup): MenuItem[] =>
         compactMenu([
             item.can.complete && {
-                label: 'Record completion',
+                label: 'Record outcome',
                 icon: CheckCircle2,
                 onClick: () => onComplete(item.id),
             },
@@ -552,7 +576,7 @@ export function FirstAidFollowups({
                 rows={rows}
                 rowKey={(item) => item.id}
                 actionsFor={actionsFor}
-                menuTitle={(item) => `Follow-up ${item.id}`}
+                menuTitle={(item) => `Follow-up · Ref ${item.id}`}
                 menuIcon={ClipboardCheck}
                 columns={[
                     {
@@ -569,7 +593,7 @@ export function FirstAidFollowups({
                                 className="block rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:ring-2 aria-[current=true]:ring-ring/60"
                             >
                                 <RecordIdentity
-                                    title={`Follow-up ${item.id}`}
+                                    title={`Follow-up · Ref ${item.id}`}
                                     sub={
                                         <span className="whitespace-pre-wrap">
                                             {item.notes}
@@ -607,7 +631,7 @@ export function FirstAidFollowups({
                                 variant={item.completed_at ? 'success' : 'info'}
                             >
                                 {item.completed_at
-                                    ? 'Recorded as complete'
+                                    ? 'Done'
                                     : 'Open'}
                             </StatusBadge>
                         ),
@@ -633,7 +657,7 @@ export function FirstAidEvidence({
     onRemove: (id: number) => void;
 }) {
     if (!d.attachments.length)
-        return <QuietLine title="Evidence" text="No files are recorded here." />;
+        return <QuietLine title="Evidence" text="No files yet." />;
     return (
         <RecordTable
             title="Evidence"
@@ -702,8 +726,8 @@ export function FirstAidEvidence({
                                     !file.download_href ? (
                                         <span className="block">
                                             {file.availability === 'missing'
-                                                ? 'File unavailable'
-                                                : 'File availability is not confirmed'}
+                                                ? 'File missing'
+                                                : 'This file can’t be opened right now'}
                                         </span>
                                     ) : null}
                                 </>
@@ -717,7 +741,8 @@ export function FirstAidEvidence({
                     nowrap: true,
                     cell: (file) =>
                         file.kind ? (
-                            words(file.kind)
+                            (attachmentKindLabels[file.kind] ??
+                            humaniseHsValue(file.kind))
                         ) : (
                             <span className="text-muted-foreground">
                                 Not recorded
@@ -749,7 +774,7 @@ export function FirstAidEvidence({
                             <RecordPerson name={file.uploaded_by.name} />
                         ) : (
                             <span className="text-muted-foreground">
-                                Operator not recorded
+                                Name not recorded
                             </span>
                         ),
                 },
@@ -774,34 +799,34 @@ export function FirstAidEvidence({
 const treatmentHistoryFields: Record<string, string> = {
     treated_person_name: 'Person treated',
     treated_person_type: 'Person type',
-    treatment_date: 'Recorded treatment time',
+    treatment_date: 'Treatment time',
     injury_illness_type: 'Injury or illness',
     injury_illness_description: 'What happened',
     body_part: 'Body part',
     treatment_given: 'Treatment given',
-    treatment_outcome: 'Recorded outcome',
+    treatment_outcome: 'Outcome',
     ambulance_called: 'Ambulance called',
-    first_aider_notes: 'First-aider notes',
-    incident_reported: 'Incident report recorded',
-    first_aider_id: 'First aider record',
-    treated_person_id: 'Staff record',
-    site_id: 'Site record',
-    client_id: 'Client record',
-    incident_id: 'Incident record',
+    first_aider_notes: 'First aider notes',
+    incident_reported: 'Incident reported',
+    first_aider_id: 'First aider (ref)',
+    treated_person_id: 'Staff member treated (ref)',
+    site_id: 'Site (ref)',
+    client_id: 'Client (ref)',
+    incident_id: 'Incident (ref)',
 };
 const followupHistoryFields: Record<string, string> = {
-    id: 'Follow-up record',
+    id: 'Follow-up (ref)',
     notes: 'Follow-up',
     due_at: 'Due',
-    completed_at: 'Completion recorded',
-    completion_notes: 'Recorded completion outcome',
-    assigned_to_user_id: 'Assigned staff record',
-    completed_by_user_id: 'Completed by staff record',
+    completed_at: 'Marked done',
+    completion_notes: 'What happened',
+    assigned_to_user_id: 'Owner (staff ref)',
+    completed_by_user_id: 'Done by (staff ref)',
 };
 const followupOutcomeHistoryFields: Record<string, string> = {
     kind: 'Outcome type',
-    result: 'Recorded result',
-    occurred_at: 'Outcome occurred',
+    result: 'Result',
+    occurred_at: 'Done on',
     note: 'Outcome note',
 };
 function capturedObject(value: unknown): Record<string, unknown> | null {
@@ -867,7 +892,7 @@ function CapturedFollowup({ value }: { value: Record<string, unknown> }) {
           )
         : null;
     return (
-        <section className="space-y-3" aria-label="Captured follow-up">
+        <section className="space-y-3" aria-label="Saved follow-up">
             <h4 className="text-sm font-medium">Follow-up at this change</h4>
             <CapturedFacts value={value} labels={followupHistoryFields} />
             {outcome && (
@@ -878,10 +903,10 @@ function CapturedFollowup({ value }: { value: Record<string, unknown> }) {
             )}
             {evidenceIds && (
                 <dl>
-                    <FirstAidFact label="Evidence records captured with completion">
+                    <FirstAidFact label="Files used (refs)">
                         {evidenceIds.length
                             ? evidenceIds.join(', ')
-                            : 'No evidence selected'}
+                            : 'No files chosen'}
                     </FirstAidFact>
                 </dl>
             )}
@@ -901,14 +926,14 @@ export function FirstAidHistory({ detail: d }: { detail: FirstAidRecord }) {
         return (
             <QuietLine
                 title="History"
-                text="No activity history is available for this record."
+                text="No history yet for this record."
             />
         );
     // newest first; each entry keeps its own captured details
     const events = [...d.history].reverse();
     const base = d.treatment_date;
     return (
-        <Surface title="History" sub="Open an entry to see its captured details">
+        <Surface title="History" sub="Open an entry to see what was saved">
             <ol className="sg-log">
                 {events.map((event) => (
                     <li key={event.id} className="sg-lr">
@@ -917,7 +942,7 @@ export function FirstAidHistory({ detail: d }: { detail: FirstAidRecord }) {
                         <div className="min-w-0">
                             <b>{event.title}</b>
                             <small>
-                                {event.actor?.name ?? 'Operator not recorded'}
+                                {event.actor?.name ?? 'Name not recorded'}
                             </small>
                             {event.note && (
                                 <p className="mt-1 text-sm whitespace-pre-wrap">
@@ -926,13 +951,13 @@ export function FirstAidHistory({ detail: d }: { detail: FirstAidRecord }) {
                             )}
                             {event.legacy && (
                                 <small>
-                                    Historical details are incomplete. Current
-                                    record values do not replace missing facts.
+                                    Some details weren’t saved at the time. We
+                                    don’t fill the gaps with today’s values.
                                 </small>
                             )}
                             <details className="mt-1">
                                 <summary className="inline-flex cursor-pointer items-center rounded-sm text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    Captured details
+                                    What was saved
                                 </summary>
                                 <div className="space-y-4 pt-3">
                                     <CapturedFacts
@@ -952,7 +977,7 @@ export function FirstAidHistory({ detail: d }: { detail: FirstAidRecord }) {
                                     ) : null}
                                     {Array.isArray(event.snapshot.names) && (
                                         <dl>
-                                            <FirstAidFact label="Recorded file names">
+                                            <FirstAidFact label="File names">
                                                 {event.snapshot.names
                                                     .filter(
                                                         (
@@ -1011,25 +1036,25 @@ export function FirstAidConnections({ detail: d }: { detail: FirstAidRecord }) {
         ...c.corrective_actions.map((record) =>
             linkRow(
                 record,
-                'Corrective action',
+                'Action',
                 <ClipboardCheck className="size-4" />,
             ),
         ),
         ...c.control_room.map((record) =>
             linkRow(
                 record,
-                'Operational response',
+                'Control room response',
                 <Radio className="size-4" />,
             ),
         ),
     ];
     const missing = [
-        !c.person && !c.site && 'Person and Site',
-        !c.equipment.length && 'Equipment context',
+        !c.person && !c.site && 'Person and site',
+        !c.equipment.length && 'Equipment',
         !c.incident && 'Incident',
         !c.safety_reviews.length && 'Safety reviews',
-        !c.corrective_actions.length && 'Corrective actions',
-        !c.control_room.length && 'Operational responses',
+        !c.corrective_actions.length && 'Actions',
+        !c.control_room.length && 'Control room responses',
     ].filter((label): label is string => !!label);
     const missingTitle = missing.length
         ? missing.length === 1
@@ -1042,15 +1067,15 @@ export function FirstAidConnections({ detail: d }: { detail: FirstAidRecord }) {
     return (
         <>
             <RowList
-                title="Connected work"
-                sub="Each record keeps its own access rules and completion checks."
+                title="Linked records"
+                sub="Each linked record has its own owner and its own rules on who can see it."
                 items={rows}
-                empty="No linked record is available to view here."
+                empty="Nothing linked that you can see."
             />
             {rows.length && missingTitle ? (
                 <QuietLine
                     title={missingTitle}
-                    text="No linked record is available to view here."
+                    text="Nothing linked that you can see."
                 />
             ) : null}
         </>
@@ -1085,8 +1110,8 @@ export function FirstAidPeople({ detail: d }: { detail: FirstAidRecord }) {
         add(
             name,
             ids.length === 1
-                ? `Follow-up ${ids[0]}`
-                : `Follow-ups ${ids.join(', ')}`,
+                ? 'Owns a follow-up'
+                : `Owns ${ids.length} follow-ups`,
         );
     const people: PersonCardItem[] = [...roles].map(([name, list]) => ({
         name,

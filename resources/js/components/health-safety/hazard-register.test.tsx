@@ -238,8 +238,8 @@ it('retains Site and period in exports and uses readable Site-scoped report page
     expect(target.searchParams.get('tab')).toBe('due_soon');
     expect(target.searchParams.get('q')).toBe('Needle');
     expect(target.searchParams.get('from')).toBe('2026-10-01');
-    fireEvent.click(header.getByRole('button', { name: 'Reports' }));
-    fireEvent.click(screen.getByRole('button', { name: 'WorkSafe register' }));
+    fireEvent.click(header.getByRole('button', { name: 'Board reports' }));
+    fireEvent.click(screen.getByRole('button', { name: 'WorkSafe notifications' }));
     expect(state.visit).toHaveBeenLastCalledWith(
         '/health-safety/reports?view=notifications&site_id=1',
     );
@@ -252,7 +252,7 @@ it('retains Site and period in exports and uses readable Site-scoped report page
         />,
     );
     expect(
-        header.queryByRole('button', { name: 'Reports' }),
+        header.queryByRole('button', { name: 'Board reports' }),
     ).not.toBeInTheDocument();
 });
 

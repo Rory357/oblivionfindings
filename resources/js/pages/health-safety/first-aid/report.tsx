@@ -116,10 +116,16 @@ export default function FirstAidReport({
                         />
                     }
                 >
+                    {!can.create ? (
+                        <Note tone="warning" icon={Info}>
+                            You don’t have permission to record first aid. Ask
+                            your team leader or health and safety manager.
+                        </Note>
+                    ) : null}
                     <Note icon={Info}>
                         Follow the guided form to record the treatment. A saved
-                        treatment has its own page for follow-ups, evidence and
-                        connected work.
+                        treatment has its own page for follow-ups, files and
+                        linked records.
                     </Note>
                     {open && (
                         <FirstAidTreatmentWizard

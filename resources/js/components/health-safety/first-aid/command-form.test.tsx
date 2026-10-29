@@ -200,7 +200,7 @@ it.each(['wrong', 'interrupted'])(
             screen.getByRole('button', { name: 'Record follow-up outcome' }),
         );
         expect(screen.getByRole('alert')).toHaveTextContent(
-            'could not be confirmed',
+            'can’t tell if this saved',
         );
         expect(state.reset).not.toHaveBeenCalled();
         expect(onSaved).not.toHaveBeenCalled();
@@ -335,7 +335,7 @@ it('does not silently create an incident when the current choice is unavailable'
     );
     fireEvent.submit(container.querySelector('form')!);
     expect(screen.getByRole('alert')).toHaveTextContent(
-        'Choose an available incident',
+        'Choose an incident you can see',
     );
     expect(state.submit).not.toHaveBeenCalled();
 });

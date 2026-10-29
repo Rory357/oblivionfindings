@@ -121,8 +121,8 @@ describe('Participation mobile cards and shared row menus', () => {
         for (const text of [
             '13 October 2026, 1:30 am',
             '3 attendees listed',
-            '2 action items outstanding',
-            'Completed · minutes missing',
+            '2 actions still to do',
+            'No minutes uploaded',
         ])
             expect(screen.getByText(text)).toBeInTheDocument();
         expect(
@@ -142,8 +142,8 @@ describe('Participation mobile cards and shared row menus', () => {
         for (const text of [
             'Safer transport',
             'Stage 2 of 4',
-            'Consultation document recorded',
-            'Outcome document not recorded',
+            'Consultation document added',
+            'Outcome document not added yet',
             '3 Oct 2026',
         ])
             expect(screen.getByText(text)).toBeInTheDocument();
@@ -165,9 +165,9 @@ describe('Participation mobile cards and shared row menus', () => {
             />,
         );
         expect(
-            screen.getByText('Awaiting External Review'),
+            screen.getByText('Awaiting external review'),
         ).toBeInTheDocument();
-        expect(screen.getByText('Stage not confirmed')).toBeInTheDocument();
+        expect(screen.getByText('Stage not known')).toBeInTheDocument();
         expect(screen.queryByText('Stage 1 of 4')).not.toBeInTheDocument();
         expect(screen.queryByText('Open')).not.toBeInTheDocument();
     });
@@ -191,7 +191,7 @@ describe('Participation mobile cards and shared row menus', () => {
         expect(context.mock.calls[0].slice(1)).toEqual([
             'meeting',
             meeting,
-            'COMPLETED',
+            'Held',
             'Safety committee',
         ]);
         expect(open).not.toHaveBeenCalled();

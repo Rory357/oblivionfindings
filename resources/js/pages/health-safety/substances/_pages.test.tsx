@@ -47,20 +47,21 @@ it('opens permanent chemical records with exact filtered Back and source-backed 
     expect(new URL(back, 'https://example.invalid').searchParams.get('q')).toBe('cleaning');
     const current = new URL(screen.getByRole('link', { name: 'View current safety data sheets' }).getAttribute('href')!, 'https://example.invalid');
     expect(current.searchParams.get('tab')).toBe('active'); expect(current.searchParams.get('sds_state')).toBe('current'); expect(current.searchParams.get('site_id')).toBe('3');
-    expect(current.searchParams.has('q')).toBe(false); expect(screen.queryByRole('button', { name: 'Reports' })).not.toBeInTheDocument();
+    expect(current.searchParams.has('q')).toBe(false); expect(screen.queryByRole('button', { name: 'Board reports' })).not.toBeInTheDocument();
 });
 it('withholds repair identities and keeps unknown header measures separate from zero or exposure counts', () => {
     const props = index(); props.source_integrity = 'repair_required'; props.rows.data[0] = { ...props.rows.data[0], source_integrity: 'repair_required', name: 'STALE-CHEMICAL-NAME', common_name: 'STALE-COMMON-NAME', storage_count: null };
     props.hero.live.active = null; props.hero.live.controlled = null; props.hero.live.sds_current = null; props.hero.attention.sds_expiring = null; props.hero.attention.sds_missing = null;
     render(<ChemicalRegister {...props} />);
     expect(screen.queryByText('STALE-CHEMICAL-NAME')).not.toBeInTheDocument(); expect(screen.queryByText('STALE-COMMON-NAME')).not.toBeInTheDocument();
-    // The one header number (current sheets) and the row's storage count stay unconfirmed, never zero.
-    expect(screen.getAllByText('Unconfirmed').length).toBeGreaterThanOrEqual(2); expect(screen.getByText(/not counted here/)).toBeInTheDocument();
+    // The one header number (current sheets) and the row's storage count read "Not available", never zero.
+    expect(screen.getAllByText('Not available')).toHaveLength(2);
+    expect(screen.getByText(/only people with wellbeing access can open them/)).toBeInTheDocument();
 });
 it('uses in-page record sections and refuses unproved child action bookmarks', () => {
     io.url = '/health-safety/substances/9?section=sds&action=edit_sds&sds=999';
     render(<ChemicalShow detail={detail()} return_to="/my-day" chemical_confirmation={null} chemical_href={null} />);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('You can’t make this change');
     fireEvent.click(screen.getByRole('tab', { name: /^Storage/ }));
     expect(io.replace).toHaveBeenCalledWith(expect.objectContaining({ preserveState: true, preserveScroll: true }));
     expect(io.replace.mock.calls[0][0].url).toContain('section=storage'); expect(io.get).not.toHaveBeenCalled();
@@ -73,7 +74,7 @@ it('withholds withdrawn child details while keeping an explicitly retained unsav
     const { rerender } = render(<ChemicalCommandForm {...props} />);
     fireEvent.change(screen.getByRole('textbox', { name: 'Supplier name' }), { target: { value: 'Retained unsaved supplier' } });
     rerender(<ChemicalCommandForm {...props} sourceAvailable={false} />);
-    expect(screen.queryByRole('textbox', { name: 'Supplier name' })).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('withheld');
+    expect(screen.queryByRole('textbox', { name: 'Supplier name' })).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('Saved details are hidden');
     rerender(<ChemicalCommandForm {...props} sourceAvailable />);
     expect(screen.getByRole('textbox', { name: 'Supplier name' })).toHaveValue('Retained unsaved supplier');
 });
@@ -82,19 +83,19 @@ it('requires explicit current-facts review after a definite version rejection an
     io.request.mockRejectedValueOnce({ response: { status: 422, data: { errors: { expected_version: ['The record has changed.'] } } } });
     render(<ChemicalCommandForm action="edit" actorId={7} detail={d} active onCancel={vi.fn()} onDone={vi.fn()} />);
     fireEvent.change(screen.getByRole('textbox', { name: /^Chemical name/ }), { target: { value: 'Retained entered name' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save reviewed details' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Review current record' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'See latest details' })).toBeEnabled());
     const original = io.request.mock.calls[0][0].data;
     io.read.mockResolvedValueOnce({ data: { detail: { ...d, name: 'Current recorded name', expected_version: 5, source_revision: 5 } } });
-    fireEvent.click(screen.getByRole('button', { name: 'Review current record' }));
+    fireEvent.click(screen.getByRole('button', { name: 'See latest details' }));
     await waitFor(() => expect(screen.getByText('Current recorded name')).toBeInTheDocument());
     expect(io.request).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Use reviewed revision' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use latest details' }));
     expect(screen.getByText('Retained entered name')).toBeInTheDocument();
     io.request.mockRejectedValueOnce(new Error('New response lost'));
-    fireEvent.click(screen.getByRole('button', { name: 'Save reviewed details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(io.request).toHaveBeenCalledTimes(2));
     expect(io.request.mock.calls[1][0].data).toMatchObject({ name: 'Retained entered name', expected_version: 5 });
     expect(io.request.mock.calls[1][0].data.idempotency_key).not.toBe(original.idempotency_key);
@@ -105,17 +106,17 @@ it('keeps current-facts review unavailable while the original write remains unce
     const props = { action: 'edit' as const, actorId: 7, detail: d, active: true, onCancel: vi.fn(), onDone: vi.fn() };
     const { rerender } = render(<ChemicalCommandForm {...props} />);
     fireEvent.change(screen.getByRole('textbox', { name: /^Chemical name/ }), { target: { value: 'Retained original entries' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save reviewed details' }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Retry exact submission' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Try saving again' })).toBeEnabled());
     const original = io.request.mock.calls[0][0].data;
     rerender(<ChemicalCommandForm {...props} detail={{ ...d, expected_version: 5, source_revision: 5 }} />);
-    expect(screen.getByRole('button', { name: 'Review current record' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Review current record' }));
+    expect(screen.getByRole('button', { name: 'See latest details' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'See latest details' }));
     expect(io.read).not.toHaveBeenCalled();
     io.request.mockRejectedValueOnce(new Error('Retry response lost'));
-    fireEvent.click(screen.getByRole('button', { name: 'Retry exact submission' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try saving again' }));
     await waitFor(() => expect(io.request).toHaveBeenCalledTimes(2));
     expect(io.request.mock.calls[1][0].data).toEqual(original);
 });

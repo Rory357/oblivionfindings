@@ -29,6 +29,7 @@ it('requires a fresh current check after an interrupted retry and never automati
     io.post.mockRejectedValueOnce(new Error('Connection interrupted'));
     render(<PpeRecoveryQueue kind="removals" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry file cleanup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete the file' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Check current attempts before retrying');
     expect(io.post).toHaveBeenCalledTimes(1); expect(io.get).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole('button', { name: 'Retry file cleanup' })).not.toBeInTheDocument();
@@ -42,6 +43,7 @@ it('keeps public-origin cleanup separate and refuses a response that claims remo
     io.post.mockResolvedValue({ data: { relocation_cleanup: { ...origin, removed_from_record: true } } });
     render(<PpeRecoveryQueue kind="relocations" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry file cleanup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete the file' }));
     expect(io.post).toHaveBeenCalledWith('/health-safety/ppe/relocation-cleanup/9/retry', {}, expect.objectContaining({ headers: { Accept: 'application/json' } }));
     expect(await screen.findByRole('alert')).toHaveTextContent('could not be confirmed');
     expect(screen.queryByText('Old public copy cleanup confirmed')).not.toBeInTheDocument();
@@ -52,6 +54,7 @@ it('retains the purpose of a confirmed transfer while protecting the active priv
     io.post.mockResolvedValue({ data: { relocation_cleanup: { ...origin, state: 'complete', public_copy_cleanup: 'complete' } } });
     render(<PpeRecoveryQueue kind="relocations" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Retry file cleanup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete the file' }));
     await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry file cleanup' })).not.toBeInTheDocument());
     expect(screen.getByRole('status')).toHaveTextContent('Old public copy cleanup confirmed');
     expect(screen.getByText(/The evidence record remains available/)).toBeInTheDocument();
@@ -82,6 +85,8 @@ it('admits one retry before React updates when a control is activated twice', as
     render(<PpeRecoveryQueue kind="removals" />);
     const button = await screen.findByRole('button', { name: 'Retry file cleanup' });
     act(() => { button.click(); button.click(); });
+    const confirm = await screen.findByRole('button', { name: 'Delete the file' });
+    act(() => { confirm.click(); confirm.click(); });
     expect(io.post).toHaveBeenCalledTimes(1);
     await act(async () => { resolve({ data: { cleanup: removal('complete') } }); });
     expect(screen.queryByRole('button', { name: 'Retry file cleanup' })).not.toBeInTheDocument();

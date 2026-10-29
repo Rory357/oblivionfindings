@@ -4,6 +4,7 @@
  * use recharts tuned to match. Colours are semantic tokens via var(--…); no raw hex/oklch. */
 import { Ring, RingCard, RowList, SectionHead } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { hsLabel, hsVariant, humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import { cn } from '@/lib/utils';
 import { Link } from '@inertiajs/react';
 import { type LucideIcon } from 'lucide-react';
@@ -50,9 +51,6 @@ function monthLabel(ym: string): string {
     return months[Number(m)] ?? ym;
 }
 
-function titleCase(value: string): string {
-    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 const BADGE_TONE = {
     critical: 'bg-status-critical-bg text-status-critical',
@@ -373,7 +371,7 @@ export function CategoryBarsCard({
                     {data.map((d) => (
                         <div key={d.label} className="flex items-center gap-2">
                             <span className="w-32 shrink-0 truncate text-xs text-muted-foreground">
-                                {titleCase(d.label)}
+                                {humaniseHsValue(d.label)}
                             </span>
                             <div className="h-[7px] flex-1 overflow-hidden rounded-full bg-muted">
                                 <div
@@ -627,18 +625,6 @@ export type OpenHazardRow = {
     site: string | null;
 };
 
-const HAZARD_LABEL: Record<string, string> = {
-    extreme: 'Extreme',
-    high: 'High',
-    medium: 'Medium',
-    low: 'Low',
-};
-const HAZARD_VARIANT: Record<string, 'critical' | 'warning' | 'neutral'> = {
-    extreme: 'critical',
-    high: 'critical',
-    medium: 'warning',
-    low: 'neutral',
-};
 
 export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
     return (
@@ -656,10 +642,14 @@ export function OpenHazardsCard({ hazards }: { hazards: OpenHazardRow[] }) {
                     href: h.site_id ? `/sites/${h.site_id}` : undefined,
                     badge: (
                         <StatusBadge
-                            variant={HAZARD_VARIANT[rating] ?? 'neutral'}
+                            variant={
+                                rating
+                                    ? hsVariant('risk_level', rating)
+                                    : 'neutral'
+                            }
                             size="sm"
                         >
-                            {HAZARD_LABEL[rating] ?? 'Low'}
+                            {rating ? hsLabel('risk_level', rating) : 'Not rated'}
                         </StatusBadge>
                     ),
                 };

@@ -181,20 +181,20 @@ it('binds a corrected observation receipt to its predecessor while retaining act
     expect(values.observed_at).toBe('2026-10-11T23:48:09.123Z');
     expect(values.next_check_at).toBe('2026-10-12T00:03:10.123Z');
     expect(values.condition).toBe('Person alert.');
-    expect(screen.getByText(/The original observer remains/)).toBeVisible();
+    expect(screen.getByText(/The person who made the check stays on/)).toBeVisible();
 });
 it('requires a selected current participant before explicitly replacing the actual observer', () => {
     const { container } = open('correct-observation');
     fireEvent.click(
-        screen.getByRole('checkbox', { name: 'Replace the actual observer' }),
+        screen.getByRole('checkbox', { name: 'Change who made the check' }),
     );
     expect(
-        screen.getByRole('button', { name: 'Save and confirm' }),
+        screen.getByRole('button', { name: 'Save correction' }),
     ).toBeDisabled();
     fireEvent.submit(container.querySelector('form')!);
     expect(command.save).not.toHaveBeenCalled();
     fireEvent.change(
-        screen.getByRole('combobox', { name: 'Replacement actual observer' }),
+        screen.getByRole('combobox', { name: 'Who made the check' }),
         { target: { value: '32' } },
     );
     fireEvent.submit(container.querySelector('form')!);
@@ -203,11 +203,11 @@ it('requires a selected current participant before explicitly replacing the actu
 it('restores preservation when the operator cancels an explicit observer replacement', () => {
     const { container } = open('correct-observation');
     const replace = screen.getByRole('checkbox', {
-        name: 'Replace the actual observer',
+        name: 'Change who made the check',
     });
     fireEvent.click(replace);
     fireEvent.change(
-        screen.getByRole('combobox', { name: 'Replacement actual observer' }),
+        screen.getByRole('combobox', { name: 'Who made the check' }),
         { target: { value: '32' } },
     );
     fireEvent.click(replace);

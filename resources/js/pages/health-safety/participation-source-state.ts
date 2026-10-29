@@ -82,10 +82,10 @@ export function workerParticipationTable(
         );
         const missing =
             access === 'restricted'
-                ? 'Access restricted'
+                ? 'Hidden — you don’t have access'
                 : access === 'readable'
                   ? '—'
-                  : 'Not confirmed';
+                  : 'Not available';
         return [
             point.label,
             participationValue(

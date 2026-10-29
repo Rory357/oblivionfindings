@@ -53,7 +53,7 @@ export function usePpeCatalogueCommand<T extends FormDataType<T>>(initial: T, co
             if (controller.signal.aborted) return;
             setChecked(null); setCheckFailed(true);
             if (axios.isAxiosError(error) && [401, 403, 404].includes(error.response?.status ?? 0)) setWithdrawn(true);
-            setFailure('Current equipment choices could not be checked. Your entries are retained. Retry the check before saving.');
+            setFailure('We couldn’t check for changes. Your entries are kept — try again before saving.');
         } finally { if (request.current === controller) { request.current = null; if (mounted.current) setChecking(false); } }
     };
     const useCurrent = () => {
@@ -71,13 +71,13 @@ export function usePpeCatalogueCommand<T extends FormDataType<T>>(initial: T, co
             const response = await axios.request({ method: command === 'update_type' ? 'put' : command === 'activate_type' || command === 'deactivate_type' ? 'patch' : 'post', url: href,
                 data: multipart ? ppeMultipart(payload) : payload, headers: { Accept: 'application/json' }, signal: controller.signal });
             if (!mounted.current || controller.signal.aborted) return;
-            if (!accept(response.data?.ppe_confirmation)) setFailure('Saving is unconfirmed. Check current work before sending again. Your entries are retained.');
+            if (!accept(response.data?.ppe_confirmation)) setFailure('We can’t tell if this saved. Select Check for changes before trying again — your entries are kept.');
         } catch (error) {
             if (!mounted.current) return;
             if (axios.isAxiosError(error) && error.response?.status === 422 && error.response.data?.errors) form.setError(Object.fromEntries(
                 Object.entries(error.response.data.errors).flatMap(([field, messages]) => Array.isArray(messages) && typeof messages[0] === 'string' ? [[field, messages[0]]] : [])) as FormDataErrors<T>);
             if (axios.isAxiosError(error) && [401, 403, 404].includes(error.response?.status ?? 0)) { setWithdrawn(true); setChecked(null); }
-            setFailure('The change is not confirmed. Check current work before sending again. Your entries are retained.');
+            setFailure('We can’t tell if this saved. Select Check for changes before trying again — your entries are kept.');
         } finally { if (request.current === controller) { request.current = null; if (mounted.current) setSaving(false); } }
     };
     // `guard` (the retained idempotency key and reviewed revision) is read-only for callers; only this hook changes it.

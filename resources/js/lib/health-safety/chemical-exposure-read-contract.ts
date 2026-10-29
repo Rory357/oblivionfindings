@@ -177,6 +177,6 @@ export interface ExposureIndexProps {
     source_integrity?: 'admitted' | 'repair_required' | 'restricted' | 'association_unconfirmed' | 'original_context_restricted';
     page: ExposurePage | null;
     filters: { site_id: number | null; worker_id: number | null; substance_id: number | null; from: string | null; to: string | null; page: number } | null;
-    can: { capture: boolean };
+    can: { capture: boolean; recover?: boolean };
     chemical_exposure_confirmation: null;
 }

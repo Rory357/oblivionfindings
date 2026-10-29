@@ -6,6 +6,7 @@
  * and the other next steps. Commands open in the page (62f) and keep their own
  * payloads; the review gate's reasons show word for word.
  */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EntityContextMenu, EntityKebab, compactMenu, useEntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
 import {
     PageHeader,
@@ -832,43 +833,23 @@ function RiskEvidence({ detail: d }: { detail: RaDetail }) {
             : null;
     return (
         <>
-            {attachment && (
-                <Surface tone="critical" title={`Remove ${attachment.original_name}?`}>
-                    <div className="grid gap-2 px-[18px] pt-2 pb-4">
-                        <p>
-                            Remove <strong>{attachment.original_name}</strong>{' '}
-                            from this assessment?
-                        </p>
-                        <p className="text-subtle">
-                            The removal is recorded in history.
-                        </p>
-                    </div>
-                    <div className="sg-actions">
-                        <Button
-                            variant="outline"
-                            disabled={removal.processing}
-                            onClick={() => setSelected(null)}
-                        >
-                            Keep evidence
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            disabled={removal.processing}
-                            onClick={() =>
-                                removal.delete(
-                                    `${RISK_REGISTER}/${d.id}/attachments/${attachment.id}`,
-                                    {
-                                        preserveScroll: true,
-                                        onSuccess: () => setSelected(null),
-                                    },
-                                )
-                            }
-                        >
-                            Remove evidence
-                        </Button>
-                    </div>
-                </Surface>
-            )}
+            <ConfirmDialog
+                open={Boolean(attachment)}
+                onClose={() => { if (!removal.processing) setSelected(null); }}
+                processing={removal.processing}
+                variant="destructive"
+                title={`Remove ${attachment?.original_name ?? 'this file'}?`}
+                description="It comes off this risk assessment and can’t be put back. The history still shows it was there and who removed it."
+                confirmText="Remove evidence"
+                cancelText="Keep evidence"
+                onConfirm={() => {
+                    if (!attachment) return;
+                    removal.delete(`${RISK_REGISTER}/${d.id}/attachments/${attachment.id}`, {
+                        preserveScroll: true,
+                        onSuccess: () => setSelected(null),
+                    });
+                }}
+            />
             {Object.keys(removal.errors).length > 0 && (
                 <Note tone="critical" icon={AlertTriangle}>
                     {Object.values(removal.errors).join(' ')}

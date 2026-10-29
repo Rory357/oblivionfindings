@@ -875,10 +875,11 @@ export function BehaviourSupportPlanCommandForm({
                     )}
                     {command === 'archive' && (
                         <p className="text-subtle">
-                            The plan will be archived. Its versions and
-                            decisions stay in history, and connected
-                            intervention reviews remain open until completed
-                            separately.
+                            Archiving means staff stop following this plan.
+                            Its versions and decisions stay in the history,
+                            and any restraint reviews linked to it stay open
+                            until they’re done. You can’t undo this: to use a
+                            plan again, start a new one.
                         </p>
                     )}
                     {Object.entries(form.errors).length > 0 && (
@@ -904,7 +905,11 @@ export function BehaviourSupportPlanCommandForm({
                                 !endpoint
                             }
                         >
-                            {form.processing ? 'Saving…' : 'Save and confirm'}
+                            {form.processing
+                                ? 'Saving…'
+                                : command === 'archive'
+                                  ? 'Archive plan'
+                                  : 'Save and confirm'}
                         </Button>
                         <Button
                             variant="outline"

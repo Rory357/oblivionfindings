@@ -53,15 +53,15 @@ it('withholds saved source facts and command fields after repair while preservin
     const damaged = { kind: 'inventory', detail: { id: 9, source_integrity: 'repair_required', command_context: null, read_scope: 'source_repair_required', can: { manage: false } } } as unknown as PpeRepairRecord;
     rerender(<PpeShow {...damaged} />);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Save test command' })).toBeDisabled();
-    expect(screen.queryByText(/Saved equipment brand/)).not.toBeInTheDocument(); expect(screen.getByRole('status')).toHaveTextContent('Source history needs review');
+    expect(screen.queryByText(/Saved equipment brand/)).not.toBeInTheDocument(); expect(screen.getByRole('status')).toHaveTextContent('This record is damaged');
     rerender(<PpeShow {...d} />); expect(screen.getByRole('textbox')).toHaveValue('Retained unsaved change');
 });
 it('never mounts a never-authorised command from a URL hint or invents a readable damaged record', () => {
     const d = record(); render(<PpeShow {...({ ...d, detail: { ...d.detail, can: { manage: false } } } as PpeRecord)} />);
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('unavailable');
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument(); expect(screen.getByRole('alert')).toHaveTextContent('can’t do this');
     cleanup();
     const damaged = { kind: 'inventory', detail: { id: 9, source_integrity: 'repair_required', command_context: null, can: {} } } as unknown as PpeRepairRecord;
-    render(<PpeShow {...damaged} />); expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('source needs review');
+    render(<PpeShow {...damaged} />); expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('needs fixing');
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
 });
 it('keeps own allocation navigation limited to its factual issue and fit-training sections', () => {
@@ -71,6 +71,6 @@ it('keeps own allocation navigation limited to its factual issue and fit-trainin
         command_context: { root_kind: 'inventory', root_id: 9, source_kind: 'allocations', source_id: 13, site_id: 4, user_id: 12, expected_version: 4, source_schema_version: 1 } } } as unknown as PpeRecord;
     render(<PpeShow {...d} />);
     expect(screen.queryByRole('button', { name: 'Evidence' })).not.toBeInTheDocument(); expect(screen.queryByRole('button', { name: 'History' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Issues' })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Fit and training' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Acknowledge issue' })).toBeInTheDocument(); expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/my-day');
+    expect(screen.queryByRole('button', { name: 'Issued to' })).not.toBeInTheDocument(); expect(screen.getByRole('button', { name: 'Fit and training' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm it’s been received' })).toBeInTheDocument(); expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/my-day');
 });

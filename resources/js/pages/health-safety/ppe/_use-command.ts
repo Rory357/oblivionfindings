@@ -84,7 +84,7 @@ export function usePpeCommand<T extends FormDataType<T>>({ initial, record, comm
             setChecked(null);
             setCheckFailed(true);
             if (axios.isAxiosError(error) && [401, 403, 404].includes(error.response?.status ?? 0)) setWithdrawn(true);
-            setFailure('Current work could not be checked. Your entries remain here. Retry the check before saving.');
+            setFailure('We couldn’t check for changes. Your entries are kept — try again before saving.');
         } finally {
             if (request.current === controller) { request.current = null; setChecking(false); }
         }
@@ -104,7 +104,7 @@ export function usePpeCommand<T extends FormDataType<T>>({ initial, record, comm
                 url: href, data: hasFile(payload) ? ppeMultipart({ ...payload, ...(method !== 'post' ? { _method: method } : {}) }) : payload,
                 headers: { Accept: 'application/json' }, signal: controller.signal });
             if (!mounted.current || controller.signal.aborted) return;
-            if (!accept(data?.ppe_confirmation)) setFailure('Saving could not be confirmed. Check current work before sending again. Your entries are retained.');
+            if (!accept(data?.ppe_confirmation)) setFailure('We can’t tell if this saved. Select Check for changes before trying again — your entries are kept.');
         } catch (error) {
             if (!mounted.current) return;
             if (axios.isAxiosError(error) && error.response?.status === 422 && error.response.data?.errors) {
@@ -114,7 +114,7 @@ export function usePpeCommand<T extends FormDataType<T>>({ initial, record, comm
                 // Validation refused this request before acceptance; keep intent for an explicit current check.
             }
             if (axios.isAxiosError(error) && [401, 403, 404].includes(error.response?.status ?? 0)) setWithdrawn(true);
-            setFailure('The change is not confirmed. Check current work before sending again. Your entries are retained.');
+            setFailure('We can’t tell if this saved. Select Check for changes before trying again — your entries are kept.');
         } finally {
             if (request.current === controller) { request.current = null; if (mounted.current) setSaving(false); }
         }

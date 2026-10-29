@@ -10,6 +10,7 @@ import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderR
 import type { MenuItem } from '@/components/lists/entity-menu';
 import { EntityContextMenu, useEntityContextMenu } from '@/components/lists/entity-menu';
 import { Log, Note, QuietLine, type LogItem, type SgTone } from '@/components/signature/blocks';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateOnly, formatTime, toDateInput } from '@/lib/datetime';
@@ -25,6 +26,12 @@ const EXPLAINED: Record<RecoveryKind, string> = {
     relocations: 'The evidence record now references its observed private copy. Cleanup of the old public copy is separate and rechecks the current private file before removing it. The evidence record remains available.',
     removals: 'These files were removed from the active record. Physical cleanup is a separate confirmed step; original record history remains.',
 };
+/** What one clean-up deletes, said in the confirm. */
+const CLEANUP_EFFECT: Record<RecoveryKind, string> = {
+    uploads: 'This deletes the stored copy of an upload that was never saved to a record. A file still used by a record is kept.',
+    removals: 'This deletes the stored copy of a file that was already removed from its record.',
+    relocations: 'This deletes the old public copy. The record keeps its private copy.',
+};
 const LOG_TITLE: Record<RecoveryKind, string> = { uploads: 'Uploads', removals: 'Removed evidence files', relocations: 'Old public copies' };
 /** Still to clean up reads amber; saved evidence green; finished cleanup quiet. */
 const tone = (attempt: RecoveryAttempt): SgTone => (attempt.can_retry ? 'warning' : attempt.state === 'accepted' ? 'success' : ['complete', 'cleaned'].includes(attempt.state) ? 'none' : 'warning');
@@ -34,6 +41,8 @@ export function PpeRecoveryQueue({ kind, checkSignal = 0 }: { kind: RecoveryKind
     const [page, setPage] = useState<RecoveryPage | null>(null); const [cursor, setCursor] = useState(0);
     const [busy, setBusy] = useState(false); const [failure, setFailure] = useState<string | null>(null);
     const [confirmation, setConfirmation] = useState<string | null>(null);
+    // Cleaning up deletes a stored file for good, so it asks first.
+    const [confirmRetry, setConfirmRetry] = useState<number | null>(null);
     const request = useRef<AbortController | null>(null); const mounted = useRef(true);
     useEffect(() => { mounted.current = true; return () => { mounted.current = false; request.current?.abort(); request.current = null; }; }, []);
     const load = async (afterId = 0) => {
@@ -76,14 +85,14 @@ export function PpeRecoveryQueue({ kind, checkSignal = 0 }: { kind: RecoveryKind
     };
     const actions = (attempt: RecoveryAttempt): MenuItem[] => [
         { label: 'Check current attempts', icon: RefreshCw, onClick: () => void load(cursor), disabled: busy ? 'A current check is in progress.' : undefined },
-        ...(attempt.can_retry ? [{ label: 'Retry file cleanup', icon: RefreshCw, onClick: () => void retry(attempt.id), disabled: busy ? 'A current check is in progress.' : undefined }] : []),
+        ...(attempt.can_retry ? [{ label: 'Retry file cleanup', icon: RefreshCw, onClick: () => setConfirmRetry(attempt.id), disabled: busy ? 'A current check is in progress.' : undefined }] : []),
     ];
     const items: LogItem[] = (page?.attempts ?? []).map((attempt) => ({
         key: attempt.id, tone: tone(attempt),
         time: attempt.recorded_at && toDateInput(attempt.recorded_at) ? formatDateOnly(toDateInput(attempt.recorded_at)) : 'Time not recorded',
         title: <><span>File attempt {attempt.id}</span> · <span>{recoveryStateLabel(kind, attempt.state)}</span></>,
         sub: [attempt.recorded_at ? formatTime(attempt.recorded_at) : null, attempt.command ? `Recorded action: ${attempt.command.replaceAll('_', ' ')}` : null].filter(Boolean).join(' · ') || undefined,
-        action: attempt.can_retry ? { label: 'Retry file cleanup', onClick: () => void retry(attempt.id) } : null,
+        action: attempt.can_retry ? { label: 'Retry file cleanup', onClick: () => setConfirmRetry(attempt.id) } : null,
         menu: actions(attempt), onContextMenu: (event) => context.open(event, attempt),
     }));
     // Without a confirmed page the check sits beside the status line; with one, the header's Check again and each row's menu re-read it.
@@ -101,6 +110,10 @@ export function PpeRecoveryQueue({ kind, checkSignal = 0 }: { kind: RecoveryKind
                 <Button type="button" size="sm" variant="outline" disabled={busy || cursor === 0} onClick={() => void load()}>Back to first page</Button>
                 <Button type="button" size="sm" variant="outline" disabled={busy || page.next_cursor === null} onClick={() => page.next_cursor !== null && void load(page.next_cursor)}>Next attempts</Button></nav>}
         </>}
+        <ConfirmDialog open={confirmRetry !== null} onClose={() => { if (!busy) setConfirmRetry(null); }} processing={busy} variant="destructive"
+            title="Delete this stored file?" confirmText="Delete the file" cancelText="Keep it"
+            description={`${CLEANUP_EFFECT[kind]} The record’s history stays. This can’t be undone.`}
+            onConfirm={() => { const id = confirmRetry; setConfirmRetry(null); if (id !== null) void retry(id); }} />
         {context.ctx && page?.attempts.some((attempt) => attempt.id === context.ctx?.record.id) && <EntityContextMenu x={context.ctx.x} y={context.ctx.y} icon={History} title={`File attempt ${context.ctx.record.id}`} items={actions(context.ctx.record)} onClose={context.close} />}
     </section>;
 }

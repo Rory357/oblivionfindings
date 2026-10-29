@@ -175,8 +175,8 @@ it('uses one review header, four linked numbers and the shared sibling rail', ()
 
 it('links to readable report pages and hides the report launcher without permission', () => {
     const rendered = render(<Reviews {...reviewProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Reports' }));
-    fireEvent.click(screen.getByRole('button', { name: 'WorkSafe register' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Board reports' }));
+    fireEvent.click(screen.getByRole('button', { name: 'WorkSafe notifications' }));
     expect(state.visit).toHaveBeenCalledWith(
         '/health-safety/reports?view=notifications',
     );
@@ -184,7 +184,7 @@ it('links to readable report pages and hides the report launcher without permiss
     state.reports = false;
     render(<Reviews {...reviewProps()} />);
     expect(
-        screen.queryByRole('button', { name: 'Reports' }),
+        screen.queryByRole('button', { name: 'Board reports' }),
     ).not.toBeInTheDocument();
 });
 

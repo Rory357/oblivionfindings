@@ -5,6 +5,8 @@
  * A current sheet reads green so a sheet due for review or missing stands out. The safe-use and wellbeing-access
  * line and the source-repair note keep the code's wording; identifiable exposures are never counted here.
  */
+import { CHEMICAL_EXPOSURES } from '@/lib/health-safety/chemical-exposure-navigation';
+import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { RecordIdentity, RecordTable, type RecordTableColumn } from '@/components/incidents/record-table';
 import type { MenuItem } from '@/components/lists';
 import { PageHeader, PageHeaderFilterButton, PageHeaderFilterSelect, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderSearch, PageLayout } from '@/components/page';
@@ -19,7 +21,7 @@ import AppLayout from '@/layouts/app-layout';
 import type { ChemicalIndexProps, ChemicalRegisterFilters, ChemicalRegisterRow, ChemicalTab } from '@/lib/health-safety/chemical-contract';
 import { CHEMICAL_REGISTER, chemicalHref, chemicalReturn } from '@/lib/health-safety/chemical-navigation';
 import type { SharedData } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Archive, ClipboardCheck, Eye, FileText, FlaskConical, MapPin, Plus, Shield, ShieldAlert, SlidersHorizontal, X } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { CHEMICAL_SHEET_LABELS, PHYSICAL_FORMS, STATUS_OPTIONS, chemicalSheetLabel, chemicalSheetTone, optionLabel } from './constants';
@@ -29,13 +31,13 @@ const TABS = [{ key: 'all', label: 'All references', icon: FlaskConical }, { key
     { key: 'sds_missing', label: 'Missing sheets', icon: ShieldAlert }, { key: 'inactive', label: 'Inactive or removed', icon: Archive }] as const;
 const TABLE_TITLE: Record<ChemicalTab, string> = { all: 'All chemicals', active: 'Active chemicals', controlled: 'Controlled chemicals',
     sds_expiring: 'Sheet reviews', sds_missing: 'Missing sheets', inactive: 'Inactive or removed chemicals' };
-const REPORTS = [{ label: 'Board summary', href: '/health-safety/reports/board-summary' }, { label: 'WorkSafe register', href: '/health-safety/reports/worksafe-register' },
-    { label: 'Investigation outcomes', href: '/health-safety/reports/investigation-outcomes' }, { label: 'Corrective-action traceability', href: '/health-safety/reports/corrective-action-traceability' }, { label: 'Risk-assessment register', href: '/health-safety/reports/risk-assessment-register' }];
+const REPORTS = boardReportLinks();
 const SHEET_FILTERS = ['current', 'expiring', 'expired', 'missing', 'unknown', 'unavailable', 'not_yet_effective', 'repair_required'].map((value) => ({ value, label: CHEMICAL_SHEET_LABELS[value] }));
-const SAFE_USE = 'References and recorded checks support safe work; they do not certify safe use. Identifiable worker exposures require private wellbeing access and are not counted here.';
+const SAFE_USE = 'Recorded checks help people work safely; they don’t prove a chemical is safe to use. Exposures are counted above; each record names the worker, so only people with wellbeing access can open them.';
 
 export default function ChemicalRegister(props: ChemicalIndexProps) {
     const { filters, rows, hero, sites, can, tabCounts } = props; const { props: shared } = usePage<SharedData>();
+    const exposures = props.exposure_summary;
     const [search, setSearch] = useState(filters.q);
     useEffect(() => setSearch(filters.q), [filters.q]);
     const filtered = (values: Record<string, string | number | null | undefined>) => {
@@ -57,7 +59,7 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
         { key: 'form', label: 'Form', nowrap: true, cell: (row) => damaged(row) ? withheld : optionLabel(PHYSICAL_FORMS, row.physical_form) },
         { key: 'status', label: 'Status', nowrap: true, cell: (row) => <StatusBadge variant={damaged(row) ? 'warning' : 'neutral'}>{damaged(row) ? 'Source needs review' : optionLabel(STATUS_OPTIONS, row.status, 'Status unconfirmed')}</StatusBadge> },
         { key: 'sds', label: 'Safety data sheet', nowrap: true, cell: (row) => <StatusBadge variant={chemicalSheetTone(row.sds_state)}>{chemicalSheetLabel(row.sds_state)}</StatusBadge> },
-        { key: 'storage', label: 'Storage locations', nowrap: true, cell: (row) => row.storage_count ?? <span className="text-muted-foreground">Unconfirmed</span> },
+        { key: 'storage', label: 'Storage locations', nowrap: true, cell: (row) => row.storage_count ?? <span className="text-muted-foreground">Not available</span> },
     ];
     const pages = [rows.current_page - 1, rows.current_page, rows.current_page + 1].filter((page) => page > 0 && page <= rows.last_page);
     const links = [{ url: rows.current_page > 1 ? filtered({ ...filters, page: rows.current_page - 1 }) : null, label: '&laquo; Previous', active: false },
@@ -73,11 +75,16 @@ export default function ChemicalRegister(props: ChemicalIndexProps) {
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Chemical register', href: CHEMICAL_REGISTER }]}>
         <Head title="Chemical register" /><PageLayout hero={<PageHeader title="Chemical register" icon={FlaskConical} subline="Chemicals, their safety data sheets and where each is stored"
             actions={<><PageHeaderSearch value={search} onChange={setSearch} ariaLabel="Search chemical references" placeholder="Search references…" onKeyDown={(event) => { if (event.key === 'Enter') go({ q: search, page: 1 }); }} />
-                {shared.auth.can?.governance?.view && <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={FileText}>Reports</PageHeaderGlassButton></DropdownMenuTrigger>
-                <DropdownMenuContent align="end">{REPORTS.map((report) => <DropdownMenuItem key={report.href} asChild><a href={report.href}>{report.label}</a></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}
+                {shared.auth.can?.governance?.view && <DropdownMenu><DropdownMenuTrigger asChild><PageHeaderGlassButton icon={FileText}>{BOARD_REPORTS_LABEL}</PageHeaderGlassButton></DropdownMenuTrigger>
+                <DropdownMenuContent align="end">{REPORTS.map((report) => <DropdownMenuItem key={report.key} asChild><Link href={report.href}>{report.label}</Link></DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu>}
                 {can.create && <PageHeaderPrimaryButton icon={Plus} onClick={() => router.get(createHref)}>Add chemical</PageHeaderPrimaryButton>}</>}
             strip={<PageHeaderNumbers>
-                <PageHeaderNumber value={hero.live.sds_current ?? 'Unconfirmed'} label="Current safety data sheets" caption="Active chemicals" href={scopeHref('active', { sds_state: 'current' })} />
+                <PageHeaderNumber value={hero.live.sds_current ?? 'Not available'} label="Current safety data sheets" caption="Active chemicals" href={scopeHref('active', { sds_state: 'current' })} />
+                {exposures ? <>
+                    <PageHeaderNumber value={exposures.exposures} label="Exposures" caption={`Last ${exposures.period_days} days`} href={exposures.exposures_href ?? CHEMICAL_EXPOSURES} />
+                    <PageHeaderNumber value={exposures.awaiting_outcome} label="Awaiting a medical outcome" caption="Medical help was sought" href={exposures.exposures_href ?? CHEMICAL_EXPOSURES} />
+                    <PageHeaderNumber value={exposures.worksafe_awaiting} label="WorkSafe notification to make" caption="Exposure events" href="/health-safety/events?tab=worksafe_pending" />
+                </> : null}
             </PageHeaderNumbers>}
             filters={<>
                 <PageHeaderFilterSelect icon={MapPin} label="All sites" value={String(filters.site_id ?? 'all')} options={[{ value: 'all', label: 'All sites' }, ...sites.map((site) => ({ value: String(site.id), label: site.name }))]} onChange={(value) => go({ site_id: value === 'all' ? null : Number(value), page: 1 })} />

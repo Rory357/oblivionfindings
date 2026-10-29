@@ -46,7 +46,7 @@ const STEPS: WizardStep[] = [
     {
         key: 'who',
         label: 'Who and where',
-        blurb: 'Person, Site and time',
+        blurb: 'Person, site and time',
         icon: MapPin,
     },
     {
@@ -290,7 +290,7 @@ function TreatmentEntry({
             .catch(() => {
                 if (!controller.signal.aborted)
                     setOptionsError(
-                        'The current choices could not be checked. Your entries are still here. Retry before saving.',
+                        'We couldn’t load the latest options. Your entries are still here. Try again before saving.',
                     );
             })
             .finally(() => {
@@ -315,7 +315,7 @@ function TreatmentEntry({
                 next[field] = message;
         };
         if (index === 0) {
-            required('site_id', 'Choose the Site where treatment occurred.');
+            required('site_id', 'Choose the site where treatment was given.');
             required(
                 'treated_person_name',
                 'Enter the name of the person treated.',
@@ -327,7 +327,7 @@ function TreatmentEntry({
                     changed('client_id')) &&
                 !data.client_id
             )
-                next.client_id = 'Choose the Client treated.';
+                next.client_id = 'Choose the client who was treated.';
             required(
                 'first_aider_id',
                 'Choose the first aider who gave treatment.',
@@ -343,7 +343,7 @@ function TreatmentEntry({
                 );
                 if (!instant || new Date(instant).getTime() > Date.now())
                     next.treatment_date =
-                        'Enter a valid New Zealand treatment time that has already occurred.';
+                        'Enter when treatment was given (it can’t be in the future).';
             }
         }
         if (index === 1) {
@@ -369,7 +369,7 @@ function TreatmentEntry({
         if (id && !options.some((item) => item.value === id))
             options.unshift({
                 value: id,
-                label: `${name || 'Person not available in current choices'} (recorded)`,
+                label: `${name || 'Person'} (no longer in the list)`,
             });
         return options;
     };
@@ -439,7 +439,7 @@ function TreatmentEntry({
                 )
             ) {
                 setFailure(
-                    'The save could not be confirmed. Your entries are still here. Check the record before trying again.',
+                    'We can’t tell if this saved. Your entries are still here. Check the record before trying again.',
                 );
                 return;
             }
@@ -470,10 +470,10 @@ function TreatmentEntry({
                 );
             setFailure(
                 response?.status === 409
-                    ? 'This record changed while you were editing. Your entries are still here. Check the current record before trying again.'
+                    ? 'Someone else changed this record while you were editing. Your entries are still here. Check the latest record before trying again.'
                     : response?.status === 403
-                      ? 'Saving is no longer available with your current access. Your entries are still here.'
-                      : 'Saving did not return confirmation. Your entries are still here. You can retry the same report.',
+                      ? 'You no longer have access to save this. Ask your health and safety manager. Your entries are still here.'
+                      : 'We can’t tell if this saved. Your entries are still here. You can try saving the same report again.',
             );
         } finally {
             setBusy(false);
@@ -485,7 +485,7 @@ function TreatmentEntry({
             open
             onClose={finish}
             title={reviewed ? 'Edit treatment record' : 'Record first aid'}
-            description="Record factual treatment details, check the report and save it."
+            description="Record what happened and the treatment given, then save."
             railIcon={HeartPulse}
             railTitle={
                 reviewed ? 'Correct treatment details' : 'Record first aid'
@@ -563,8 +563,8 @@ function TreatmentEntry({
                             }
                             blurb={
                                 saved.href
-                                    ? 'The treatment record is saved. Open it to review follow-ups, evidence and connected work.'
-                                    : 'Your report was accepted. Access to the full treatment record is controlled separately.'
+                                    ? 'The treatment record is saved. Open it to see follow-ups, files and linked records.'
+                                    : 'Your report is saved. Health and safety staff look after the full record, so you may not be able to open it.'
                             }
                             actions={
                                 <div className="flex flex-wrap justify-center gap-3">
@@ -642,7 +642,7 @@ function TreatmentEntry({
                     )}
                     {loading && (
                         <p role="status" className="text-subtle">
-                            Checking current choices…
+                            Loading options…
                         </p>
                     )}
                     {optionsError && (
@@ -655,7 +655,7 @@ function TreatmentEntry({
                                 variant="outline"
                                 onClick={() => setReload((value) => value + 1)}
                             >
-                                Retry choices
+                                Try again
                             </Button>
                         </div>
                     )}
@@ -673,13 +673,13 @@ function TreatmentEntry({
                             <StepHead
                                 title="Who received treatment?"
                                 icon={MapPin}
-                                blurb="Record the person, Site, first aider and actual treatment time."
+                                blurb="Record the person, site, first aider and when treatment was given."
                             />
                             <Field label="Site" required error={errors.site_id}>
                                 <SelectInput
                                     frontline
                                     value={data.site_id}
-                                    placeholder="Choose a Site"
+                                    placeholder="Choose a site"
                                     options={siteOptions}
                                     onChange={(value) =>
                                         setData((current) => ({
@@ -726,7 +726,7 @@ function TreatmentEntry({
                                     <SelectInput
                                         frontline
                                         value={data.client_id}
-                                        placeholder="Choose a Client"
+                                        placeholder="Choose a client"
                                         options={clientOptions}
                                         onChange={(value) =>
                                             setData((current) => ({
@@ -746,10 +746,10 @@ function TreatmentEntry({
                             ) : (
                                 <>
                                     {data.treated_person_type === 'staff' && (
-                                        <Field label="Staff account">
+                                        <Field label="Staff member">
                                             <SelectInput
                                                 frontline
-                                                placeholder="Choose a staff account or enter a name"
+                                                placeholder="Choose a staff member or type a name"
                                                 value={
                                                     data.treated_person_id ||
                                                     'manual'
@@ -838,7 +838,7 @@ function TreatmentEntry({
                             <StepHead
                                 title="Injury or illness"
                                 icon={Activity}
-                                blurb="Describe the facts available to you."
+                                blurb="Describe what you know."
                             />
                             <Field
                                 label="Injury or illness"
@@ -931,18 +931,18 @@ function TreatmentEntry({
                                 />
                             </Field>
                             <p className="text-subtle">
-                                This records the reported outcome. It does not
-                                confirm hospital admission or clinical
-                                clearance.
+                                This records what you were told happened next.
+                                It doesn’t confirm a hospital stay or that the
+                                person is medically cleared.
                             </p>
                         </>
                     )}
                     {step === 3 && (
                         <>
                             <StepHead
-                                title="Incident and first-aider notes"
+                                title="Incident and first aider notes"
                                 icon={Link2}
-                                blurb="Connect an existing Client incident when one is available, or record that a report was made elsewhere."
+                                blurb="Link an existing client incident if there is one, or record that a report was made elsewhere."
                             />
                             <Field label="An incident report has been made">
                                 <Checkbox
@@ -971,7 +971,7 @@ function TreatmentEntry({
                                                     reviewed?.incident_link_state ===
                                                         'unavailable' &&
                                                     !data.related_incident_id
-                                                        ? 'Retain existing incident connection'
+                                                        ? 'Keep the linked incident'
                                                         : 'No incident selected',
                                             },
                                             ...pickers.incidents.map(
@@ -985,7 +985,7 @@ function TreatmentEntry({
                                                 ? [
                                                       {
                                                           value: data.related_incident_id,
-                                                          label: `${reviewed?.related_incident?.reference ?? 'Existing incident'} (recorded connection)`,
+                                                          label: `${reviewed?.related_incident?.reference ?? 'Linked incident'} (already linked)`,
                                                       },
                                                   ]
                                                 : []),
@@ -1010,11 +1010,11 @@ function TreatmentEntry({
                                 <p className="text-subtle">
                                     After saving, people with the appropriate
                                     access can add follow-ups and evidence or
-                                    create a linked Client incident from the
+                                    create a linked client incident from the
                                     treatment page.
                                 </p>
                             )}
-                            <Field label="First-aider notes">
+                            <Field label="First aider notes">
                                 <Textarea
                                     rows={5}
                                     value={data.first_aider_notes}
@@ -1038,7 +1038,7 @@ function TreatmentEntry({
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <ReviewCard
                                     icon={MapPin}
-                                    title="Person and Site"
+                                    title="Person and site"
                                     onEdit={() => move(0)}
                                 >
                                     <ReviewRow
@@ -1139,20 +1139,20 @@ function TreatmentEntry({
                                         value={
                                             data.incident_reported
                                                 ? 'Yes'
-                                                : 'Not recorded here'
+                                                : 'No'
                                         }
                                     />
                                     <ReviewRow
-                                        label="Connected incident"
+                                        label="Linked incident"
                                         value={
                                             selectedIncident?.reference ??
                                             reviewed?.related_incident
                                                 ?.reference ??
                                             (reviewed?.incident_link_state ===
                                             'unavailable'
-                                                ? 'Existing connection retained'
+                                                ? 'Linked incident kept'
                                                 : data.related_incident_id
-                                                  ? `Incident ${data.related_incident_id}`
+                                                  ? `Incident · Ref ${data.related_incident_id}`
                                                   : 'No incident selected')
                                         }
                                     />

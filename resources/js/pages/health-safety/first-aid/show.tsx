@@ -88,7 +88,7 @@ const SECTIONS = [
     { key: 'followups', label: 'Follow-ups' },
     { key: 'evidence', label: 'Evidence' },
     { key: 'history', label: 'History' },
-    { key: 'connections', label: 'Connected work' },
+    { key: 'connections', label: 'Linked records' },
 ] as const;
 /** The drawing's header: Add evidence and Edit beside Add follow-up; the rest under More. */
 const GLASS: FirstAidCommand[] = ['add-evidence', 'edit'];
@@ -192,7 +192,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
     const incidentRef = incident
         ? (incident.reference ??
           incident.reference_number ??
-          `Incident ${incident.id}`)
+          `Incident report · Ref ${incident.id}`)
         : null;
     const incidentWaiting =
         d.incident_reported &&
@@ -236,9 +236,9 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                 ? `${incidentRef}${delivery ? ` · ${firstAidDeliveryLabel(delivery.status).toLowerCase()}` : ''}`
                 : d.incident_reported
                   ? d.incident_link_state === 'unavailable'
-                      ? 'Reported · not available to view'
-                      : 'Reported · not linked here'
-                  : 'Not recorded here',
+                      ? 'Incident reported · you don’t have access to it — ask your health and safety manager'
+                      : 'Incident reported · not linked yet'
+                  : 'No incident reported',
             state: state(2),
             tone: 'warning',
         },
@@ -247,7 +247,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
             meta: open.length
                 ? `${open.length} open`
                 : d.followups.length
-                  ? 'Outcomes recorded'
+                  ? 'All done'
                   : 'None recorded',
             state: state(3),
             tone: overdue ? 'critical' : 'warning',
@@ -269,7 +269,7 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                       : 'Next step',
                 text: nextItem.notes,
                 meta: [
-                    `Follow-up ${nextItem.id} · ${nextItem.assigned_to?.name ?? 'Needs an owner'}`,
+                    `${nextItem.assigned_to?.name ?? 'Needs an owner'} · Ref ${nextItem.id}`,
                     unowned.filter((item) => item.id !== nextItem.id).length
                         ? `${plural(unowned.filter((item) => item.id !== nextItem.id).length, 'other follow-up')} still ${unowned.filter((item) => item.id !== nextItem.id).length === 1 ? 'needs' : 'need'} an owner`
                         : null,
@@ -286,8 +286,8 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
           : incidentWaiting
             ? {
                   label: 'Incident and review',
-                  text: 'An incident report is recorded but not linked here',
-                  meta: 'The incident keeps its own owner, review and closure. Recording treatment does not complete that work.',
+                  text: 'An incident was reported but isn’t linked to this treatment yet',
+                  meta: 'The incident still needs its own review — recording first aid doesn’t close it.',
                   tone: 'warning',
               }
             : null;
@@ -339,10 +339,10 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                 { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Safety registers', href: '/health-safety/registers' },
                 { title: 'First aid', href: FIRST_AID_REGISTER },
-                { title: reference, href: firstAidHref(d.id) },
+                { title: `First aid — ${d.treated_person_name}`, href: firstAidHref(d.id) },
             ]}
         >
-            <Head title={`${reference} · First aid`} />
+            <Head title={`First aid — ${d.treated_person_name} · ${reference}`} />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
@@ -363,11 +363,11 @@ function FirstAidWorkspace({ detail: d, pickers, return_to }: Props) {
                                 </PageHeaderStatusChip>
                             }
                             subline={[
-                                reference,
                                 d.site?.name ?? 'Site not recorded',
                                 d.treatment_date
                                     ? dateTimeWithYear(d.treatment_date)
                                     : null,
+                                reference,
                             ]
                                 .filter(Boolean)
                                 .join(' · ')}

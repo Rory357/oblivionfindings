@@ -42,9 +42,9 @@ it('ignores a late search response after the user changes the search instead of 
 it('rejects contradictory pagination and changed source versions without clearing the parent selection or enabling saving choices', async () => {
     io.get.mockResolvedValueOnce({ data: { ...reply().data, coordinator_picker: { ...reply().data.coordinator_picker, next_page: null } } });
     const changed = vi.fn(); const { rerender } = render(<InjuryPeoplePicker id="owner" label="Incident owner" endpoint="/health-safety/injuries/9/command-options" group="coordinators" value="101" onChange={changed} injuryId={9} version={4} />);
-    await tick(); expect(screen.getByRole('alert')).toHaveTextContent('could not be confirmed'); expect(changed).not.toHaveBeenCalled();
+    await tick(); expect(screen.getByRole('alert')).toHaveTextContent('couldn’t load the list'); expect(changed).not.toHaveBeenCalled();
     io.get.mockResolvedValueOnce({ data: { ...reply().data, expected_version: 6 } });
-    fireEvent.click(screen.getByRole('button', { name: 'Retry search' })); await tick();
+    fireEvent.click(screen.getByRole('button', { name: 'Search again' })); await tick();
     expect(screen.getByRole('combobox', { name: 'Incident owner' })).toBeDisabled(); expect(changed).not.toHaveBeenCalled();
     rerender(<InjuryPeoplePicker id="owner" label="Incident owner" endpoint="/health-safety/injuries/9/command-options" group="coordinators" value="101" onChange={changed} injuryId={9} version={6} />);
     io.get.mockResolvedValueOnce({ data: { ...reply().data, expected_version: 6 } }); await tick();
@@ -64,6 +64,6 @@ it('filters correction choices by the selected Site while checking the unchanged
     expect(screen.getByRole('combobox', { name: 'Incident owner' })).not.toBeDisabled();
     io.get.mockResolvedValueOnce({ data: { ...reply().data, canonical_site_id: 8, site_id: 10 } });
     rerender(<InjuryPeoplePicker id="owner" label="Incident owner" endpoint="/health-safety/injuries/9/command-options" group="coordinators" value="101" onChange={changed} injuryId={9} version={4} siteId="10" canonicalSiteId={4} />);
-    await tick(); expect(screen.getByRole('alert')).toHaveTextContent('could not be confirmed');
+    await tick(); expect(screen.getByRole('alert')).toHaveTextContent('couldn’t load the list');
     expect(changed).not.toHaveBeenCalled(); expect(screen.getByRole('combobox', { name: 'Incident owner' })).toBeDisabled();
 });

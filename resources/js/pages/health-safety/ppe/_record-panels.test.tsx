@@ -27,8 +27,8 @@ it.each(['allocations', 'inspections'] as const)('retains repair truth for withh
         pages: { [section]: { current_page: 1, last_page: 2, total: 26 } } };
     const p = props({ ...record, detail: d } as PpeRecord, section);
     render(<PpeRecordPanel {...p} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Page counts include those saved rows');
-    expect(screen.queryByText(/No (issues|inspections) are recorded/)).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Page counts include those records');
+    expect(screen.queryByText(/Not issued to anyone yet|No inspections yet/)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(p.page).toHaveBeenCalledWith(section === 'allocations' ? 'allocations_page' : 'inspections_page', 2);
 });
@@ -39,16 +39,16 @@ it('keeps own issue fields and navigation separate even if an overbroad payload 
         attachments: [{ original_name: 'Private evidence' }], catalogue_integrity: 'repair_required', can: { manage: false, acknowledge_own: true },
         command_context: { ...context, source_kind: 'allocations', source_id: 13, user_id: 12 } } } as unknown as PpeRecord;
     const { rerender } = render(<PpeRecordPanel {...props(record, 'overview')} />);
-    expect(screen.getByRole('status')).toHaveTextContent('type reference needs repair');
+    expect(screen.getByRole('status')).toHaveTextContent('type linked to this item needs fixing');
     expect(screen.queryByText('Private supervisor note')).not.toBeInTheDocument();
     expect(screen.queryByText('Private issuer')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Open equipment record' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Open the equipment/ })).not.toBeInTheDocument();
     rerender(<PpeRecordPanel {...props(record, 'evidence')} />);
-    expect(screen.getByText('Evidence requires separate record access.')).toBeInTheDocument();
+    expect(screen.getByText('You don’t have access to this record’s files.')).toBeInTheDocument();
     expect(screen.queryByText('Private evidence')).not.toBeInTheDocument();
     rerender(<PpeRecordPanel {...props(record, 'fit-training')} />);
     expect(screen.queryByText('Private test result')).not.toBeInTheDocument();
-    expect(screen.getByText('Currency not established')).toBeInTheDocument();
+    expect(screen.getByText('Check before use')).toBeInTheDocument();
 });
 it('shows unavailable historical evidence without a public URL and opens only its eligible exact transfer', () => {
     const record = inventory();
@@ -59,12 +59,12 @@ it('shows unavailable historical evidence without a public URL and opens only it
     const p = props({ ...record, detail: d } as unknown as PpeRecord, 'evidence');
     render(<PpeRecordPanel {...p} />);
     expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Preview evidence' })).not.toBeInTheDocument();
-    expect(screen.getAllByText(/does not confirm available bytes/)).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Preview' })).not.toBeInTheDocument();
+    expect(screen.getAllByText(/can’t be opened — it may be missing/)).toHaveLength(2);
     // The transfer lives in the row's menu (kebab and right-click, drawing pg-hsn-121d).
     fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 60, clientY: 80 });
     expect(screen.queryByRole('menuitem', { name: /Preview|Download/ })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Move evidence to private storage' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move file to secure storage' }));
     expect(p.open).toHaveBeenCalledWith('relocate_evidence', 8);
     expect(screen.getByText('The retained file path cannot be confirmed.')).toBeInTheDocument();
 });
@@ -79,14 +79,14 @@ it('uses the private verified evidence endpoints and keeps its original metadata
     expect(screen.getByText(/Original uploader/)).toBeInTheDocument();
     fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 60, clientY: 80 });
     expect(screen.getByRole('menuitem', { name: 'Download' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Preview evidence' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Preview' }));
     expect(screen.getByRole('dialog')).toHaveTextContent('Verified inspection.pdf');
 });
 it('separates unconfirmed command history from the earlier reconstructed facts', () => {
     const record = inventory();
     const d = { ...record.detail, command_history_integrity: 'repair_required', pages: { history: { current_page: 1, last_page: 2, total: 30 } } };
     render(<PpeRecordPanel {...props({ ...record, detail: d } as PpeRecord, 'history')} />);
-    expect(screen.getByRole('status')).toHaveTextContent('withheld');
-    expect(screen.getByText(/not a complete audit certificate/)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('damaged and hidden');
+    expect(screen.getByText(/pieced together from the record and may be incomplete/)).toBeInTheDocument();
     expect(screen.getByText('Page 1 of 2 · 30 records')).toBeInTheDocument();
 });

@@ -56,10 +56,10 @@ it('retains legacy completion without inventing an actor, contact or clinical ou
             onComplete={() => {}}
         />,
     );
-    expect(screen.getByText('Recorded as complete')).toBeInTheDocument();
-    expect(screen.getByText('Operator not recorded')).toBeInTheDocument();
+    expect(screen.getByText('Done')).toBeInTheDocument();
+    expect(screen.getByText('Name not recorded')).toBeInTheDocument();
     expect(
-        screen.getByText('No completion outcome was captured in this record.'),
+        screen.getByText('No outcome was written down.'),
     ).toBeInTheDocument();
     expect(screen.queryByText('Current first aider')).not.toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -86,10 +86,10 @@ it('distinguishes a recorded attempt from successful contact and retains missing
             onComplete={() => {}}
         />,
     );
-    expect(screen.getByText('Attempt recorded')).toBeInTheDocument();
-    expect(screen.queryByText('Contact recorded')).not.toBeInTheDocument();
+    expect(screen.getByText('Attempt made')).toBeInTheDocument();
+    expect(screen.queryByText('Contact made')).not.toBeInTheDocument();
     expect(
-        screen.getByText(/Evidence.pdf · File unavailable/),
+        screen.getByText(/Evidence.pdf · File missing/),
     ).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
 });
@@ -100,7 +100,7 @@ it('never offers a download for a missing file or removal for retained evidence'
             onRemove={() => {}}
         />,
     );
-    expect(screen.getByText('File unavailable')).toBeInTheDocument();
+    expect(screen.getByText('File missing')).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(
         screen.queryByRole('button', { name: 'Remove file' }),
@@ -156,16 +156,16 @@ it('renders historical facts without substituting the current treatment or follo
     const [legacy, earlier] = screen.getAllByRole('listitem');
     expect(earlier).toHaveTextContent('Earlier treatment');
     expect(within(earlier).getByText('No')).toBeInTheDocument();
-    expect(legacy).toHaveTextContent('Historical details are incomplete');
+    expect(legacy).toHaveTextContent('Some details weren’t saved at the time');
     expect(screen.queryByText('Current treatment')).not.toBeInTheDocument();
     expect(screen.queryByText('Never show this')).not.toBeInTheDocument();
     expect(
         screen.queryByText('Never show nested data'),
     ).not.toBeInTheDocument();
-    expect(within(earlier).getByText('Attempt recorded')).toBeInTheDocument();
+    expect(within(earlier).getByText('Attempt made')).toBeInTheDocument();
     expect(earlier).toHaveTextContent('Earlier unanswered call');
     expect(within(earlier).getByText('2')).toBeInTheDocument();
-    expect(screen.queryByText('Contact recorded')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contact made')).not.toBeInTheDocument();
 });
 it('keeps the report flag separate from an independently unavailable incident', () => {
     render(
@@ -189,7 +189,7 @@ it('keeps the report flag separate from an independently unavailable incident', 
     );
     expect(screen.getByText('Yes')).toBeInTheDocument();
     expect(
-        screen.getAllByText('No linked record is available to view here.'),
+        screen.getAllByText('Nothing linked that you can see.'),
     ).toHaveLength(2);
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByText('No incident')).not.toBeInTheDocument();

@@ -1,6 +1,6 @@
 /**
- * Restrictive intervention record (approved H&S drawings pg-hsn-102 … 102i —
- * Stephan 23 Oct 2026): one record header — the intervention and the person,
+ * Restraint record (approved H&S drawings pg-hsn-102 … 102i —
+ * Stephan 23 Oct 2026): one record header — the restraint and the person,
  * its review state, the facts that need someone, and where it is up to with
  * the next step — then each section as signature blocks.
  *
@@ -108,7 +108,12 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
-import { titleCase } from '../shared';
+import {
+    hsBadge,
+    hsLabel,
+    humaniseHsValue,
+} from '@/lib/health-safety/hs-labels';
+import { ATTACHMENT_CATEGORY_LABEL } from '../shared';
 
 const SECTIONS = [
     { key: 'overview', label: 'Overview', icon: FileText },
@@ -118,7 +123,7 @@ const SECTIONS = [
     { key: 'followups', label: 'Follow-ups', icon: ClipboardList },
     { key: 'evidence', label: 'Evidence', icon: Paperclip },
     { key: 'history', label: 'History', icon: History },
-    { key: 'connections', label: 'Connected work', icon: Link2 },
+    { key: 'connections', label: 'Linked records', icon: Link2 },
 ] as const;
 const COMMAND_ICONS: Partial<Record<RestraintEventCommand, LucideIcon>> = {
     review: ClipboardCheck,
@@ -136,18 +141,51 @@ type Props = {
     return_to?: string | null;
 };
 const personName = (person: SourcePerson | null) =>
-    person?.name ?? (person ? 'Identity retained; current directory access unavailable' : 'Not recorded');
+    person?.name ?? (person ? 'Name hidden — you don’t have access' : 'Not recorded');
 const when = (value: string | null | undefined) => (value ? formatDateTimeLong(value) : 'Not recorded');
-const words = (value: string | null | undefined) => (value ? value.replaceAll('_', ' ') : '');
-const sentence = (key: string) => {
-    const text = key.replaceAll('_', ' ');
-    return text.charAt(0).toUpperCase() + text.slice(1);
+/** Plain words for the plan-approval check when the record has no explanation of its own. */
+const PLAN_AUTHORIZATION_LABEL: Record<string, string> = {
+    verified: 'An approved plan version was in use at the time',
+    ambiguous: 'More than one approved plan version could apply',
+    asserted_out_of_plan: 'Recorded as outside the plan',
+    approval_unknown: 'We couldn’t check the plan was approved',
+    currency_unknown: 'We couldn’t check the plan was current',
+    missing: 'No behaviour support plan on record',
+    legacy_unknown: 'Older record — some details weren’t kept',
 };
-const SEVERITY_TONE: Record<string, 'critical' | 'warning' | 'success'> = {
-    critical: 'critical',
-    high: 'critical',
-    medium: 'warning',
-    low: 'success',
+/** What each update in the history was for. */
+const DELIVERY_PURPOSE_LABEL: Record<string, string> = {
+    source_review: 'Sent to health and safety for a safety review',
+    source_reconcile: 'Linked incident checked',
+    operational_bridge: 'Control room told',
+    review_assignment: 'Review owner told',
+    followup_assignment: 'Follow-up owner told',
+    evidence_removal: 'File removed',
+    due_reminder: 'Reminder sent',
+};
+const DELIVERY_STATUS_LABEL: Record<string, string> = {
+    pending: 'Waiting to send',
+    failed: 'Didn’t go through — trying again',
+    delivered: 'Done',
+    skipped: 'Not needed',
+};
+const FOLLOWUP_OUTCOME_LABEL: Record<string, string> = {
+    recorded: 'Done',
+    contacted: 'Contact made',
+    attempted: 'Tried to make contact',
+    unable_to_contact: 'Couldn’t make contact',
+    declined: 'Declined',
+    not_required: 'Not needed',
+    other: 'Done (other)',
+};
+const label = (map: Record<string, string>, value: string | null | undefined) =>
+    value ? (map[value] ?? humaniseHsValue(value)) : 'Not recorded';
+/** A recorded value made readable: dates through the house format, stored codes as words. */
+const readable = (value: string | number) => {
+    if (typeof value === 'number') return String(value);
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return formatDateTimeLong(value);
+    if (/^[a-z]+(_[a-z]+)+$/.test(value)) return humaniseHsValue(value);
+    return value;
 };
 const sectionForCommand = (command: RestraintEventCommand): RestraintEventSection =>
     command.includes('observation')
@@ -184,6 +222,8 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     const panel = useRef<HTMLDivElement>(null);
     const interacted = useRef(false);
     const reference = d.reference_number ?? `RE-${d.id}`;
+    const typeLabel = hsLabel('restraint_type', d.restraint_type);
+    const severity = hsBadge('severity', d.severity);
     const href = (next: RestraintEventSection, action: RestraintEventCommand | null = null, id?: number | null) =>
         restraintHref('events', d.id, {
             workspace: workspace as RestraintWorkspace,
@@ -237,7 +277,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
             {overflow.length ? (
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More intervention actions" />
+                        <PageHeaderGlassButton icon={MoreHorizontal} aria-label="More restraint actions" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         {overflow.map((item) => (
@@ -258,8 +298,8 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     ) : null;
 
     const facts: PageHeaderFact[] = [
-        { value: titleCase(d.restraint_type), label: 'Intervention', tone: d.within_support_plan ? undefined : 'critical' },
-        { value: titleCase(d.severity), label: 'Severity', tone: SEVERITY_TONE[d.severity] },
+        { value: typeLabel, label: 'Restraint type', tone: d.within_support_plan ? undefined : 'critical' },
+        { value: severity.label, label: 'Severity', tone: severity.variant === 'success' || severity.variant === 'warning' || severity.variant === 'critical' ? severity.variant : undefined },
         ...(d.review_due_at && d.needs_review ? [{ value: dateTimeWithYear(d.review_due_at), label: 'Review due', tone: 'warning' as const }] : []),
         ...(openFollowups.length
             ? [{ value: String(openFollowups.length), label: openFollowups.length === 1 ? 'Open follow-up' : 'Open follow-ups' }]
@@ -293,10 +333,22 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
           ? {
                 label: d.review_due_at ? `Next step · due ${formatDate(d.review_due_at)}, ${formatTime(d.review_due_at)}` : 'Next step',
                 text: `${owner} records the review`,
-                meta: `Review owner · ${d.reviewed_at ? 'Current source revision not reviewed' : 'First review not recorded yet'}`,
+                meta: [
+                    `Review owner · ${d.reviewed_at ? 'Changed since the last review' : 'First review not recorded yet'}`,
+                    allowed('review') ? null : `You can’t record this review · ask ${owner} or a health and safety manager`,
+                ]
+                    .filter(Boolean)
+                    .join(' · '),
                 tone: 'warning',
             }
-          : { label: 'Next step', text: EVENT_COMMAND_LABELS['assign-review'], meta: 'Nobody owns the review yet', tone: 'warning' };
+          : {
+                label: 'Next step',
+                text: EVENT_COMMAND_LABELS['assign-review'],
+                meta: allowed('assign-review')
+                    ? 'Nobody owns the review yet'
+                    : 'Nobody owns the review yet · ask a health and safety manager to choose one',
+                tone: 'warning',
+            };
 
     const people: PersonCardItem[] = [];
     const addPerson = (name: string | null | undefined, role: string) => {
@@ -319,7 +371,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     };
 
     const main = command ? (
-        <Surface aria-label="Current intervention action">
+        <Surface aria-label="Current restraint action">
             <div className="p-5">
                 <RestraintEventCommandForm
                     key={`${d.id}-${command}-${child ?? ''}`}
@@ -339,14 +391,14 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
             <FactRows
                 title="Review and owner"
                 rows={[
-                    ['Named owner', personName(d.review_owner_id)],
+                    ['Review owner', personName(d.review_owner_id)],
                     ['Review due', when(d.review_due_at)],
                     ['First review', when(d.reviewed_at)],
                     [
-                        'Reviewed source',
+                        'Version reviewed',
                         d.reviewed_source_revision === null
-                            ? 'Not recorded'
-                            : `Revision ${d.reviewed_source_revision} of current revision ${d.source_revision}`,
+                            ? 'Not reviewed yet'
+                            : `Version ${d.reviewed_source_revision} (latest is ${d.source_revision})`,
                     ],
                 ]}
                 action={
@@ -359,12 +411,12 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                           : null
                 }
             />
-            <SourceFacts rows={d.reviews} empty="No review evidence recorded." title="Review evidence" />
+            <SourceFacts rows={d.reviews} empty="No reviews yet." title="Review" />
         </>
     ) : section === 'monitoring' ? (
-        <SourceFacts rows={d.observations} empty="No monitoring observations recorded." title="Observation" correct={(item, superseded) => correctAction('monitoring', item, superseded)} />
+        <SourceFacts rows={d.observations} empty="No checks recorded yet." title="Check" correct={(item, superseded) => correctAction('monitoring', item, superseded)} />
     ) : section === 'debrief' ? (
-        <SourceFacts rows={d.debriefs} empty="No debrief evidence recorded." title="Debrief" correct={(item, superseded) => correctAction('debrief', item, superseded)} />
+        <SourceFacts rows={d.debriefs} empty="No debrief recorded yet." title="Debrief" correct={(item, superseded) => correctAction('debrief', item, superseded)} />
     ) : section === 'followups' ? (
         <FollowupTable
             rows={d.followups}
@@ -388,7 +440,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
             menuFor={(item) =>
                 compactMenu([
                     item.download_url && {
-                        label: 'Download private file',
+                        label: 'Download file',
                         icon: Download,
                         onClick: () => window.location.assign(item.download_url!),
                     },
@@ -404,20 +456,20 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
         />
     ) : section === 'history' ? (
         <>
-            <SourceFacts rows={d.reviews} empty="No history recorded." title="History" />
+            <SourceFacts rows={d.reviews} empty="No history yet." title="History" />
             {d.deliveries.length ? (
                 <Log
-                    title="Delivery and reminders"
-                    sub="Delivery confirms that work was passed on. It does not complete the intervention review or another record."
+                    title="Updates and reminders"
+                    sub="Who was told and when. Sending an update doesn’t complete the review."
                     limit={d.deliveries.length}
                     items={d.deliveries.map((item, index) => ({
                         key: index,
                         time: item.delivered_at ? formatTime(item.delivered_at) : item.created_at ? formatTime(item.created_at) : '',
                         tone: item.failure_code ? 'warning' : item.delivered_at ? 'success' : 'info',
-                        title: `${sentence(item.purpose)} · ${words(item.status)}`,
+                        title: `${label(DELIVERY_PURPOSE_LABEL, item.purpose)} · ${label(DELIVERY_STATUS_LABEL, item.status)}`,
                         sub: [
                             item.delivered_at ? when(item.delivered_at) : item.created_at ? when(item.created_at) : null,
-                            item.failure_code ? 'Needs delivery review' : null,
+                            item.failure_code ? 'Didn’t go through' : null,
                         ]
                             .filter(Boolean)
                             .join(' · '),
@@ -425,24 +477,24 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                 />
             ) : (
                 <QuietLine
-                    title="Delivery and reminders"
-                    sub="Delivery confirms that work was passed on. It does not complete the intervention review or another record."
-                    text="No delivery history retained."
+                    title="Updates and reminders"
+                    sub="Who was told and when. Sending an update doesn’t complete the review."
+                    text="No updates sent yet."
                 />
             )}
         </>
     ) : section === 'connections' ? (
         <RowList
-            title="Connected work"
-            sub="Each connected record has its own owner, permissions and completion steps."
+            title="Linked records"
+            sub="Each linked record has its own owner and steps"
             items={(
                 [
                     ['incident', 'Incident', Link2],
-                    ['plan', 'Behaviour-support plan', FileText],
+                    ['plan', 'Behaviour support plan', FileText],
                     ['plan_version', 'Plan version used', FileText],
-                    ['plan_approval', 'Approval recorded', ClipboardCheck],
-                    ['health_safety', 'H&S review', ClipboardCheck],
-                    ['control_room', 'Control Room response', ShieldAlert],
+                    ['plan_approval', 'Plan approval', ClipboardCheck],
+                    ['health_safety', 'Safety review', ClipboardCheck],
+                    ['control_room', 'Control room response', ShieldAlert],
                     ['stay', 'Respite stay', Link2],
                     ['client', 'Person', UserRound],
                 ] as const
@@ -452,7 +504,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                     key,
                     leading: <Icon aria-hidden="true" className="size-4" />,
                     title: label,
-                    sub: link ? undefined : 'No accessible connection',
+                    sub: link ? undefined : 'Not linked, or you don’t have access — ask a health and safety manager',
                     href: link
                         ? `${link.href}${link.href.includes('?') ? '&' : '?'}return_to=${encodeURIComponent(restraintHref('events', d.id, { workspace, section: 'connections' }))}`
                         : undefined,
@@ -463,7 +515,8 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
         <>
             {d.source_provenance === 'legacy_uncertainty' ? (
                 <Note tone="warning">
-                    This is a historical record. Earlier approval and source details have not been reconstructed as new facts.
+                    Older record from before the current system. Approval and other details that weren’t recorded at the time
+                    haven’t been added afterwards.
                 </Note>
             ) : null}
             <Story
@@ -490,7 +543,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                         ['Person’s response', d.person_response],
                         ['Support afterwards', d.post_incident_support],
                         ...(d.injury_occurred
-                            ? ([['Injury', d.injury_details || 'Injury recorded; detail unavailable']] as [string, string | null][])
+                            ? ([['Injury', d.injury_details || 'Injury recorded — no details given']] as [string, string | null][])
                             : []),
                     ] as [string, string | null][]
                 ).map(([h, t]) => ({ h, t: <span className="whitespace-pre-wrap">{t ?? 'Not recorded'}</span> }))}
@@ -498,8 +551,8 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
             <FactRows
                 title="On record"
                 rows={[
-                    ['Actual start', when(d.started_at)],
-                    ['Actual end', when(d.ended_at)],
+                    ['Started', when(d.started_at)],
+                    ['Ended', when(d.ended_at)],
                     [
                         'Staff involved',
                         d.staff_involved.map((item) => ('kind' in item ? item.text : personName(item))).join(', ') || 'Not recorded',
@@ -515,19 +568,19 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
         <>
             {!command && section === 'overview' ? (
                 <KnowList
-                    title="Against the plan"
+                    title="Compared with the plan"
                     items={[
-                        { tone: planTone, text: <b>{d.within_support_plan ? 'Reported within plan' : 'Reported outside plan'}</b> },
+                        { tone: planTone, text: <b>{d.within_support_plan ? 'In the plan (as reported)' : 'Outside the plan (as reported)'}</b> },
                         {
                             tone: d.within_support_plan ? 'info' : 'warning',
                             text: (
                                 <>
-                                    <b>Recorded authorization</b> · {d.plan_authorization.explanation ?? words(d.plan_authorization.state)}
+                                    <b>Plan approval</b> · {d.plan_authorization.explanation ?? label(PLAN_AUTHORIZATION_LABEL, d.plan_authorization.state)}
                                 </>
                             ),
                         },
                         ...(d.deviation_reason
-                            ? [{ tone: 'warning' as SgTone, text: <><b>Reason for difference</b> · {d.deviation_reason}</> }]
+                            ? [{ tone: 'warning' as SgTone, text: <><b>Why it was different from the plan</b> · {d.deviation_reason}</> }]
                             : []),
                     ]}
                 />
@@ -544,13 +597,13 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                     ? [
                           { title: 'Health & safety', href: '/health-safety' },
                           { title: 'Safety registers', href: '/health-safety/registers' },
-                          { title: 'Restrictive interventions', href: RESTRAINT_REGISTER },
+                          { title: 'Restraints', href: RESTRAINT_REGISTER },
                       ]
                     : []),
-                { title: `${titleCase(d.restraint_type)} intervention — ${d.client.name}`, href: href('overview') },
+                { title: `${typeLabel} restraint — ${d.client.name}`, href: href('overview') },
             ]}
         >
-            <Head title={`${reference} · Restrictive intervention`} />
+            <Head title={`${typeLabel} restraint · ${reference}`} />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
@@ -559,10 +612,10 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                             wrapTitle
                             backHref={returnTo}
                             icon={ShieldAlert}
-                            title={`${titleCase(d.restraint_type)} intervention — ${d.client.name}`}
+                            title={`${typeLabel} restraint — ${d.client.name}`}
                             titleChip={
                                 <PageHeaderStatusChip variant={d.needs_review ? 'warning' : 'success'}>
-                                    {d.needs_review ? 'Review needed' : 'Review recorded'}
+                                    {d.needs_review ? 'Needs review' : 'Reviewed'}
                                 </PageHeaderStatusChip>
                             }
                             subline={[
@@ -573,13 +626,13 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
                             ].join(' · ')}
                             actions={command ? undefined : header}
                             facts={<PageHeaderFacts items={facts} />}
-                            strip={command ? undefined : <PageHeaderStages steps={stages} next={next} ariaLabel="Intervention stage" />}
+                            strip={command ? undefined : <PageHeaderStages steps={stages} next={next} ariaLabel="Restraint stage" />}
                             rail={
                                 <PageHeaderRail
                                     items={[...SECTIONS]}
                                     value={section}
                                     onSelect={(next) => move(next)}
-                                    ariaLabel="Restrictive intervention sections"
+                                    ariaLabel="Restraint sections"
                                 />
                             }
                         />
@@ -606,7 +659,7 @@ function EventWorkspace({ detail, workspace, pickers, return_to }: Props) {
     );
 }
 
-/** Source records (reviews, observations, debriefs): newest first, every fact kept, with who recorded it and the source revision. */
+/** Reviews, checks and debriefs: newest first, every detail kept, with who recorded it and the version. */
 function SourceFacts({
     rows,
     empty,
@@ -632,9 +685,9 @@ function SourceFacts({
                         title={`${title} · ${dateTimeWithYear(item.occurred_at ?? item.created_at, "Time not recorded")}`}
                         sub={[
                             `Recorded by ${personName(item.recorder)}`,
-                            item.actual_actor ? `Actual participant: ${personName(item.actual_actor)}` : null,
-                            `Source revision ${item.source_revision}`,
-                            superseded ? 'Earlier evidence' : null,
+                            item.actual_actor ? `Done by ${personName(item.actual_actor)}` : null,
+                            `Version ${item.source_revision}`,
+                            superseded ? 'Replaced by a later entry' : null,
                         ]
                             .filter(Boolean)
                             .join(' · ')}
@@ -642,10 +695,12 @@ function SourceFacts({
                         rows={
                             facts.length
                                 ? facts.map(([key, value]): [ReactNode, ReactNode] => [
-                                      sentence(key),
-                                      <span className="whitespace-pre-wrap">{Array.isArray(value) ? value.join(', ') : String(value)}</span>,
+                                      humaniseHsValue(key),
+                                      <span className="whitespace-pre-wrap">
+                                          {Array.isArray(value) ? value.map((part) => readable(part)).join(', ') : readable(value as string | number)}
+                                      </span>,
                                   ])
-                                : [['Facts', 'Not recorded']]
+                                : [['Details', 'Not recorded']]
                         }
                     />
                 );
@@ -702,7 +757,7 @@ function FollowupTable({
                     <RecordIdentity title={<StatusBadge variant="neutral">Cancelled</StatusBadge>} sub={item.cancellation_reason ?? undefined} />
                 ) : item.completed_at ? (
                     <RecordIdentity
-                        title={<StatusBadge variant="success">{sentence(item.completion_outcome?.outcome ?? 'Outcome recorded')}</StatusBadge>}
+                        title={<StatusBadge variant="success">{item.completion_outcome?.outcome ? label(FOLLOWUP_OUTCOME_LABEL, item.completion_outcome.outcome) : 'Done'}</StatusBadge>}
                         sub={when(item.completed_at)}
                     />
                 ) : (
@@ -765,14 +820,14 @@ function EvidenceTable({
                             item.original_name
                         )
                     }
-                    sub={[item.category ? sentence(item.category) : 'Evidence', item.notes].filter(Boolean).join(' · ')}
+                    sub={[item.category ? label(ATTACHMENT_CATEGORY_LABEL, item.category) : 'Evidence', item.notes].filter(Boolean).join(' · ')}
                 />
             ),
         },
         { key: 'added', label: 'Added', nowrap: true, cell: (item) => when(item.created_at) },
         {
             key: 'availability',
-            label: 'Availability',
+            label: 'Status',
             nowrap: true,
             cell: (item) =>
                 item.removed_at ? (
@@ -783,14 +838,14 @@ function EvidenceTable({
                 ) : item.availability === 'available' ? (
                     <StatusBadge variant="success">Available</StatusBadge>
                 ) : (
-                    <StatusBadge variant="warning">{sentence(item.availability)}</StatusBadge>
+                    <StatusBadge variant="warning">{item.availability === 'unavailable' ? 'Not available' : humaniseHsValue(item.availability)}</StatusBadge>
                 ),
         },
     ];
     return (
         <RecordTable
             title="Evidence"
-            sub="Private files · download or remove each one from its menu"
+            sub="Files · use each file’s menu to download or remove it"
             actions={
                 onAdd ? (
                     <Button variant="outline" size="sm" onClick={onAdd}>
@@ -806,7 +861,7 @@ function EvidenceTable({
             menuIcon={Paperclip}
             empty={
                 <p className="sg-quiet px-4 py-5">
-                    <span>No evidence files recorded.</span>
+                    <span>No files added yet.</span>
                 </p>
             }
         />

@@ -1,6 +1,7 @@
 /* One corrective action — the approved drawing pg-hsn-43 (Stephan, 23 Oct 2026): the action's five stages with the
  * independent check as the next step, what we agreed told as a story, people and linked records beside it. The
  * complete / verify / return / owner panes and their submissions are unchanged. */
+import { HS_LABELS, hsLabel } from '@/lib/health-safety/hs-labels';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     ActionOwnerPane,
@@ -95,30 +96,14 @@ export type CorrectiveActionWorkspace = {
     ownership: ActionOwnership;
     can: Record<'start' | 'complete' | 'verify' | 'return' | 'close', boolean>;
 };
-const statuses: Record<string, string> = {
-    open: 'Not started',
-    in_progress: 'In progress',
-    completed: 'Awaiting verification',
-    verified: 'Verified',
-    closed: 'Closed',
-};
-const REVIEW_STAGE: Record<string, string> = {
-    open: 'Open',
-    investigating: 'Investigating',
-    corrective_action: 'Corrective action',
-    monitoring: 'Monitoring',
-    closed: 'Closed',
-};
+// Words from the shared H&S labels (docs/health-safety-build/vocabulary.md).
+const statuses = HS_LABELS.action_status as Record<string, string>;
 const PRIORITY_TONE: Record<string, PageHeaderFact['tone']> = {
     low: 'success',
     medium: 'warning',
     high: 'critical',
     critical: 'critical',
 };
-
-function capitalise(value: string): string {
-    return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value;
-}
 
 /** Tone of an action-history row, read from its words (returned = attention, added/verified/closed = done). */
 function historyTone(label: string): SgTone {
@@ -231,7 +216,7 @@ function ActionRecord({
         pane === 'owner' ? ownership.can_assign : pane && can[pane];
 
     const owner = ca.owner?.name ?? null;
-    const reviewStage = REVIEW_STAGE[review.status] ?? capitalise(review.status);
+    const reviewStage = hsLabel('review_status', review.status);
     const today = toDateInput(new Date());
     const dueToday = !!ca.due_date && ca.due_date === today;
     const overdue =
@@ -436,7 +421,7 @@ function ActionRecord({
 
     const facts: PageHeaderFact[] = [
         {
-            value: capitalise(ca.priority),
+            value: hsLabel('action_priority', ca.priority),
             label: 'Priority',
             tone: PRIORITY_TONE[ca.priority] ?? 'neutral',
         },

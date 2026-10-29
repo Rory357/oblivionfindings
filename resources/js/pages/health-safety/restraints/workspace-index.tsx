@@ -1,8 +1,8 @@
 /**
- * Restrictive interventions register (approved H&S drawings pg-hsn-100,
+ * Restraints list (approved H&S drawings pg-hsn-100,
  * 100b — Stephan 23 Oct 2026): one header with the two numbers that need
  * someone, the filters (the quieter ones under More filters) and the status
- * views as rail tabs; then Interventions or Behaviour-support plans as a
+ * views as rail tabs; then Restraints or Behaviour support plans as a
  * table. Every row opens its record; its kebab and right-click carry Open and,
  * for reviewers, Review. Restraint wording — reported plan use, injury, the
  * current source revision and its review — stays exactly as the records say it.
@@ -60,11 +60,11 @@ import {
     X,
 } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
+import { hsBadge, hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     PLAN_STATUS_META,
     RESTRAINT_TYPE_OPTIONS,
     SEVERITY_OPTIONS,
-    titleCase,
     type RestraintFilters,
     type RestraintHero,
     type RestraintTabCounts,
@@ -118,24 +118,24 @@ type Props = {
 type Next = Record<string, string | number | null>;
 
 const EVENT_TABS = [
-    { key: 'all', label: 'All interventions' },
+    { key: 'all', label: 'All restraints' },
     { key: 'unreviewed', label: 'Needs review' },
-    { key: 'out_of_plan', label: 'Reported outside plan' },
+    { key: 'out_of_plan', label: 'Outside the plan' },
     { key: 'injury', label: 'Injury recorded' },
     { key: 'critical', label: 'Critical' },
     { key: '30d', label: 'Last 30 days' },
 ];
 const PLAN_TABS = [
     { key: 'all', label: 'Current plans' },
-    { key: 'active', label: 'Active' },
+    { key: 'active', label: 'In use' },
     { key: 'draft', label: 'Drafts' },
     { key: 'review_due', label: 'Review due' },
-    { key: 'under_review', label: 'Under review' },
+    { key: 'under_review', label: 'Being reviewed' },
     { key: 'archived', label: 'Archived' },
 ];
 const LENSES: GroupedProfileNavTab[] = [
-    { key: 'events', label: 'Interventions', icon: ShieldAlert },
-    { key: 'plans', label: 'Behaviour-support plans', icon: FileText },
+    { key: 'events', label: 'Restraints', icon: ShieldAlert },
+    { key: 'plans', label: 'Behaviour support plans', icon: FileText },
 ];
 /** A header number opens its view with every narrowing filter cleared. */
 const CLEAR: Next = {
@@ -219,9 +219,9 @@ export default function RestraintWorkspaceIndex({
         );
     const menuFor = (kind: 'events' | 'plans', id: number): MenuItem[] =>
         compactMenu([
-            { label: kind === 'events' ? 'Open record' : 'Open plan', icon: Eye, onClick: () => open(kind, id) },
+            { label: kind === 'events' ? 'Open restraint' : 'Open plan', icon: Eye, onClick: () => open(kind, id) },
             can.review && {
-                label: kind === 'events' ? 'Review record' : 'Review plan',
+                label: kind === 'events' ? 'Review restraint' : 'Review plan',
                 icon: ClipboardCheck,
                 onClick: () => review(kind, id),
             },
@@ -233,17 +233,17 @@ export default function RestraintWorkspaceIndex({
                 { title: 'Home', href: '/dashboard' },
                 { title: 'Health & safety', href: '/health-safety' },
                 { title: 'Safety registers', href: '/health-safety/registers' },
-                { title: 'Restrictive interventions', href: RESTRAINT_REGISTER },
+                { title: 'Restraints', href: RESTRAINT_REGISTER },
             ]}
         >
-            <Head title="Restrictive interventions and behaviour support" />
+            <Head title="Restraints and behaviour support plans" />
             <PageLayout
                 hero={
                     <PageHeader
                         wrapTitle
                         icon={ShieldAlert}
-                        title="Restrictive interventions"
-                        subline="Interventions, behaviour-support plans and their reviews"
+                        title="Restraints"
+                        subline="Restraints, behaviour support plans and their reviews"
                         actions={
                             <>
                                 <PageHeaderSearch
@@ -252,20 +252,20 @@ export default function RestraintWorkspaceIndex({
                                     onKeyDown={(event) => {
                                         if (event.key === 'Enter') go({ q: search.trim() || null });
                                     }}
-                                    placeholder="Search person or record text"
-                                    ariaLabel="Search restrictive interventions and plans"
+                                    placeholder="Search by person or words in the record"
+                                    ariaLabel="Search restraints and plans"
                                 />
                                 <PageHeaderGlassButton asChild>
                                     <a href={`${RESTRAINT_REGISTER}/export?${query()}`}>
                                         <Download className="size-4" />
-                                        Export filtered records
+                                        Export these records (CSV)
                                     </a>
                                 </PageHeaderGlassButton>
                                 {can.create && (
                                     <PageHeaderPrimaryButton asChild>
                                         <Link href={report(lens === 'plans' ? 'plan' : 'event')}>
                                             <Plus className="size-4" />
-                                            {lens === 'plans' ? 'Add behaviour-support plan' : 'Record intervention'}
+                                            {lens === 'plans' ? 'Add behaviour support plan' : 'Record a restraint'}
                                         </Link>
                                     </PageHeaderPrimaryButton>
                                 )}
@@ -276,14 +276,14 @@ export default function RestraintWorkspaceIndex({
                                 <PageHeaderNumber
                                     label="Needs review"
                                     value={hero.attention.unreviewed}
-                                    caption="Current source revision not reviewed"
+                                    caption="New or changed since the last review"
                                     tone={hero.attention.unreviewed > 0 ? 'warning' : undefined}
                                     href={href({ ...CLEAR, lens: 'events', tab: 'unreviewed', period: 'all' })}
                                 />
                                 <PageHeaderNumber
                                     label="Plan reviews due"
                                     value={hero.attention.plans_review_due}
-                                    caption="Active plans with a due review"
+                                    caption="Plans in use that are due for review"
                                     tone={hero.attention.plans_review_due > 0 ? 'warning' : undefined}
                                     href={href({ ...CLEAR, lens: 'plans', tab: 'review_due', period: 'all' })}
                                 />
@@ -304,7 +304,7 @@ export default function RestraintWorkspaceIndex({
                                     label="Period"
                                     value={filters.period ?? '30d'}
                                     options={[
-                                        { value: 'week', label: 'Last 7 days' },
+                                        { value: 'week', label: 'This week' },
                                         { value: '30d', label: 'Last 30 days' },
                                         { value: 'quarter', label: 'Last 3 months' },
                                         { value: 'all', label: 'All time' },
@@ -335,7 +335,7 @@ export default function RestraintWorkspaceIndex({
                             <PageHeaderRail
                                 value={tab}
                                 onSelect={(value) => go({ tab: value })}
-                                ariaLabel={lens === 'events' ? 'Intervention views' : 'Plan views'}
+                                ariaLabel={lens === 'events' ? 'Restraint views' : 'Plan views'}
                                 items={tabs.map((item) => ({
                                     ...item,
                                     count: (tabCounts[lens] as Record<string, number>)[item.key],
@@ -350,7 +350,7 @@ export default function RestraintWorkspaceIndex({
                         activeTab={lens}
                         onTab={(value) => go({ lens: value, tab: 'all', review_state: null })}
                         testIdPrefix="restraint-register"
-                        ariaLabel="Register record type"
+                        ariaLabel="Show restraints or plans"
                         panelId="restraint-register-panel"
                         renderLink={() => null}
                     />
@@ -378,7 +378,7 @@ export default function RestraintWorkspaceIndex({
     );
 }
 
-/** Type, severity, reported plan use, review and an exact date range — the quieter filters. */
+/** Type, severity, whether it was in the plan, review and an exact date range — the quieter filters. */
 function MoreFilters({
     lens,
     filters,
@@ -413,13 +413,13 @@ function MoreFilters({
                 {lens === 'events' ? (
                     <>
                         {select('severity', 'Severity', 'All severities', SEVERITY_OPTIONS)}
-                        {select('within_plan', 'Reported plan use', 'All', [
-                            { value: 'yes', label: 'Reported within plan' },
-                            { value: 'no', label: 'Reported outside plan' },
+                        {select('within_plan', 'In the plan? (as reported)', 'All', [
+                            { value: 'yes', label: 'In the plan' },
+                            { value: 'no', label: 'Outside the plan' },
                         ])}
                         {select('review_state', 'Review', 'All', [
-                            { value: 'reviewed', label: 'Current revision reviewed' },
-                            { value: 'unreviewed', label: 'Current revision needs review' },
+                            { value: 'reviewed', label: 'Reviewed' },
+                            { value: 'unreviewed', label: 'Needs review (new or changed)' },
                         ])}
                     </>
                 ) : (
@@ -485,7 +485,7 @@ function EventTable({
             cell: (row) => (
                 <RecordIdentity
                     title={row.client.name}
-                    sub={[row.reference, titleCase(row.restraint_type), row.site?.name ?? 'Site not recorded'].join(' · ')}
+                    sub={[hsLabel('restraint_type', row.restraint_type), row.site?.name ?? 'Site not recorded', row.reference].join(' · ')}
                 />
             ),
         },
@@ -505,13 +505,13 @@ function EventTable({
         },
         {
             key: 'plan',
-            label: 'Plan use (as reported)',
+            label: 'In the plan? (as reported)',
             nowrap: true,
             cell: (row) =>
                 row.within_support_plan ? (
-                    'Reported within plan'
+                    'In the plan'
                 ) : (
-                    <StatusBadge variant="critical">Reported outside plan</StatusBadge>
+                    <StatusBadge variant="critical">Outside the plan</StatusBadge>
                 ),
         },
         {
@@ -529,7 +529,10 @@ function EventTable({
             key: 'severity',
             label: 'Severity',
             nowrap: true,
-            cell: (row) => <StatusBadge status={row.severity}>{titleCase(row.severity)}</StatusBadge>,
+            cell: (row) => {
+                const badge = hsBadge('severity', row.severity);
+                return <StatusBadge variant={badge.variant}>{badge.label}</StatusBadge>;
+            },
         },
         {
             key: 'review',
@@ -539,21 +542,20 @@ function EventTable({
                 row.needs_review ? (
                     <StatusBadge variant="warning">Needs review</StatusBadge>
                 ) : (
-                    <StatusBadge variant="success">Current revision reviewed</StatusBadge>
+                    <StatusBadge variant="success">Reviewed</StatusBadge>
                 ),
         },
-        { key: 'revision', label: 'Source revision', nowrap: true, cell: (row) => row.source_revision },
     ];
     return (
         <RecordTable
-            title="Interventions"
+            title="Restraints"
             sub="Newest first · click a row to open it, right-click for more"
             columns={columns}
             rows={rows}
             rowKey={(row) => row.id}
             onOpen={onOpen}
             actionsFor={menuFor}
-            menuTitle={(row) => `${row.reference} · ${row.client.name}`}
+            menuTitle={(row) => `${row.client.name} · ${row.reference}`}
             menuIcon={ShieldAlert}
             empty={EMPTY}
             footer={footer}
@@ -582,11 +584,11 @@ function PlanTable({
         { key: 'person', label: 'Person', nowrap: true, cell: (row) => <RecordPerson name={row.client.name} /> },
         {
             key: 'practice',
-            label: 'Practice type',
+            label: 'Restraint type',
             nowrap: true,
             cell: (row) =>
                 row.restrictive_practice_type ? (
-                    titleCase(row.restrictive_practice_type)
+                    hsLabel('restraint_type', row.restrictive_practice_type)
                 ) : (
                     <span className="text-muted-foreground">Not recorded</span>
                 ),
@@ -617,13 +619,13 @@ function PlanTable({
         },
         {
             key: 'version',
-            label: 'Published version',
+            label: 'Approved version in use',
             nowrap: true,
             cell: (row) =>
                 row.published_version_id ? (
-                    'Published version recorded'
+                    'Yes'
                 ) : (
-                    <span className="text-muted-foreground">No retained published version</span>
+                    <span className="text-muted-foreground">None in use yet</span>
                 ),
         },
         {
@@ -640,7 +642,7 @@ function PlanTable({
                                 : 'neutral'
                         }
                     >
-                        {meta?.label ?? titleCase(row.status)}
+                        {meta?.label ?? hsLabel('plan_status', row.status)}
                     </StatusBadge>
                 );
             },
@@ -648,14 +650,14 @@ function PlanTable({
     ];
     return (
         <RecordTable
-            title="Behaviour-support plans"
-            sub="Open a plan to see if and how it was approved · approval applicability needs the individual record"
+            title="Behaviour support plans"
+            sub="Open a plan to see who approved it and when"
             columns={columns}
             rows={rows}
             rowKey={(row) => row.id}
             onOpen={onOpen}
             actionsFor={menuFor}
-            menuTitle={(row) => `${row.reference} · ${row.title}`}
+            menuTitle={(row) => `${row.title} · ${row.reference}`}
             menuIcon={FileText}
             empty={EMPTY}
             footer={footer}

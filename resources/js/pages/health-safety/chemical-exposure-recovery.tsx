@@ -1,4 +1,5 @@
 import { PageHeader, PageHeaderGlassButton, PageHeaderMeterBig, PageHeaderMeterBlock, PageHeaderMeterCaption, PageHeaderRail, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { SafetyFormDraftContext, useSafetyDraftState, useSafetyWorkspaceDrafts } from '@/hooks/use-safety-workspace-drafts';
@@ -42,6 +43,8 @@ function RecoveryWorkspace({ can }: Props) {
     const [cursors, setCursors] = useState({ staging: 0, cleanups: 0 }); const [nonce, setNonce] = useState(0);
     const [loadedKey, setLoadedKey] = useState<string | null>(null); const [busy, setBusy] = useState(false); const [uncertain, setUncertain] = useState(false);
     const [message, setMessage] = useState<string | null>(null); const request = useRef<AbortController | null>(null);
+    // A clean-up deletes stored bytes for good, so it asks first.
+    const [pendingCleanup, setPendingCleanup] = useState<{ kind: 'stage_cleanup' | 'removed_cleanup'; id: number } | null>(null);
     const allowed = can.inspect && !withdrawn; const key = `${cursors.staging}:${cursors.cleanups}:${nonce}`;
     const activeRows = loadedKey === key && allowed; const currentStages = activeRows ? stages : null; const currentCleanups = activeRows ? cleanups : null;
     useSafetyDraftState({ dirty: uncertain, busy, uncertain });
@@ -99,11 +102,17 @@ function RecoveryWorkspace({ can }: Props) {
                     <div className="flex flex-wrap gap-3">{view === 'staging' && <Button variant="outline" className="frontline-tap" disabled={busy || uncertain} onClick={() => void run('inspect', row.id)}>Check original upload acceptance</Button>}
                         {can.retry && view === 'staging' && 'accepted' in row && row.accepted && <Button variant="outline" className="frontline-tap" disabled={busy || uncertain} onClick={() => void run('bind', row.id)}>Reconnect accepted evidence</Button>}
                         {can.retry && row.can_retry && row.state !== 'cleaned' && <Button variant="outline" className="frontline-tap" disabled={busy || uncertain}
-                            onClick={() => void run(view === 'staging' ? 'stage_cleanup' : 'removed_cleanup', row.id)}>{view === 'staging' ? 'Clean unaccepted staged bytes' : 'Retry physical file cleanup'}</Button>}</div>
+                            onClick={() => setPendingCleanup({ kind: view === 'staging' ? 'stage_cleanup' : 'removed_cleanup', id: row.id })}>{view === 'staging' ? 'Clean unaccepted staged bytes' : 'Retry physical file cleanup'}</Button>}</div>
                 </li>)}</ul>)}
                 {allowed && activeRows && <nav aria-label="Recovery pages" className="flex flex-wrap gap-3">{cursors[view] > 0 && <Button variant="outline" className="frontline-tap" disabled={busy} onClick={() => setCursors((old) => ({ ...old, [view]: 0 }))}>First recovery page</Button>}
                     {(view === 'staging' ? currentStages : currentCleanups)?.next_cursor && <Button variant="outline" className="frontline-tap" disabled={busy} onClick={() => setCursors((old) => ({ ...old, [view]: (view === 'staging' ? currentStages : currentCleanups)!.next_cursor! }))}>Next recovery page</Button>}</nav>}
             </div>
+            <ConfirmDialog open={pendingCleanup !== null} onClose={() => setPendingCleanup(null)} processing={busy} variant="destructive"
+                title="Delete this stored file?" confirmText="Delete the file" cancelText="Keep it"
+                description={pendingCleanup?.kind === 'stage_cleanup'
+                    ? 'This deletes the stored copy of an upload that was never saved to the exposure record. The record’s history stays. This can’t be undone.'
+                    : 'This deletes the stored copy of a file already removed from the exposure record. The record’s history stays. This can’t be undone.'}
+                onConfirm={() => { const next = pendingCleanup; setPendingCleanup(null); if (next) void run(next.kind, next.id); }} />
         </PageLayout>
     </AppLayout>;
 }

@@ -104,13 +104,13 @@ const choose = async (name: string, value: string) => {
 const next = () =>
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 async function fillNew() {
-    await choose('Choose a Site', 'Approved Site');
+    await choose('Choose a site', 'Approved Site');
     await waitFor(() =>
         expect(
-            screen.queryByText('Checking current choices…'),
+            screen.queryByText('Loading options…'),
         ).not.toBeInTheDocument(),
     );
-    await choose('Choose a staff account or enter a name', 'Enter a name');
+    await choose('Choose a staff member or type a name', 'Enter a name');
     fireEvent.change(screen.getByLabelText("Person's name", { exact: false }), {
         target: { value: 'Recorded person' },
     });
@@ -201,18 +201,18 @@ it('retains the reviewed draft, version and command identity through wrong confi
     next();
     next();
     next();
-    fireEvent.change(screen.getByLabelText('First-aider notes'), {
+    fireEvent.change(screen.getByLabelText('First aider notes'), {
         target: { value: 'Retain this correction' },
     });
     next();
     fireEvent.click(screen.getByRole('button', { name: 'Save correction' }));
     expect(
-        await screen.findByText(/The save could not be confirmed/),
+        await screen.findByText(/We can’t tell if this saved\. Your entries are still here\. Check the record/),
     ).toBeInTheDocument();
     expect(screen.getByText('Retain this correction')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save correction' }));
     expect(
-        await screen.findByText(/Saving did not return confirmation/),
+        await screen.findByText(/You can try saving the same report again/),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save correction' }));
     await screen.findByText('Treatment record updated');
@@ -288,9 +288,9 @@ it('refreshes capture incidents for the explicit Client and Site, and opens the 
             onClose={() => {}}
         />,
     );
-    await choose('Choose a Site', 'Approved Site');
+    await choose('Choose a site', 'Approved Site');
     await choose('Choose a person type', 'Client');
-    await choose('Choose a Client', 'Approved Client');
+    await choose('Choose a client', 'Approved Client');
     await waitFor(() =>
         expect(vi.mocked(axios.get).mock.lastCall?.[1]?.params).toEqual({
             site_id: '2',
@@ -300,7 +300,7 @@ it('refreshes capture incidents for the explicit Client and Site, and opens the 
     );
     await waitFor(() =>
         expect(
-            screen.queryByText('Checking current choices…'),
+            screen.queryByText('Loading options…'),
         ).not.toBeInTheDocument(),
     );
     await choose('Choose the first aider', 'Current first aider');
@@ -317,7 +317,7 @@ it('refreshes capture incidents for the explicit Client and Site, and opens the 
     await choose('Choose an outcome', 'Returned to activity');
     next();
     await choose('Choose an existing incident', 'No incident selected');
-    expect(screen.getByLabelText('First-aider notes')).toBeInTheDocument();
+    expect(screen.getByLabelText('First aider notes')).toBeInTheDocument();
 });
 
 it('keeps edited content but disables a save after current edit authority is withdrawn', () => {
@@ -326,7 +326,7 @@ it('keeps edited content but disables a save after current edit authority is wit
     next();
     next();
     next();
-    fireEvent.change(screen.getByLabelText('First-aider notes'), {
+    fireEvent.change(screen.getByLabelText('First aider notes'), {
         target: { value: 'Keep after access changes' },
     });
     next();

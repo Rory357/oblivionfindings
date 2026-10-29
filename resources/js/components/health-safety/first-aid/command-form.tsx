@@ -21,7 +21,7 @@ import type {
 export const FIRST_AID_COMMAND_LABELS: Record<FirstAidCommand, string> = {
     edit: 'Edit treatment record',
     archive: 'Archive treatment record',
-    'link-incident': 'Connect an incident',
+    'link-incident': 'Link an incident',
     'add-followup': 'Add follow-up',
     'edit-followup': 'Edit follow-up',
     'complete-followup': 'Record follow-up outcome',
@@ -146,7 +146,7 @@ export function useFirstAidCommand<T extends FormDataType<T>>(
                     )
                 ) {
                     setFailure(
-                        'This change could not be confirmed. Your entries are still here. Check the record before trying again.',
+                        'We can’t tell if this saved. Your entries are still here. Check the record before trying again.',
                     );
                     return;
                 }
@@ -165,7 +165,7 @@ export function useFirstAidCommand<T extends FormDataType<T>>(
             onFinish: () => {
                 if (!responded)
                     setFailure(
-                        'The save could not be confirmed. Your entries are still here. Check the record before trying again.',
+                        'We can’t tell if this saved. Your entries are still here. Check the record before trying again.',
                     );
             },
         });
@@ -241,7 +241,7 @@ export function FirstAidCommandForm({
     ) {
         choices.unshift({
             value: String(followup.assigned_to.id),
-            label: `${followup.assigned_to.name} (recorded assignment)`,
+            label: `${followup.assigned_to.name} (currently assigned)`,
         });
     }
     return (
@@ -265,7 +265,7 @@ export function FirstAidCommandForm({
                           : null;
                 if (editingFollowup && form.data.due_at && !due) {
                     setFailure(
-                        'Choose a valid New Zealand due time and its clock occurrence if requested.',
+                        'Choose a due date and time. If the clocks change that night, choose which time you mean.',
                     );
                     return;
                 }
@@ -283,7 +283,7 @@ export function FirstAidCommandForm({
                         Date.parse(outcome) > Date.now())
                 ) {
                     setFailure(
-                        'Record the actual outcome time and result. An outcome cannot be in the future.',
+                        'Add when it was done and the result. The time can’t be in the future.',
                     );
                     return;
                 }
@@ -298,7 +298,7 @@ export function FirstAidCommandForm({
                     )
                 ) {
                     setFailure(
-                        'Choose an available incident or choose to create one.',
+                        'Choose an incident you can see, or choose to create one.',
                     );
                     return;
                 }
@@ -306,7 +306,7 @@ export function FirstAidCommandForm({
                     command === 'add-evidence' &&
                     (!form.data.file || form.data.file.size > 20 * 1024 * 1024)
                 ) {
-                    setFailure('Choose one supported file up to 20 MB.');
+                    setFailure('Choose one photo, PDF or Word file up to 20 MB.');
                     return;
                 }
                 form.transform((data) => ({
@@ -390,8 +390,9 @@ export function FirstAidCommandForm({
             </h2>
             {!allowed && (
                 <p role="alert" className="text-sm text-status-critical">
-                    This action is no longer available. Your entries remain here
-                    for you to review.
+                    You can’t do this now — the treatment record may have been
+                    archived, or your access has changed. Ask your health and
+                    safety manager. Your entries are still here.
                 </p>
             )}
             {editingFollowup && (
@@ -408,9 +409,9 @@ export function FirstAidCommandForm({
                     </Field>
                     <Field label="Follow-up owner">
                         <HazardStaffPicker
-                            searchLabel="Search available follow-up owners"
-                            listLabel="Available follow-up owners"
-                            emptyLabel="No available owners match this search."
+                            searchLabel="Search follow-up owners"
+                            listLabel="Follow-up owners"
+                            emptyLabel="No owners match this search."
                             value={form.data.assigned_to_user_id}
                             onChange={(value) =>
                                 form.setData('assigned_to_user_id', value)
@@ -476,13 +477,13 @@ export function FirstAidCommandForm({
                             onChange={(value) =>
                                 form.setData('outcome_kind', value)
                             }
-                            placeholder="No structured outcome"
+                            placeholder="No type"
                             options={[
                                 { value: 'action', label: 'Action' },
                                 { value: 'contact', label: 'Contact' },
                                 {
                                     value: 'claim_followup',
-                                    label: 'Claim follow-up',
+                                    label: 'ACC claim follow-up',
                                 },
                                 { value: 'observation', label: 'Observation' },
                             ]}
@@ -497,16 +498,16 @@ export function FirstAidCommandForm({
                                 disabled={form.processing}
                                 onClick={() => form.setData('outcome_kind', '')}
                             >
-                                Remove structured outcome
+                                Clear the type
                             </Button>
-                            <Field label="Recorded result" required>
+                            <Field label="Result" required>
                                 <SelectInput
                                     frontline
                                     value={form.data.outcome_result}
                                     onChange={(value) =>
                                         form.setData('outcome_result', value)
                                     }
-                                    placeholder="Choose the actual result"
+                                    placeholder="What was the result?"
                                     options={[
                                         {
                                             value: 'recorded',
@@ -600,7 +601,7 @@ export function FirstAidCommandForm({
                             (file) => file.availability === 'available',
                         ) && (
                             <p className="text-subtle">
-                                No available files are recorded here.
+                                No files attached yet.
                             </p>
                         )}
                     </fieldset>
@@ -614,12 +615,13 @@ export function FirstAidCommandForm({
                                 form.setData('completion_evidence_ids', [])
                             }
                         >
-                            Clear evidence selection
+                            Clear file selection
                         </Button>
                     )}
                     <p className="text-subtle">
-                        Record what actually happened. This does not send a
-                        message, submit a claim or record clinical clearance.
+                        Record what was done. Saving doesn’t send a message,
+                        lodge an ACC claim or confirm the person is medically
+                        cleared.
                     </p>
                 </>
             )}
@@ -656,14 +658,14 @@ export function FirstAidCommandForm({
                     {form.data.incident_mode === 'existing' && (
                         <Field label="Incident" required>
                             <HazardStaffPicker
-                                searchLabel="Search available incidents"
-                                listLabel="Available incidents"
-                                emptyLabel="No available incidents match this search."
+                                searchLabel="Search incidents"
+                                listLabel="Incidents"
+                                emptyLabel="No incidents match this search."
                                 value={form.data.related_incident_id}
                                 onChange={(value) =>
                                     form.setData('related_incident_id', value)
                                 }
-                                placeholder="Choose an available incident"
+                                placeholder="Choose an incident"
                                 options={pickers.incidents.map((item) => ({
                                     value: String(item.id),
                                     label: `${item.reference ?? `Incident ${item.id}`}${item.title ? ` · ${item.title}` : ''}`,
@@ -687,8 +689,8 @@ export function FirstAidCommandForm({
                         </Field>
                     )}
                     <p className="text-subtle">
-                        The incident uses this treatment's person and Site. Its
-                        ownership, review and closure remain separate.
+                        The incident is created for the same person and site.
+                        It has its own owner, review and close-off.
                     </p>
                 </>
             )}
@@ -721,7 +723,7 @@ export function FirstAidCommandForm({
                             </p>
                         </div>
                     )}
-                    <Field label="Evidence kind">
+                    <Field label="What kind of file is this?">
                         <SelectInput
                             frontline
                             value={form.data.kind}
@@ -752,18 +754,16 @@ export function FirstAidCommandForm({
             )}
             {command === 'remove-evidence' && (
                 <p className="text-sm">
-                    Remove {attachment?.original_name ?? 'this file'} from the
-                    available evidence? The recorded history is retained.
-                    Evidence used for a completed outcome cannot be removed
-                    here.
+                    Remove {attachment?.original_name ?? 'this file'}? It stays
+                    in the record’s history. A file used to close a follow-up
+                    can’t be removed.
                 </p>
             )}
             {command === 'archive' && (
                 <p className="text-sm">
-                    Archive this treatment record? Its history and evidence are
-                    retained. Each follow-up must have a recorded outcome first.
-                    Archiving does not close the linked incident or safety
-                    review.
+                    Archive this treatment record? Its history and files are
+                    kept. Every follow-up needs an outcome first. Archiving
+                    doesn’t close the linked incident or safety review.
                 </p>
             )}
             {(failure || Object.keys(form.errors).length > 0) && (

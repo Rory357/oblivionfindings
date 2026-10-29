@@ -33,7 +33,7 @@ it('shows a permitted plan separately when actual tracker location is restricted
     expect(
         screen.getByRole('group', { name: 'Planned place' }),
     ).toHaveTextContent('0, 0');
-    expect(screen.getByText('Location is restricted')).toBeInTheDocument();
+    expect(screen.getByText('Location hidden — you don’t have access')).toBeInTheDocument();
     expect(screen.queryByText('45, 46')).not.toBeInTheDocument();
 });
 it('uses each historical plan and never backfills the current plan into older events', () => {

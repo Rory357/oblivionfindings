@@ -30,13 +30,13 @@ it('uses the real shared context menu to open connected work and conceals medica
     render(<InjuryRegisterList rows={[row]} total={1} returnTo="/tasks?assigned=me" medical={false} />);
     fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 70, clientY: 100 });
     expect(screen.queryByRole('menuitem', { name: 'Recovery plans' })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Connected work' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Linked records' }));
     expect(io.get).toHaveBeenCalledWith('/health-safety/injuries/9?section=connections&return_to=%2Ftasks%3Fassigned%3Dme');
 });
 
 it('keeps unknown private counts distinct from healthy zero and preserves medically authorised source menus', () => {
     render(<InjuryRegisterList rows={[row]} total={1} returnTo="/health-safety/injuries" medical />);
-    expect(screen.getByText('Not confirmed plans · 0 assessments · 1 files')).toBeInTheDocument();
+    expect(screen.getByText('Plans not available · 0 checks · 1 file')).toBeInTheDocument();
     fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 70, clientY: 100 });
-    for (const name of ['Open injury', 'Connected work', 'Recovery plans', 'Assessments', 'Evidence', 'History']) expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
+    for (const name of ['Open injury', 'Linked records', 'Recovery plans', 'Fitness-for-work checks', 'Evidence', 'History']) expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
 });

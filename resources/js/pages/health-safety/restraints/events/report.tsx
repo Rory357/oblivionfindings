@@ -1,5 +1,5 @@
 /**
- * Record a restrictive intervention, or add a behaviour-support plan, as a
+ * Record a restraint, or add a behaviour support plan, as a
  * full page (approved H&S drawings pg-hsn-103, 103b). The capture forms are
  * unchanged — their fields, checks, prescoping (a Respite stay locks the
  * person and Site) and unsaved-draft guard all stay; this page only frames
@@ -69,8 +69,8 @@ export default function RestraintReport({
     const cancel = () => drafts.request(() => router.get(returnTo));
     const title =
         kind === 'plan'
-            ? 'Add behaviour-support plan'
-            : 'Record restrictive intervention';
+            ? 'Add behaviour support plan'
+            : 'Record a restraint';
     // The register crumb only when the person came from it (reporters may not have register access).
     const fromRegister = returnTo.startsWith(RESTRAINT_REGISTER);
     return (
@@ -85,7 +85,7 @@ export default function RestraintReport({
                               href: '/health-safety/registers',
                           },
                           {
-                              title: 'Restrictive interventions',
+                              title: 'Restraints',
                               href: returnTo,
                           },
                       ]
@@ -105,10 +105,10 @@ export default function RestraintReport({
                             title={title}
                             subline={
                                 capture_context
-                                    ? 'Record facts for this person’s current Respite stay. Review and approval retain their own permissions.'
+                                    ? 'Record what happened during this person’s respite stay · it’s reviewed afterwards by someone allowed to review restraints'
                                     : kind === 'plan'
                                       ? 'Saves a draft · review and approval happen on the plan’s own page'
-                                      : 'Record actual facts, then continue each review and approval in its own workspace.'
+                                      : 'Record what happened · it’s reviewed afterwards on its own page'
                             }
                             rail={
                                 can.create_plan ? (
@@ -116,12 +116,12 @@ export default function RestraintReport({
                                         items={[
                                             {
                                                 key: 'event',
-                                                label: 'Intervention',
+                                                label: 'Restraint',
                                                 icon: ShieldAlert,
                                             },
                                             {
                                                 key: 'plan',
-                                                label: 'Behaviour-support plan',
+                                                label: 'Behaviour support plan',
                                                 icon: BookOpen,
                                             },
                                         ]}
@@ -139,7 +139,7 @@ export default function RestraintReport({
                                                 });
                                             })
                                         }
-                                        ariaLabel="Safety capture type"
+                                        ariaLabel="What are you recording?"
                                     />
                                 ) : undefined
                             }

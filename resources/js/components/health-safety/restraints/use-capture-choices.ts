@@ -68,8 +68,8 @@ export function useCaptureChoices(
                 setFailure(
                     axios.isAxiosError(error) &&
                         [401, 403, 404].includes(error.response?.status ?? 0)
-                        ? 'Current access to this person is unavailable. Your factual entries remain here.'
-                        : 'The current choices could not be checked. Choose the person again to retry. Your factual entries remain here.',
+                        ? 'You can’t record for this person any more. Your entries are still here — ask your team leader if you need access.'
+                        : 'We couldn’t load the options for this person. Choose them again to retry. Your entries are still here.',
                 );
             }
         } finally {

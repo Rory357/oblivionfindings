@@ -304,6 +304,7 @@ it('keeps recovered physical cleanup pending until the actual result confirms it
     fireEvent.click(screen.getByRole('button', { name: 'View removal cleanups' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Retry physical file cleanup' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Retry physical file cleanup' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete the file' }));
     await waitFor(() => expect(screen.getByText(/recovery response is unconfirmed/)).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Retry physical file cleanup' })).toBeDisabled(); expect(screen.queryByText('File cleanup confirmed')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Check recorded recovery state' }));

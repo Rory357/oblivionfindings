@@ -30,12 +30,12 @@ export default function InjuryCreate({ capture, return_to }: { capture: InjuryCa
     }));
     return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: 'Report workplace injury', href: `${INJURY_REGISTER}/create` }]}>
         <Head title="Report workplace injury" /><SafetyFormDraftContext.Provider value={drafts.register}>
-            <PageLayout hero={<PageHeader variant="profile" title="Report workplace injury" backHref={returnTo} icon={HeartPulse} subline="Record what happened, then confirm the next handover"
+            <PageLayout hero={<PageHeader variant="profile" title="Report workplace injury" backHref={returnTo} icon={HeartPulse} subline="Tell us what happened, then choose who looks after it next"
                 actions={!open && capture.can.create ? <PageHeaderPrimaryButton icon={Plus} onClick={() => setOpen(true)}>Open injury form</PageHeaderPrimaryButton> : undefined}
                 strip={<PageHeaderStages steps={steps} ariaLabel="Injury report steps" />} />}>
                 <div className="grid min-w-0 gap-5">
-                    <Note icon={Info}>The recorded injury has its own page for its owner, recovery work, evidence and history.</Note>
-                    {!capture.can.create && <Note tone="warning" icon={AlertTriangle}><p role="alert">Reporting is no longer available with your current access.</p></Note>}
+                    <Note icon={Info}>Once saved, the injury gets its own page showing its owner, recovery plan, files and history.</Note>
+                    {!capture.can.create && <Note tone="warning" icon={AlertTriangle}><p role="alert">Reporting is no longer available with your current access. Ask your team leader or a health and safety manager to check your access.</p></Note>}
                 </div>
                 {open && <InjuryCommandForm key={`capture:${shared.auth.user.id}`} detail={null} command="create" actorId={shared.auth.user.id} capture={capture} returnTo={returnTo} onStepChange={onStepChange} onCancel={leave} onDone={(href) => { setOpen(false); router.get(href ? injuryReturn(href) : returnTo); }} />}
             </PageLayout>{drafts.confirmation}

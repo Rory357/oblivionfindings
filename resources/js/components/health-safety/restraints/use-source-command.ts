@@ -294,7 +294,7 @@ export function useSourceCommand<T extends FormDataType<T>>({
             )
                 setWithdrawn(true);
             setFailure(
-                'Current work could not be checked. Your entries remain here. Retry the check before saving.',
+                'We couldn’t load the latest version. Your entries are still here. Try again before saving.',
             );
         } finally {
             if (request.current === controller) {
@@ -369,7 +369,7 @@ export function useSourceCommand<T extends FormDataType<T>>({
                     )
                 )
                     setFailure(
-                        'Saving could not be confirmed. Your entries remain here. Check the record before trying again.',
+                        'We couldn’t tell if this saved. Your entries are still here. Open the record to check before you try again.',
                     );
             },
             onError: () => {
@@ -378,13 +378,13 @@ export function useSourceCommand<T extends FormDataType<T>>({
             onCancel: () => {
                 responded = true;
                 setFailure(
-                    'Saving was interrupted. Your entries remain here. Check the record before trying again.',
+                    'Saving was interrupted. Your entries are still here. Open the record to check before you try again.',
                 );
             },
             onFinish: () => {
                 if (!responded)
                     setFailure(
-                        'Saving could not be confirmed. Your entries remain here. Check the record before trying again.',
+                        'We couldn’t tell if this saved. Your entries are still here. Open the record to check before you try again.',
                     );
             },
         });

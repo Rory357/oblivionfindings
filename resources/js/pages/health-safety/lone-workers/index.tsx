@@ -6,6 +6,7 @@
  * sit side by side under the sessions. The coverage and safety caveats keep
  * the code's wording.
  */
+import { boardReportHref } from '@/lib/health-safety/board-reports';
 import {
     canonicalControlRoomAlertId,
     type Alert,
@@ -324,8 +325,8 @@ export default function LoneWorkersIndex({
                 <Link href="/health-safety/analytics">Safety trends</Link>
             </Button>
             <Button asChild variant="outline" size="sm">
-                <Link href="/health-safety/reports/board-summary">
-                    Board summary
+                <Link href={boardReportHref('board')}>
+                    Board safety summary
                 </Link>
             </Button>
         </>

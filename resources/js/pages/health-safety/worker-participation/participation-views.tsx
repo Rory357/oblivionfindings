@@ -4,7 +4,7 @@
  * and held with their loose ends), consultations as a table with where each
  * is up to. Every record keeps its kebab and right-click menu from the page's
  * one actionsFor list (eligibility stays there), and opens its detail dialog.
- * Site ownership that isn't confirmed is always said, never hidden.
+ * A record whose site hasn't been checked always says so, never hidden.
  */
 import {
     RecordIdentity,
@@ -30,14 +30,20 @@ import {
     type RepRow,
 } from '@/components/worker-participation/shared';
 import { formatDate, formatDateOnly, formatTime } from '@/lib/datetime';
-import { titleCase } from '@/pages/health-safety/components/register-row-kit';
 import { MessageSquare } from 'lucide-react';
 import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { participationMenu, type ParticipationActions } from './participation-cards';
+import {
+    consultationStatusLabel,
+    electionMethodLabel,
+    meetingStatusLabel,
+    participationMenu,
+    repStatusLabel,
+    type ParticipationActions,
+} from './participation-cards';
 
 type OnContext<T> = (event: ReactMouseEvent, kind: string, row: T, tag: string, meta: string) => void;
 
-const SITE_UNCONFIRMED = 'Site ownership not confirmed';
+const SITE_UNCONFIRMED = 'Site not checked — confirm which site this belongs to';
 
 function plural(n: number, one: string, many = `${one}s`): string {
     return `${n} ${n === 1 ? one : many}`;
@@ -67,7 +73,7 @@ export function RepresentativeCards({
         <div className="grid gap-3">
             <PeopleCards
                 title="Health and safety representatives"
-                sub="Elected and appointed representatives"
+                sub="Elected, appointed or volunteer representatives"
                 cols={3}
                 items={rows.map((r) => {
                     const name = r.user?.name ?? 'Representative not recorded';
@@ -81,7 +87,7 @@ export function RepresentativeCards({
                         sub: [
                             unconfirmed ? null : (r.site?.name ?? 'Site not recorded'),
                             r.work_group ?? 'Work group not recorded',
-                            inactive ? (titleCase(r.status) || 'Status not recorded').toLowerCase() : null,
+                            inactive ? repStatusLabel(r.status).toLowerCase() : null,
                         ]
                             .filter(Boolean)
                             .join(' · '),
@@ -91,16 +97,16 @@ export function RepresentativeCards({
                             </StatusBadge>
                         ) : below ? (
                             <StatusBadge variant="warning" size="sm">
-                                Training under 2 days
+                                Under 2 training days
                             </StatusBadge>
                         ) : inactive ? (
                             <StatusBadge variant={REP_STATUS[r.status] ?? 'neutral'} size="sm">
-                                {titleCase(r.status) || 'Status not recorded'}
+                                {repStatusLabel(r.status)}
                             </StatusBadge>
                         ) : undefined,
                         foot: (
                             <>
-                                {r.election_method ? titleCase(r.election_method) : 'Election method not recorded'}{' '}
+                                {electionMethodLabel(r.election_method)}{' '}
                                 {formatDateOnly(r.elected_at, 'date not recorded')} ·{' '}
                                 <b>
                                     {recorded
@@ -112,7 +118,7 @@ export function RepresentativeCards({
                         onOpen: () => onOpen(r.id),
                         menu: participationMenu(actionsFor('representative', r)),
                         onContextMenu: (event) =>
-                            onContext(event, 'representative', r, r.status.toUpperCase(), `${name} · ${r.site?.name ?? ''}`),
+                            onContext(event, 'representative', r, repStatusLabel(r.status), `${name} · ${r.site?.name ?? ''}`),
                     };
                 })}
             />
@@ -135,10 +141,10 @@ function meetingItem(
     const missingMinutes = m.status === 'completed' && !m.minutes_document_path;
     const loose = [
         m.site_ownership === 'unconfirmed' ? SITE_UNCONFIRMED : null,
-        m.actions_due_count > 0 ? plural(m.actions_due_count, 'action') + ' open' : null,
-        missingMinutes ? 'Minutes missing' : null,
+        m.actions_due_count > 0 ? plural(m.actions_due_count, 'action') + ' still to do' : null,
+        missingMinutes ? 'No minutes uploaded' : null,
         m.status === 'cancelled' ? 'Cancelled' : null,
-        m.minutes_document_path ? 'Minutes filed' : null,
+        m.minutes_document_path ? 'Minutes uploaded' : null,
     ].filter(Boolean);
     return {
         key: m.id,
@@ -159,7 +165,7 @@ function meetingItem(
         ].join(' · '),
         action: { label: 'View', onClick: () => onOpen(m.id) },
         menu: participationMenu(actionsFor('meeting', m)),
-        onContextMenu: (event) => onContext(event, 'meeting', m, m.status.toUpperCase(), name),
+        onContextMenu: (event) => onContext(event, 'meeting', m, meetingStatusLabel(m.status), name),
     };
 }
 
@@ -193,9 +199,9 @@ export function MeetingLogs({
                     <QuietLine title="Coming up" text="No meetings scheduled in this view." />
                 )}
                 {held.length ? (
-                    <Log title="Held" sub="Completed or cancelled, with each one’s loose ends" items={held.map(item)} limit={held.length} />
+                    <Log title="Held" sub="Held or cancelled meetings, and anything still to do" items={held.map(item)} limit={held.length} />
                 ) : (
-                    <QuietLine title="Held" text="No completed or cancelled meetings in this view." />
+                    <QuietLine title="Held" text="No held or cancelled meetings in this view." />
                 )}
             </SideBySide>
             {footer ? <div className="flex flex-wrap items-center justify-between gap-3">{footer}</div> : null}
@@ -241,7 +247,7 @@ export function ConsultationTable({
             cell: (c) => {
                 const status = CONSULT_STATUS[c.status];
                 const stage = CONSULT_ORDER[c.status];
-                const label = status?.label ?? (titleCase(c.status) || 'Status not recorded');
+                const label = consultationStatusLabel(c.status);
                 return stage ? (
                     <StageDots
                         stage={stage}
@@ -250,7 +256,7 @@ export function ConsultationTable({
                         tone={status?.tone === 'warning' ? 'warning' : status?.tone === 'success' ? 'success' : undefined}
                     />
                 ) : (
-                    <span className="text-muted-foreground">{label} · stage not confirmed</span>
+                    <span className="text-muted-foreground">{label} · stage not known</span>
                 );
             },
         },
@@ -260,18 +266,18 @@ export function ConsultationTable({
             nowrap: true,
             cell: (c) =>
                 c.document_path || c.outcome_document_path ? (
-                    [c.document_path ? 'Document' : null, c.outcome_document_path ? 'outcome' : null]
+                    [c.document_path ? 'Consultation document' : null, c.outcome_document_path ? 'outcome document' : null]
                         .filter(Boolean)
                         .join(' · ')
                 ) : (
-                    <span className="text-muted-foreground">None recorded</span>
+                    <span className="text-muted-foreground">None added yet</span>
                 ),
         },
     ];
     return (
         <RecordTable
             title="Consultations"
-            sub="Feedback, then outcome, then close · right-click a row for its options"
+            sub="Steps: get feedback, record the outcome, then close · right-click a row for more options"
             columns={columns}
             rows={rows}
             rowKey={(c) => c.id}

@@ -166,7 +166,7 @@ it('preserves an untouched plan by omission and sends explicit null only when it
     expect(onSaved).toHaveBeenCalledOnce();
     fireEvent.change(
         screen.getByRole('combobox', {
-            name: 'Choose a planned location source',
+            name: 'Choose how to set the planned location',
         }),
         { target: { value: 'none' } },
     );
@@ -190,7 +190,7 @@ it('retains planned coordinates and exact retry identity after an uncertain save
     );
     fireEvent.change(
         screen.getByRole('combobox', {
-            name: 'Choose a planned location source',
+            name: 'Choose how to set the planned location',
         }),
         { target: { value: 'manual' } },
     );
@@ -204,7 +204,7 @@ it('retains planned coordinates and exact retry identity after an uncertain save
     );
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(screen.getByRole('alert')).toHaveTextContent(
-        'could not be confirmed',
+        'can’t tell if this saved',
     );
     const first = state.submit.mock.calls[0][2];
     expect(first.planned_location).toMatchObject({
@@ -273,7 +273,7 @@ it.each(['wrong', 'interrupted'] as const)(
             screen.getByRole('button', { name: 'Record check-in' }),
         );
         expect(screen.getByRole('alert')).toHaveTextContent(
-            'could not be confirmed',
+            'can’t tell if this saved',
         );
         expect(
             screen.getByRole('textbox', { name: 'Check-in notes' }),

@@ -16,6 +16,7 @@ import {
 import {
     deliveryLabel,
     observationLabel,
+    responseStatusLabel,
     sessionClock,
     SessionCheckIns,
     SessionConnections,
@@ -27,7 +28,6 @@ import {
     SessionResponse,
     sessionStarter,
     SessionTrackerRing,
-    words,
 } from '@/components/health-safety/lone-workers/session-panels';
 import type {
     LinkedRecord,
@@ -52,7 +52,7 @@ import {
     type PageHeaderNextStep,
     type PageHeaderStage,
 } from '@/components/page/page-header-strip';
-import { SideColumn, Surface } from '@/components/signature/blocks';
+import { Note, SideColumn, Surface } from '@/components/signature/blocks';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -74,6 +74,7 @@ import {
     BellRing,
     CheckCircle2,
     Clock,
+    Info,
     MapPin,
     MoreHorizontal,
     Pencil,
@@ -92,7 +93,7 @@ const SECTIONS = [
     { key: 'response', label: 'Response' },
     { key: 'location', label: 'Location' },
     { key: 'history', label: 'History' },
-    { key: 'connections', label: 'Connected work' },
+    { key: 'connections', label: 'Linked records' },
 ] as const;
 const COMMAND_ICONS: Record<SessionCommand, LucideIcon> = {
     edit: Pencil,
@@ -177,8 +178,8 @@ export default function LoneWorkerShow({
         : d.status === 'completed'
           ? 'Ended'
           : d.is_check_in_overdue
-            ? 'Checkpoint overdue'
-            : 'Session active';
+            ? 'Check-in overdue'
+            : 'Active';
     const worker = d.worker?.name ?? null;
     const base = d.started_at;
     const response: LinkedRecord | null = d.connections.control_room[0] ?? null;
@@ -206,7 +207,7 @@ export default function LoneWorkerShow({
                       value: sessionClock(
                           d.next_check_in_at,
                           base,
-                          'Unknown',
+                          'Not known',
                       ),
                       label: 'Next check-in',
                       tone: overdue ? ('critical' as const) : undefined,
@@ -246,7 +247,7 @@ export default function LoneWorkerShow({
     const canPanic = allowed.includes('panic');
     const doNext = [
         canCheckIn ? 'Record a check-in' : null,
-        canPanic ? (canCheckIn ? 'or request help' : 'Request help') : null,
+        canPanic ? (canCheckIn ? 'or ask for help' : 'Ask for help') : null,
     ]
         .filter(Boolean)
         .join(' ');
@@ -281,7 +282,7 @@ export default function LoneWorkerShow({
                 state: state(0),
             },
             {
-                label: 'Sent',
+                label: 'Sent to control room',
                 meta: deliveryLabel(delivery),
                 state: state(1),
                 tone:
@@ -291,7 +292,7 @@ export default function LoneWorkerShow({
                 ? [
                       {
                           label: 'Responder',
-                          meta: assigned ?? 'Needs an owner',
+                          meta: assigned ?? 'Needs a responder',
                           state: state(2),
                           tone: 'critical' as const,
                       },
@@ -315,27 +316,27 @@ export default function LoneWorkerShow({
                 : [
                       {
                           label: 'Response',
-                          meta: 'Not available to view here',
+                          meta: 'You can’t see the response from here',
                           state: sent ? ('now' as const) : ('todo' as const),
                           tone: 'warning' as const,
                       },
                   ]),
         ];
         const reference = response
-            ? (response.reference_number ?? `Response ${response.id}`)
+            ? (response.reference_number ?? 'Control room response')
             : null;
         next = response
             ? {
                   label: 'Next step · now',
                   tone: 'critical',
                   text: !assigned
-                      ? 'The control room response needs a responder'
+                      ? 'The control room needs to send someone'
                       : !response.acknowledged_at
-                        ? `${assigned} acknowledges the response`
-                        : 'The control room resolves the response',
+                        ? `Waiting for ${assigned} to acknowledge`
+                        : 'Waiting for the control room to close it off',
                   meta: [
                       reference,
-                      words(response.status ?? 'unknown').toLowerCase(),
+                      responseStatusLabel(response.status),
                       d.emergency_notes,
                   ]
                       .filter(Boolean)
@@ -345,7 +346,7 @@ export default function LoneWorkerShow({
                   label: 'Help requested',
                   tone: 'critical',
                   text: deliveryLabel(delivery),
-                  meta: 'No response record is available to view here. This does not confirm whether a response exists or someone is attending.',
+                  meta: 'You can’t see the control room’s response from here. That doesn’t mean nobody is coming — phone the control room to check.',
               };
     } else if (ended) {
         steps = [
@@ -358,7 +359,7 @@ export default function LoneWorkerShow({
             },
         ];
     } else {
-        const nextDue = sessionClock(d.next_check_in_at, base, 'Unknown');
+        const nextDue = sessionClock(d.next_check_in_at, base, 'Not known');
         steps = [
             { label: 'Started', meta: startedMeta, state: 'done' },
             ...(received
@@ -463,7 +464,9 @@ export default function LoneWorkerShow({
                 },
             ]}
         >
-            <Head title={`${d.reference} · Lone-worker safety`} />
+            <Head
+                title={`${worker ? `Lone-worker session — ${worker}` : `Lone-worker session ${d.reference}`} · Lone-worker safety`}
+            />
             <SafetyFormDraftContext.Provider value={drafts.register}>
                 <PageLayout
                     hero={
@@ -563,7 +566,7 @@ export default function LoneWorkerShow({
                                                 icon={Siren}
                                             >
                                                 <Link href={continueResponse.href}>
-                                                    Continue response
+                                                    Open in control room
                                                 </Link>
                                             </PageHeaderPrimaryButton>
                                         ) : primaryCommand ? (
@@ -620,6 +623,17 @@ export default function LoneWorkerShow({
                             tabIndex={-1}
                             className="grid min-w-0 gap-5 outline-none"
                         >
+                            {!command &&
+                            !glass.length &&
+                            !more.length &&
+                            !primaryCommand &&
+                            !continueResponse ? (
+                                <Note icon={Info}>
+                                    {ended
+                                        ? 'This session has ended, so nothing more can be recorded on it.'
+                                        : 'You can’t change this session. The worker on it, or someone who manages lone-worker safety, can check in, ask for help or end it — ask your team leader if something needs doing.'}
+                                </Note>
+                            ) : null}
                             {main}
                         </div>
                         <aside

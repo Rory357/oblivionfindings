@@ -11,6 +11,7 @@
  * fmtDateTime. All endpoints redirect()->back(), so a mutation just needs
  * { preserveScroll, onSuccess: () => setAction(null) } — Inertia re-renders the
  * detail prop while ?representative= is in the URL. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -103,6 +104,9 @@ export function RepresentativeDetailDialog({
     // The dialog is keyed by representative id in the list, so it mounts fresh on
     // each open — the right-click menu uses initialAction to land on a pane.
     const [section, setSection] = useState<SectionKey>('overview');
+    // Standing a representative down asks first.
+    const [confirmStandDown, setConfirmStandDown] = useState(false);
+    const [standingDown, setStandingDown] = useState(false);
     const [action, setAction] = useState<WpDetailAction | null>(
         initialAction === 'edit' || initialAction === 'training'
             ? initialAction
@@ -180,15 +184,9 @@ export function RepresentativeDetailDialog({
                     size="sm"
                     variant="outline"
                     className="text-status-critical hover:text-status-critical"
-                    onClick={() =>
-                        router.put(
-                            `${WP_BASE}/representatives/${d.id}`,
-                            { status: 'inactive' },
-                            { preserveScroll: true },
-                        )
-                    }
+                    onClick={() => setConfirmStandDown(true)}
                 >
-                    <Slash className="mr-1.5 h-4 w-4" /> Mark stood-down
+                    <Slash className="mr-1.5 h-4 w-4" /> No longer a representative
                 </Button>
             ) : (
                 <Button
@@ -248,6 +246,23 @@ export function RepresentativeDetailDialog({
                     {section === 'history' ? <HistorySection d={d} /> : null}
                 </>
             )}
+            <ConfirmDialog
+                open={confirmStandDown}
+                onClose={() => { if (!standingDown) setConfirmStandDown(false); }}
+                onConfirm={() => {
+                    setStandingDown(true);
+                    router.put(`${WP_BASE}/representatives/${d.id}`, { status: 'inactive' }, {
+                        preserveScroll: true,
+                        onFinish: () => { setStandingDown(false); setConfirmStandDown(false); },
+                    });
+                }}
+                processing={standingDown}
+                variant="destructive"
+                title="No longer a representative?"
+                description={`${d.user?.name ?? 'This person'} will show as no longer a health and safety representative${d.site?.name ? ` for ${d.site.name}` : ''}. The site may show as having no representative until someone else is added. You can make them active again later.`}
+                confirmText="No longer a representative"
+                cancelText="Keep as representative"
+            />
         </WizardShell>
     );
 }

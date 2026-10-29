@@ -130,10 +130,10 @@ export function PlannedLocationFields({
         <section aria-label="Planned location" className="space-y-4">
             <h3 className="font-semibold">Planned location</h3>
             <p className="text-subtle">
-                An intended place for this work. This is separate from a
-                recorded check-in position or live GPS.
+                Where the work is meant to happen. This isn’t a check-in or a
+                live GPS location.
             </p>
-            <Field label="Location source">
+            <Field label="How do you want to set it?">
                 <SelectInput
                     frontline
                     value={value.method || 'none'}
@@ -144,7 +144,7 @@ export function PlannedLocationFields({
                                 : (method as PlannedLocationDraft['method']),
                         )
                     }
-                    placeholder="Choose a planned location source"
+                    placeholder="Choose how to set the planned location"
                     options={[
                         { value: 'none', label: 'No planned location' },
                         { value: 'manual', label: 'Enter coordinates' },
@@ -155,7 +155,7 @@ export function PlannedLocationFields({
                         },
                         {
                             value: 'site_address',
-                            label: 'Use Site address',
+                            label: 'Use site address',
                             disabled: !site?.address,
                         },
                         {
@@ -278,13 +278,12 @@ export function PlannedLocationFields({
                             >
                                 Use current{' '}
                                 {value.method === 'site_address'
-                                    ? 'Site'
+                                    ? 'site'
                                     : 'shift'}{' '}
                                 address
                             </Button>
                             <p className="text-subtle">
-                                Choosing this source records its current
-                                approved address when you save.
+                                We’ll save the address as it is now.
                             </p>
                         </>
                     )}
@@ -388,8 +387,8 @@ function PlannedAddressLookup({
             )}
             {results && !results.length && (
                 <p role="status" className="text-subtle">
-                    No map points found. Add a suburb or city, or choose Enter
-                    coordinates.
+                    No matching places found. Add a suburb or city, or choose
+                    Enter coordinates.
                 </p>
             )}
             {results && results.length > 0 && (

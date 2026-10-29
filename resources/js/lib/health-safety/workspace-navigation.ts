@@ -367,11 +367,11 @@ export const SAFETY_HUBS: SafetyHub[] = [
             },
             {
                 key: 'board',
-                label: 'Board assurance',
+                label: 'Board safety summary',
                 href: '/health-safety/reports?view=board',
                 icon: ShieldCheck,
                 description:
-                    'Review the safety summary prepared for governance.',
+                    'How we’re doing on health and safety, for the board.',
                 visible: assuranceReader,
             },
             {
@@ -384,16 +384,16 @@ export const SAFETY_HUBS: SafetyHub[] = [
             },
             {
                 key: 'action-traceability',
-                label: 'Corrective action traceability',
+                label: 'Actions and their safety reviews',
                 href: '/health-safety/reports?view=action-traceability',
                 icon: ListChecks,
                 description:
-                    'Trace actions back to the safety events they address.',
+                    'Each action and the safety review it came from.',
                 visible: assuranceReader,
             },
             {
                 key: 'risk-register',
-                label: 'Risk assessment register',
+                label: 'Risk assessment report',
                 href: '/health-safety/reports?view=risk-register',
                 icon: Target,
                 description: 'Review risk assessments for assurance.',

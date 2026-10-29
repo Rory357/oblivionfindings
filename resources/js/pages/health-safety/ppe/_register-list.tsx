@@ -1,8 +1,8 @@
 /**
  * PPE register tables (approved H&S drawings pg-hsn-120, 120b, 120c — Stephan 23 Oct 2026): equipment, equipment
  * issued and the catalogue, each as the drawn table block (`RecordTable`). Every row opens its record; its kebab and
- * right-click carry the same sections. Rows whose saved source needs repair stay listed with their facts withheld
- * and their actions limited to opening the record.
+ * right-click carry the same sections. Damaged rows stay listed with their details hidden and their actions limited
+ * to opening the record.
  *
  * `PpeRows` (card or table list) stays for the Site profile's PPE tab.
  */
@@ -25,6 +25,7 @@ import { router } from '@inertiajs/react';
 import { ClipboardCheck, FileText, HardHat, History, Package, Pencil, Plus, Power, UserRound, type LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { CatalogueCommand, CatalogueDisplayRow, CatalogueRow } from './_catalogue-state';
+import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import { catIcon, catLabel, condLabel, statusLabel, statusTone, type AllocationRow, type InventoryRow } from './ppe-shared';
 
 type NullableFacts<T> = { [K in keyof T]: T[K] | null };
@@ -54,12 +55,12 @@ export function PpeRows<T extends { id: number }>({ rows, total, title, caption,
 }
 
 const damaged = (row: { source_integrity?: string }) => row.source_integrity === 'repair_required';
-const repair = (row: { source_integrity?: string }) => damaged(row) ? <StatusBadge variant="warning">Source needs review</StatusBadge> : row.source_integrity === 'legacy_unknown' ? <StatusBadge variant="neutral">Earlier history not confirmed</StatusBadge> : null;
-const withheld = <span className="text-muted-foreground">Not confirmed</span>;
+const repair = (row: { source_integrity?: string }) => damaged(row) ? <StatusBadge variant="warning">Needs fixing — ask an administrator</StatusBadge> : row.source_integrity === 'legacy_unknown' ? <StatusBadge variant="neutral">Older record — some details weren’t kept</StatusBadge> : null;
+const withheld = <span className="text-muted-foreground">Hidden until fixed</span>;
+const HIDDEN_SUB = 'Details hidden until this record is fixed';
 const none = <span className="text-muted-foreground">—</span>;
 const EMPTY = <p role="status" className="sg-quiet px-4 py-6"><span>No records match these filters. Change the filters to find another record.</span></p>;
-/** The register says "Issued" for equipment out with a worker (the tab is "Issued equipment"). */
-const serviceLabel = (status: string | null) => (status === 'allocated' ? 'Issued' : statusLabel(status));
+const serviceLabel = (status: string | null) => statusLabel(status);
 const tone = (status: string | null): StatusVariant => statusTone(status);
 /** Whole NZ calendar days from today to a saved date (YYYY-MM-DD); null when there is no valid date. */
 function daysAhead(day: string | null): number | null {
@@ -97,25 +98,25 @@ const icon = (category: string | null | undefined) => {
 /** Equipment (pg-hsn-120): one row per inventory record. */
 export function PpeInventoryTable({ rows, total, returnTo, footer }: { rows: InventoryDisplayRow[]; total: number; returnTo: string; footer: ReactNode }) {
     const href = (row: InventoryDisplayRow, section?: PpeSection) => ppeHref('inventory', row.id, { returnTo, section });
-    const name = (row: InventoryDisplayRow) => damaged(row) ? `Equipment ${row.id} · source needs review` : row.ppe_type?.name ?? `Equipment ${row.id}`;
+    const name = (row: InventoryDisplayRow) => damaged(row) ? `Equipment record needs fixing · Ref ${row.id}` : row.ppe_type?.name ?? `Equipment · Ref ${row.id}`;
     const actions = (row: InventoryDisplayRow): MenuItem[] => [{ label: 'Open equipment', icon: Package, onClick: () => router.get(href(row)) },
-        ...(!damaged(row) ? [{ label: 'Issues and returns', icon: UserRound, onClick: () => router.get(href(row, 'allocations')) },
+        ...(!damaged(row) ? [{ label: 'Who’s had it', icon: UserRound, onClick: () => router.get(href(row, 'allocations')) },
             { label: 'Inspections', icon: ClipboardCheck, onClick: () => router.get(href(row, 'inspections')) },
-            { label: 'Evidence', icon: FileText, onClick: () => router.get(href(row, 'evidence')) }, { label: 'History', icon: History, onClick: () => router.get(href(row, 'history')) }] : [])];
+            { label: 'Files', icon: FileText, onClick: () => router.get(href(row, 'evidence')) }, { label: 'History', icon: History, onClick: () => router.get(href(row, 'history')) }] : [])];
     const fact = (row: InventoryDisplayRow, value: () => ReactNode) => damaged(row) ? withheld : value();
     const columns: RecordTableColumn<InventoryDisplayRow>[] = [
         { key: 'item', label: 'Item', className: 'min-w-[15rem]', cell: (row) => <div className="grid gap-1">
             <RecordIdentity leading={icon(damaged(row) ? null : row.ppe_type?.category)} title={name(row)}
-                sub={damaged(row) ? 'Saved facts withheld pending repair' : [row.brand, row.model, row.serial_number].filter(Boolean).join(' · ') || 'No identifying details recorded'} />
+                sub={damaged(row) ? HIDDEN_SUB : [row.brand, row.model, row.serial_number].filter(Boolean).join(' · ') || 'No identifying details recorded'} />
             {repair(row) ? <span className="pl-10">{repair(row)}</span> : null}</div> },
-        { key: 'site', label: 'Site and storage', nowrap: true, cell: (row) => fact(row, () => <RecordIdentity title={row.site?.name ?? 'Site unavailable'} sub={row.location ?? 'Storage not recorded'} />) },
+        { key: 'site', label: 'Site and storage', nowrap: true, cell: (row) => fact(row, () => <RecordIdentity title={row.site?.name ?? 'Site not available'} sub={row.location ?? 'Storage not recorded'} />) },
         { key: 'status', label: 'Status', nowrap: true, cell: (row) => fact(row, () => <StatusBadge variant={tone(row.status)}>{serviceLabel(row.status)}</StatusBadge>) },
         { key: 'quantity', label: 'Quantity', nowrap: true, cell: (row) => fact(row, () => row.quantity ?? 'Not recorded') },
         { key: 'condition', label: 'Condition', nowrap: true, cell: (row) => fact(row, () => condLabel(row.condition)) },
         { key: 'expiry', label: 'Expiry', nowrap: true, cell: (row) => fact(row, () => expiryCell(row)) },
         { key: 'inspection', label: 'Next inspection', nowrap: true, cell: (row) => fact(row, () => inspectionCell(row)) },
     ];
-    return <RecordTable title="Equipment" sub={`Showing ${rows.length} of ${total} · right-click a row for issues, returns, inspections, files or history`}
+    return <RecordTable title="Equipment" sub={`Showing ${rows.length} of ${total} · right-click a row for who’s had it, inspections, files or history`}
         ariaLabel="Matching equipment records" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
         actionsFor={actions} menuTitle={name} menuIcon={Package} empty={EMPTY} footer={footer} />;
 }
@@ -123,10 +124,10 @@ export function PpeInventoryTable({ rows, total, returnTo, footer }: { rows: Inv
 /** Equipment issued (pg-hsn-120b): open issues, oldest acknowledgement gaps visible. */
 export function PpeAllocationTable({ rows, total, returnTo, footer }: { rows: AllocationDisplayRow[]; total: number; returnTo: string; footer: ReactNode }) {
     const href = (row: AllocationDisplayRow, section?: PpeSection) => ppeHref('allocations', row.id, { returnTo, section });
-    const name = (row: AllocationDisplayRow) => damaged(row) ? `PPE issue ${row.id} · source needs review` : row.ppe_type?.name ?? `PPE issue ${row.id}`;
-    const actions = (row: AllocationDisplayRow): MenuItem[] => [{ label: 'Open PPE issue', icon: UserRound, onClick: () => router.get(href(row)) },
-        ...(!damaged(row) ? [{ label: 'Fit and training facts', icon: ClipboardCheck, onClick: () => router.get(href(row, 'fit-training')) },
-            { label: 'Evidence', icon: FileText, onClick: () => router.get(href(row, 'evidence')) }, { label: 'History', icon: History, onClick: () => router.get(href(row, 'history')) }] : [])];
+    const name = (row: AllocationDisplayRow) => damaged(row) ? `Issue record needs fixing · Ref ${row.id}` : row.ppe_type?.name ?? `Issued PPE · Ref ${row.id}`;
+    const actions = (row: AllocationDisplayRow): MenuItem[] => [{ label: 'Open', icon: UserRound, onClick: () => router.get(href(row)) },
+        ...(!damaged(row) ? [{ label: 'Fit test and training', icon: ClipboardCheck, onClick: () => router.get(href(row, 'fit-training')) },
+            { label: 'Files', icon: FileText, onClick: () => router.get(href(row, 'evidence')) }, { label: 'History', icon: History, onClick: () => router.get(href(row, 'history')) }] : [])];
     const fact = (row: AllocationDisplayRow, value: () => ReactNode) => damaged(row) ? withheld : value();
     // A respirator issued without a fit test on record is the one that needs someone: it reads as an amber badge.
     const training = (row: AllocationDisplayRow) => (row.training_completed ? 'Training done' : 'No training on record');
@@ -140,16 +141,16 @@ export function PpeAllocationTable({ rows, total, returnTo, footer }: { rows: Al
     const columns: RecordTableColumn<AllocationDisplayRow>[] = [
         { key: 'item', label: 'Item', className: 'min-w-[14rem]', cell: (row) => <div className="grid gap-1">
             <RecordIdentity leading={icon(damaged(row) ? null : row.ppe_type?.category)} title={name(row)}
-                sub={damaged(row) ? 'Saved facts withheld pending repair' : row.inventory_item?.serial_number ?? 'Serial number not recorded'} />
+                sub={damaged(row) ? HIDDEN_SUB : row.inventory_item?.serial_number ?? 'Serial number not recorded'} />
             {repair(row) ? <span className="pl-10">{repair(row)}</span> : null}</div> },
-        { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => fact(row, () => row.user?.name ? <RecordPerson name={row.user.name} /> : <span className="text-muted-foreground">Worker unavailable</span>) },
-        { key: 'site', label: 'Site', nowrap: true, cell: (row) => fact(row, () => row.inventory_item?.site?.name ?? 'Site unavailable') },
+        { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => fact(row, () => row.user?.name ? <RecordPerson name={row.user.name} /> : <span className="text-muted-foreground">Worker not available</span>) },
+        { key: 'site', label: 'Site', nowrap: true, cell: (row) => fact(row, () => row.inventory_item?.site?.name ?? 'Site not available') },
         { key: 'issued', label: 'Issued', nowrap: true, cell: (row) => fact(row, () => row.allocated_at ? <RecordIdentity title={formatDateOnly(toDateInput(row.allocated_at))} sub={formatTime(row.allocated_at)} /> : 'Not recorded') },
-        { key: 'ack', label: 'Acknowledged', nowrap: true, cell: (row) => fact(row, () => <StatusBadge variant={row.acknowledged ? 'success' : 'warning'}>{row.acknowledged ? 'Yes' : 'Not yet'}</StatusBadge>) },
+        { key: 'ack', label: 'Received', nowrap: true, cell: (row) => fact(row, () => <StatusBadge variant={row.acknowledged ? 'success' : 'warning'}>{row.acknowledged ? 'Yes' : 'Not yet confirmed'}</StatusBadge>) },
         { key: 'fit', label: 'Fit test · training', cell: (row) => fact(row, () => fitTraining(row)) },
     ];
-    return <RecordTable title="Equipment issued" sub={`Showing ${rows.length} of ${total} · Current suitability is not confirmed here · right-click a row for fit, training, files or history`}
-        ariaLabel="Matching PPE issues" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
+    return <RecordTable title="Equipment issued" sub={`Showing ${rows.length} of ${total} · check fit before use · right-click a row for fit test, training, files or history`}
+        ariaLabel="Matching issued equipment" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
         actionsFor={actions} menuTitle={name} menuIcon={UserRound} empty={EMPTY} footer={footer} />;
 }
 
@@ -159,24 +160,24 @@ const FREQUENCY: Record<string, string> = { daily: 'Inspect daily', weekly: 'Ins
 export function PpeCatalogueTable({ rows, canAdd, onCommand, onAdd }: { rows: CatalogueDisplayRow[]; canAdd: boolean; onCommand: (command: CatalogueCommand, type: CatalogueRow) => void; onAdd: () => void }) {
     const href = (row: CatalogueDisplayRow) => `/health-safety/ppe?tab=types&ppe_type_id=${row.id}`;
     const broken = (row: CatalogueDisplayRow): row is Extract<CatalogueDisplayRow, { source_integrity: 'repair_required' }> => row.source_integrity === 'repair_required';
-    const name = (row: CatalogueDisplayRow) => row.name ?? `Catalogue type ${row.id} · source needs review`;
-    const actions = (row: CatalogueDisplayRow): MenuItem[] => [{ label: 'View catalogue facts', icon: HardHat, onClick: () => router.get(href(row)) },
-        ...(!broken(row) && row.can.manage ? [{ label: 'Edit catalogue type', icon: Pencil, onClick: () => onCommand('update_type', row) },
-            { label: row.is_active ? 'Retire catalogue type' : 'Activate catalogue type', icon: Power, onClick: () => onCommand(row.is_active ? 'deactivate_type' : 'activate_type', row) }] : [])];
+    const name = (row: CatalogueDisplayRow) => row.name ?? `Equipment type needs fixing · Ref ${row.id}`;
+    const actions = (row: CatalogueDisplayRow): MenuItem[] => [{ label: 'View equipment type', icon: HardHat, onClick: () => router.get(href(row)) },
+        ...(!broken(row) && row.can.manage ? [{ label: 'Edit equipment type', icon: Pencil, onClick: () => onCommand('update_type', row) },
+            { label: row.is_active ? 'Stop using this type' : 'Start using this type again', icon: Power, onClick: () => onCommand(row.is_active ? 'deactivate_type' : 'activate_type', row) }] : [])];
     const details = (row: CatalogueRow) => <RecordIdentity title={row.description ?? 'Description not recorded'}
-        sub={[`Hazards: ${row.hazards_addressed ?? 'not recorded'}`, row.standards_reference ?? 'Standards reference not recorded',
-            row.inspection_frequency ? FREQUENCY[row.inspection_frequency] ?? `Inspect ${row.inspection_frequency}` : 'Inspection interval not recorded',
+        sub={[`Hazards: ${row.hazards_addressed ?? 'not recorded'}`, row.standards_reference ?? 'Standard not recorded',
+            row.inspection_frequency ? FREQUENCY[row.inspection_frequency] ?? `Inspect ${humaniseHsValue(row.inspection_frequency).toLowerCase()}` : 'Inspection interval not recorded',
             row.typical_lifespan_months == null ? 'Lifespan not recorded' : `Lasts about ${row.typical_lifespan_months} months`].join(' · ')} />;
     const columns: RecordTableColumn<CatalogueDisplayRow>[] = [
         { key: 'type', label: 'Type', className: 'min-w-[13rem]', cell: (row) => <div className="grid gap-1">
-            <RecordIdentity leading={icon(broken(row) ? null : row.category)} title={name(row)} sub={broken(row) ? 'Saved facts withheld pending repair' : catLabel(row.category)} />
+            <RecordIdentity leading={icon(broken(row) ? null : row.category)} title={name(row)} sub={broken(row) ? HIDDEN_SUB : catLabel(row.category)} />
             {repair(row) ? <span className="pl-10">{repair(row)}</span> : null}</div> },
-        { key: 'status', label: 'Status', nowrap: true, cell: (row) => broken(row) ? withheld : <StatusBadge variant={row.is_active ? 'neutral' : 'warning'}>{row.is_active ? 'Active' : 'Retired'}</StatusBadge> },
+        { key: 'status', label: 'Status', nowrap: true, cell: (row) => broken(row) ? withheld : <StatusBadge variant={row.is_active ? 'neutral' : 'warning'}>{row.is_active ? 'In use' : 'No longer used'}</StatusBadge> },
         { key: 'details', label: 'Details', className: 'min-w-[20rem]', cell: (row) => broken(row) ? withheld : details(row) },
-        { key: 'stock', label: 'In stock', nowrap: true, cell: (row) => row.inventory_count == null ? `Not confirmed · ${row.physical_inventory_count} saved rows` : `${row.inventory_count} at your sites` },
+        { key: 'stock', label: 'In stock', nowrap: true, cell: (row) => row.inventory_count == null ? 'Count not available' : `${row.inventory_count} at your sites` },
     ];
-    return <RecordTable title="Equipment types" sub={`${rows.length} ${rows.length === 1 ? 'type' : 'types'} · Shared across the organisation · Recorded references do not certify equipment`}
-        ariaLabel="Organisation catalogue types" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
+    return <RecordTable title="Equipment types" sub={`${rows.length} ${rows.length === 1 ? 'type' : 'types'} · Shared across the organisation`}
+        ariaLabel="Equipment types" columns={columns} rows={rows} rowKey={(row) => row.id} onOpen={(row) => router.get(href(row))}
         actions={canAdd ? <Button variant="outline" size="sm" onClick={onAdd}><Plus className="size-4" /> Add type</Button> : undefined}
         actionsFor={actions} menuTitle={name} menuIcon={HardHat} empty={EMPTY} />;
 }

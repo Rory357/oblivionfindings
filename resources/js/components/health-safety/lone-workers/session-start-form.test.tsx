@@ -96,12 +96,12 @@ beforeEach(() => {
 afterEach(cleanup);
 function chooseShift() {
     fireEvent.change(
-        screen.getByRole('combobox', { name: 'Choose an active shift' }),
+        screen.getByRole('combobox', { name: 'Choose a current shift' }),
         { target: { value: '12' } },
     );
 }
 function submit() {
-    fireEvent.click(screen.getByRole('button', { name: 'Start session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start working alone' }));
 }
 
 it('starts another fresh draft only after confirmation and fresh eligible options, with a new retry identity', async () => {
@@ -132,33 +132,33 @@ it('starts another fresh draft only after confirmation and fresh eligible option
     ).toHaveValue('2 Shift Road');
     fireEvent.change(
         screen.getByRole('combobox', {
-            name: 'Choose a planned location source',
+            name: 'Choose how to set the planned location',
         }),
         { target: { value: 'shift_address' } },
     );
     submit();
-    await screen.findByRole('link', { name: 'Open safety session' });
+    await screen.findByRole('link', { name: 'Open the session' });
     const first = state.post.mock.calls[0][1];
     expect(first.planned_location).toEqual({ method: 'shift_address' });
     fireEvent.click(
         screen.getByRole('button', { name: 'Start another session' }),
     );
     expect(await screen.findByRole('alert')).toHaveTextContent(
-        'next form could not be loaded',
+        'couldn’t load a new form',
     );
     expect(
-        screen.getByRole('link', { name: 'Open safety session' }),
+        screen.getByRole('link', { name: 'Open the session' }),
     ).toBeInTheDocument();
     fireEvent.click(
         screen.getByRole('button', { name: 'Start another session' }),
     );
-    await screen.findByRole('button', { name: 'Start session' });
+    await screen.findByRole('button', { name: 'Start working alone' });
     expect(
-        screen.getByRole('combobox', { name: 'Choose an active shift' }),
+        screen.getByRole('combobox', { name: 'Choose a current shift' }),
     ).toHaveValue('standalone');
     expect(
         screen.getByRole('combobox', {
-            name: 'Choose a planned location source',
+            name: 'Choose how to set the planned location',
         }),
     ).toHaveValue('none');
     chooseShift();
@@ -181,7 +181,7 @@ it('clears a source-bound plan when the selected source changes', () => {
     chooseShift();
     fireEvent.change(
         screen.getByRole('combobox', {
-            name: 'Choose a planned location source',
+            name: 'Choose how to set the planned location',
         }),
         { target: { value: 'shift_address' } },
     );
@@ -189,12 +189,12 @@ it('clears a source-bound plan when the selected source changes', () => {
         screen.getByRole('textbox', { name: 'Planned address or description' }),
     ).toHaveValue('2 Shift Road');
     fireEvent.change(
-        screen.getByRole('combobox', { name: 'Choose an active shift' }),
+        screen.getByRole('combobox', { name: 'Choose a current shift' }),
         { target: { value: 'standalone' } },
     );
     expect(
         screen.getByRole('combobox', {
-            name: 'Choose a planned location source',
+            name: 'Choose how to set the planned location',
         }),
     ).toHaveValue('none');
 });
@@ -220,7 +220,7 @@ it('derives the worker, Site and client from the reviewed shift and requires a m
     chooseShift();
     submit();
     expect(
-        await screen.findByRole('link', { name: 'Open safety session' }),
+        await screen.findByRole('link', { name: 'Open the session' }),
     ).toHaveAttribute(
         'href',
         '/health-safety/lone-workers/sessions/22?return_to=%2Fmy-day',
@@ -285,13 +285,13 @@ it.each([
     });
     submit();
     expect(await screen.findByRole('alert')).toHaveTextContent(
-        'could not be confirmed',
+        'can’t tell if the session started',
     );
     expect(screen.getByRole('textbox', { name: 'Activity' })).toHaveValue(
         'Visiting Aroha',
     );
     expect(
-        screen.queryByRole('link', { name: 'Open safety session' }),
+        screen.queryByRole('link', { name: 'Open the session' }),
     ).not.toBeInTheDocument();
     const first = state.post.mock.calls[0][1];
     submit();
@@ -313,7 +313,7 @@ it('does not submit an own session without an eligible shift', () => {
         />,
     );
     expect(
-        screen.getByRole('button', { name: 'Start session' }),
+        screen.getByRole('button', { name: 'Start working alone' }),
     ).toBeDisabled();
     expect(state.post).not.toHaveBeenCalled();
 });

@@ -62,7 +62,7 @@ export function SessionStartForm(props: SessionStartProps) {
                     const options = response.data;
                     if (!options?.can?.start) {
                         setRefreshError(
-                            'Starting another session is not currently available. You can still open the session you saved.',
+                            'You can’t start another session right now. You can still open the one you saved.',
                         );
                         return;
                     }
@@ -78,7 +78,7 @@ export function SessionStartForm(props: SessionStartProps) {
                 } catch {
                     if (!controller.signal.aborted)
                         setRefreshError(
-                            'The next form could not be loaded. Your saved session is recorded. Try Start another session again.',
+                            'We couldn’t load a new form. Your session is saved. Select Start another session to try again.',
                         );
                 } finally {
                     if (!controller.signal.aborted) setRefreshing(false);
@@ -153,14 +153,14 @@ function SessionStartEntry({
     if (createdId)
         return (
             <div className="space-y-4">
-                <h2 className="text-section-title">Safety session started</h2>
+                <h2 className="text-section-title">Working alone started</h2>
                 <p role="status" className="text-sm">
-                    LW-{createdId} is recorded. Open the session to review its
+                    The session is saved. Open the session to review its
                     check-ins and response.
                 </p>
                 <Button asChild className="frontline-tap">
                     <Link href={loneWorkerHref(createdId, { returnTo })}>
-                        Open safety session
+                        Open the session
                     </Link>
                 </Button>
                 {!own && (
@@ -205,7 +205,7 @@ function SessionStartEntry({
                     (!own && (!data.site_id || !data.user_id))
                 ) {
                     setError(
-                        'Choose the worker and approved Site or active shift, and a valid New Zealand expected end.',
+                        'Choose the worker, their site or current shift, and when they’re expected to finish.',
                     );
                     return;
                 }
@@ -253,7 +253,7 @@ function SessionStartEntry({
                         record?.id !== proof.id
                     ) {
                         setError(
-                            'Starting this session could not be confirmed. Your entries are still here. Check your sessions before retrying.',
+                            'We can’t tell if the session started. Your entries are still here. Check your sessions before trying again.',
                         );
                         return;
                     }
@@ -272,14 +272,14 @@ function SessionStartEntry({
                             : '';
                     setError(
                         message ||
-                            'The session could not be confirmed. Your entries are still here. Check your connection and try again.',
+                            'We can’t tell if the session started. Your entries are still here. Check your connection and try again.',
                     );
                 } finally {
                     setBusy(false);
                 }
             }}
         >
-            <h2 className="text-section-title">Start safety session</h2>
+            <h2 className="text-section-title">Start working alone</h2>
             <Field label="Linked shift" required={own}>
                 <SelectInput
                     frontline
@@ -287,27 +287,27 @@ function SessionStartEntry({
                     onChange={(value) =>
                         chooseShift(value === 'standalone' ? '' : value)
                     }
-                    placeholder="Choose an active shift"
+                    placeholder="Choose a current shift"
                     options={[
                         ...(!own
                             ? [
                                   {
                                       value: 'standalone',
-                                      label: 'Standalone session',
+                                      label: 'Not linked to a shift',
                                   },
                               ]
                             : []),
                         ...pickers.shifts.map((item) => ({
                             value: String(item.id),
-                            label: `${item.worker?.name ?? 'Your shift'} · ${pickers.sites.find((site) => site.id === item.site_id)?.name ?? 'Approved Site'} · Ends ${formatDateTimeLong(item.ends_at, 'not recorded')}`,
+                            label: `${item.worker?.name ?? 'Your shift'} · ${pickers.sites.find((site) => site.id === item.site_id)?.name ?? 'Your site'} · Ends ${formatDateTimeLong(item.ends_at, 'not recorded')}`,
                         })),
                     ]}
                 />
             </Field>
             {own && pickers.shifts.length === 0 && (
                 <p role="status" className="text-sm">
-                    No eligible active shift is available. Start your assigned
-                    shift before starting its safety session.
+                    You don’t have a shift in progress. Start your shift first,
+                    then start working alone.
                 </p>
             )}
             {!own && (
@@ -320,14 +320,14 @@ function SessionStartEntry({
                                 value={
                                     pickers.sites.find(
                                         (site) => site.id === shift.site_id,
-                                    )?.name ?? 'Approved Site'
+                                    )?.name ?? 'Your site'
                                 }
                             />
                         ) : (
                             <SelectInput
                                 frontline
                                 value={data.site_id}
-                                placeholder="Choose an approved Site"
+                                placeholder="Choose a site"
                                 onChange={(value) =>
                                     setData((current) => ({
                                         ...current,
@@ -468,9 +468,9 @@ function SessionStartEntry({
                 />
             </Field>
             <p className="text-subtle">
-                Starting sets the first checkpoint. A separate check-in records
-                contact with the worker. Starting or ending monitoring does not
-                change attendance.
+                Starting sets when the first check-in is due. Only a check-in
+                records contact with the worker. Starting or ending this doesn’t
+                clock anyone in or out.
             </p>
             <PlannedLocationFields
                 value={data.planned_location}
@@ -492,7 +492,7 @@ function SessionStartEntry({
                     type="submit"
                     disabled={busy || (own && !pickers.shifts.length)}
                 >
-                    {busy ? 'Starting…' : 'Start session'}
+                    {busy ? 'Starting…' : 'Start working alone'}
                 </Button>
                 <Button
                     className="frontline-tap"

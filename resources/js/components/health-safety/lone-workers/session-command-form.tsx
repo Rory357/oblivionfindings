@@ -23,9 +23,9 @@ export const SESSION_COMMAND_LABELS: Record<SessionCommand, string> = {
     edit: 'Edit session',
     'check-in': 'Record check-in',
     end: 'End session',
-    panic: 'Request help',
-    locate: 'Manage location refresh',
-    'acknowledge-panic': 'Acknowledge tracker panic',
+    panic: 'Ask for help',
+    locate: 'Get a new tracker location',
+    'acknowledge-panic': 'I’m handling the panic alert',
     remove: 'Remove ended session',
 };
 export const SESSION_COMMAND_SECTIONS: Record<SessionCommand, SessionSection> =
@@ -133,7 +133,7 @@ export function SessionCommandForm({
                         : null;
                 if (command === 'edit' && !instant) {
                     setFailure(
-                        'Choose a valid New Zealand expected end and its clock occurrence if requested.',
+                        'Choose when the work is expected to finish. If the clocks change that night, choose which time you mean.',
                     );
                     return;
                 }
@@ -215,7 +215,7 @@ export function SessionCommandForm({
                                 )
                             ) {
                                 setFailure(
-                                    'This change could not be confirmed. Your entries are still here. Check the session before trying again.',
+                                    'We can’t tell if this saved. Your entries are still here. Check the session before trying again.',
                                 );
                                 return;
                             }
@@ -234,7 +234,7 @@ export function SessionCommandForm({
                         onFinish: () => {
                             if (!responded)
                                 setFailure(
-                                    'The save could not be confirmed. Your entries are still here. Check the session before trying again.',
+                                    'We can’t tell if this saved. Your entries are still here. Check the session before trying again.',
                                 );
                         },
                     },
@@ -244,8 +244,10 @@ export function SessionCommandForm({
             <h2 className="text-section-title">{label}</h2>
             {!allowed && (
                 <p role="alert" className="text-sm text-status-critical">
-                    This action is no longer available. Your entries remain here
-                    so you can review them before returning to the session.
+                    You can’t do this now — the session may have changed (for
+                    example, it has ended) or your access has changed. Ask your
+                    health and safety coordinator if it still needs doing. Your
+                    entries are still here.
                 </p>
             )}
             {command === 'edit' && (
@@ -303,9 +305,8 @@ export function SessionCommandForm({
                         />
                     </Field>
                     <p className="text-subtle">
-                        Changing the schedule does not record a check-in. The
-                        worker, Site and linked shift remain part of the
-                        original session.
+                        Changing the times isn’t a check-in. The worker, site
+                        and shift stay the same.
                     </p>
                     <PlannedLocationFields
                         value={form.data.planned_location}
@@ -328,14 +329,14 @@ export function SessionCommandForm({
             )}
             {command === 'check-in' && (
                 <>
-                    <Field label="Worker's reported status" required>
+                    <Field label="How is the worker?" required>
                         <SelectInput
                             frontline
                             value={form.data.status}
                             onChange={(value) => form.setData('status', value)}
-                            placeholder="Choose the reported status"
+                            placeholder="Choose one"
                             options={[
-                                { value: 'ok', label: 'Reported OK' },
+                                { value: 'ok', label: 'OK' },
                                 {
                                     value: 'concern',
                                     label: 'Concern needs follow-up',
@@ -354,9 +355,8 @@ export function SessionCommandForm({
                         />
                     </Field>
                     <p className="text-subtle">
-                        The check-in will record the current time and the person
-                        submitting it. Use Request help if an emergency response
-                        is needed.
+                        The check-in saves the time now and your name. If
+                        someone needs emergency help, use Ask for help.
                     </p>
                 </>
             )}
@@ -376,36 +376,36 @@ export function SessionCommandForm({
                         />
                     </Field>
                     <p className="text-sm">
-                        This records a help request. Check its delivery and
-                        response on the session page. Follow your emergency
-                        procedure if immediate help is needed.
+                        This sends a help request. Check on the session page
+                        that it was sent and who is responding. If someone needs
+                        help now, follow your emergency procedure.
                     </p>
                 </>
             )}
             {command === 'end' && (
                 <p className="text-sm">
-                    This ends monitoring for this session. It does not clock the
-                    worker out, resolve an incident or complete a safety review.
+                    This ends working alone for this session. It doesn’t clock
+                    the worker out, close an incident or finish a safety review.
                 </p>
             )}
             {command === 'remove' && (
                 <p className="text-sm">
-                    Remove this ended session from the register. Its recorded
-                    safety history is retained.
+                    Remove this ended session from the list. Its safety history
+                    is kept.
                 </p>
             )}
             {command === 'locate' && (
                 <p className="text-sm">
-                    Continue to device management to confirm your identity and
-                    record the reason for a location refresh. Opening that page
-                    does not send a command or confirm a location.
+                    Next you’ll go to the device page to confirm it’s you and say
+                    why you need a new location. Nothing is sent to the tracker
+                    until you finish there.
                 </p>
             )}
             {command === 'acknowledge-panic' && (
                 <p className="text-sm">
-                    Acknowledge the tracker panic flag and its linked
-                    operational alert. This does not confirm worker safety,
-                    record a check-in or end the session.
+                    Confirm you’re dealing with the tracker’s panic alert and its
+                    control room alert. This doesn’t confirm the worker is safe,
+                    isn’t a check-in and doesn’t end the session.
                 </p>
             )}
             {(failure || Object.keys(form.errors).length > 0) && (

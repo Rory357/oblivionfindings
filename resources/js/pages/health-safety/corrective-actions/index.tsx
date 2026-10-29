@@ -1,5 +1,4 @@
 import {
-    EVENT_CATEGORY_LABELS,
     EventDetailDialog,
     type EventActionKey,
     type EventDetail,
@@ -44,6 +43,8 @@ import {
 } from '@/components/ui/popover';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Field, SelectInput } from '@/components/wizard/primitives';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { hsLabel } from '@/lib/health-safety/hs-labels';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateOnly, toDateInput } from '@/lib/datetime';
 import {
@@ -56,7 +57,6 @@ import {
     entityTone,
     FlagBadge,
     initials,
-    titleCase,
     TONE_BG,
     TONE_DOT,
 } from '@/pages/health-safety/components/register-row-kit';
@@ -194,10 +194,10 @@ type Props = {
 /* ------------------------------------------------------------------ */
 
 const PRI: Record<string, { tone: Tone; label: string }> = {
-    low: { tone: 'success', label: 'Low' },
-    medium: { tone: 'warning', label: 'Medium' },
-    high: { tone: 'critical', label: 'High' },
-    critical: { tone: 'critical', label: 'Critical' },
+    low: { tone: 'neutral', label: hsLabel('action_priority', 'low') },
+    medium: { tone: 'warning', label: hsLabel('action_priority', 'medium') },
+    high: { tone: 'warning', label: hsLabel('action_priority', 'high') },
+    critical: { tone: 'critical', label: hsLabel('action_priority', 'critical') },
 };
 
 const ACTION_STAGE: Record<
@@ -205,38 +205,38 @@ const ACTION_STAGE: Record<
     { label: string; variant: StatusVariant; icon: LucideIcon }
 > = {
     open: {
-        label: 'Open',
+        label: hsLabel('action_status', 'open'),
         variant: 'info',
         icon: ListChecks,
     },
     in_progress: {
-        label: 'In progress',
+        label: hsLabel('action_status', 'in_progress'),
         variant: 'info',
         icon: Activity,
     },
     completed: {
-        label: 'Awaiting verification',
+        label: hsLabel('action_status', 'completed'),
         variant: 'warning',
         icon: ShieldCheck,
     },
     verified: {
-        label: 'Verified',
+        label: hsLabel('action_status', 'verified'),
         variant: 'success',
         icon: CheckCircle2,
     },
     closed: {
-        label: 'Closed',
+        label: hsLabel('action_status', 'closed'),
         variant: 'neutral',
         icon: CheckCircle2,
     },
 };
 
 const EVENT_STAGE: Record<string, { label: string; icon: LucideIcon }> = {
-    open: { label: 'Open', icon: AlertTriangle },
-    investigating: { label: 'Investigating', icon: Search },
-    corrective_action: { label: 'Corrective action', icon: ListChecks },
-    monitoring: { label: 'Monitoring', icon: Activity },
-    closed: { label: 'Closed', icon: CheckCircle2 },
+    open: { label: hsLabel('review_status', 'open'), icon: AlertTriangle },
+    investigating: { label: hsLabel('review_status', 'investigating'), icon: Search },
+    corrective_action: { label: hsLabel('review_status', 'corrective_action'), icon: ListChecks },
+    monitoring: { label: hsLabel('review_status', 'monitoring'), icon: Activity },
+    closed: { label: hsLabel('review_status', 'closed'), icon: CheckCircle2 },
 };
 
 /** Parent-event category → icon + chip tint for the source-style cell, mirroring
@@ -309,6 +309,9 @@ export default function CorrectiveActionsIndex({
         actionId: number;
         pane: ActionPane;
     } | null>(null);
+    // Closing from the list menu asks first, the same as on the action's own page.
+    const [closing, setClosing] = useState<{ href: string; title: string } | null>(null);
+    const [closeBusy, setCloseBusy] = useState(false);
 
     // Board (default, pg-hsn-42) or the register List; the choice rides in the URL with the filters.
     const view: 'board' | 'list' =
@@ -512,11 +515,7 @@ export default function CorrectiveActionsIndex({
                     icon: <Lock className="h-3.5 w-3.5" />,
                     label: 'Close action',
                     onClick: () =>
-                        router.post(
-                            `${base}/close`,
-                            {},
-                            { preserveScroll: true },
-                        ),
+                        setClosing({ href: `${base}/close`, title: action.title }),
                 });
             }
         }
@@ -587,6 +586,25 @@ export default function CorrectiveActionsIndex({
             ]}
         >
             <Head title="Corrective actions" />
+            <ConfirmDialog
+                open={closing !== null}
+                onClose={() => { if (!closeBusy) setClosing(null); }}
+                frontline
+                processing={closeBusy}
+                variant="default"
+                title="Close this checked action?"
+                description={`This closes “${closing?.title ?? 'this action'}”. Closing the incident and its safety review are separate decisions.`}
+                confirmText="Close action"
+                cancelText="Keep it open"
+                onConfirm={() => {
+                    if (!closing) return;
+                    setCloseBusy(true);
+                    router.post(closing.href, {}, {
+                        preserveScroll: true,
+                        onFinish: () => { setCloseBusy(false); setClosing(null); },
+                    });
+                }}
+            />
 
             <div className="flex w-full max-w-full min-w-0 flex-col gap-5">
                 {/* ---- Header (pg-hsn-42) ---- */}
@@ -1289,9 +1307,7 @@ function ActionCard({
                                         {action.event.reference_number}
                                     </span>{' '}
                                     ·{' '}
-                                    {EVENT_CATEGORY_LABELS[
-                                        action.event.event_category
-                                    ] ?? titleCase(action.event.event_category)}
+                                    {hsLabel('review_category', action.event.event_category)}
                                     {action.event.site_name
                                         ? ` · ${action.event.site_name}`
                                         : ''}
@@ -1309,7 +1325,7 @@ function ActionCard({
                     </p>
                     <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                         <span className="inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {titleCase(action.action_type)}
+                            {hsLabel('action_type', action.action_type)}
                         </span>
                         {action.is_overdue ? (
                             <FlagBadge
@@ -1613,9 +1629,7 @@ export function ActionTable({
                                                     </span>
                                                 ) : null}
                                                 <span className="mt-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                    {titleCase(
-                                                        action.action_type,
-                                                    )}
+                                                    {hsLabel('action_type', action.action_type)}
                                                 </span>
                                             </span>
                                         </div>
@@ -1697,14 +1711,7 @@ export function ActionTable({
                                                         }
                                                     </span>
                                                     <span className="block truncate text-[11px] font-medium text-muted-foreground">
-                                                        {EVENT_CATEGORY_LABELS[
-                                                            action.event
-                                                                .event_category
-                                                        ] ??
-                                                            titleCase(
-                                                                action.event
-                                                                    .event_category,
-                                                            )}
+                                                        {hsLabel('review_category', action.event.event_category)}
                                                         {action.event.site_name
                                                             ? ` · ${action.event.site_name}`
                                                             : ''}

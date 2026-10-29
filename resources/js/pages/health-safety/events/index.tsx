@@ -1,5 +1,4 @@
 import {
-    EVENT_CATEGORY_LABELS,
     EventDetailDialog,
     worksafeLabel,
     type EventActionKey,
@@ -7,6 +6,8 @@ import {
     type EventSectionKey,
     type WorksafeState,
 } from '@/components/health-safety/event-detail-dialog';
+import { hsLabel, hsVariant } from '@/lib/health-safety/hs-labels';
+import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import {
     SafetyDateFilter,
     SafetyRegisterSearch,
@@ -43,7 +44,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     Table,
     TableBody,
@@ -62,10 +63,7 @@ import {
 } from '@/lib/datetime';
 import { safetyReviewHref } from '@/lib/health-safety/navigation';
 import { type Tone } from '@/pages/health-safety/components/hs-hero-kit';
-import {
-    FlagBadge,
-    titleCase,
-} from '@/pages/health-safety/components/register-row-kit';
+import { FlagBadge } from '@/pages/health-safety/components/register-row-kit';
 import { type SharedData } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
@@ -205,20 +203,6 @@ const STAGE_ORDER = [
     'monitoring',
     'closed',
 ] as const;
-const STAGE: Record<string, { label: string }> = {
-    open: { label: 'Open' },
-    investigating: { label: 'Investigating' },
-    corrective_action: { label: 'Corrective action' },
-    monitoring: { label: 'Monitoring' },
-    closed: { label: 'Closed' },
-};
-
-const SEVERITY_VARIANT: Record<string, StatusVariant> = {
-    low: 'success',
-    medium: 'warning',
-    high: 'critical',
-    critical: 'critical',
-};
 
 const SOURCE_OPTIONS = [
     { value: 'incidents', label: 'Incidents' },
@@ -247,26 +231,8 @@ const CATEGORY_OPTIONS = [
     'equipment_fault',
 ];
 
-/** The five governance board reports surfaced from the hero CTA popover. */
-const BOARD_REPORTS = [
-    { label: 'Board summary', href: '/health-safety/reports?view=board' },
-    {
-        label: 'WorkSafe register',
-        href: '/health-safety/reports?view=notifications',
-    },
-    {
-        label: 'Investigation outcomes',
-        href: '/health-safety/reports?view=investigation-outcomes',
-    },
-    {
-        label: 'Corrective-action traceability',
-        href: '/health-safety/reports?view=action-traceability',
-    },
-    {
-        label: 'Risk-assessment register',
-        href: '/health-safety/reports?view=risk-register',
-    },
-];
+/** The board reports surfaced from the hero menu (shared list and names). */
+const BOARD_REPORTS = boardReportLinks();
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -525,7 +491,7 @@ export default function HsEventsIndex({
             x: e.clientX || anchor.left,
             y: e.clientY || anchor.bottom,
             tag: sev.label.toUpperCase(),
-            meta: `${ev.reference_number} · ${EVENT_CATEGORY_LABELS[ev.event_category] ?? titleCase(ev.event_category)}`,
+            meta: `${ev.reference_number} · ${hsLabel('review_category', ev.event_category)}`,
             items,
         });
     };
@@ -628,7 +594,7 @@ export default function HsEventsIndex({
                                 <Popover>
                                     <PopoverTrigger asChild>
                                         <PageHeaderGlassButton icon={FileText}>
-                                            Reports
+                                            {BOARD_REPORTS_LABEL}
                                         </PageHeaderGlassButton>
                                     </PopoverTrigger>
                                     <PopoverContent
@@ -737,10 +703,7 @@ export default function HsEventsIndex({
                                                     (value) => ({
                                                         value,
                                                         label:
-                                                            EVENT_CATEGORY_LABELS[
-                                                                value
-                                                            ] ??
-                                                            titleCase(value),
+                                                            hsLabel('review_category', value),
                                                     }),
                                                 ),
                                             ]}
@@ -846,12 +809,10 @@ export default function HsEventsIndex({
                                                 <dd>
                                                     {filters.action_context
                                                         .priority
-                                                        ? titleCase(
-                                                              filters.action_context.priority.replaceAll(
-                                                                  ',',
-                                                                  ' / ',
-                                                              ),
-                                                          )
+                                                        ? filters.action_context.priority
+                                                              .split(',')
+                                                              .map((value) => hsLabel('action_priority', value))
+                                                              .join(' / ')
                                                         : 'All priorities'}
                                                 </dd>
                                             </div>
@@ -1046,7 +1007,7 @@ function reviewWhere(ev: EventRow): {
                 : undefined;
     return {
         stage: rank + 1,
-        label: STAGE[ev.status]?.label ?? titleCase(ev.status),
+        label: hsLabel('review_status', ev.status),
         note: waits.join(' · '),
         tone,
     };
@@ -1094,8 +1055,7 @@ export function EventTable({
                                 aria-label={`Open safety review ${ev.reference_number}`}
                             >
                                 {ev.reference_number} ·{' '}
-                                {EVENT_CATEGORY_LABELS[ev.event_category] ??
-                                    titleCase(ev.event_category)}
+                                {hsLabel('review_category', ev.event_category)}
                             </Button>
                             <Button
                                 variant="ghost"
@@ -1148,7 +1108,9 @@ export function EventTable({
                                     Severity
                                 </dt>
                                 <dd>
-                                    <StatusBadge status={ev.severity} />
+                                    <StatusBadge variant={hsVariant('severity', ev.severity)}>
+                                        {hsLabel('severity', ev.severity)}
+                                    </StatusBadge>
                                 </dd>
                             </div>
                             <div>
@@ -1157,11 +1119,8 @@ export function EventTable({
                                 </dt>
                                 <dd>
                                     <StatusBadge
-                                        status={ev.status}
-                                        label={
-                                            STAGE[ev.status]?.label ??
-                                            titleCase(ev.status)
-                                        }
+                                        variant={hsVariant('review_status', ev.status)}
+                                        label={hsLabel('review_status', ev.status)}
                                     />
                                 </dd>
                             </div>
@@ -1293,8 +1252,7 @@ export function EventTable({
                         {rows.map((ev) => {
                             const when = ev.occurred_at ?? ev.reported_at;
                             const category =
-                                EVENT_CATEGORY_LABELS[ev.event_category] ??
-                                titleCase(ev.event_category);
+                                hsLabel('review_category', ev.event_category);
                             const place = ev.client_name ?? ev.site_name;
                             const placeSub = ev.client_name
                                 ? ev.site_name
@@ -1370,13 +1328,9 @@ export function EventTable({
                                     </TableCell>
                                     <TableCell className="px-4 py-3">
                                         <StatusBadge
-                                            variant={
-                                                SEVERITY_VARIANT[ev.severity] ??
-                                                'neutral'
-                                            }
+                                            variant={hsVariant('severity', ev.severity)}
                                         >
-                                            {SEV[ev.severity]?.label ??
-                                                titleCase(ev.severity)}
+                                            {hsLabel('severity', ev.severity)}
                                         </StatusBadge>
                                     </TableCell>
                                     <TableCell className="px-4 py-3 whitespace-normal">

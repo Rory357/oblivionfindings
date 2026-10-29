@@ -6,6 +6,8 @@
  * itself, so they show only when every active assessment is on this page —
  * never a page-local count dressed as a total.
  */
+import { boardReportHref } from '@/lib/health-safety/board-reports';
+import { hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     RaRegisterTable,
     raMenuItems,
@@ -342,8 +344,8 @@ export default function RiskAssessmentsIndex({
                         ? null
                         : r.attached_to.name,
                     residual
-                        ? `${r.risk_level} → ${r.residual_risk_level}`
-                        : 'not scored after controls yet',
+                        ? `${hsLabel('risk_level', r.risk_level)} before controls → ${hsLabel('risk_level', r.residual_risk_level)} after`
+                        : 'Not rated after controls yet',
                     reviewWords(r),
                 ]
                     .filter(Boolean)
@@ -408,12 +410,11 @@ export default function RiskAssessmentsIndex({
                                         <PageHeaderGlassButton asChild>
                                             <a
                                                 href={
-                                                    '/health-safety/reports/risk-assessment-register?' +
-                                                    query()
+                                                    boardReportHref('risk-register')
                                                 }
-                                                aria-label="Export register"
+                                                aria-label="Open the risk assessment report"
                                             >
-                                                Export
+                                                Risk assessment report
                                             </a>
                                         </PageHeaderGlassButton>
                                     )}

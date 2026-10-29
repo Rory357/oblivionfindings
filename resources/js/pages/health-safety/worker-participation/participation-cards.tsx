@@ -15,6 +15,7 @@ import {
     CONSULT_ORDER,
     CONSULT_STATUS,
     consultationTypeLabel,
+    ELECTION_METHODS,
     MEETING_STATUS,
     REP_STATUS,
     type ConsultationRow,
@@ -22,7 +23,7 @@ import {
     type RepRow,
 } from '@/components/worker-participation/shared';
 import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
-import { titleCase } from '@/pages/health-safety/components/register-row-kit';
+import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import {
     Calendar,
     FileCheck2,
@@ -36,6 +37,23 @@ import {
 import type { MouseEvent, ReactNode } from 'react';
 
 export type ParticipationRow = RepRow | MeetingRow | ConsultationRow;
+
+/** Stored statuses in the words people read (vocabulary.md: "No longer a representative"). */
+const REP_STATUS_LABELS: Record<string, string> = { active: 'Active', inactive: 'No longer a representative', resigned: 'Resigned' };
+const MEETING_STATUS_LABELS: Record<string, string> = { scheduled: 'Scheduled', in_progress: 'In progress', completed: 'Held', cancelled: 'Cancelled' };
+const CONSULT_STATUS_LABELS: Record<string, string> = { actioned: 'Action taken' };
+const labelFrom = (map: Record<string, string>, value: string | null | undefined, missing = 'Status not recorded') =>
+    !value ? missing : map[value] ?? humaniseHsValue(value);
+export const repStatusLabel = (value: string | null | undefined) => labelFrom(REP_STATUS_LABELS, value);
+export const meetingStatusLabel = (value: string | null | undefined) => labelFrom(MEETING_STATUS_LABELS, value);
+export const consultationStatusLabel = (value: string | null | undefined) =>
+    !value ? 'Status not recorded' : CONSULT_STATUS_LABELS[value] ?? CONSULT_STATUS[value]?.label ?? humaniseHsValue(value);
+export const electionMethodLabel = (value: string | null | undefined) =>
+    !value ? 'Election method not recorded' : ELECTION_METHODS.find((method) => method.key === value)?.label ?? humaniseHsValue(value);
+/** A status in words for a row of any kind (the right-click menu's title). */
+export const participationStatusLabel = (kind: string, value: string | null | undefined) =>
+    kind === 'representative' ? repStatusLabel(value) : kind === 'meeting' ? meetingStatusLabel(value) : consultationStatusLabel(value);
+const KIND_LABELS: Record<string, string> = { representative: 'Representative', meeting: 'Committee meeting', consultation: 'Consultation' };
 export type ParticipationKind = 'representative' | 'meeting' | 'consultation';
 export type ParticipationActions = (
     kind: string,
@@ -113,7 +131,7 @@ export function ParticipationCards<T extends ParticipationRow>({
     return (
         <ul
             className="grid gap-5 p-4 md:hidden"
-            aria-label={`${titleCase(kind)} records`}
+            aria-label={`${KIND_LABELS[kind] ?? humaniseHsValue(kind)} records`}
         >
             {rows.map((row) => {
                 let name: string;
@@ -133,15 +151,13 @@ export function ParticipationCards<T extends ParticipationRow>({
                         <>
                             {status(
                                 REP_STATUS[rep.status] ?? 'neutral',
-                                titleCase(rep.status) || 'Status not recorded',
+                                repStatusLabel(rep.status),
                             )}
                             <EntityChip>
                                 {rep.work_group ?? 'Work group not recorded'}
                             </EntityChip>
                             <EntityChip>
-                                {rep.election_method
-                                    ? titleCase(rep.election_method)
-                                    : 'Election method not recorded'}
+                                {electionMethodLabel(rep.election_method)}
                             </EntityChip>
                             <EntityChip icon={Calendar}>
                                 Elected{' '}
@@ -180,15 +196,15 @@ export function ParticipationCards<T extends ParticipationRow>({
                         <>
                             {status(
                                 MEETING_STATUS[meeting.status] ?? 'neutral',
-                                titleCase(meeting.status) ||
-                                    'Status not recorded',
+                                meetingStatusLabel(meeting.status),
                             )}
                             <EntityChip icon={Users}>
                                 {meeting.attendees_count} attendees listed
                             </EntityChip>
                             <EntityChip icon={Wrench}>
-                                {meeting.actions_due_count} action items
-                                outstanding
+                                {meeting.actions_due_count}{' '}
+                                {meeting.actions_due_count === 1 ? 'action' : 'actions'}{' '}
+                                still to do
                             </EntityChip>
                         </>
                     );
@@ -198,10 +214,10 @@ export function ParticipationCards<T extends ParticipationRow>({
                             icon={FileText}
                         >
                             {meeting.minutes_document_path
-                                ? 'Minutes recorded'
+                                ? 'Minutes uploaded'
                                 : missingMinutes
-                                  ? 'Completed · minutes missing'
-                                  : 'Minutes not recorded'}
+                                  ? 'No minutes uploaded'
+                                  : 'No minutes yet'}
                         </EntityStatusChip>
                     );
                 } else {
@@ -214,9 +230,7 @@ export function ParticipationCards<T extends ParticipationRow>({
                         <>
                             {status(
                                 current?.tone ?? 'neutral',
-                                current?.label ??
-                                    (titleCase(consultation.status) ||
-                                        'Status not recorded'),
+                                consultationStatusLabel(consultation.status),
                             )}
                             <EntityChip icon={MessageSquare}>
                                 {consultationTypeLabel(
@@ -232,7 +246,7 @@ export function ParticipationCards<T extends ParticipationRow>({
                             <EntityChip>
                                 {stage
                                     ? `Stage ${stage} of 4`
-                                    : 'Stage not confirmed'}
+                                    : 'Stage not known'}
                             </EntityChip>
                         </>
                     );
@@ -241,14 +255,14 @@ export function ParticipationCards<T extends ParticipationRow>({
                             <EntityChip icon={FileText}>
                                 Consultation document{' '}
                                 {consultation.document_path
-                                    ? 'recorded'
-                                    : 'not recorded'}
+                                    ? 'added'
+                                    : 'not added yet'}
                             </EntityChip>
                             <EntityChip icon={FileCheck2}>
                                 Outcome document{' '}
                                 {consultation.outcome_document_path
-                                    ? 'recorded'
-                                    : 'not recorded'}
+                                    ? 'added'
+                                    : 'not added yet'}
                             </EntityChip>
                         </>
                     );
@@ -279,7 +293,7 @@ export function ParticipationCards<T extends ParticipationRow>({
                                     event,
                                     kind,
                                     row,
-                                    row.status.toUpperCase(),
+                                    participationStatusLabel(kind, row.status),
                                     name,
                                 )
                             }
@@ -293,7 +307,7 @@ export function ParticipationCards<T extends ParticipationRow>({
                                 </>
                             }
                             footer={{
-                                primary: `${titleCase(kind)} record`,
+                                primary: KIND_LABELS[kind] ?? humaniseHsValue(kind),
                                 trailing: (
                                     // eslint-disable-next-line no-restricted-syntax -- the card footer's text action (same look as the other cards' links).
                                     <button

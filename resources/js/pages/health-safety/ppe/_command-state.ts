@@ -2,9 +2,9 @@ import type { PpeCommand } from '@/lib/health-safety/ppe-navigation';
 import type { PpeRecord, PpeReceipt } from './_workspace-types';
 
 export const PPE_COMMAND_LABELS: Record<PpeCommand, string> = {
-    edit: 'Edit recorded item', allocate: 'Issue PPE', inspect: 'Record inspection', condemn: 'Condemn item', dispose: 'Record disposal',
-    acknowledge: 'Acknowledge issue', return: 'Record return', upload_evidence: 'Add evidence', remove_evidence: 'Remove evidence',
-    hold: 'Place on hold', release: 'Release from hold', relocate_evidence: 'Move evidence to private storage',
+    edit: 'Edit item', allocate: 'Issue PPE', inspect: 'Record inspection', condemn: 'Take out of use (condemn)', dispose: 'Record disposal',
+    acknowledge: 'Confirm it’s been received', return: 'Record return', upload_evidence: 'Add evidence', remove_evidence: 'Remove evidence',
+    hold: 'Place on hold', release: 'Return to use', relocate_evidence: 'Move file to secure storage',
 };
 export const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 const positive = (value: unknown): value is number => Number.isSafeInteger(value) && Number(value) > 0;

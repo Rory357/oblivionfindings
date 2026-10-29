@@ -32,17 +32,17 @@ export function PpePeoplePicker({ id, siteId, value, disabled, onChange, onValid
         return () => { clearTimeout(timer); controller.abort(); };
     }, [siteId, search, page, retry, onValidity]);
     return <div className="space-y-3">
-        <Input className="frontline-tap" aria-label="Search workers at this Site" value={search} maxLength={200} disabled={disabled} placeholder="Search workers…" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
-        <HazardStaffPicker id={id} listLabel="Workers at this Site" searchLabel="Search this page" options={items.map((person) => ({ value: String(person.id), label: person.name }))}
+        <Input className="frontline-tap" aria-label="Search workers at this site" value={search} maxLength={200} disabled={disabled} placeholder="Search workers…" onChange={(event) => { setSearch(event.target.value); setPage(1); }} />
+        <HazardStaffPicker id={id} listLabel="Workers at this site" searchLabel="Search this page" options={items.map((person) => ({ value: String(person.id), label: person.name }))}
             value={items.some((person) => String(person.id) === value) ? value : ''}
-            placeholder={value ? 'Selected worker retained · search to change' : 'Choose worker'} disabled={disabled || loading || failed}
+            placeholder={value ? 'Worker chosen · search to change' : 'Choose worker'} disabled={disabled || loading || failed}
             onChange={(selected) => { const person = items.find((item) => String(item.id) === selected); if (person) onChange(selected, person); }} />
         <div className="flex flex-wrap items-center gap-3">
-            <Button type="button" className="frontline-tap" variant="outline" disabled={disabled || loading || page === 1} onClick={() => setPage(page - 1)}>Previous choices</Button>
-            <span className="text-caption">Page {page}{meta ? ` of ${meta.last_page} · ${meta.total} choices` : ''}</span>
-            <Button type="button" className="frontline-tap" variant="outline" disabled={disabled || loading || failed || !meta || page >= meta.last_page} onClick={() => setPage(page + 1)}>More choices</Button>
+            <Button type="button" className="frontline-tap" variant="outline" disabled={disabled || loading || page === 1} onClick={() => setPage(page - 1)}>Previous page</Button>
+            <span className="text-caption">Page {page}{meta ? ` of ${meta.last_page} · ${meta.total} ${meta.total === 1 ? 'worker' : 'workers'}` : ''}</span>
+            <Button type="button" className="frontline-tap" variant="outline" disabled={disabled || loading || failed || !meta || page >= meta.last_page} onClick={() => setPage(page + 1)}>Next page</Button>
         </div>
-        {loading && <p role="status" className="text-subtle">Checking current choices…</p>}
-        {failed && <div className="space-y-2"><p role="alert" className="text-subtle text-status-critical">Current worker choices could not be loaded. Your selection is retained.</p><Button type="button" className="frontline-tap" variant="outline" disabled={disabled || loading} onClick={() => setRetry(retry + 1)}>Retry choices</Button></div>}
+        {loading && <p role="status" className="text-subtle">Loading workers…</p>}
+        {failed && <div className="space-y-2"><p role="alert" className="text-subtle text-status-critical">We couldn’t load the list of workers. Your choice is kept.</p><Button type="button" className="frontline-tap" variant="outline" disabled={disabled || loading} onClick={() => setRetry(retry + 1)}>Try again</Button></div>}
     </div>;
 }

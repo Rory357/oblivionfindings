@@ -139,8 +139,8 @@ export function ParticipationHeader({
                         value={c.participation.active_reps}
                         caption={
                             b.sites_total > 0
-                                ? `${b.reps_coverage_pct}% recorded coverage · ${b.sites_covered}/${b.sites_total} sites · ${c.participation.sites_without_rep} without a rep`
-                                : 'Site coverage not confirmed'
+                                ? `${b.sites_covered} of ${b.sites_total} sites have a representative · ${c.participation.sites_without_rep} without one`
+                                : 'No sites to check yet'
                         }
                         tone={c.participation.sites_without_rep > 0 ? 'warning' : undefined}
                         href={href({ tab: 'representatives', status: 'active', period: 'all' })}
@@ -150,15 +150,15 @@ export function ParticipationHeader({
                     <PageHeaderNumber
                         label="Open consultations"
                         value={c.consultation.open}
-                        caption={`${c.consultation.awaiting_feedback} open or feedback received · ${b.consultations_awaiting} awaiting progression`}
+                        caption={`${c.consultation.awaiting_feedback} open or with feedback received · ${b.consultations_awaiting} waiting for the next step`}
                         href={href({ tab: 'consultations', status: 'open', period: 'all' })}
                         preserveState
                         preserveScroll
                     />
                     <PageHeaderNumber
-                        label="Meetings with outstanding actions"
+                        label="Meetings with unfinished actions"
                         value={c.consultation.meetings_with_outstanding_actions}
-                        caption={`${c.consultation.overdue_actions} unfinished action items across these meetings`}
+                        caption={`${c.consultation.overdue_actions} ${c.consultation.overdue_actions === 1 ? 'action' : 'actions'} still to do from these meetings`}
                         tone={c.consultation.meetings_with_outstanding_actions > 0 ? 'warning' : undefined}
                         href={href({ tab: 'meetings', status: null, period: 'all', focus: 'actions_outstanding' })}
                         preserveState
@@ -167,7 +167,7 @@ export function ParticipationHeader({
                     <PageHeaderNumber
                         label="Minutes missing"
                         value={c.consultation.minutes_outstanding}
-                        caption={`${b.minutes_overdue} completed meetings without filed minutes`}
+                        caption={`${b.minutes_overdue} ${b.minutes_overdue === 1 ? 'meeting' : 'meetings'} held with no minutes uploaded`}
                         tone={c.consultation.minutes_outstanding > 0 ? 'warning' : undefined}
                         href={href({ tab: 'meetings', status: null, period: 'all', focus: 'minutes_missing' })}
                         preserveState
@@ -212,12 +212,12 @@ export function ParticipationHeader({
                                 filters.tab === 'representatives'
                                     ? [
                                           { value: 'all', label: 'All representatives' },
-                                          { value: 'training_below_two', label: 'Active reps below 2 training days' },
+                                          { value: 'training_below_two', label: 'Active representatives with under 2 training days' },
                                       ]
                                     : [
                                           { value: 'all', label: 'All meetings' },
-                                          { value: 'actions_outstanding', label: 'Meetings with outstanding actions' },
-                                          { value: 'minutes_missing', label: 'Completed meetings missing minutes' },
+                                          { value: 'actions_outstanding', label: 'Meetings with unfinished actions' },
+                                          { value: 'minutes_missing', label: 'Held meetings with no minutes uploaded' },
                                       ]
                             }
                         />
@@ -259,7 +259,7 @@ export function ParticipationHeader({
     );
 }
 
-/** The two numbers beyond the header's four: every meeting, and reps below two recorded training days. */
+/** The two numbers beyond the header's four: every meeting, and representatives under two recorded training days. */
 export function ParticipationTally({
     filters,
     hero,
@@ -284,8 +284,8 @@ export function ParticipationTally({
                 },
                 {
                     value: hero.badges.training_below_minimum,
-                    label: 'Rep training below 2 days',
-                    sub: 'Cumulative recorded days · annual training not confirmed',
+                    label: 'Representatives with under 2 training days',
+                    sub: 'Counts every training day ever recorded, not just this year',
                     tone: hero.badges.training_below_minimum > 0 ? 'warning' : undefined,
                     href: participationHref(filters, {
                         tab: 'representatives',
@@ -293,7 +293,7 @@ export function ParticipationTally({
                         period: 'all',
                         focus: 'training_below_two',
                     }),
-                    linkLabel: 'View rep training below 2 days',
+                    linkLabel: 'View representatives with under 2 training days',
                 },
             ]}
         />

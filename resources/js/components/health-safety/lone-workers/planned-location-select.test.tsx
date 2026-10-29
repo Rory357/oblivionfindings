@@ -27,7 +27,7 @@ it('opens the actual shared location selector and can clear a previously chosen 
     }
     render(<Form />);
     const select = screen.getByRole('combobox', {
-        name: 'Choose a planned location source',
+        name: 'Choose how to set the planned location',
     });
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.click(
@@ -61,11 +61,11 @@ it('opens the real standalone and optional Client choices without empty Radix va
         />,
     );
     fireEvent.keyDown(
-        screen.getByRole('combobox', { name: 'Choose an active shift' }),
+        screen.getByRole('combobox', { name: 'Choose a current shift' }),
         { key: 'ArrowDown' },
     );
     fireEvent.click(
-        await screen.findByRole('option', { name: 'Standalone session' }),
+        await screen.findByRole('option', { name: 'Not linked to a shift' }),
     );
     fireEvent.keyDown(
         screen.getByRole('combobox', { name: 'Choose a client if relevant' }),
@@ -73,6 +73,6 @@ it('opens the real standalone and optional Client choices without empty Radix va
     );
     fireEvent.click(await screen.findByRole('option', { name: 'No client' }));
     expect(
-        screen.getByRole('button', { name: 'Start session' }),
+        screen.getByRole('button', { name: 'Start working alone' }),
     ).toBeInTheDocument();
 });

@@ -19,6 +19,13 @@ import type { WizardStep } from '@/components/wizard/shell';
 import { WizardShell } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
+import {
+    BOARD_REPORTS,
+    BOARD_REPORTS_LABEL,
+    boardReportHref,
+    type BoardReportKey,
+} from '@/lib/health-safety/board-reports';
+import { hsLabel, humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import { type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -109,18 +116,14 @@ const REGISTER: Record<string, string> = {
     first_aid: '/health-safety/first-aid',
 };
 
-// Governance report set — same list as the dashboard's export popover; analytics opens each
-// dated report in a new tab (export-led), the dashboard navigates (report-led).
-const GOV_REPORTS: { name: string; label: string }[] = [
-    { name: 'board-summary', label: 'Board summary' },
-    { name: 'worksafe-register', label: 'WorkSafe register' },
-    { name: 'investigation-outcomes', label: 'Investigation outcomes' },
-    {
-        name: 'corrective-action-traceability',
-        label: 'Corrective-action traceability',
-    },
-    { name: 'risk-assessment-register', label: 'Risk-assessment register' },
-];
+// Board reports: the shared list and names (lib/health-safety/board-reports); each opens its readable page.
+const REPORT_ICONS: Record<BoardReportKey, typeof FileText> = {
+    board: FileText,
+    notifications: Shield,
+    'investigation-outcomes': Activity,
+    'action-traceability': ClipboardList,
+    'risk-register': AlertTriangle,
+};
 
 function fmt(v: number | null | undefined, suffix = ''): string {
     return v === null || v === undefined ? '—' : `${v}${suffix}`;
@@ -472,7 +475,7 @@ function Heatmap({
                                         <button
                                             type="button"
                                             onClick={() => onCell(s)}
-                                            title={`${s.name} · ${String(key).replace(/_/g, ' ')}: ${unknown ? 'Not confirmed' : fmt(s[key] as number)}`}
+                                            title={`${s.name} · ${humaniseHsValue(String(key))}: ${unknown ? 'Not available' : fmt(s[key] as number)}`}
                                             className="flex h-9 w-full min-w-[68px] items-center justify-center rounded-md font-semibold text-foreground tabular-nums transition-transform hover:scale-[1.04] focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
                                             style={{
                                                 backgroundColor: `color-mix(in oklab, var(--status-critical) ${mixPct}%, var(--card))`,
@@ -659,7 +662,7 @@ function DrillModal({
                         <span className="text-muted-foreground">
                             Selection:
                         </span>{' '}
-                        <span className="font-medium text-foreground capitalize">
+                        <span className="font-medium text-foreground">
                             {target.label}
                         </span>
                     </span>
@@ -801,13 +804,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
             : p.toString();
     };
 
-    const reportUrl = (name: string) => {
-        const p = new URLSearchParams();
-        if (filters.from) p.set('from', filters.from);
-        if (filters.to) p.set('to', filters.to);
-        if (filters.site_id !== null) p.set('site_id', String(filters.site_id));
-        return `/health-safety/reports/${name}?${p.toString()}`;
-    };
+    const reportUrl = (key: BoardReportKey) => boardReportHref(key, filters);
 
     const openDrill = (target: DrillTarget) => setDrill(target);
 
@@ -868,26 +865,26 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     // ── derived chart data ──
     const severitySegments: DonutDatum[] = severity_data.map((d) => ({
         key: d.severity,
-        label: d.severity.replace(/_/g, ' '),
+        label: hsLabel('severity', d.severity),
         value: d.count,
         color: severityFill(d.severity),
     }));
     const riskSegments: DonutDatum[] = hazard_data.map((d) => ({
         key: d.risk_rating,
-        label: d.risk_rating,
+        label: hsLabel('risk_level', d.risk_rating),
         value: d.count,
         color: riskFill(d.risk_rating),
     }));
     const incidentTypeItems: BreakdownItem[] = incident_data.map((d, i) => ({
         key: d.type,
-        label: d.type.replace(/_/g, ' '),
+        label: humaniseHsValue(d.type),
         value: d.count,
         color: PALETTE[i % PALETTE.length],
     }));
     const injuryTypeItems: BreakdownItem[] = injury_data.by_type.map(
         (d, i) => ({
             key: d.type,
-            label: d.type.replace(/_/g, ' '),
+            label: humaniseHsValue(d.type),
             value: d.count,
             color: PALETTE[i % PALETTE.length],
         }),
@@ -895,7 +892,7 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
     const bodyPartItems: BreakdownItem[] = injury_data.by_body_part.map(
         (d, i) => ({
             key: d.body_part,
-            label: d.body_part.replace(/_/g, ' '),
+            label: humaniseHsValue(d.body_part),
             value: d.count,
             color: PALETTE[i % PALETTE.length],
         }),
@@ -976,9 +973,9 @@ export default function HealthSafetyAnalytics(props: AnalyticsProps) {
                             tab === 'sites' ? 'sites' : 'incidents',
                         )}
                         canViewBoardReports={canViewBoardReports}
-                        reports={GOV_REPORTS.map((report) => ({
+                        reports={BOARD_REPORTS.map((report) => ({
                             label: report.label,
-                            href: reportUrl(report.name),
+                            href: reportUrl(report.key),
                         }))}
                     />
                 }
@@ -1682,7 +1679,7 @@ function RestraintBreakdowns({
     ): BreakdownItem[] =>
         (rows ?? []).map((r, i) => ({
             key: r.label || 'unspecified',
-            label: titleCaseLabel(r.label),
+            label: r.label ? humaniseHsValue(r.label) : 'Not recorded',
             value: r.count,
             color: colour(r.label, i),
         }));
@@ -1863,10 +1860,6 @@ function EmptyBreakdown() {
     );
 }
 
-function titleCaseLabel(s: string): string {
-    if (!s) return 'Unspecified';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 function planStatusFill(status: string): string {
     switch (status) {
@@ -1892,7 +1885,7 @@ function GovernanceTab({
 }: {
     scorecard: AnalyticsProps['scorecard'];
     trends: AnalyticsProps['trends'];
-    reportUrl: (n: string) => string;
+    reportUrl: (key: BoardReportKey) => string;
     exportUrl: () => void;
     canViewReports: boolean;
 }) {
@@ -1955,73 +1948,23 @@ function GovernanceTab({
 
             <div>
                 <h3 className="mb-2 text-sm font-bold text-foreground">
-                    Governance packs
+                    {BOARD_REPORTS_LABEL}
                 </h3>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {/* Report packs open governance.view-gated routes; hide them for
                         register-only roles. The CSV export below is hazards.view-gated,
                         so it stays available. */}
-                    {canViewReports ? (
-                        <>
-                            <GovPackCard
-                                icon={FileText}
-                                title="Board safety summary"
-                                desc="Leading-vs-lagging assurance for the board pack."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('board-summary'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={Shield}
-                                title="WorkSafe register analytics"
-                                desc="Notifiable events register (HSWA s.56)."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('worksafe-register'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={Activity}
-                                title="Investigation outcomes"
-                                desc="Investigation status and outcomes summary."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('investigation-outcomes'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={ClipboardList}
-                                title="Corrective-action traceability"
-                                desc="Action close-out evidence trail."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl(
-                                            'corrective-action-traceability',
-                                        ),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                            <GovPackCard
-                                icon={AlertTriangle}
-                                title="Risk-assessment register"
-                                desc="Current hazard/risk assessment register."
-                                onOpen={() =>
-                                    window.open(
-                                        reportUrl('risk-assessment-register'),
-                                        '_blank',
-                                    )
-                                }
-                            />
-                        </>
-                    ) : null}
+                    {canViewReports
+                        ? BOARD_REPORTS.map((report) => (
+                              <GovPackCard
+                                  key={report.key}
+                                  icon={REPORT_ICONS[report.key]}
+                                  title={report.label}
+                                  desc={report.description}
+                                  onOpen={() => window.open(reportUrl(report.key), '_blank')}
+                              />
+                          ))
+                        : null}
                     <GovPackCard
                         icon={Download}
                         title="Export current view"

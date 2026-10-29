@@ -41,15 +41,16 @@ export function InjuryRegisterList({ rows, total, returnTo, medical, sub, footer
     const open = (row: InjuryRegisterRow, section: 'overview' | 'recovery' | 'capacity' | 'connections' | 'evidence' | 'history' = 'overview') => router.get(injuryHref(row.id, { section, returnTo }));
     const actions = (row: InjuryRegisterRow): MenuItem[] => [
         { label: 'Open injury', icon: FileText, onClick: () => open(row) },
-        { label: 'Connected work', icon: Link2, onClick: () => open(row, 'connections') },
+        { label: 'Linked records', icon: Link2, onClick: () => open(row, 'connections') },
         ...(medical ? [
             { label: 'Recovery plans', icon: HeartPulse, onClick: () => open(row, 'recovery') },
-            { label: 'Assessments', icon: Stethoscope, onClick: () => open(row, 'capacity') },
+            { label: 'Fitness-for-work checks', icon: Stethoscope, onClick: () => open(row, 'capacity') },
             { label: 'Evidence', icon: Paperclip, onClick: () => open(row, 'evidence') },
         ] : []),
         { label: 'History', icon: History, onClick: () => open(row, 'history') },
     ];
-    const count = (value: number | null) => value === null ? 'Not confirmed' : String(value);
+    /** A count with its noun ('1 plan', '2 plans'); an unknown count says so instead of reading as zero. */
+    const count = (value: number | null, one: string, many: string) => value === null ? `${many[0].toUpperCase()}${many.slice(1)} not available` : `${value} ${value === 1 ? one : many}`;
     return <RecordTable
         title="Injuries"
         sub={sub}
@@ -58,23 +59,23 @@ export function InjuryRegisterList({ rows, total, returnTo, medical, sub, footer
         rowKey={(row) => row.id}
         onOpen={(row) => open(row)}
         actionsFor={actions}
-        menuTitle={(row) => `${row.reference} · ${row.injury_type_label}`}
+        menuTitle={(row) => `${row.injury_type_label} · ${row.reference}`}
         menuIcon={HeartPulse}
         columns={[
             { key: 'injury', label: 'Injury', className: 'min-w-[12rem]', cell: (row) => <RecordIdentity
                 title={<Link href={injuryHref(row.id, { returnTo })} onClick={(event) => event.stopPropagation()} aria-label={`Open injury ${row.reference}`}
                     className="rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">{row.injury_type_label}</Link>}
-                sub={<>{row.reference}{row.source_integrity === 'repair_required' ? <span className="mt-1 flex"><StatusBadge variant="warning">Source needs review</StatusBadge></span> : null}</>} /> },
-            { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => row.worker?.name ? <RecordPerson name={row.worker.name} /> : <span className="text-muted-foreground">Worker unavailable</span> },
-            { key: 'site', label: 'Site', nowrap: true, cell: (row) => row.site?.name ?? <span className="text-muted-foreground">Site unavailable</span> },
+                sub={<>{row.reference}{row.source_integrity === 'repair_required' ? <span className="mt-1 flex"><StatusBadge variant="critical">Needs fixing — ask an administrator</StatusBadge></span> : null}</>} /> },
+            { key: 'worker', label: 'Worker', nowrap: true, cell: (row) => row.worker?.name ? <RecordPerson name={row.worker.name} /> : <span className="text-muted-foreground">Name hidden</span> },
+            { key: 'site', label: 'Site', nowrap: true, cell: (row) => row.site?.name ?? <span className="text-muted-foreground">Site hidden</span> },
             { key: 'date', label: 'Date', nowrap: true, cell: (row) => row.injury_date ? <RecordIdentity title={dateWithYear(row.injury_date)} sub={formatTime(row.injury_date)} /> : <span className="text-muted-foreground">Not recorded</span> },
             { key: 'severity', label: 'Severity', nowrap: true, cell: (row) => <div className="grid justify-items-start gap-1">
                 <StatusBadge variant={SEVERITY_TONE[row.severity] ?? 'neutral'}>{severityLabel(row.severity)}</StatusBadge>
-                {row.worksafe_notifiable ? <span className="text-subtle">WorkSafe flag</span> : null}
+                {row.worksafe_notifiable ? <span className="text-subtle">Marked notifiable to WorkSafe</span> : null}
             </div> },
             { key: 'stage', label: 'Where it’s up to', nowrap: true, cell: (row) => { const stage = injuryStage(row.status); return <StageDots stage={stage.stage} of={STATUS_ORDER.length} label={stage.label} tone={stage.tone} />; } },
-            { key: 'lost', label: 'Days lost', nowrap: true, cell: (row) => <span className="tabular-nums">{row.lost_time_days}</span> },
-            ...(medical ? [{ key: 'linked', label: 'Linked records', nowrap: true, cell: (row: InjuryRegisterRow) => <span className="text-subtle">{count(row.rtw_count)} plans · {count(row.capacity_count)} assessments · {count(row.attachment_count)} files</span> }] : []),
+            { key: 'lost', label: 'Days off work', nowrap: true, cell: (row) => <span className="tabular-nums">{row.lost_time_days}</span> },
+            ...(medical ? [{ key: 'linked', label: 'Linked records', nowrap: true, cell: (row: InjuryRegisterRow) => <span className="text-subtle">{count(row.rtw_count, 'plan', 'plans')} · {count(row.capacity_count, 'check', 'checks')} · {count(row.attachment_count, 'file', 'files')}</span> }] : []),
         ]}
         empty={<p className="sg-quiet"><Ring tone="none" /><span>No injuries match these filters. Change the filters to find another record.</span></p>}
         footer={rows.length ? footer ?? <p className="text-subtle">{`${rows.length} of ${total} shown`}</p> : undefined}

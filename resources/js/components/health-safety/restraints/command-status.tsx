@@ -32,18 +32,17 @@ export function SourceCommandStatus({
             <div className="space-y-4" role="status">
                 <p className="flex items-center gap-2 text-status-success">
                     <CheckCircle2 aria-hidden="true" className="size-5" />
-                    {result.changed === false ? 'No change needed · confirmed' : 'Saved and confirmed'}
+                    {result.changed === false ? 'Nothing changed — already saved' : 'Saved'}
                 </p>
                 {result.disposition === 'approval_pending' && (
                     <p className="text-subtle text-status-warning">
-                        Approval is still needed. This request has not approved
-                        or activated the plan.
+                        This still needs approval. The plan hasn’t been approved
+                        or put into use yet.
                     </p>
                 )}
                 {result.disposition === 'approved_not_published' && (
                     <p className="text-subtle">
-                        The decision is recorded. The plan has not been
-                        activated.
+                        Decision saved. The plan isn’t in use yet.
                     </p>
                 )}
                 <Button
@@ -60,8 +59,10 @@ export function SourceCommandStatus({
         <div className="space-y-3">
             {!allowed && !checking && (
                 <p role="alert" className="text-subtle text-status-critical">
-                    This change is currently unavailable. Your unsaved entries
-                    remain here.
+                    You can’t make this change any more — the record may have
+                    been closed or your access changed. Ask a health and safety
+                    manager if you think you should. Your entries are still
+                    here.
                 </p>
             )}
             {failure && (
@@ -71,9 +72,9 @@ export function SourceCommandStatus({
             )}
             {stale && (
                 <p role="alert" className="text-subtle text-status-warning">
-                    This record or its approval policy changed. Check the
-                    current work, then review it before saving your retained
-                    entries.
+                    Someone changed this record (or the approval rules) while
+                    you were working. Load the latest version and check it,
+                    then save — your entries are still here.
                 </p>
             )}
             {canCheck && (
@@ -86,8 +87,8 @@ export function SourceCommandStatus({
                         onClick={onCheck}
                     >
                         {checking
-                            ? 'Checking current work…'
-                            : 'Check current work'}
+                            ? 'Loading latest version…'
+                            : 'Load latest version'}
                     </Button>
                     {stale && (
                         <Button
@@ -97,7 +98,7 @@ export function SourceCommandStatus({
                             disabled={checking || !allowed || !reviewAvailable}
                             onClick={onReview}
                         >
-                            Use reviewed current version
+                            Use the latest version
                         </Button>
                     )}
                 </div>
@@ -105,7 +106,7 @@ export function SourceCommandStatus({
             {reviewAvailable && currentFacts && (
                 <details className="rounded-xl border border-border p-4">
                     <summary className="frontline-hit text-subtle cursor-pointer font-medium focus-visible:ring-2 focus-visible:ring-ring">
-                        Read the current record before using this version
+                        See what the latest version says
                     </summary>
                     <dl className="mt-4 space-y-3">
                         {currentFacts.map((item) => (

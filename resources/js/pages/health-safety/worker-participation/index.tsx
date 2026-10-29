@@ -41,6 +41,7 @@ import {
     type RepRow,
     type WpDetailAction,
 } from '@/components/worker-participation/shared';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { titleCase } from '@/pages/health-safety/components/register-row-kit';
 import type { SharedData } from '@/types';
@@ -158,6 +159,23 @@ function ParticipationWorkspace({
     const [pendingAction, setPendingAction] = useState<WpDetailAction | null>(
         null,
     );
+    // Standing a representative down and cancelling a meeting ask first (they change the record people rely on).
+    const [confirming, setConfirming] = useState<
+        | { action: 'stand_down'; id: number; name: string | null }
+        | { action: 'cancel_meeting'; id: number; name: string | null }
+        | null
+    >(null);
+    const [confirmBusy, setConfirmBusy] = useState(false);
+    const runConfirmed = () => {
+        if (!confirming) return;
+        setConfirmBusy(true);
+        const finish = { preserveScroll: true, onFinish: () => { setConfirmBusy(false); setConfirming(null); } };
+        if (confirming.action === 'stand_down') {
+            router.put(`${BASE}/representatives/${confirming.id}`, { status: 'inactive' }, finish);
+        } else {
+            router.put(`${BASE}/meetings/${confirming.id}/cancel`, {}, finish);
+        }
+    };
 
     const go = (next: Partial<Filters>) =>
         router.get(
@@ -278,14 +296,10 @@ function ParticipationWorkspace({
                     active
                         ? {
                               icon: <Slash className="h-3.5 w-3.5" />,
-                              label: 'Mark stood-down',
+                              label: 'No longer a representative',
                               tone: 'critical',
                               onClick: () =>
-                                  router.put(
-                                      `${BASE}/representatives/${row.id}`,
-                                      { status: 'inactive' },
-                                      { preserveScroll: true },
-                                  ),
+                                  setConfirming({ action: 'stand_down', id: row.id, name: row.user?.name ?? null }),
                           }
                         : {
                               icon: <CheckCircle2 className="h-3.5 w-3.5" />,
@@ -351,11 +365,7 @@ function ParticipationWorkspace({
                         label: 'Cancel meeting',
                         tone: 'critical',
                         onClick: () =>
-                            router.put(
-                                `${BASE}/meetings/${row.id}/cancel`,
-                                {},
-                                { preserveScroll: true },
-                            ),
+                            setConfirming({ action: 'cancel_meeting', id: row.id, name: row.committee?.name ?? null }),
                     },
                 );
             }
@@ -610,6 +620,19 @@ function ParticipationWorkspace({
                     initialAction={pendingAction}
                 />
             ) : null}
+            <ConfirmDialog
+                open={confirming !== null}
+                onClose={() => { if (!confirmBusy) setConfirming(null); }}
+                onConfirm={runConfirmed}
+                processing={confirmBusy}
+                variant="destructive"
+                title={confirming?.action === 'stand_down' ? 'No longer a representative?' : 'Cancel this meeting?'}
+                description={confirming?.action === 'stand_down'
+                    ? `${confirming.name ?? 'This person'} will show as no longer a health and safety representative, and their site may show as having no representative until someone else is added. You can make them active again later.`
+                    : `This ${confirming?.name ? confirming.name + ' ' : ''}meeting stays on the record as cancelled and can’t be held or edited. This can’t be undone.`}
+                confirmText={confirming?.action === 'stand_down' ? 'No longer a representative' : 'Cancel meeting'}
+                cancelText={confirming?.action === 'stand_down' ? 'Keep as representative' : 'Keep meeting'}
+            />
             {detail?.kind === 'meeting' ? (
                 <MeetingDetailDialog
                     key={detail.data.id}

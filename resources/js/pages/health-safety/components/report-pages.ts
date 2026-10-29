@@ -10,6 +10,8 @@ const REPORT_PAGES: Record<string, string> = {
     drill: '/health-safety/drills/create?return_to=%2Fhealth-safety',
     rtw: '/health-safety/injuries/create?return_to=%2Fhealth-safety',
     lone: '/health-safety/lone-workers?start=1',
+    // An exposure is recorded from its chemical: the register is where the person picks it.
+    exposure: '/health-safety/substances?tab=active',
 };
 
 /** The report page for a Report-menu item, or null when it opens in place. */

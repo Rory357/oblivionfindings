@@ -1,6 +1,8 @@
 /* H&S previews open the canonical record or register. Optional summaries are
  * read-only; shared card actions work with touch, keyboard and right-click. */
 import { worksafeLabel } from '@/components/health-safety/event-detail-dialog';
+import { boardReportHref } from '@/lib/health-safety/board-reports';
+import { hsLabel, humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import { EntityContextMenu, useEntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
 import { Log, QuietLine, RowList } from '@/components/signature/blocks';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -137,10 +139,6 @@ export type WorklistKey =
 
 type PillTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
 
-function titleCase(value?: string | null): string {
-    if (!value) return '—';
-    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
 
 type NormRow = {
     key: string;
@@ -187,7 +185,7 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
                 : undefined,
         },
         title: r.title ?? r.reference ?? `Corrective action #${r.id}`,
-        sub: [r.reference, titleCase(r.priority)].filter(Boolean).join(' · '),
+        sub: [r.reference, hsLabel('action_priority', r.priority)].filter(Boolean).join(' · '),
         owner: r.owner,
         due: formatDateOnly(r.due_date),
         clientId: r.client_id,
@@ -212,8 +210,8 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
             rows: [
                 { label: 'Reference', value: r.reference },
                 { label: 'Title', value: r.title },
-                { label: 'Priority', value: titleCase(r.priority) },
-                { label: 'Status', value: titleCase(r.status) },
+                { label: 'Priority', value: hsLabel('action_priority', r.priority) },
+                { label: 'Status', value: hsLabel('action_status', r.status) },
                 { label: 'Due date', value: formatDateOnly(r.due_date) },
                 {
                     label: 'Days overdue',
@@ -265,7 +263,7 @@ function acceptanceRows(rows: AcceptanceRow[]): NormRow[] {
             rows: [
                 { label: 'Reference', value: row.event_reference },
                 { label: 'Title', value: row.title },
-                { label: 'Severity', value: titleCase(row.severity) },
+                { label: 'Severity', value: hsLabel('severity', row.severity) },
                 { label: 'Client', value: row.client },
                 { label: 'Site', value: row.site },
                 { label: 'Proposed owner', value: row.owner },
@@ -281,9 +279,9 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
         actionLabel: r.event_id ? `Open investigation: ${r.reference ?? r.id}` : `Find investigation: ${r.reference ?? r.id}`,
         pill: r.is_overdue
             ? { label: 'Overdue', tone: 'critical', icon: Clock }
-            : { label: titleCase(r.status), tone: 'info', icon: Search },
+            : { label: hsLabel('investigation_status', r.status), tone: 'info', icon: Search },
         title: `Investigation ${r.reference ?? `#${r.id}`}`,
-        sub: titleCase(r.type),
+        sub: hsLabel('investigation_type', r.type),
         owner: r.owner,
         due: formatDateOnly(r.target_completion_date),
         clientId: r.client_id,
@@ -298,7 +296,7 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
             description: 'Read-only detail of an open H&S investigation.',
             railIcon: Search,
             railTitle: r.reference ?? `Investigation #${r.id}`,
-            railSub: titleCase(r.type),
+            railSub: hsLabel('investigation_type', r.type),
             cardTitle: 'Investigation',
             cardIcon: Search,
             registerUrl: '/health-safety/events',
@@ -307,8 +305,8 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
             staffId: r.staff_id,
             rows: [
                 { label: 'Reference', value: r.reference },
-                { label: 'Type', value: titleCase(r.type) },
-                { label: 'Status', value: titleCase(r.status) },
+                { label: 'Type', value: hsLabel('investigation_type', r.type) },
+                { label: 'Status', value: hsLabel('investigation_status', r.status) },
                 {
                     label: 'Target completion',
                     value: formatDateOnly(r.target_completion_date),
@@ -352,31 +350,31 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
                 r.title ?? `${r.event_reference} · WorkSafe notifiable event`,
             sub: awaiting
                 ? 'Notify WorkSafe — action required'
-                : notifiedSub || titleCase(r.incident_type),
+                : notifiedSub || humaniseHsValue(r.incident_type),
             owner: null,
             due: null,
             clientId: null,
             staffId: null,
             registerUrl,
-            registerLabel: 'WorkSafe register',
+            registerLabel: 'WorkSafe notifications',
             tag: 'WS',
             tagTone: awaiting ? 'warning' : 'success',
-            meta: titleCase(r.incident_type),
+            meta: humaniseHsValue(r.incident_type),
             detail: {
                 title: 'WorkSafe notifiable event',
                 description:
                     'Recorded notification details. Open the event to manage notification and follow-up.',
                 railIcon: ShieldAlert,
                 railTitle: r.title ?? r.event_reference,
-                railSub: titleCase(r.incident_type),
+                railSub: humaniseHsValue(r.incident_type),
                 cardTitle: 'Notifiable event',
                 cardIcon: ShieldAlert,
                 registerUrl,
-                registerLabel: 'WorkSafe register',
+                registerLabel: 'WorkSafe notifications',
                 rows: [
                     { label: 'Title', value: r.title },
                     { label: 'H&S reference', value: r.event_reference },
-                    { label: 'Type', value: titleCase(r.incident_type) },
+                    { label: 'Type', value: humaniseHsValue(r.incident_type) },
                     { label: 'Status', value: statusLabel },
                     { label: 'Occurred', value: formatDateTimeLong(r.occurred_at) },
                     { label: 'Notified', value: formatDateTimeLong(r.notified_at) },
@@ -485,13 +483,13 @@ export function HsWorklists({
     const context = useEntityContextMenu<NormRow>();
     const [detailKey, setDetailKey] = useState<string | null>(null);
 
-    // The WorkSafe register report is governance.view-gated; for register-only
+    // The WorkSafe notifications report is governance.view-gated; for register-only
     // roles (hazards.view) fall back to the non-gated events WorkSafe tab so the
     // worklist's register links (card, context menu, detail dialog) don't 403.
     const canViewGovReports =
         usePage<SharedData>().props.auth.can?.governance?.view ?? false;
     const worksafeRegisterUrl = canViewGovReports
-        ? '/health-safety/reports/worksafe-register'
+        ? boardReportHref('notifications')
         : '/health-safety/events?tab=worksafe';
 
     const visit = (href: string) => { context.close(); router.visit(href); };

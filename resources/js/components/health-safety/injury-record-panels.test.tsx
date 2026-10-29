@@ -14,11 +14,11 @@ afterEach(cleanup);
 it('does not report none recorded when damaged evidence or history is withheld', () => {
     const d = record({ source_integrity: 'repair_required', evidence_integrity: 'repair_required', history_integrity: 'repair_required' });
     const { rerender } = render(<InjuryRecordPanel detail={d} section="evidence" open={vi.fn()} sourceHref="/health-safety/injuries/9" />);
-    expect(screen.getByRole('status')).toHaveTextContent('needs review'); expect(screen.queryByText('No evidence is recorded.')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Ask an administrator'); expect(screen.queryByText('No evidence is recorded.')).not.toBeInTheDocument();
     rerender(<InjuryRecordPanel detail={d} section="history" open={vi.fn()} sourceHref="/health-safety/injuries/9" />);
-    expect(screen.getByRole('status')).toHaveTextContent('needs review'); expect(screen.queryByText(/No attributed source version/)).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Ask an administrator'); expect(screen.queryByText(/No changes recorded yet/)).not.toBeInTheDocument();
     rerender(<InjuryRecordPanel detail={{ ...d, history: null }} section="history" open={vi.fn()} sourceHref="/health-safety/injuries/9" />);
-    expect(screen.getByText('Source needs review')).toBeInTheDocument(); expect(screen.queryByText('Medical details restricted')).not.toBeInTheDocument();
+    expect(screen.getByText('Needs fixing — ask an administrator')).toBeInTheDocument(); expect(screen.queryByText('Medical details are private.')).not.toBeInTheDocument();
 });
 
 it('preserves a real evidence removal command when retained metadata has no retrievable bytes and offers no false preview or download', () => {
@@ -26,7 +26,7 @@ it('preserves a real evidence removal command when retained metadata has no retr
         availability: 'unavailable', url: null, source_version_id: 14, source_revision: 1, attribution_state: 'recorded', size: 1024, created_at: null,
         uploaded_by: null, kind: 'document', notes: null, alt_text: null }] });
     render(<InjuryRecordPanel detail={d} section="evidence" open={open} sourceHref="/health-safety/injuries/9" />);
-    expect(screen.getByText(/File unavailable/)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: /Preview/ })).not.toBeInTheDocument(); expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/File not available/)).toBeInTheDocument(); expect(screen.queryByRole('button', { name: /Preview/ })).not.toBeInTheDocument(); expect(screen.queryByRole('link', { name: /Download/ })).not.toBeInTheDocument();
     // Removal lives in the row's menu (kebab and right-click, drawing pg-hsn-88g).
     fireEvent.contextMenu(screen.getAllByRole('row')[1], { clientX: 70, clientY: 100 });
     expect(screen.queryByRole('menuitem', { name: /Preview|Download/ })).not.toBeInTheDocument();
@@ -38,9 +38,9 @@ it('shows an actually cleared historical field and withholds a restricted side w
         before_access: 'readable' as const, after_access: 'readable' as const, source_context: { worker_id: 12, site_id: 4 }, recorded_at: null,
         recorder: null, attribution_state: 'recorded' as const, before: { notes: 'Previous note' }, after: { notes: null } };
     const { rerender } = render(<InjuryRecordPanel detail={record({ history: [entry] })} section="history" open={vi.fn()} sourceHref="/health-safety/injuries/9" />);
-    expect(screen.getByText('Before: Previous note')).toBeInTheDocument(); expect(screen.getByText('Recorded: Not recorded')).toBeInTheDocument();
+    expect(screen.getByText('Before: Previous note')).toBeInTheDocument(); expect(screen.getByText('After: Not recorded')).toBeInTheDocument();
     rerender(<InjuryRecordPanel detail={record({ history: [{ ...entry, access: 'restricted', after_access: 'restricted', after: null }] })} section="history" open={vi.fn()} sourceHref="/health-safety/injuries/9" />);
-    expect(screen.getByText('Recorded: Restricted')).toBeInTheDocument(); expect(screen.getByText('Source version facts')).toBeInTheDocument();
+    expect(screen.getByText('After: Hidden — you don’t have access')).toBeInTheDocument(); expect(screen.getByText('Details at this version')).toBeInTheDocument();
 });
 
 it('opens only a readable connection with one bounded injury return and no old receipt or command values', () => {

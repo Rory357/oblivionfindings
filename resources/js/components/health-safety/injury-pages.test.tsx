@@ -42,7 +42,7 @@ it('retains a mounted command draft after current medical permission or source i
     rerender(<InjuryShow detail={{ ...d, medical_access: 'restricted', can: { ...d.can, review: false } }} return_to="/tasks?assigned=me" />);
     expect(screen.getByRole('textbox')).toHaveValue('Unsaved review notes'); expect(screen.getByRole('button', { name: 'Save test command' })).toBeDisabled();
     rerender(<InjuryShow detail={{ ...d, source_integrity: 'repair_required', can: { ...d.can, review: false } }} return_to="/tasks?assigned=me" />);
-    expect(screen.getByRole('textbox')).toHaveValue('Unsaved review notes'); expect(screen.getByRole('status')).toHaveTextContent('Source record needs review');
+    expect(screen.getByRole('textbox')).toHaveValue('Unsaved review notes'); expect(screen.getByRole('status')).toHaveTextContent('This record needs fixing');
 });
 
 it('does not open a never-authorised command from a URL and retains safe record navigation', () => {

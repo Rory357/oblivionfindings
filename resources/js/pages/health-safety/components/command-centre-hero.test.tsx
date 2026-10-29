@@ -220,7 +220,7 @@ describe('H&S shared header and source-aware attention', () => {
         ).toHaveAttribute('href', '/compliance/hazards?tab=active');
         expect(screen.queryByRole('link', { name: 'View incidents' })).not.toBeInTheDocument();
         expect(
-            screen.queryByRole('button', { name: /Export board summary/ }),
+            screen.queryByRole('button', { name: /Board reports/ }),
         ).not.toBeInTheDocument();
     });
     it('retains the report callback and exposes only authorised board exports', () => {
@@ -230,15 +230,15 @@ describe('H&S shared header and source-aware attention', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Report' }));
         expect(onReport).toHaveBeenCalledTimes(1);
         fireEvent.click(
-            screen.getByRole('button', { name: /Export board summary/ }),
+            screen.getByRole('button', { name: /Board reports/ }),
         );
         expect(
             screen.getByRole('link', {
-                name: 'Corrective-action traceability',
+                name: 'Actions and their safety reviews',
             }),
         ).toHaveAttribute(
             'href',
-            '/health-safety/reports/corrective-action-traceability',
+            '/health-safety/reports?view=action-traceability',
         );
     });
     it('carries a nondefault Site and custom period only to destinations that consume those filters', () => {

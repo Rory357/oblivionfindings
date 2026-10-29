@@ -53,7 +53,7 @@ describe('Participation viewer boundary', () => {
         ).not.toBeInTheDocument();
         expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
         expect(
-            screen.getByText('Participation is unavailable'),
+            screen.getByText('You can’t see this page right now'),
         ).toBeInTheDocument();
         expect(
             screen.getByRole('heading', { name: 'Worker participation' }),
@@ -156,7 +156,7 @@ describe('Participation viewer boundary', () => {
             </ParticipationViewerBoundary>,
         );
         const button = screen.getByRole('button', {
-            name: 'Reload participation',
+            name: 'Reload page',
         });
         expect(button).toHaveClass('frontline-tap', 'frontline-focus');
         fireEvent.click(button);

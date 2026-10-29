@@ -10,44 +10,47 @@ import { formatDateOnly } from '@/lib/datetime';
 import axios from 'axios';
 import { CheckCircle2, ClipboardCheck, FlaskConical, Shield, FileText } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
-import { PHYSICAL_FORMS, QUANTITY_UNITS, STATUS_OPTIONS } from './constants';
+import { PHYSICAL_FORMS, QUANTITY_UNITS, STATUS_OPTIONS, optionLabel } from './constants';
 import { useChemicalCommand, type ChemicalCommandTarget } from './_use-command';
 
 type Values = Record<string, string | File | null>;
-type FieldSpec = { key: string; label: string; multiline?: boolean; required?: boolean; type?: string; options?: { value: string; label: string }[] };
+type FieldSpec = { key: string; label: string; hint?: string; multiline?: boolean; required?: boolean; type?: string; options?: { value: string; label: string }[] };
 export const CHEMICAL_LABELS: Record<ChemicalAction | 'create', string> = {
-    create: 'Add chemical reference', edit: 'Edit chemical reference', status: 'Change reference status', add_sds: 'Add safety data sheet',
-    edit_sds: 'Correct sheet details', current_sds: 'Select current sheet', add_storage: 'Add storage location', edit_storage: 'Edit storage location',
-    audit_storage: 'Record inventory check', archive_storage: 'Archive storage location', restore_storage: 'Restore storage location',
+    create: 'Add chemical', edit: 'Edit chemical', status: 'Change status', add_sds: 'Add safety data sheet',
+    edit_sds: 'Fix sheet details', current_sds: 'Make this the current sheet', add_storage: 'Add storage location', edit_storage: 'Edit storage location',
+    audit_storage: 'Record a stock check', archive_storage: 'Archive storage location', restore_storage: 'Restore storage location',
 };
 const reference: FieldSpec[] = [
     { key: 'name', label: 'Chemical name', required: true }, { key: 'physical_form', label: 'Physical form', required: true, options: PHYSICAL_FORMS },
-    { key: 'common_name', label: 'Common name' }, { key: 'un_number', label: 'UN number' }, { key: 'hsno_approval', label: 'HSNO approval' },
-    { key: 'hsno_classification', label: 'HSNO classification' }, { key: 'signal_word', label: 'Signal word' },
+    { key: 'common_name', label: 'Common name' },
+    { key: 'un_number', label: 'UN number', hint: 'The dangerous goods number from the safety data sheet (SDS), for example UN1203' },
+    { key: 'hsno_approval', label: 'HSNO approval', hint: 'The approval number under the Hazardous Substances and New Organisms (HSNO) Act, from the safety data sheet (SDS)' },
+    { key: 'hsno_classification', label: 'HSNO classification', hint: 'The hazard classification under the Hazardous Substances and New Organisms (HSNO) Act, from the safety data sheet (SDS)' },
+    { key: 'signal_word', label: 'Signal word', hint: '“Danger” or “Warning”, as shown on the label' },
     { key: 'hazard_classifications', label: 'Hazard classifications — one per line', multiline: true },
-    { key: 'ghs_pictograms', label: 'GHS pictogram codes — one per line', multiline: true },
+    { key: 'ghs_pictograms', label: 'Hazard symbols (GHS codes such as GHS02) — one per line', hint: 'The Globally Harmonised System (GHS) symbols on the label or safety data sheet (SDS)', multiline: true },
     ...['is_controlled_substance', 'requires_tracking'].map((key) => ({ key, label: key === 'requires_tracking' ? 'Tracking required' : 'Controlled substance', options: [{ value: '0', label: 'No' }, { value: '1', label: 'Yes' }] })),
 ];
 const controls: FieldSpec[] = [
     { key: 'hazard_statements', label: 'Hazard statements' }, { key: 'precautionary_statements', label: 'Precautionary statements' },
-    { key: 'ppe_required', label: 'PPE required' }, { key: 'storage_requirements', label: 'Storage requirements' },
+    { key: 'ppe_required', label: 'Protective equipment (PPE) needed' }, { key: 'storage_requirements', label: 'Storage requirements' },
     { key: 'handling_precautions', label: 'Handling precautions' }, { key: 'first_aid_measures', label: 'First aid measures' },
     { key: 'firefighting_measures', label: 'Firefighting measures' }, { key: 'spill_procedures', label: 'Spill procedures' },
 ].map((field) => ({ ...field, multiline: true }));
-controls.push({ key: 'exposure_limit_type', label: 'Exposure limit type' }, { key: 'exposure_limit_value', label: 'Exposure limit value' });
+controls.push({ key: 'exposure_limit_type', label: 'Exposure limit type', hint: 'As written on the safety data sheet, for example WES-TWA (workplace exposure standard, 8-hour average)' }, { key: 'exposure_limit_value', label: 'Exposure limit value' });
 const sheetFields: FieldSpec[] = [{ key: 'version', label: 'Sheet version', required: true }, { key: 'issue_date', label: 'Issue date', required: true, type: 'date' },
     { key: 'review_date', label: 'Review date', type: 'date' }, { key: 'supplier_name', label: 'Supplier name' }, { key: 'supplier_contact', label: 'Supplier contact' }];
-const storageFields: FieldSpec[] = [{ key: 'location_description', label: 'Storage location', required: true }, { key: 'current_quantity', label: 'Recorded quantity', type: 'text' },
+const storageFields: FieldSpec[] = [{ key: 'location_description', label: 'Storage location', required: true }, { key: 'current_quantity', label: 'Amount held', type: 'text' },
     { key: 'quantity_unit', label: 'Quantity unit', options: QUANTITY_UNITS }, { key: 'maximum_quantity', label: 'Maximum quantity', type: 'text' },
-    { key: 'container_type', label: 'Container type' }, { key: 'last_audit_date', label: 'Last inventory check', type: 'date' },
+    { key: 'container_type', label: 'Container type' }, { key: 'last_audit_date', label: 'Last stock check', type: 'date' },
     { key: 'storage_notes', label: 'Storage notes', multiline: true }];
 const booleanFields: FieldSpec[] = ['properly_labelled', 'segregation_compliant'].map((key) => ({ key,
-    label: key === 'properly_labelled' ? 'Containers properly labelled' : 'Segregation compliant',
+    label: key === 'properly_labelled' ? 'Containers properly labelled' : 'Kept apart from incompatible chemicals (segregation)',
     options: [{ value: 'unknown', label: 'Not recorded' }, { value: '1', label: 'Yes' }, { value: '0', label: 'No' }] }));
-const reason: FieldSpec = { key: 'reason', label: 'Reason for this change', required: true, multiline: true };
+const reason: FieldSpec = { key: 'reason', label: 'Why are you making this change?', required: true, multiline: true };
 function specs(action: ChemicalAction | 'create', capture: ChemicalCapture | null): FieldSpec[] {
     if (action === 'create' || action === 'edit') return [...reference, ...controls];
-    if (action === 'status') return [{ key: 'status', label: 'Reference status', required: true, options: STATUS_OPTIONS }, reason];
+    if (action === 'status') return [{ key: 'status', label: 'Status', required: true, options: STATUS_OPTIONS }, reason];
     if (action === 'add_sds' || action === 'edit_sds') return [...sheetFields, ...(action === 'edit_sds' ? [reason] : [])];
     if (action === 'current_sds' || action === 'archive_storage' || action === 'restore_storage') return [reason];
     if (action === 'audit_storage') return [storageFields[1], ...booleanFields.map((field) => ({ ...field, required: true, options: field.options?.filter((option) => option.value !== 'unknown') })),
@@ -153,7 +156,7 @@ export function ChemicalCommandForm({ action, actorId, detail: providedDetail, s
         } catch (error) {
             if (controller.signal.aborted) return;
             if (axios.isAxiosError(error) && [401, 403, 404].includes(error.response?.status ?? 0)) onWithdraw?.();
-            setReviewFailure('Current facts could not be confirmed. Your original entries are retained.');
+            setReviewFailure('We couldn’t load the latest details. Your entries are kept.');
         } finally { if (reviewRequest.current === controller) { reviewRequest.current = null; setReviewing(false); } }
     };
     const useReviewed = () => {
@@ -166,51 +169,54 @@ export function ChemicalCommandForm({ action, actorId, detail: providedDetail, s
         if (action.includes('storage') && action !== 'add_storage' && next.expected === null) return;
         if (command.uncertain && !command.resetReviewedRejection()) return;
         setReviewedRecord(fresh);
-        setVersions(next); setFresh(null); setReviewFailure('Current revision reviewed. Your retained entries have not been replaced. Recheck them before submitting.');
+        setVersions(next); setFresh(null); setReviewFailure('Now using the latest details. Your entries haven’t changed — check them before saving.');
     };
     useEffect(() => { if (command.withdrawn) onWithdraw?.(); }, [command.withdrawn, onWithdraw]);
     useEffect(() => { onStep?.(step, !!command.receipt); }, [step, command.receipt, onStep]);
-    const steps = catalogue ? [{ key: 'reference', label: 'Reference', blurb: 'Identity and classification', icon: FlaskConical },
-        { key: 'controls', label: 'Safe use', blurb: 'Recorded precautions and responses', icon: Shield }, { key: 'review', label: 'Review', blurb: 'Check before saving', icon: ClipboardCheck }] :
-        [{ key: 'facts', label: 'Details', blurb: 'Record this change', icon: FileText }, { key: 'review', label: 'Review', blurb: 'Check before saving', icon: ClipboardCheck }];
+    const steps = catalogue ? [{ key: 'reference', label: 'About the chemical', blurb: 'Name and hazard type', icon: FlaskConical },
+        { key: 'controls', label: 'Safe use', blurb: 'Precautions and what to do if something goes wrong', icon: Shield }, { key: 'review', label: 'Check and save', blurb: 'Check before saving', icon: ClipboardCheck }] :
+        [{ key: 'facts', label: 'Details', blurb: 'What’s changing', icon: FileText }, { key: 'review', label: 'Check and save', blurb: 'Check before saving', icon: ClipboardCheck }];
+    /** A saved value in words: a chosen option by its label, an unanswered yes/no as "Not recorded". */
+    const shown = (spec: FieldSpec, value: unknown) => value == null || value === '' || value === 'unknown' ? 'Not recorded'
+        : spec.options ? optionLabel(spec.options, String(value)) : String(value);
     const review = step === steps.length - 1; const displayFields = catalogue ? step === 0 ? reference : controls : fields;
     const title = CHEMICAL_LABELS[action];
-    const field = (spec: FieldSpec) => <Field key={spec.key} label={spec.label} required={spec.required} htmlFor={`${id}-${spec.key}`} error={command.errors[spec.key]}>
+    const field = (spec: FieldSpec) => <Field key={spec.key} label={spec.label} hint={spec.hint} required={spec.required} htmlFor={`${id}-${spec.key}`} error={command.errors[spec.key]}>
         {spec.options ? <SelectInput id={`${id}-${spec.key}`} ariaLabel={spec.label} frontline value={String(values[spec.key] ?? '')} placeholder="Choose…" options={spec.options} disabled={command.locked}
             onChange={(value) => setValues((current) => ({ ...current, [spec.key]: value }))} /> : spec.multiline ?
             <Textarea id={`${id}-${spec.key}`} value={String(values[spec.key] ?? '')} disabled={command.locked} onChange={(event) => setValues((current) => ({ ...current, [spec.key]: event.target.value }))} /> :
             <Input id={`${id}-${spec.key}`} type={spec.type ?? 'text'} className="frontline-tap" value={String(values[spec.key] ?? '')} disabled={command.locked} onChange={(event) => setValues((current) => ({ ...current, [spec.key]: event.target.value }))} />}
     </Field>;
-    return <WizardShell open={active} frontline onClose={onCancel} title={title} description="Record the reviewed chemical facts. Changes stay with their permanent source record."
-        railIcon={FlaskConical} railTitle={title} railSub="Chemical reference" steps={steps} stepIndex={step} onStepClick={(next) => !command.locked && setStep(next)}
+    return <WizardShell open={active} frontline onClose={onCancel} title={title} description="Fill in the chemical’s details from its safety data sheet (SDS)."
+        railIcon={FlaskConical} railTitle={title} railSub={detail?.name ?? 'Chemical'} steps={steps} stepIndex={step} onStepClick={(next) => !command.locked && setStep(next)}
         footerStart={<Button variant="outline" type="button" className="frontline-tap" onClick={onCancel}>{command.receipt ? 'Close' : 'Cancel'}</Button>}
-        footerEnd={command.receipt ? <Button type="button" className="frontline-tap" onClick={onDone}>{action === 'create' ? 'Done' : 'Return to record'}</Button> : <>
+        footerEnd={command.receipt ? <Button type="button" className="frontline-tap" onClick={onDone}>{action === 'create' ? 'Done' : 'Back to the chemical'}</Button> : <>
             {step > 0 && <Button type="button" variant="outline" className="frontline-tap" disabled={command.locked} onClick={() => setStep(step - 1)}>Back</Button>}
-            {!review ? <Button type="button" className="frontline-tap" disabled={command.locked} onClick={() => setStep(step + 1)}>Review</Button> :
-                <Button type="button" className="frontline-tap" disabled={command.locked || (action === 'add_sds' && !values.file)} onClick={() => command.submit(chemicalFormPayload(action, values, capture), action === 'add_sds')}>Save reviewed details</Button>}</>}
+            {!review ? <Button type="button" className="frontline-tap" disabled={command.locked} onClick={() => setStep(step + 1)}>Next</Button> :
+                <Button type="button" className="frontline-tap" disabled={command.locked || (action === 'add_sds' && !values.file)} onClick={() => command.submit(chemicalFormPayload(action, values, capture), action === 'add_sds')}>Save</Button>}</>}
         success={!!command.receipt}>
         {command.receipt ? <div className="space-y-4"><CheckCircle2 aria-hidden className="size-8 text-status-success" /><h2 className="text-section-title">Saved</h2>
-            <p className="text-subtle">{command.receipt.changed ? 'This exact submission was accepted.' : 'The submission was accepted with no change to the recorded facts.'}</p>
-            {command.href ? <Button asChild className="frontline-tap"><a href={command.href}>Open chemical record</a></Button> : <p className="text-subtle">Your submission is confirmed. Your current access does not include opening the saved record.</p>}</div> :
-            command.withdrawn || !validSource ? <p role="alert" className="text-subtle text-status-warning">Current access or source history is unavailable. Saved facts are withheld; your unsent entries remain in memory until you leave.</p> : <>
-                {(stale || choicesError || !allowed) && <p role="alert" className="text-subtle text-status-warning">{stale ? 'The record has changed. Check the original submission before reviewing current facts.' : choicesError ? 'Current Site choices could not be loaded. Close this form and check access before trying again.' : 'This change is unavailable for the current record.'}</p>}
+            <p className="text-subtle">{command.receipt.changed ? 'Saved.' : 'Saved — nothing needed to change.'}</p>
+            {command.href ? <Button asChild className="frontline-tap"><a href={command.href}>Open the chemical</a></Button> : <p className="text-subtle">Saved. You don’t have access to open this chemical — ask your health and safety manager if you need it.</p>}</div> :
+            command.withdrawn || !validSource ? <p role="alert" className="text-subtle text-status-warning">You can’t make this change — you may have lost access, or the record needs fixing by an administrator. Ask your health and safety manager. Saved details are hidden; your entries stay here until you leave the page.</p> : <>
+                {(stale || choicesError || !allowed) && <p role="alert" className="text-subtle text-status-warning">{stale ? 'Someone else changed this chemical while you were working. Check whether your save went through, then look at the latest details.' : choicesError ? 'We couldn’t load the list of sites. Close this form and try again — if it keeps happening, ask your health and safety manager to check your access.' : 'You can’t make this change. Only people who manage the chemical register can — ask your health and safety manager.'}</p>}
                 {command.message && <div role="status" className="space-y-3"><p className="text-subtle text-status-warning">{command.message}</p>
-                    <div className="flex flex-wrap gap-2">{command.canCheck && <Button type="button" className="frontline-tap" variant="outline" disabled={command.busy} onClick={() => void command.check()}>Check original submission</Button>}
-                        <Button type="button" className="frontline-tap" variant="outline" disabled={command.busy || !command.canRetry} onClick={command.retry}>Retry exact submission</Button>
-                        {command.canEditRejected && <Button type="button" className="frontline-tap" variant="outline" onClick={() => { command.editRejected(); setStep(0); }}>Edit rejected entries</Button>}</div></div>}
+                    <div className="flex flex-wrap gap-2">{command.canCheck && <Button type="button" className="frontline-tap" variant="outline" disabled={command.busy} onClick={() => void command.check()}>Check if it saved</Button>}
+                        <Button type="button" className="frontline-tap" variant="outline" disabled={command.busy || !command.canRetry} onClick={command.retry}>Try saving again</Button>
+                        {command.canEditRejected && <Button type="button" className="frontline-tap" variant="outline" onClick={() => { command.editRejected(); setStep(0); }}>Fix my entries</Button>}</div></div>}
                 {Object.entries(command.errors).filter(([key]) => ['command', 'expected_version', 'parent_expected_version', 'idempotency_key', 'file'].includes(key)).map(([key, message]) => <p role="alert" key={key} className="text-subtle text-status-critical">{message}</p>)}
-                {(stale || command.errors.expected_version || command.errors.parent_expected_version) && <Button type="button" className="frontline-tap" variant="outline" disabled={reviewing || command.busy || (command.uncertain && !command.canReviewRejected)} onClick={() => void reviewCurrent()}>Review current record</Button>}
+                {(stale || command.errors.expected_version || command.errors.parent_expected_version) && <Button type="button" className="frontline-tap" variant="outline" disabled={reviewing || command.busy || (command.uncertain && !command.canReviewRejected)} onClick={() => void reviewCurrent()}>See latest details</Button>}
                 {reviewFailure && <p role="status" className="text-subtle">{reviewFailure}</p>}
-                {fresh && <ReviewCard icon={ClipboardCheck} title="Current recorded facts">
+                {fresh && <ReviewCard icon={ClipboardCheck} title="Latest saved details">
                     {fields.map((spec) => { const source = fresh.storage ?? fresh.sheet ?? fresh.detail; const value = (source as unknown as Record<string, unknown>)[spec.key];
-                        return <ReviewRow key={spec.key} label={spec.label} value={spec.key === 'reason' ? 'Your reason is retained below' : spec.key === 'site_id' ? fresh.storage?.site.name :
-                            Array.isArray(value) ? value.join(', ') : typeof value === 'boolean' ? value ? 'Yes' : 'No' : spec.type === 'date' ? formatDateOnly(value as string | null, 'Not recorded') : value == null ? 'Not recorded' : String(value)} />; })}
-                    <Button type="button" className="mt-3 frontline-tap" disabled={reviewing || command.busy} onClick={useReviewed}>Use reviewed revision</Button>
+                        return <ReviewRow key={spec.key} label={spec.label} value={spec.key === 'reason' ? 'Your reason is kept below' : spec.key === 'site_id' ? fresh.storage?.site.name :
+                            Array.isArray(value) ? value.join(', ') : typeof value === 'boolean' ? value ? 'Yes' : 'No' : spec.type === 'date' ? formatDateOnly(value as string | null, 'Not recorded') : shown(spec, value)} />; })}
+                    <Button type="button" className="mt-3 frontline-tap" disabled={reviewing || command.busy} onClick={useReviewed}>Use latest details</Button>
                 </ReviewCard>}
-                {review ? <ReviewCard icon={ClipboardCheck} title="Reviewed submission" onEdit={command.locked ? undefined : () => setStep(0)}>
-                    {fields.map((spec) => <ReviewRow key={spec.key} label={spec.label} value={String(values[spec.key] ?? '') || 'Not recorded'} />)}
-                    {action === 'add_sds' && <ReviewRow label="Selected sheet" value={values.file instanceof File ? values.file.name : 'No file selected'} />}
-                    <p className="mt-3 text-subtle">Recorded reference information does not certify that use, storage or worker exposure is safe.</p>
+                {review ? <ReviewCard icon={ClipboardCheck} title="Check your entries" onEdit={command.locked ? undefined : () => setStep(0)}>
+                    {fields.map((spec) => <ReviewRow key={spec.key} label={spec.label} value={spec.type === 'date' && values[spec.key] ? formatDateOnly(String(values[spec.key]), 'Not recorded') : shown(spec, values[spec.key])} />)}
+                    {action === 'add_sds' && <ReviewRow label="Sheet file" value={values.file instanceof File ? values.file.name : 'No file selected'} />}
+                    <p className="mt-3 text-subtle">Check the safety data sheet (SDS) before use.</p>
                 </ReviewCard> : <div className="grid gap-4 sm:grid-cols-2">{displayFields.map(field)}
                     {action === 'add_sds' && <div className="sm:col-span-2"><Field label="Safety data sheet" required error={command.errors.file}>
                         <FileDropzone accept=".pdf,.doc,.docx" multiple={false} disabled={command.locked} title="Choose safety data sheet" hint="PDF or Word · maximum 10 MB" onFiles={(files) => setValues((current) => ({ ...current, file: files[0] ?? null }))} />

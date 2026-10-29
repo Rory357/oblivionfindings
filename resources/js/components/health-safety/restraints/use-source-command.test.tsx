@@ -135,7 +135,7 @@ it('keeps draft facts and the same command identity after an uncertain submissio
         expected_version: 4,
     });
     act(() => io.submissions[0].options.onFinish());
-    expect(result.current.failure).toContain('could not be confirmed');
+    expect(result.current.failure).toContain('couldn’t tell if this saved');
     expect(result.current.form.data.notes).toBe(
         'Checked the person and called the nurse.',
     );

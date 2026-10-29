@@ -20,13 +20,14 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { formatDateOnly, toDateInput, workerDayRange } from '@/lib/datetime';
+import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import type { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     CalendarDays,
     ChevronDown,
-    Download,
+    FileText,
     Plus,
     ShieldCheck,
 } from 'lucide-react';
@@ -82,25 +83,8 @@ export type CommandCentreHeroProps = AttentionProps & {
     rail?: ReactNode;
     search?: { value: string; onChange: (value: string) => void };
 };
-const GOV_REPORTS = [
-    { label: 'Board summary', href: '/health-safety/reports/board-summary' },
-    {
-        label: 'WorkSafe register',
-        href: '/health-safety/reports/worksafe-register',
-    },
-    {
-        label: 'Investigation outcomes',
-        href: '/health-safety/reports/investigation-outcomes',
-    },
-    {
-        label: 'Corrective-action traceability',
-        href: '/health-safety/reports/corrective-action-traceability',
-    },
-    {
-        label: 'Risk-assessment register',
-        href: '/health-safety/reports/risk-assessment-register',
-    },
-];
+// One board-report list, linking the readable report pages (lib/health-safety/board-reports).
+const GOV_REPORTS = boardReportLinks();
 function presetRange(
     key: string,
     asAt: Date = new Date(),
@@ -296,8 +280,8 @@ export function CommandCentreHero({
                     {canViewBoardReports && (
                         <Popover>
                             <PopoverTrigger asChild>
-                                <PageHeaderGlassButton icon={Download}>
-                                    Export board summary
+                                <PageHeaderGlassButton icon={FileText}>
+                                    {BOARD_REPORTS_LABEL}
                                     <ChevronDown className="size-3.5" />
                                 </PageHeaderGlassButton>
                             </PopoverTrigger>

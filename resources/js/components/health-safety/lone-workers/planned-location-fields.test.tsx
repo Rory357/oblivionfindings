@@ -220,7 +220,7 @@ it('distinguishes a successful empty lookup from transport failure', async () =>
     query('No matching place');
     lookup();
     expect(await screen.findByRole('status')).toHaveTextContent(
-        'No map points found',
+        'No matching places found',
     );
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });

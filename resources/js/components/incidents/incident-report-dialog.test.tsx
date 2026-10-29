@@ -1041,12 +1041,13 @@ describe('IncidentReportDialog truthful incident intent', () => {
     });
 
     it('promises only incident reporting from the H&S launcher tile', () => {
+        inertia.pageProps = { auth: { can: { incidents: { create: true } } } };
         render(
             <ReportLauncher open onClose={() => {}} onWorkflow={() => {}} />,
         );
 
         expect(
-            screen.getByRole('button', { name: /Report incident/i }),
+            screen.getByRole('button', { name: /Report an incident/i }),
         ).toBeInTheDocument();
         expect(
             screen.queryByText(/Report incident \/ near-miss/i),

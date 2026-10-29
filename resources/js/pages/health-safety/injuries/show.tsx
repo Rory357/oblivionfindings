@@ -14,7 +14,7 @@ import type { InjuryCommand, InjuryRecord, InjurySection } from '@/components/he
 import { dateTimeWithYear, dateWithYear } from '@/components/incidents/incident-stages';
 import { PageHeader, PageHeaderGlassButton, PageHeaderPrimaryButton, PageHeaderRail, PageHeaderStatusChip, PageLayout } from '@/components/page';
 import { PageHeaderFacts, PageHeaderStages, type PageHeaderFact, type PageHeaderNextStep, type PageHeaderStage } from '@/components/page/page-header-strip';
-import { SideColumn } from '@/components/signature/blocks';
+import { Note, SideColumn } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { SafetyFormDraftContext, useSafetyWorkspaceDrafts } from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
@@ -26,12 +26,11 @@ import { useEffect, useRef, useState } from 'react';
 
 const SECTIONS = [
     { key: 'overview', label: 'Overview' }, { key: 'recovery', label: 'Recovery plan' },
-    { key: 'capacity', label: 'Assessments' }, { key: 'scheduling', label: 'Scheduling' },
-    { key: 'treatment', label: 'Treatment and claim' }, { key: 'connections', label: 'Connected work' },
+    { key: 'capacity', label: 'Fitness-for-work checks' }, { key: 'scheduling', label: 'Scheduling' },
+    { key: 'treatment', label: 'Treatment and ACC claim' }, { key: 'connections', label: 'Linked records' },
     { key: 'evidence', label: 'Evidence' }, { key: 'history', label: 'History' },
 ] as const;
 const COMMAND_SECTION: Record<InjuryCommand, InjurySection> = { start_treatment: 'treatment', begin_rtw: 'recovery', mark_recovered: 'recovery', close: 'overview', acc: 'treatment', add_rtw: 'recovery', add_capacity: 'capacity', edit: 'overview', assign: 'overview', review: 'recovery', edit_rtw: 'recovery', add_duty: 'recovery', upload_evidence: 'evidence', remove_evidence: 'evidence' };
-const STAGE_LABELS: Record<string, string> = { reported: 'Reported', under_treatment: 'Under treatment', return_to_work: 'Return to work', recovered: 'Recovered', closed: 'Closed' };
 /** What the coordinator does next at each stage (the transition the header button records). */
 const NEXT_STEP: Record<string, string> = {
     reported: 'records that treatment has started',
@@ -88,29 +87,29 @@ function InjuryWorkspace({ detail: d, return_to }: Props) {
     const severityTone = SEVERITY_TONE[d.severity];
     const facts: PageHeaderFact[] = [
         { value: severityLabel(d.severity), label: 'Severity', tone: severityTone && severityTone !== 'neutral' ? severityTone : undefined },
-        ...(unassigned ? [{ value: d.coordination.attribution_state === 'unassigned' ? 'Needs an owner' : 'Assignment needs review', label: 'Owner', tone: 'warning' as const }] : []),
+        ...(unassigned ? [{ value: d.coordination.attribution_state === 'unassigned' ? 'Needs an owner' : 'Owner unclear — choose one', label: 'Owner', tone: 'warning' as const }] : []),
         { value: d.coordination.next_review_date ? dateWithYear(d.coordination.next_review_date) : 'Not set', label: 'Next review' },
     ];
     const reachedAt = stageDates(d);
     const current = Math.max(0, STATUS_ORDER.indexOf(d.status as (typeof STATUS_ORDER)[number]));
     const closed = d.status === 'closed';
     const steps: PageHeaderStage[] = STATUS_ORDER.map((status, index) => ({
-        label: STAGE_LABELS[status],
+        label: statusLabel(status),
         meta: index === 0 && unassigned && !closed ? 'No owner yet'
             : reachedAt[status] && index <= current ? `${index === current && index > 0 && !closed ? 'Since ' : ''}${dateWithYear(reachedAt[status])}` : undefined,
         state: closed || index < current ? 'done' : index === current ? 'now' : 'todo',
         tone: index === current && unassigned && !closed ? 'critical' : undefined,
     }));
     const next: PageHeaderNextStep | null = closed ? null : unassigned
-        ? { label: 'Next step', text: 'Choose who coordinates this injury', tone: 'critical', meta: 'Recovery coordination, operational response and safety review each retain their own owner and outcome.' }
+        ? { label: 'Next step', text: 'Choose who coordinates this injury', tone: 'critical', meta: 'Recovery, the on-the-day response and the safety review each have their own owner' }
         : NEXT_STEP[d.status] ? { label: 'Next step', text: `${owner} ${NEXT_STEP[d.status]}`, meta: `Recovery coordinator${d.coordination.next_review_date ? ` · next review ${dateWithYear(d.coordination.next_review_date)}` : ''}` } : null;
 
-    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: d.reference, href: injuryHref(d.id) }]}>
-        <Head title={`${d.reference} · Workplace injury`} />
+    return <AppLayout breadcrumbs={[{ title: 'Home', href: '/dashboard' }, { title: 'Health & safety', href: '/health-safety' }, { title: 'Safety registers', href: '/health-safety/registers' }, { title: 'Workplace injuries', href: INJURY_REGISTER }, { title: `${d.injury_type_label} · ${d.reference}`, href: injuryHref(d.id) }]}>
+        <Head title={`Workplace injury · ${d.reference}`} />
         <SafetyFormDraftContext.Provider value={drafts.register}>
-            <PageLayout hero={<PageHeader variant="profile" wrapTitle backHref={returnTo} title={`${d.injury_type_label} — ${d.worker?.name ?? 'Worker unavailable'}`} icon={HeartPulse}
+            <PageLayout hero={<PageHeader variant="profile" wrapTitle backHref={returnTo} title={`${d.injury_type_label} — ${d.worker?.name ?? 'Name hidden'}`} icon={HeartPulse}
                 titleChip={<PageHeaderStatusChip variant={closed ? 'neutral' : unassigned ? 'warning' : 'info'}>{statusLabel(d.status)}</PageHeaderStatusChip>}
-                subline={[d.reference, d.site?.name ?? 'Site unavailable', d.injury_date ? dateTimeWithYear(d.injury_date) : null, owner ? `Owner ${owner}` : null].filter(Boolean).join(' · ')}
+                subline={[d.reference, d.site?.name ?? 'Site hidden', d.injury_date ? dateTimeWithYear(d.injury_date) : null, owner ? `Owner ${owner}` : null].filter(Boolean).join(' · ')}
                 actions={<>
                     {d.can.assign && nextAction !== 'assign' && <PageHeaderGlassButton icon={Users} onClick={() => open('assign')}>{d.coordination.coordinator ? 'Change owner' : 'Assign owner'}</PageHeaderGlassButton>}
                     {nextAction && <PageHeaderPrimaryButton onClick={() => open(nextAction)}>{nextAction === 'assign' ? 'Assign owner' : INJURY_COMMAND_LABELS[nextAction]}</PageHeaderPrimaryButton>}
@@ -120,11 +119,11 @@ function InjuryWorkspace({ detail: d, return_to }: Props) {
                 rail={<PageHeaderRail items={[...SECTIONS]} value={section} onSelect={(next) => move(next)} ariaLabel="Injury sections" />} />}>
                 <div className="grid min-w-0 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)]">
                     <div ref={panel} tabIndex={-1} className="grid min-w-0 gap-5 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                        {d.source_integrity === 'repair_required' && <div role="status" className="flex items-start gap-2.5 rounded-[14px] border border-status-warning/40 bg-status-warning-bg px-[18px] py-3">
-                            <AlertTriangle aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-status-warning" />
-                            <div className="grid gap-1"><p className="text-sm font-semibold text-status-warning-foreground">Source record needs review</p><p className="text-sm text-status-warning-foreground">The factual occurrence is retained. Changes and private source details are withheld until its recorded history can be confirmed.</p></div>
-                        </div>}
-                        {command && !retainCommand && <div className="grid justify-items-start gap-3 rounded-[14px] border border-border bg-card px-[18px] py-4"><p role="alert" className="text-sm font-medium">This change is no longer available for the current record.</p><Button type="button" variant="outline" onClick={() => move(section)}>Return to the record</Button></div>}
+                        {d.source_integrity === 'repair_required' && <div role="status"><Note tone="warning" icon={AlertTriangle}>
+                            <p className="font-semibold">This record needs fixing</p>
+                            <p>The injury is still on record, but nobody can change it or see its private details until an administrator fixes its history. Ask an administrator.</p>
+                        </Note></div>}
+                        {command && !retainCommand && <div className="grid justify-items-start gap-3 rounded-[14px] border border-border bg-card px-[18px] py-4"><p role="alert" className="text-sm font-medium">This change is no longer available for the current record — it may have moved on or your access changed. Ask the injury owner or a health and safety manager.</p><Button type="button" variant="outline" onClick={() => move(section)}>Return to the record</Button></div>}
                         {command && retainCommand && <div className="rounded-[14px] border border-border bg-card p-5 empty:hidden"><InjuryCommandForm key={`${shared.auth.user.id}:${d.id}:${commandKey}`} detail={d} command={command} actorId={shared.auth.user.id} selected={selected} returnTo={returnTo} onCancel={() => move(section)} onDone={() => { interacted.current = true; router.get(href(section), {}, { preserveState: false, preserveScroll: true }); }} /></div>}
                         <InjuryRecordPanel detail={d} section={section} open={open} sourceHref={href(section)} />
                     </div>

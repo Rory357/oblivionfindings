@@ -44,6 +44,7 @@ import {
     Siren,
     User,
 } from 'lucide-react';
+import { humaniseHsValue } from '@/lib/health-safety/hs-labels';
 import type { ReactNode } from 'react';
 import type { LinkedRecord, SafetySession, SessionDelivery } from './types';
 
@@ -53,20 +54,20 @@ export const words = (value: string) =>
     value.replace(/[_-]/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
 export const deliveryLabel = (delivery: SessionDelivery | null) =>
     ({
-        pending: 'Pending delivery',
-        failed: 'Delivery failed',
-        delivered: 'Delivered',
-        suppressed: 'Suppressed',
-        skipped: 'Not delivered',
-        unknown: 'Not confirmed',
+        pending: 'Waiting to send',
+        failed: 'Sending failed',
+        delivered: 'Sent',
+        suppressed: 'Not sent (switched off)',
+        skipped: 'Not sent',
+        unknown: 'Not available',
     })[delivery?.status ?? 'unknown'];
 export const observationLabel = (state: string) =>
     ({
         no_check_in: 'No check-in received',
         received: 'Check-in received',
         stale: 'Check-in is old',
-        unknown: 'Timing not confirmed',
-    })[state] ?? 'Timing not confirmed';
+        unknown: 'Not known yet',
+    })[state] ?? 'Not known yet';
 export const monitorLabel = (state: string) =>
     ({
         current: 'Monitor checked recently',
@@ -74,6 +75,70 @@ export const monitorLabel = (state: string) =>
         failed: 'Monitor check failed',
         unknown: 'Monitor not confirmed',
     })[state] ?? 'Monitor not confirmed';
+
+/** Plain words for a stored value; an unknown value is made readable, a missing one reads "Not available". */
+const plain = (labels: Record<string, string>, value: unknown): string =>
+    value == null || value === ''
+        ? 'Not available'
+        : (labels[String(value)] ?? humaniseHsValue(String(value)));
+/** A control room response's status. */
+export const responseStatusLabel = (status: string | null | undefined) =>
+    plain(
+        {
+            open: 'Open',
+            ack: 'Acknowledged',
+            triaging: 'Being checked',
+            confirmed: 'Confirmed as real',
+            resolved: 'Resolved',
+            closed: 'Closed',
+            dismissed: 'Dismissed',
+        },
+        status,
+    );
+const checkInLabel = (status: unknown) =>
+    plain({ ok: 'OK', concern: 'Concern', emergency: 'Emergency' }, status);
+const sessionStatusLabel = (status: unknown) =>
+    plain(
+        {
+            active: 'Active',
+            overdue: 'Check-in overdue',
+            emergency: 'Emergency',
+            completed: 'Ended',
+        },
+        status,
+    );
+const LEGACY_ALERT_TYPES: Record<string, string> = {
+    emergency: 'Emergency',
+    overdue_check_in: 'Check-in overdue',
+    no_response: 'No response',
+};
+const LEGACY_ALERT_STATES: Record<string, string> = {
+    active: 'Active',
+    acknowledged: 'Acknowledged',
+    resolved: 'Resolved',
+};
+const COLLECTION_LABELS: Record<string, string> = {
+    current: 'Sending',
+    stale: 'Out of date',
+    unknown: 'Not known',
+};
+/** A linked record's status (incident, safety review, action, control room response). */
+const LINKED_STATUS: Record<string, string> = {
+    open: 'Open',
+    active: 'Active',
+    overdue: 'Overdue',
+    pending: 'Pending',
+    draft: 'Draft',
+    closed: 'Closed',
+    resolved: 'Resolved',
+    completed: 'Done',
+    verified: 'Checked',
+    archived: 'Archived',
+    ack: 'Acknowledged',
+    triaging: 'Being checked',
+    confirmed: 'Confirmed as real',
+    dismissed: 'Dismissed',
+};
 
 /**
  * A session time: the time alone on the same NZ day as `base` (the session's
@@ -124,7 +189,7 @@ export function SessionOverview({ detail: d }: { detail: SafetySession }) {
             icon: User,
             text: d.client?.name
                 ? `With ${d.client.name}`
-                : 'No client available to view',
+                : 'No client you can see',
         },
     ];
     return (
@@ -140,8 +205,8 @@ export function SessionOverview({ detail: d }: { detail: SafetySession }) {
                 ]}
             />
             <Note icon={Info}>
-                Starting a session sets its first checkpoint. It does not record
-                a worker check-in or confirm that the worker is safe.
+                Starting the session sets when the first check-in is due. It
+                isn’t a check-in and doesn’t confirm the worker is safe.
             </Note>
         </>
     );
@@ -174,7 +239,7 @@ export function SessionCheckIns({ detail: d }: { detail: SafetySession }) {
                           : 'none') as SgTone,
                       title: d.is_check_in_overdue
                           ? 'Check-in overdue'
-                          : 'Next checkpoint',
+                          : 'Next check-in due',
                       sub: observationLabel(o.state),
                   },
               ]
@@ -184,14 +249,14 @@ export function SessionCheckIns({ detail: d }: { detail: SafetySession }) {
                 key: check.id,
                 time: sessionClock(check.checked_in_at, base),
                 tone: CHECK_TONE[check.status] ?? ('info' as SgTone),
-                title: `Check-in ${index + 1} · ${check.status === 'ok' ? 'Reported OK' : words(check.status)}`,
+                title: `Check-in ${index + 1} · ${check.status === 'ok' ? 'Reported OK' : checkInLabel(check.status)}`,
                 sub: (
                     <>
                         {check.receipt_source === 'legacy_created_at'
-                            ? 'Historical record created'
+                            ? 'Saved (from an older record)'
                             : 'Received'}{' '}
                         {sessionClock(check.received_at, base)} ·{' '}
-                        {check.recorded_by?.name ?? 'Operator not recorded'}
+                        {check.recorded_by?.name ?? 'Name not recorded'}
                         {check.notes ? (
                             <span className="whitespace-pre-wrap">
                                 {' '}
@@ -203,9 +268,9 @@ export function SessionCheckIns({ detail: d }: { detail: SafetySession }) {
                             <span className="block">
                                 Position recorded with this check-in:{' '}
                                 {String(check.location_lat)},{' '}
-                                {String(check.location_lng)}. Historical
-                                check-in position; this does not establish the
-                                worker's current location.
+                                {String(check.location_lng)}. This is where they
+                                were at that check-in, not necessarily where
+                                they are now.
                             </span>
                         ) : null}
                     </>
@@ -224,12 +289,12 @@ export function SessionCheckIns({ detail: d }: { detail: SafetySession }) {
                 />
             ) : null}
             {d.check_ins.length === 0 ? (
-                <QuietLine text="No check-in records are available for this session." />
+                <QuietLine text="No check-ins recorded for this session." />
             ) : null}
             {o.receipt_source === 'legacy_created_at' && (
                 <Note icon={Info}>
-                    The last receipt time comes from the historical record
-                    creation time. A separate delivery receipt was not recorded.
+                    For older check-ins, “received” is when the record was saved
+                    — the exact arrival time wasn’t kept.
                 </Note>
             )}
         </>
@@ -285,7 +350,7 @@ export function SessionResponse({ detail: d }: { detail: SafetySession }) {
                 title="Help request and response"
                 sub={
                     delivery
-                        ? `Request ${delivery.episode_number} · ${delivery.attempts} delivery ${delivery.attempts === 1 ? 'attempt' : 'attempts'}. Delivery records processing of the request; it does not confirm that a responder has accepted it.`
+                        ? `Help request ${delivery.episode_number} · ${delivery.attempts} ${delivery.attempts === 1 ? 'try' : 'tries'} to send. This shows whether it was sent, not that someone has picked it up.`
                         : undefined
                 }
                 facts={[
@@ -299,7 +364,7 @@ export function SessionResponse({ detail: d }: { detail: SafetySession }) {
                     },
                     {
                         icon: RotateCw,
-                        text: `Next delivery attempt: ${recordedAt(delivery?.next_attempt_at)}`,
+                        text: `Next try to send: ${recordedAt(delivery?.next_attempt_at)}`,
                     },
                 ]}
                 paras={[
@@ -313,17 +378,17 @@ export function SessionResponse({ detail: d }: { detail: SafetySession }) {
                 d.connections.control_room.map((alert) => (
                     <FactRows
                         key={alert.id}
-                        title={alert.reference_number ?? `Response ${alert.id}`}
-                        sub="Operational response"
-                        action={{ label: 'Continue response', href: alert.href }}
+                        title={alert.reference_number ?? 'Control room response'}
+                        sub="Control room response"
+                        action={{ label: 'Open in control room', href: alert.href }}
                         rows={[
                             [
                                 'Response status',
-                                words(alert.status ?? 'unknown'),
+                                responseStatusLabel(alert.status),
                             ],
                             [
                                 'Assigned responder',
-                                assignedName(alert) ?? 'Needs an owner',
+                                assignedName(alert) ?? 'Needs a responder',
                             ],
                             ['Acknowledged', recordedAt(alert.acknowledged_at)],
                             ['Resolved', recordedAt(alert.resolved_at)],
@@ -332,25 +397,25 @@ export function SessionResponse({ detail: d }: { detail: SafetySession }) {
                 ))
             ) : (
                 <QuietLine
-                    title="Operational response"
-                    text="No response record is available to view here. This does not confirm whether a response exists or someone is attending."
+                    title="Control room response"
+                    text="You can’t see a control room response here. That doesn’t mean no one is responding — check with the control room."
                 />
             )}
             <Note tone="warning" icon={AlertTriangle}>
-                Acknowledging a response or tracker panic does not record a
-                check-in, confirm worker safety or close linked incident and
-                review work.
+                Acknowledging a response or a tracker panic alert isn’t a
+                check-in. It doesn’t confirm the worker is safe or close any
+                linked incident or safety review.
             </Note>
             {d.legacy_alert_history.length > 0 && (
                 <Log
-                    title="Historical alerts"
-                    sub="Read-only historical records. These do not confirm a current operational response."
+                    title="Older alerts"
+                    sub="Older alerts, kept for reference. They don’t show what’s happening now."
                     limit={d.legacy_alert_history.length}
                     items={d.legacy_alert_history.map((alert) => ({
                         key: alert.id,
                         time: sessionClock(alert.triggered_at, base),
                         tone: 'none' as SgTone,
-                        title: `${words(alert.type)} · ${words(alert.recorded_status)}`,
+                        title: `${plain(LEGACY_ALERT_TYPES, alert.type)} · ${plain(LEGACY_ALERT_STATES, alert.recorded_status)}`,
                         sub: recordedAt(alert.triggered_at),
                     }))}
                 />
@@ -364,14 +429,14 @@ export function SessionResponse({ detail: d }: { detail: SafetySession }) {
 /* ------------------------------------------------------------------ */
 
 const TRACKER_STATES: Record<string, string> = {
-    restricted: 'Location is restricted',
-    session_ended: 'Live location is unavailable after this session ended',
+    restricted: 'Location hidden — you don’t have access',
+    session_ended: 'Live location isn’t shown after the session ends',
     not_assigned: 'No tracker assigned',
-    integrity_error: 'Tracker assignment needs review',
-    collection_stopped: 'Tracker collection stopped',
-    available: 'Location observation available',
-    stale: 'Location observation is old',
-    unknown: 'No location observation confirmed',
+    integrity_error: 'Tracker setup needs checking — ask the device admin',
+    collection_stopped: 'Tracker has stopped sending',
+    available: 'Tracker location available',
+    stale: 'Tracker location is out of date',
+    unknown: 'No tracker location yet',
 };
 /** Device contact freshness (the access service's collection_state). */
 const COLLECTION_TONE: Record<string, SgTone> = {
@@ -413,8 +478,8 @@ function plannedPlace(value: unknown): PlannedPlace | null {
                 : 'Address only; no map point recorded',
         source:
             typeof place.method === 'string'
-                ? (PLAN_METHODS[place.method] ?? 'Source not recorded')
-                : 'Source not recorded',
+                ? (PLAN_METHODS[place.method] ?? 'Not recorded')
+                : 'Not recorded',
         recordedAt:
             typeof place.recorded_at === 'string' ? place.recorded_at : null,
         by:
@@ -423,7 +488,7 @@ function plannedPlace(value: unknown): PlannedPlace | null {
             'name' in place.recorded_by &&
             typeof place.recorded_by.name === 'string'
                 ? place.recorded_by.name
-                : 'Operator not recorded',
+                : 'Name not recorded',
     };
 }
 
@@ -431,7 +496,7 @@ function plannedPlace(value: unknown): PlannedPlace | null {
 function PlannedPlaceText({ value }: { value: unknown }) {
     if (value == null) return <>No planned location recorded.</>;
     const place = plannedPlace(value);
-    if (!place) return <>Planned location details are unavailable.</>;
+    if (!place) return <>Planned location details aren’t available.</>;
     return (
         <>
             {place.description ?? 'Not recorded'} · {place.point} ·{' '}
@@ -450,7 +515,7 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
             key: 'contact',
             time: sessionClock(tracker.last_seen_at, base),
             tone: COLLECTION_TONE[tracker.collection_state] ?? 'none',
-            title: 'Last device contact',
+            title: 'Tracker last heard from',
             sub: tracker.name ?? 'Tracker',
         });
     if (tracker && (tracker.observed_at || tracker.received_at))
@@ -458,11 +523,11 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
             key: 'observed',
             time: sessionClock(tracker.observed_at, base),
             tone: d.tracker_state === 'available' ? 'success' : 'warning',
-            title: 'Location observed',
+            title: 'Tracker location',
             sub: `Received ${sessionClock(tracker.received_at, base)} · ${
                 tracker.latitude != null && tracker.longitude != null
                     ? `${tracker.latitude}, ${tracker.longitude}`
-                    : 'No permitted observation available'
+                    : 'Location not available'
             }`,
         });
     if (d.shift_gps) items.push(shiftGpsItem(d.shift_gps, base));
@@ -476,8 +541,8 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
         sub: (
             <span aria-label="Planned place" role="group" className="block">
                 <span className="block">
-                    This is the intended place for the work, not evidence of
-                    the worker's position.
+                    Where the work is meant to happen — not where the worker
+                    actually is.
                 </span>
                 <span className="block">
                     <PlannedPlaceText value={d.planned_location} />
@@ -488,7 +553,7 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
     items.push({
         key: 'recorded',
         tone: 'none',
-        title: 'Recorded location description',
+        title: 'Location notes',
         sub: d.location || 'Not recorded',
     });
     return (
@@ -496,16 +561,15 @@ export function SessionLocation({ detail: d }: { detail: SafetySession }) {
             <Log
                 title="Location"
                 sub={
-                    TRACKER_STATES[d.tracker_state] ??
-                    'Location availability is not confirmed'
+                    TRACKER_STATES[d.tracker_state] ?? 'Tracker location unknown'
                 }
                 items={items}
                 limit={items.length}
             />
             <Note icon={Info}>
-                Device contact and location observations are separate facts.
-                Neither confirms the worker’s current location or safety without
-                checking the observation time and response.
+                When the tracker last checked in and where it was are two
+                separate things. Check the times — neither confirms where the
+                worker is now or that they are safe.
             </Note>
         </>
     );
@@ -545,19 +609,18 @@ export function SessionTrackerRing({ detail: d }: { detail: SafetySession }) {
             <QuietLine
                 title="Tracker"
                 text={
-                    TRACKER_STATES[d.tracker_state] ??
-                    'Location availability is not confirmed'
+                    TRACKER_STATES[d.tracker_state] ?? 'Tracker location unknown'
                 }
             />
         );
     const checks: CheckItem[] = [
         {
-            label: 'Collection',
+            label: 'Tracker signal',
             state: COLLECTION_TONE[tracker.collection_state] ?? 'none',
-            note: words(tracker.collection_state),
+            note: plain(COLLECTION_LABELS, tracker.collection_state),
         },
         {
-            label: 'Tracker panic flag',
+            label: 'Panic button',
             state: tracker.panic_active ? 'critical' : 'success',
             note: tracker.panic_active ? 'Active' : 'Not active',
         },
@@ -581,8 +644,7 @@ export function SessionTrackerRing({ detail: d }: { detail: SafetySession }) {
             of={checks.length}
             label={tracker.name ?? 'Tracker'}
             sub={
-                TRACKER_STATES[d.tracker_state] ??
-                'Location availability is not confirmed'
+                TRACKER_STATES[d.tracker_state] ?? 'Tracker location unknown'
             }
             checks={checks}
         />
@@ -603,13 +665,19 @@ const historyLabels: Record<string, string> = {
     started_at: 'Started',
     expected_end_at: 'Expected end',
     ended_at: 'Ended',
-    last_check_in_at: 'Last check-in occurred',
+    last_check_in_at: 'Last check-in',
     emergency_triggered_at: 'Help requested',
     from: 'Previous status',
     to: 'New status',
     check_in_id: 'Check-in',
     episode_id: 'Help request',
     alert_id: 'Response',
+};
+const CHECK_IN_FIELDS: Record<string, string> = {
+    status: 'Check-in status',
+    notes: 'Check-in notes',
+    checked_in_at: 'Checked in',
+    received_at: 'Check-in received',
 };
 const HISTORY_TONE: Record<string, SgTone> = {
     'healthSafety.loneWorker.session.start': 'info',
@@ -629,7 +697,7 @@ function PlannedPlaceEvidence({ value }: { value: unknown }) {
     if (!place)
         return (
             <p className="text-subtle">
-                Planned location details are unavailable.
+                Planned location details aren’t available.
             </p>
         );
     return (
@@ -638,7 +706,7 @@ function PlannedPlaceEvidence({ value }: { value: unknown }) {
                 {place.description}
             </SessionFact>
             <SessionFact label="Planned map point">{place.point}</SessionFact>
-            <SessionFact label="Plan source">{place.source}</SessionFact>
+            <SessionFact label="How it was set">{place.source}</SessionFact>
             <SessionFact label="Plan recorded">
                 {recordedAt(place.recordedAt)}
             </SessionFact>
@@ -658,7 +726,7 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
     // newest first; each entry keeps its own captured details
     const events = [...d.history].reverse();
     return (
-        <Surface title="History" sub="Open an entry to see its captured details">
+        <Surface title="History" sub="Open an entry to see what was saved">
             <ol className="sg-log">
                 {events.map((event) => (
                     <li key={event.id} className="sg-lr">
@@ -667,7 +735,7 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                         <div className="min-w-0">
                             <b>{event.title}</b>
                             <small>
-                                {event.actor?.name ?? 'Operator not recorded'}
+                                {event.actor?.name ?? 'Name not recorded'}
                             </small>
                             {event.note && (
                                 <p className="mt-1 text-sm whitespace-pre-wrap">
@@ -676,14 +744,13 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                             )}
                             {event.legacy && (
                                 <small>
-                                    Historical details are incomplete. Current
-                                    values do not replace missing recorded
-                                    facts.
+                                    Some details weren’t saved at the time. We
+                                    don’t fill the gaps with today’s values.
                                 </small>
                             )}
                             <details className="mt-1">
                                 <summary className="inline-flex cursor-pointer items-center rounded-sm text-sm font-medium text-primary outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                    Captured details
+                                    What was saved
                                 </summary>
                                 <dl className="grid gap-3 pt-3 sm:grid-cols-2">
                                     {Object.entries(event.snapshot)
@@ -703,7 +770,9 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                                                     ? recordedAt(value)
                                                     : value == null
                                                       ? 'Not recorded'
-                                                      : String(value)}
+                                                      : ['status', 'from', 'to'].includes(key)
+                                                        ? sessionStatusLabel(value)
+                                                        : String(value)}
                                             </SessionFact>
                                         ))}
                                     {event.snapshot.check_in &&
@@ -722,7 +791,7 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                                               .map(([key, value]) => (
                                                   <SessionFact
                                                       key={`check-${key}`}
-                                                      label={`Check-in ${words(key).toLowerCase()}`}
+                                                      label={CHECK_IN_FIELDS[key]}
                                                   >
                                                       {typeof value ===
                                                           'string' &&
@@ -730,7 +799,9 @@ export function SessionHistory({ detail: d }: { detail: SafetySession }) {
                                                           ? recordedAt(value)
                                                           : value == null
                                                             ? 'Not recorded'
-                                                            : String(value)}
+                                                            : key === 'status'
+                                                              ? checkInLabel(value)
+                                                              : String(value)}
                                                   </SessionFact>
                                               ))
                                         : null}
@@ -779,7 +850,7 @@ function linkedBadge(record: LinkedRecord): ReactNode {
         : ['closed', 'resolved', 'completed', 'verified'].includes(key)
           ? 'neutral'
           : 'info';
-    return <StatusBadge variant={variant}>{words(key)}</StatusBadge>;
+    return <StatusBadge variant={variant}>{plain(LINKED_STATUS, key)}</StatusBadge>;
 }
 
 function linkedRow(
@@ -810,17 +881,12 @@ export function SessionConnections({ detail: d }: { detail: SafetySession }) {
         ...(shift
             ? [
                   linkedRow(
-                      'Workforce shift',
+                      'Shift',
                       shift,
                       <CalendarClock className="size-4" />,
-                      [
-                          `Shift ${shift.id}`,
-                          shift.starts_at
-                              ? `${sessionClock(shift.starts_at, null)} – ${sessionClock(shift.ends_at, shift.starts_at)}`
-                              : null,
-                      ]
-                          .filter(Boolean)
-                          .join(' · '),
+                      shift.starts_at
+                          ? `${sessionClock(shift.starts_at, null)} – ${sessionClock(shift.ends_at, shift.starts_at)}`
+                          : 'Time not recorded',
                   ),
               ]
             : []),
@@ -832,7 +898,7 @@ export function SessionConnections({ detail: d }: { detail: SafetySession }) {
             : []),
         ...c.control_room.map((record) =>
             linkedRow(
-                'Operational response',
+                'Control room response',
                 record,
                 <Siren className="size-4" />,
             ),
@@ -849,19 +915,19 @@ export function SessionConnections({ detail: d }: { detail: SafetySession }) {
         ),
         ...c.corrective_actions.map((record) =>
             linkedRow(
-                'Corrective action',
+                'Action',
                 record,
                 <ShieldAlert className="size-4" />,
             ),
         ),
     ];
     const missing = [
-        !shift && 'Workforce shift',
+        !shift && 'Shift',
         !c.site && !c.client && 'Site and client',
-        !c.control_room.length && 'Operational responses',
+        !c.control_room.length && 'Control room responses',
         !c.incidents.length && 'Incidents',
         !c.safety_reviews.length && 'Safety reviews',
-        !c.corrective_actions.length && 'Corrective actions',
+        !c.corrective_actions.length && 'Actions',
     ].filter((label): label is string => !!label);
     const missingTitle = missing.length
         ? missing.length === 1
@@ -871,15 +937,15 @@ export function SessionConnections({ detail: d }: { detail: SafetySession }) {
     return (
         <>
             <RowList
-                title="Connected work"
-                sub="Each source keeps its own permissions, owner and completion checks. Records you cannot access are not shown here."
+                title="Linked records"
+                sub="Each linked record has its own owner. Records you can’t open aren’t shown."
                 items={rows}
-                empty="No linked record is available to view here."
+                empty="Nothing linked that you can see."
             />
             {rows.length && missingTitle ? (
                 <QuietLine
                     title={missingTitle}
-                    text="No linked record is available to view here."
+                    text="Nothing linked that you can see."
                 />
             ) : null}
         </>
@@ -904,7 +970,7 @@ export function SessionPeople({ detail: d }: { detail: SafetySession }) {
     const starter = sessionStarter(d);
     const planner = plannedPlace(d.planned_location)?.by ?? null;
     const plannerName =
-        planner && planner !== 'Operator not recorded' ? planner : null;
+        planner && planner !== 'Name not recorded' ? planner : null;
     const people: PersonCardItem[] = [
         ...(d.worker?.name
             ? [

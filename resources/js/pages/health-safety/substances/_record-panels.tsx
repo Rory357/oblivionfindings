@@ -20,6 +20,8 @@ import type { ChemicalAction, ChemicalSection } from '@/lib/health-safety/chemic
 import { Archive, CircleAlert, ClipboardCheck, Edit, Eye, FileText, Hand, MapPin, Plus, TriangleAlert, Undo2 } from 'lucide-react';
 import { useEffect, type CSSProperties, type ReactNode } from 'react';
 import { chemicalSheetLabel, chemicalSheetTone } from './constants';
+import { exposureCaptureHref } from '@/lib/health-safety/chemical-exposure-navigation';
+import { Link, usePage } from '@inertiajs/react';
 
 const text = (value: string | number | null | undefined) => value === null || value === undefined || value === '' ? 'Not recorded' : String(value);
 const bool = (value: boolean | null) => value === null ? 'Not recorded' : value ? 'Yes' : 'No';
@@ -148,9 +150,18 @@ export function ChemicalRecordSide({ detail, section, onStorage }: { detail: Che
     </>;
 }
 
+/** Exposures name the worker, so they stay on the private exposure pages; this page only starts a new one. */
+function ChemicalExposuresPanel({ detail }: { detail: ChemicalDetail }) {
+    const { url } = usePage();
+    return <>
+        <Note icon={CircleAlert}><b>Worker exposures are private</b> — An exposure record names the worker, so only people with wellbeing and safety access can see it. This page doesn’t show or count them.</Note>
+        {detail.can.create || detail.can.manage ? <div><Button asChild size="sm"><Link href={exposureCaptureHref(detail.id, url)}><Plus aria-hidden="true" className="size-4" />Record an exposure</Link></Button></div> : null}
+    </>;
+}
+
 export function ChemicalRecordPanel({ detail, section, open }: { detail: ChemicalDetail; section: ChemicalSection; sourceHref?: string; open: Open }) {
     if (detail.source_integrity === 'repair_required') return <div role="status"><Note tone="warning">Source history needs review. Saved details and changes are withheld until they can be confirmed.</Note></div>;
-    if (section === 'exposures') return <Note icon={CircleAlert}><b>Private worker exposures</b> — Identifiable exposure records require current wellbeing and safety access. This public reference does not include exposure records or counts.</Note>;
+    if (section === 'exposures') return <ChemicalExposuresPanel detail={detail} />;
     if (section === 'sds') return <ChemicalSdsPanel detail={detail} open={open} />;
     if (section === 'storage') return <>
         <section className="grid min-w-0 gap-3"><SectionHead title="Storage locations" sub="Quantities and checks are recorded facts. Unknown quantities remain unconfirmed."

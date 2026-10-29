@@ -115,7 +115,7 @@ describe('Participation shared header', () => {
         );
         expect(
             screen.getByRole('button', {
-                name: 'Active reps below 2 training days',
+                name: 'Active representatives with under 2 training days',
             }),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Clear Show' }));
@@ -179,9 +179,9 @@ describe('Participation shared header', () => {
             ['Active representatives', '7', 'representatives'],
             ['All meetings', '12', 'meetings'],
             ['Open consultations', '4', 'consultations'],
-            ['Meetings with outstanding actions', '2', 'meetings'],
+            ['Meetings with unfinished actions', '2', 'meetings'],
             ['Minutes missing', '2', 'meetings'],
-            ['Rep training below 2 days', '1', 'representatives'],
+            ['Representatives with under 2 training days', '1', 'representatives'],
         ];
         for (const [label, value, tab] of expected) {
             const link = screen.getByRole('link', {
@@ -197,14 +197,14 @@ describe('Participation shared header', () => {
             expect(href.searchParams.get('tab')).toBe(tab);
             expect(href.searchParams.has('q')).toBe(false);
             expect(link.className).toMatch(
-                ['All meetings', 'Rep training below 2 days'].includes(label)
+                ['All meetings', 'Representatives with under 2 training days'].includes(label)
                     ? /sg-t--link/
                     : /eh-number/,
             );
         }
         expect(
             screen.getByText(
-                '75% recorded coverage · 3/4 sites · 1 without a rep',
+                '3 of 4 sites have a representative · 1 without one',
             ),
         ).toBeInTheDocument();
         expect(
@@ -227,10 +227,10 @@ describe('Participation shared header', () => {
         for (const label of [
             'active representatives',
             'open consultations',
-            'meetings with outstanding actions',
+            'meetings with unfinished actions',
             'all meetings',
             'minutes missing',
-            'rep training below 2 days',
+            'representatives with under 2 training days',
         ]) {
             const href = new URL(
                 screen
@@ -249,12 +249,12 @@ describe('Participation shared header', () => {
         expect(meetings.searchParams.get('period')).toBe('all');
         expect(meetings.searchParams.has('focus')).toBe(false);
         expect(
-            screen.getByText('5 unfinished action items across these meetings'),
+            screen.getByText('5 actions still to do from these meetings'),
         ).toBeInTheDocument();
         for (const [label, focus] of [
             ['minutes missing', 'minutes_missing'],
-            ['rep training below 2 days', 'training_below_two'],
-            ['meetings with outstanding actions', 'actions_outstanding'],
+            ['representatives with under 2 training days', 'training_below_two'],
+            ['meetings with unfinished actions', 'actions_outstanding'],
         ]) {
             const target = new URL(
                 screen
@@ -349,10 +349,10 @@ describe('Participation shared header', () => {
             />,
         );
         expect(
-            screen.getByText('Site coverage not confirmed'),
+            screen.getByText('No sites to check yet'),
         ).toBeInTheDocument();
         expect(
-            screen.queryByText(/0% recorded coverage/),
+            screen.queryByText(/0 of 0 sites/),
         ).not.toBeInTheDocument();
         for (const link of screen.getAllByRole('link'))
             expect(link).not.toHaveClass('eh-meter--success');

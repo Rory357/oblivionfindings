@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Field, SelectInput } from '@/components/wizard/primitives';
 import { toDatetimeLocal, workerTimeOffset } from '@/lib/datetime';
+import { hsLabel } from '@/lib/health-safety/hs-labels';
 import {
     restraintHref,
     type RestraintEventCommand,
@@ -31,14 +32,14 @@ export const EVENT_COMMAND_LABELS: Record<
     RestraintEventCommand | 'create',
     string
 > = {
-    create: 'Record restrictive intervention',
-    correct: 'Correct the factual record',
+    create: 'Record a restraint',
+    correct: 'Correct what was recorded',
     review: 'Record review',
-    'assign-review': 'Assign review owner',
-    'link-incident': 'Connect incident',
-    'unlink-incident': 'Remove incident connection',
-    'add-observation': 'Record observation',
-    'correct-observation': 'Correct observation',
+    'assign-review': 'Choose who reviews this',
+    'link-incident': 'Link an incident',
+    'unlink-incident': 'Unlink the incident',
+    'add-observation': 'Record a check',
+    'correct-observation': 'Correct a check',
     'record-debrief': 'Record debrief',
     'correct-debrief': 'Correct debrief',
     'add-followup': 'Add follow-up',
@@ -48,6 +49,48 @@ export const EVENT_COMMAND_LABELS: Record<
     'cancel-followup': 'Cancel follow-up',
     'add-evidence': 'Add evidence',
     'remove-evidence': 'Remove evidence',
+};
+/** The save button names what it does (never a bare "Save and confirm"). */
+const SAVE_LABELS: Record<RestraintEventCommand | 'create', string> = {
+    create: 'Save restraint',
+    correct: 'Save correction',
+    review: 'Save review',
+    'assign-review': 'Save review owner',
+    'link-incident': 'Link incident',
+    'unlink-incident': 'Unlink incident',
+    'add-observation': 'Save check',
+    'correct-observation': 'Save correction',
+    'record-debrief': 'Save debrief',
+    'correct-debrief': 'Save correction',
+    'add-followup': 'Add follow-up',
+    'reassign-followup': 'Change owner',
+    'complete-followup': 'Save outcome',
+    'correct-followup': 'Save correction',
+    'cancel-followup': 'Cancel follow-up',
+    'add-evidence': 'Add file',
+    'remove-evidence': 'Remove file',
+};
+const DEBRIEF_STATUS_LABELS: Record<string, string> = {
+    completed: 'Done',
+    not_yet_done: 'Not done yet',
+    declined: 'Declined',
+    not_required: 'Not needed',
+};
+const FOLLOWUP_OUTCOME_LABELS: Record<string, string> = {
+    recorded: 'Done',
+    contacted: 'Contact made',
+    attempted: 'Tried to make contact',
+    unable_to_contact: 'Couldn’t make contact',
+    declined: 'Declined',
+    not_required: 'Not needed',
+    other: 'Other',
+};
+const EVIDENCE_CATEGORY_LABELS: Record<string, string> = {
+    body_map: 'Body map',
+    injury_photo: 'Injury photo',
+    authorisation: 'Authorisation form',
+    debrief: 'Debrief notes',
+    other: 'Other',
 };
 export function eventCommandAllowed(
     detail: RestraintEventDetail,
@@ -286,18 +329,10 @@ export function RestraintEventCommandForm({
     const currentFacts = checkedEvent
         ? [
               {
-                  label: 'Current record version',
-                  value: String(checkedEvent.lock_version),
-              },
-              {
-                  label: 'Current source revision',
-                  value: String(checkedEvent.source_revision),
-              },
-              {
-                  label: 'Recorded intervention',
+                  label: 'What happened',
                   value: checkedEvent.restraint_description,
               },
-              { label: 'Trigger', value: checkedEvent.trigger_description },
+              { label: 'What led to it', value: checkedEvent.trigger_description },
               {
                   label: 'Alternatives attempted',
                   value: checkedEvent.de_escalation_attempted,
@@ -307,7 +342,7 @@ export function RestraintEventCommandForm({
                   value: checkedEvent.person_response,
               },
               {
-                  label: 'Post-incident support',
+                  label: 'Support afterwards',
                   value: checkedEvent.post_incident_support,
               },
               {
@@ -316,7 +351,7 @@ export function RestraintEventCommandForm({
               },
               { label: 'Injury details', value: checkedEvent.injury_details },
               {
-                  label: 'Plan evidence',
+                  label: 'Was it in the plan?',
                   value: checkedEvent.plan_authorization.explanation,
               },
               {
@@ -324,7 +359,7 @@ export function RestraintEventCommandForm({
                   value: checkedEvent.review_owner_id?.name ?? null,
               },
               {
-                  label: 'Selected follow-up',
+                  label: 'Follow-up',
                   value:
                       checkedEvent.followups.find((item) => item.id === childId)
                           ?.notes ?? null,
@@ -386,7 +421,7 @@ export function RestraintEventCommandForm({
                 <p className="text-subtle">
                     {pickers.clients.find(
                         (item) => String(item.id) === form.data.client_id,
-                    )?.name ?? 'Current stay person'}
+                    )?.name ?? 'Person on this respite stay'}
                 </p>
             ) : (
                 <>
@@ -742,7 +777,7 @@ export function RestraintEventCommandForm({
             />
             {command === 'create' && choices.checking && (
                 <p role="status" className="text-caption">
-                    Checking this person’s current choices…
+                    Loading options for this person…
                 </p>
             )}
             {command === 'create' && choices.failure && (
@@ -759,7 +794,7 @@ export function RestraintEventCommandForm({
                         className="frontline-tap"
                         onClick={() => chooseClient(form.data.client_id)}
                     >
-                        Retry current choices
+                        Try again
                     </Button>
                 </div>
             )}
@@ -776,7 +811,7 @@ export function RestraintEventCommandForm({
                                 person('client_id', 'Person', pickers.clients)}
                             {select(
                                 'restraint_type',
-                                'Intervention type',
+                                'Restraint type',
                                 [
                                     'physical',
                                     'chemical',
@@ -785,8 +820,7 @@ export function RestraintEventCommandForm({
                                     'environmental',
                                 ].map((value) => ({
                                     value,
-                                    label:
-                                        value[0].toUpperCase() + value.slice(1),
+                                    label: hsLabel('restraint_type', value),
                                 })),
                                 true,
                             )}
@@ -796,9 +830,7 @@ export function RestraintEventCommandForm({
                                 ['low', 'medium', 'high', 'critical'].map(
                                     (value) => ({
                                         value,
-                                        label:
-                                            value[0].toUpperCase() +
-                                            value.slice(1),
+                                        label: hsLabel('severity', value),
                                     }),
                                 ),
                                 true,
@@ -806,12 +838,12 @@ export function RestraintEventCommandForm({
                             {time(
                                 'started_at',
                                 'started_offset',
-                                'Actual start time',
+                                'Start time',
                             )}
                             {time(
                                 'ended_at',
                                 'ended_offset',
-                                'Actual end time',
+                                'End time',
                                 false,
                             )}
                             <Field
@@ -832,7 +864,7 @@ export function RestraintEventCommandForm({
                             </Field>
                             {text(
                                 'trigger_description',
-                                'What led to the intervention?',
+                                'What led to the restraint?',
                                 true,
                             )}
                             {text(
@@ -863,7 +895,7 @@ export function RestraintEventCommandForm({
                             </Field>
                             {form.data.injury_occurred &&
                                 text('injury_details', 'Injury details', true)}
-                            <Field label="Was this within the approved support plan?">
+                            <Field label="Was this in the person’s approved behaviour support plan?">
                                 <Checkbox
                                     checked={form.data.within_support_plan}
                                     onCheckedChange={(value) =>
@@ -876,7 +908,7 @@ export function RestraintEventCommandForm({
                             </Field>
                             {person(
                                 'behaviour_support_plan_id',
-                                'Recorded plan',
+                                'Behaviour support plan',
                                 pickers.plansForPicker
                                     .filter(
                                         (item) =>
@@ -893,17 +925,15 @@ export function RestraintEventCommandForm({
                             {!form.data.within_support_plan &&
                                 text(
                                     'deviation_reason',
-                                    'Reason the intervention differed from the plan',
+                                    'Why it was outside the plan',
                                     true,
                                 )}
                             {command === 'correct' && (
                                 <div className="space-y-3 rounded-xl border border-border p-4">
                                     <p className="text-subtle">
-                                        Staff attribution stays unchanged unless
-                                        you select a correction. Replacing it
-                                        records a new factual version;
-                                        historical attribution remains in the
-                                        record history.
+                                        Staff names stay as they are unless you
+                                        tick a box below. If you change them, the
+                                        old names stay in the history.
                                     </p>
                                     <label className="frontline-tap text-subtle flex items-center gap-3">
                                         <Checkbox
@@ -917,12 +947,12 @@ export function RestraintEventCommandForm({
                                                 )
                                             }
                                         />
-                                        Correct the recorded authoriser
+                                        Change who authorised it
                                     </label>
                                     {form.data.correct_authoriser
                                         ? person(
                                               'authorised_by',
-                                              'Replacement authoriser (empty removes attribution)',
+                                              'Who authorised it (leave blank to remove the name)',
                                               pickers.staff,
                                           )
                                         : null}
@@ -936,10 +966,10 @@ export function RestraintEventCommandForm({
                                                 )
                                             }
                                         />
-                                        Replace the complete involved-staff list
+                                        Change the staff involved
                                     </label>
                                     {form.data.correct_staff ? (
-                                        <Field label="Replacement involved staff (empty clears the list)">
+                                        <Field label="Staff involved (untick everyone to clear the list)">
                                             <div className="space-y-3">
                                                 {pickers.staff.map((staff) => (
                                                     <label
@@ -985,7 +1015,7 @@ export function RestraintEventCommandForm({
                                 <>
                                     {person(
                                         'authorised_by',
-                                        'Person who authorised the intervention',
+                                        'Person who authorised the restraint',
                                         pickers.staff,
                                     )}
                                     <Field label="Staff who were involved">
@@ -1048,13 +1078,13 @@ export function RestraintEventCommandForm({
                         <>
                             {person(
                                 'reviewed_by',
-                                'Actual reviewer (leave empty for yourself)',
+                                'Who did the review (leave blank if it was you)',
                                 pickers.reviewers,
                             )}
                             {time(
                                 'reviewed_at',
                                 'reviewed_offset',
-                                'Actual review time',
+                                'When the review happened',
                             )}
                             {text('review_notes', 'Review findings')}
                             {text(
@@ -1063,9 +1093,12 @@ export function RestraintEventCommandForm({
                             )}
                             {select(
                                 'severity',
-                                'Reviewed severity',
+                                'Severity after review',
                                 ['low', 'medium', 'high', 'critical'].map(
-                                    (value) => ({ value, label: value }),
+                                    (value) => ({
+                                        value,
+                                        label: hsLabel('severity', value),
+                                    }),
                                 ),
                                 true,
                             )}
@@ -1079,7 +1112,7 @@ export function RestraintEventCommandForm({
                         <>
                             {person(
                                 'review_owner_id',
-                                'Named review owner',
+                                'Who will review it',
                                 pickers.reviewers,
                             )}
                             {time(
@@ -1105,10 +1138,9 @@ export function RestraintEventCommandForm({
                             {command === 'correct-observation' ? (
                                 <div className="space-y-3 rounded-xl border border-border p-4">
                                     <p className="text-caption text-muted-foreground">
-                                        The original observer remains on this
-                                        corrected observation unless you
-                                        explicitly replace them. The correction
-                                        recorder is recorded separately.
+                                        The person who made the check stays on
+                                        it unless you change them. Your name is
+                                        saved as the person who corrected it.
                                     </p>
                                     <label className="frontline-tap text-subtle flex items-center gap-3">
                                         <Checkbox
@@ -1120,12 +1152,12 @@ export function RestraintEventCommandForm({
                                                 )
                                             }
                                         />
-                                        Replace the actual observer
+                                        Change who made the check
                                     </label>
                                     {form.data.replace_observer
                                         ? person(
                                               'observed_by',
-                                              'Replacement actual observer',
+                                              'Who made the check',
                                               pickers.staff,
                                           )
                                         : null}
@@ -1135,22 +1167,22 @@ export function RestraintEventCommandForm({
                                             role="alert"
                                             className="text-caption text-status-critical"
                                         >
-                                            Select the replacement observer
-                                            before saving.
+                                            Choose who made the check before
+                                            saving.
                                         </p>
                                     ) : null}
                                 </div>
                             ) : (
                                 person(
                                     'observed_by',
-                                    'Actual observer (leave empty for yourself)',
+                                    'Who made the check (leave blank if it was you)',
                                     pickers.staff,
                                 )
                             )}
                             {time(
                                 'observed_at',
                                 'observed_offset',
-                                'Actual observation time',
+                                'When the check happened',
                             )}
                             {text('condition', 'The person’s condition', true)}
                             {text('response', 'Response and support provided')}
@@ -1175,19 +1207,19 @@ export function RestraintEventCommandForm({
                                     'not_required',
                                 ].map((value) => ({
                                     value,
-                                    label: value.replaceAll('_', ' '),
+                                    label: DEBRIEF_STATUS_LABELS[value],
                                 })),
                                 true,
                             )}
                             {time(
                                 'occurred_at',
                                 'occurred_offset',
-                                'Actual debrief time',
+                                'When the debrief happened',
                                 form.data.status === 'completed',
                             )}
                             {text(
                                 'actual_participants',
-                                'Actual participants (one per line)',
+                                'Who took part (one name per line)',
                             )}
                             {text(
                                 'person_voice',
@@ -1220,7 +1252,7 @@ export function RestraintEventCommandForm({
                                 text('notes', 'What needs to happen?', true)}
                             {person(
                                 'assigned_to_user_id',
-                                'Named follow-up owner',
+                                'Who will do this',
                                 pickers.followupOwners,
                             )}
                             {time(
@@ -1237,11 +1269,11 @@ export function RestraintEventCommandForm({
                             {time(
                                 'completed_at',
                                 'completed_offset',
-                                'Actual outcome time',
+                                'When it was done',
                             )}
                             {select(
                                 'outcome',
-                                'Recorded outcome',
+                                'Outcome',
                                 [
                                     'recorded',
                                     'contacted',
@@ -1252,7 +1284,7 @@ export function RestraintEventCommandForm({
                                     'other',
                                 ].map((value) => ({
                                     value,
-                                    label: value.replaceAll('_', ' '),
+                                    label: FOLLOWUP_OUTCOME_LABELS[value],
                                 })),
                                 true,
                             )}
@@ -1307,7 +1339,7 @@ export function RestraintEventCommandForm({
                                     'other',
                                 ].map((value) => ({
                                     value,
-                                    label: value.replaceAll('_', ' '),
+                                    label: EVIDENCE_CATEGORY_LABELS[value],
                                 })),
                             )}
                             {text('notes', 'Evidence notes')}
@@ -1378,7 +1410,7 @@ export function RestraintEventCommandForm({
                                 source.checking
                             }
                         >
-                            {form.processing ? 'Saving…' : 'Save and confirm'}
+                            {form.processing ? 'Saving…' : SAVE_LABELS[command]}
                         </Button>
                         <Button
                             className="frontline-tap"
