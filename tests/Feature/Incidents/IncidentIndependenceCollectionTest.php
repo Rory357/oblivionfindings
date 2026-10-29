@@ -183,7 +183,10 @@ final class IncidentIndependenceCollectionTest extends IncidentIndependenceTestC
         $copy = (array) DB::table('audit_logs')->where('id', $row->audit_id)->first(); unset($copy['id']);
         $copy['meta'] = json_encode(['incident_id' => (int) $legacy->id, 'retained_claim' => true]); $armed = true; $fired = false;
         DB::connection()->beforeExecuting(function ($sql) use (&$armed, &$fired, $copy): void {
-            if (! $armed || ! str_contains($sql, 'AS evidence_fingerprint')) { return; }
+            // The claim lands during evidence capture: the per-incident graph read, or (for an incident with no evidence
+            // yet) the batched evidence read that precedes it (speed, 30 Oct). Either way it must not be admitted.
+            $batched = str_contains($sql, 'from `audit_logs`') && str_contains($sql, '`meta`') && str_contains($sql, ' in (');
+            if (! $armed || (! str_contains($sql, 'AS evidence_fingerprint') && ! $batched)) { return; }
             $armed = false; $fired = true; DB::table('audit_logs')->insert($copy);
         });
         try {
@@ -272,5 +275,35 @@ final class IncidentIndependenceCollectionTest extends IncidentIndependenceTestC
         $this->accept($this->command());
         $query = $this->scope($this->manager, fn (Builder $query) => $query);
         $this->expectException(\LogicException::class); $query->count();
+    }
+
+    /** Speed path (30 Oct): an evidence-free incident joins one set-based block; evidence or a fact change that
+     * appears after scoping still conceals it, as the per-incident block did. */
+    public function test_an_evidence_free_incident_is_concealed_when_evidence_or_its_facts_change_after_scoping(): void
+    {
+        $healthy = $this->incident();
+        $this->scope($this->manager, function (Builder $query) use ($healthy): void {
+            $this->assertSame(1, (clone $query)->count());
+            AuditLog::query()->forceCreate(['user_id' => $this->manager->id, 'action' => 'incidents.independence.declaration.accepted',
+                'meta' => ['incident_id' => $healthy->id]]);
+            $this->assertSame(0, (clone $query)->count());
+        }, id: $healthy->id);
+
+        $changed = $this->incident();
+        $this->scope($this->manager, function (Builder $query) use ($changed): void {
+            $this->assertSame(1, (clone $query)->count());
+            DB::table('client_incidents')->where('id', $changed->id)->update(['status' => 'closed']);
+            $this->assertSame(0, (clone $query)->count());
+        }, id: $changed->id);
+    }
+
+    public function test_evidence_free_and_declared_incidents_share_one_scope_with_their_own_rules(): void
+    {
+        $private = $this->accept($this->command());
+        $healthy = $this->incident();
+        $second = $this->incident();
+        // The lead is named on the declared incident and sees only the plain ones; the manager sees all three.
+        $this->assertSame([$healthy->id, $second->id], $this->ids($this->lead));
+        $this->assertSame([$private['incident_id'], $healthy->id, $second->id], $this->ids($this->manager));
     }
 }

@@ -183,6 +183,94 @@ final class IncidentIndependenceIntakeService
      * and final SQL remain in this same read lifetime. No private narrative, DTO or transferable token is returned.
      * Direct/copy consumers can use the same method with whereKey(originalIncidentId), before hydrating the source.
      */
+    /** @var \WeakMap<CurrentAuthorizationReads, array<int, bool>>|null root id => true when it has no independence evidence */
+    private static ?\WeakMap $evidenceFree = null;
+
+    /**
+     * Speed (MASTER for Stephan, 30 Oct: H&S Overview made 237 per-incident proofs of ~12 queries each). For a batch of
+     * incidents, find in the same reads snapshot which have NO independence evidence in any family the proof reads
+     * (declarations, acceptance receipts, declaration audits). Those roots skip straight to the result the full proof
+     * gives for "no evidence": no proof, empty membership and an empty binding graph. Anything found, or any row that
+     * can't be mapped to an incident, sends the root through the full proof unchanged. whereAdmitted() still adds SQL
+     * absence guards for every family, so a stale or wrong "evidence-free" can only hide a row, never admit one.
+     *
+     * @param  iterable<int|string>  $rootIds
+     */
+    public function prefetchEvidenceInReads(iterable $rootIds, CurrentAuthorizationReads $reads): void
+    {
+        $reads->assertActive();
+        self::$evidenceFree ??= new \WeakMap;
+        $known = self::$evidenceFree[$reads] ?? [];
+        $ids = collect($rootIds)->map(fn ($id) => (int) $id)->filter(fn (int $id) => $id > 0 && ! array_key_exists($id, $known))
+            ->unique()->values();
+        foreach ($ids->chunk(500) as $chunk) {
+            $list = $chunk->values()->all();
+            $wanted = array_flip($list);
+            $dirty = [];
+            $unmapped = false;
+            $mark = function (mixed $id) use (&$dirty, &$unmapped, $wanted): void {
+                if (is_numeric($id) && isset($wanted[(int) $id])) { $dirty[(int) $id] = true; } else { $unmapped = true; }
+            };
+            foreach ($reads->query(Declaration::query()->where(fn ($q) => $q->whereIn('incident_id', $list)
+                ->orWhereIn('source_tuple->incident_id', $list)))->get(['id', 'incident_id', 'source_tuple']) as $row) {
+                $mark($row->incident_id);
+                $raw = $row->getRawOriginal('source_tuple');
+                $tuple = is_array($raw) ? $raw : (is_string($raw) ? json_decode($raw, true) : null);
+                if (is_array($tuple) && array_key_exists('incident_id', $tuple)) { $mark($tuple['incident_id']); }
+            }
+            $keys = array_map(fn (int $id) => $this->key($id), $list);
+            $prefix = IncidentIndependencePolicySettings::DECLARATION_PREFIX;
+            foreach ($reads->query(HealthSafetySettingChange::query()->where(fn ($q) => $q->whereIn('setting_key', $keys)
+                ->orWhere(fn ($decl) => $decl->where('origin', 'incident_independent_handling')->where(fn ($tuple) =>
+                    $tuple->whereIn('after_value->incident_id', $list)->orWhereIn('accepted_result->incident_id', $list)))))
+                ->get(['id', 'setting_key', 'after_value', 'accepted_result']) as $row) {
+                if (is_string($row->setting_key) && str_starts_with($row->setting_key, $prefix)) { $mark(substr($row->setting_key, strlen($prefix))); }
+                foreach ([$row->getRawOriginal('after_value'), $row->getRawOriginal('accepted_result')] as $raw) {
+                    $value = is_array($raw) ? $raw : (is_string($raw) ? json_decode($raw, true) : null);
+                    if (is_array($value) && array_key_exists('incident_id', $value)) { $mark($value['incident_id']); }
+                }
+            }
+            foreach ($reads->query(AuditLog::query()->where('action', 'like', 'incidents.independence.declaration.%')
+                ->whereIn('meta->incident_id', $list))->get(['id', 'meta']) as $row) {
+                $raw = $row->getRawOriginal('meta');
+                $meta = is_array($raw) ? $raw : (is_string($raw) ? json_decode($raw, true) : null);
+                $mark(is_array($meta) ? ($meta['incident_id'] ?? null) : null);
+            }
+            $found = self::$evidenceFree[$reads] ?? [];
+            // A row that matched but can't be pinned to one incident makes the whole chunk take the full proof.
+            foreach ($list as $id) { $found[$id] = ! $unmapped && ! isset($dirty[$id]); }
+            self::$evidenceFree[$reads] = $found;
+        }
+    }
+
+    /** True only for a root proven evidence-free in this reads lifetime whose own independence columns are untouched. */
+    private function evidenceFreeRoot(ClientIncident $root, CurrentAuthorizationReads $reads): bool
+    {
+        if (self::$evidenceFree === null || ! isset(self::$evidenceFree[$reads])) {
+            return false;
+        }
+        if ((self::$evidenceFree[$reads][(int) $root->id] ?? false) !== true) {
+            return false;
+        }
+
+        return ! $root->independent_handling_requested
+            && (int) $root->independence_schema_version === 0
+            && (int) $root->independence_revision === 0;
+    }
+
+    /** Exactly what bindingGraph() returns when no family has a row: every family empty under the same selector. */
+    private function emptyGraph(ClientIncident $root): array
+    {
+        $selector = ['incident_id' => (int) $root->id, 'declaration_ids' => [], 'exclusion_ids' => [],
+            'acceptance_ids' => [], 'audit_ids' => [], 'policy_id' => null];
+        $graph = [];
+        foreach (['declaration', 'exclusion', 'owner_exclusion', 'acceptance', 'audit', 'policy_mutex'] as $family) {
+            $graph[$family] = ['selector' => $selector, 'rows' => []];
+        }
+
+        return $graph;
+    }
+
     /**
      * $siteBoundaryOnly: the restricted H&S event check (Stephan, 25 Oct, "event yes, incident no") keeps the
      * incident's Site boundary and every independence rule here, but not the HR-confidential content rule, so the
@@ -203,8 +291,19 @@ final class IncidentIndependenceIntakeService
         $identities->select(array_map(fn ($column) => 'client_incidents.'.$column, self::ROOT_COLUMNS))
             ->selectRaw(IncidentIndependenceBindingSql::fingerprint('root', 'client_incidents').' AS independence_binding');
         $admitted = [];
-        foreach ($reads->query($identities)->get() as $root) {
+        $roots = $reads->query($identities)->get();
+        $this->prefetchEvidenceInReads($roots->pluck('id'), $reads);
+        foreach ($roots as $root) {
             try {
+                if ($this->evidenceFreeRoot($root, $reads)) {
+                    // Same outcome as the full proof for a root with no evidence (see prefetchEvidenceInReads()).
+                    $proof = null; $membership = ['declaration' => [], 'acceptance' => [], 'audit' => []];
+                    $graph = $this->emptyGraph($root);
+                    $this->assertProvedMembership($graph, $proof, $membership);
+                    $admitted[] = ['id' => (int) $root->id, 'root' => $root->getRawOriginal('independence_binding'),
+                        'proof_guards' => [], 'graph' => $graph, 'evidence_free' => true];
+                    continue;
+                }
                 $membership = []; $proof = $this->proof($root, $reads, $membership);
                 $denied = $proof === null ? [] : ($purpose === 'assignment' || $proof['policy']['mode'] === 'block_involved_access' ? $proof['ids'] : []);
                 if (in_array((int) $current->id, $denied, true)) { continue; }
@@ -257,10 +356,48 @@ final class IncidentIndependenceIntakeService
             (fn () => array_keys($this->scopes))->call($query), $query->removedScopes()];
     }
 
+    /**
+     * The evidence-free admitted roots as ONE set-based block instead of one OR block each (speed, 30 Oct: a block per
+     * incident made 200–500 KB SQL statements). It is the same test, row by row:
+     * - the exact root: `(id, root fingerprint)` must be one of the admitted pairs, as `id = X AND fingerprint = ?` was;
+     * - its empty evidence graph: the per-root absence checks used the literal id X; here they compare the row's own
+     *   `client_incidents.id`, with the same columns and comparisons. Exclusion, owner-exclusion and policy-mutex
+     *   checks are omitted because, with no declaration and no policy, their selectors were already empty
+     *   (`IN ()` / `1 = 0`), so those NOT EXISTS were always true.
+     *
+     * @param  list<array{id: int, root: string}>  $free
+     */
+    private function whereEvidenceFree(Builder $set, array $free): void
+    {
+        $pairs = []; $bindings = [];
+        foreach ($free as $binding) { $pairs[] = '(?, ?)'; $bindings[] = $binding['id']; $bindings[] = $binding['root']; }
+        $set->whereIn('client_incidents.id', array_column($free, 'id'))
+            ->whereRaw('(`client_incidents`.`id`, '.IncidentIndependenceBindingSql::fingerprint('root', 'client_incidents').') IN ('.implode(', ', $pairs).')', $bindings);
+        $declaration = IncidentIndependenceBindingSql::table('declaration');
+        $set->whereNotExists(DB::table($declaration.' as independence_free_declaration')->selectRaw('1')
+            ->where(fn ($row) => $row->whereColumn('independence_free_declaration.incident_id', 'client_incidents.id')
+                ->orWhereRaw("json_unquote(json_extract(`independence_free_declaration`.`source_tuple`, '$.\"incident_id\"')) = `client_incidents`.`id`")));
+        $acceptance = IncidentIndependenceBindingSql::table('acceptance');
+        $set->whereNotExists(DB::table($acceptance.' as independence_free_acceptance')->selectRaw('1')
+            ->where(fn ($row) => $row->whereRaw('`independence_free_acceptance`.`setting_key` = CONCAT(?, `client_incidents`.`id`)', [IncidentIndependencePolicySettings::DECLARATION_PREFIX])
+                ->orWhere(fn ($source) => $source->where('independence_free_acceptance.origin', 'incident_independent_handling')
+                    ->where(fn ($tuple) => $tuple
+                        ->whereRaw("json_unquote(json_extract(`independence_free_acceptance`.`after_value`, '$.\"incident_id\"')) = `client_incidents`.`id`")
+                        ->orWhereRaw("json_unquote(json_extract(`independence_free_acceptance`.`accepted_result`, '$.\"incident_id\"')) = `client_incidents`.`id`")))));
+        $audit = IncidentIndependenceBindingSql::table('audit');
+        $set->whereNotExists(DB::table($audit.' as independence_free_audit')->selectRaw('1')
+            ->where('independence_free_audit.action', 'like', 'incidents.independence.declaration.%')
+            ->whereRaw("json_unquote(json_extract(`independence_free_audit`.`meta`, '$.\"incident_id\"')) = `client_incidents`.`id`"));
+    }
+
     /** One OR block per admitted incident: the exact root, its proof guards and its closed evidence graph. */
     private function whereAdmitted(Builder $query, array $admitted): Builder
     {
-        return $query->where(function (Builder $allowed) use ($admitted): void {
+        $free = array_values(array_filter($admitted, fn (array $binding): bool => ($binding['evidence_free'] ?? false) === true));
+        $admitted = array_values(array_filter($admitted, fn (array $binding): bool => ($binding['evidence_free'] ?? false) !== true));
+
+        return $query->where(function (Builder $allowed) use ($admitted, $free): void {
+            if ($free !== []) { $allowed->orWhere(fn (Builder $set) => $this->whereEvidenceFree($set, $free)); }
             foreach ($admitted as $binding) {
                 $allowed->orWhere(function (Builder $exact) use ($binding): void {
                     $exact->where('client_incidents.id', $binding['id'])

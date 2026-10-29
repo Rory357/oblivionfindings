@@ -181,12 +181,20 @@ final class IncidentOwnershipService
         return $result;
     }
 
+    /** @var \WeakMap<CurrentAuthorizationReads, array<int, User>>|null the viewer's locked evidence per read lifetime */
+    private static ?\WeakMap $lockedViewers = null;
+
     /** Additional copied-source admission before any owner/root body; old/default summary and all commands retain their contract. */
     public function summaryFromProtectedSourceInCurrentReads(User $viewer, ClientIncident $incident, CurrentAuthorizationReads $reads, Builder $protectedParents): ?array
     {
         $reads->assertActive();
         if (! $protectedParents->getModel() instanceof ClientIncident) { throw new LogicException('Incident owner summary requires a canonical incident parent query.'); }
-        $current = $this->authorization->lockForUserWithoutWaiting($viewer, IncidentOwnerEligibility::PERMISSIONS);
+        // The viewer's evidence is locked once per read lifetime (speed, 30 Oct: once per incident before). The read's
+        // transaction already holds those share locks, so a second lock of the same rows returns the same facts.
+        self::$lockedViewers ??= new \WeakMap;
+        $locked = self::$lockedViewers[$reads] ?? [];
+        $current = $locked[(int) $viewer->id] ??= $this->authorization->lockForUserWithoutWaiting($viewer, IncidentOwnerEligibility::PERMISSIONS);
+        self::$lockedViewers[$reads] = $locked;
         $one = IncidentIndependenceIntakeService::narrowedToIncident($protectedParents, (int) $incident->id, $reads) ?? (clone $protectedParents)->whereKey($incident->id);
         $qualified = app(IncidentAccessService::class)->apply($one, $current, $reads);
         $source = $reads->query(clone $qualified)->first(IncidentRoutingService::SOURCE_COLUMNS);

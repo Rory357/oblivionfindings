@@ -66,6 +66,8 @@ final class IncidentHsEventSourceReadService
         if ($eventIds !== []) {
             $roots = $reads->query(ClientIncident::query()->where(fn (Builder $root) => $root
                 ->whereIn('id', $sourceIds)->orWhereIn('hs_event_id', $eventIds)))->get(array_values(array_unique(self::ROOT_META)));
+            // One batched evidence check for every root, instead of a full independence proof per root (speed, 30 Oct).
+            app(IncidentIndependenceIntakeService::class)->prefetchEvidenceInReads($roots->pluck('id'), $reads);
             $discovery = $this->discovery[$reads] ?? [];
             foreach ($identities as $event) {
                 $discovery[$event->id] ??= $roots->filter(fn ($root) => (int) $root->id === (int) $event->source_id || (int) $root->hs_event_id === (int) $event->id)->values();
@@ -170,6 +172,7 @@ final class IncidentHsEventSourceReadService
         }
         $discover = app(IncidentAccessService::class)->apply((clone $incidents)->setEagerLoads([])->reorder()->when(true, QueryPaging::clear(...)), $current, $reads);
         $roots = $reads->query($discover->select(array_values(array_unique(self::ROOT_META))))->get();
+        app(IncidentIndependenceIntakeService::class)->prefetchEvidenceInReads($roots->pluck('id'), $reads);
         $bindings = [];
         foreach ($roots as $root) { $bindings[] = $this->originalRootParent($root, $current, $reads, false); }
         if ($bindings === []) { return $this->protect($incidents->whereRaw('1 = 0'), $reads); }
