@@ -44,9 +44,9 @@ class SafeguardingConcernController extends Controller
      */
     public function index(Request $request): Response
     {
-        $this->authorize('viewAny', SafeguardingConcern::class);
+        $user = $this->currentViewer($request);
+        abort_unless($user->can('viewAny', SafeguardingConcern::class), 403);
 
-        $user = $request->user();
         $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
 
         $tab = (string) $request->get('tab', 'all');
@@ -189,6 +189,20 @@ class SafeguardingConcernController extends Controller
      * Serialize a concern for the detail modal when ?concern={id} is present and
      * the viewer is authorised; otherwise null (the dialog stays closed).
      */
+    /**
+     * The register and record read the viewer's current permissions and Sites from the database, never a copy of the
+     * user warmed earlier (Codex's safeguarding current-read rule, #11). The fresh copy becomes the request's user, so
+     * the policies and Site checks after this line all see the same current facts.
+     */
+    private function currentViewer(Request $request): User
+    {
+        $fresh = User::query()->findOrFail($request->user()->getKey());
+        auth()->setUser($fresh);
+        $request->setUserResolver(fn () => $fresh);
+
+        return $fresh;
+    }
+
     private function resolveDetail(Request $request, User $user, bool $canSensitive): ?array
     {
         $concernId = $request->integer('concern');
@@ -319,12 +333,17 @@ class SafeguardingConcernController extends Controller
      */
     public function show(Request $request, SafeguardingConcern $concern): Response
     {
-        $this->authorize('view', $concern);
+        $user = $this->currentViewer($request);
+        // A concern at a Site outside the viewer's Sites answers "not found", so its existence there isn't revealed;
+        // one they can see but may not open answers "forbidden". Either way nothing about it (files, investigations,
+        // risk reviews) is loaded first.
+        abort_unless($this->concernPolicy->applyVisibleScope(SafeguardingConcern::query()->whereKey($concern->getKey()), $user)->exists(), 404);
+        abort_unless($user->can('view', $concern), 403);
 
-        $canSensitive = $request->user()->can('viewSensitive', SafeguardingConcern::class);
+        $canSensitive = $user->can('viewSensitive', SafeguardingConcern::class);
 
         return Inertia::render('safeguarding/concern', [
-            'detail' => $this->buildConcernDetail($concern, $request->user(), $canSensitive),
+            'detail' => $this->buildConcernDetail($concern, $user, $canSensitive),
             'returnUrl' => $this->reportingReturnUrl($request),
         ]);
     }

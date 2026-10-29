@@ -24,8 +24,8 @@ final class RespiteRestraintReadService
             $fresh = $this->currentStay($current, $reads, $sites, $stay);
             $can = $this->capabilities($current, $reads, $sites, $fresh);
 
-            // No stay report link: Codex's stay report page is unrouted until the decision 7 follow-up.
-            return ['can' => $can, 'summary' => $can['view'] ? $this->register->summary($current, $fresh->client) : null, 'report_href' => null];
+            // The stay's own "record a restraint" page, for people who may record for this stay.
+            return ['can' => $can, 'summary' => $can['view'] ? $this->register->summary($current, $fresh->client) : null, 'report_href' => $can['capture'] ? $this->reportHref($fresh) : null];
         }), $this->emptyStay());
     }
 
@@ -36,7 +36,7 @@ final class RespiteRestraintReadService
             $can = $this->capabilities($current, $reads, $sites, $fresh);
             abort_unless($can['capture'], 403);
 
-            return ['pickers' => $this->register->pickersForStay($current, $fresh), 'client_id' => (int) $fresh->client_id, 'site_id' => $this->stays->siteId($fresh), 'respite_stay_id' => (int) $fresh->id, 'store_href' => '/respite/stays/'.$fresh->id.'/restraints', 'can_create_plan' => ($current->canDo('restraints.create') || $current->canDo('restraints.manage')) && $this->allowed(fn () => $this->access->assertClient($fresh->client, $current, $reads, $sites, 'capture'))];
+            return ['pickers' => $this->register->pickersForStay($current, $fresh), 'client_id' => (int) $fresh->client_id, 'site_id' => $this->stays->siteId($fresh), 'respite_stay_id' => (int) $fresh->id, 'store_href' => '/respite/stays/'.$fresh->id.'/restraints/record', 'can_create_plan' => ($current->canDo('restraints.create') || $current->canDo('restraints.manage')) && $this->allowed(fn () => $this->access->assertClient($fresh->client, $current, $reads, $sites, 'capture'))];
         });
     }
 
@@ -69,7 +69,7 @@ final class RespiteRestraintReadService
                     }
                     $reviewTotal += $unreviewed;
                     $missingTotal += $missing;
-                    $byStay[(int) $fresh->id] = ['can' => $can, 'report_href' => null, 'unreviewed' => $unreviewed];
+                    $byStay[(int) $fresh->id] = ['can' => $can, 'report_href' => $can['capture'] ? $this->reportHref($fresh) : null, 'unreviewed' => $unreviewed];
                     if (! $can['capture'] || ! in_array($fresh->status, ['active', 'extended'], true)) {
                         continue;
                     }
@@ -114,6 +114,11 @@ final class RespiteRestraintReadService
         $proof = fn ($operation) => $this->allowed(fn () => $this->access->assertClient($stay->client, $current, $reads, $sites, $operation));
 
         return ['capture' => $current->canDo('respite.stays.manage') && $proof('respite_capture'), 'view' => $current->canDo('restraints.view') && $proof('view'), 'review' => ($current->canDo('restraints.review') || $current->canDo('restraints.manage')) && $proof('workspace')];
+    }
+
+    private function reportHref(RespiteStay $stay): string
+    {
+        return '/respite/stays/'.$stay->id.'/restraints/report?'.http_build_query(['return_to' => '/respite/stays/'.$stay->id], '', '&', PHP_QUERY_RFC3986);
     }
 
     private function emptyStay(): array

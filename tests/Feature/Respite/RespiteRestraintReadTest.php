@@ -15,7 +15,9 @@ use App\Services\Respite\RespiteRestraintReadService;
 use App\Services\Respite\RespiteStayScope;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Request;
+use App\Events\Respite\RespiteEvent;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia as Assert;
 use LogicException;
 use Tests\Feature\HealthSafety\RestraintEventCommandTestCase;
@@ -52,13 +54,14 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         return ['can' => ['capture' => false, 'view' => false, 'review' => false], 'summary' => null, 'report_href' => null];
     }
 
-    public function test_capture_only_stay_page_has_no_report_link_or_private_summary(): void
+    public function test_capture_only_stay_page_links_the_stay_report_without_private_summary(): void
     {
         $stay = $this->stay();
         $this->recorded($stay);
         $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
-        // Decision 7: capture is main's respite form on this page; Codex's stay report page is unrouted until the follow-up.
-        $response = $this->actingAs($viewer)->get(route('respite.stays.show', $stay))->assertOk()->assertInertia(fn (Assert $page) => $page->component('respite/stays/show')->where('stay.id', $stay->id)->where('restraints.can', ['capture' => true, 'view' => false, 'review' => false])->where('restraints.summary', null)->where('restraints.report_href', null));
+        // Stephan (26 Oct, "yes build it"): the stay page links its own "record a restraint" page for people who may record.
+        $report = '/respite/stays/'.$stay->id.'/restraints/report?return_to='.rawurlencode('/respite/stays/'.$stay->id);
+        $response = $this->actingAs($viewer)->get(route('respite.stays.show', $stay))->assertOk()->assertInertia(fn (Assert $page) => $page->component('respite/stays/show')->where('stay.id', $stay->id)->where('restraints.can', ['capture' => true, 'view' => false, 'review' => false])->where('restraints.summary', null)->where('restraints.report_href', $report));
         $this->assertStringNotContainsString('Sensitive factual source', $response->getContent());
         $this->assertStringNotContainsString('plan_authorization_snapshot', $response->getContent());
         $this->assertStringNotContainsString('restraint_events', $response->getContent());
@@ -116,19 +119,61 @@ final class RespiteRestraintReadTest extends RestraintEventCommandTestCase
         $this->assertSame([$ownPlan->id], array_column($data['pickers']['plansForPicker'], 'id'));
         $this->assertNotContains($inactive->id, array_column($data['pickers']['staff'], 'id'));
         $this->assertSame($stay->id, $data['respite_stay_id']);
-        $this->assertSame('/respite/stays/'.$stay->id.'/restraints', $data['store_href']);
+        $this->assertSame('/respite/stays/'.$stay->id.'/restraints/record', $data['store_href']);
     }
 
-    public function test_capture_only_coordinator_posts_main_form_and_does_not_open_generic_or_stay_report(): void
+    public function test_capture_only_coordinator_records_on_the_stay_page_once_and_recovers_it_from_the_receipt(): void
+    {
+        Event::fake([RespiteEvent::class]);
+        $stay = $this->stay();
+        $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
+        // Stephan (26 Oct, "yes build it"): the stay's own page, locked to the stay, saving with a command key.
+        $page = $this->actingAs($viewer)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertOk();
+        $this->assertSame(['client_id' => $this->client->id, 'site_id' => $this->site->id, 'respite_stay_id' => $stay->id,
+            'store_href' => '/respite/stays/'.$stay->id.'/restraints/record'], $page->json('capture_context'));
+        $this->assertSame(['capture' => true, 'create_plan' => false], $page->json('can'));
+        $this->getJson(route('health-safety.restraints.report'))->assertForbidden();
+        $input = $this->capture();
+        $this->from('/respite/stays/'.$stay->id.'/restraints/report')->post(route('respite.stays.restraints.record', $stay), $input)
+            ->assertRedirect('/respite/stays/'.$stay->id.'/restraints/report')->assertSessionHasNoErrors()
+            ->assertSessionHas('restraint_confirmation', fn ($proof) => $proof['idempotency_key'] === strtolower($input['idempotency_key']));
+        $row = RestraintEvent::sole();
+        $this->assertSame([$stay->id, $this->client->id, $this->site->id], [(int) $row->stay_id, (int) $row->client_id, (int) $row->site_id]);
+        $this->assertDatabaseCount('restraint_command_receipts', 1);
+        // A resend after a lost response replays the same save: no second event, no second Respite event.
+        $this->post(route('respite.stays.restraints.record', $stay), $input)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('restraint_events', 1);
+        Event::assertDispatchedTimes(RespiteEvent::class, 1);
+        // The page finds the saved work from its receipt; another stay's page does not.
+        $recovered = $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?receipt_key='.$input['idempotency_key'])->assertOk();
+        $this->assertSame($row->id, $recovered->json('restraint_confirmation.event_id'));
+        $otherStay = $this->stay();
+        $this->assertNull($this->getJson('/respite/stays/'.$otherStay->id.'/restraints/report?receipt_key='.$input['idempotency_key'])->assertOk()->json('restraint_confirmation'));
+        // A forged person or stay never moves the record.
+        $otherClient = Client::factory()->create(['site_id' => $this->site->id]);
+        $this->post(route('respite.stays.restraints.record', $stay), $this->capture(['client_id' => $otherClient->id]))->assertNotFound();
+        $this->post(route('respite.stays.restraints.record', $stay), $this->capture(['stay_id' => $otherStay->id]))->assertNotFound();
+        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?respite_stay_id='.$otherStay->id)->assertNotFound();
+        $this->assertDatabaseCount('restraint_events', 1);
+    }
+
+    public function test_the_stay_page_needs_the_stay_grant_and_the_stays_site(): void
+    {
+        $stay = $this->stay();
+        $reader = $this->staff(['clients.viewAny', 'respite.viewAny', 'restraints.view']);
+        $this->actingAs($reader)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertForbidden();
+        $this->post(route('respite.stays.restraints.record', $stay), $this->capture())->assertForbidden();
+        $foreign = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage'], Site::factory()->create(['is_active' => true]));
+        $this->actingAs($foreign)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertNotFound();
+        $this->post(route('respite.stays.restraints.record', $stay), $this->capture())->assertNotFound();
+        $this->assertDatabaseCount('restraint_events', 0);
+    }
+
+    public function test_capture_only_coordinator_can_still_use_the_respite_workspace_quick_form(): void
     {
         $stay = $this->stay();
         $viewer = $this->staff(['clients.viewAny', 'respite.viewAny', 'respite.stays.manage']);
-        // Stephan (25 Oct): main's respite restraint form and action stay for this merge, so the stay's store
-        // endpoint takes main's form payload. Codex's dedicated stay report page (and keyed receipt) is
-        // unrouted until the follow-up.
-        $this->actingAs($viewer)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertNotFound();
-        $this->getJson(route('health-safety.restraints.report'))->assertForbidden();
-        $this->post(route('respite.stays.restraints.store', $stay), [
+        $this->actingAs($viewer)->post(route('respite.stays.restraints.store', $stay), [
             'started_at' => now()->subHour()->toDateTimeString(), 'restraint_type' => 'physical_hold', 'severity' => 'medium',
             'trigger_description' => 'Escalating distress', 'de_escalation_attempted' => 'Calm voice and space offered',
             'restraint_description' => 'Brief guided hold', 'within_support_plan' => false,

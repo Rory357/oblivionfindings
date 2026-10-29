@@ -54,7 +54,8 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $visibleSite = Site::factory()->create(['name' => 'Accessible Site']);
         $foreignSite = Site::factory()->create(['name' => 'Foreign Site']);
         // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
-        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'fleet.viewAny', 'incidents.viewAny'], 'H&S Viewer');
+        // The safeguarding count needs safeguarding access (Stephan, 26 Oct: "Hide it" otherwise).
+        $viewer = $this->siteBoundUser($visibleSite, ['hazards.view', 'fleet.viewAny', 'incidents.viewAny', 'safeguarding.viewAny'], 'H&S Viewer');
 
         $visibleClient = Client::factory()->create(['site_id' => $visibleSite->id]);
         $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
@@ -574,8 +575,10 @@ class HealthSafetyDashboardSiteIsolationTest extends TestCase
         $secondarySite = Site::factory()->create(['name' => 'Secondary Site']);
         $remoteSite = Site::factory()->create(['name' => 'Remote Site']);
         // Incident counts need incident read and the restraint summary needs restraint read (the build keeps both rules).
+        // The safeguarding count follows Safeguarding's own read: safeguarding access, and its own all-Sites permission
+        // (reports.viewAny); H&S all-Sites access doesn't widen it (Stephan, 26 Oct, Overview safeguarding count).
         $viewer = $this->userWithPermissions(
-            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage', 'incidents.viewAny'],
+            ['hazards.view', 'healthSafety.viewAllSites', 'fleet.viewAny', 'fleet.manage', 'incidents.viewAny', 'safeguarding.viewAny', 'reports.viewAny'],
             'Application H&S lead',
         );
         HrEmployeeProfile::factory()->create([

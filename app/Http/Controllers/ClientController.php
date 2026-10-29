@@ -63,7 +63,6 @@ use App\Models\ConsentType;
 use App\Models\ControlRoomAlert;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
-use App\Models\FirstAidRecord;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
@@ -104,7 +103,11 @@ use App\Services\Clients\ClientWorkerEligibility;
 use App\Services\ConsentValidationService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
 use App\Services\Fleet\TransportRequestService;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\HealthSafetyReadContext;
+use App\Services\HealthSafety\HealthSafetyReadMaterialisationProof;
 use App\Services\HealthSafety\HsModuleSummaryService;
+use App\Services\Incidents\IncidentHsEventSourceReadService;
 use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\DoseSlots\ClientCalendarDoses;
 use App\Services\Medication\DoseSlots\DoseAwaySources;
@@ -1343,23 +1346,17 @@ class ClientController extends Controller
                 : ['sites' => [], 'clients' => [], 'events' => []],
 
             // Recent incidents (last 5)
+            // Recent incidents (last 5) the viewer may read through the incident source rules: their Sites,
+            // assigned-only reach and HR-confidential privacy (Stephan, 26 Oct: "Yes, narrow them").
             'client_incidents' => $sectionAccess['incidents']
-                ? ClientIncident::where('client_id', $client->id)
-                    ->with(['reporter:id,name'])
-                    ->orderByDesc('occurred_at')
-                    ->limit(5)
-                    ->get()
+                ? $this->readableRecentIncidents($request->user(), (int) $client->id)
                 : null,
 
-            // First-aid treatments recorded for this client (read-only panel; gated on the
-            // first_aid_records.client_id FK added by the gold-standard rebuild).
+            // First-aid treatments recorded for this client (read-only panel), read through First Aid's own
+            // rules: the viewer's H&S Sites and the client's current Site, with links to the treatment pages.
             'first_aid_records' => $sectionAccess['first_aid']
                 && SchemaCache::hasTable('first_aid_records')
-                ? FirstAidRecord::where('client_id', $client->id)
-                    ->with(['site:id,name', 'firstAider:id,name'])
-                    ->orderByDesc('treatment_date')
-                    ->limit(10)
-                    ->get()
+                ? app(FirstAidSourceProjectionService::class)->forClient($request->user(), $client)
                 : [],
 
             'care_plans_summary' => $sectionAccess['care_plans'] ? [
@@ -3738,6 +3735,24 @@ class ClientController extends Controller
         }
 
         return back()->with('success', 'Panic acknowledged.');
+    }
+
+    /** The profile's recent incidents, read through the incident source rules (Codex's narrowing). */
+    private function readableRecentIncidents(User $viewer, int $clientId): array
+    {
+        return HealthSafetyReadContext::within($viewer, IncidentHsEventSourceReadService::PERMISSIONS,
+            fn (HealthSafetyReadContext $context): array => HealthSafetyReadMaterialisationProof::within($context,
+                function (HealthSafetyReadMaterialisationProof $proof) use ($context, $clientId): array {
+                    $query = $context->applyIncidentSourceScope(ClientIncident::query()->where('client_id', $clientId));
+                    $parent = (clone $query)->setEagerLoads([])->reorder()->select('client_incidents.reported_by');
+                    $query->with(['reporter' => function ($relation) use ($context, $parent, $proof): void {
+                        $relation->select(['users.id', 'users.name'])->whereIn('users.id', clone $parent);
+                        $context->reconsumeIncidentPredicate($relation->getQuery(), $parent);
+                        $proof->protect($relation->getQuery());
+                    }]);
+
+                    return $proof->protect($query)->orderByDesc('occurred_at')->orderByDesc('id')->limit(5)->get()->toArray();
+                }));
     }
 
     private function isTruthy(mixed $value): bool

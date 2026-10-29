@@ -134,7 +134,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
 
     public function test_mounted_ordinary_only_reads_survive_withdrawal_without_admitting_a_late_meeting_copy(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (26 Oct) said "Not now" to the meeting delivery pipeline and participation inbox. The participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
         $this->clearNotices();
         $ordinary = $this->ordinary();
         $reader = app(BoardPackAccessService::class);
@@ -353,7 +353,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
 
     public function test_production_full_centre_excludes_legacy_copied_title_and_roundtrips_bound_notice(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (26 Oct) said "Not now" to the meeting delivery pipeline and participation inbox. The participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
         $legacy = (string) Str::uuid();
         $this->actor->notifications()->create(['id' => $legacy, 'type' => CommitteeMeetingScheduled::class,
             'data' => ['type' => 'hs_committee_meeting', 'title' => 'Forbidden legacy private title']]);
@@ -391,7 +391,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
 
     public function test_production_direct_read_cannot_open_an_unproven_legacy_copy(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Stephan (26 Oct) said "Not now" to the meeting delivery pipeline and participation inbox. The participation inbox reader isn\'t mounted in BoardPackAccessService::visibleNotificationQuery; mounting it alone would hide the CommitteeMeetingScheduled notices main still sends.', 'mount the inbox reader with the meeting delivery pipeline.'));
         $legacy = (string) Str::uuid();
         $this->actor->notifications()->create(['id' => $legacy, 'type' => CommitteeMeetingScheduled::class,
             'data' => ['type' => 'hs_committee_meeting', 'title' => 'Forbidden legacy private title']]);
@@ -421,7 +421,7 @@ final class WorkerParticipationNotificationSourceReadTest extends RestraintEvent
     public function test_production_board_pack_and_own_medication_notifications_preserve_existing_rules(bool $currentStaff): void
     {
         if (! $currentStaff) {
-            $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, "the non-current-staff case needs the participation inbox reader mounted in BoardPackAccessService::visibleNotificationQuery, which isn't.", 'mount the inbox reader with the meeting delivery pipeline.'));
+            $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, "Stephan (26 Oct) said 'Not now' to the meeting delivery pipeline and participation inbox. The non-current-staff case needs the participation inbox reader mounted in BoardPackAccessService::visibleNotificationQuery, which isn't.", 'mount the inbox reader with the meeting delivery pipeline.'));
         }
         // Board pack permissions come from their own seeder, not RbacSeeder.
         $this->seed(\Database\Seeders\GovernancePermissionsSeeder::class);

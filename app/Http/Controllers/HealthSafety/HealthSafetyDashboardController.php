@@ -32,6 +32,7 @@ use App\Support\Incidents\IncidentOccurrencePeriod;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use App\Services\Safeguarding\SafeguardingConcernReadScope;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -169,9 +170,11 @@ class HealthSafetyDashboardController extends Controller
         $this->siteAccess->applyAlertScope($activeAlertsQuery, $user, $hsSiteBypass);
         $activeAlerts = $activeAlertsQuery->count();
 
-        $openSafeguarding = SafeguardingConcern::query()->open();
-        $this->applySiteIds($openSafeguarding, $siteIds);
-        $openSafeguarding = $openSafeguarding->count();
+        // Open safeguarding concerns are counted through Safeguarding's own read, at the Sites that read admits
+        // (Stephan, 26 Oct: "Hide it" without safeguarding access). Without it no concern is queried at all.
+        $safeguarding = $user === null ? ['access' => 'restricted', 'count' => null, 'href' => null]
+            : app(SafeguardingConcernReadScope::class)->openCountInContext($user, $context, $siteIds);
+        $openSafeguarding = $safeguarding['count'];
 
         // Preparation shares fresh evidence; Fleet retains its own read and asset Site authority.
         $fleet = ['access' => 'restricted', 'rolling_count' => null, 'open_count' => null];
@@ -239,6 +242,7 @@ class HealthSafetyDashboardController extends Controller
 
         return [
             'kpis' => $kpis,
+            'safeguarding_source' => ['access' => $safeguarding['access'], 'href' => $safeguarding['href']],
             // Exposure managers only: a count of exposures not on the H&S register yet, no details (job 3).
             'exposure_delivery_problems' => app(\App\Services\HealthSafety\ChemicalExposureDeliveryProblems::class)->countFor($user, $context),
             'source_scope' => 'readable_subset',
@@ -564,6 +568,7 @@ class HealthSafetyDashboardController extends Controller
             ...\App\Services\HealthSafety\RestraintAccessService::PERMISSIONS,
             ...\App\Services\HealthSafety\InjuryAccessService::PERMISSIONS,
             ...\App\Services\HealthSafety\ChemicalExposureCommandAccess::PERMISSIONS,
+            ...SafeguardingConcernReadScope::PERMISSIONS,
             ...FleetIncidentReadScope::PERMISSIONS,
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
         ]));

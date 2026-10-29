@@ -19,6 +19,7 @@ use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
+use App\Services\Clients\ClientPortalMembershipService;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
@@ -266,8 +267,10 @@ class HandleInertiaRequests extends Middleware
                     ? User::find(app('impersonate')->getImpersonatorId())?->only('id', 'name')
                     : null,
 
-                // Portal client data for sidebar navigation
+                // Portal client data for sidebar navigation. A current or former staff member is never listed
+                // as a portal member (the portal rule in ClientPortalMembershipService).
                 'portalClients' => $user && $user->hasRole('client', 'next_of_kin')
+                    && app(ClientPortalMembershipService::class)->treatsAsPortalMember($user)
                     ? $user->portalClients()->get(['clients.id', 'clients.first_name', 'clients.last_name', 'clients.profile_photo_path'])->map(fn ($c) => [
                         'id' => $c->id,
                         'name' => trim($c->first_name.' '.$c->last_name),

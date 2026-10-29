@@ -222,7 +222,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_actual_private_source_delivery_risk_and_acceptance_chain_retains_original_version(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $r = $this->accept($risk);
         $marker = HsRiskAssessmentAcceptance::findOrFail($r['id']); $ref = $marker->after_binding['events'][0]['exposure'];
         $this->assertSame('recorded', $ref['attribution_state']); $this->assertGreaterThan(0, $ref['source_version_id']);
@@ -233,7 +233,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_private_acceptance_refuses_until_real_general_audit_recognition_is_mounted(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it). Its exposure fixture also runs Codex\'s unmounted exposure delivery pipeline, which refuses the H&S event the restored exposure observer now creates on save.', 'wire risk acceptance with the general audit recognition patch and the exposure delivery pipeline.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it). Its exposure fixture also runs Codex\'s unmounted exposure delivery pipeline, which refuses the H&S event the restored exposure observer now creates on save.', 'wire risk acceptance with the general audit recognition patch and the exposure delivery pipeline.'));
         $risk = $this->linked();
         if (! method_exists(app(ChemicalExposureAuditAccessService::class), 'scopeRiskAcceptanceSubjects')) {
             $this->integrity(fn () => $this->accept($risk)); $this->assertSame(0, HsRiskAssessmentAcceptance::count());
@@ -245,7 +245,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_private_grant_withdrawal_precedes_risk_business_and_private_version_queries(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $this->accept($risk); $this->manager->load(['roles.permissions','permissionOverrides']);
         $this->allow($this->manager, 'hr.wellbeing.view', false);
         [, $queries] = $this->capturedQueries(function () use ($risk): array { $this->denial(fn () => $this->history($risk)); return []; });
@@ -259,7 +259,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_private_current_staff_withdrawal_refuses_history_and_restores(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $this->accept($risk);
         HrEmployeeProfile::where('user_id', $this->manager->id)->update(['is_active' => false]);
         $this->denial(fn () => $this->history($risk));
@@ -269,7 +269,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_private_detach_and_changed_parent_cannot_replace_original_binding(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $this->accept($risk); $before = $this->tuple($risk);
         DB::transaction(function () use ($risk, $before): void {
             DB::table('hs_risk_assessments')->where('id', $risk->id)->update(['hs_event_id' => null]);
@@ -280,7 +280,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_legacy_hse_identity_and_dual_same_parent_are_retained_without_normalizing_storage(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked();
         $risk->forceFill(['assessable_type' => HsEvent::class, 'assessable_id' => $risk->hs_event_id])->saveQuietly();
         $r = $this->accept($risk); $binding = HsRiskAssessmentAcceptance::findOrFail($r['id'])->after_binding;
@@ -291,7 +291,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_conflicting_dual_parent_site_is_concealed_before_private_risk_facts(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it). Its exposure fixture also runs Codex\'s unmounted exposure delivery pipeline, which refuses the H&S event the restored exposure observer now creates on save.', 'wire risk acceptance with the general audit recognition patch and the exposure delivery pipeline.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it). Its exposure fixture also runs Codex\'s unmounted exposure delivery pipeline, which refuses the H&S event the restored exposure observer now creates on save.', 'wire risk acceptance with the general audit recognition patch and the exposure delivery pipeline.'));
         $risk = $this->linked();
         $foreign = HsEvent::factory()->create(['site_id' => $this->foreignSite->id]);
         $risk->forceFill(['assessable_type' => HsEvent::class, 'assessable_id' => $foreign->id])->saveQuietly();
@@ -309,7 +309,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_corrupted_private_flag_cannot_let_generic_auditor_read_private_marker_payload(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->linked(); $r = $this->accept($risk);
         DB::table('hs_risk_assessment_acceptances')->where('id', $r['id'])->update(['has_exposure' => false]);
         $auditor = $this->staff(['audit.viewAny']); $this->allow($auditor, 'hr.wellbeing.view', false);
@@ -317,7 +317,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     }
     public function test_original_incident_client_withdrawal_and_restore_gate_private_history(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         foreach (['incidents.viewAny','clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $client = \App\Models\Client::factory()->create(['site_id' => $this->site->id]);
         $incident = \App\Models\ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
@@ -330,7 +330,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_current_incident_context_move_is_not_inferred_as_original_accepted_context(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         foreach (['incidents.viewAny','clients.viewAny'] as $key) { $this->allow($this->manager, $key); }
         $client = \App\Models\Client::factory()->create(['site_id' => $this->site->id]);
         $incident = \App\Models\ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $client->id,
@@ -345,7 +345,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_general_audit_recognition_count_search_and_page_exclude_corrupt_marker_under_current_callback(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $this->allow($this->manager, 'audit.viewAny'); $risk = $this->ordinary(); $r = $this->accept($risk);
         $audit = app(ChemicalExposureAuditAccessService::class);
         $visible = $audit->materialize($this->manager, fn ($actor, $context) => $audit->scope(AuditLog::whereKey($r['audit_log_id']), $actor, $context)->count());
@@ -360,7 +360,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
 
     public function test_unknown_binding_metadata_and_no_context_audit_queries_never_certify_a_private_flag(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->ordinary(); $r = $this->accept($risk);
         DB::table('hs_risk_assessment_acceptances')->where('id', $r['id'])->update(['after_binding' => json_encode(['schema_version' => 99]), 'has_exposure' => false]);
         $this->assertFalse(app(ChemicalExposureAuditAccessService::class)->scope(AuditLog::whereKey($r['audit_log_id']))->exists());
@@ -379,7 +379,7 @@ class HsRiskAssessmentAcceptanceTest extends ChemicalExposureCommandTestCase
     }
     public function test_missing_marker_partial_null_metadata_is_concealed_while_ordinary_legacy_audit_stays_visible(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::DECIDED, 'Change history: deferred, Stephan to confirm (26/29 Oct; MASTER chose "Not now" on his behalf, the approval step and audit log stay). RiskAssessmentAcceptanceService is an unwired prospective foundation (no route, writer or reader mounts it) and refuses private acceptance until the general audit recognition patch is supplied.', 'wire risk acceptance with the general audit recognition patch.'));
         $risk = $this->ordinary(); $this->allow($this->manager, 'audit.viewAny');
         $ordinary = AuditLog::where('auditable_type', $risk->getMorphClass())->where('auditable_id', $risk->id)->where('action', 'risk_assessment.created')->sole();
         $audit = app(ChemicalExposureAuditAccessService::class);

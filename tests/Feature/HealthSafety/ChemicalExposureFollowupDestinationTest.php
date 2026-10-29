@@ -169,8 +169,8 @@ final class ChemicalExposureFollowupDestinationTest extends ChemicalExposureComm
         [$root, $receiver, $row, $receipt] = $this->assigned(); $items = app(ChemicalExposureFollowupProvider::class)->authorizedTasks($receiver);
         $this->assertCount(1, $items); $dto = $items[0]->toArray();
         $this->assertSame('chemical_exposure_followup-'.$receipt['source_id'], $dto['id']);
-        // Codex's provider deliberately gives no link until the follow-up focus route is mounted (logged follow-up).
-        $this->assertNull($dto['link']);
+        // #3: the row opens the exposure page on this follow-up (ids only; the page re-checks access).
+        $this->assertSame('/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$receipt['source_id'], $dto['link']);
         $this->assertNull($dto['description']); $this->assertNull($dto['client']); $this->assertNull($dto['site']); $this->assertTrue($dto['restricted']);
         $this->assertStringNotContainsString('PRIVATE-', json_encode($dto, JSON_THROW_ON_ERROR));
         $this->assertSame(0, DatabaseNotification::count());

@@ -54,6 +54,9 @@ final class ChemicalPublicWorkspaceControllerTest extends ChemicalCommandTestCas
     {
         foreach (DB::getQueryLog() as $query) {
             $sql = strtolower($query['query']);
+            // Stephan (26 Oct, "Anyone who sees the list"): the register shows exposure counts at the viewer's Sites.
+            // A count is the only exposure query allowed; no exposure row or column is ever selected.
+            if (str_starts_with($sql, 'select count(*) as aggregate from `substance_exposure_records` where')) { continue; }
             $this->assertStringNotContainsString('chemical_exposure', $sql);
             $this->assertStringNotContainsString('substance_exposure_records', $sql);
             $this->assertStringNotContainsString('workplace_injury', $sql);

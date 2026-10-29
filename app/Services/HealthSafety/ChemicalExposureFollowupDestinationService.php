@@ -386,10 +386,11 @@ final class ChemicalExposureFollowupDestinationService
                         'status' => $child->completed_at ? 'completed' : 'open', 'bucket' => $child->completed_at ? 'done' : 'open',
                         'severity' => 'info', 'assignee' => ['id' => (int) $current->id, 'name' => 'You'], 'client' => null, 'site' => null,
                         'dueAt' => $child->due_at?->toISOString(), 'createdAt' => $child->created_at?->toISOString(),
-                        // No fabricated usable link. Root-owned route/focused-child transport remains unmounted.
-                        'link' => null, 'description' => null, 'actionLabel' => 'Open record',
-                        'displayState' => null,
-                        'actionHelp' => $navigation ? null : 'This assigned follow-up cannot be opened here until its protected workspace is available.']];
+                        // The exposure page opens straight on this follow-up (it finds the right page itself) and
+                        // re-checks the viewer's current access; the link carries ids only.
+                        'link' => $navigation ? null : '/health-safety/chemical-exposures/'.(int) $root->id.'?section=followups&followup='.(int) $child->id,
+                        'description' => null, 'actionLabel' => 'Open follow-up',
+                        'displayState' => null, 'actionHelp' => null]];
                 } catch (LogicException) { continue; }
                 catch (\Illuminate\Validation\ValidationException $error) {
                     if (array_keys($error->errors()) !== ['source']) { throw $error; }

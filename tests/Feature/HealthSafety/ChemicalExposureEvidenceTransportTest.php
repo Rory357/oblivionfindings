@@ -13,7 +13,6 @@ use App\Services\HealthSafety\ChemicalExposureWorkspaceService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Tests\Support\NotInThisBuild;
 
 /** Physical file/commit contract; prospective HTTP routes remain UNAPPLIED and all cases UNRUN. */
 final class ChemicalExposureEvidenceTransportTest extends ChemicalExposureCommandTestCase
@@ -152,7 +151,6 @@ final class ChemicalExposureEvidenceTransportTest extends ChemicalExposureComman
     }
     public function test_rejected_stage_recovery_is_actor_only_json_and_never_emits_path_uuid_or_private_file_name(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the chemical exposure evidence recovery-staging endpoints aren\'t routed in Codex\'s snapshot or this build.', 'build the exposure evidence recovery-staging endpoints.'));
         $root = $this->exposure(); $stage = $this->failed($root); $this->actingAs($this->manager);
         $url = self::BASE.'/recovery/staging/'.$stage->id;
         $this->get($url)->assertNotFound(); $json = $this->getJson($url)->assertOk()->assertJsonPath('staging.accepted', false);
@@ -164,7 +162,6 @@ final class ChemicalExposureEvidenceTransportTest extends ChemicalExposureComman
     }
     public function test_shared_hr_pointer_blocks_rejected_stage_cleanup_and_http_retry_remains_honestly_pending(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the chemical exposure evidence recovery-staging endpoints aren\'t routed in Codex\'s snapshot or this build.', 'build the exposure evidence recovery-staging endpoints.'));
         $root = $this->exposure(); $stage = $this->failed($root);
         HrDocument::factory()->create(['employee_profile_id' => $this->manager->hrEmployeeProfile->id,
             'storage_disk' => 'local', 'storage_path' => $stage->path]);
@@ -172,9 +169,19 @@ final class ChemicalExposureEvidenceTransportTest extends ChemicalExposureComman
             ->assertOk()->assertJsonPath('staging.accepted', false)->assertJsonPath('staging.state', 'cleanup_pending');
         Storage::disk('private')->assertExists($stage->path); $this->assertSame(1, $root->fresh()->source_revision);
     }
+    public function test_recovery_page_offers_recovery_only_to_exposure_managers(): void
+    {
+        $this->actingAs($this->manager)->get(self::BASE.'/recovery')->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->component('health-safety/chemical-exposure-recovery')->where('can', ['inspect' => true, 'retry' => true]));
+        $this->getJson(self::BASE.'/recovery/cleanups')->assertOk()->assertJsonPath('attempts', []);
+        $reader = $this->staff(['hazards.view', 'hr.wellbeing.view']);
+        $this->actingAs($reader)->get(self::BASE.'/recovery')->assertOk()->assertInertia(fn (\Inertia\Testing\AssertableInertia $page) => $page
+            ->where('can', ['inspect' => false, 'retry' => false]));
+        $this->getJson(self::BASE.'/recovery/staging')->assertForbidden();
+        $this->getJson(self::BASE.'/recovery/cleanups')->assertForbidden();
+    }
     public function test_recovery_permission_revocation_does_not_purge_pending_bytes_or_claim_acceptance(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the chemical exposure evidence recovery-staging endpoints aren\'t routed in Codex\'s snapshot or this build.', 'build the exposure evidence recovery-staging endpoints.'));
         $root = $this->exposure(); $stage = $this->failed($root); $this->manager->canDo('hr.wellbeing.view');
         $this->allow($this->manager, 'hr.wellbeing.view', false);
         $this->actingAs($this->manager)->postJson(self::BASE.'/recovery/staging/'.$stage->id.'/retry-cleanup', [])->assertForbidden();

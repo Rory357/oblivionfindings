@@ -333,6 +333,14 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             Route::get('/capture', [ChemicalExposureWorkspaceController::class, 'capture'])->name('capture');
             Route::get('/capture-options', [ChemicalExposureWorkspaceController::class, 'captureOptions'])->name('capture-options');
             Route::get('/capture-confirmation', [ChemicalExposureWorkspaceController::class, 'captureReceipt'])->name('capture-confirmation');
+            // Evidence recovery: the manager's own unfinished uploads and pending file clean-ups. JSON routes re-check access.
+            Route::get('/recovery', [ChemicalExposureWorkspaceController::class, 'recovery'])->name('recovery');
+            Route::get('/recovery/staging', [ChemicalExposureWorkspaceController::class, 'recoveryStages'])->name('recovery.staging.index');
+            Route::get('/recovery/staging/{stage}', [ChemicalExposureWorkspaceController::class, 'recoveryStage'])->whereNumber('stage')->name('recovery.staging.show');
+            Route::post('/recovery/staging/{stage}/bind-acceptance', [ChemicalExposureWorkspaceController::class, 'bindRecoveryStage'])->whereNumber('stage')->middleware('throttle:30,1')->name('recovery.staging.bind');
+            Route::post('/recovery/staging/{stage}/retry-cleanup', [ChemicalExposureWorkspaceController::class, 'cleanRecoveryStage'])->whereNumber('stage')->middleware('throttle:30,1')->name('recovery.staging.cleanup');
+            Route::get('/recovery/cleanups', [ChemicalExposureWorkspaceController::class, 'recoveryCleanups'])->name('recovery.cleanups.index');
+            Route::post('/recovery/cleanups/{cleanup}/retry', [ChemicalExposureWorkspaceController::class, 'retryRecoveryCleanup'])->whereNumber('cleanup')->middleware('throttle:30,1')->name('recovery.cleanups.retry');
             Route::get('/{exposure}', [ChemicalExposureWorkspaceController::class, 'show'])->whereNumber('exposure')->name('show');
             Route::get('/{exposure}/confirmation', [ChemicalExposureWorkspaceController::class, 'receipt'])->whereNumber('exposure')->name('confirmation');
             Route::get('/{exposure}/command-options', [ChemicalExposureWorkspaceController::class, 'commandOptions'])->whereNumber('exposure')->name('command-options');

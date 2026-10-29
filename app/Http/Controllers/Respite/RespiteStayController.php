@@ -17,6 +17,7 @@ use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
 use App\Models\ServiceAgreement;
+use App\Services\HealthSafety\RestraintService;
 use App\Services\Incidents\IncidentJourneyService;
 use App\Services\References\ReferenceNumberGenerator;
 use App\Services\Respite\RespiteMedicalDisclosure;
@@ -455,6 +456,39 @@ class RespiteStayController extends Controller
         ]));
 
         return back()->with('success', 'Restraint event recorded.');
+    }
+
+    /**
+     * The save behind the stay's own "record a restraint" page (the shared restraint form). It goes through the shared
+     * restraint command with a command key: the stay's own person, Site and stay, one receipt and one Respite event, so
+     * a lost response is recovered from its receipt instead of being sent twice. The Respite workspace's quick form
+     * keeps the direct save above.
+     */
+    public function recordRestraintFromPage(Request $request, RespiteStay $stay, RestraintService $commands): RedirectResponse
+    {
+        $accepted = DB::transaction(function () use ($request, $stay, $commands): array {
+            $currentStay = $this->stayScope->resolveAuthorizedStay($request, (int) $stay->id, true);
+            $input = $request->except('_token', '_method', 'return_to', 'section', 'action');
+            if (! array_key_exists('client_id', $input)) {
+                $input['client_id'] = (int) $currentStay->client_id;
+            }
+            $result = $commands->createForStay($request->user(), $currentStay, $input);
+            $proof = $commands->confirmationForViewer($request->user(), $result);
+            abort_unless($proof && $proof['event_id'] === $result['event_id'] && $proof['idempotency_key'] === $result['idempotency_key']
+                && $proof['version'] === $result['version'] && $proof['command'] === 'create', 403);
+            $proof['replayed'] = $result['replayed'];
+
+            return ['confirmation' => $proof, 'stay_id' => (int) $currentStay->id, 'client_id' => (int) $currentStay->client_id];
+        });
+        if (! $accepted['confirmation']['replayed']) {
+            event(new RespiteEvent('respite.stay.restraint_recorded', [
+                'id' => $accepted['confirmation']['event_id'],
+                'stay_id' => $accepted['stay_id'],
+                'client_id' => $accepted['client_id'],
+            ]));
+        }
+
+        return back()->with('success', 'Restraint event recorded.')->with('restraint_confirmation', $accepted['confirmation']);
     }
 
     public function recordIncident(Request $request, RespiteStay $stay): RedirectResponse

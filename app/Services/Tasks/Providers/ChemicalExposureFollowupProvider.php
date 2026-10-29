@@ -7,11 +7,12 @@ use App\Services\HealthSafety\ChemicalExposureFollowupDestinationService;
 use App\Services\HealthSafety\HealthSafetyReadContext;
 use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
+use App\Services\Tasks\Contracts\UnwatchableTaskProvider;
 use App\Services\Tasks\TaskItem;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /** Registered in TaskAggregator::defaultProviders(). Source commands alone complete work; no generic model/audit/assignment adapter. */
-final class ChemicalExposureFollowupProvider implements ContextualHealthSafetyTaskProvider, SiteScopedTaskProvider
+final class ChemicalExposureFollowupProvider implements ContextualHealthSafetyTaskProvider, SiteScopedTaskProvider, UnwatchableTaskProvider
 {
     public function sourceKey(): string { return 'chemical_exposure_followup'; }
     public function label(): string { return 'Private follow-ups'; }

@@ -276,6 +276,24 @@ Stephan's answers on the open H&S items (26 Oct ~14:10, pop-ups in the coordinat
 
 Before any Pest run in a worktree that holds a local `npm run build`, move `public/build` aside: its manifest sets Inertia's asset version, and every X-Inertia test request then answers 409.
 
+## Resumed 29 Oct (branch `claude/hs-ease-of-use`)
+
+Stephan (29 Oct, via MASTER): "also you are in control of health and safety". MASTER decides on his behalf overnight; decisions go to MASTER as short options (no pop-ups).
+
+- **#9 re-checked, now "Not now" (MASTER, 29 Oct, for Stephan):** the 26 Oct question said "acceptance step", but Codex's `RiskAssessmentAcceptanceService` is not a sign-off step. Risk assessments already have their approval step and "Is the remaining risk acceptable?". Codex's piece is a tamper-proof change history: a sealed copy of every risk change with who and when. Today's audit log already records every change. The 13 `HsRiskAssessmentAcceptanceTest` skips are now `DECIDED` ("Change history: deferred, Stephan to confirm"). **Possible later job:** (A) change history for all risk assessments, about 2 days with the general audit-page recognition Codex's private cases need; or (B) only risk assessments not linked to a private record, about 1 day. Stephan may switch to A or B.
+- **#8:** the 13 meeting delivery and participation inbox skips are now `DECIDED` ("Not now").
+- **#12:** the 29 other-module tests are listed for their owners in the shared notes (`hs-other-module-tests-for-owners-2026-10-29.md`).
+- **Built (tests run per item):**
+  - #3 /tasks follow-up link;
+  - #5 Overview safeguarding count through Safeguarding's own read;
+  - #2 register exposure counts (`ChemicalRegisterExposureSummary`, counts only);
+  - #7 portal rule on the sidebar and the portal landing list (`ClientPortalMembershipService::treatsAsPortalMember`);
+  - #6 client profile incidents and First Aid narrowing;
+  - #4 respite stay restraint page (`/respite/stays/{stay}/restraints/report`, saving through its own keyed route `/restraints/record`; the workspace's quick form keeps main's direct save);
+  - #10 evidence recovery routes and Codex's recovery page (`/health-safety/chemical-exposures/recovery`);
+  - #11 safeguarding register read checks.
+- **Part 3 clean-up approved by MASTER (29 Oct):** take a full .com database dump first (outside `/var/www/oblivionfindings`), send MASTER the list and the dump path, then delete only test and demo-fixture records, then add realistic NZ data.
+
 ## Jobs after the H&S merge (each its own tested change, pushed and deploy-checked)
 
 1. ✅ **Participation Site checks on every write** (Stephan, option A "All participation"): committees (create), representatives (add, edit), consultations (add, edit, status, document upload) and meetings. Each write needs the record's Site among the manager's H&S Sites; `healthSafety.viewAllSites` covers every Site; a record with no Site needs all-Sites access. Tests per write type: own Site allowed, other Site refused, all-Sites allowed, Site-less without all-Sites refused. **Done 26 Oct:** every participation write route (13) checks the record's Site; another Site's record answers 404 like the register, creating at another Site 403; `WorkerParticipationSiteWriteTest` covers own, other, all-Sites and Site-less for each.

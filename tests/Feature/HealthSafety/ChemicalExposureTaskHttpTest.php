@@ -24,22 +24,25 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
         $this->actingAs($receiver)->get($this->origin())->assertOk()->assertInertia(fn (Assert $page) => $page
             ->component('tasks/index')->where('pagination.total', 1)->has('items', 1)->where('items.0.id', $id)
             ->where('items.0.assignee', ['id' => $receiver->id, 'name' => 'You'])->where('items.0.restricted', true)
-            ->where('items.0.link', null)->where('items.0.description', null)->where('items.0.client', null)->where('items.0.site', null)
-            ->where('items.0.actionHelp', fn ($value) => is_string($value) && $value !== ''));
+            ->where('items.0.link', '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$child->id)->where('items.0.description', null)->where('items.0.client', null)->where('items.0.site', null)
+            ->where('items.0.actionHelp', null));
         $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->component('my-day/index')
-            ->where('myTasks.items', fn ($rows) => collect($rows)->contains(fn ($row) => $row['id'] === $id && $row['link'] === null
+            ->where('myTasks.items', fn ($rows) => collect($rows)->contains(fn ($row) => $row['id'] === $id && $row['link'] === '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$child->id
                 && $row['title'] === 'Assigned follow-up')));
         $this->assertSame(2, $root->fresh()->source_revision); $this->assertNull($child->fresh()->completed_at);
     }
 
-    public function test_actual_private_drawer_has_no_audit_actors_watchers_generic_commands_or_false_open_capability(): void
+    public function test_actual_private_drawer_has_no_audit_actors_watchers_or_generic_commands_and_opens_the_follow_up(): void
     {
         [$root, $receiver, $child] = $this->assignedWork();
         TaskWatcher::create(['source' => 'chemical_exposure_followup', 'item_id' => $child->id, 'user_id' => $this->manager->id]);
+        // #3 (no decision needed): the drawer opens the exposure page on this follow-up, which re-checks access itself.
+        // It still offers no "Follow": private named work is never watched (UnwatchableTaskProvider).
         $response = $this->actingAs($receiver)->getJson($this->drawer($child->id))->assertOk()
             ->assertJsonPath('item.assignee', ['id' => $receiver->id, 'name' => 'You'])
             ->assertJsonPath('timeline', [])->assertJsonPath('watchers', [])->assertJsonPath('watchersHidden', true)
-            ->assertJsonPath('canAssign', false)->assertJsonPath('canSplit', false)->assertJsonPath('canOpen', false)->assertJsonPath('canWatch', false);
+            ->assertJsonPath('item.link', '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$child->id)
+            ->assertJsonPath('canAssign', false)->assertJsonPath('canSplit', false)->assertJsonPath('canOpen', true)->assertJsonPath('canWatch', false);
         $this->assertStringNotContainsString('PRIVATE-', $response->getContent());
         $this->post('/tasks/chemical_exposure_followup/'.$child->id.'/assign', ['assignee_id' => $this->manager->id])->assertStatus(400);
         $this->post('/tasks/chemical_exposure_followup/'.$child->id.'/split', ['title' => 'Generic child attempt'])->assertStatus(400);
@@ -120,14 +123,16 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
         $incident->update(['site_id' => $this->foreignSite->id]); $this->getJson($this->drawer($child->id))->assertNotFound();
     }
 
-    public function test_actual_twenty_seven_child_feed_counts_and_drawer_do_not_infer_focused_private_get_readiness(): void
+    public function test_actual_twenty_seven_child_feed_counts_and_drawer_link_the_exact_follow_up(): void
     {
         [$root, $receiver, $first] = $this->assignedWork();
         for ($i = 0; $i < 26; $i++) { $this->assignedWork(null, $receiver, $root); }
         $this->actingAs($receiver)->get($this->origin().'&page=2')->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('pagination.total', 27)->where('pagination.page', 1)->has('items', 27));
+        // The link carries ids only; the exposure page finds the follow-up's own page itself (#3).
         $this->getJson($this->drawer($first->id))->assertOk()->assertJsonPath('item.id', 'chemical_exposure_followup-'.$first->id)
-            ->assertJsonPath('item.link', null)->assertJsonPath('canOpen', false);
+            ->assertJsonPath('item.link', '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$first->id)
+            ->assertJsonPath('canOpen', true);
         $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->where('myTasks.total', 27)->has('myTasks.items', 8));
         // Guarded source GET+exact page26 focus/return regression is gate_runner's separate full transport suite.
     }

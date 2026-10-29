@@ -119,7 +119,8 @@ final class ChemicalExposureWorkspaceService
                 'source_integrity' => $repair ? 'repair_required' : 'admitted',
                 'page' => ['current_page' => $f['page'], 'last_page' => $repair ? null : max(1, (int) ceil($total / 25)),
                     'total' => $repair ? null : $total, 'per_page' => 25, 'has_more' => $repair ? null : $total > $f['page'] * 25],
-                'filters' => $f, 'sites' => $siteOptions, 'can' => ['capture' => $capture]];
+                // recover: exposure managers can open their evidence recovery page (it checks again itself).
+                'filters' => $f, 'sites' => $siteOptions, 'can' => ['capture' => $capture, 'recover' => $current->canDo('hazards.manage')]];
         });
     }
 

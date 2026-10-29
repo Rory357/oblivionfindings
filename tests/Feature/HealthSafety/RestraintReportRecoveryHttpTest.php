@@ -218,16 +218,17 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
     }
 
     /*
-     * Decision 7 (Stephan, 25 Oct): a respite stay records through main's respite form for this merge,
-     * and Codex's stay report page (`/respite/stays/{stay}/restraints/report`) is unrouted until that
-     * follow-up, because its receipt recovery cannot find a submission of main's form.
+     * A respite-only actor has no shared capture. The Respite workspace's quick form (main's) keeps its direct save;
+     * the stay's own page (Stephan, 26 Oct: "yes build it") saves through its own keyed route, tested in
+     * RespiteRestraintReadTest.
      */
-    public function test_respite_only_actor_records_through_main_form_and_has_no_shared_capture_or_stay_report(): void
+    public function test_respite_only_actor_records_through_main_form_and_has_no_shared_capture(): void
     {
         Event::fake([RespiteEvent::class]);
         $stay = $this->stay();
         $actor = $this->staff(['respite.viewAny', 'respite.stays.manage', 'clients.viewAny']);
-        $this->actingAs($actor)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertNotFound();
+        $this->actingAs($actor)->getJson('/respite/stays/'.$stay->id.'/restraints/report')->assertOk()
+            ->assertJsonPath('capture_context.store_href', '/respite/stays/'.$stay->id.'/restraints/record');
         $input = $this->capture();
         $this->postJson(route('health-safety.restraints.events.store'), $input)->assertForbidden();
         $this->postJson(route('health-safety.restraints.plans.store'), $this->planInput())->assertForbidden();
@@ -248,8 +249,10 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         $input = $this->capture(['stay_id' => $stay->id, 'site_id' => $this->site->id]);
         $saved = $this->service()->create($actor, $input);
         $this->revoke($actor, 'restraints.create');
-        // The generic report is the only recovery entry now; the respite grant does not reopen it.
+        // Neither the generic report nor the stay's own page reopens it on the respite grant.
         $this->actingAs($actor->fresh())->getJson($this->report($saved['idempotency_key']))->assertForbidden();
+        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?receipt_key='.$saved['idempotency_key'])->assertOk()
+            ->assertJsonPath('restraint_confirmation', null)->assertJsonPath('restraint_href', null);
         $this->postJson(route('health-safety.restraints.events.store'), $input)->assertForbidden();
         $this->assertDatabaseCount('restraint_events', 1);
         $this->assertDatabaseCount('restraint_command_receipts', 1);
@@ -304,8 +307,11 @@ final class RestraintReportRecoveryHttpTest extends RestraintEventCommandTestCas
         foreach (['stay_id', 'respite_stay_id'] as $key) {
             $this->getJson(route('health-safety.restraints.report', [$key => $stay->id]))->assertUnprocessable();
         }
-        // Codex's stay report page is unrouted for this merge (decision 7 follow-up).
-        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?respite_stay_id='.$stay->id)->assertNotFound();
+        // The stay's own page carries the stay; its query may only repeat it, never pick another.
+        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?respite_stay_id='.$stay->id)->assertOk()
+            ->assertJsonPath('capture_context.respite_stay_id', $stay->id);
+        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?respite_stay_id='.($stay->id + 1000))->assertNotFound();
+        $this->getJson('/respite/stays/'.$stay->id.'/restraints/report?stay_id='.$stay->id)->assertUnprocessable();
         $this->assertDatabaseCount('restraint_events', 0);
         $this->assertDatabaseCount('restraint_command_receipts', 0);
     }

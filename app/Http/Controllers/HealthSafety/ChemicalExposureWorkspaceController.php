@@ -139,6 +139,72 @@ final class ChemicalExposureWorkspaceController extends Controller
         }
         return $this->headers(response()->json($this->deliveryWorkspace->retry($r->user(), $exposure, $delivery)));
     }
+    /**
+     * Evidence recovery: the signed-in manager's own upload attempts that never became a saved attachment, and removed
+     * files whose physical clean-up is still pending. The page reads and acts through the JSON routes below; each
+     * call re-checks current exposure access, and only the person who made the attempt sees it.
+     */
+    public function recovery(Request $r)
+    {
+        $this->queryKeys($r, []);
+        $can = $this->recoveryAccess($r);
+
+        return $this->headers(Inertia::render('health-safety/chemical-exposure-recovery', ['can' => ['inspect' => $can, 'retry' => $can]])->toResponse($r));
+    }
+    public function recoveryStages(Request $r)
+    {
+        $this->jsonOnly($r); $this->queryKeys($r, ['after_id']);
+        return $this->headers(response()->json($this->evidence->stagingAttemptsForViewer($r->user(), $this->cursor($r))));
+    }
+    public function recoveryStage(Request $r, string|int $stage)
+    {
+        $stage = $this->id($stage); $this->jsonOnly($r); $this->queryKeys($r, []);
+        return $this->headers(response()->json(['staging' => $this->evidence->inspectStaging($r->user(), $stage)]));
+    }
+    public function bindRecoveryStage(Request $r, string|int $stage)
+    {
+        $stage = $this->id($stage); $this->noInput($r);
+        return $this->headers(response()->json(['staging' => $this->evidence->bindAcceptedStage($r->user(), $stage)]));
+    }
+    public function cleanRecoveryStage(Request $r, string|int $stage)
+    {
+        $stage = $this->id($stage); $this->noInput($r);
+        return $this->headers(response()->json(['staging' => $this->evidence->retryStagingCleanup($r->user(), $stage)]));
+    }
+    public function recoveryCleanups(Request $r)
+    {
+        $this->jsonOnly($r); $this->queryKeys($r, ['after_id']);
+        return $this->headers(response()->json($this->evidence->cleanupAttemptsForViewer($r->user(), $this->cursor($r))));
+    }
+    public function retryRecoveryCleanup(Request $r, string|int $cleanup)
+    {
+        $cleanup = $this->id($cleanup); $this->noInput($r);
+        return $this->headers(response()->json(['cleanup' => $this->evidence->retryRemovalCleanup($r->user(), $cleanup)]));
+    }
+    /** A recovery action carries no new command, value or file: anything sent with it is refused. */
+    private function noInput(Request $r): void
+    {
+        $this->jsonOnly($r); $this->queryKeys($r, []);
+        if ($r->request->count() > 0 || $r->json()->count() > 0 || $r->allFiles() !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['recovery' => 'A recovery action takes no input.']);
+        }
+    }
+    private function cursor(Request $r): int
+    {
+        if (! $r->has('after_id')) { return 0; }
+        $this->selection($r->input('after_id'));
+        return (int) $r->input('after_id');
+    }
+    /** Whether the viewer may use recovery now (exposure management); the JSON routes check again on every call. */
+    private function recoveryAccess(Request $r): bool
+    {
+        try {
+            return $this->workspace->recoveryAdmission($r->user())['can']['inspect'];
+        } catch (HttpExceptionInterface $denied) {
+            if (! in_array($denied->getStatusCode(), [403, 404], true)) { throw $denied; }
+            return false;
+        }
+    }
     private function accepted(Request $r, array $receipt, ?int $substanceId = null)
     {
         if (array_diff(array_keys($receipt), ChemicalExposureLedger::RECEIPT_KEYS)

@@ -12,6 +12,7 @@ use App\Services\Tasks\Contracts\ContextualHealthSafetyTaskProvider;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\ManagesAssignmentNotifications;
 use App\Services\Tasks\Contracts\SplittableTaskProvider;
+use App\Services\Tasks\Contracts\UnwatchableTaskProvider;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskAssignmentNotifier;
 use App\Services\Tasks\TaskItem;
@@ -203,7 +204,8 @@ class AllTasksController extends Controller
             'item' => $item->toArray(),
             'timeline' => $timeline,
             'canOpen' => $canOpen,
-            'canWatch' => $canOpen,
+            // Private named work opens but is never followed (UnwatchableTaskProvider).
+            'canWatch' => $canOpen && ! $provider instanceof UnwatchableTaskProvider,
             'canAssign' => $canOpen
                 && $provider instanceof AssignableTaskProvider
                 && $provider->canAssign($user),
@@ -312,6 +314,7 @@ class AllTasksController extends Controller
             $this->providerFiltersForReturnTo($returnTo),
         );
         abort_unless($item?->link !== null, 404);
+        abort_if($aggregator->providerFor($source) instanceof UnwatchableTaskProvider, 404);
 
         TaskWatcher::query()->firstOrCreate([
             'source' => $source,

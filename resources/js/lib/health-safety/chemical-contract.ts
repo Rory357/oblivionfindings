@@ -230,6 +230,8 @@ export interface ChemicalIndex {
     };
     badges: { sds_to_action: number | null; worksafe_awaiting: null };
     exposure_access: 'restricted';
+    /** Exposure numbers for anyone who sees the list (Stephan, 26 Oct), at the Sites shown; counts only. */
+    exposure_summary?: { exposures: number; awaiting_outcome: number; worksafe_awaiting: number; period_days: number; exposures_href: string | null };
     sites: ChemicalSiteOption[];
     can: ChemicalCan;
     detail: null;

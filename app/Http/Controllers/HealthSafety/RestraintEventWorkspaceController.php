@@ -7,6 +7,8 @@ use App\Models\BehaviourSupportPlan;
 use App\Models\RestraintCommandReceipt;
 use App\Models\RestraintEvent;
 use App\Models\RestraintEventAttachment;
+use App\Models\RespiteStay;
+use App\Services\Respite\RespiteRestraintReadService;
 use App\Services\HealthSafety\BehaviourSupportPlanWorkspaceService;
 use App\Services\HealthSafety\RestraintAccessService;
 use App\Services\HealthSafety\RestraintEvidenceService;
@@ -36,11 +38,26 @@ class RestraintEventWorkspaceController extends Controller
     public function report(Request $request): Response|JsonResponse
     {
         abort_if($request->has('stay_id') || $request->has('respite_stay_id'), 422);
-        // The generic entry retains restraint capture authority. A respite stay records through main's
-        // respite form for this merge (decision 7); Codex's stay report page returns with that follow-up.
+        // The generic entry retains restraint capture authority. A respite stay records on its own page (below).
         $this->access->withCurrentViewer($request->user(), fn ($current) => $this->access->assertOperation($current, 'capture'));
 
         return $this->reportPage($request);
+    }
+
+    /**
+     * "Record a restraint for this stay" (Stephan, 26 Oct: "yes build it"): the shared form, locked to the stay's own
+     * person, Site and stay, for people who manage respite stays. It saves through the respite stay route with a
+     * command key, so a lost response is recovered from its receipt instead of being sent twice.
+     */
+    public function reportStay(Request $request, RespiteStay $stay): Response|JsonResponse
+    {
+        $context = app(RespiteRestraintReadService::class)->reportContext($request->user(), $stay);
+        foreach (['client_id', 'site_id', 'respite_stay_id'] as $key) {
+            abort_if($request->filled($key) && $this->positive($request->input($key)) !== $context[$key], 404);
+        }
+        abort_if($request->has('stay_id'), 422);
+
+        return $this->reportPage($request, $context);
     }
 
     private function reportPage(Request $request, ?array $context = null): Response|JsonResponse

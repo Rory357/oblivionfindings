@@ -34,6 +34,9 @@ final class ChemicalPublicWorkspaceController extends Controller
         $filters = $this->filters($r);
         // Prove current index admission before converging an old modal bookmark.
         $props = $this->reader->index($r->user(), $filters);
+        // Exposure numbers for anyone who sees the list (Stephan, 26 Oct), at the Sites the register admitted.
+        $props['exposure_summary'] = app(\App\Services\HealthSafety\ChemicalRegisterExposureSummary::class)->forViewer($r->user(),
+            array_map('intval', array_column($props['sites'] ?? [], 'id')), $props['filters']['site_id'] ?? null, (int) ($props['filters']['period'] ?? 90));
         if ($r->filled('substance')) {
             $id = $this->id($r->input('substance'));
             $this->reader->detail($r->user(), $id);

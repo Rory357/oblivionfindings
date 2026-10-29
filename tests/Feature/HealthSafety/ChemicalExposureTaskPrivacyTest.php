@@ -57,7 +57,7 @@ final class ChemicalExposureTaskPrivacyTest extends ChemicalExposureTaskReadTest
         $this->assertSame(['view' => true, 'badge' => 1, 'degraded' => false], $this->ownTasks()->navigationBadgeFor($receiver));
         $this->assertSame(['id' => $receiver->id, 'name' => 'You'], $exact->assignee);
         $this->assertTrue($exact->restricted); $this->assertNull($exact->description); $this->assertNull($exact->client); $this->assertNull($exact->site);
-        $this->assertNull($exact->link); $this->assertNotEmpty($exact->actionHelp);
+        $this->assertSame('/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$child->id, $exact->link); $this->assertNull($exact->actionHelp);
         $this->assertStringNotContainsString('PRIVATE-', json_encode($exact->toArray(), JSON_THROW_ON_ERROR));
     }
 
@@ -229,8 +229,9 @@ final class ChemicalExposureTaskPrivacyTest extends ChemicalExposureTaskReadTest
         $aggregator = $this->ownTasks();
         $this->assertCount(27, $aggregator->itemsFor($receiver)); $this->assertSame(27, $aggregator->navigationBadgeFor($receiver)['badge']);
         $exact = $aggregator->findItemFor($receiver, 'chemical_exposure_followup', $first->id);
-        $this->assertSame('chemical_exposure_followup-'.$first->id, $exact?->id); $this->assertNull($exact?->link);
-        // Exact protected Workspace focus/page resolution is a separate owning transport prerequisite, never stubbed here.
+        $this->assertSame('chemical_exposure_followup-'.$first->id, $exact?->id);
+        $this->assertSame('/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$first->id, $exact?->link);
+        // The exposure page resolves this follow-up to its own page (ChemicalExposureFollowupFocusTest).
     }
 
     public function test_original_reported_site_context_and_acceptance_remain_final_dependencies_after_a_to_b_and_later_b_work(): void

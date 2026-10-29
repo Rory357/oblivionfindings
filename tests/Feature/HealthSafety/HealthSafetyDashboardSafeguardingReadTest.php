@@ -11,7 +11,6 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
-use Tests\Support\NotInThisBuild;
 
 /** Prospective real GET acceptance for UNAPPLIED H&S Safeguarding consumer, not a passing claim. */
 final class HealthSafetyDashboardSafeguardingReadTest extends TestCase
@@ -48,7 +47,6 @@ final class HealthSafetyDashboardSafeguardingReadTest extends TestCase
 
     public function test_hazards_only_get_denies_source_counts_and_link_without_any_concern_sql(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the Overview\'s safeguarding source read (the count only with safeguarding.viewAny, plus a safeguarding_source link) was never built; the count stays as on main.', 'safeguarding count privacy on the Overview (logged for Stephan).'));
         $this->concern($this->site); DB::enableQueryLog(); DB::flushQueryLog();
         try { $props = $this->dashboard(); $sql = implode(' ', array_column(DB::getQueryLog(), 'query')); }
         finally { DB::disableQueryLog(); }
@@ -60,7 +58,6 @@ final class HealthSafetyDashboardSafeguardingReadTest extends TestCase
 
     public function test_actual_selected_site_open_count_link_matches_canonical_register_and_masking_is_not_a_gate(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the Overview\'s safeguarding source read (the count only with safeguarding.viewAny, plus a safeguarding_source link) was never built; the count stays as on main.', 'safeguarding count privacy on the Overview (logged for Stephan).'));
         $this->grant('safeguarding.viewAny'); $this->grant('safeguarding.viewSensitive', false);
         $this->concern($this->site); $this->concern($this->site, 'monitoring'); $this->concern($this->site, 'closed');
         $this->concern($this->site, 'no_action_required'); $this->concern($this->otherSite); $this->concern(null);
@@ -73,7 +70,6 @@ final class HealthSafetyDashboardSafeguardingReadTest extends TestCase
 
     public function test_hs_all_sites_does_not_imply_reports_bypass_or_view_and_selected_nondefault_scope_is_exact(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the Overview\'s safeguarding source read (the count only with safeguarding.viewAny, plus a safeguarding_source link) was never built; the count stays as on main.', 'safeguarding count privacy on the Overview (logged for Stephan).'));
         $this->grant('healthSafety.viewAllSites'); $this->grant('safeguarding.viewAny');
         $this->concern($this->site); $this->concern($this->otherSite); $this->concern($this->otherSite);
         $this->assertSame(1, $this->dashboard()['kpis']['open_safeguarding']);
@@ -86,7 +82,6 @@ final class HealthSafetyDashboardSafeguardingReadTest extends TestCase
 
     public function test_warmed_source_grant_withdraw_restore_and_readable_zero_do_not_reuse_prior_counts(): void
     {
-        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::NEVER_BUILT, 'the Overview\'s safeguarding source read (the count only with safeguarding.viewAny, plus a safeguarding_source link) was never built; the count stays as on main.', 'safeguarding count privacy on the Overview (logged for Stephan).'));
         $this->grant('safeguarding.viewAny'); $this->concern($this->site); $this->viewer->load('roles.permissions', 'permissionOverrides');
         $this->assertSame(1, $this->dashboard()['kpis']['open_safeguarding']);
         $this->grant('safeguarding.viewAny', false); $this->assertNull($this->dashboard()['kpis']['open_safeguarding']);
