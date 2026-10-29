@@ -455,3 +455,27 @@ Drawings: `docs/health-safety-build/drawings/` (`63f658209`, updated after revie
   - **Not** `incidents.create` for team_lead. An incident report needs a client the reporter can read, and team leads hold no client read access, so it would only work by widening their reading. MASTER to decide.
 - **Follow-up after that yes:** a support worker can see their own workplace injury. This needs a new read path for injury records, so it's not in the held change.
 - **Follow-up:** `/incidents/create` and My Day's "Report incident" open the form on the incident register, so anyone allowed to report but not to read the register would be refused. A standalone report page would fix that for report-only roles.
+
+## Stephan's answers and follow-ups (30 Oct)
+
+Stephan answered directly in this session (pop-ups); MASTER was told.
+
+- **Create-only reporting merged** (`3a410363f`, Stephan: "Merge it"). Live on the .com: a demo support worker opens the restraint report and the workplace injury form; both registers stay closed (403).
+- **Team leads report incidents** (Stephan: "Let them read clients", "All at their sites", "Report-only page").
+  - `team_lead` gains `incidents.create` and `clients.viewAny` (ClientPolicy still limits it to their sites). Grant migration `2026_10_30_110000_grant_team_lead_incident_reporting`.
+  - The incident register stays closed to them: no `incidents.viewAny` or `incidents.viewAssigned`.
+  - Tests: `TeamLeadIncidentReportingTest`.
+  - Knock-on: client reading also lets team leads see client-assigned devices at their sites in Security & Devices (its client tab follows `clients.viewAny`). `HealthcareWorkspaceTest` used team_lead as "a role without client reading"; that case now removes the key inside the test.
+  - Seen on main, not from this change: `RestrictedIndependentAuthoritySeedingTest` (2 cases) finds `referrals.settings.governance` on admin.
+- **Standalone incident report page** `/incidents/report`:
+  - The same incident wizard laid out as a page, using the reporting page shell from "Raise a concern" (now shared as `WizardPageShell`).
+  - `/incidents/create` sends people who can't open the register there; people who can still report on the register as before.
+  - It lists only the people the register's form would offer them. It shows no "Open incident" button and no register crumb to people who can't open the register. Close returns to My Day.
+- **My injuries in My HR** `/hr/my/injuries` (Stephan: "My HR", "Facts, care and plan"):
+  - Read-only. Being the injured worker is the read rule; no H&S permission is involved, and nobody else's injury is reachable.
+  - Shown: what happened, dates, lost days, treatment, the ACC claim, the return-to-work plan and modified duties, and who is coordinating.
+  - Not shown: free-text notes (injury notes; plan review, clearance and agreement notes; duty notes), uploaded files, capacity assessments, or the linked incident (which can name a client).
+  - The Injuries tab shows only to someone with an injury on record. My Day shows "Your workplace injury" with a link while one is open.
+  - Tests: `MyInjuriesTest`, `injuries.test.tsx`.
+- **Fix: My Day "Report something" now actually shows.** The earlier button went into `my-day-hero.tsx`, which the My Day page doesn't render (only tests did). It now sits in the "Record care" card beside "Report incident", and the hero change is reverted.
+- **Control Room failed jobs on the .com:** handed to MASTER. Stephan: "the demo seeded data can be removed if it is causing the issues".

@@ -133,6 +133,10 @@ trait BuildsMyHrShell
                 'policiesDue' => $policiesDue,
                 'onesToAck' => $onesToAck,
                 'kudosThisMonth' => $kudosThisMonth,
+                // Own workplace injuries: the Injuries tab shows only when there is one (Stephan, 30 Oct).
+                'injuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)->count(),
+                'openInjuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)
+                    ->whereNotIn('status', ['recovered', 'closed'])->count(),
             ],
             'calendar' => $this->myHrCalendarFeed($user, now()),
         ];

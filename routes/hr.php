@@ -94,6 +94,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/expenses/{expenseClaim}/withdraw', [MyHrController::class, 'withdrawExpenseClaim'])->name('expenses.withdraw');
         Route::get('/training', [MyHrController::class, 'training'])->name('training');
         Route::get('/benefits', [MyHrController::class, 'benefits'])->name('benefits');
+        // The worker's own workplace injuries, read-only (Stephan, 30 Oct).
+        Route::get('/injuries', [MyHrController::class, 'injuries'])->name('injuries');
         // Owner-gated: a new hire completes their own onboarding task from the
         // Overview's "Getting started" card (subject-only; enforced in-controller).
         Route::post('/onboarding/tasks/{task}/complete', [MyHrController::class, 'completeOnboardingTask'])->name('onboarding.tasks.complete');

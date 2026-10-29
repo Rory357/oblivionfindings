@@ -507,6 +507,23 @@ class MyHrController extends Controller
         ]);
     }
 
+    /**
+     * The worker's own workplace injuries, read-only (Stephan, 30 Oct: facts, care and the return-to-work plan; no
+     * internal notes or files). Being the injured worker is the read rule; see OwnInjuryReadService.
+     */
+    public function injuries(Request $request)
+    {
+        $user = $this->currentMyHrUser($request);
+
+        $response = Inertia::render('hr/my/injuries', [
+            'myHr' => $this->myHrShellProps($user),
+            'injuries' => app(\App\Services\HealthSafety\OwnInjuryReadService::class)->forWorker($user),
+        ])->toResponse($request);
+        $response->headers->set('Cache-Control', 'private, no-store, no-cache, must-revalidate');
+
+        return $response;
+    }
+
     public function leave(Request $request)
     {
         $user = $this->currentMyHrUser($request);

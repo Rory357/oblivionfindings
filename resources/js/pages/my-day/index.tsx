@@ -1104,6 +1104,33 @@ export default function MyDay() {
                         }
                     />
 
+                    {(props.own_open_injuries ?? 0) > 0 ? (
+                        <Card>
+                            <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <HeartPulse
+                                        className="mt-0.5 size-5 shrink-0 text-status-warning"
+                                        aria-hidden="true"
+                                    />
+                                    <div>
+                                        <h2 className="text-section-title">
+                                            Your workplace injury
+                                        </h2>
+                                        <p className="text-subtle">
+                                            See your care and return-to-work
+                                            plan.
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/my/injuries">
+                                        Open my injury
+                                    </Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ) : null}
+
                     {props.first_aid_followups?.length ? (
                         <FirstAidFollowupsCard
                             followups={props.first_aid_followups}

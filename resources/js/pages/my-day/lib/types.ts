@@ -561,6 +561,8 @@ export interface MyDayPageProps {
     active_round?: MyDayActiveRound | null;
     active_lone_worker_session?: MyDayLoneWorkerSession | null;
     first_aid_followups?: MyDayFirstAidFollowup[];
+    /** The worker's own open workplace injuries (count only); links to My HR › Injuries. */
+    own_open_injuries?: number;
     my_ppe?: MyDayPpe[];
     myTasks?: MyDayMyTasks;
     shiftChecklists?: ShiftChecklistRun[];

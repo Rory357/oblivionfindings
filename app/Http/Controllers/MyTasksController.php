@@ -235,6 +235,10 @@ class MyTasksController extends Controller
             // so re-checks / ACC45 lodgements / whānau calls don't slip. Each
             // row deep-links to the register's record modal (no write here).
             'first_aid_followups' => $this->getFirstAidFollowups($user),
+            // The worker's own open workplace injuries (a count only) → "Your workplace injury" link to My HR
+            // (Stephan, 30 Oct). Being the injured worker is the read rule.
+            'own_open_injuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)
+                ->whereNotIn('status', ['recovered', 'closed'])->count(),
             'first_aid_confirmation' => app(FirstAidService::class)->confirmationForViewer($user, $request->session()->get('first_aid_confirmation')),
             // Worker-facing "My PPE" card — the worker's own active allocations that
             // still need acknowledgement or an RPE fit-test. Empty unless action is

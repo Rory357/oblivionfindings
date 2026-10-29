@@ -141,6 +141,9 @@ export type MyHrShellData = {
         policiesDue: number;
         onesToAck: number;
         kudosThisMonth: number;
+        /** Own workplace injuries (any status); the Injuries tab shows only when > 0. */
+        injuries?: number;
+        openInjuries?: number;
     };
     /** Current-month feed for the hero footer calendar. Other months are
      *  fetched on demand from `GET /hr/my/calendar?month=YYYY-MM`. */
