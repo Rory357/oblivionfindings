@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\AppSetting;
 use App\Models\ChemicalCommandIntent;
+use App\Models\ChemicalCommandReceipt;
 use App\Models\ChemicalExposureCommandReceipt;
 use App\Models\Client;
 use App\Models\FirstAidRecord;
@@ -14,6 +16,7 @@ use App\Models\RestraintEvent;
 use App\Models\Site;
 use App\Models\SubstanceStorageLocation;
 use App\Models\User;
+use App\Services\HealthSafety\ChemicalCommandService;
 use App\Services\HealthSafety\ChemicalExposureSourceService;
 use App\Services\HealthSafety\FirstAidService;
 use App\Services\HealthSafety\HsRiskAssessmentService;
@@ -42,9 +45,20 @@ use Throwable;
  *    (first aid / restraint `creation_key`, chemical command intent key);
  *  - risk assessments have no key column, so the UUID → id pairs are kept in
  *    the private app_settings row REGISTRY_KEY.
+ *
+ * A prepare step runs first, because first aid needs a first aider on staff
+ * and exposures need a substance stored at the Site:
+ *  - up to 3 Sites without a first aider get one (a team lead or coordinator
+ *    first) through the HR profile model; only profiles that were off are
+ *    changed, and their ids are kept in FIRST_AIDERS_KEY;
+ *  - up to 2 Sites without stored substances get a storage location through
+ *    ChemicalCommandService::createStorage under a UUIDv5 command key; the
+ *    exact command is kept in STORAGE_KEY so a re-run replays it.
+ *
  * Re-running skips anything already there. `--remove` archives what the
- * services can archive (first aid, risk assessments); restraint and chemical
- * exposure records have no archive command and are left in place.
+ * services can archive (first aid, risk assessments, storage locations), turns
+ * off exactly the first-aider flags this command turned on, and leaves
+ * restraint and chemical exposure records (no archive command) in place.
  */
 final class HealthSafetyDemoData extends Command
 {
@@ -60,13 +74,24 @@ final class HealthSafetyDemoData extends Command
     /** Private app_settings row holding risk assessment key → id pairs. */
     public const REGISTRY_KEY = 'health_safety.demo_data.risk_assessments';
 
+    /** Private app_settings row: HR profile ids whose first-aider flag this command turned on. */
+    public const FIRST_AIDERS_KEY = 'health_safety.demo_data.first_aiders';
+
+    /** Private app_settings row: storage command key → substance id and the exact command sent. */
+    public const STORAGE_KEY = 'health_safety.demo_data.storage_locations';
+
+    /** Sites that get a first aider / a storage location when they have none. */
+    private const FIRST_AIDER_SITES = 3;
+
+    private const STORAGE_SITES = 2;
+
     /** Sites whose name contains any of these are test fixtures, not demo houses. */
     public const EXCLUDED_SITE_WORDS = ['Playwright', 'RELEASE', 'Codex', 'E2E', 'demo'];
 
     /** A record removed with --remove is recreated under its next generation key. */
     private const MAX_GENERATIONS = 25;
 
-    private const KINDS = ['first_aid' => 'First aid', 'chemical' => 'Chemical exposures', 'restraint' => 'Restraints', 'risk' => 'Risk assessments'];
+    private const KINDS = ['first_aider' => 'First aiders (HR flag)', 'storage' => 'Substance storage locations', 'first_aid' => 'First aid','chemical' => 'Chemical exposures', 'restraint' => 'Restraints', 'risk' => 'Risk assessments'];
 
     /** @var array<string, array<string, int>> */
     private array $summary = [];
@@ -99,12 +124,17 @@ final class HealthSafetyDemoData extends Command
         if ($this->option('remove')) {
             $this->removeFirstAid();
             $this->removeRiskAssessments();
+            $this->removeStorage();
+            $this->restoreFirstAiders();
             $this->countLeftInPlace();
         } else {
             $places = $this->places();
             if ($places->isEmpty()) {
                 $this->warn('No active demo Sites this user can reach. Nothing was created.');
             } else {
+                $places = $this->prepareFirstAiders($places);
+                $places = $this->prepareStorage($places);
+                $this->noteGaps($places);
                 $this->seedFirstAid($places);
                 $this->seedChemicalExposures($places);
                 $this->seedRestraints($places);
@@ -175,25 +205,251 @@ final class HealthSafetyDemoData extends Command
             $substances = HazardousSubstance::query()->where('status', 'active')
                 ->whereIn('id', SubstanceStorageLocation::query()->where('site_id', $site->id)->select('hazardous_substance_id'))
                 ->orderBy('id')->get();
-            $place = [
+            return [
                 'site' => $site,
                 'staff' => $staff,
                 'firstAiders' => $staff->filter(fn (User $user) => $user->hrEmployeeProfile?->is_first_aider === true)->values(),
                 'clients' => collect($clientsBySite[$site->id] ?? [])->values(),
                 'substances' => $substances,
             ];
+        })->values();
+    }
+
+    private function noteGaps(Collection $places): void
+    {
+        foreach ($places as $place) {
             $missing = array_keys(array_filter([
                 'no current staff' => $place['staff']->isEmpty(),
                 'no first aider on staff' => $place['firstAiders']->isEmpty(),
                 'no active clients' => $place['clients']->isEmpty(),
-                'no stored hazardous substances' => $substances->isEmpty(),
+                'no stored hazardous substances' => $place['substances']->isEmpty(),
             ]));
             if ($missing !== []) {
-                $this->line('  Note: '.$site->name.' has '.implode(', ', $missing).' — records that need them go to other Sites.');
+                $this->line('  Note: '.$place['site']->name.' has '.implode(', ', $missing).' — records that need them go to other Sites.');
             }
+        }
+    }
 
-            return $place;
-        })->values();
+    // ── Prepare: first aiders ─────────────────────────────────────────
+
+    /** Gives up to FIRST_AIDER_SITES Sites a first aider, changing only profiles that were off. */
+    private function prepareFirstAiders(Collection $places): Collection
+    {
+        $places = $places->all();
+        $flagged = $this->setting(self::FIRST_AIDERS_KEY);
+        $targets = collect($places)->filter(fn (array $p) => $p['staff']->count() > 1)
+            ->sortBy(fn (array $p) => sprintf('%d-%010d', $p['clients']->isEmpty() ? 1 : 0, $p['site']->id))
+            ->keys()->take(self::FIRST_AIDER_SITES);
+        foreach ($targets as $index) {
+            $place = $places[$index];
+            if ($place['firstAiders']->isNotEmpty()) {
+                $this->count('first_aider', 'present');
+
+                continue;
+            }
+            $site = $place['site'];
+            $candidate = $place['staff']
+                ->filter(fn (User $user) => $user->hrEmployeeProfile !== null)
+                ->sortBy(fn (User $user) => sprintf('%d-%d-%010d', $this->leadRank($user),
+                    (int) $user->hrEmployeeProfile->primary_site_id === (int) $site->id ? 0 : 1, $user->id))
+                ->first();
+            if (! $candidate) {
+                $this->skip('first_aider', $site->name, 'no staff member with an HR profile');
+
+                continue;
+            }
+            $profile = $candidate->hrEmployeeProfile;
+            $label = "{$candidate->name}".($profile->position_title ? " ({$profile->position_title})" : '')." as a first aider at {$site->name}";
+            if ($this->dryRun) {
+                $this->line("  + would mark {$label}");
+            } else {
+                try {
+                    // The HR profile model, as the HR profile edit screen saves it.
+                    $profile->update(['is_first_aider' => true]);
+                    $flagged = array_values(array_unique([...$flagged, (int) $profile->id]));
+                    $this->saveSetting(self::FIRST_AIDERS_KEY, $flagged);
+                    $this->line("  + marked {$label}");
+                } catch (Throwable $error) {
+                    $this->skip('first_aider', $site->name, $this->reason($error));
+
+                    continue;
+                }
+            }
+            $this->count('first_aider', 'created');
+            $places[$index]['firstAiders'] = collect([$candidate]);
+        }
+
+        return collect($places);
+    }
+
+    /** 0 = team lead / coordinator by access role, 1 = by HR job title only, 2 = anyone else. */
+    private function leadRank(User $user): int
+    {
+        $roles = [$user->role, ...$user->roles()->pluck('name')->all()];
+        if (array_intersect(['team_lead', 'coordinator'], $roles) !== []) {
+            return 0;
+        }
+        $title = $user->hrEmployeeProfile?->position_title.' '.$user->hrEmployeeProfile?->position_role;
+
+        return preg_match('/team ?lead|coordinator|senior support/i', $title) === 1 ? 1 : 2;
+    }
+
+    private function restoreFirstAiders(): void
+    {
+        $flagged = $this->setting(self::FIRST_AIDERS_KEY);
+        $kept = [];
+        foreach ($flagged as $id) {
+            $profile = HrEmployeeProfile::query()->find($id);
+            if (! $profile || $profile->is_first_aider !== true) {
+                continue; // Already off (or gone): nothing of ours left to undo.
+            }
+            $name = $profile->user?->name ?? 'HR profile '.$id;
+            if ($this->dryRun) {
+                $this->line("  - would turn off the first-aider flag for {$name}");
+                $this->count('first_aider', 'removed');
+                $kept[] = $id;
+
+                continue;
+            }
+            try {
+                $profile->update(['is_first_aider' => false]);
+                $this->line("  - turned off the first-aider flag for {$name}");
+                $this->count('first_aider', 'removed');
+            } catch (Throwable $error) {
+                $kept[] = $id;
+                $this->count('first_aider', 'left');
+                $this->line("  · {$name}: first-aider flag left on — ".$this->reason($error));
+            }
+        }
+        if (! $this->dryRun && $flagged !== []) {
+            $this->saveSetting(self::FIRST_AIDERS_KEY, $kept);
+        }
+    }
+
+    // ── Prepare: substance storage ────────────────────────────────────
+
+    private function storageSpecs(): array
+    {
+        return [
+            ['storage-1', ['bleach', 'hypochlorite', 'chlorine'], [
+                'location_description' => 'Locked cleaning cupboard, laundry', 'current_quantity' => '4', 'maximum_quantity' => '10',
+                'quantity_unit' => 'litres', 'container_type' => '2 L bottles', 'properly_labelled' => true, 'segregation_compliant' => true,
+                'storage_notes' => 'Top shelf, away from the ammonia-based cleaners. Gloves and safety glasses hang inside the door.',
+            ]],
+            ['storage-2', ['oven', 'caustic', 'degreaser'], [
+                'location_description' => 'Child-locked cupboard under the kitchen sink', 'current_quantity' => '2', 'maximum_quantity' => '4',
+                'quantity_unit' => 'cans', 'container_type' => '500 g aerosol cans', 'properly_labelled' => true, 'segregation_compliant' => true,
+                'storage_notes' => 'Only used with the window open and the rangehood on.',
+            ]],
+        ];
+    }
+
+    /** Gives up to STORAGE_SITES Sites without stored substances a storage location. */
+    private function prepareStorage(Collection $places): Collection
+    {
+        $places = $places->all();
+        $registry = $this->setting(self::STORAGE_KEY);
+        $needy = collect($places)->filter(fn (array $p) => $p['staff']->isNotEmpty() && $p['substances']->isEmpty())->keys()->values();
+        $catalogue = HazardousSubstance::query()->where('status', 'active')->orderBy('id')->get();
+        foreach ($this->storageSpecs() as $index => [$name, $words, $fields]) {
+            [$state, $key] = $this->storageSlot($name);
+            if ($state === 'present') {
+                $this->count('storage', 'present');
+                $this->replayStorage($name, $key, $registry[$key] ?? null);
+
+                continue;
+            }
+            if ($state === 'exhausted') {
+                $this->skip('storage', $name, 'too many earlier copies were removed');
+
+                continue;
+            }
+            $placeIndex = $needy[$index] ?? null;
+            if ($placeIndex === null) {
+                $this->line("  · {$name}: not needed — no other Site is missing a stored substance.");
+
+                continue;
+            }
+            if ($catalogue->isEmpty()) {
+                $this->skip('storage', $name, 'no active hazardous substance in the register');
+
+                continue;
+            }
+            $site = $places[$placeIndex]['site'];
+            $substance = $catalogue->first(fn (HazardousSubstance $s) => collect($words)->contains(fn ($w) => stripos($s->name.' '.$s->common_name, $w) !== false))
+                ?? $catalogue[$index % $catalogue->count()];
+            $zone = (string) (config('app.worker_timezone') ?: 'Pacific/Auckland');
+            $revision = (int) HazardousSubstance::query()->whereKey($substance->id)->value('source_revision');
+            $command = ['idempotency_key' => $key, 'parent_expected_version' => $revision, 'site_id' => (int) $site->id,
+                ...$fields, 'last_audit_date' => CarbonImmutable::now($zone)->subDays(12 + 9 * $index)->toDateString()];
+            $label = "{$substance->name} — {$fields['location_description']}, {$site->name}";
+            $added = false;
+            $this->attempt('storage', $name, $label, function () use ($substance, $command, $key, &$registry, &$added) {
+                app(ChemicalCommandService::class)->createStorage($substance->id, $this->actor, $command);
+                $registry[$key] = ['substance_id' => (int) $substance->id, 'command' => $command];
+                $this->saveSetting(self::STORAGE_KEY, $registry);
+                $added = true;
+            });
+            if ($added || $this->dryRun) {
+                $places[$placeIndex]['substances'] = collect([$substance]);
+            }
+        }
+
+        return collect($places);
+    }
+
+    /** @return array{0: string, 1: ?string} [create|present|exhausted, key] */
+    private function storageSlot(string $name): array
+    {
+        for ($generation = 1; $generation <= self::MAX_GENERATIONS; $generation++) {
+            $key = self::key($name, $generation);
+            $receipt = ChemicalCommandReceipt::query()->where('idempotency_key', $key)->where('source_type', 'storage')->first(['source_id']);
+            if (! $receipt) {
+                // A claimed key without a receipt is never reused for different work.
+                return ChemicalCommandIntent::query()->where('idempotency_key', $key)->exists() ? ['present', $key] : ['create', $key];
+            }
+            $row = SubstanceStorageLocation::withTrashed()->find($receipt->source_id, ['id', 'deleted_at']);
+            if ($row && $row->deleted_at === null) {
+                return ['present', $key];
+            }
+        }
+
+        return ['exhausted', null];
+    }
+
+    /** Sends the identical original command again: the service answers from its receipt. */
+    private function replayStorage(string $name, string $key, ?array $stored): void
+    {
+        if ($this->dryRun || ! is_array($stored) || ! isset($stored['substance_id'], $stored['command'])) {
+            return;
+        }
+        try {
+            app(ChemicalCommandService::class)->createStorage((int) $stored['substance_id'], $this->actor, $stored['command']);
+            $this->line("  = {$name}: already there (command replayed)");
+        } catch (Throwable $error) {
+            $this->line("  = {$name}: already there (replay not accepted: ".$this->reason($error).')');
+        }
+    }
+
+    private function removeStorage(): void
+    {
+        foreach ($this->storageSpecs() as [$name]) {
+            for ($generation = 1; $generation <= self::MAX_GENERATIONS; $generation++) {
+                $receipt = ChemicalCommandReceipt::query()->where('idempotency_key', self::key($name, $generation))->where('source_type', 'storage')->first(['source_id']);
+                if (! $receipt) {
+                    break;
+                }
+                $row = SubstanceStorageLocation::withTrashed()->find($receipt->source_id);
+                if (! $row || $row->deleted_at !== null) {
+                    continue;
+                }
+                $parent = HazardousSubstance::withTrashed()->find($row->hazardous_substance_id);
+                $command = ['idempotency_key' => self::key($name.':archive', $generation), 'expected_version' => (int) $row->source_revision,
+                    'parent_expected_version' => (int) $parent?->source_revision, 'reason' => 'No longer kept at this location.'];
+                $this->removal('storage', $name, 'archive storage location "'.$row->location_description.'"',
+                    fn () => app(ChemicalCommandService::class)->archiveStorage((int) $row->hazardous_substance_id, (int) $row->id, $this->actor, $command));
+            }
+        }
     }
 
     /** The n-th eligible place, so each record keeps landing on the same Site. */
@@ -532,15 +788,25 @@ final class HealthSafetyDemoData extends Command
 
     private function registry(): array
     {
-        $value = AppSetting::query()->where('key', self::REGISTRY_KEY)->value('value');
-        $value = is_string($value) ? json_decode($value, true) : $value;
-
-        return is_array($value) ? array_map('intval', $value) : [];
+        return array_map('intval', $this->setting(self::REGISTRY_KEY));
     }
 
     private function saveRegistry(array $registry): void
     {
-        AppSetting::query()->updateOrCreate(['key' => self::REGISTRY_KEY], ['value' => $registry]);
+        $this->saveSetting(self::REGISTRY_KEY, $registry);
+    }
+
+    private function setting(string $key): array
+    {
+        $value = AppSetting::query()->where('key', $key)->value('value');
+        $value = is_string($value) ? json_decode($value, true) : $value;
+
+        return is_array($value) ? $value : [];
+    }
+
+    private function saveSetting(string $key, array $value): void
+    {
+        AppSetting::query()->updateOrCreate(['key' => $key], ['value' => $value]);
     }
 
     // ── Records with no archive command ───────────────────────────────
