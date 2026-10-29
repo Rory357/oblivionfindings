@@ -19,6 +19,7 @@ describe('reportPageFor', () => {
         );
         expect(reportPageFor('substance')).toBe('/health-safety/substances/create');
         expect(reportPageFor('exposure')).toBe('/health-safety/substances?tab=active');
+        expect(reportPageFor('safeguarding')).toBe('/safeguarding/create');
     });
 
     it('keeps the in-place wizards in place', () => {
