@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+    allTasksBadge,
     buildNavSearchCatalog,
     governanceActionableTabKeys,
     isIconActive,
@@ -847,5 +848,40 @@ describe('app sidebar Security & Devices navigation', () => {
             expect(isIconActive(url, itItem, itGroups)).toBe(true);
             expect(isIconActive(url, securityItem, securityGroups)).toBe(false);
         }
+    });
+});
+
+describe('All Tasks count in the sidebar', () => {
+    const page = (extra: Record<string, unknown> = {}) => ({
+        auth: { can: { tasks: { view: true } } },
+        ...extra,
+    });
+
+    it('is not known (a dash, never 0) while it loads after the page or if that load failed', () => {
+        expect(allTasksBadge(page())).toBeNull();
+    });
+
+    it('is not known when a task module could not be read', () => {
+        expect(
+            allTasksBadge(page({ taskNav: { view: true, badge: 0, badgeDegraded: true } })),
+        ).toBeNull();
+    });
+
+    it('shows the loaded count, including a real zero', () => {
+        expect(
+            allTasksBadge(page({ taskNav: { view: true, badge: 7, badgeDegraded: false } })),
+        ).toBe(7);
+        expect(
+            allTasksBadge(page({ taskNav: { view: true, badge: 0, badgeDegraded: false } })),
+        ).toBe(0);
+    });
+
+    it('reads the count the H&S event page still sends with the page', () => {
+        expect(
+            allTasksBadge({
+                taskNav: null,
+                auth: { can: { tasks: { view: true, badge: 4, badgeDegraded: false } } },
+            }),
+        ).toBe(4);
     });
 });

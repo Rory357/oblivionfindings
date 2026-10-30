@@ -46,6 +46,7 @@ class FirstAidWorkProjectionTest extends TestCase
             $this->grant($key, $allowed);
         }
         $tasks = Mockery::mock(TaskAggregator::class);
+        $tasks->shouldReceive('navigationVisibleFor')->andReturn(true);
         $tasks->shouldReceive('navigationBadgeFor')->andReturn(['view' => true, 'badge' => 0, 'degraded' => false]);
         $tasks->shouldReceive('navigationBadgeInContext')->andReturn(['view' => true, 'badge' => 0, 'degraded' => false]);
         $tasks->shouldReceive('findItemFor')->andReturnUsing(function ($viewer, $source, $id) {
