@@ -517,6 +517,39 @@ class TaskAggregator
         return $this->navigationBadge($user);
     }
 
+    /**
+     * Whether the person reads at least one task module (the /tasks link shows),
+     * without building the badge. Plain modules answer from their read checks in
+     * a few milliseconds; the H&S modules' read checks run only when none of them
+     * is readable, and never load any H&S work.
+     * Same answer as navigationBadgeFor()['view'].
+     */
+    public function navigationVisibleFor(User $user): bool
+    {
+        foreach ($this->providers as $provider) {
+            if ($provider instanceof ContextualHealthSafetyTaskProvider) {
+                continue;
+            }
+            try {
+                if ($provider->canView($user)) {
+                    return true;
+                }
+            } catch (Throwable) {
+                // Not readable here; the badge pass reports the fault.
+            }
+        }
+
+        // No plain module: ask the H&S modules the same read check the badge pass
+        // makes, without loading any of their work (the badge loads it later).
+        foreach ($this->healthSafetyProviderPasses($user, [], true, null, viewOnly: true) as $pass) {
+            if ($pass['view']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** Computes scalar navigation inside the caller's active read callback. */
     public function navigationBadgeInContext(User $viewer, HealthSafetyReadContext $context): array
     {
@@ -634,7 +667,7 @@ class TaskAggregator
      *
      * @return array<int, array{view: bool, items: TaskItem[], failed: bool}>
      */
-    private function healthSafetyProviderPasses(User $viewer, array $filters, bool $navigation = false, ?HealthSafetyReadContext $providedContext = null): array
+    private function healthSafetyProviderPasses(User $viewer, array $filters, bool $navigation = false, ?HealthSafetyReadContext $providedContext = null, bool $viewOnly = false): array
     {
         $sources = $filters['sources'] ?? null;
         $providers = array_values(array_filter($this->providers,
@@ -653,13 +686,13 @@ class TaskAggregator
 
         try {
             $consume = fn (HealthSafetyReadContext $context): array => $context->consumeSourceViewer($permissions,
-                function (User $current) use ($context, $viewer, $filters, $providers, $navigation): array {
+                function (User $current) use ($context, $viewer, $filters, $providers, $navigation, $viewOnly): array {
                     $passes = [];
                     foreach ($providers as $provider) {
                         $pass = ['view' => false, 'items' => [], 'failed' => false];
                         try {
                             $pass['view'] = $provider->canView($current);
-                            if ($pass['view']) {
+                            if ($pass['view'] && ! $viewOnly) {
                                 $pass['items'] = $navigation
                                     ? $provider->authorizedNavigationTasksInContext($viewer, $context)
                                     : $provider->authorizedTasksInContext($viewer, $filters, $context);

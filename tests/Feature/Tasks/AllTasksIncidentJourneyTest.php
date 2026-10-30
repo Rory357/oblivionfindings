@@ -449,9 +449,11 @@ it('searches incident journey responsibilities beyond each providers normal 300 
             ->where('items', fn ($items) => collect($items)
                 ->contains(fn ($item) => $item['id'] === 'corrective_action-'.$targetAction->id)));
 
+    // One read each for the page's items. The sidebar's All Tasks count no longer runs
+    // with the page (it loads after it, with the inbox), so the second read is gone.
     expect(TaskSearch::hasQuery(['q' => '0']))->toBeTrue()
-        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(2)
-        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(2)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_work_orders')))->toHaveCount(1)
+        ->and(collect($queries)->filter(fn (string $sql) => str_contains($sql, 'fleet_service_schedules')))->toHaveCount(1)
         ->and(collect($queries)->contains(
             fn (string $sql) => str_contains($sql, 'hs_corrective_actions')
                 && str_contains($sql, ' like '),
