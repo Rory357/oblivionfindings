@@ -13,7 +13,9 @@ import {
     type PageHeaderStripTone,
 } from '@/components/page/page-header-strip';
 import { Tally, type TallyItem } from '@/components/signature/blocks';
+import { DeferredPanel } from '@/components/deferred-panel';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
     Popover,
     PopoverContent,
@@ -69,15 +71,16 @@ type AttentionProps = {
     /** Exposure managers only: exposures not on the H&S register yet (a count, no details). Absent for everyone else. */
     exposureDeliveryProblems?: number | null;
 };
-export type CommandCentreHeroProps = AttentionProps & {
+export type CommandCentreHeroProps = Partial<AttentionProps> & {
     sourceCompleteness?: 'unknown';
-    leadingLagging: HeroLeadingLagging;
+    /** Given directly, or loaded in the background from the page's `leading_lagging` prop (step C). */
+    leadingLagging?: HeroLeadingLagging;
     filters: HeroFilters;
     sites: Array<{ id: number; name: string }>;
-    openSafeguarding: number | null;
-    fleetUnresolved: number | null;
-    fleetIncidents30d: number | null;
-    procedures: {
+    openSafeguarding?: number | null;
+    fleetUnresolved?: number | null;
+    fleetIncidents30d?: number | null;
+    procedures?: {
         approved: number;
         review_due: number;
         coverage_gap_categories: number;
@@ -104,10 +107,15 @@ function presetRange(
 }
 const fmt = (value: number | null, suffix = '') =>
     value === null ? '—' : String(value) + suffix;
+/** Only to lay out the loading labels; its values are never shown. */
+const LOADING_FIGURES: HeroLeadingLagging = {
+    lagging: { incidents: 0, ltifr: null, trifr: null, injury_severity_rate: null, days_since_lti: null },
+    leading: { near_miss_ratio: null, actions_on_time_pct: null, training_pct: null, open_hazards: 0 },
+};
 /** One of the four header numbers (the drawing's labels; every number links to where it lives). */
 type Headline = {
     label: string;
-    value: string;
+    value: ReactNode;
     caption?: string;
     href: string;
     tone?: PageHeaderStripTone;
@@ -170,8 +178,6 @@ export function CommandCentreHero({
                 ? sites[0].name
                 : 'All sites'
             : (activeSite?.name ?? 'Site access unconfirmed');
-    const lagging = leadingLagging.lagging;
-    const leading = leadingLagging.leading;
     // These keys are consumed by the destination controllers. Current-state
     // registers deliberately receive no occurrence-date filter.
     const destination = (path: string, params: Record<string, string> = {}) => {
@@ -187,7 +193,7 @@ export function CommandCentreHero({
     });
     // Four header numbers per lens (approved H&S drawings, 23 Oct). The fifth and sixth
     // measures (procedures and fleet, or safeguarding and fleet) live in the page body.
-    const headline: Headline[] =
+    const headlineFor = ({ lagging, leading }: HeroLeadingLagging): Headline[] =>
         filters.lens === 'governance'
             ? [
                   {
@@ -265,6 +271,32 @@ export function CommandCentreHero({
                       }),
                   },
               ];
+    const numbers = (items: Headline[]) => (
+        <PageHeaderNumbers>
+            {items.map((n) => (
+                <PageHeaderNumber
+                    key={n.label}
+                    value={n.value}
+                    label={n.label}
+                    caption={n.caption}
+                    tone={n.tone}
+                    href={n.href}
+                />
+            ))}
+        </PageHeaderNumbers>
+    );
+    // While the numbers load (in the background, step C): the same four labels with a placeholder, never a "0".
+    const loadingNumbers = () =>
+        numbers(
+            headlineFor(LOADING_FIGURES).map((n) => ({
+                ...n,
+                value: (
+                    <Skeleton className="inline-block h-[0.85em] w-12 bg-current opacity-20 align-middle" />
+                ),
+                caption: 'Loading',
+                tone: undefined,
+            })),
+        );
     const validRange =
         !!formatDateOnly(customFrom, '') &&
         !!formatDateOnly(customTo, '') &&
@@ -323,19 +355,16 @@ export function CommandCentreHero({
             }
             strip={
                 // The frontline start keeps the header to the title and Report something (drawing D1).
-                filters.lens === 'frontline' ? undefined : (
-                    <PageHeaderNumbers>
-                        {headline.map((n) => (
-                            <PageHeaderNumber
-                                key={n.label}
-                                value={n.value}
-                                label={n.label}
-                                caption={n.caption}
-                                tone={n.tone}
-                                href={n.href}
-                            />
-                        ))}
-                    </PageHeaderNumbers>
+                filters.lens === 'frontline' ? undefined : leadingLagging ? (
+                    numbers(headlineFor(leadingLagging))
+                ) : (
+                    <DeferredPanel<{ leading_lagging: HeroLeadingLagging }>
+                        data="leading_lagging"
+                        label="Headline numbers"
+                        fallback={loadingNumbers()}
+                    >
+                        {({ leading_lagging }) => numbers(headlineFor(leading_lagging))}
+                    </DeferredPanel>
                 )
             }
             filters={

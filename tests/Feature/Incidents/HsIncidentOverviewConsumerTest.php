@@ -11,6 +11,8 @@ use Inertia\Testing\AssertableInertia;
 /** Actual Overview HTTP projections; source declarations are not executed acceptance. */
 final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -42,7 +44,7 @@ final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
         $readable = $this->incident(['client_id' => $this->client->id, 'type' => 'near_miss', 'occurred_at' => now()->subHours(2)]);
         $this->bundle($readable);
 
-        $this->actingAs($this->manager)->get('/health-safety?site='.$this->site->id)
+        $this->actingAs($this->manager)->getOverview('/health-safety?site='.$this->site->id)
             ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('health-safety/dashboard')
                 ->where('kpis.incidents_30d', 2)->where('kpis.near_misses_30d', 1)
@@ -52,7 +54,7 @@ final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
                 ->where('incidents_by_category.0.label', 'injury')->where('incidents_by_category.0.count', 1)
                 ->where('site_league.0.incidents', 2));
 
-        $this->actingAs($this->lead)->get('/health-safety?site='.$this->site->id)
+        $this->actingAs($this->lead)->getOverview('/health-safety?site='.$this->site->id)
             ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('health-safety/dashboard')
                 ->where('source_scope', 'readable_subset')->where('source_completeness', 'unknown')
@@ -79,13 +81,13 @@ final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
             $this->allow($this->manager, 'incidents.viewAssigned', false);
         });
         try {
-            $this->actingAs($this->manager)->get('/health-safety?site='.$this->site->id)->assertNotFound();
+            $this->actingAs($this->manager)->getOverview('/health-safety?site='.$this->site->id)->assertNotFound();
         } finally {
             $state->armed = false;
         }
         $this->assertTrue($state->fired, 'The mutation must occur at the actual later category aggregation.');
         $this->allow($this->manager, 'incidents.viewAny');
-        $this->actingAs($this->manager)->get('/health-safety?site='.$this->site->id)
+        $this->actingAs($this->manager)->getOverview('/health-safety?site='.$this->site->id)
             ->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('kpis.incidents_30d', 1));
     }
 
@@ -105,7 +107,7 @@ final class HsIncidentOverviewConsumerTest extends IncidentIndependenceTestCase
             DB::table('client_incidents')->where('id', $incident->id)->update(['client_id' => $other->id]);
         });
         try {
-            $this->actingAs($this->manager)->get('/health-safety?site='.$this->site->id)->assertNotFound();
+            $this->actingAs($this->manager)->getOverview('/health-safety?site='.$this->site->id)->assertNotFound();
         } finally {
             $state->armed = false;
         }

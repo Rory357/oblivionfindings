@@ -15,6 +15,8 @@ use Illuminate\Support\Str;
 /** Actual cross-module consumers. Source prepared only; every complete case requires admitted native verification. */
 final class PpeCrossModuleProjectionTest extends PpeReadTestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     public function test_actual_site_presenter_preserves_legacy_facts_and_permanent_site_back(): void
     {
         $this->item->update(['quantity' => 7, 'expiry_date' => '2026-10-20', 'next_inspection_due' => '2026-10-12']);
@@ -234,7 +236,7 @@ final class PpeCrossModuleProjectionTest extends PpeReadTestCase
         $this->assertSame(1, $props['ppe_kpi_state']['physical_inventory_count']);
         $this->assertSame(1, $props['worklists']['ppe_expiring_state']['physical_record_count']);
         $this->assertStringNotContainsString('FOREIGN-PRIVATE', json_encode($props, JSON_THROW_ON_ERROR));
-        $partial = $this->actingAs($this->viewer)->get('/health-safety', ['X-Inertia' => 'true', 'Accept' => 'application/json',
+        $partial = $this->actingAs($this->viewer)->getOverview('/health-safety', ['X-Inertia' => 'true', 'Accept' => 'application/json',
             'X-Inertia-Partial-Component' => 'health-safety/dashboard', 'X-Inertia-Partial-Data' => 'kpis,ppe_kpi_state,worklists'])
             ->assertOk()->json('props');
         $this->assertSame($props['kpis']['ppe_expiring'], $partial['kpis']['ppe_expiring']);
@@ -325,7 +327,7 @@ final class PpeCrossModuleProjectionTest extends PpeReadTestCase
 
     private function dashboard(): array
     {
-        return $this->actingAs($this->viewer)->get('/health-safety', ['X-Inertia' => 'true', 'Accept' => 'application/json'])
+        return $this->actingAs($this->viewer)->getOverview('/health-safety', ['X-Inertia' => 'true', 'Accept' => 'application/json'])
             ->assertOk()->json('props');
     }
 

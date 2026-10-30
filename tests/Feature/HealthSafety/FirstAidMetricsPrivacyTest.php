@@ -21,6 +21,8 @@ use Tests\TestCase;
 
 class FirstAidMetricsPrivacyTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     private Site $site;
@@ -46,7 +48,7 @@ class FirstAidMetricsPrivacyTest extends TestCase
         $before = $this->analytics();
         $client = Client::factory()->create(['site_id' => $this->site->id]);
         $private = $this->source(['treated_person_type' => 'client', 'client_id' => $client->id, 'treated_person_name' => 'Private subject marker', 'injury_illness_type' => 'fracture', 'treatment_outcome' => 'sent_to_hospital', 'ambulance_called' => true, 'treatment_given' => 'Private treatment marker']);
-        $this->actingAs($this->viewer)->get('/health-safety')->assertOk()->assertInertia(fn (Assert $page) => $page->where('first_aid', ['treatments' => 1, 'ambulance' => 0, 'hospital' => 0]));
+        $this->actingAs($this->viewer)->getOverview('/health-safety')->assertOk()->assertInertia(fn (Assert $page) => $page->where('first_aid', ['treatments' => 1, 'ambulance' => 0, 'hospital' => 0]));
         $after = $this->analytics();
         $this->assertSame(['by_type' => [['type' => 'cut', 'count' => 1]], 'by_outcome' => [['outcome' => 'returned_to_activity', 'count' => 1]],
             'source_access' => 'readable', 'scope' => 'current_readable_sources'], $after['first_aid_data']);
@@ -80,7 +82,7 @@ class FirstAidMetricsPrivacyTest extends TestCase
         $this->assertSame(['treatments' => 2, 'ambulance' => 1, 'hospital' => 1], $metrics['activity']);
         $this->assertSame(['cut' => 1, 'fracture' => 1], array_column($metrics['by_type'], 'count', 'type'));
         $this->assertSame(['returned_to_activity' => 1, 'sent_to_hospital' => 1], array_column($metrics['by_outcome'], 'count', 'outcome'));
-        $this->actingAs($this->viewer)->get('/health-safety')->assertOk()->assertInertia(fn (Assert $page) => $page->where('first_aid', $metrics['activity']));
+        $this->actingAs($this->viewer)->getOverview('/health-safety')->assertOk()->assertInertia(fn (Assert $page) => $page->where('first_aid', $metrics['activity']));
         $this->assertSame($metrics['by_type'], $this->analytics()['first_aid_data']['by_type']);
         $this->assertStringContainsString(trim($client->first_name.' '.$client->last_name), $this->get('/health-safety/first-aid/export?period=30d')->assertOk()->streamedContent());
     }
@@ -96,7 +98,7 @@ class FirstAidMetricsPrivacyTest extends TestCase
         $this->assertSame(2, $this->metrics()['activity']['treatments']);
         $this->grant('clients.viewAssigned', false);
         $this->assertSame(1, $this->metrics()['activity']['treatments']);
-        $this->actingAs($this->viewer)->get('/health-safety')->assertOk()->assertInertia(fn (Assert $page) => $page->where('first_aid.treatments', 1));
+        $this->actingAs($this->viewer)->getOverview('/health-safety')->assertOk()->assertInertia(fn (Assert $page) => $page->where('first_aid.treatments', 1));
         $this->assertSame([['type' => 'cut', 'count' => 1]], $this->analytics()['first_aid_data']['by_type']);
         $this->assertStringNotContainsString('Revoked private subject', $this->get('/health-safety/first-aid/export?period=all')->assertOk()->streamedContent());
     }

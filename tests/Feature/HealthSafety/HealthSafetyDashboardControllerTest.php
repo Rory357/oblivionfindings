@@ -17,6 +17,8 @@ use Tests\TestCase;
  */
 class HealthSafetyDashboardControllerTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     protected Site $site;
@@ -46,7 +48,7 @@ class HealthSafetyDashboardControllerTest extends TestCase
     {
         $officer = $this->hsOfficer();
         $this->actingAs($officer)
-            ->get('/health-safety')
+            ->getOverview('/health-safety')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('health-safety/dashboard')
@@ -68,7 +70,7 @@ class HealthSafetyDashboardControllerTest extends TestCase
         $site = Site::factory()->create(['tenant_id' => 1]);
 
         $this->actingAs($this->hsOfficer())
-            ->get('/health-safety?lens=governance&site='.$site->id)
+            ->getOverview('/health-safety?lens=governance&site='.$site->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('filters.lens', 'governance')
@@ -81,7 +83,7 @@ class HealthSafetyDashboardControllerTest extends TestCase
     {
         $officer = $this->hsOfficer();
         $this->actingAs($officer)
-            ->get('/health-safety?lens=bogus')
+            ->getOverview('/health-safety?lens=bogus')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('filters.lens', HealthSafetyDashboardController::startFor($officer)));
     }
@@ -110,6 +112,6 @@ class HealthSafetyDashboardControllerTest extends TestCase
             $user->roles()->attach($role);
         }
 
-        $this->actingAs($user)->get('/health-safety')->assertForbidden();
+        $this->actingAs($user)->getOverview('/health-safety')->assertForbidden();
     }
 }

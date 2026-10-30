@@ -31,6 +31,8 @@ use Tests\TestCase;
 
 class FirstAidDerivedMetricsPrivacyTest extends TestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     use RefreshDatabase;
 
     private Site $site;
@@ -426,7 +428,7 @@ class FirstAidDerivedMetricsPrivacyTest extends TestCase
 
     private function dashboard(): array
     {
-        return $this->actingAs($this->viewer)->get('/health-safety')->assertOk()->inertiaProps();
+        return $this->actingAs($this->viewer)->getOverview('/health-safety')->assertOk()->inertiaProps();
     }
 
     private function analytics(): array
