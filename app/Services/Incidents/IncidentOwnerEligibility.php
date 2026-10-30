@@ -36,7 +36,14 @@ final class IncidentOwnerEligibility
         $reads->assertActive();
         self::$answers ??= new \WeakMap;
         $known = self::$answers[$reads] ?? [];
-        if (! array_key_exists($key, $known)) { $known[$key] = (bool) $decide(); self::$answers[$reads] = $known; }
+        if (! array_key_exists($key, $known)) {
+            $answer = (bool) $decide();
+            // Read the answers again: a nested question (canManage asks activeInternal) stored its own meanwhile,
+            // and writing back the copy from before would drop it (31 Oct: activeInternal was decided per incident).
+            $known = self::$answers[$reads] ?? [];
+            $known[$key] = $answer;
+            self::$answers[$reads] = $known;
+        }
 
         return $known[$key];
     }
