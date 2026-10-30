@@ -1313,12 +1313,9 @@ class MyTasksController extends Controller
     private function getMyAggregatedTasks(User $user, array $currentShiftTaskIds = []): array
     {
         try {
-            $aggregator = app(TaskAggregator::class);
-            $items = $aggregator->filterItems(
-                $aggregator->itemsFor($user),
-                $user,
-                ['assigned' => 'me'],
-            );
+            // Passing the filter in lets providers that support it (incidents) narrow to the
+            // viewer's own rows before their per-row proofs; itemsFor() still applies it to every row.
+            $items = app(TaskAggregator::class)->itemsFor($user, ['assigned' => 'me']);
             // itemsFor() excludes done items by default; keep a guard anyway.
             $currentIds = array_map(fn ($id) => 'shift_task-'.$id, $currentShiftTaskIds);
             $items = array_values(array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE && ! in_array($i->id, $currentIds, true)));
