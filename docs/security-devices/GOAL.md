@@ -450,7 +450,7 @@ Each item is ticked with the commit that fixed it and how it was proved.
 | Phase | State | Commit | Gate | Stephan's walk | On main / .com |
 | --- | --- | --- | --- | --- | --- |
 | Finish line (this file) | Approved by MASTER, 30 Oct | 8b2cc254d | — | — | — |
-| A · Honest and safe | Built (A1–A8); gate running | see git log | | | |
+| A · Honest and safe | Built (A1–A8); local gate passed 31 Oct; waiting for Stephan's walk | `61f5e2c22` … `4b0568a13`, merged with main as `3e5675e39` | Pest 100 of 101 (the 1 is main's hub syslog test, same on main); vitest 14/14; lint 0/0; build OK; tsc: 1 H&S test error that main has too | Waiting | — |
 | B · Windows app and hubs | Not started | | | | |
 | C · Core screens | Not started | | | | |
 | D · Alerts | Not started | | | | |
