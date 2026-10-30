@@ -35,11 +35,14 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
         [$own] = $this->world();
         foreach (self::ROLES as $role) {
             $viewer = $this->viewer($role, $own);
-            [$full, $fullQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia())->get('/health-safety'));
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->get('/health-safety', $this->inertia()));
+            // Since step C the first response is cheap too, so compare with the same request also asking for the headline part.
+            [, $fullQueries] = $this->measure(fn () => $this->actingAs($viewer)
+                ->get('/health-safety', [...$this->inertia('health-safety/dashboard'), 'X-Inertia-Partial-Data' => 'inbox,kpis']));
             // The page's KPI work must not run at all for the inbox request (any call on these mocks fails the test).
             $this->mock(HsDashboardService::class);
             $this->mock(HsKpiService::class);
-            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia('health-safety/dashboard'))->get('/health-safety'));
+            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->get('/health-safety', $this->inertia('health-safety/dashboard')));
             $this->app->forgetInstance(HsDashboardService::class);
             $this->app->forgetInstance(HsKpiService::class);
 
@@ -67,8 +70,8 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
 
         $statuses = [];
         foreach (['no permission' => $noPermission, 'no Site' => $noSite, 'officer' => $this->viewer('health_safety_officer', $own)] as $label => $user) {
-            $full = $this->actingAs($user)->withHeaders($this->inertia())->get('/health-safety')->status();
-            $inbox = $this->actingAs($user)->withHeaders($this->inertia('health-safety/dashboard'))->get('/health-safety')->status();
+            $full = $this->actingAs($user)->get('/health-safety', $this->inertia())->status();
+            $inbox = $this->actingAs($user)->get('/health-safety', $this->inertia('health-safety/dashboard'))->status();
             $this->assertSame($full, $inbox, "{$label}: the inbox request must answer like the page.");
             $statuses[$label] = $inbox;
         }
@@ -82,14 +85,14 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
         [$own] = $this->world();
         foreach (self::ROLES as $role) {
             $viewer = $this->viewer($role, $own);
-            [$full] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia())->get('/tasks'));
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->get('/tasks', $this->inertia()));
             // The same partial request but also asking for the task list goes the normal way and builds it, so the
             // difference between the two is exactly the page work the inbox request skips. (A ratio against the full
             // page stopped meaning anything once the sidebar count moved out of the first load and roles are read
             // once per page view: the full /tasks page became cheap in this small test world.)
             [, $withListQueries] = $this->measure(fn () => $this->actingAs($viewer)
-                ->withHeaders([...$this->inertia('tasks/index'), 'X-Inertia-Partial-Data' => 'inbox,items'])->get('/tasks'));
-            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia('tasks/index'))->get('/tasks'));
+                ->get('/tasks', [...$this->inertia('tasks/index'), 'X-Inertia-Partial-Data' => 'inbox,items']));
+            [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->get('/tasks', $this->inertia('tasks/index')));
 
             $full->assertOk()->assertJsonPath('component', 'tasks/index');
             $inbox->assertOk()->assertJsonPath('component', 'tasks/index')->assertJsonMissingPath('props.items')->assertJsonMissingPath('props.stats');
