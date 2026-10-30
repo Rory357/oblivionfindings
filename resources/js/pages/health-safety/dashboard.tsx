@@ -1,3 +1,4 @@
+import { DeferredPanel } from '@/components/deferred-panel';
 import { PageHeaderRail, PageLayout } from '@/components/page';
 import {
     Flow,
@@ -9,11 +10,12 @@ import {
     type LogItem,
     type TallyItem,
 } from '@/components/signature/blocks';
+import { SkeletonCard, SkeletonStats } from '@/components/ui/skeleton-card';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { hsLabel, hsVariant } from '@/lib/health-safety/hs-labels';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
@@ -46,49 +48,51 @@ import { WIZARD_CONFIGS } from './components/wizard-configs';
 import { completedAgo, HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
 
+type Backbone = {
+    events: {
+        open_events: number;
+        open_events_high_critical: number;
+        events_period: number;
+        worksafe_notifiable_open: number;
+        worksafe_pending: number;
+        events_by_severity: Record<string, number>;
+    };
+    investigations: {
+        active_investigations: number;
+        overdue_investigations: number;
+        awaiting_review: number;
+    };
+    corrective_actions: {
+        open_actions: number;
+        overdue_actions: number;
+        awaiting_verification: number;
+    };
+    risk_assessments: {
+        active_assessments: number;
+        high_extreme_active: number;
+        due_for_review: number;
+    };
+    training: {
+        total_requirements: number;
+        blocking_requirements: number;
+        staff_non_compliant: number;
+    };
+};
+
+type SafeguardingSource = { access: 'readable' | 'restricted'; href: string | null };
+type Kpis = Record<string, number | null>;
+type IncidentTrend = Array<{ month: string; count: number; types: Record<string, number> }>;
+type FrequencyTrend = Array<{ month: string; ltifr: number | null; trifr: number | null }>;
+type SiteLeague = Array<{ id: number; name: string; incidents: number; hazards: number | null }>;
+type FirstAid = { treatments: number | null; ambulance: number | null; hospital: number | null };
+
+/**
+ * First-response props are always here. The rest load after the page shows (step C, Inertia::defer groups
+ * "headline", "work" and "detail") and are undefined until then; every panel that shows them uses <DeferredPanel>.
+ */
 type Props = {
-    /** Exposure managers only: how many exposures haven't reached the H&S register (job 3). */
-    exposure_delivery_problems?: number | null;
-    /** Safeguarding's own read: the open-concerns link, or restricted without safeguarding access. */
-    safeguarding_source?: { access: 'readable' | 'restricted'; href: string | null };
     source_scope?: 'readable_subset';
     source_completeness?: 'unknown';
-    kpis: Record<string, number | null>;
-    incident_trends: Array<{
-        month: string;
-        count: number;
-        types: Record<string, number>;
-    }>;
-    backbone?: {
-        events: {
-            open_events: number;
-            open_events_high_critical: number;
-            events_period: number;
-            worksafe_notifiable_open: number;
-            worksafe_pending: number;
-            events_by_severity: Record<string, number>;
-        };
-        investigations: {
-            active_investigations: number;
-            overdue_investigations: number;
-            awaiting_review: number;
-        };
-        corrective_actions: {
-            open_actions: number;
-            overdue_actions: number;
-            awaiting_verification: number;
-        };
-        risk_assessments: {
-            active_assessments: number;
-            high_extreme_active: number;
-            due_for_review: number;
-        };
-        training: {
-            total_requirements: number;
-            blocking_requirements: number;
-            staff_non_compliant: number;
-        };
-    };
     filters: HeroFilters;
     lens: string;
     sites: Array<{ id: number; name: string }>;
@@ -100,37 +104,35 @@ type Props = {
         site_id?: number | null;
     }>;
     staff: Array<{ id: number; name: string }>;
-    leading_lagging: HeroLeadingLagging;
-    frequency_trends: Array<{
-        month: string;
-        ltifr: number | null;
-        trifr: number | null;
-    }>;
-    frequency_operands: { near_misses: number; recordable: number | null };
-    hazard_burndown: Array<{ week: string; open: number }>;
-    incidents_by_category: Array<{ label: string; count: number }>;
-    site_league: Array<{
-        id: number;
-        name: string;
-        incidents: number;
-        hazards: number | null;
-    }>;
-    open_hazards_list: OpenHazardRow[];
     worker_participation: ParticipationCoverage;
     procedures: {
         approved: number;
         review_due: number;
         coverage_gap_categories: number;
     };
-    first_aid?: {
-        treatments: number | null;
-        ambulance: number | null;
-        hospital: number | null;
-    };
-    restraints?: RestraintDashboardData;
-    worklists: WorklistsPayload;
     /** Where open incidents are up to, by stage (optional: hidden until the source sends it). */
     incident_stages?: IncidentStagesData | null;
+
+    // Background group "headline".
+    kpis?: Kpis;
+    /** Safeguarding's own read: the open-concerns link, or restricted without safeguarding access. */
+    safeguarding_source?: SafeguardingSource;
+    incident_trends?: IncidentTrend;
+    leading_lagging?: HeroLeadingLagging;
+    frequency_trends?: FrequencyTrend;
+    // Background group "work".
+    worklists?: WorklistsPayload;
+    backbone?: Backbone;
+    /** Exposure managers only: how many exposures haven't reached the H&S register (job 3). */
+    exposure_delivery_problems?: number | null;
+    // Background group "detail".
+    frequency_operands?: { near_misses: number; recordable: number | null };
+    hazard_burndown?: Array<{ week: string; open: number }>;
+    incidents_by_category?: Array<{ label: string; count: number }>;
+    site_league?: SiteLeague;
+    open_hazards_list?: OpenHazardRow[];
+    first_aid?: FirstAid;
+    restraints?: RestraintDashboardData;
 };
 
 type RestraintDashboardData = {
@@ -158,48 +160,31 @@ type RestraintDashboardData = {
     }> | null;
 };
 
-const EMPTY_RESTRAINTS: RestraintDashboardData = {
-    summary: {
-        events_in_period: null,
-        out_of_plan: null,
-        with_injury: null,
-        critical: null,
-        unreviewed: null,
-        active_plans: null,
-        plans_review_due: null,
-        clients_no_active_bsp: null,
-        source_access: 'unavailable',
-    },
-    unreviewed: null,
-};
+type WorkValues = { worklists: WorklistsPayload; backbone: Backbone; exposure_delivery_problems: number | null };
+const WORK_KEYS: Array<keyof WorkValues> = ['worklists', 'backbone', 'exposure_delivery_problems'];
+
+/** A panel fed by the "work" group (worklists, backbone counts, exposure problems). */
+function WorkPanel({ label, rows = 3, children }: { label: string; rows?: number; children: (values: WorkValues) => ReactNode }) {
+    return (
+        <DeferredPanel<WorkValues> data={WORK_KEYS} label={label} fallback={<SkeletonCard rows={rows} />}>
+            {children}
+        </DeferredPanel>
+    );
+}
 
 export default function HealthSafetyDashboard({
     source_completeness,
-    exposure_delivery_problems,
-    safeguarding_source,
-    kpis,
-    incident_trends,
-    backbone,
     filters,
     sites,
     org_name,
     clients,
     staff,
-    leading_lagging,
-    frequency_trends,
-    frequency_operands,
-    hazard_burndown,
-    incidents_by_category,
-    site_league,
-    open_hazards_list = [],
     worker_participation = {
         pct: null,
         committees: null,
         source_access: 'unavailable',
     },
-    procedures = { approved: 0, review_due: 0, coverage_gap_categories: 0 },
-    first_aid = { treatments: null, ambulance: null, hospital: null },
-    restraints = EMPTY_RESTRAINTS,
+    procedures,
     worklists,
     incident_stages = null,
 }: Props) {
@@ -223,20 +208,22 @@ export default function HealthSafetyDashboard({
         }
         setActiveWizard(key);
     };
-    const visibleWorklists = searchDashboardWorklists(worklists, search);
+    const visible = (lists: WorklistsPayload) => searchDashboardWorklists(lists, search);
     const searchTerms = search
         .trim()
         .toLocaleLowerCase('en-NZ')
         .split(/\s+/)
         .filter(Boolean);
-    const visibleSites = site_league.filter((site) =>
-        searchTerms.every((term) =>
-            site.name.toLocaleLowerCase('en-NZ').includes(term),
-        ),
-    );
+    const visibleSites = (league: SiteLeague) =>
+        league.filter((site) =>
+            searchTerms.every((term) =>
+                site.name.toLocaleLowerCase('en-NZ').includes(term),
+            ),
+        );
+    // Tab counts appear once the worklists have loaded; until then the tabs carry no count (never a "0").
     const tabItems = buildHsTabItems(
-        worklists.open_investigations.length,
-        worklists.expiring.length,
+        worklists?.open_investigations.length ?? 0,
+        worklists?.expiring.length ?? 0,
     );
     // Destinations keep the selected Site (the destination registers read site_id).
     const destination = (path: string, params: Record<string, string> = {}) => {
@@ -244,21 +231,22 @@ export default function HealthSafetyDashboard({
         if (filters.site !== null) query.set('site_id', String(filters.site));
         return path + (query.size ? '?' + query.toString() : '');
     };
-    const fleetUnresolved = kpis.fleet_unresolved ?? null;
-    const fleet30 = kpis.fleet_incidents_30d ?? null;
-    const openSafeguarding = kpis.open_safeguarding ?? null;
     const fleetRestricted =
         'Access restricted — Health & safety access doesn’t include Fleet records';
     // The header carries four numbers; the lens's other two measures open the body (approved drawings).
-    const measures: TallyItem[] =
-        filters.lens === 'governance'
+    const measuresFor = (kpis: Kpis, safeguardingSource: SafeguardingSource): TallyItem[] => {
+        const fleetUnresolved = kpis.fleet_unresolved ?? null;
+        const fleet30 = kpis.fleet_incidents_30d ?? null;
+        const openSafeguarding = kpis.open_safeguarding ?? null;
+
+        return filters.lens === 'governance'
             ? [
                   {
                       value: openSafeguarding === null ? '—' : String(openSafeguarding),
                       label: 'Safeguarding',
                       sub: openSafeguarding === null ? 'Not available' : 'Open concerns now',
                       // Safeguarding's own read decides the count and the link (Stephan, 26 Oct: hidden without access).
-                      href: safeguarding_source?.href ?? undefined,
+                      href: safeguardingSource.href ?? undefined,
                   },
                   {
                       value: fleetUnresolved === null ? '—' : String(fleetUnresolved),
@@ -297,15 +285,58 @@ export default function HealthSafetyDashboard({
                       href: fleet30 === null ? undefined : destination('/fleet-assets/incidents'),
                   },
               ];
+    };
+    const measures = (
+        <DeferredPanel<{ kpis: Kpis; safeguarding_source: SafeguardingSource }>
+            data={['kpis', 'safeguarding_source']}
+            label="Safety measures"
+            fallback={<SkeletonStats count={2} />}
+        >
+            {({ kpis, safeguarding_source }) => <Tally items={measuresFor(kpis, safeguarding_source)} keepZeros />}
+        </DeferredPanel>
+    );
     const attention = (
-        <CommandCentreAttention
-            expiring={worklists.expiring}
-            ppeState={worklists.ppe_expiring_state}
-            worksafePending={backbone?.events.worksafe_pending ?? null}
-            activeAlerts={kpis.active_alerts ?? null}
-            exposureDeliveryProblems={exposure_delivery_problems ?? null}
-            site={filters.site}
-        />
+        <DeferredPanel<WorkValues & { kpis: Kpis }>
+            data={[...WORK_KEYS, 'kpis']}
+            label="Needs attention"
+            fallback={<SkeletonStats count={4} />}
+        >
+            {({ worklists: lists, backbone, exposure_delivery_problems, kpis }) => (
+                <CommandCentreAttention
+                    expiring={lists.expiring}
+                    ppeState={lists.ppe_expiring_state}
+                    worksafePending={backbone.events.worksafe_pending ?? null}
+                    activeAlerts={kpis.active_alerts ?? null}
+                    exposureDeliveryProblems={exposure_delivery_problems ?? null}
+                    site={filters.site}
+                />
+            )}
+        </DeferredPanel>
+    );
+    const worklist = (show: Parameters<typeof HsWorklists>[0]['show'], label: string) => (
+        <WorkPanel label={label}>
+            {({ worklists: lists }) => <HsWorklists worklists={visible(lists)} show={show} />}
+        </WorkPanel>
+    );
+    const trend = (variant: 'full' | 'bars') => (
+        <DeferredPanel<{ incident_trends: IncidentTrend; frequency_trends: FrequencyTrend }>
+            data={['incident_trends', 'frequency_trends']}
+            label="Incident trend"
+            fallback={<SkeletonCard rows={5} />}
+        >
+            {({ incident_trends, frequency_trends }) =>
+                variant === 'full' ? (
+                    <IncidentTrendCard
+                        bars={incident_trends}
+                        frequency={frequency_trends}
+                        variant="full"
+                        title="Incidents and near misses"
+                    />
+                ) : (
+                    <IncidentBars bars={incident_trends} />
+                )
+            }
+        </DeferredPanel>
     );
 
     return (
@@ -321,19 +352,8 @@ export default function HealthSafetyDashboard({
                 hero={
                     <CommandCentreHero
                         sourceCompleteness={source_completeness}
-                        leadingLagging={leading_lagging}
                         filters={filters}
                         sites={sites}
-                        expiring={worklists.expiring}
-                        ppeState={worklists.ppe_expiring_state}
-                        worksafePending={
-                            backbone?.events.worksafe_pending ?? null
-                        }
-                        activeAlerts={kpis.active_alerts ?? null}
-                        openSafeguarding={kpis.open_safeguarding ?? null}
-                        fleetUnresolved={kpis.fleet_unresolved ?? null}
-                        fleetIncidents30d={kpis.fleet_incidents_30d ?? null}
-                        procedures={procedures}
                         onReport={() => setLauncherOpen(true)}
                         orgName={org_name}
                         search={{ value: search, onChange: setSearch }}
@@ -390,30 +410,33 @@ export default function HealthSafetyDashboard({
                             ) : null}
                             <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
                                 <div className="grid min-w-0 gap-5">
-                                    <Tally items={measures} keepZeros />
+                                    {measures}
                                     {filters.lens === 'governance' ? (
                                         <>
                                             {attention}
-                                            <HsWorklists worklists={visibleWorklists} show={['acceptance']} />
-                                            <HsWorklists worklists={visibleWorklists} show={['corrective_actions']} />
-                                            <HsWorklists worklists={visibleWorklists} show={['notifiable']} />
-                                            <IncidentTrendCard
-                                                bars={incident_trends}
-                                                frequency={frequency_trends}
-                                                variant="full"
-                                                title="Incidents and near misses"
-                                            />
+                                            {worklist(['acceptance'], 'H&S handovers')}
+                                            {worklist(['corrective_actions'], 'Overdue corrective actions')}
+                                            {worklist(['notifiable'], 'Notifiable events')}
+                                            {trend('full')}
                                         </>
                                     ) : (
                                         <>
-                                            <NeedsYouNow worklists={visibleWorklists} />
-                                            <IncidentBars bars={incident_trends} />
+                                            <WorkPanel label="What needs you now" rows={4}>
+                                                {({ worklists: lists }) => <NeedsYouNow worklists={visible(lists)} />}
+                                            </WorkPanel>
+                                            {trend('bars')}
                                         </>
                                     )}
                                 </div>
                                 <SideColumn>
-                                    <SiteSafetyComparisonCard data={visibleSites} />
-                                    <HsWorklists worklists={visibleWorklists} show={['expiring']} />
+                                    <DeferredPanel<{ site_league: SiteLeague }>
+                                        data="site_league"
+                                        label="Site comparison"
+                                        fallback={<SkeletonCard rows={4} />}
+                                    >
+                                        {({ site_league }) => <SiteSafetyComparisonCard data={visibleSites(site_league)} />}
+                                    </DeferredPanel>
+                                    {worklist(['expiring'], 'Coming due')}
                                 </SideColumn>
                             </div>
                         </>
@@ -421,50 +444,99 @@ export default function HealthSafetyDashboard({
 
                     {tab === 'leading' && (
                         <>
-                            <Tally items={measures} keepZeros />
+                            {measures}
                             {attention}
-                            <FirstAidTally data={first_aid} />
+                            <DeferredPanel<{ first_aid: FirstAid }>
+                                data="first_aid"
+                                label="First aid"
+                                fallback={<SkeletonStats count={3} />}
+                            >
+                                {({ first_aid }) => <FirstAidTally data={first_aid} />}
+                            </DeferredPanel>
                             <LeadingPanel
                                 workerParticipation={worker_participation}
                                 filters={filters}
                             />
-                            <LeadingCharts
-                                ratio={leading_lagging.leading.near_miss_ratio}
-                                operands={frequency_operands}
-                                burndown={hazard_burndown}
-                                drillPct={kpis.drill_compliance_pct ?? null}
-                                trainingPct={leading_lagging.leading.training_pct}
-                                openHazards={open_hazards_list}
-                            />
+                            <DeferredPanel<{
+                                leading_lagging: HeroLeadingLagging;
+                                frequency_operands: { near_misses: number; recordable: number | null };
+                                hazard_burndown: Array<{ week: string; open: number }>;
+                                kpis: Kpis;
+                                open_hazards_list: OpenHazardRow[];
+                            }>
+                                data={['leading_lagging', 'frequency_operands', 'hazard_burndown', 'kpis', 'open_hazards_list']}
+                                label="Prevention charts"
+                                fallback={<SkeletonCard rows={6} />}
+                            >
+                                {({ leading_lagging, frequency_operands, hazard_burndown, kpis, open_hazards_list }) => (
+                                    <LeadingCharts
+                                        ratio={leading_lagging.leading.near_miss_ratio}
+                                        operands={frequency_operands}
+                                        burndown={hazard_burndown}
+                                        drillPct={kpis.drill_compliance_pct ?? null}
+                                        trainingPct={leading_lagging.leading.training_pct}
+                                        openHazards={open_hazards_list}
+                                    />
+                                )}
+                            </DeferredPanel>
                         </>
                     )}
 
                     {tab === 'lagging' && (
                         <>
-                            <Tally items={measures} keepZeros />
+                            {measures}
                             {attention}
-                            <LaggingPanel data={leading_lagging.lagging} filters={filters} />
-                            <LaggingCharts
-                                bars={incident_trends}
-                                frequency={frequency_trends}
-                                severity={backbone?.events?.events_by_severity}
-                                category={incidents_by_category}
-                            />
-                            <RestraintSection data={restraints} />
-                            <HsWorklists worklists={visibleWorklists} show={['investigations']} />
+                            <DeferredPanel<{ leading_lagging: HeroLeadingLagging }>
+                                data="leading_lagging"
+                                label="Harm and injury rates"
+                                fallback={<SkeletonStats count={4} />}
+                            >
+                                {({ leading_lagging }) => <LaggingPanel data={leading_lagging.lagging} filters={filters} />}
+                            </DeferredPanel>
+                            <DeferredPanel<{
+                                incident_trends: IncidentTrend;
+                                frequency_trends: FrequencyTrend;
+                                backbone: Backbone;
+                                incidents_by_category: Array<{ label: string; count: number }>;
+                            }>
+                                data={['incident_trends', 'frequency_trends', 'backbone', 'incidents_by_category']}
+                                label="Harm charts"
+                                fallback={<SkeletonCard rows={6} />}
+                            >
+                                {({ incident_trends, frequency_trends, backbone, incidents_by_category }) => (
+                                    <LaggingCharts
+                                        bars={incident_trends}
+                                        frequency={frequency_trends}
+                                        severity={backbone.events?.events_by_severity}
+                                        category={incidents_by_category}
+                                    />
+                                )}
+                            </DeferredPanel>
+                            <DeferredPanel<{ restraints: RestraintDashboardData }>
+                                data="restraints"
+                                label="Restraint practice"
+                                fallback={<SkeletonCard rows={4} />}
+                            >
+                                {({ restraints }) => <RestraintSection data={restraints} />}
+                            </DeferredPanel>
+                            {worklist(['investigations'], 'Open investigations')}
                         </>
                     )}
 
                     {tab === 'compliance' && (
                         <>
-                            <Tally items={measures} keepZeros />
+                            {measures}
                             {attention}
-                            <CompliancePanel
-                                site={filters.site}
-                                expiring={worklists.expiring}
-                                worksafePending={backbone?.events.worksafe_pending ?? null}
-                            />
-                            <HsWorklists worklists={visibleWorklists} show={['expiring']} />
+                            <WorkPanel label="Duties" rows={4}>
+                                {({ worklists: lists, backbone }) => (
+                                    <CompliancePanel
+                                        site={filters.site}
+                                        expiring={lists.expiring}
+                                        worksafePending={backbone.events.worksafe_pending ?? null}
+                                    />
+                                )}
+                            </WorkPanel>
+                            {worklist(['expiring'], 'Coming due')}
                             <GovernanceExports />
                         </>
                     )}

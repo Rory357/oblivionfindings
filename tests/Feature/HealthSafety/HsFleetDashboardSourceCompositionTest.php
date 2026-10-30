@@ -22,6 +22,8 @@ use Tests\Feature\Incidents\IncidentRoutingTestCase;
 /** Whole actual dashboard boundary for one organisation; native/performance acceptance remains UNRUN. */
 final class HsFleetDashboardSourceCompositionTest extends IncidentRoutingTestCase
 {
+    use \Tests\Support\LoadsHealthSafetyOverview;
+
     private Site $foreignSite;
     private Asset $local;
     private Asset $foreign;
@@ -295,8 +297,8 @@ final class HsFleetDashboardSourceCompositionTest extends IncidentRoutingTestCas
 
     private function page(array $filters = []): TestResponse
     {
-        return $this->actingAs($this->manager)->get('/health-safety?'.http_build_query($filters), ['X-Inertia' => 'true',
-            'X-Inertia-Partial-Component' => 'health-safety/dashboard', 'X-Inertia-Partial-Data' => 'kpis']);
+        // The whole Overview (every background part), so a change in any of its reads is caught as before.
+        return $this->actingAs($this->manager)->getOverview('/health-safety?'.http_build_query($filters), ['X-Inertia' => 'true']);
     }
 
     private function projection(?array $sites): array
