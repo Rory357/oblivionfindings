@@ -191,8 +191,9 @@ final class ChatOffboarding
 
     /**
      * The longest-standing remaining member who is current staff with access to
-     * the channel's site. Full allows() is not used here: while the leaver's row
-     * still exists, the staff-audience check would fail for everyone.
+     * the channel's site. Full allows() is not used here: while the row of a
+     * leaver who is now a client or family sign-in still exists, the staff
+     * conversation check fails for everyone.
      */
     private function nextOwner(OpsConversation $conversation, User $leaving): ?User
     {
