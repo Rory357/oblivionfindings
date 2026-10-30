@@ -82,7 +82,13 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
         [$own] = $this->world();
         foreach (self::ROLES as $role) {
             $viewer = $this->viewer($role, $own);
-            [$full, $fullQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia())->get('/tasks'));
+            [$full] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia())->get('/tasks'));
+            // The same partial request but also asking for the task list goes the normal way and builds it, so the
+            // difference between the two is exactly the page work the inbox request skips. (A ratio against the full
+            // page stopped meaning anything once the sidebar count moved out of the first load and roles are read
+            // once per page view: the full /tasks page became cheap in this small test world.)
+            [, $withListQueries] = $this->measure(fn () => $this->actingAs($viewer)
+                ->withHeaders([...$this->inertia('tasks/index'), 'X-Inertia-Partial-Data' => 'inbox,items'])->get('/tasks'));
             [$inbox, $inboxQueries] = $this->measure(fn () => $this->actingAs($viewer)->withHeaders($this->inertia('tasks/index'))->get('/tasks'));
 
             $full->assertOk()->assertJsonPath('component', 'tasks/index');
@@ -92,7 +98,7 @@ class InboxFollowUpSkipsPageWorkTest extends TestCase
             foreach (array_diff(array_keys($props), ['inbox']) as $key) {
                 $this->assertSame($full->json("props.{$key}"), $props[$key], "{$role}: {$key} must match the full page.");
             }
-            $this->assertLessThan(intdiv($fullQueries, 3), $inboxQueries, "{$role}: the inbox request must not rebuild the task list ({$inboxQueries} vs {$fullQueries} queries).");
+            $this->assertLessThan($withListQueries, $inboxQueries, "{$role}: the inbox request must not build the task list ({$inboxQueries} queries vs {$withListQueries} when the list is asked for).");
         }
     }
 
