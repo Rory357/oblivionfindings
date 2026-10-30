@@ -49,6 +49,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.4
+          tools: composer:v2
+          coverage: none
+
+      - name: Restore Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: vendor-${{ runner.os }}-php84-${{ hashFiles('composer.lock') }}
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader --no-progress
+
+      # The route helpers in resources/js/{actions,routes,wayfinder} are generated
+      # (gitignored); the Vite build used to make them before tsc ran. Same command
+      # and options as the wayfinder() plugin in vite.config.ts.
+      - name: Generate Wayfinder route helpers
+        run: php artisan wayfinder:generate --with-form
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
