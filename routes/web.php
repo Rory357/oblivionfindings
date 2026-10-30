@@ -90,8 +90,8 @@ Route::get('/robots.txt', function () {
     return response($body, 200)->header('Content-Type', 'text/plain');
 })->name('robots');
 
-// Public routes
-require __DIR__.'/referrals.php';
+// Public routes (and the staff referral workspace). Page loads retry on a busy row (RetryPageReadOnLockConflict).
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/referrals.php');
 
 Route::get('/', [PublicProviderController::class, 'show'])->defaults('provider_page', 'home')->name('home');
 Route::get('/services', [PublicProviderController::class, 'show'])->defaults('provider_page', 'services')->name('provider.services');
@@ -169,7 +169,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 // links (including existing POST action endpoints) keep working via the
 // redirect below and the unchanged action routes.
 Route::get('/my-day', MyTasksController::class)
-    ->middleware(['auth'])
+    ->middleware(['auth', RetryPageReadOnLockConflict::class])
     ->name('my-day');
 
 Route::get('/my-day/safety/meetings/{id}', [MyDayMeetingInvitationController::class, 'show'])
@@ -457,10 +457,11 @@ Route::middleware(['auth', 'throttle:60,1'])->prefix('my-calendar/entries')->gro
 });
 
 // ── Operations module ────────────────────────────────────────────────
-require __DIR__.'/operations.php';
+// Page loads in Operations and eMAR retry when a save briefly holds a row their proof locks (31 Oct 2026).
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/operations.php');
 
 // ── eMAR module ──────────────────────────────────────────────────────
-require __DIR__.'/emar.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/emar.php');
 
 // Domain-specific routes
 require __DIR__.'/auth.php';
@@ -480,7 +481,7 @@ require __DIR__.'/fleet-assets.php';
 require __DIR__.'/control-room.php';
 require __DIR__.'/security-devices.php';
 require __DIR__.'/shifts.php';
-require __DIR__.'/medications.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/medications.php');
 require __DIR__.'/compliance.php';
 require __DIR__.'/reports.php';
 require __DIR__.'/integrations.php';
@@ -489,7 +490,7 @@ require __DIR__.'/chat.php';
 require __DIR__.'/respite.php';
 
 // Compliance module routes
-require __DIR__.'/safeguarding.php';
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/safeguarding.php');
 require __DIR__.'/training.php';
 require __DIR__.'/privacy.php';
 
@@ -515,8 +516,8 @@ require __DIR__.'/health-clinical.php';
 // Health & Safety module
 Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/health-safety.php');
 
-// API routes
-require __DIR__.'/api_medications.php';
+// API routes (medication file exports retry on a busy row too)
+Route::middleware(RetryPageReadOnLockConflict::class)->group(fn () => require __DIR__.'/api_medications.php');
 
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
