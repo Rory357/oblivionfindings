@@ -185,8 +185,15 @@ class ProcedureReviewRequestTaskProviderTest extends TestCase
         $this->assertSame('/my-day', $myDayQuery['return_to']);
         $this->assertSame((string) $review->id, $myDayQuery['request']);
         $this->app->instance(TaskAggregator::class, new TaskAggregator([$this->provider]));
-        $response = $this->actingAs($this->executor)->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->component('my-day/index')->has('myTasks.items'));
-        $actual = collect($response->viewData('page')['props']['myTasks']['items'])->firstWhere('id', 'procedure_review_request-'.$review->id);
+        // The My tasks card loads after the page (31 Oct 2026): the first response has none.
+        $myTasks = null;
+        $this->actingAs($this->executor)->get('/my-day')->assertOk()->assertInertia(function (Assert $page) use (&$myTasks) {
+            $page->component('my-day/index')->missing('myTasks')->loadDeferredProps('my-tasks', function (Assert $page) use (&$myTasks) {
+                $page->has('myTasks.items');
+                $myTasks = $page->toArray()['props']['myTasks'];
+            });
+        });
+        $actual = collect($myTasks['items'])->firstWhere('id', 'procedure_review_request-'.$review->id);
         $this->assertNotNull($actual);
         parse_str(parse_url($actual['link'], PHP_URL_QUERY), $actualQuery);
         $this->assertSame('/my-day', $actualQuery['return_to']);

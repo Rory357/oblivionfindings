@@ -26,9 +26,11 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
             ->where('items.0.assignee', ['id' => $receiver->id, 'name' => 'You'])->where('items.0.restricted', true)
             ->where('items.0.link', '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$child->id)->where('items.0.description', null)->where('items.0.client', null)->where('items.0.site', null)
             ->where('items.0.actionHelp', null));
-        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->component('my-day/index')
+        // The My tasks card loads after the page (31 Oct 2026): the first response has none.
+        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->component('my-day/index')->missing('myTasks')
+            ->loadDeferredProps('my-tasks', fn (Assert $page) => $page
             ->where('myTasks.items', fn ($rows) => collect($rows)->contains(fn ($row) => $row['id'] === $id && $row['link'] === '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$child->id
-                && $row['title'] === 'Assigned follow-up')));
+                && $row['title'] === 'Assigned follow-up'))));
         $this->assertSame(2, $root->fresh()->source_revision); $this->assertNull($child->fresh()->completed_at);
     }
 
@@ -59,8 +61,9 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
             $this->allow($receiver, $key, false);
             $this->get($this->origin())->assertOk()->assertInertia(fn (Assert $page) => $page->has('items', 0)->where('pagination.total', 0));
             $this->getJson($this->drawer($child->id))->assertNotFound();
-            $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page
-                ->where('myTasks.items', fn ($rows) => ! collect($rows)->contains('id', 'chemical_exposure_followup-'.$child->id)));
+            $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->missing('myTasks')
+                ->loadDeferredProps('my-tasks', fn (Assert $page) => $page
+                ->where('myTasks.items', fn ($rows) => ! collect($rows)->contains('id', 'chemical_exposure_followup-'.$child->id))));
             $this->allow($receiver, $key);
             $this->get($this->origin())->assertOk()->assertInertia(fn (Assert $page) => $page->has('items', 1));
         }
@@ -76,8 +79,11 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
         [$root, $receiver, $child] = $this->assignedWork(); [$sealed, $legacy] = $this->sealedLegacy($receiver);
         $this->actingAs($receiver)->get($this->origin())->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('pagination.total', 1)->where('items.0.id', 'chemical_exposure_followup-'.$child->id));
-        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page
+        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->missing('myTasks')
+            ->loadDeferredProps('my-tasks', fn (Assert $page) => $page
             ->where('myTasks.items', fn ($rows) => collect($rows)->contains('id', 'chemical_exposure_followup-'.$child->id))
+            // The card now says it could not load on itself (myTasks.unavailable), as well as in the page's list.
+            ->missing('myTasks.unavailable'))
             ->where('data_unavailable', fn ($sections) => ! in_array('Other tasks', (array) $sections, true)));
         $this->getJson($this->drawer($legacy->id))->assertNotFound();
     }
@@ -107,8 +113,9 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
         $this->get($this->origin())->assertOk()->assertInertia(fn (Assert $page) => $page->has('items', 0));
         $this->get($this->origin().'&done=1')->assertOk()->assertInertia(fn (Assert $page) => $page->has('items', 1)->where('items.0.bucket', 'done'));
         $this->getJson($this->drawer($child->id))->assertOk()->assertJsonPath('item.bucket', 'done');
-        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('myTasks.items', fn ($rows) => ! collect($rows)->contains('id', 'chemical_exposure_followup-'.$child->id)));
+        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->missing('myTasks')
+            ->loadDeferredProps('my-tasks', fn (Assert $page) => $page
+            ->where('myTasks.items', fn ($rows) => ! collect($rows)->contains('id', 'chemical_exposure_followup-'.$child->id))));
     }
 
     public function test_original_client_source_read_withdrawal_and_foreign_private_recipient_are_real_http_direct_object_denials(): void
@@ -133,7 +140,8 @@ final class ChemicalExposureTaskHttpTest extends ChemicalExposureTaskReadTestCas
         $this->getJson($this->drawer($first->id))->assertOk()->assertJsonPath('item.id', 'chemical_exposure_followup-'.$first->id)
             ->assertJsonPath('item.link', '/health-safety/chemical-exposures/'.$root->id.'?section=followups&followup='.$first->id)
             ->assertJsonPath('canOpen', true);
-        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->where('myTasks.total', 27)->has('myTasks.items', 8));
+        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->missing('myTasks')
+            ->loadDeferredProps('my-tasks', fn (Assert $page) => $page->where('myTasks.total', 27)->has('myTasks.items', 8)));
         // Guarded source GET+exact page26 focus/return regression is gate_runner's separate full transport suite.
     }
 

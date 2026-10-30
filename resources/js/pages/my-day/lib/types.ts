@@ -485,6 +485,8 @@ export interface MyDayMyTasks {
     viewer_id?: number;
     total: number;
     items: MyDayAggregatedTask[];
+    /** The read failed: the card says so instead of showing "nothing assigned". */
+    unavailable?: boolean;
 }
 
 export interface MyDayPreShiftBriefing {

@@ -387,7 +387,11 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   All Tasks count shows a dash until it is known. Keep cheap, urgent safety
   facts in the first response. In the controller, give every other prop as a
   closure (`'overview' => fn () => …`): the background request runs the
-  controller again, and only closures let it skip what it did not ask for.
+  controller again, and only closures let it skip what it did not ask for. A
+  controller that builds its whole page in one go (My Day) returns early
+  instead: `App\Support\Inertia\DeferredLoad::only()` tells it the request
+  asks only for background-loaded or shared header props, so it answers with
+  just those.
 
   ```tsx
   <DeferredPanel<{ myTasks: MyDayMyTasks }>

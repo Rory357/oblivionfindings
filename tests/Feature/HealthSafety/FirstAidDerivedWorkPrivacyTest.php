@@ -103,8 +103,10 @@ class FirstAidDerivedWorkPrivacyTest extends TestCase
         $origin = '/tasks?sources=hs_event,hs_investigation,corrective_action&assigned=me';
         $this->actingAs($this->worker)->get($origin)->assertOk()->assertInertia(fn (Assert $page) => $page
             ->where('pagination.total', 3)->where('items', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect($expected)->sort()->values()->all()));
-        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('myTasks.items', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect($expected)->sort()->values()->all()));
+        // The My tasks card loads after the page (31 Oct 2026): the first response has none.
+        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->missing('myTasks')
+            ->loadDeferredProps('my-tasks', fn (Assert $page) => $page
+            ->where('myTasks.items', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect($expected)->sort()->values()->all())));
         $this->assertDerivedProviders($event, $investigation, $action, true);
         $this->getJson('/tasks/lookup?q='.rawurlencode($action->reference_number))->assertOk()->assertJsonPath('match.ref', $action->reference_number);
         $this->worker->load('permissionOverrides', 'hrEmployeeProfile');
@@ -113,7 +115,8 @@ class FirstAidDerivedWorkPrivacyTest extends TestCase
         // The test application spans requests; production aggregation is request-scoped.
         $this->app->forgetInstance(TaskAggregator::class);
         $this->get($origin)->assertOk()->assertInertia(fn (Assert $page) => $page->where('pagination.total', 0)->has('items', 0));
-        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->has('myTasks.items', 0));
+        $this->get('/my-day')->assertOk()->assertInertia(fn (Assert $page) => $page->missing('myTasks')
+            ->loadDeferredProps('my-tasks', fn (Assert $page) => $page->has('myTasks.items', 0)));
         foreach ([['hs_event', $event->id], ['hs_investigation', $investigation->id], ['corrective_action', $action->id]] as [$source, $id]) {
             $this->getJson('/tasks/detail?source='.$source.'&id='.$id)->assertNotFound();
         }

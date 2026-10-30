@@ -45,6 +45,7 @@ use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
 use App\Support\HealthSafety\LoneWorkerSessionPresenter;
+use App\Support\Inertia\DeferredLoad;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
 use Illuminate\Http\Request;
@@ -62,6 +63,11 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class MyTasksController extends Controller
 {
+    private const COMPONENT = 'my-day/index';
+
+    /** The background request that fills the "My tasks" card after the page shows. */
+    public const MY_TASKS_GROUP = 'my-tasks';
+
     private array $unavailableSections = [];
 
     /**
@@ -99,6 +105,15 @@ class MyTasksController extends Controller
     private function myDayResponse(Request $request, BroadcastRecipientReadContext $broadcastContext): Response
     {
         $user = $request->user();
+        // The browser's background fill for the "My tasks" card (or for the shared header
+        // data) asks for nothing else from this page: build only what it asked for, instead
+        // of the whole page a second time.
+        $deferredOnly = DeferredLoad::only($request, self::COMPONENT, ['myTasks']);
+        if ($deferredOnly !== null) {
+            return Inertia::render(self::COMPONENT, in_array('myTasks', $deferredOnly, true)
+                ? ['myTasks' => fn () => $this->myTasksOnly($user, Carbon::now($this->workerTimezone()))]
+                : []);
+        }
         $userId = $user->id;
         $canOpenEmar = $user->canDo('medications.view');
         $canRecordMedications = $user->canDo('medications.administer.record');
@@ -208,7 +223,7 @@ class MyTasksController extends Controller
             $this->unavailableSections[] = 'Handover summary';
         }
 
-        return Inertia::render('my-day/index', [
+        return Inertia::render(self::COMPONENT, [
             'today' => $todayFormatted,
             'today_iso' => $workerNow->toDateString(),
             'shifts' => $shifts->values()->all(),
@@ -250,7 +265,12 @@ class MyTasksController extends Controller
             // Cross-module "My tasks" card — the signed-in user's open work
             // items from the /tasks aggregator (assigned=me), capped at 8
             // rows. `total` carries the uncapped count for the footer link.
-            'myTasks' => Inertia::always($this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id'))),
+            // It is the slow part of the page (every task module), so the first
+            // load leaves it out and the browser fetches it straight after. Every
+            // partial reload still re-reads it for the current viewer, as before.
+            'myTasks' => DeferredLoad::isPartialReload($request, self::COMPONENT)
+                ? Inertia::always($this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id')))
+                : Inertia::defer(fn () => $this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id')), self::MY_TASKS_GROUP),
             'active_shift' => $activeShiftCard,
             'task_creation' => [
                 'can_create' => $activeShift && app(ShiftTaskWorkService::class)->canCreate($user, $activeShift),
@@ -1308,7 +1328,7 @@ class MyTasksController extends Controller
      * slicing. Providers may have their own bounds. A provider failure
      * returns an empty fallback with the separate Other tasks unavailable marker.
      *
-     * @return array{viewer_id: int, total: int, items: array<int, array<string, mixed>>}
+     * @return array{viewer_id: int, total: int, items: array<int, array<string, mixed>>, unavailable?: true}
      */
     private function getMyAggregatedTasks(User $user, array $currentShiftTaskIds = []): array
     {
@@ -1338,8 +1358,26 @@ class MyTasksController extends Controller
             report($e);
             $this->unavailableSections[] = 'Other tasks';
 
-            return ['viewer_id' => (int) $user->id, 'total' => 0, 'items' => []];
+            // `unavailable` lets the card say it could not load, rather than show
+            // "nothing assigned", when it was filled by its own background request.
+            return ['viewer_id' => (int) $user->id, 'total' => 0, 'items' => [], 'unavailable' => true];
         }
+    }
+
+    /**
+     * The "My tasks" card on its own, for its background fill: the active shift's
+     * tasks are left out exactly as on the full page (they show on the shift card).
+     *
+     * @return array{viewer_id: int, total: int, items: array<int, array<string, mixed>>, unavailable?: true}
+     */
+    private function myTasksOnly(User $user, Carbon $workerNow): array
+    {
+        $activeShift = $this->resolveActiveShiftModel($user, $workerNow);
+        $shiftTaskIds = $activeShift
+            ? array_column($this->workerShiftPayload($user, $activeShift, $workerNow)['tasks'] ?? [], 'id')
+            : [];
+
+        return $this->getMyAggregatedTasks($user, $shiftTaskIds);
     }
 
     private function getTimesheets(User $user): array

@@ -256,10 +256,33 @@ it('matches every dose slot with a single administration query (no N+1)', functi
         // The PRN queue makes one independent canonical unresolved-parent
         // read, regardless of scheduled-slot growth; neither loads per slot.
         $this->assertSame(1, count($reads['scheduled_window']));
+        // Since 31 Oct 2026 the My tasks card loads after the page, so its two medication reads (the PRN queue and
+        // the follow-up scope) are no longer in the first response: they moved to the card's request, checked below.
         $this->assertSame([
-            'scheduled_window' => 1, 'board_day' => 0, 'prn_unresolved' => 1,
-            'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 0, 'unexpected' => 0,
+            'scheduled_window' => 1, 'board_day' => 0, 'prn_unresolved' => 0,
+            'administration_batch' => 0, 'followup_scope' => 0, 'refusal_scope' => 0, 'unexpected' => 0,
         ], MedicationReadQueryInventory::counts($reads), MedicationReadQueryInventory::describe($reads));
+
+        // The card's background request, as the browser sends it: one read each, whatever the slot count.
+        app()->forgetScopedInstances();
+        auth()->forgetUser();
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        try {
+            $card = $this->actingAs($worker->fresh())->get('/my-day', [
+                'X-Inertia' => 'true', 'X-Inertia-Version' => (string) $response->viewData('page')['version'],
+                'X-Inertia-Partial-Component' => 'my-day/index', 'X-Inertia-Partial-Data' => 'myTasks',
+            ])->assertOk();
+            $cardReads = MedicationReadQueryInventory::fromLog(DB::getQueryLog());
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+        $this->assertSame($worker->id, $card->json('props.myTasks.viewer_id'));
+        $this->assertSame([
+            'scheduled_window' => 0, 'board_day' => 0, 'prn_unresolved' => 1,
+            'administration_batch' => 0, 'followup_scope' => 1, 'refusal_scope' => 0, 'unexpected' => 0,
+        ], MedicationReadQueryInventory::counts($cardReads), MedicationReadQueryInventory::describe($cardReads));
         $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 })->group('my-day');

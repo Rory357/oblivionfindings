@@ -303,20 +303,21 @@ it('lists only the viewer\'s own incidents on the My Day "My tasks" card', funct
         ->assertInertia(fn ($page) => $page
             ->where('items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all() === $allIds));
 
+    // The card loads straight after the page (its own background request).
     $this->actingAs($user)
         ->get('/my-day')
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
+        ->assertInertia(fn ($page) => $page->missing('myTasks')->loadDeferredProps('my-tasks', fn ($fill) => $fill
             ->where('myTasks.total', 1)
-            ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$mine->id]));
+            ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$mine->id])));
 
     // The colleague's card shows only theirs.
     $this->actingAs($colleague)
         ->get('/my-day')
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
+        ->assertInertia(fn ($page) => $page->missing('myTasks')->loadDeferredProps('my-tasks', fn ($fill) => $fill
             ->where('myTasks.total', 1)
-            ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$theirs->id]));
+            ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->all() === ['incident-'.$theirs->id])));
 });
 
 it('filters to items due within the week', function () {

@@ -1041,10 +1041,11 @@ it('keeps list counts csv detail lookup reports my day and watchers in parity fo
     $this->actingAs($actor)
         ->get('/my-day')
         ->assertOk()
-        ->assertInertia(fn ($page) => $page
+        // The My tasks card loads straight after the page (its own background request).
+        ->assertInertia(fn ($page) => $page->missing('myTasks')->loadDeferredProps('my-tasks', fn ($fill) => $fill
             ->where('myTasks.total', $mine->count())
             ->where('myTasks.items', fn ($items) => collect($items)->pluck('id')->sort()->values()->all()
-                === $expectedMine));
+                === $expectedMine)));
 
     $visibleIncident = $matrix['incident']['visible'][0];
     $hiddenIncident = $matrix['incident']['hidden'][0];

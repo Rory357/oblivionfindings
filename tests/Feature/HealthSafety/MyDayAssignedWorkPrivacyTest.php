@@ -32,12 +32,16 @@ final class MyDayAssignedWorkPrivacyTest extends ChemicalExposureTaskReadTestCas
     }
     public function test_full_page_binds_real_assigned_private_work_to_current_viewer_without_copied_medical_prose(): void
     {
-        [, $receiver, $child] = $this->assignedWork(); $page = $this->full($receiver)->viewData('page')['props'];
+        [, $receiver, $child] = $this->assignedWork(); $full = $this->full($receiver)->viewData('page');
+        // The My tasks card loads after the page (31 Oct 2026): the first response has none, and the
+        // browser's background request for it (as below) carries the card.
+        $this->assertArrayNotHasKey('myTasks', $full['props']); $this->assertSame(['myTasks'], $full['deferredProps']['my-tasks'] ?? null);
+        $page = $this->partial($receiver, 'myTasks')->json('props');
         $this->assertSame($receiver->id, $page['myTasks']['viewer_id']); $this->assertSame(1, $page['myTasks']['total']);
         $this->assertSame('chemical_exposure_followup-'.$child->id, $page['myTasks']['items'][0]['id']);
         $this->assertSame('Assigned follow-up', $page['myTasks']['items'][0]['title']);
         $this->assertStringNotContainsString('PRIVATE-TASK', json_encode($page['myTasks'], JSON_THROW_ON_ERROR));
-        foreach (['clock', 'timesheets', 'medications_due', 'active_shift'] as $key) { $this->assertArrayHasKey($key, $page); }
+        foreach (['clock', 'timesheets', 'medications_due', 'active_shift'] as $key) { $this->assertArrayHasKey($key, $full['props']); }
     }
     public function test_auth_only_partial_always_replaces_warmed_private_rows_and_count_after_each_real_read_grant_revoke_restore(): void
     {
@@ -67,11 +71,18 @@ final class MyDayAssignedWorkPrivacyTest extends ChemicalExposureTaskReadTestCas
     public function test_auth_only_account_switch_returns_only_actual_new_viewer_work_and_identity_not_previous_deadlines(): void
     {
         [, $first, $old] = $this->assignedWork(); [, $second, $current] = $this->assignedWork();
-        $oldPage = $this->full($first)->viewData('page')['props']['myTasks'];
+        // The My tasks card loads after the page (31 Oct 2026): the old viewer's card comes from its background request.
+        $this->assertArrayNotHasKey('myTasks', $this->full($first)->viewData('page')['props']);
+        $oldPage = $this->partial($first, 'myTasks')->json('props.myTasks');
         $this->assertSame('chemical_exposure_followup-'.$old->id, $oldPage['items'][0]['id']);
         $response = $this->bound($this->partial($second), $second, 1)->assertJsonPath('props.auth.user.id', $second->id)
             ->assertJsonPath('props.myTasks.items.0.id', 'chemical_exposure_followup-'.$current->id);
         $this->assertNotContains('chemical_exposure_followup-'.$old->id, array_column($response->json('props.myTasks.items'), 'id'));
+        // After the switch, the new viewer's own background card request proves it too: bound to them, not empty
+        // (they have one piece of work), their work only and none of the old viewer's.
+        $background = $this->bound($this->partial($second, 'myTasks'), $second, 1);
+        $this->assertSame(['chemical_exposure_followup-'.$current->id], array_column($background->json('props.myTasks.items'), 'id'));
+        $this->assertNotContains('chemical_exposure_followup-'.$old->id, array_column($background->json('props.myTasks.items'), 'id'));
     }
     public function test_my_tasks_only_partial_carries_current_viewer_binding_when_auth_is_not_requested(): void
     {
@@ -147,9 +158,12 @@ final class MyDayAssignedWorkPrivacyTest extends ChemicalExposureTaskReadTestCas
     public function test_component_mismatch_keeps_actual_full_my_day_payload_and_viewer_binding(): void
     {
         [, $receiver] = $this->assignedWork(); $this->full($receiver);
-        $response = $this->bound($this->partial($receiver, 'auth', ['X-Inertia-Partial-Component' => 'another/component']), $receiver, 1);
+        $response = $this->partial($receiver, 'auth', ['X-Inertia-Partial-Component' => 'another/component']);
         $response->assertJsonPath('component', 'my-day/index');
         foreach (['clock', 'timesheets', 'medications_due', 'shifts', 'stats'] as $key) { $this->assertArrayHasKey($key, $response->json('props')); }
+        // The full payload leaves the My tasks card to its background request (31 Oct 2026), which keeps the viewer binding.
+        $response->assertJsonMissingPath('props.myTasks')->assertJsonPath('deferredProps.my-tasks', ['myTasks']);
+        $this->bound($this->partial($receiver, 'myTasks'), $receiver, 1);
     }
     public function test_guest_my_day_route_does_not_disclose_source_rows_or_assigned_counts(): void
     {

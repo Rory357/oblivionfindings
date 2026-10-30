@@ -21,11 +21,13 @@ import { ChecklistConfigProvider } from '@/components/checklists/context';
 import { CategoryIcon, StatusBadge } from '@/components/checklists/primitives';
 import { RunModal } from '@/components/checklists/run-modal';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DeferredPanel } from '@/components/deferred-panel';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SkeletonCard } from '@/components/ui/skeleton-card';
 import useLiveRefresh from '@/hooks/use-live-refresh';
 import AppLayout from '@/layouts/app-layout';
 import { formatRelative, formatTime } from '@/lib/datetime';
@@ -1144,9 +1146,19 @@ export default function MyDay() {
                         />
                     ) : null}
 
-                    {props.myTasks && props.myTasks.total > 0 ? (
-                        <MyTasksCard tasks={props.myTasks} />
-                    ) : null}
+                    {/* Loads straight after the page (it reads every task module). */}
+                    <DeferredPanel<{ myTasks: MyDayMyTasks }>
+                        data="myTasks"
+                        label="Other assigned work"
+                        fallback={<SkeletonCard rows={3} />}
+                        failed={({ myTasks }) => !!myTasks.unavailable}
+                    >
+                        {({ myTasks }) =>
+                            myTasks.total > 0 ? (
+                                <MyTasksCard tasks={myTasks} />
+                            ) : null
+                        }
+                    </DeferredPanel>
 
                     {activeShift &&
                     canViewShiftChecklists &&
