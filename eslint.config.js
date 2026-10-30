@@ -397,6 +397,15 @@ export default [
             'no-restricted-imports': [
                 'error',
                 {
+                    paths: [
+                        {
+                            // DESIGN.md "Skeleton vs loader" + anti-pattern "Bare <Deferred>".
+                            name: '@inertiajs/react',
+                            importNames: ['Deferred'],
+                            message:
+                                'Background-loaded panels use <DeferredPanel> (@/components/deferred-panel): it adds the error state with Try again and keeps data through a refresh. See DESIGN.md "Skeleton vs loader".',
+                        },
+                    ],
                     patterns: [
                         {
                             group: ['@fullcalendar/*'],
@@ -438,6 +447,13 @@ export default [
                             name: '@/components/finance/finance-hero',
                             message:
                                 'FinanceHero is deleted. Use <PageHeader> from @/components/page. See DESIGN.md "Page headers".',
+                        },
+                        {
+                            // Repeated from the calendar block (this block replaces it for finance).
+                            name: '@inertiajs/react',
+                            importNames: ['Deferred'],
+                            message:
+                                'Background-loaded panels use <DeferredPanel> (@/components/deferred-panel): it adds the error state with Try again and keeps data through a refresh. See DESIGN.md "Skeleton vs loader".',
                         },
                     ],
                     patterns: [

@@ -11,6 +11,8 @@ use App\Services\CurrentAuthorizationReads;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use App\Support\HealthSafety\ProofParity;
 use App\Support\HealthSafety\QueryPaging;
 
 /** The same read boundary for a direct H&S event and its linked projections.
@@ -122,8 +124,89 @@ final class HsEventAccessService
         return $this->applyFirstAidSourceScope($query, $viewer, $context, $sourceCandidates);
     }
 
-    /** Confidential treatment and restraint reviews intersect their source policy; unrelated sources retain theirs. */
+    /** @var \WeakMap<HealthSafetyReadContext, array<int, list<int>>>|null */
+    private static ?\WeakMap $provenSourceEventIds = null;
+
+    /**
+     * EXCEPTION to "never a detached ID admission list" (IncidentHsEventSourceReadService), approved by Stephan on
+     * 30 Oct 2026 (speed option B, relayed by MASTER): one H&S page ran dozens of counts, each re-embedding every
+     * linked review's full source proof (200–500 KB statements, 12–20 s pages).
+     *
+     * Inside a read context, the H&S event ids that the full unchanged source chain admits (first-aid, restraint,
+     * injury and incident source rules with their exact original facts: applyFirstAidSourceScopeEmbedded()) are proven
+     * ONCE, over all events, inside this request's locked read. Every later caller in the same read then gets "its own
+     * query AND id IN that set", which is the same rows the embedded chain would give it, because the chain decides
+     * each event on its own facts. Callers keep their own Site scope and filters.
+     *
+     * Conditions (Stephan): the set lives only in this HealthSafetyReadContext (one request, one transaction, one
+     * viewer); it is never cached across requests, stored, or handed to another user; who sees what is unchanged
+     * (role-by-role parity tests compare it with the embedded chain). The read's share locks keep the proven rows
+     * from changing underneath it.
+     *
+     * @return list<int>
+     */
+    private function provenSourceEventIds(User $viewer, HealthSafetyReadContext $context): array
+    {
+        $context->assertViewer($viewer);
+        self::$provenSourceEventIds ??= new \WeakMap;
+        $known = self::$provenSourceEventIds[$context] ?? [];
+        if (array_key_exists((int) $viewer->id, $known)) { return $known[(int) $viewer->id]; }
+        $ids = $this->proveSourceEventIds($viewer, $context);
+        $known[(int) $viewer->id] = $ids;
+        self::$provenSourceEventIds[$context] = $known;
+        self::$provenViewers ??= new \WeakMap;
+        self::$provenViewers[$context] = $viewer;
+
+        return $ids;
+    }
+
+    /** @var \WeakMap<HealthSafetyReadContext, User>|null the viewer each proven set belongs to (one per context) */
+    private static ?\WeakMap $provenViewers = null;
+
+    /** @return list<int> */
+    private function proveSourceEventIds(User $viewer, HealthSafetyReadContext $context): array
+    {
+        return $this->applyFirstAidSourceScopeEmbedded(HsEvent::withTrashed(), $viewer, $context)
+            ->reorder()->pluck('hs_events.id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /**
+     * The response barrier for the proven set: before a page-wide read hands back its result, the full embedded chain
+     * runs once more. If anything the set was proven on has changed since (a withdrawn permission, a moved source),
+     * the whole response is withheld (404), exactly as the embedded per-statement proof would have done.
+     */
+    public function recheckProvenSourceEventIds(HealthSafetyReadContext $context): void
+    {
+        $viewer = self::$provenViewers[$context] ?? null;
+        if ($viewer === null) { return; }
+        $proven = self::$provenSourceEventIds[$context][(int) $viewer->id] ?? null;
+        if ($proven !== null && $this->proveSourceEventIds($viewer, $context) !== $proven) {
+            throw new NotFoundHttpException;
+        }
+    }
+
+    /** Confidential treatment and restraint reviews intersect their source policy; unrelated sources retain theirs.
+     * Inside a read context this is "id IN the set proven once for this request" (see provenSourceEventIds()). */
     public function applyFirstAidSourceScope(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
+    {
+        // Named candidates bound the read to those rows (a row outside them is not admitted), and that bounded read is
+        // already small, so it keeps the embedded chain.
+        if ($context === null || $viewer === null || $sourceCandidates !== null || ! $context->provesPageWide()) {
+            return $this->applyFirstAidSourceScopeEmbedded($query, $viewer, $context, $sourceCandidates);
+        }
+        $context->assertViewer($viewer);
+        $original = ProofParity::$enabled ? clone $query : null;
+        $scoped = $context->query($query->whereIn('hs_events.id', $this->provenSourceEventIds($viewer, $context)));
+        if ($original !== null) {
+            ProofParity::assertSameRows($scoped, $this->applyFirstAidSourceScopeEmbedded($original, $viewer, $context, $sourceCandidates),
+                'hs_events.id', 'H&S event source scope');
+        }
+
+        return $scoped;
+    }
+
+    /** The full source chain, embedded in the query (the original scope; also what proves the per-request set). */
+    public function applyFirstAidSourceScopeEmbedded(Builder $query, ?User $viewer, ?HealthSafetyReadContext $context = null, ?Builder $sourceCandidates = null): Builder
     {
         $types = array_unique([FirstAidRecord::class, (new FirstAidRecord)->getMorphClass()]);
         if ($context !== null) {
@@ -417,6 +500,24 @@ final class HsEventAccessService
         $context->assertViewer($viewer);
         $candidates = $context->applyEventSiteScope(HsEvent::query()->whereKey($event->id),
             UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
+        if ($context->provesPageWide()) {
+            // One row on a page-wide read (each task's linked review): the same Site and hazards.view checks as
+            // applyReadableScope(), then "is it in the set this read proved" instead of re-running the whole chain for
+            // this one row. The query is exactly the candidate, so no row outside the candidates can be admitted.
+            return $context->consumeSourceViewer(FirstAidAccessService::PERMISSIONS, function (User $current) use ($candidates, $context): bool {
+                if (! $current->canDo('hazards.view')) {
+                    return false;
+                }
+                $original = ProofParity::$enabled ? clone $candidates : null;
+                $scoped = $context->query((clone $candidates)->whereIn('hs_events.id', $this->provenSourceEventIds($current, $context)));
+                if ($original !== null) {
+                    ProofParity::assertSameRows($scoped, $this->applyFirstAidSourceScopeEmbedded(clone $original, $current, $context, $original),
+                        'hs_events.id', 'H&S event row check');
+                }
+
+                return $scoped->exists();
+            });
+        }
 
         return $this->applyReadableScope(clone $candidates, $viewer, $context, $candidates)->exists();
     }

@@ -191,6 +191,11 @@ final class HealthSafetyReadContext
             try {
                 $result = $consumer($context);
                 self::assertMaterialized($result);
+                if ($context->provenSets) {
+                    // The proven sets' response barrier (speed option B): prove once more before anything leaves.
+                    app(HsEventAccessService::class)->recheckProvenSourceEventIds($context);
+                    app(\App\Services\Incidents\IncidentHsEventSourceReadService::class)->recheckProvenIncidentIds($reads);
+                }
 
                 return $result;
             } finally {
@@ -231,6 +236,34 @@ final class HealthSafetyReadContext
         $this->assertActive();
 
         return $this->reads->query($query);
+    }
+
+    private bool $provenSets = false;
+
+    /**
+     * A page-wide read (the Overview, All Tasks) proves its readable reviews and incidents once and runs every count
+     * against that set (speed option B, Stephan 30 Oct 2026; see HsEventAccessService::provenSourceEventIds()). Only
+     * those pages switch it on: a single-record or filtered read keeps the embedded proof, so it never looks at
+     * unrelated private source rows.
+     */
+    public function provePageWide(): void
+    {
+        $this->assertActive();
+        $this->provenSets = true;
+        \App\Services\Incidents\IncidentHsEventSourceReadService::provePageWide($this->reads);
+    }
+
+    /** provePageWide() for a fluent call site: returns this context. */
+    public function provePageWideAnd(): self
+    {
+        $this->provePageWide();
+
+        return $this;
+    }
+
+    public function provesPageWide(): bool
+    {
+        return $this->provenSets;
     }
 
     public function assertViewer(User $viewer): void

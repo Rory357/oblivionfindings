@@ -43,7 +43,11 @@ final class IncidentHsEventSourceReadService
         });
     }
 
-    /** No callback means no source evidence, never an inferred permission or a detached ID admission list. */
+    /** No callback means no source evidence, never an inferred permission or a detached ID admission list.
+     * One approved exception (Stephan, 30 Oct 2026, speed option B): within ONE request's locked read, the ids that
+     * the full unchanged proof admits may be proven once and reused by that same request's later counts and lists.
+     * Never across requests, stored, or for another user. See HsEventAccessService::provenReadableEventIds() and
+     * IncidentRegisterReadService (proven register ids). */
     public function withoutIncidentSources(Builder $events): Builder
     {
         return $events->where(function (Builder $ordinary): void {
@@ -163,8 +167,86 @@ final class IncidentHsEventSourceReadService
         return $query;
     }
 
-    /** Original incident scopes for admitted metrics/reports. No HSE association is invented for an independent incident. */
+    /** @var \WeakMap<CurrentAuthorizationReads, array<int, list<int>>>|null */
+    private static ?\WeakMap $provenIncidentIds = null;
+
+    /** @var \WeakMap<CurrentAuthorizationReads, true>|null reads a page-wide H&S read switched on (HealthSafetyReadContext::provePageWide) */
+    private static ?\WeakMap $pageWideReads = null;
+
+    /** Only a page-wide read uses the proven incident set; every other read keeps the embedded scope. */
+    public static function provePageWide(CurrentAuthorizationReads $reads): void
+    {
+        $reads->assertActive();
+        self::$pageWideReads ??= new \WeakMap;
+        self::$pageWideReads[$reads] = true;
+    }
+
+    public static function isPageWide(?CurrentAuthorizationReads $reads): bool
+    {
+        return $reads !== null && isset(self::$pageWideReads[$reads]);
+    }
+
+    /** @var \WeakMap<CurrentAuthorizationReads, array<int, User>>|null */
+    private static ?\WeakMap $provenIncidentViewers = null;
+
+    /** @return list<int> */
+    private function proveIncidentIds(User $current, CurrentAuthorizationReads $reads): array
+    {
+        return $reads->query($this->applyIncidentScopeInReadsEmbedded(ClientIncident::query(), $current, $reads))
+            ->reorder()->pluck('client_incidents.id')->map(fn ($id) => (int) $id)->unique()->sort()->values()->all();
+    }
+
+    /**
+     * Response barrier for the proven incident sets: the embedded scope runs once more before a page-wide read returns;
+     * a set that no longer matches (a moved incident, a withdrawn permission) withholds the whole response (404).
+     */
+    public function recheckProvenIncidentIds(CurrentAuthorizationReads $reads): void
+    {
+        foreach (self::$provenIncidentViewers[$reads] ?? [] as $id => $current) {
+            $proven = self::$provenIncidentIds[$reads][$id] ?? null;
+            if ($proven !== null && $this->proveIncidentIds($current, $reads) !== $proven) {
+                throw new \Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+            }
+        }
+    }
+
+    /**
+     * Original incident scopes for admitted metrics/reports. No HSE association is invented for an independent incident.
+     * Approved exception (Stephan, 30 Oct 2026, speed option B; see the rule note above withoutIncidentSources()): the
+     * incident ids the embedded scope admits are proven ONCE per locked read and viewer, over all incidents, and each
+     * metric in the same read is "its own filters AND id IN that set". The embedded scope decides each incident on its
+     * own facts, so the rows are the same; parity tests compare the two for every role.
+     */
     public function applyIncidentScopeInReads(Builder $incidents, User $current, CurrentAuthorizationReads $reads): Builder
+    {
+        $reads->assertActive();
+        if (! $incidents->getModel() instanceof ClientIncident || $incidents->getQuery()->from !== 'client_incidents') {
+            throw new LogicException('Incident source scope requires the canonical incident table.');
+        }
+        if (! isset(self::$pageWideReads[$reads])) {
+            return $this->applyIncidentScopeInReadsEmbedded($incidents, $current, $reads);
+        }
+        self::$provenIncidentIds ??= new \WeakMap;
+        $known = self::$provenIncidentIds[$reads] ?? [];
+        if (! array_key_exists((int) $current->id, $known)) {
+            $known[(int) $current->id] = $this->proveIncidentIds($current, $reads);
+            self::$provenIncidentIds[$reads] = $known;
+            self::$provenIncidentViewers ??= new \WeakMap;
+            self::$provenIncidentViewers[$reads] = [...(self::$provenIncidentViewers[$reads] ?? []), (int) $current->id => $current];
+        }
+
+        $original = \App\Support\HealthSafety\ProofParity::$enabled ? clone $incidents : null;
+        $scoped = $this->protect($incidents->whereIn('client_incidents.id', $known[(int) $current->id]), $reads);
+        if ($original !== null) {
+            \App\Support\HealthSafety\ProofParity::assertSameRows($scoped, $this->applyIncidentScopeInReadsEmbedded($original, $current, $reads),
+                'client_incidents.id', 'Incident source scope');
+        }
+
+        return $scoped;
+    }
+
+    /** The embedded scope: every admitted incident's full guard in the query (also what proves the per-read set). */
+    public function applyIncidentScopeInReadsEmbedded(Builder $incidents, User $current, CurrentAuthorizationReads $reads): Builder
     {
         $reads->assertActive();
         if (! $incidents->getModel() instanceof ClientIncident || $incidents->getQuery()->from !== 'client_incidents') {

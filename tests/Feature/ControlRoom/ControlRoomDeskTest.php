@@ -37,6 +37,8 @@ class ControlRoomDeskTest extends TestCase
         $viewer = $this->siteBoundUser($site, ['controlRoom.viewAny', 'controlRoom.alerts.manage']);
 
         $this->mock(TaskAggregator::class, function ($mock): void {
+            // The page decides the link at once; the count loads after it, with the inbox.
+            $mock->shouldReceive('navigationVisibleFor')->andReturn(true);
             $mock->shouldReceive('navigationBadgeFor')
                 ->once()
                 ->andReturn(['view' => true, 'badge' => 7, 'degraded' => false]);
@@ -61,9 +63,12 @@ class ControlRoomDeskTest extends TestCase
                 ->has('staff')
                 ->has('can')
                 ->where('auth.can.tasks.view', true)
-                ->where('auth.can.tasks.badge', 7)
-                ->where('auth.can.tasks.badgeDegraded', false)
+                ->missing('taskNav')
                 ->missing('analytics')
+                ->loadDeferredProps('default', fn ($fill) => $fill
+                    ->where('taskNav.view', true)
+                    ->where('taskNav.badge', 7)
+                    ->where('taskNav.badgeDegraded', false))
             );
 
         $permissionQueries = collect(DB::getQueryLog())->filter(fn (array $query) => str_contains($query['query'], 'permission_user')

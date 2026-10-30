@@ -374,6 +374,31 @@ the lifted `page-hero-tone-*` classes, never raw `text-status-*`.
   `skeleton-card`) so the page doesn't jump; the Event Horizon loader (next
   bullet) is for boots, transitions, and indeterminate section loads where
   no layout can be promised.
+  **Background-loaded panels (approved 2026-10-30).** A slow part of a page
+  loads after the page shows: the server sends it with
+  `Inertia::defer(fn () => …, '<group>')` and the page wraps it in
+  `<DeferredPanel>` (`components/deferred-panel.tsx`). The panel shows the
+  matching skeleton while it loads, an `ErrorState` with "Try again" if the
+  load fails or never arrives, and the last data it showed (for the same
+  person) during a page refresh instead of flashing back to the skeleton. A
+  loading or failed panel never reads as "0", "nothing overdue" or an empty
+  list; a payload that says its own read failed (`unavailable: true`) shows
+  the error too. Counts in the chrome follow the same rule: the sidebar's
+  All Tasks count shows a dash until it is known. Keep cheap, urgent safety
+  facts in the first response. In the controller, give every other prop as a
+  closure (`'overview' => fn () => …`): the background request runs the
+  controller again, and only closures let it skip what it did not ask for.
+
+  ```tsx
+  <DeferredPanel<{ myTasks: MyDayMyTasks }>
+      data="myTasks"
+      label="Other assigned work"
+      fallback={<SkeletonCard rows={3} />}
+      failed={({ myTasks }) => !!myTasks.unavailable}
+  >
+      {({ myTasks }) => <MyTasksCard tasks={myTasks} />}
+  </DeferredPanel>
+  ```
 - **Loading spinner — the "Event Horizon" brand loader (approved
   2026-09-04).** Page, transition, and section loading use the animated
   Oblivion wordmark (the O is a black-hole accretion ring in `--primary`
@@ -1089,6 +1114,11 @@ before.
   (`work_email` is nullable): a recruitment hire whose offer has no work
   email signs in with their personal address but gets no work email, and
   any page showing `work_email` renders nothing when it is null.
+- **Bare `<Deferred>` from `@inertiajs/react`** (decided 2026-10-30 with the
+  background-loading work). Inertia's own `<Deferred>` shows its fallback
+  forever when the load fails, and drops back to the fallback on every full
+  refresh (My Day refreshes every 60 s). Use `<DeferredPanel>` (see "Skeleton
+  vs loader"). ESLint blocks importing `Deferred` from `@inertiajs/react`.
 
 - **A conversation buried under its own chrome** (corrected 2026-10-22,
   Chat: "the UI looks really bad"). On a 1440 × 900 screen the family

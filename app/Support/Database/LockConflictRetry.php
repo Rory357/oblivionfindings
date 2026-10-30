@@ -69,7 +69,7 @@ final class LockConflictRetry
     }
 
     /** True inside an application transaction (the test suite's wrapping transaction is not one). */
-    private static function insideCallerTransaction(): bool
+    public static function insideCallerTransaction(): bool
     {
         return DB::transactionLevel() > 0 && app('db.transactions')->callbackApplicableTransactions()->isNotEmpty();
     }

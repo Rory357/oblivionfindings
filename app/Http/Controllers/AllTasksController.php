@@ -18,6 +18,7 @@ use App\Services\Tasks\TaskAssignmentNotifier;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskSearch;
 use App\Services\UserSiteAccessService;
+use App\Support\Inertia\SharedDeferredReload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,6 +43,12 @@ class AllTasksController extends Controller
     public function index(Request $request, TaskAggregator $aggregator): Response|StreamedResponse
     {
         $user = $request->user();
+
+        // The header inbox's follow-up request gets only the inbox, and this page has no always props,
+        // so building the task list for it would be thrown away (Speed, 30 Oct).
+        if (SharedDeferredReload::only($request, 'tasks/index')) {
+            return Inertia::render('tasks/index', []);
+        }
 
         // A bare visit applies the user's saved default view (if any).
         $params = $request->query();

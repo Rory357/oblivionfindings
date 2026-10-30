@@ -580,7 +580,6 @@ describe('Permanent safety review workspace', () => {
             complete: false,
             label,
             href: '/health-safety/events/17?action=worksafe-decision',
-            classification: 'hard' as const,
         });
         render(
             <EventRecordWorkspace
@@ -593,7 +592,6 @@ describe('Permanent safety review workspace', () => {
                                 complete: true,
                                 label: 'H&S handover accepted where required',
                                 href: '/health-safety/events/17?action=accept-handover',
-                                classification: 'exceptional',
                             },
                             blocked('worksafe_decision', 'Record the WorkSafe notifiability decision before closing this event.'),
                             blocked('worksafe_notification', 'Record the signed WorkSafe decision before confirming notification requirements.'),

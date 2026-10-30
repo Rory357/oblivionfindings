@@ -43,7 +43,7 @@ import { ReportLauncher } from './components/report-launcher';
 import { reportPageFor } from './components/report-pages';
 import { RoleStart } from './components/role-start';
 import { WIZARD_CONFIGS } from './components/wizard-configs';
-import { HsWorklists, type WorklistsPayload } from './components/worklists';
+import { completedAgo, HsWorklists, type WorklistsPayload } from './components/worklists';
 import type { ParticipationCoverage } from './participation-source-state';
 
 type Props = {
@@ -596,12 +596,17 @@ function NeedsYouNow({ worklists }: { worklists: WorklistsPayload }) {
             sortAt: c.due_date ?? '',
             time: shortDay(c.due_date),
             tone: 'critical',
-            title: `Corrective action overdue — ${c.title ?? c.reference ?? `#${c.id}`}`,
+            // Marked completed but not yet verified: say what is waiting, counted from completion.
+            title: `${c.status === 'completed' ? 'Waiting for verification' : 'Corrective action overdue'} — ${c.title ?? c.reference ?? `#${c.id}`}`,
             sub: [
                 c.reference,
                 c.priority ? `${hsLabel('action_priority', c.priority)} priority` : null,
                 c.owner,
-                c.days_overdue != null ? `${c.days_overdue} days overdue` : 'Overdue',
+                c.status === 'completed' && c.completed_days_ago != null
+                    ? completedAgo(c.completed_days_ago)
+                    : c.days_overdue != null
+                      ? `${c.days_overdue} days overdue`
+                      : 'Overdue',
             ]
                 .filter(Boolean)
                 .join(' · '),

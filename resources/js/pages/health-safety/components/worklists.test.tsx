@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { HsWorklists, type WorklistsPayload } from './worklists';
+import { completedAgo, HsWorklists, type WorklistsPayload } from './worklists';
 
 const navigation = vi.hoisted(() => ({ visit: vi.fn() }));
 
@@ -102,4 +102,12 @@ it('uses the events register when a preview lacks a confirmed investigation pare
     render(<HsWorklists worklists={{ ...connected, open_investigations: [{ ...connected.open_investigations[0], event_id: null }] }} show={['investigations']} />);
     expect(screen.getByRole('link', { name: 'Find investigation: INV-41' })).toHaveAttribute('href', '/health-safety/events');
     expect(screen.queryByRole('link', { name: 'Open investigation: INV-41' })).not.toBeInTheDocument();
+});
+it('labels a completed but unverified action as waiting for verification, not overdue', () => {
+    const waiting = { ...connected.overdue_corrective_actions[0], status: 'completed', days_overdue: 5, completed_days_ago: 2 };
+    render(<HsWorklists worklists={{ ...connected, overdue_corrective_actions: [waiting, { ...waiting, id: 32, title: 'Fix the gate', status: 'open' }] }} show={['corrective_actions']} />);
+    expect(screen.getAllByText(/5d overdue/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Waiting for verification/).length).toBeGreaterThan(0);
+    expect(document.body.textContent?.match(/5d overdue/g)?.length).toBe(document.body.textContent?.match(/Waiting for verification/g)?.length);
+    expect([0, 1, 4].map(completedAgo)).toEqual(['completed today', 'completed 1 day ago', 'completed 4 days ago']);
 });

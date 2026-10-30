@@ -56,6 +56,12 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // PROOF_PARITY=1 makes every test also prove that the per-request proven id sets (speed option B, Stephan
+        // 30 Oct 2026) admit exactly the rows the original embedded scopes admit; a difference fails the test. It is
+        // a sweep switch, not the default: its extra queries would disturb tests that inspect the statements they run.
+        // ProvenScopeParityTest compares the two directly on every run.
+        \App\Support\HealthSafety\ProofParity::$enabled = filter_var(env('PROOF_PARITY', false), FILTER_VALIDATE_BOOL);
+
         // SecurityPolicy keeps a static copy of its settings. A session timeout one test
         // sets must not sign the next test's requests out once its rows are rolled back.
         SecurityPolicy::flushCache();
