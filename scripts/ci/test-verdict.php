@@ -59,15 +59,19 @@ foreach ($iterator as $file) {
 $known = oblivionCiKnownFailures($root.'/tests/ci/known-failures.php');
 $comparison = oblivionCiCompare($results, $known);
 $crashed = [];
-$builds = 0;
-$reuses = 0;
+$firstTests = [];
+$slowestShard = 0.0;
 foreach ($summaries as $summary) {
     foreach ($summary['crashed'] ?? [] as $batch => $files) {
         $crashed[] = sprintf('%s shard %d batch %d: %s', $summary['suite'], $summary['shard'], $batch, implode(' ', $files));
     }
-    $builds += (int) ($summary['database_builds'] ?? 0);
-    $reuses += (int) ($summary['database_reuses'] ?? 0);
+    if (($summary['suite'] ?? '') === 'feature' && isset($summary['median_first_test_seconds'])) {
+        $firstTests[] = (float) $summary['median_first_test_seconds'];
+    }
+    $slowestShard = max($slowestShard, (float) ($summary['seconds'] ?? 0));
 }
+sort($firstTests);
+$firstTest = $firstTests === [] ? 0.0 : $firstTests[intdiv(count($firstTests), 2)];
 
 $missingShards = $expectShards > 0 && count($summaries) < $expectShards
     ? $expectShards - count($summaries)
@@ -93,8 +97,9 @@ $verdict = [
     'unreadable_results' => $unreadable,
     'shards_reported' => count($summaries),
     'shards_missing' => $missingShards,
-    'database_builds' => $builds,
-    'database_reuses' => $reuses,
+    'slowest_shard_seconds' => round($slowestShard),
+    // A feature batch's first test also pays for its process's test database build.
+    'median_first_feature_test_seconds' => $firstTest,
 ];
 file_put_contents($directory.'/verdict.json', json_encode($verdict, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 
@@ -104,7 +109,7 @@ $lines[] = $green
     : '## ❌ Tests red: new failures or missing results';
 $lines[] = '';
 $lines[] = sprintf(
-    '%d tests: %d passed, %d failed (%d known, %d new), %d skipped. Shards reported: %d%s. Test databases built %d, reused %d.',
+    '%d tests: %d passed, %d failed (%d known, %d new), %d skipped. Shards reported: %d%s. Slowest shard %d min; a feature batch\'s first test (database build included) %.0f s.',
     count($results),
     $counts['passed'],
     $counts['failed'],
@@ -113,8 +118,8 @@ $lines[] = sprintf(
     $counts['skipped'],
     count($summaries),
     $missingShards > 0 ? sprintf(' (%d missing)', $missingShards) : '',
-    $builds,
-    $reuses,
+    (int) round($slowestShard / 60),
+    $firstTest,
 );
 
 $section = static function (string $title, array $items) use (&$lines): void {

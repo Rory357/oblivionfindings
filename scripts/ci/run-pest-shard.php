@@ -207,6 +207,7 @@ function oblivionCiPestMain(array $arguments): int
 
     $results = [];
     $crashed = [];
+    $firstTestSeconds = [];
     foreach ($batchResults as $batchIndex => $batch) {
         $batchTests = [];
         if (is_file($batch['junit'])) {
@@ -223,17 +224,17 @@ function oblivionCiPestMain(array $arguments): int
             $crashed[$batchIndex + 1] = $batches[$batchIndex];
         }
 
+        if ($batchTests !== []) {
+            $firstTestSeconds[] = reset($batchTests)['time'];
+        }
+
         $results += $batchTests;
     }
 
     $known = oblivionCiKnownFailures($root.'/tests/ci/known-failures.php');
     $comparison = oblivionCiCompare($results, $known);
-    $databaseBuilds = 0;
-    $databaseReuses = 0;
-    foreach ($batchResults as $batch) {
-        $databaseBuilds += substr_count($batch['output'], '[test-db] building pool slot');
-        $databaseReuses += substr_count($batch['output'], '[test-db] reused pool slot');
-    }
+    sort($firstTestSeconds);
+    $medianStart = $firstTestSeconds === [] ? 0.0 : $firstTestSeconds[intdiv(count($firstTestSeconds), 2)];
 
     file_put_contents($junitDirectory.'/'.$label.'-summary.json', json_encode([
         'suite' => $suite,
@@ -248,20 +249,19 @@ function oblivionCiPestMain(array $arguments): int
         'new' => $comparison['new'],
         'known' => $comparison['known'],
         'crashed' => $crashed,
-        'database_builds' => $databaseBuilds,
-        'database_reuses' => $databaseReuses,
+        // A batch's first test also pays for its process's test database build.
+        'median_first_test_seconds' => round($medianStart, 1),
         'batch_seconds' => array_map(static fn (array $batch): float => round($batch['seconds'], 1), $batchResults),
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
     fwrite(STDOUT, sprintf(
-        "\nCI Pest shard done in %ds: %d tests, %d known failures, %d new failures, %d crashed batches; test databases built %d, reused %d.\n",
+        "\nCI Pest shard done in %ds: %d tests, %d known failures, %d new failures, %d crashed batches; a batch's first test (database build included) took %.1fs (median).\n",
         (int) round(microtime(true) - $started),
         count($results),
         count($comparison['known']),
         count($comparison['new']),
         count($crashed),
-        $databaseBuilds,
-        $databaseReuses,
+        $medianStart,
     ));
 
     foreach ($comparison['new'] as $id) {

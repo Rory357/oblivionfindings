@@ -9,9 +9,11 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use PDO;
+use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 use Tests\Support\FrozenClockTimezone;
 use Tests\Support\IsolatedDatabaseCleanup;
+use Tests\Support\MysqlStatementSplitter;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -453,6 +455,18 @@ abstract class TestCase extends BaseTestCase
         ]))));
     }
 
+    protected function schemaDumpPath(): string
+    {
+        $configuredSchemaPath = trim((string) ($this->environmentValue('MYSQL_TEST_SCHEMA_PATH') ?? ''));
+
+        return $configuredSchemaPath !== ''
+            ? $configuredSchemaPath
+            : Application::inferBasePath()
+                .DIRECTORY_SEPARATOR.'database'
+                .DIRECTORY_SEPARATOR.'schema'
+                .DIRECTORY_SEPARATOR.'mysql-schema.sql';
+    }
+
     protected function loadSchemaDumpIntoTestingDatabase(
         string $host,
         string $port,
@@ -460,13 +474,7 @@ abstract class TestCase extends BaseTestCase
         string $password,
         string $database,
     ): bool {
-        $configuredSchemaPath = trim((string) ($this->environmentValue('MYSQL_TEST_SCHEMA_PATH') ?? ''));
-        $schemaPath = $configuredSchemaPath !== ''
-            ? $configuredSchemaPath
-            : Application::inferBasePath()
-                .DIRECTORY_SEPARATOR.'database'
-                .DIRECTORY_SEPARATOR.'schema'
-                .DIRECTORY_SEPARATOR.'mysql-schema.sql';
+        $schemaPath = $this->schemaDumpPath();
 
         if (! is_file($schemaPath)) {
             return false;
@@ -474,7 +482,9 @@ abstract class TestCase extends BaseTestCase
 
         // Preferred path: shell out to the `mysql` client binary. Fast and
         // handles delimiters, comments, and binary data robustly.
-        $mysqlBinary = $this->resolveMysqlBinary();
+        // MYSQL_TEST_SCHEMA_LOADER=pdo skips it (to prove the fallback).
+        $loader = strtolower((string) ($this->environmentValue('MYSQL_TEST_SCHEMA_LOADER') ?? 'auto'));
+        $mysqlBinary = $loader === 'pdo' ? null : $this->resolveMysqlBinary();
         if ($mysqlBinary !== null) {
             $process = new Process([
                 $mysqlBinary,
@@ -503,18 +513,15 @@ abstract class TestCase extends BaseTestCase
             throw new \RuntimeException('The required native MySQL schema import did not succeed; PDO fallback is disabled.');
         }
 
-        // Fallback path: pure-PHP PDO loader. Slightly slower but works on
-        // machines that don't ship the `mysql.exe` client (e.g. Herd on
-        // Windows). The dump produced by `php artisan rostering:dump-schema-portable`
-        // is intentionally compatible: only `--` line comments, `/*! ... */`
-        // version-conditional pragmas, and `;`-terminated statements.
+        // Fallback path: pure-PHP PDO loader, for machines without the `mysql`
+        // client (e.g. Herd on Windows). It splits the dump the way the client
+        // does (DELIMITER blocks, quoted data, comments), so the same mysqldump
+        // file loads either way.
         return $this->loadSchemaDumpViaPdo($schemaPath, $host, $port, $username, $password, $database);
     }
 
     /**
-     * Stream-execute a `*-schema.sql` dump via PDO. Splits on `;` at end of
-     * line (after stripping `--` comments and blank lines). Skips DELIMITER
-     * directives because the portable dumper does not emit them.
+     * Run a mysqldump file statement by statement through PDO.
      */
     protected function loadSchemaDumpViaPdo(
         string $schemaPath,
@@ -524,79 +531,24 @@ abstract class TestCase extends BaseTestCase
         string $password,
         string $database,
     ): bool {
+        $sql = @file_get_contents($schemaPath);
+        if ($sql === false) {
+            return false;
+        }
+
         try {
             $pdo = new PDO(
-                sprintf('mysql:host=%s;port=%s;dbname=%s', $host, $port, $database),
+                sprintf('mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4', $host, $port, $database),
                 $username,
                 $password,
                 [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
             );
-        } catch (\Throwable) {
-            return false;
-        }
 
-        $handle = fopen($schemaPath, 'r');
-        if ($handle === false) {
-            return false;
-        }
-
-        $buffer = '';
-        $insideMultiLineComment = false;
-
-        try {
-            while (($line = fgets($handle)) !== false) {
-                $trimmed = ltrim($line);
-
-                // Skip blank lines and `--` comments before any statement starts.
-                if ($buffer === '' && ($trimmed === '' || $trimmed === "\n" || str_starts_with($trimmed, '--'))) {
-                    continue;
-                }
-
-                // Skip /*!...*/ that span multiple lines (rare in our dumps).
-                if ($insideMultiLineComment) {
-                    if (str_contains($line, '*/')) {
-                        $insideMultiLineComment = false;
-                    }
-
-                    continue;
-                }
-
-                if ($buffer === '' && str_starts_with($trimmed, '/*') && ! str_contains($line, '*/')) {
-                    $insideMultiLineComment = true;
-
-                    continue;
-                }
-
-                $buffer .= $line;
-
-                // A statement ends with `;` at the end of a line (ignoring trailing whitespace).
-                if (preg_match('/;\s*$/', rtrim($line))) {
-                    $statement = trim($buffer);
-                    $buffer = '';
-
-                    if ($statement === '' || $statement === ';') {
-                        continue;
-                    }
-
-                    try {
-                        $pdo->exec($statement);
-                    } catch (\PDOException) {
-                        return false;
-                    }
-                }
+            foreach (MysqlStatementSplitter::split($sql) as $statement) {
+                $pdo->exec($statement);
             }
-        } finally {
-            fclose($handle);
-        }
-
-        // Flush a trailing statement without a final newline.
-        $remaining = trim($buffer);
-        if ($remaining !== '' && $remaining !== ';') {
-            try {
-                $pdo->exec($remaining);
-            } catch (\PDOException) {
-                return false;
-            }
+        } catch (\PDOException) {
+            return false;
         }
 
         return true;
@@ -604,18 +556,21 @@ abstract class TestCase extends BaseTestCase
 
     protected function resolveMysqlBinary(): ?string
     {
-        if ($configuredBinary = $this->resolveClientBinaryFromEnvironment(['MYSQL_BINARY', 'MYSQL_CLIENT_BIN'], 'mysql.exe')) {
+        $binaryName = DIRECTORY_SEPARATOR === '\\' ? 'mysql.exe' : 'mysql';
+
+        if ($configuredBinary = $this->resolveClientBinaryFromEnvironment(['MYSQL_BINARY', 'MYSQL_CLIENT_BIN'], $binaryName)) {
             return $configuredBinary;
         }
 
         foreach ($this->mysqlClientDirectories() as $directory) {
-            $candidate = $directory.DIRECTORY_SEPARATOR.'mysql.exe';
+            $candidate = $directory.DIRECTORY_SEPARATOR.$binaryName;
             if (is_file($candidate)) {
                 return $candidate;
             }
         }
 
-        return null;
+        // Linux and macOS (CI runners) have the client on PATH.
+        return DIRECTORY_SEPARATOR === '\\' ? null : (new ExecutableFinder)->find('mysql');
     }
 
     /**

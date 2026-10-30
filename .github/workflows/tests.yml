@@ -31,7 +31,6 @@ permissions:
 # Pull requests from forks always run on GitHub-hosted runners: the repository is public.
 env:
   TESTS_WORKERS: ${{ vars.TESTS_WORKERS || '3' }}
-  TEST_DB_POOL_SIZE: ${{ vars.TESTS_WORKERS || '3' }}
   DB_CONNECTION: mysql
   DB_HOST: 127.0.0.1
   DB_PORT: 3306
