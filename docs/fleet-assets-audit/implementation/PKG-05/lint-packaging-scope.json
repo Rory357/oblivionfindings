@@ -1,0 +1,40 @@
+{
+  "approvedBase": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "frozenFiles": 576,
+  "frozenBytesChanged": [],
+  "ignoredCodeFiles": 166,
+  "unexpectedlyIncludedFrozenFiles": [],
+  "production": [
+    {
+      "file": "resources/js/components/fleet-assets/transport/calendar.tsx",
+      "included": true,
+      "rulesUnchanged": true
+    },
+    {
+      "file": "resources/js/components/fleet-assets/transport/calendar-actions.ts",
+      "included": true,
+      "rulesUnchanged": true
+    },
+    {
+      "file": "resources/js/components/fleet-assets/transport/dialogs.tsx",
+      "included": true,
+      "rulesUnchanged": true
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/workspace.tsx",
+      "included": true,
+      "rulesUnchanged": true
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/bookings/show.tsx",
+      "included": true,
+      "rulesUnchanged": true
+    },
+    {
+      "file": "resources/js/pages/sites/calendar/_parts.tsx",
+      "included": true,
+      "rulesUnchanged": true
+    }
+  ],
+  "unrelatedPreviewScopeUnchanged": true
+}

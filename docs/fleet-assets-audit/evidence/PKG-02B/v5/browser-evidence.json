@@ -1,0 +1,410 @@
+{
+  "version": "PKG-02B-v5",
+  "capturedAt": "2026-09-21T22:25:05.105Z",
+  "method": "Codex browser UI automation; synthetic preview only",
+  "finalReviewAt": "2026-09-21T22:23:59.579Z",
+  "checks": [
+    {
+      "check": "Custom service type and 9 calendar months saved with due date",
+      "pass": true
+    },
+    {
+      "check": "Custom template DEMO-4 adds/reorders question; required PDF blocks missing evidence; failed run links existing WO-0264 with preserved answer snapshot and original PDF",
+      "pass": true
+    },
+    {
+      "check": "Geofence shared selection read-only, custom copy 180m, undo/redo, invalid overnight rejected, exception retained, inactive save",
+      "pass": true
+    },
+    {
+      "check": "Map editor right-click creates circle; keyboard radius changed 100→107m; cancel prompts discard",
+      "pass": true
+    },
+    {
+      "check": "Service tab audit: Evidence & due dates",
+      "pass": true
+    },
+    {
+      "check": "Service tab audit: Service schedules",
+      "pass": true
+    },
+    {
+      "check": "Service tab audit: Reminders",
+      "pass": true
+    },
+    {
+      "check": "Service tab audit: Service history",
+      "pass": true
+    },
+    {
+      "check": "Service tab audit: Mileage",
+      "pass": true
+    },
+    {
+      "check": "Maintenance open and history show canonical source, owner, status and work links",
+      "pass": true
+    },
+    {
+      "check": "Trip search filters to Alex, source and GPS provenance retained",
+      "pass": true
+    },
+    {
+      "check": "Calendar right-click slot opens request menu; appointment opens source/manage menu",
+      "pass": true
+    },
+    {
+      "check": "Calendar Week",
+      "pass": true
+    },
+    {
+      "check": "Calendar Day",
+      "pass": true
+    },
+    {
+      "check": "Calendar Agenda",
+      "pass": true
+    },
+    {
+      "check": "Calendar Timeline",
+      "pass": true
+    },
+    {
+      "check": "Calendar Month",
+      "pass": true
+    },
+    {
+      "check": "Mileage add 82500 with PDF updates distance; correction to82495 requires reason and original retained",
+      "pass": true
+    },
+    {
+      "check": "Reminder created with owner, backup and monthly repeat; calendar entry supports source actions; completing cycle advances to23Oct without releasing vehicle",
+      "pass": true
+    },
+    {
+      "check": "GV500CG reconciliation: confirmation required; dashboard 82474 retained, next tracker sample updates planning to82486; offline falls back to82474",
+      "result": "pass"
+    },
+    {
+      "check": "Final bundle profile tab audit",
+      "result": [
+        {
+          "primary": "Overview",
+          "section": "Readiness",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: VEHICLE READINESS\n    - heading \"Restricted for use\" [level=2]\n    - paragraph: Condition concern · independent release required\n    - generic: Action required\n    - generic: Next action\n    - strong: Rev"
+        },
+        {
+          "primary": "Overview",
+          "section": "Vehicle details",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - button \"Upload profile photo\":\n      - text: Upload profile photo\n    - generic: VH-014 · KWH014\n    - heading \"Toyota Hiace\" [level=2]\n    - paragraph: Kōwhai House · Community transport\n    - generic: In service"
+        },
+        {
+          "primary": "Service & compliance",
+          "section": "Evidence & due dates",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: EVIDENCE & OBLIGATIONS\n    - heading \"Service & compliance\" [level=2]\n    - button \"Service schedules\":\n      - text: Service schedules\n    - generic: Requirement\n    - generic: Recorded status\n    - gene"
+        },
+        {
+          "primary": "Service & compliance",
+          "section": "Service schedules",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: PLANNED MAINTENANCE\n    - heading \"Service schedules\" [level=2]\n    - button \"Add schedule\"\n    - heading \"Routine service\" [level=3]\n    - text: SCH-DEMO-07\n    - button \"Record actions\":\n    - generic: "
+        },
+        {
+          "primary": "Service & compliance",
+          "section": "Reminders",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: TIMELY FOLLOW-UP\n    - heading \"Reminders\" [level=2]\n    - paragraph: One place for vehicle follow-ups and obligation reminders.\n    - button \"Open calendar\":\n      - text: Open calendar\n    - button \"Add"
+        },
+        {
+          "primary": "Service & compliance",
+          "section": "Service history",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: VEHICLE RECORD\n    - heading \"Service & work history\" [level=2]\n    - textbox \"Find service history\":\n      - /placeholder: Find a service or reference…\n    - combobox \"Service history filter\":\n      - op"
+        },
+        {
+          "primary": "Service & compliance",
+          "section": "Mileage",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: DISTANCE & EVIDENCE\n    - heading \"Mileage history\" [level=2]\n    - paragraph: Dashboard readings, their sources and the service distance they inform.\n    - button \"Add reading\":\n      - text: Add reading"
+        },
+        {
+          "primary": "Checks & inspections",
+          "section": "Recent checks",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: ORIGINAL OBSERVATIONS\n    - heading \"Checks & inspections\" [level=2]\n    - button \"Start check\":\n      - text: Start check\n    - button \"Vehicle condition record CHK-0182 · DEMO-3 · 21 Sept 2026 Failed\":\n"
+        },
+        {
+          "primary": "Checks & inspections",
+          "section": "Templates",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: CONTROLLED TEMPLATES\n    - heading \"Check templates\" [level=2]\n    - button \"Start check\":\n      - text: Start check\n    - textbox \"Search checklist library\":\n      - /placeholder: Search checklists…\n    "
+        },
+        {
+          "primary": "Maintenance",
+          "section": "Open work",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: MAINTENANCE\n    - heading \"Open work\" [level=2]\n    - generic: 2 work records\n    - button \"Awaiting assessment Condition concern WO-0264 · CHK-0182 Kōwhai House Coordinator\":\n      - generic: Awaiting as"
+        },
+        {
+          "primary": "Maintenance",
+          "section": "Historical work",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: VEHICLE RECORD\n    - heading \"Service & work history\" [level=2]\n    - textbox \"Find service history\":\n      - /placeholder: Find a service or reference…\n    - combobox \"Service history filter\":\n      - op"
+        },
+        {
+          "primary": "Map",
+          "section": "Location & geofences",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: LOCATION · VH-014\n    - heading \"Vehicle location\" [level=2]\n    - generic: Current sample · DEMO\n    - button \"Recenter\":\n      - text: Recenter\n    - button \"Historical trail\":\n      - text: Historical "
+        },
+        {
+          "primary": "Map",
+          "section": "Vehicle telemetry",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: CONNECTED VEHICLE\n    - heading \"GV500CG · vehicle telemetry\" [level=2]\n    - paragraph: Vehicle state, power and mileage with source confidence.\n    - generic: Current sample · DEMO\n    - text: Synthetic"
+        },
+        {
+          "primary": "Map",
+          "section": "Driving insights",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: DRIVING INSIGHTS\n    - heading \"Understand the journey\" [level=2]\n    - paragraph: Vehicle behaviour, event evidence and coaching follow-up.\n    - combobox \"Driving period\":\n      - option \"Last 7 days\" ["
+        },
+        {
+          "primary": "Map",
+          "section": "Alerts & Control Room",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: SAFETY & RESPONSE\n    - heading \"Vehicle alerts → Control Room\" [level=2]\n    - paragraph: One source event, one response record, linked follow-up.\n    - button \"Response plan\"\n    - text: GV500CG event\n "
+        },
+        {
+          "primary": "Trip history",
+          "section": "Vehicle trips",
+          "panelPresent": true,
+          "overflow": false,
+          "excerpt": "\n    - generic: DEDICATED VEHICLE HISTORY · VH-014\n    - heading \"Trip history\" [level=2]\n    - textbox \"Search trips\":\n      - /placeholder: Driver, journey or reference…\n    - combobox \"Trip date filter\":\n      - optio"
+        }
+      ]
+    },
+    {
+      "check": "Final build: 82474 dashboard → next sample82486 estimate → service2514remaining; collision delivery failure→same-id retry→ack→Maintenance WO-269→back to source→resolved false alarm, hold retained",
+      "result": "pass"
+    },
+    {
+      "check": "Latest refinement: map card and inspector both894.5px with728px imagery; compact distinct map/vehicle menus; hover/focus stats; square trip map628.234px each side; event selection moves cursor to point3; TRIP-DEMO-11 low-voltage signal creates CR-DEMO-410, Maintenance disabled until triaged then enabled and linked WO-269",
+      "result": "pass"
+    },
+    {
+      "check": "Final compact calendar",
+      "result": [
+        {
+          "view": "Week",
+          "selected": "true",
+          "overflow": false
+        },
+        {
+          "view": "Day",
+          "selected": "true",
+          "overflow": false
+        },
+        {
+          "view": "Agenda",
+          "selected": "true",
+          "overflow": false
+        },
+        {
+          "view": "Timeline",
+          "selected": "true",
+          "overflow": false
+        },
+        {
+          "view": "Month",
+          "selected": "true",
+          "overflow": false
+        }
+      ]
+    },
+    {
+      "check": "Missing tracker trip history",
+      "result": "Zero trips; No tracker trip history; manual mileage and booking custody remain available"
+    },
+    {
+      "check": "Driving insights final",
+      "result": "97 distance-weighted score; 2/3 scored; partial withheld; event times 9:12, 8:04, 8:06; per-trip navigation"
+    },
+    {
+      "check": "Final trip voltage alert",
+      "result": "CR-DEMO-410, source TRIP-DEMO-11, observation 20 Sept 5:02 pm, coordinates -41.288/174.775, 11.6 V evidence, Maintenance disabled pending triage"
+    },
+    {
+      "check": "Overspeed analytics and Control Room",
+      "result": "95 period score; trip82/99; Today withheld; personal score withheld; overspeed CR-DEMO-410 has 68 km/h,42 seconds,55 trigger,trip12/source coords; repeated trip event correlates once; changing draft threshold to80 preserves original50 rule evidence."
+    },
+    {
+      "check": "Final analytics compact layout and deep link",
+      "result": "1280 dark no horizontal overflow; 1440 light reviewed; reload retains Driving insights; final overspeed trip map 668.234 × 668.234 px"
+    }
+  ],
+  "profileTabAudit": [
+    {
+      "primary": "Overview",
+      "section": "Readiness",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: VEHICLE READINESS\n    - heading \"Restricted for use\" [level=2]\n    - paragraph: Condition concern · independent release required\n    - generic: Action required\n    - generic: Next action\n    - strong: Rev"
+    },
+    {
+      "primary": "Overview",
+      "section": "Vehicle details",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - button \"Upload profile photo\":\n      - text: Upload profile photo\n    - generic: VH-014 · KWH014\n    - heading \"Toyota Hiace\" [level=2]\n    - paragraph: Kōwhai House · Community transport\n    - generic: In service"
+    },
+    {
+      "primary": "Service & compliance",
+      "section": "Evidence & due dates",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: EVIDENCE & OBLIGATIONS\n    - heading \"Service & compliance\" [level=2]\n    - button \"Service schedules\":\n      - text: Service schedules\n    - generic: Requirement\n    - generic: Recorded status\n    - gene"
+    },
+    {
+      "primary": "Service & compliance",
+      "section": "Service schedules",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: PLANNED MAINTENANCE\n    - heading \"Service schedules\" [level=2]\n    - button \"Add schedule\"\n    - heading \"Routine service\" [level=3]\n    - text: SCH-DEMO-07\n    - button \"Record actions\":\n    - generic: "
+    },
+    {
+      "primary": "Service & compliance",
+      "section": "Reminders",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: TIMELY FOLLOW-UP\n    - heading \"Reminders\" [level=2]\n    - paragraph: One place for vehicle follow-ups and obligation reminders.\n    - button \"Open calendar\":\n      - text: Open calendar\n    - button \"Add"
+    },
+    {
+      "primary": "Service & compliance",
+      "section": "Service history",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: VEHICLE RECORD\n    - heading \"Service & work history\" [level=2]\n    - textbox \"Find service history\":\n      - /placeholder: Find a service or reference…\n    - combobox \"Service history filter\":\n      - op"
+    },
+    {
+      "primary": "Service & compliance",
+      "section": "Mileage",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: DISTANCE & EVIDENCE\n    - heading \"Mileage history\" [level=2]\n    - paragraph: Dashboard readings, their sources and the service distance they inform.\n    - button \"Add reading\":\n      - text: Add reading"
+    },
+    {
+      "primary": "Checks & inspections",
+      "section": "Recent checks",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: ORIGINAL OBSERVATIONS\n    - heading \"Checks & inspections\" [level=2]\n    - button \"Start check\":\n      - text: Start check\n    - button \"Vehicle condition record CHK-0182 · DEMO-3 · 21 Sept 2026 Failed\":\n"
+    },
+    {
+      "primary": "Checks & inspections",
+      "section": "Templates",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: CONTROLLED TEMPLATES\n    - heading \"Check templates\" [level=2]\n    - button \"Start check\":\n      - text: Start check\n    - textbox \"Search checklist library\":\n      - /placeholder: Search checklists…\n    "
+    },
+    {
+      "primary": "Maintenance",
+      "section": "Open work",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: MAINTENANCE\n    - heading \"Open work\" [level=2]\n    - generic: 2 work records\n    - button \"Awaiting assessment Condition concern WO-0264 · CHK-0182 Kōwhai House Coordinator\":\n      - generic: Awaiting as"
+    },
+    {
+      "primary": "Maintenance",
+      "section": "Historical work",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: VEHICLE RECORD\n    - heading \"Service & work history\" [level=2]\n    - textbox \"Find service history\":\n      - /placeholder: Find a service or reference…\n    - combobox \"Service history filter\":\n      - op"
+    },
+    {
+      "primary": "Map",
+      "section": "Location & geofences",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: LOCATION · VH-014\n    - heading \"Vehicle location\" [level=2]\n    - generic: Current sample · DEMO\n    - button \"Recenter\":\n      - text: Recenter\n    - button \"Historical trail\":\n      - text: Historical "
+    },
+    {
+      "primary": "Map",
+      "section": "Vehicle telemetry",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: CONNECTED VEHICLE\n    - heading \"GV500CG · vehicle telemetry\" [level=2]\n    - paragraph: Vehicle state, power and mileage with source confidence.\n    - generic: Current sample · DEMO\n    - text: Synthetic"
+    },
+    {
+      "primary": "Map",
+      "section": "Driving insights",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: DRIVING INSIGHTS\n    - heading \"Understand the journey\" [level=2]\n    - paragraph: Vehicle behaviour, event evidence and coaching follow-up.\n    - combobox \"Driving period\":\n      - option \"Last 7 days\" ["
+    },
+    {
+      "primary": "Map",
+      "section": "Alerts & Control Room",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: SAFETY & RESPONSE\n    - heading \"Vehicle alerts → Control Room\" [level=2]\n    - paragraph: One source event, one response record, linked follow-up.\n    - button \"Response plan\"\n    - text: GV500CG event\n "
+    },
+    {
+      "primary": "Trip history",
+      "section": "Vehicle trips",
+      "panelPresent": true,
+      "overflow": false,
+      "excerpt": "\n    - generic: DEDICATED VEHICLE HISTORY · VH-014\n    - heading \"Trip history\" [level=2]\n    - textbox \"Search trips\":\n      - /placeholder: Driver, journey or reference…\n    - combobox \"Trip date filter\":\n      - optio"
+    }
+  ],
+  "compactCalendarViews": [
+    {
+      "view": "Week",
+      "selected": "true",
+      "overflow": false
+    },
+    {
+      "view": "Day",
+      "selected": "true",
+      "overflow": false
+    },
+    {
+      "view": "Agenda",
+      "selected": "true",
+      "overflow": false
+    },
+    {
+      "view": "Timeline",
+      "selected": "true",
+      "overflow": false
+    },
+    {
+      "view": "Month",
+      "selected": "true",
+      "overflow": false
+    }
+  ],
+  "finalConsole": [],
+  "notes": [
+    "Checks span iterative v5 builds; screenshots26–27 supersede earlier driving analytics and trip screenshots.",
+    "Six scoring/evidence assertions are recorded in scoring-checks.json.",
+    "Targeted workflow verification, not production acceptance."
+  ]
+}

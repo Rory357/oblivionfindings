@@ -1,0 +1,22 @@
+{
+  "builtAt": "2026-09-27T22:51:06.046Z",
+  "root": "C:/Users/steph/.codex/worktrees/fleet-personal-reports/oblivionfindings",
+  "manifestSha256": "311799cc5185fd4bb9f5894b4dfd50618ef34d83404272670d610486d89ce7dd",
+  "bundles": [
+    {
+      "entry": "resources/css/app.css",
+      "file": "assets/app-BgwMGqJT.css",
+      "sha256": "b9447729203125a3835563d57aacfb8cdef99ab78bdc19a361efb078d65c913b"
+    },
+    {
+      "entry": "resources/js/app.tsx",
+      "file": "assets/app-Blb7C51n.js",
+      "sha256": "4b9d80f6f69cad24d8fc39bd7ff423a77cfa26b1045f944994596df12f33e5e2"
+    },
+    {
+      "entry": "resources/js/pages/reporting/workspace.tsx",
+      "file": "assets/workspace-B6pVkbws.js",
+      "sha256": "c0783a142066ffaa16f5126c1081b44f55c8c3c6cd9e15341c8a8125bba24ebf"
+    }
+  ]
+}

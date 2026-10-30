@@ -1,0 +1,46 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleDrivingAlertsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdriving insights follow the trip site rule and withhold private trips[39m[90m                                     [39m [90m247.01s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevent reviews are idempotent version checked audited and recalculate the trip score[39m[90m                         [39m [90m1.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma published scoring policy versions the weights and gates a persons score[39m[90m                                   [39m [90m1.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual speed limits need a second reviewer and evidence before an evaluation uses them[39m[90m                      [39m [90m1.14s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe draft response plan is versioned and owned by site staff[39m[90m                                                [39m [90m0.83s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma recorded overspeed reaches control room and its response links maintenance and a follow up[39m[90m                [39m [90m1.79s[39m  
+  [32;1m✓[39;22m[90m [39m[90man undelivered vehicle signal is retried through recovery and private reports keep no trip or place[39m[90m         [39m [90m1.01s[39m  
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bFleetSignalSourceProvisioningTest[39m
+  [32;1m✓[39;22m[90m [39m[90mthe migration provisions the active fleet source when it is missing[39m[90m                                         [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrunning the migration again changes nothing[39m[90m                                                                 [39m [90m0.62s[39m  
+  [32;1m✓[39;22m[90m [39m[90man existing source is left exactly as it was with data set "switched off by an admin"[39m[90m                       [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90man existing source is left exactly as it was with data set "paused for maintenance"[39m[90m                         [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90man existing source is left exactly as it was with data set "active and renamed by an admin"[39m[90m                 [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrolling back keeps the source[39m[90m                                                                               [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma vehicle event sent from the profile reaches control room through the migrated source[39m[90m                      [39m [90m0.89s[39m  
+............                                        26 / 26 (100%)
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleTripHistoryTest[39m
+  [32;1m✓[39;22m[90m [39m[90mtrip history is concealed outside the viewers sites and needs fleet view[39m[90m                                    [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriver names from other sites are not shown[39m[90m                                                                 [39m [90m0.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90mlist filters by auckland day search driver and event type[39m[90m                                                   [39m [90m0.99s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads the latest days and at most a year and says so[39m[90m                                               [39m [90m0.71s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe list reads at most the latest trips while exports keep their own limits[39m[90m                                 [39m [90m1.49s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip detail reads behaviour from the recorded telemetry[39m[90m                                                     [39m [90m0.72s[39m  
+  [32;1m✓[39;22m[90m [39m[90mpersonal and restricted trips are listed without their places or route[39m[90m                                      [39m [90m0.77s[39m  
+  [32;1m✓[39;22m[90m [39m[90mconfirming a driver needs authority a site candidate and is audited[39m[90m                                         [39m [90m0.85s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdeleting a trip never erases its driver confirmation or event reviews[39m[90m                                       [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexports are scoped branded sanitised and audited[39m[90m                                                            [39m [90m1.01s[39m  
+  [32;1m✓[39;22m[90m [39m[90mdriving metrics count queclink harsh reports and speed episodes[39m[90m                                             [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtrip builder records maximum speed for the trips list[39m[90m                                                       [39m [90m0.68s[39m  
+
+  [90mTests:[39m    [32;1m26 passed[39;22m[90m (887 assertions)[39m
+  [90mDuration:[39m [39m269.48s[39m
+
+
+
+Time: 04:29.183, Memory: 170.00 MB
+
+[30;42mOK (26 tests, 887 assertions)[0m

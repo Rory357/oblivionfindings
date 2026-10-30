@@ -1,3 +1,4 @@
+import { medsTodayHref } from '@/lib/meds-today-location';
 import {
     AlertTriangle,
     ArrowUpRight,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode } from 'react';
 
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { PageHero } from '@/components/page/page-hero';
 import { type PageHeroBadge } from '@/components/page/page-hero-badges';
 import { type PageHeroStat } from '@/components/page/page-hero-stats';
@@ -27,6 +29,7 @@ import { PageTabs } from '@/components/page/page-tabs';
 import { Button } from '@/components/ui/button';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
+import { myDayIncidentHref } from '../lib/incident-navigation';
 import type {
     MyDayActiveSite,
     MyDayMedDue,
@@ -303,9 +306,7 @@ export function MyDayHero({
         !onOpenVitals && singleResident
             ? `/clients/${singleResident.id}?tab=observations`
             : null;
-    const incidentHref = activeShiftId
-        ? `/incidents/create?shift_id=${activeShiftId}`
-        : '/incidents/create';
+    const incidentHref = myDayIncidentHref({ shiftId: activeShiftId });
 
     const quickActions = [
         {
@@ -416,7 +417,7 @@ export function MyDayHero({
                       {
                           icon: Pill,
                           label: t('res_give_meds'),
-                          href: `/meds/today?client=${r.id}`,
+                          href: medsTodayHref(r.id),
                       },
                       {
                           icon: StickyNote,
@@ -436,7 +437,7 @@ export function MyDayHero({
                       {
                           icon: AlertTriangle,
                           label: t('res_incident'),
-                          href: `/incidents/create?client_id=${r.id}`,
+                          href: myDayIncidentHref({ clientId: r.id }),
                       },
                   ],
               },
@@ -466,7 +467,7 @@ export function MyDayHero({
                           {
                               icon: Pill,
                               label: t('res_give_meds'),
-                              href: `/meds/today?client=${singleResident.id}`,
+                              href: medsTodayHref(singleResident.id),
                           },
                           {
                               icon: StickyNote,
@@ -486,7 +487,9 @@ export function MyDayHero({
                           {
                               icon: AlertTriangle,
                               label: t('res_incident'),
-                              href: `/incidents/create?client_id=${singleResident.id}`,
+                              href: myDayIncidentHref({
+                                  clientId: singleResident.id,
+                              }),
                           },
                       ],
                   },
@@ -553,23 +556,16 @@ export function MyDayHero({
             quickActionsHeading={t('hero_quick_actions')}
             actions={
                 <>
-                    <Button
-                        type="button"
-                        variant="default"
-                        size="sm"
+                    <PageHeaderPrimaryButton
+                        icon={clockedIn ? Square : Play}
                         onClick={onClockToggle}
                         data-test={
                             clockedIn ? 'clock-out-button' : 'clock-in-button'
                         }
-                        className="frontline-tap bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                        className="frontline-tap"
                     >
-                        {clockedIn ? (
-                            <Square className="h-3.5 w-3.5" />
-                        ) : (
-                            <Play className="h-3.5 w-3.5" />
-                        )}
                         {clockedIn ? t('btn_end_shift') : t('btn_clock_in')}
-                    </Button>
+                    </PageHeaderPrimaryButton>
                     <Button
                         type="button"
                         variant="outline"

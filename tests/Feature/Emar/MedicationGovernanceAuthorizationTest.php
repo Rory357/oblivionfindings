@@ -22,8 +22,12 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Support\Medication\MedicationStockQuantity as Quantity;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -39,6 +43,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
         $this->seed(RbacSeeder::class);
     }
 
@@ -59,7 +65,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
 
         foreach ([
             'emar.controlled' => MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            'emar.destructions' => MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            'emar.destructions' => MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY.'|'.MedicationGovernanceScopeService::STOCK_CAPABILITY,
             'emar.cd_loss.index' => MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
             'emar.stock' => MedicationGovernanceScopeService::STOCK_CAPABILITY,
         ] as $routeName => $actionCapability) {
@@ -84,27 +90,56 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $route = Route::getRoutes()->getByName($routeName);
             $this->assertNotNull($route, $routeName);
             $middleware = $route->gatherMiddleware();
-            $this->assertContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
+            $this->assertContains('permission:medications.reports.view', $middleware, $routeName);
+            $this->assertNotContains('permission:medications.reports.export|reports.viewAny', $middleware, $routeName);
             $this->assertNotContains('permission:medications.view', $middleware, $routeName);
+            if (in_array($routeName, [
+                'emar.reports.export_mar', 'emar.reports.export_discrepancies',
+                'reports.medications.export_mar', 'reports.medications.export_discrepancies',
+                'api.medications.reports.export',
+            ], true)) {
+                $this->assertContains('permission:medications.reports.export', $middleware, $routeName);
+            }
+            if (in_array($routeName, ['emar.reports.export_discrepancies', 'reports.medications.export_discrepancies'], true)) {
+                $this->assertContains('permission:medications.controlled.view', $middleware, $routeName);
+            }
         }
 
+        // Generic reports or export alone cannot open the medication reader.
+        foreach ([['reports.viewAny'], ['medications.reports.export']] as $permissions) {
+            $reportActor = $this->userWithPermissions($permissions);
+            $this->actingAs($reportActor)->get(route('emar.reports'))->assertForbidden();
+        }
+        // The mixed POST export route exact-gates its selected export type in
+        // the controller; a report reader cannot export clinical doses.
+        $reportReader = $this->userWithPermissions(['medications.reports.view']);
+        $this->actingAs($reportReader)->postJson(route('emar.reports.export'), ['type' => 'doses'])->assertForbidden();
+
         $sharedPermissions = file_get_contents(app_path('Http/Middleware/HandleInertiaRequests.php'));
-        $sidebar = file_get_contents(resource_path('js/components/app-sidebar.tsx'));
+        // NAV: hub rail views live in lib/emar-navigation.ts (the sidebar and
+        // hub rails both read it).
+        $navigation = file_get_contents(resource_path('js/lib/emar-navigation.ts'));
         $this->assertIsString($sharedPermissions);
-        $this->assertIsString($sidebar);
+        $this->assertIsString($navigation);
         $this->assertStringContainsString("'controlledView' => \$user->canDo('medications.controlled.view')", $sharedPermissions);
         $this->assertStringContainsString("'stockUpdate' => \$user->canDo('medications.stock.update')", $sharedPermissions);
+        $this->assertStringContainsString("'reportsView' => \$user->canDo('medications.reports.view')", $sharedPermissions);
         $this->assertMatchesRegularExpression(
-            "/if \(can\?\.medications\?\.view && can\?\.medications\?\.controlledView\)\s*admin\.push\(\{\s*title: 'Controlled Drugs'/s",
-            $sidebar,
+            "/label: 'Controlled register',\s*href: '\/emar\/controlled',\s*icon: \w+,\s*visible: all\(view, controlledView\)/s",
+            $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/if \(can\?\.medications\?\.view && can\?\.medications\?\.controlledView\)\s*compliance\.push\(\{\s*title: 'Destructions'/s",
-            $sidebar,
+            "/label: 'Destructions & returns',\s*href: '\/emar\/destructions',\s*icon: \w+,\s*visible: all\(view, any\(controlledView, stockUpdate\)\)/s",
+            $navigation,
+        );
+        // Approved P06: the Stock view lands on the Stock hub (Lane C8).
+        $this->assertMatchesRegularExpression(
+            "/key: 'stock',\s*label: '[^']+',\s*href: '\/emar\/stock\/packs',\s*icon: \w+,\s*visible: all\(view, stockUpdate\)/s",
+            $navigation,
         );
         $this->assertMatchesRegularExpression(
-            "/if \(can\?\.medications\?\.view && can\?\.medications\?\.stockUpdate\)\s*mgmt\.push\(\{\s*title: 'Stock Management'/s",
-            $sidebar,
+            "/label: 'Standard reports',\s*href: '\/emar\/reports',\s*icon: \w+,\s*visible: reportsView/s",
+            $navigation,
         );
 
         foreach ([
@@ -210,10 +245,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'unit' => 'tablets',
             'reorder_level' => 5,
         ]);
-        $controlledActor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $controlledActor = $this->controlledRecorder($context);
         $stockActor = $this->userWithPermissions(
             [MedicationGovernanceScopeService::STOCK_CAPABILITY],
             $context['local_site'],
@@ -246,6 +278,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     {
         $context = $this->context();
         $actor = $this->userWithPermissions([
+            'medications.view', 'medications.controlled.manage',
             MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
             MedicationGovernanceScopeService::STOCK_CAPABILITY,
@@ -267,6 +300,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     {
         $context = $this->context();
         $actor = $this->userWithPermissions([
+            'medications.view', 'medications.controlled.manage',
             MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
         ], $context['local_site']);
         $before = $this->stateSnapshot($context);
@@ -304,7 +338,6 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'emar.medications',
             'emar.stock',
             'emar.prescriptions',
-            'emar.competency',
             'emar.reviews',
             'emar.rounds',
             'emar.self_admin',
@@ -319,6 +352,24 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 ->get(route($routeName, ['site_id' => 999999]))
                 ->assertNotFound();
         }
+
+        // P11: /emar/competency redirects to Staff eligibility, after checking
+        // a named Site like any eMAR reader (B2 C1 review): another house, or
+        // none, is not found. Staff eligibility lists the reader's own houses.
+        $foreignSiteId = (int) $context['foreign_site']->id;
+        $this->actingAs($actor)
+            ->get(route('emar.competency', ['site_id' => $foreignSiteId]))
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->get(route('emar.competency', ['site_id' => 999999]))
+            ->assertNotFound();
+        $this->actingAs($actor)
+            ->get(route('emar.safety.eligibility', ['house' => $foreignSiteId]))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('emar/StaffEligibility')
+                ->where('houses', fn ($houses): bool => collect($houses)->pluck('id')->doesntContain($foreignSiteId))
+                ->where('people', fn ($people): bool => collect($people)->pluck('house_id')->doesntContain($foreignSiteId)));
 
         foreach ([
             'emar.prn',
@@ -369,9 +420,12 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_medication_detail_conceals_forged_client_relationships(): void
     {
         $context = $this->context();
+        // A Site-wide reader (clients.viewAny): a medicine's details follow
+        // the per-person record gate (P02), so a bare reader opens no one's.
         $actor = $this->userWithPermissions([
             MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
+            'clients.viewAny',
         ], $context['local_site']);
 
         ClientMedicationAdministration::query()->create([
@@ -437,12 +491,12 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         ], $context['local_site']);
 
         $controlled = $this->actingAs($actor)->get(route('emar.controlled'))->assertOk();
-        $this->assertSame([$context['local_medication']->id], collect($controlled->inertiaProps('medications'))->pluck('id')->all());
-        $this->assertSame([], collect($controlled->inertiaProps('discrepancies'))->pluck('id')->all());
-        $this->assertSame([], collect($controlled->inertiaProps('destructions'))->pluck('id')->all());
-        $this->assertSame([], collect($controlled->inertiaProps('lossReports'))->pluck('id')->all());
-        $this->assertSame([$context['local_client']->id], collect($controlled->inertiaProps('clients'))->pluck('id')->all());
-        $this->assertSame([$context['local_site']->id], collect($controlled->inertiaProps('sites'))->pluck('id')->all());
+        $this->assertSame([$context['local_medication']->id], collect($controlled->inertiaProps('product.medicines'))->pluck('id')->all());
+        $this->assertSame([], collect($controlled->inertiaProps('product.discrepancies'))->pluck('id')->all());
+        $this->assertSame([], collect($controlled->inertiaProps('product.destructions'))->pluck('id')->all());
+        $this->assertSame([], collect($controlled->inertiaProps('product.losses'))->pluck('id')->all());
+        $this->assertSame([$context['local_client']->id], collect($controlled->inertiaProps('product.people'))->pluck('id')->all());
+        $this->assertSame([$context['local_site']->id], collect($controlled->inertiaProps('product.sites'))->pluck('id')->all());
 
         $stock = $this->actingAs($actor)->get(route('emar.stock'))->assertOk();
         $this->assertSame([$context['local_stock']->id], collect($stock->inertiaProps('stockItems'))->pluck('id')->all());
@@ -456,13 +510,15 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame([$context['local_client']->id], collect($medications->inertiaProps('clients'))->pluck('id')->all());
         $this->assertSame([$context['local_site']->id], collect($medications->inertiaProps('sites'))->pluck('id')->all());
 
-        $destructions = $this->actingAs($actor)->get(route('emar.destructions'))->assertOk();
-        $this->assertSame([], collect($destructions->inertiaProps('destructions'))->pluck('id')->all());
-        $this->assertSame([$context['local_medication']->id], collect($destructions->inertiaProps('medications'))->pluck('id')->all());
-        $this->assertSame([$context['local_client']->id], collect($destructions->inertiaProps('clients'))->pluck('id')->all());
+        // Lane C2: the old Destructions page lands on the canonical views.
+        $destructions = $this->actingAs($actor)->get(route('emar.destructions'))->assertRedirect();
+        $this->assertStringStartsWith('/emar/', (string) parse_url((string) $destructions->headers->get('Location'), PHP_URL_PATH));
 
-        $lossReports = $this->actingAs($actor)->get(route('emar.cd_loss.index'))->assertOk();
-        $this->assertSame([], collect($lossReports->json())->pluck('id')->all());
+        $redirect = $this->actingAs($actor)->get(route('emar.cd_loss.index'))->assertRedirect('/emar/controlled?view=losses');
+        $lossReports = $this->actingAs($actor)->get($redirect->headers->get('Location'))->assertOk();
+        $this->assertSame([], collect($lossReports->inertiaProps('product.losses'))->pluck('id')->all());
+        $this->assertSame([$context['local_medication']->id], collect($lossReports->inertiaProps('product.medicines'))->pluck('id')->all());
+        $this->assertSame([$context['local_client']->id], collect($lossReports->inertiaProps('product.people'))->pluck('id')->all());
 
         $dashboard = $this->actingAs($actor)->get(route('emar.index'))->assertOk();
         $this->assertSame([$context['local_medication']->id], collect($dashboard->inertiaProps('medicationOptions'))->pluck('id')->all());
@@ -510,23 +566,28 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $this->actingAs($globalReader)
                 ->get(route('emar.stock', ['site_id' => $context['foreign_site']->id]))
                 ->assertOk();
-            $this->actingAs($globalReader)
-                ->get(route('emar.destructions', ['site_id' => $context['foreign_site']->id]))
-                ->assertOk();
-            $this->actingAs($globalReader)
-                ->get(route('emar.cd_loss.index', ['site_id' => $context['foreign_site']->id]))
-                ->assertOk();
+            // Lane C2: the old Destructions page keeps the requested house on redirect.
+            $disposals = $this->actingAs($globalReader)->get(route('emar.destructions', ['site_id' => $context['foreign_site']->id]))->assertRedirect();
+            $this->assertStringContainsString('site_id='.$context['foreign_site']->id, (string) $disposals->headers->get('Location'));
+            foreach (['emar.cd_loss.index' => 'losses'] as $routeName => $view) {
+                $redirect = $this->actingAs($globalReader)
+                    ->get(route($routeName, ['site_id' => $context['foreign_site']->id]))
+                    ->assertRedirect('/emar/controlled?view='.$view.'&site_id='.$context['foreign_site']->id);
+                $page = $this->actingAs($globalReader)->get($redirect->headers->get('Location'))->assertOk();
+                $this->assertSame($context['foreign_site']->id, $page->inertiaProps('product.filters.site_id'));
+                $this->assertSame([$context['foreign_medication']->id], collect($page->inertiaProps('product.medicines'))->pluck('id')->all());
+                $this->assertSame([$context['foreign_client']->id], collect($page->inertiaProps('product.people'))->pluck('id')->all());
+                $this->assertSame([$context['foreign_site']->id], collect($page->inertiaProps('product.sites'))->pluck('id')->all());
+                $expectedId = $view === 'destructions' ? $context['foreign_destruction']->id : $context['foreign_loss']->id;
+                $this->assertSame([$expectedId], collect($page->inertiaProps('product.'.$view))->pluck('id')->all());
+            }
         }
     }
 
     public function test_forged_same_site_parent_ids_are_concealed_without_mutation(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions([
-            MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            MedicationGovernanceScopeService::STOCK_CAPABILITY,
-        ], $context['local_site']);
+        $actor = $this->controlledRecorder($context, [MedicationGovernanceScopeService::STOCK_CAPABILITY]);
         $otherClient = Client::factory()->create([
             'site_id' => $context['local_site']->id,
             'status' => 'active',
@@ -585,11 +646,13 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         // Global Site scope broadens the target boundary; the mutation actor
         // still needs current employment evidence at their canonical home Site.
         $globalActor = $this->userWithPermissions([
+            'medications.view', MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
             MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
             MedicationGovernanceScopeService::STOCK_CAPABILITY,
             'clinical.accessAllSites',
         ], $context['local_site']);
 
+        $this->recordControlledPresence($globalActor, $context['foreign_client']);
         $this->actingAs($globalActor)
             ->post(
                 route('emar.controlled.entries.store'),
@@ -605,7 +668,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'on_hand_before' => '9.00',
                 'on_hand_after' => '9.50',
                 'witnessed_by' => $context['foreign_witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => '66331c15-a12a-4b44-b26e-604ebd25bd48',
                 'queued_offline' => false,
             ])
@@ -627,17 +690,72 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame(8, (int) $context['foreign_stock']->refresh()->reorder_level);
     }
 
+    public function test_controlled_pharmacy_delivery_replay_requires_current_recorder_presence_and_witness_pin(): void
+    {
+        $context = $this->context();
+        $actor = $this->controlledRecorder($context, [MedicationGovernanceScopeService::STOCK_CAPABILITY]);
+        $order = MedicationPharmacyOrder::create([
+            'client_id' => $context['local_client']->id,
+            'client_medication_id' => $context['local_medication']->id,
+            'pharmacy_name' => 'Synthetic Pharmacy',
+            'quantity_ordered' => 5,
+            'status' => 'dispensed',
+            'ordered_by' => $actor->id,
+        ]);
+        $payload = [
+            'client_medication_id' => $context['local_medication']->id,
+            'quantity_received' => '0.50',
+            'on_hand_before' => '10.00',
+            'on_hand_after' => '10.50',
+            'witnessed_by' => $context['witness']->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'client_request_uuid' => (string) Str::uuid(),
+        ];
+        $url = route('emar.pharmacy_orders.controlled_delivery', $order);
+
+        $this->actingAs($actor)->from('/emar/pharmacy-orders')->post($url, $payload)
+            ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success', 'Controlled drug delivery recorded.');
+        $entry = ClientControlledDrugEntry::query()->where('pharmacy_order_id', $order->id)->sole();
+        $storedEntry = $entry->getRawOriginal();
+        $storedOrder = $order->fresh()->getRawOriginal();
+        $afterReceipt = $this->stateSnapshot($context);
+
+        // The original stock head remains valid for an exact retry without a second receipt.
+        $this->actingAs($actor)->from('/emar/pharmacy-orders')->post($url, $payload)
+            ->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success', 'Controlled drug delivery already recorded.');
+        $this->assertSame($afterReceipt, $this->stateSnapshot($context));
+
+        $failedPinAudits = AuditLog::query()->where('action', 'medications.witness_pin.failed')->count();
+        $this->actingAs($actor)->postJson($url, [...$payload, 'witness_credential' => 'wrong-pin'])
+            ->assertUnprocessable()->assertJsonValidationErrors('witness_credential');
+        $this->assertSame($failedPinAudits + 1, AuditLog::query()->where('action', 'medications.witness_pin.failed')->count());
+        $afterReceipt['audits']++; // The security audit is intentional; no second clinical receipt is written.
+        Shift::query()->where('user_id', $actor->id)->update(['status' => 'cancelled']);
+        $this->actingAs($actor)->postJson($url, $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('presence');
+
+        $this->assertSame($afterReceipt, $this->stateSnapshot($context));
+        $this->assertSame($storedEntry, $entry->fresh()->getRawOriginal());
+        $this->assertSame($storedOrder, $order->fresh()->getRawOriginal());
+        $this->assertSame('10.50', $context['local_stock']->fresh()->on_hand);
+        $this->assertSame(1, ClientControlledDrugEntry::query()->where('pharmacy_order_id', $order->id)->count());
+        $this->assertSame(1, AuditLog::query()->where('action', 'medications.controlled.pharmacy_delivery.receive')->count());
+        $this->assertSame(1, MedicationIdempotencyResult::query()->where('scope', 'emar-controlled-pharmacy-delivery')->where('request_uuid', $payload['client_request_uuid'])->count());
+    }
+
     public function test_controlled_recorder_and_witness_capabilities_remain_distinct(): void
     {
         $context = $this->context();
         $recorder = $this->userWithPermissions(
             [
+                'medications.view',
                 MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
                 MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
                 'medications.controlled.witness',
             ],
             $context['local_site'],
         );
+        $this->recordControlledPresence($recorder, $context['local_client']);
         $unauthorisedWitness = $this->userWithPermissions([]);
 
         $this->actingAs($recorder)
@@ -661,7 +779,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             ->post(route('emar.destructions.store'), [
                 ...$this->controlledDestructionPayload($context),
                 'quantity' => 1,
-                'witness_1_id' => $unauthorisedWitness->id,
+                'witnessed_by' => $unauthorisedWitness->id,
             ])
             ->assertNotFound();
 
@@ -672,32 +790,28 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_idempotent_replay_is_object_bound_and_authorized_before_cache_lookup(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $uuid = '10000000-0000-4000-8000-000000000001';
         $localPayload = $this->controlledEntryPayload(
             $context['local_client'],
             $context['local_medication'],
             $context['witness'],
-        ) + ['client_request_uuid' => $uuid];
+            $uuid,
+        );
 
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.entries.store'), $localPayload)
-            ->assertOk()
-            ->assertJsonPath('sync.duplicate', false);
-
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.entries.store'), $localPayload)
-            ->assertOk()
-            ->assertJsonPath('sync.duplicate', true);
+        $first = $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $localPayload)->assertOk();
+        $replay = $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $localPayload)->assertOk();
+        $this->assertEquals(Arr::except($first->json(), ['sync']), Arr::except($replay->json(), ['sync']));
+        $first->assertJsonPath('sync.duplicate', false);
+        $replay->assertJsonPath('sync.duplicate', true);
+        $this->assertDatabaseCount('controlled_product_requests', 1);
 
         $foreignPayload = $this->controlledEntryPayload(
             $context['foreign_client'],
             $context['foreign_medication'],
             $context['witness'],
-        ) + ['client_request_uuid' => $uuid];
+            $uuid,
+        );
         $this->actingAs($actor)
             ->postJson(route('emar.controlled.entries.store'), $foreignPayload)
             ->assertNotFound();
@@ -709,13 +823,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_controlled_entry_replay_is_bound_to_the_canonical_action_payload(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                'clinical.accessAllSites',
-            ],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context, ['clinical.accessAllSites']);
         $uuid = '10000000-0000-4000-8000-000000000021';
         $payload = [
             ...$this->controlledEntryPayload(
@@ -776,9 +884,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'expiry_date' => '2028-08-27',
                 'cd_schedule' => 3,
                 'notes' => 'Changed controlled administration details.',
-                'captured_offline_at' => $capturedOfflineAt,
-                'origin_device_id' => 'controlled-register-device-2',
-                'queued_offline' => true,
+                // Material conflicts are tested online; queued cupboard writes are separately rejected.
             ],
         ];
 
@@ -789,10 +895,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $this->assertSame(409, $response->status(), $description);
             $response->assertJsonPath('sync.status', 'conflict');
         }
-        $secondActor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), [...$payload, 'queued_offline' => true])->assertUnprocessable();
+        $secondActor = $this->controlledRecorder($context);
         $this->actingAs($secondActor)
             ->postJson(route('emar.controlled.entries.store'), $payload)
             ->assertConflict()
@@ -806,8 +910,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             ->count());
         $this->assertSame(9.0, (float) $context['local_stock']->refresh()->on_hand);
         $this->assertSame(10.0, (float) $context['foreign_stock']->refresh()->on_hand);
-        $this->assertSame(1, MedicationIdempotencyResult::query()
-            ->where('scope', 'emar-controlled-entry')
+        $this->assertSame(1, DB::table('controlled_product_requests')
+            ->where('actor_id', $actor->id)
             ->where('request_uuid', $uuid)
             ->count());
     }
@@ -815,21 +919,17 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_controlled_balance_check_replay_is_bound_to_the_canonical_action_payload(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                'clinical.accessAllSites',
-            ],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context, ['clinical.accessAllSites']);
         $uuid = '10000000-0000-4000-8000-000000000022';
         $payload = [
             'client_medication_id' => $context['local_medication']->id,
+            'expected_entry_id' => null,
             'expected_balance' => '10.00',
             'actual_balance' => '9.50',
+            'recount_balance' => '9.50',
             'witnessed_by' => $context['witness']->id,
-            'witness_credential' => 'password',
-            'discrepancy_notes' => 'Half unit count variance.',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'notes' => 'Half unit count variance.',
             'immediate_action_taken' => 'Secured stock and notified the clinical lead.',
             'client_request_uuid' => $uuid,
         ];
@@ -877,9 +977,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 ...$payload,
                 'discrepancy_notes' => 'Changed discrepancy evidence.',
                 'immediate_action_taken' => 'Changed immediate action.',
-                'captured_offline_at' => $capturedOfflineAt,
-                'origin_device_id' => 'controlled-count-device-2',
-                'queued_offline' => true,
+                // Material conflicts are tested online; queued cupboard writes are separately rejected.
             ],
         ];
 
@@ -890,10 +988,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             $this->assertSame(409, $response->status(), $description);
             $response->assertJsonPath('sync.status', 'conflict');
         }
-        $secondActor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $this->actingAs($actor)->postJson(route('emar.controlled.balance_check.store'), [...$payload, 'queued_offline' => true])->assertUnprocessable();
+        $secondActor = $this->controlledRecorder($context);
         $this->actingAs($secondActor)
             ->postJson(route('emar.controlled.balance_check.store'), $payload)
             ->assertConflict()
@@ -914,8 +1010,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             ->count());
         $this->assertSame(9.5, (float) $context['local_stock']->refresh()->on_hand);
         $this->assertSame(10.0, (float) $context['foreign_stock']->refresh()->on_hand);
-        $this->assertSame(1, MedicationIdempotencyResult::query()
-            ->where('scope', 'emar-controlled-balance-check')
+        $this->assertSame(1, DB::table('controlled_product_requests')
+            ->where('actor_id', $actor->id)
             ->where('request_uuid', $uuid)
             ->count());
     }
@@ -1031,10 +1127,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_fractional_controlled_entry_is_lossless_across_failure_retry_and_replay(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $uuid = '10000000-0000-4000-8000-000000000010';
         $payload = [
             ...$this->controlledEntryPayload(
@@ -1043,6 +1136,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 $context['witness'],
             ),
             'quantity' => 0.5,
+            'actual_balance' => 9.5,
             'on_hand_before' => 10,
             'on_hand_after' => 9.5,
             'client_request_uuid' => $uuid,
@@ -1052,23 +1146,22 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             ->postJson(route('emar.controlled.entries.store'), [
                 ...$payload,
                 'quantity' => 0.001,
+                'actual_balance' => 9.999,
                 'on_hand_after' => 9.999,
                 'client_request_uuid' => '10000000-0000-4000-8000-000000000012',
             ])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['quantity', 'on_hand_after']);
+            ->assertJsonValidationErrors(['quantity', 'actual_balance']);
 
         $injectFailure = true;
 
-        MedicationIdempotencyResult::creating(
-            function (MedicationIdempotencyResult $result) use (&$injectFailure, $uuid): void {
-                if ($injectFailure && $result->request_uuid === $uuid) {
-                    $injectFailure = false;
-
-                    throw new RuntimeException('Injected failure after fractional stock mutation.');
-                }
-            },
-        );
+        DB::listen(function (QueryExecuted $query) use (&$injectFailure, $uuid): void {
+            if ($injectFailure && str_starts_with(strtolower($query->sql), 'insert into')
+                && str_contains($query->sql, 'controlled_product_requests') && in_array($uuid, $query->bindings, true)) {
+                $injectFailure = false;
+                throw new RuntimeException('Injected failure after fractional stock mutation.');
+            }
+        });
 
         $this->withoutExceptionHandling();
         try {
@@ -1083,18 +1176,15 @@ class MedicationGovernanceAuthorizationTest extends TestCase
 
         $this->assertSame(10.0, (float) $context['local_stock']->refresh()->on_hand);
         $this->assertDatabaseCount('client_controlled_drug_entries', 0);
-        $this->assertDatabaseMissing('medication_idempotency_results', [
+        $this->assertDatabaseMissing('controlled_product_requests', [
             'request_uuid' => $uuid,
         ]);
 
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.entries.store'), $payload)
-            ->assertOk()
-            ->assertJsonPath('sync.duplicate', false);
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.entries.store'), $payload)
-            ->assertOk()
-            ->assertJsonPath('sync.duplicate', true);
+        $first = $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $payload)->assertOk();
+        $replay = $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $payload)->assertOk();
+        $this->assertEquals(Arr::except($first->json(), ['sync']), Arr::except($replay->json(), ['sync']));
+        $first->assertJsonPath('sync.duplicate', false);
+        $replay->assertJsonPath('sync.duplicate', true);
 
         $entry = ClientControlledDrugEntry::query()
             ->where('client_medication_id', $context['local_medication']->id)
@@ -1103,7 +1193,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame(10.0, (float) $entry->on_hand_before);
         $this->assertSame(9.5, (float) $entry->on_hand_after);
         $this->assertSame(9.5, (float) $context['local_stock']->refresh()->on_hand);
-        $this->assertSame(1, MedicationIdempotencyResult::query()
+        $this->assertSame(1, DB::table('controlled_product_requests')
             ->where('request_uuid', $uuid)
             ->count());
     }
@@ -1111,32 +1201,29 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_fractional_balance_check_preserves_entry_discrepancy_and_replay_provenance(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $uuid = '10000000-0000-4000-8000-000000000011';
         $payload = [
             'client_medication_id' => $context['local_medication']->id,
+            'expected_entry_id' => null,
             'expected_balance' => 10,
             'actual_balance' => 9.5,
+            'recount_balance' => 9.5,
             'witnessed_by' => $context['witness']->id,
-            'witness_credential' => 'password',
-            'discrepancy_notes' => 'Half unit count variance.',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'notes' => 'Half unit count variance.',
             'immediate_action_taken' => 'Secured stock and notified the clinical lead.',
             'client_request_uuid' => $uuid,
         ];
 
         $injectFailure = true;
-        MedicationIdempotencyResult::creating(
-            function (MedicationIdempotencyResult $result) use (&$injectFailure, $uuid): void {
-                if ($injectFailure && $result->request_uuid === $uuid) {
-                    $injectFailure = false;
-
-                    throw new RuntimeException('Injected failure after fractional balance check.');
-                }
-            },
-        );
+        DB::listen(function (QueryExecuted $query) use (&$injectFailure, $uuid): void {
+            if ($injectFailure && str_starts_with(strtolower($query->sql), 'insert into')
+                && str_contains($query->sql, 'controlled_product_requests') && in_array($uuid, $query->bindings, true)) {
+                $injectFailure = false;
+                throw new RuntimeException('Injected failure after fractional balance check.');
+            }
+        });
 
         $this->withoutExceptionHandling();
         try {
@@ -1154,18 +1241,17 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame(0, ClientControlledDrugDiscrepancy::query()
             ->where('client_medication_id', $context['local_medication']->id)
             ->count());
-        $this->assertDatabaseMissing('medication_idempotency_results', [
+        $this->assertDatabaseMissing('controlled_product_requests', [
             'request_uuid' => $uuid,
         ]);
 
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.balance_check.store'), $payload)
-            ->assertOk()
-            ->assertJsonPath('sync.duplicate', false);
-        $this->actingAs($actor)
-            ->postJson(route('emar.controlled.balance_check.store'), $payload)
-            ->assertOk()
-            ->assertJsonPath('sync.duplicate', true);
+        $first = $this->actingAs($actor)->postJson(route('emar.controlled.balance_check.store'), $payload)->assertOk();
+        $replay = $this->actingAs($actor)->postJson(route('emar.controlled.balance_check.store'), $payload)->assertOk();
+        $firstReceipt = Arr::except($first->json(), ['sync']);
+        $replayedReceipt = Arr::except($replay->json(), ['sync']);
+        ksort($firstReceipt);
+        ksort($replayedReceipt);
+        $this->assertSame($firstReceipt, $replayedReceipt);
 
         $entry = ClientControlledDrugEntry::query()
             ->where('client_medication_id', $context['local_medication']->id)
@@ -1180,7 +1266,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->assertSame(9.5, (float) $discrepancy->on_hand_after);
         $this->assertSame(-0.5, (float) $discrepancy->difference);
         $this->assertSame(9.5, (float) $context['local_stock']->refresh()->on_hand);
-        $this->assertSame(1, MedicationIdempotencyResult::query()
+        $this->assertSame(1, DB::table('controlled_product_requests')
             ->where('request_uuid', $uuid)
             ->count());
     }
@@ -1188,13 +1274,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_fractional_controlled_destruction_preserves_stock_and_register_provenance(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            ],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
 
         $this->actingAs($actor)
             ->post(route('emar.destructions.store'), $this->controlledDestructionPayload($context))
@@ -1218,13 +1298,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_controlled_destruction_requires_canonical_locked_stock_before_any_write(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            ],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $unstockedMedication = $this->medication(
             $context['local_client'],
             'Unstocked controlled medication',
@@ -1239,7 +1313,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'client_medication_id' => $unstockedMedication->id,
                 'medication_name' => $unstockedMedication->name,
             ])
-            ->assertSessionHasErrors('quantity');
+            ->assertSessionHasErrors('expected_balance');
 
         $this->assertSame($before, $this->stateSnapshot($context));
         $this->assertDatabaseMissing('medication_destructions', [
@@ -1261,11 +1335,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'on_hand' => 10,
             'unit' => 'tablets',
         ]);
-        $actor = $this->userWithPermissions([
-            MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            MedicationGovernanceScopeService::STOCK_CAPABILITY,
-        ], $context['local_site']);
+        $actor = $this->controlledRecorder($context, [MedicationGovernanceScopeService::STOCK_CAPABILITY]);
         $before = $this->stateSnapshot($context);
 
         $this->actingAs($actor)
@@ -1298,10 +1368,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_stale_controlled_balance_is_rejected_without_partial_effect(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
 
         $this->actingAs($actor)
             ->from('/emar/controlled')
@@ -1311,10 +1378,11 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                     $context['local_medication'],
                     $context['witness'],
                 ),
+                'expected_balance' => 9,
                 'on_hand_before' => 9,
                 'on_hand_after' => 8,
             ])
-            ->assertSessionHasErrors('on_hand_before');
+            ->assertConflict();
 
         $this->assertDatabaseCount('client_controlled_drug_entries', 0);
         $this->assertSame(10, (int) $context['local_stock']->refresh()->on_hand);
@@ -1323,10 +1391,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_controlled_mutations_bind_to_the_locked_canonical_medication_identity(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $duplicateNameMedication = $this->medication(
             $context['local_client'],
             $context['local_medication']->name,
@@ -1404,10 +1469,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_controlled_witness_is_current_site_eligible_distinct_and_credential_confirmed(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $foreignWitness = $this->userWithPermissions(
             ['medications.controlled.witness'],
             $context['foreign_site'],
@@ -1446,7 +1508,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             ->from('/emar/controlled')
             ->post(route('emar.controlled.entries.store'), [
                 ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $actor),
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('witnessed_by');
 
@@ -1471,115 +1533,62 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_stock_movement_requires_a_complete_valid_transition_and_constrained_initialization(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
-        $basePayload = $this->controlledEntryPayload(
-            $context['local_client'],
-            $context['local_medication'],
-            $context['witness'],
-        );
-
-        foreach (['on_hand_before', 'on_hand_after'] as $missingBalance) {
+        $actor = $this->controlledRecorder($context);
+        $basePayload = $this->controlledEntryPayload($context['local_client'], $context['local_medication'], $context['witness']);
+        foreach (['on_hand_before', 'on_hand_after', 'expected_balance', 'actual_balance'] as $missingBalance) {
             $payload = $basePayload;
             unset($payload[$missingBalance]);
-            $this->actingAs($actor)
-                ->from('/emar/controlled')
-                ->post(route('emar.controlled.entries.store'), $payload)
-                ->assertSessionHasErrors($missingBalance);
-
-            $this->actingAs($actor)
-                ->from('/emar/controlled')
-                ->post(route('emar.controlled.entries.store'), [
-                    ...$basePayload,
-                    $missingBalance => null,
-                ])
-                ->assertSessionHasErrors($missingBalance);
+            $this->actingAs($actor)->from('/emar/controlled')
+                ->post(route('emar.controlled.entries.store'), $payload)->assertSessionHasErrors($missingBalance);
+            $this->actingAs($actor)->from('/emar/controlled')
+                ->post(route('emar.controlled.entries.store'), [...$basePayload, $missingBalance => null])->assertSessionHasErrors($missingBalance);
         }
-
-        $this->actingAs($actor)
-            ->from('/emar/controlled')
-            ->post(route('emar.controlled.entries.store'), [
-                ...$basePayload,
-                'on_hand_after' => 7,
-            ])
-            ->assertSessionHasErrors('on_hand_after');
-        $this->actingAs($actor)
-            ->from('/emar/controlled')
-            ->post(route('emar.controlled.entries.store'), [
-                ...$basePayload,
-                'entry_type' => 'adjustment',
-                'quantity' => 2,
-                'on_hand_after' => 9,
-            ])
-            ->assertSessionHasErrors('quantity');
-
-        $uninitializedMedication = $this->medication(
-            $context['local_client'],
-            'Uninitialized morphine',
-            'LOCAL-MED-INIT',
-        );
-        $initialPayload = [
-            ...$this->controlledEntryPayload($context['local_client'], $uninitializedMedication, $context['witness']),
-            'entry_type' => 'receipt',
-            'quantity' => 3,
-            'unit' => 'tablets',
-            'on_hand_before' => 0,
-            'on_hand_after' => 3,
-        ];
-
+        $this->actingAs($actor)->from('/emar/controlled')
+            ->post(route('emar.controlled.entries.store'), [...$basePayload, 'on_hand_after' => 7])->assertSessionHasErrors('on_hand_after');
+        $this->actingAs($actor)->from('/emar/controlled')
+            ->post(route('emar.controlled.entries.store'), [...$basePayload, 'quantity' => 2])->assertSessionHasErrors('actual_balance');
+        $uninitialized = $this->medication($context['local_client'], 'Uninitialized morphine', 'LOCAL-MED-INIT');
+        $initialPayload = [...$this->controlledEntryPayload($context['local_client'], $uninitialized, $context['witness']),
+            'expected_balance' => 0, 'actual_balance' => 3, 'entry_type' => 'receipt', 'quantity' => 3,
+            'unit' => 'tablets', 'on_hand_before' => 0, 'on_hand_after' => 3];
+        // The cupboard command requires existing receipt evidence; a posted
+        // initialization flag cannot manufacture a starting stock balance.
+        $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $initialPayload)
+            ->assertUnprocessable()->assertJsonValidationErrors('expected_balance');
         foreach ([
-            $initialPayload,
+            [...$initialPayload, 'initialize_stock' => true],
             [...$initialPayload, 'initialize_stock' => true, 'entry_type' => 'transfer_in'],
             [...$initialPayload, 'initialize_stock' => true, 'on_hand_before' => 1, 'on_hand_after' => 4],
             [...$initialPayload, 'initialize_stock' => true, 'unit' => null],
-        ] as $invalidInitialization) {
-            $this->actingAs($actor)
-                ->from('/emar/controlled')
-                ->post(route('emar.controlled.entries.store'), $invalidInitialization)
-                ->assertSessionHasErrors('initialize_stock');
+        ] as $invalid) {
+            $this->actingAs($actor)->postJson(route('emar.controlled.entries.store'), $invalid)
+                ->assertUnprocessable()->assertJsonValidationErrors('initialize_stock');
         }
-
-        $this->assertDatabaseMissing('client_medication_stocks', [
-            'client_medication_id' => $uninitializedMedication->id,
-        ]);
-        $this->actingAs($actor)
-            ->post(route('emar.controlled.entries.store'), [
-                ...$initialPayload,
-                'initialize_stock' => true,
-            ])
-            ->assertRedirect();
-
-        $this->assertDatabaseHas('client_medication_stocks', [
-            'client_medication_id' => $uninitializedMedication->id,
-            'on_hand' => 3,
-            'unit' => 'tablets',
-        ]);
-        $this->assertSame(10, (int) $context['local_stock']->refresh()->on_hand);
-        $this->assertSame(1, ClientControlledDrugEntry::query()
-            ->where('client_medication_id', $uninitializedMedication->id)
-            ->count());
+        $this->assertDatabaseMissing('client_medication_stocks', ['client_medication_id' => $uninitialized->id]);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 0);
+        $this->assertSame(10.0, (float) $context['local_stock']->fresh()->on_hand);
+        $this->actingAs($actor)->post(route('emar.controlled.entries.store'), $basePayload)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(9.0, (float) $context['local_stock']->fresh()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
     public function test_balance_check_requires_existing_locked_stock_and_canonical_medication(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $uninitializedMedication = $this->medication(
             $context['local_client'],
             'No stock morphine',
             'LOCAL-MED-NO-STOCK',
         );
         $balancePayload = [
+            'client_request_uuid' => (string) Str::uuid(),
+            'expected_entry_id' => null,
             'client_medication_id' => $context['local_medication']->id,
             'expected_balance' => 10,
             'actual_balance' => 10,
             'witnessed_by' => $context['witness']->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
 
         foreach (['expected_balance', 'actual_balance'] as $missingBalance) {
@@ -1602,25 +1611,29 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         $this->actingAs($actor)
             ->from('/emar/controlled')
             ->post(route('emar.controlled.balance_check.store'), [
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null,
                 'client_medication_id' => $uninitializedMedication->id,
                 'client_id' => $context['local_client']->id,
                 'medication_name' => $uninitializedMedication->name,
                 'expected_balance' => 0,
                 'actual_balance' => 0,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertSessionHasErrors('expected_balance');
 
         $this->actingAs($actor)
             ->post(route('emar.controlled.balance_check.store'), [
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null,
                 'client_medication_id' => $context['local_medication']->id,
                 'client_id' => $context['local_client']->id,
                 'medication_name' => 'Forged medicine name',
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertNotFound();
 
@@ -1637,11 +1650,13 @@ class MedicationGovernanceAuthorizationTest extends TestCase
 
         $this->actingAs($actor)
             ->post(route('emar.controlled.balance_check.store'), [
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null,
                 'client_medication_id' => $context['local_medication']->id,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ])
             ->assertRedirect();
 
@@ -1690,39 +1705,23 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_replayed_destruction_void_preserves_the_original_void_history(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            ],
-            $context['local_site'],
-        );
-        $destruction = MedicationDestruction::create([
-            'client_id' => $context['local_client']->id,
-            'client_medication_id' => $context['local_medication']->id,
-            'site_id' => $context['local_site']->id,
-            'medication_name' => $context['local_medication']->name,
-            'quantity' => 1,
-            'unit' => 'tablets',
-            'reason' => 'expired',
-            'disposal_method' => 'denaturing',
-            'is_controlled_drug' => true,
-            'destroyed_by' => $context['witness']->id,
-            'witness_1_id' => $context['witness']->id,
-            'witness_2_id' => $context['second_witness']->id,
-            'destroyed_at' => now(),
-        ]);
-
-        $this->actingAs($actor)
-            ->from('/emar/destructions')
-            ->post(route('emar.destructions.void', $destruction), ['void_reason' => 'Duplicate record'])
-            ->assertSessionHasNoErrors();
-
+        $actor = $this->controlledRecorder($context, ['medications.controlled.manage']);
+        $created = $this->actingAs($actor)->postJson(route('emar.destructions.store'), $this->controlledDestructionPayload($context))->assertOk();
+        $destruction = MedicationDestruction::query()->findOrFail($created->json('target_id'));
+        $payload = [
+            ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $context['witness']),
+            'notes' => 'Duplicate record',
+        ];
+        $first = $this->actingAs($actor)->postJson(route('emar.destructions.void', $destruction), $payload)->assertOk();
         $firstVoid = $destruction->fresh();
-        $this->actingAs($actor)
-            ->from('/emar/destructions')
-            ->post(route('emar.destructions.void', $destruction), ['void_reason' => 'Replacement reason'])
-            ->assertSessionHasErrors('void_reason');
+        $replay = $this->actingAs($actor)->postJson(route('emar.destructions.void', $destruction), $payload)->assertOk();
+        $this->assertEquals(Arr::except($first->json(), ['sync']), Arr::except($replay->json(), ['sync']));
+        $first->assertJsonPath('sync.duplicate', false);
+        $replay->assertJsonPath('sync.duplicate', true);
+        $this->actingAs($actor)->postJson(route('emar.destructions.void', $destruction), [
+            ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $context['witness']),
+            'notes' => 'Replacement reason',
+        ])->assertConflict();
 
         $replayedVoid = $destruction->fresh();
         $this->assertSame('Duplicate record', $replayedVoid->void_reason);
@@ -1789,10 +1788,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_strict_audit_failure_rolls_back_controlled_entry(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $before = $this->stateSnapshot($context);
 
         $this->assertStrictAuditFailureRollsBack(
@@ -1813,21 +1809,21 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_strict_audit_failure_rolls_back_controlled_balance_check(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $before = $this->stateSnapshot($context);
 
         $this->assertStrictAuditFailureRollsBack(
-            'medications.controlled.balance_check.record',
+            'medications.controlled.entry.record',
             fn () => $this->actingAs($actor)->post(route('emar.controlled.balance_check.store'), [
                 'client_medication_id' => $context['local_medication']->id,
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null,
                 'expected_balance' => 10,
                 'actual_balance' => 9.5,
+                'recount_balance' => 9.5,
                 'witnessed_by' => $context['witness']->id,
-                'witness_credential' => 'password',
-                'discrepancy_notes' => 'Half unit variance under investigation.',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'notes' => 'Half unit variance under investigation.',
                 'immediate_action_taken' => 'Secured stock and notified the clinical lead.',
             ]),
         );
@@ -1841,10 +1837,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_strict_audit_failure_rolls_back_controlled_discrepancy_resolution(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [MedicationGovernanceScopeService::CONTROLLED_CAPABILITY],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context, ['medications.controlled.manage']);
         $discrepancy = ClientControlledDrugDiscrepancy::create([
             'client_id' => $context['local_client']->id,
             'client_medication_id' => $context['local_medication']->id,
@@ -1860,13 +1853,13 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         ]);
 
         $this->assertStrictAuditFailureRollsBack(
-            'medications.controlled.discrepancy.resolve',
+            'medications.controlled.resolve',
             fn () => $this->actingAs($actor)->post(
                 route('emar.controlled.discrepancies.resolve', $discrepancy),
                 [
-                    'resolution_notes' => 'Recount completed and source identified.',
-                    'resolution_action' => 'Stock secured',
-                ],
+                    ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $context['witness']),
+                    'outcome' => 'found', 'quantity' => 0.5, 'notes' => 'Recount completed and source identified.',
+                ]
             ),
         );
 
@@ -1878,10 +1871,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_client_medical_discrepancy_resolution_uses_the_same_strict_audit_transaction(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions([
-            MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-            'medications.view',
-        ], $context['local_site']);
+        $actor = $this->controlledRecorder($context, ['medications.controlled.manage']);
         $discrepancy = ClientControlledDrugDiscrepancy::create([
             'client_id' => $context['local_client']->id,
             'client_medication_id' => $context['local_medication']->id,
@@ -1897,13 +1887,16 @@ class MedicationGovernanceAuthorizationTest extends TestCase
         ]);
 
         $this->assertStrictAuditFailureRollsBack(
-            'medications.controlled.discrepancy.resolve',
+            'medications.controlled.resolve',
             fn () => $this->actingAs($actor)->post(
                 route('clients.medical.controlled_discrepancies.close', [
                     'client' => $context['local_client'],
                     'discrepancy' => $discrepancy,
                 ]),
-                ['resolution_notes' => 'Recount completed.'],
+                [
+                    ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $context['witness']),
+                    'outcome' => 'found', 'quantity' => 0.5, 'notes' => 'Recount completed.',
+                ],
             ),
         );
 
@@ -1916,6 +1909,8 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     {
         $context = $this->context();
         $actor = $this->userWithPermissions([
+            'medications.controlled.manage',
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
             MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
             'medications.view',
         ], $context['local_site']);
@@ -1943,17 +1938,11 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_strict_audit_failure_rolls_back_controlled_destruction(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            ],
-            $context['local_site'],
-        );
+        $actor = $this->controlledRecorder($context);
         $before = $this->stateSnapshot($context);
 
         $this->assertStrictAuditFailureRollsBack(
-            'medications.destruction.record',
+            'medications.controlled.recorded',
             fn () => $this->actingAs($actor)->post(
                 route('emar.destructions.store'),
                 $this->controlledDestructionPayload($context),
@@ -1966,35 +1955,19 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     public function test_strict_audit_failure_rolls_back_destruction_void(): void
     {
         $context = $this->context();
-        $actor = $this->userWithPermissions(
-            [
-                MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
-                MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-            ],
-            $context['local_site'],
-        );
-        $destruction = MedicationDestruction::create([
-            'client_id' => $context['local_client']->id,
-            'client_medication_id' => $context['local_medication']->id,
-            'site_id' => $context['local_site']->id,
-            'medication_name' => $context['local_medication']->name,
-            'quantity' => 1,
-            'unit' => 'tablets',
-            'reason' => 'expired',
-            'disposal_method' => 'denaturing',
-            'is_controlled_drug' => true,
-            'destroyed_by' => $context['witness']->id,
-            'witness_1_id' => $context['witness']->id,
-            'witness_2_id' => $context['second_witness']->id,
-            'destroyed_at' => now(),
-        ]);
+        $actor = $this->controlledRecorder($context, ['medications.controlled.manage']);
+        $created = $this->actingAs($actor)->postJson(route('emar.destructions.store'), $this->controlledDestructionPayload($context))->assertOk();
+        $destruction = MedicationDestruction::query()->findOrFail($created->json('target_id'));
         $before = $this->stateSnapshot($context);
 
         $this->assertStrictAuditFailureRollsBack(
-            'medications.destruction.void',
+            'medications.controlled.destruction_void',
             fn () => $this->actingAs($actor)->post(
                 route('emar.destructions.void', $destruction),
-                ['void_reason' => 'Duplicate controlled register record'],
+                [
+                    ...$this->controlledEntryPayload($context['local_client'], $context['local_medication'], $context['witness']),
+                    'notes' => 'Duplicate controlled register record',
+                ],
             ),
         );
 
@@ -2118,15 +2091,17 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'assessor_declared_at' => now()->subMonth(),
                 'staff_acknowledged_at' => now()->subMonth()->addMinute(),
                 'can_witness_controlled' => true,
+                'controlled_drugs' => true,
+                'restricted' => false,
             ]);
             Shift::factory()->create([
                 'client_id' => $witnessClient->id,
                 'site_id' => $witnessSite->id,
                 'service_context_id' => $witnessClient->service_context_id,
                 'user_id' => $controlledWitness->id,
-                'starts_at' => now()->subHour(),
-                'ends_at' => now()->addHour(),
-                'actual_starts_at' => now()->subHour(),
+                'starts_at' => now()->utc()->subHour(),
+                'ends_at' => now()->utc()->addHour(),
+                'actual_starts_at' => now()->utc()->subHour(),
                 'status' => 'in_progress',
                 'started_by' => $controlledWitness->id,
                 'created_by' => $competencyAssessor->id,
@@ -2267,22 +2242,50 @@ class MedicationGovernanceAuthorizationTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function controlledEntryPayload(Client $client, ClientMedication $medication, User $witness): array
+    private function controlledEntryPayload(Client $client, ClientMedication $medication, User $witness, ?string $uuid = null): array
     {
+        $balance = $medication->stock?->fresh()->on_hand;
+
         return [
             'client_medication_id' => $medication->id,
             'client_id' => $client->id,
             'medication_name' => $medication->name,
-            'entry_type' => 'administration',
+            'movement_type' => 'going_out',
+            'client_request_uuid' => $uuid ?? (string) Str::uuid(),
+            'expected_balance' => $balance,
+            'expected_entry_id' => ClientControlledDrugEntry::query()->where('client_medication_id', $medication->id)->latest('id')->value('id'),
+            'actual_balance' => $balance === null ? null : Quantity::subtract($balance, 1),
             'quantity' => 1,
             'on_hand_before' => 10,
             'on_hand_after' => 9,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
     }
 
     /** @return array<string, mixed> */
+    private function controlledRecorder(array $context, array $extraPermissions = []): User
+    {
+        $actor = $this->userWithPermissions([
+            'medications.view', MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
+            MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY, ...$extraPermissions,
+        ], $context['local_site']);
+        $this->recordControlledPresence($actor, $context['local_client']);
+
+        return $actor;
+    }
+
+    private function recordControlledPresence(User $actor, Client $client): void
+    {
+        $client->supportWorkers()->syncWithoutDetaching([$actor->id]);
+        Shift::factory()->create([
+            'user_id' => $actor->id, 'client_id' => $client->id, 'site_id' => $client->site_id,
+            'service_context_id' => $client->service_context_id, 'status' => 'in_progress',
+            'starts_at' => now()->utc()->subHour(), 'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(), 'started_by' => $actor->id,
+        ]);
+    }
+
     private function controlledDestructionPayload(array $context): array
     {
         return [
@@ -2293,12 +2296,14 @@ class MedicationGovernanceAuthorizationTest extends TestCase
             'quantity' => 0.5,
             'unit' => 'tablets',
             'reason' => 'expired',
-            'disposal_method' => 'denaturing',
+            'method' => 'pharmacy_return',
+            'expected_balance' => $context['local_stock']->fresh()->on_hand,
+            'expected_entry_id' => ClientControlledDrugEntry::query()->where('client_medication_id', $context['local_medication']->id)->latest('id')->value('id'),
             'is_controlled_drug' => true,
-            'witness_1_id' => $context['witness']->id,
-            'witness_1_credential' => 'password',
-            'witness_2_id' => $context['second_witness']->id,
-            'witness_2_credential' => 'password',
+            'witnessed_by' => $context['witness']->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'second_witness_id' => $context['second_witness']->id,
+            'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => (string) Str::uuid(),
@@ -2386,10 +2391,12 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'client_medication_id' => $medication->id,
                 'client_id' => $client->id,
                 'medication_name' => $medication->name,
+                'client_request_uuid' => (string) Str::uuid(),
+                'expected_entry_id' => null,
                 'expected_balance' => 10,
                 'actual_balance' => 10,
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             ]],
             ['POST', 'emar.pharmacy_orders.controlled_delivery', ['order' => $context['foreign_order']], [
                 'client_medication_id' => $medication->id,
@@ -2397,7 +2404,7 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'on_hand_before' => '10.00',
                 'on_hand_after' => '10.50',
                 'witnessed_by' => $witness->id,
-                'witness_credential' => 'password',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => '4768024e-a514-46a4-bb49-2e01b83a9ad8',
             ]],
             ['POST', 'emar.controlled.discrepancies.resolve', ['discrepancy' => $context['foreign_discrepancy']], [
@@ -2411,12 +2418,14 @@ class MedicationGovernanceAuthorizationTest extends TestCase
                 'quantity' => 1,
                 'unit' => 'tablets',
                 'reason' => 'expired',
-                'disposal_method' => 'denaturing',
+                'method' => 'pharmacy_return',
+                'expected_balance' => 10,
+                'expected_entry_id' => null,
                 'is_controlled_drug' => true,
-                'witness_1_id' => $witness->id,
-                'witness_1_credential' => 'password',
-                'witness_2_id' => $context['second_witness']->id,
-                'witness_2_credential' => 'password',
+                'witnessed_by' => $witness->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'second_witness_id' => $context['second_witness']->id,
+                'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'authorised_by_name' => 'Pharmacist Pat',
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),

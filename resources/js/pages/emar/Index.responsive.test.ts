@@ -60,7 +60,7 @@ describe('eMAR oversight responsive containment', () => {
         }
 
         expect(regions[0]).toContain('Add medication');
-        expect(regions[0]).toContain('All clients →');
+        expect(regions[0]).toContain('All people →');
         expect(regions[0]).toContain('<CardContent className="min-w-0">');
         expect(regions[0]).toContain(
             'grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3',

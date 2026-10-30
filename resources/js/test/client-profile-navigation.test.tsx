@@ -56,7 +56,13 @@ vi.mock('@inertiajs/react', async () => {
             reset: vi.fn(),
             setData: vi.fn(),
         }),
-        usePage: () => ({ props: clientShowHarness.pageProps }),
+        usePage: () => ({
+            props: clientShowHarness.pageProps,
+            url:
+                window.location.pathname +
+                window.location.search +
+                window.location.hash,
+        }),
     };
 });
 

@@ -1,0 +1,106 @@
+# P07 seventh-batch residual dispositions
+
+## Package and verification
+
+Base: `6221023a1d8173ebdea854e4bc3155b7f4be2740`. Branch: `codex/emar-p07-seventh-residuals-20261004`.
+
+The completed seventh batch reported **392 passes and 88 failures**. This lane owns **56 observed failures**: ControlledDrugs 25, Destructions 16, GovernanceAuthorization 12, ControlledDoseOverride 2 and Fleet 1. Evidence was read from `storage/app/emar-seventh-failures.json` in the primary checkout and the complete integration `storage/logs/emar-seventh-repair.log` / `.xml`. The JSON uses PHPUnit display names and class names rather than repository paths.
+
+| Commit | Sole test file | Scope |
+| --- | --- | --- |
+| `0eec21d0b95c69894fda706decb6174162381265` | `tests/Feature/Emar/ControlledDrugsTest.php` | Qualified witness/present recorder fixtures and selected command prerequisites; 66 additions, 3 substitutions. |
+| `f8a79d7a46b5d6c6eee0d27033681ddd90f13a85` | `tests/Feature/Emar/DestructionsTest.php` | Two denaturing cases receive current command, stock and policy prerequisites; 50 additions, 4 substitutions. |
+| `9e302511c9eb446b82d977725c688d5a8c68483b` | `tests/Feature/Emar/MedicationGovernanceAuthorizationTest.php` | Six bounded fixture/representation updates; 25 additions, 34 deletions, principally replacement of incomplete actor fixtures with the existing recorder helper. |
+| `4b6a72150ca0ba56a2ec384695478fbda29940ce` | `tests/Feature/FleetAssets/ResidentTransportMedicationTransitTest.php` | One packing-evidence case gains stock and required-witness fixtures plus no-write assertions; 11 additions. |
+
+All four files passed PHP 8.4 syntax checks and scoped whitespace checks. Static comparison against the base preserved all original method sets: ControlledDrugs 27, Destructions 16, GovernanceAuthorization 41, Fleet 9. Bodies unchanged after newline normalization: 18, 14, 35 and 8 respectively. Seventeen observed failing methods have edits; one already-passing decimal-limit method has extra request prerequisites. No production files changed. No functional tests, application boot, heavy checks, installs, queues, builds, pushes, PRs or deployments were run. **None of these cases is claimed passing after this patch. Main's eighth batch is the runtime validation.**
+
+The existing collaboration workers are finished: `/root/controlled_policy` owned ControlledDrugs, `/root/witness_boundary` owned GovernanceAuthorization, and `/root/controlled_ui` owned the single Fleet case. Root handled the two Destructions cases. RBAC, Recovery, Lifecycle, forgotten PIN and Main's three fixtures are untouched. No extra worker was started. Main owns the independently integrated reader/privacy patch `3e911ef28`; P09 owns subsequent person/day reader and frontend work. This package does not duplicate either source change or replace the remaining reader assertions.
+
+## Edited cases: before and bounded disposition
+
+`Candidate` means the observed fixture/representation cause has a bounded proposed correction, not a runtime pass. `Prerequisites only` means original source/contract expectations still remain open. All listed names are exact test methods.
+
+| File | Method | Seventh observation | After this package |
+| --- | --- | --- | --- |
+| ControlledDrugs | `test_cd_entry_rejects_unreconciled_balance` | Expected errors absent before movement validation. | Candidate: current movement alias, UUID, head, expected/actual balances and qualified/present fixtures. Same reject/no-entry guarantee; error key names `actual_balance`. |
+| ControlledDrugs | `test_cd_entry_accepts_reconciled_balance` | Zero entries instead of one. | Candidate: same command prerequisites; original positive entry and stock assertions retained. |
+| ControlledDrugs | `test_cd_witness_confirms_with_their_witness_pin_not_their_login_password` | Expected PIN errors absent. | Candidate: current command and qualified-witness prerequisites; invalid login-password/valid PIN and no-write guarantees retained. |
+| ControlledDrugs | `test_balance_check_mismatch_requires_a_truthful_immediate_action_before_any_write` | Missing expected `immediate_action_taken` error. | Candidate: canonical head, UUID, recount and notes now reach the intended safety validation; no-write assertions retained. |
+| ControlledDrugs | `test_controlled_loss_requires_a_truthful_immediate_action_before_any_write` | Missing expected immediate-action error. | Candidate: canonical medicine, head, UUID, quantity, notes and real PIN witness; no report/incident/receipt/stock effects retained. |
+| ControlledDrugs | `test_balance_check_mismatch_links_incident_to_discrepancy` | Unexpected request errors. | Prerequisites only: head/UUID/recount/notes supplied. Original positive redirect/success, incident and discrepancy assertions retained. Current endpoint returns JSON 200. |
+| ControlledDrugs | `test_loss_report_captures_accountable_officer_and_regulator` | Unexpected request errors. | Prerequisites only: canonical medicine/head/UUID/quantity/notes/PIN witness. Jane CDAO, Medsafe/reference and immediate-action evidence assertions retained; source metadata/notification handling remains open. |
+| ControlledDrugs | `test_overdue_cd_check_command_raises_then_balance_check_resolves_alert` | Unexpected count errors. | Prerequisites only: count UUID/head added; original raise-to-resolve lifecycle retained. Missing cadence is explicitly `not_configured` in current policy; the old implicit overdue expectation requires approved cadence/roster fixture or contract reconciliation, not a fabricated overdue source behavior. |
+| ControlledDrugs | `test_balance_check_actual_balance_obeys_decimal_10_2_register_limit_without_writes` | Already passed the seventh batch. | Additive UUID/head prerequisites only. Decimal-limit rejection and every no-write assertion retained. |
+| Destructions | `test_cd_destruction_rejects_duplicate_witnesses` | Missing legacy `witness_2_id` error. | Candidate: existing stock, current snapshot, explicit permitted on-site policy, current witness fields and real first PIN. Same duplicate person; expected key is `second_witness_id`. Original posted legacy secrets and all don't-flash assertions retained. Main's reader/privacy source patch must accompany validation. |
+| Destructions | `test_cd_destruction_records_with_two_distinct_witnesses` | Missing expected-head validation prevented recording. | Candidate: current snapshot, method, qualified distinct witnesses/PINs, present recorder and explicit test policy. Original positive count retained; add canonical witness/method, one ledger entry and 10-to-8 stock assertions, plus JSON 200. |
+| GovernanceAuthorization | `test_fractional_balance_check_preserves_entry_discrepancy_and_replay_provenance` | Strict receipt arrays differed by top-level key order. | Candidate: sort both flat receipts before strict comparison. Every field, value/type, fractional stock, discrepancy, rollback and durable receipt assertion retained. |
+| GovernanceAuthorization | `test_client_medical_discrepancy_conceals_foreign_nested_objects_before_validation` | Route prerequisite returned 403 before intended 404. | Candidate: grant existing controlled-view prerequisite to this actor fixture. Invalid foreign/missing requests still require 404 and identical bodies. |
+| GovernanceAuthorization | `test_controlled_entry_replay_is_bound_to_the_canonical_action_payload` | Initial positive command returned 404. | Prerequisites only: existing recorder helper supplies module, controlled view, person assignment and presence. Equivalent numeric replay, altered-payload conflicts, UUID authority and all positive/stock assertions retained. |
+| GovernanceAuthorization | `test_controlled_balance_check_replay_is_bound_to_the_canonical_action_payload` | Initial positive command returned 422. | Prerequisites only: same recorder fixture plus head/recount/canonical notes. Numeric equivalence, sync envelopes, target/actor conflicts and no extra stock effects remain asserted. |
+| GovernanceAuthorization | `test_controlled_mutations_bind_to_the_locked_canonical_medication_identity` | Initial positive command returned 404. | Prerequisites only: recorder helper; positive current JSON 200 replaces redirect. Direct-ID/stock assertions and forged parent/name 404s retained; dropped hints remain a source/contract gap. |
+| GovernanceAuthorization | `test_balance_check_requires_existing_locked_stock_and_canonical_medication` | Missing expected-balance validation was obscured. | Prerequisites only: recorder plus UUID/head in count envelopes; positive JSON 200. Absent/null balance, absent stock and forged parent/name assertions retained. Current snapshot mismatch uses 409 rather than field validation. |
+| Fleet | `test_controlled_drug_administration_rejects_label_only_packing_evidence` | Stock prerequisite prevented packing-attestation rejection. | Candidate: canonical stock and explicit witness-required medicine/transit log. Label-only packing evidence still rejected; preserve no administration and add zero controlled entries and identical raw stock/transit rows. |
+
+## Untouched observed failures
+
+These 39 observed failing method bodies are unchanged. Fixture additions can affect execution prerequisites, but no semantic assertion was removed or relabeled as passing.
+
+| File | Exact method | Remaining disposition |
+| --- | --- | --- |
+| ControlledDrugs | `test_manual_controlled_entry_rejects_incomplete_or_contradictory_offline_provenance` | Online-only action aborts before legacy per-field offline provenance validation. Preserve original provenance assertions; held contract. |
+| ControlledDrugs | `test_manual_controlled_balance_check_rejects_incomplete_or_contradictory_offline_provenance` | Same online-only/provenance discrepancy; no offline acceptance or safety rewrite. |
+| ControlledDrugs | `test_manual_controlled_entry_and_balance_accept_online_idempotency_uuids_without_provenance` | Legacy payload lacks current fields; original sync/duplicate envelope remains asserted. |
+| ControlledDrugs | `test_controlled_inertia_forms_redirect_while_json_replays_return_sync_payloads` | Source always returns JSON 200; legacy redirect and sync expectations retained. |
+| ControlledDrugs | `test_controlled_entry_and_balance_check_replays_remain_durable_after_pruning` | Original durable replay/provenance/receipt contract retained; legacy prerequisite and receipt/envelope differences remain. |
+| ControlledDrugs | `test_controlled_offline_entry_and_balance_audit_failures_roll_back_receipts_stock_and_replay_bindings` | Online-only rejection prevents original injected-audit target; retain rollback/provenance assertions. |
+| ControlledDrugs | `test_page_serves_brand_colour` | Legacy component differs from current `emar/ControlledRegister`/`product`; original brand guarantee retained for later read-contract update. |
+| ControlledDrugs | `test_page_exposes_reconciliation_fields_filters_and_current_user` | Legacy projection differs; field/filter/current-user assertions retained. |
+| ControlledDrugs | `test_med_cd_scope_reconciliation_ignores_noncanonical_client_medication_balance_checks` | Legacy `medications` projection absent; canonical/noncanonical reconciliation assertions retained. |
+| ControlledDrugs | `test_client_filter_scopes_medications` | Legacy projection/filter contract differs; actual person-scope assertions retained. P09 owns reader correction. |
+| ControlledDrugs | `test_date_param_scopes_movements_window` | Legacy `date` projection absent. **Entire original multiple-date inclusion/exclusion test is unchanged**, including the filter assertion. P09 owns NZ-day reader correction. |
+| ControlledDrugs | `test_loss_report_rejects_incomplete_or_contradictory_offline_provenance` | Online-only/provenance discrepancy retained. |
+| ControlledDrugs | `test_loss_report_replay_is_bound_to_authority_target_and_report_semantics` | Legacy request prerequisites, receipt identity and sync envelope remain open; authority/target guarantees retained. |
+| ControlledDrugs | `test_loss_report_and_durable_replay_result_commit_atomically` | Missing expected head precedes original atomic durable receipt target. No old receipt table rewrite. |
+| ControlledDrugs | `test_loss_report_audit_failure_rolls_back_report_incident_and_replay_binding` | Missing expected head precedes injected-audit target; all atomic rollback assertions retained. |
+| ControlledDrugs | `test_controlled_loss_mutations_require_canonical_local_ownership` | 302 precedes expected 404; controller validation/dropped legacy ownership hints remain. Invalid clinical payloads are preserved. |
+| ControlledDrugs | `test_cd_entry_classifies_schedule_on_medication` | Historical schedule metadata remains null; no source metadata repair imported. |
+| Destructions | `test_void_marks_record_voided_not_deleted` | Unlinked legacy record/current manage/UUID/head/witness/notes prerequisites prevent positive void. Retention and void-actor assertions intact; no writer repair. |
+| Destructions | `test_void_is_administrative_only_and_records_explicit_reconciliation_provenance` | Original session message absent; source destruction void calls register stock reversal, contradicting administrative-only model contract. Stock 8.5, one original entry and reconciliation audit assertions intact; absolute writer hold. |
+| Destructions | `test_void_requires_a_reason` | Unlinked legacy record and current command/manage prerequisites obscure reason validation. Original required-reason/no-void assertion retained. |
+| Destructions | `test_destruction_rejects_incomplete_or_contradictory_offline_provenance` | Online-only abort precedes old field provenance validation; preserve original assertions. |
+| Destructions | `test_destruction_replay_is_single_effect_and_changed_payload_conflicts` | Missing current head initially. Canonical form/strength assertions expose missing source storage; single-effect/conflict/stock assertions retained. Writer/metadata and old conflict-envelope contract held. |
+| Destructions | `test_destruction_replay_rechecks_current_witness_authority_before_returning_success` | Missing head initially. Source cached receipt precedes current witness confirmation; original revoked-witness 404 and no-extra-effects assertions retained. Absolute witness-before-cache hold. |
+| Destructions | `test_destruction_replay_key_is_durable_and_conflicts_when_the_target_changes` | Missing head initially; old `MedicationIdempotencyResult` persistence differs from actor-scoped controlled receipt table. Durable/target/stock guarantees retained. |
+| Destructions | `test_new_destruction_requires_a_canonical_link_and_conceals_site_mismatch_before_clinical_validation` | 302 instead of 404: malformed quantity validates before ignored posted site hint. Keep malformed payload and concealment-before-validation target. |
+| Destructions | `test_ordinary_destruction_locks_current_site_witness_and_records_truthful_method` | Missing current head initially; controlled-product admission also requires present controlled flag. Ordinary disposal/truthful site-staff witness contract held. |
+| Destructions | `test_void_uses_immutable_classification_and_retains_soft_deleted_medication_link` | Source admission uses current controlled flag/view instead of immutable destruction classification. Historical/soft-deleted ownership guarantee retained; absolute ordinary-maintenance hold. |
+| Destructions | `test_record_only_actor_cannot_probe_store_or_void_a_controlled_destruction` | Invalid store payload returns302 before expected404. Record-only/no-read concealment-before-validation payload and no-effect assertions intact. |
+| Destructions | `test_non_controlled_destruction_conceals_noncanonical_witness_before_insert` | Missing current head initially; ordinary pathway unsupported by controlled-only admission. Noncanonical witness and no-insert/stock assertions intact; do not count an unrelated admission404 as a witness repair. |
+| Destructions | `test_page_serves_brand_colour_and_payload` | Old reader redirects302; current product projection lacks old page shape. Preserve brand, medicines, sites/staff and **clients filter** positive assertions; no reader weakening. |
+| Destructions | `test_payload_carries_detail_fields_for_voided_cd_record` | Old reader redirects302 and raw record cannot currently void. Witness names, authorizer, labels, immutable void semantics/reconciliation trail still asserted; source/payload contract gap. |
+| GovernanceAuthorization | `test_reader_routes_and_sidebar_require_module_plus_exact_operational_capabilities` | Original report-route/sidebar capability contract differs from current routes; assertions intact. |
+| GovernanceAuthorization | `test_emar_reader_matrix_conceals_foreign_site_client_and_medication_ids` | Current read drops posted `client_id`; 200 does not establish correct foreign-person denial. Original matrix intact; P09 reader owner. |
+| GovernanceAuthorization | `test_omitted_filters_intersect_reader_rows_pickers_and_dashboard_with_allowed_sites` | Legacy reader projections differ; row/picker/dashboard approved-site intersections intact. |
+| GovernanceAuthorization | `test_explicit_global_site_permission_broadens_reader_scope_but_never_replaces_page_capability` | Legacy page redirects302; exact capabilities and broader approved-site visibility assertions retained. |
+| GovernanceAuthorization | `test_explicit_global_site_role_still_requires_and_honours_each_exact_capability` | Positive recorder prerequisites and held delivery adapter remain; no production role grants. |
+| GovernanceAuthorization | `test_stock_movement_requires_a_complete_valid_transition_and_constrained_initialization` | Legacy on-hand/entry-type/init hints are ignored by current movement command. Constrained initialization/receipt assertions retained; receipt/pack hold. |
+| ControlledDoseOverride | `test_active_dose_override_never_bypasses_witnessed_register_counts` | Missing witness ID 0 aborts with 404 in confirmed attestation user locking before the existing missing/self-witness 422 guard. Keep required 422 and stock/ledger no-effect assertions; witness-boundary precedence requires approved source review. |
+| ControlledDoseOverride | `test_override_dose_signoff_requires_a_post_dose_participant_count_and_closes_source_once` | 500 from unknown `client_medication_administration_id` register column. Absolute FK/schema hold; no query bypass or migration. |
+
+## Source and clinical concerns kept separate from fixture corrections
+
+- `ControlledRegisterService::perform` hashes raw numeric JSON, scopes request UUIDs by actor and returns a cached receipt before current witness confirmation. Equivalent-number/cross-actor UUID/sync/current-witness assertions have not been made to match missing behavior.
+- `ControlledRegisterService::destructionFollowUp` invokes register reversal for void, while `MedicationDestruction::VOID_STOCK_SEMANTICS` specifies an administrative annotation with separate governed reconciliation. This unresolved clinical contract is not repaired or approved by any fixture update.
+- `ControlledRegisterService::destruction` stores canonical medication name/class and witnesses but not canonical form/strength or the prior authorizer evidence. Original metadata and detail assertions are retained.
+- `ControlledProductController::action` validates before the source scope lock and drops legacy client/site/name hints; malformed direct-object requests must remain meaningful privacy tests. Main/P09 reader work does not authorize a writer or authority bypass.
+- `MedicationGovernanceScopeService::confirmedControlledWitnessAttestation` includes witness ID 0 in its required-user set before the downstream missing-witness validation. This explains the override count 404/422 failure; fake witnesses or relaxed status assertions were not substituted.
+- Unknown count cadence remains explicit. The retained legacy alert test should be reconciled with approved cadence and real roster configuration; source must not invent a hardcoded overdue threshold.
+
+## Continuing approval boundaries
+
+Rejected `1033a1f0dd08d0e811160ff9331a57402fe91c95` is **not applied or retried**. Main's automatic approval review rejected its substantial controlled production changes and roughly 1,600 removed test lines because the scope could weaken or misrepresent coverage and retained unresolved assertions. This package makes small new test-only changes from Main's stated base, preserves every original method, and preserves the original date-filter test in full. It does not port a broad equivalent.
+
+`277d20ba1b` remains held for actual administration/waste evidence linkage, witness identity/roster scope and schema/FK work. No witness-before-cache change, ordinary destruction/immutable maintenance writer, receipt/pack adapter, house-lead/receive role grant, administration-column bypass, deleted/superseded recording authority, or `d32897b78` forgotten-PIN/emergency/queued/pending-paper authority has been imported.
+
+All authorization reasoning is for one organisation and multiple approved sites, using exact capabilities, canonical person/medicine ownership and privacy. No multi-tenant architecture, queue or transport was introduced.

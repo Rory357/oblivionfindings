@@ -13,6 +13,7 @@
  * (Inertia fires onSuccess for back()->with('error') redirects too).
  *
  * NZ English, semantic design tokens only. */
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -52,6 +53,8 @@ import {
     Wrench,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { api, type Option } from '../register/api';
+import { SearchPicker } from '../register/controls';
 
 /* ------------------------------------------------------------------ */
 /*  Props + local shapes                                               */
@@ -68,6 +71,7 @@ type ClientOption = {
 
 /** Editable slice of an asset — what the show/edit payloads expose. */
 export type AssetWizardAsset = {
+    asset_profile_version?: number;
     id: number;
     name: string;
     asset_tag: string | null;
@@ -314,6 +318,7 @@ const STEP_FOR_FIELD: Record<string, StepKey> = {
     registration_expires_at: 'compliance',
     wof_expires_at: 'compliance',
     cof_expires_at: 'compliance',
+    vehicle_evidence: 'compliance',
     requires_inspection: 'compliance',
     inspection_due_at: 'compliance',
     requires_maintenance: 'compliance',
@@ -352,6 +357,31 @@ export function AssetWizardDialog({
     const [processing, setProcessing] = useState(false);
     const [done, setDone] = useState(false);
     const [createdId, setCreatedId] = useState<number | null>(null);
+    const [canonicalRoom, setCanonicalRoom] = useState('');
+    const [canonicalRooms, setCanonicalRooms] = useState<Option[]>([]);
+    useEffect(() => {
+        setCanonicalRoom('');
+        if (isEdit || !open || !data.site_id) {
+            setCanonicalRooms([]);
+            return;
+        }
+        const controller = new AbortController();
+        void api<Option[]>(
+            `/rooms?site_id=${data.site_id}`,
+            'GET',
+            undefined,
+            controller.signal,
+        )
+            .then(setCanonicalRooms)
+            .catch((error) => {
+                if (error.name !== 'AbortError')
+                    setErrors((previous) => ({
+                        ...previous,
+                        site_room_id: error.message,
+                    }));
+            });
+        return () => controller.abort();
+    }, [data.site_id, isEdit, open]);
 
     const cur = STEPS[stepIndex];
     const stepKey = cur.key as StepKey;
@@ -414,7 +444,6 @@ export function AssetWizardDialog({
             !!data.location.trim(),
             !!data.purchase_date,
             data.category !== 'vehicle' || !!data.registration_number.trim(),
-            data.category !== 'vehicle' || !!data.wof_expires_at,
         ];
         return Math.round(
             (checks.filter(Boolean).length / checks.length) * 100,
@@ -452,6 +481,10 @@ export function AssetWizardDialog({
         setProcessing(true);
 
         const payload = {
+            expected_version: asset?.asset_profile_version,
+            ...(!isEdit
+                ? { site_room_id: canonicalRoom ? Number(canonicalRoom) : null }
+                : {}),
             name: data.name,
             asset_tag: nn(data.asset_tag),
             category: nn(data.category),
@@ -466,11 +499,10 @@ export function AssetWizardDialog({
             serial_number: nn(data.serial_number),
             description: nn(data.description),
             registration_number: nn(data.registration_number),
-            registration_expires_at: nn(data.registration_expires_at),
-            wof_expires_at: nn(data.wof_expires_at),
-            cof_expires_at: nn(data.cof_expires_at),
+            // Registration, WoF and CoF evidence and odometer readings are
+            // versioned records on the vehicle's Service & compliance tab;
+            // this register form no longer writes their legacy columns.
             fuel_type: nn(data.fuel_type),
-            odometer_km: nn(data.odometer_km),
             purchase_date: nn(data.purchase_date),
             warranty_expires_at: nn(data.warranty_expires_at),
             requires_inspection: data.requires_inspection,
@@ -529,8 +561,10 @@ export function AssetWizardDialog({
                 ) : (
                     <>
                         <span className="font-semibold">{data.name}</span> is
-                        now on the asset register. Add documents, trackers,
-                        inspections and assignments from its detail page.
+                        now on the asset register.{' '}
+                        {data.category === 'vehicle'
+                            ? 'Record its registration, WoF, CoF, RUC and odometer on its Service & compliance tab before it is booked.'
+                            : 'Add documents, trackers, inspections and assignments from its detail page.'}
                     </>
                 )
             }
@@ -545,9 +579,15 @@ export function AssetWizardDialog({
                         {createdId != null ? (
                             <Button asChild>
                                 <Link
-                                    href={`/fleet-assets/assets/${createdId}`}
+                                    href={
+                                        data.category === 'vehicle'
+                                            ? `/fleet-assets/vehicles/${createdId}?tab=service`
+                                            : `/fleet-assets/assets/${createdId}`
+                                    }
                                 >
-                                    View asset
+                                    {data.category === 'vehicle'
+                                        ? 'Open vehicle'
+                                        : 'View asset'}
                                 </Link>
                             </Button>
                         ) : (
@@ -632,6 +672,32 @@ export function AssetWizardDialog({
                         onClientChange={handleClientChange}
                     />
                 ) : null}
+                {stepKey === 'location' && !isEdit && (
+                    <div className="mt-4">
+                        <SearchPicker
+                            label="Assigned room"
+                            options={canonicalRooms}
+                            value={canonicalRoom}
+                            onChange={setCanonicalRoom}
+                            empty="No room assigned"
+                            disabled={!data.site_id}
+                        />
+                        {errors.site_room_id && (
+                            <p
+                                role="alert"
+                                className="mt-1 text-xs text-status-critical"
+                            >
+                                {errors.site_room_id}
+                            </p>
+                        )}
+                    </div>
+                )}
+                {stepKey === 'location' && isEdit && (
+                    <p className="mt-4 text-sm text-muted-foreground">
+                        Changing the site or client clears the assigned room if
+                        it belongs to a different site.
+                    </p>
+                )}
                 {stepKey === 'compliance' ? (
                     <StepCompliance data={data} set={set} errors={errors} />
                 ) : null}
@@ -799,18 +865,16 @@ function StepDetails({ data, set, errors }: StepProps) {
                         </Field>
                         <Field
                             label="Odometer"
-                            hint="km"
-                            error={errors.odometer_km}
+                            hint="recorded on the vehicle"
+                            error={
+                                errors.odometer_km ?? errors.vehicle_evidence
+                            }
                         >
-                            <Input
-                                type="number"
-                                min={0}
-                                value={data.odometer_km}
-                                onChange={(e) =>
-                                    set('odometer_km', e.target.value)
-                                }
-                                placeholder="e.g. 84500"
-                            />
+                            <p className="text-subtle py-2">
+                                {data.odometer_km
+                                    ? `${Number(data.odometer_km).toLocaleString('en-NZ')} km · update it from the vehicle's Mileage tab`
+                                    : "Record the first reading from the vehicle's Mileage tab after saving."}
+                            </p>
                         </Field>
                     </div>
                 ) : null}
@@ -820,23 +884,27 @@ function StepDetails({ data, set, errors }: StepProps) {
                         Purchase &amp; warranty
                     </SubHead>
                     <Field label="Purchase date" error={errors.purchase_date}>
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="asset-purchase-date"
+                            label="Purchase date"
+                            allowClear
+                            invalid={!!errors.purchase_date}
                             value={data.purchase_date}
-                            onChange={(e) =>
-                                set('purchase_date', e.target.value)
-                            }
+                            onChange={(value) => set('purchase_date', value)}
                         />
                     </Field>
                     <Field
                         label="Warranty expires"
                         error={errors.warranty_expires_at}
                     >
-                        <Input
-                            type="date"
+                        <DatePicker
+                            id="asset-warranty-expires"
+                            label="Warranty expires"
+                            allowClear
+                            invalid={!!errors.warranty_expires_at}
                             value={data.warranty_expires_at}
-                            onChange={(e) =>
-                                set('warranty_expires_at', e.target.value)
+                            onChange={(value) =>
+                                set('warranty_expires_at', value)
                             }
                         />
                     </Field>
@@ -946,46 +1014,32 @@ function StepCompliance({ data, set, errors }: StepProps) {
             <div className="grid gap-4">
                 {data.category === 'vehicle' ? (
                     <div className="grid gap-4 sm:grid-cols-2">
-                        <SubHead icon={Car}>Compliance dates</SubHead>
-                        <Field
-                            label="Registration expires"
-                            error={errors.registration_expires_at}
-                        >
-                            <Input
-                                type="date"
-                                value={data.registration_expires_at}
-                                onChange={(e) =>
-                                    set(
-                                        'registration_expires_at',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </Field>
-                        <Field
-                            label="WOF expires"
-                            error={errors.wof_expires_at}
-                        >
-                            <Input
-                                type="date"
-                                value={data.wof_expires_at}
-                                onChange={(e) =>
-                                    set('wof_expires_at', e.target.value)
-                                }
-                            />
-                        </Field>
-                        <Field
-                            label="COF expires"
-                            error={errors.cof_expires_at}
-                        >
-                            <Input
-                                type="date"
-                                value={data.cof_expires_at}
-                                onChange={(e) =>
-                                    set('cof_expires_at', e.target.value)
-                                }
-                            />
-                        </Field>
+                        <SubHead icon={Car}>
+                            Registration, WoF, CoF and RUC
+                        </SubHead>
+                        <InfoCard icon={Info}>
+                            {data.registration_expires_at ||
+                            data.wof_expires_at ||
+                            data.cof_expires_at ? (
+                                <>
+                                    Last recorded: registration{' '}
+                                    {data.registration_expires_at ||
+                                        'not recorded'}
+                                    , WoF{' '}
+                                    {data.wof_expires_at || 'not recorded'}, CoF{' '}
+                                    {data.cof_expires_at || 'not recorded'}
+                                    .{' '}
+                                </>
+                            ) : null}
+                            These are recorded with their evidence on the
+                            vehicle&apos;s Service &amp; compliance tab, so
+                            every change keeps its source and history.
+                            {errors.vehicle_evidence ? (
+                                <span className="mt-1 block font-medium text-destructive">
+                                    {errors.vehicle_evidence}
+                                </span>
+                            ) : null}
+                        </InfoCard>
                     </div>
                 ) : null}
 
@@ -1014,14 +1068,14 @@ function StepCompliance({ data, set, errors }: StepProps) {
                                         label="Next inspection due"
                                         error={errors.inspection_due_at}
                                     >
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="asset-inspection-due"
+                                            label="Next inspection due"
+                                            allowClear
+                                            invalid={!!errors.inspection_due_at}
                                             value={data.inspection_due_at}
-                                            onChange={(e) =>
-                                                set(
-                                                    'inspection_due_at',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                set('inspection_due_at', value)
                                             }
                                         />
                                     </Field>
@@ -1050,14 +1104,16 @@ function StepCompliance({ data, set, errors }: StepProps) {
                                         label="Next maintenance due"
                                         error={errors.maintenance_due_at}
                                     >
-                                        <Input
-                                            type="date"
+                                        <DatePicker
+                                            id="asset-maintenance-due"
+                                            label="Next maintenance due"
+                                            allowClear
+                                            invalid={
+                                                !!errors.maintenance_due_at
+                                            }
                                             value={data.maintenance_due_at}
-                                            onChange={(e) =>
-                                                set(
-                                                    'maintenance_due_at',
-                                                    e.target.value,
-                                                )
+                                            onChange={(value) =>
+                                                set('maintenance_due_at', value)
                                             }
                                         />
                                     </Field>

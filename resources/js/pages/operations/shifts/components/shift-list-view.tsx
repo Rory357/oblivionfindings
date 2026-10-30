@@ -13,6 +13,7 @@ import { shiftTypeMeta } from '@/lib/shift-types';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     clientFullName,
     effectiveStatus,
@@ -150,18 +151,16 @@ function DayBlock({
                         {fmtDayHeading(date)}
                     </div>
                     {isToday ? (
-                        <span className="inline-flex items-center rounded-full bg-status-info-bg px-2 py-0.5 text-[11px] font-medium text-status-info">
-                            Today
-                        </span>
+                        <StatusBadge variant="info">Today</StatusBadge>
                     ) : null}
                     <span className="text-xs text-muted-foreground">
                         {list.length} shift{list.length === 1 ? '' : 's'} ·{' '}
                         {hours.toFixed(1)}h
                     </span>
                     {openCount > 0 ? (
-                        <span className="inline-flex items-center rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-medium text-status-critical">
+                        <StatusBadge variant="critical">
                             {openCount} open
-                        </span>
+                        </StatusBadge>
                     ) : null}
                 </div>
                 {onCreateOnDay ? (
@@ -247,7 +246,7 @@ function ShiftRowItem({
                     <span className="font-normal text-muted-foreground">–</span>
                     {end}
                 </div>
-                <div className="text-[11px] text-muted-foreground tabular-nums">
+                <div className="text-xs text-muted-foreground tabular-nums">
                     {hours > 0 ? `${hours.toFixed(1)}h` : '—'}
                 </div>
             </div>
@@ -263,7 +262,7 @@ function ShiftRowItem({
                     <span className="truncate font-medium text-foreground">
                         {clientFullName(shift.client)}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
                         <TypeIcon className="h-3 w-3" />
                         {type.label}
                     </span>

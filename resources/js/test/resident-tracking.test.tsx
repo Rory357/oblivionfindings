@@ -251,8 +251,15 @@ function historyResident(overrides: Partial<Resident> = {}): Resident {
 it('renders the resident sidebar and queues Locate Now from a list row', async () => {
     renderResidentTracking();
 
-    expect(screen.getByText('Residents tracked')).toBeInTheDocument();
-    expect(screen.getByText('3 online')).toBeInTheDocument();
+    // cbd9b3ccf moved the "Residents tracked" stat into the Event Horizon
+    // header's fact subline ("… · 3 tracked · 3 online · …").
+    expect(
+        screen.getByText(
+            (_text, el) =>
+                el?.tagName === 'P' &&
+                /3 tracked\s*· 3 online/.test(el.textContent ?? ''),
+        ),
+    ).toBeInTheDocument();
     expect(screen.getByText('Battery not reported')).toBeVisible();
     expect(screen.getByText('Low battery')).toBeVisible();
     expect(screen.getByText('Charging')).toBeVisible();

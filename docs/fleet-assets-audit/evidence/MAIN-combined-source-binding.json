@@ -1,0 +1,26 @@
+{
+  "candidate": "f3fd2f77657c7fe09022ff69562e8c3487c9668b",
+  "ancestors": [
+    {
+      "revision": "bb0eea61abe61a14d9b65af59f8bf1add88e8bb5",
+      "included": true
+    },
+    {
+      "revision": "fbb0eda96586ca751b73382eb90720abd6b8721a",
+      "included": true
+    },
+    {
+      "revision": "38239d35506bf97c4b6f865a13aa10933b4cb439",
+      "included": true
+    },
+    {
+      "revision": "352ce7006098b227b945a47c4d55400c9aeff429",
+      "included": true
+    },
+    {
+      "revision": "50716b9cca0473ee4082e329ce6ff1347833f714",
+      "included": true
+    }
+  ],
+  "affectedSourceChangesDuringMainTest": []
+}

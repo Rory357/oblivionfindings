@@ -1,0 +1,47 @@
+name: oblivion-voice
+services:
+    voice:
+        image: livekit/livekit-server:v1.13.10
+        command: [--config, /etc/livekit.yaml]
+        restart: unless-stopped
+        init: true
+        read_only: true
+        security_opt:
+            - no-new-privileges:true
+        cap_drop: [ALL]
+        cap_add: [NET_BIND_SERVICE]
+        networks: [voice_private]
+        volumes:
+            - type: bind
+              source: ./livekit.yaml
+              target: /etc/livekit.yaml
+              read_only: true
+              bind:
+                  create_host_path: false
+            - type: bind
+              source: ./certificates
+              target: /etc/voice-certificates
+              read_only: true
+              bind:
+                  create_host_path: false
+        ports:
+            # Signalling/admin traffic must pass through the host gateway.
+            - 127.0.0.1:7880:7880/tcp
+            # TURN TLS passes through the host's SNI gateway on port 443.
+            - 127.0.0.1:5349:443/tcp
+            - 7881:7881/tcp
+            - 7882:7882/udp
+            - 3478:3478/udp
+        logging:
+            driver: json-file
+            options:
+                max-size: 10m
+                max-file: '3'
+networks:
+    voice_private:
+        driver: bridge
+        ipam:
+            config:
+                # Check for a collision with existing host/container networks first.
+                - subnet: 172.29.244.0/24
+                  gateway: 172.29.244.1

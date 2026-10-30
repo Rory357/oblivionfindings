@@ -121,6 +121,64 @@ class IncidentControllerTest extends TestCase
         ], $overrides);
     }
 
+    public function test_main_person_and_shift_capture_store_the_same_nz_occurrence_instant(): void
+    {
+        $this->mockNotificationService();
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'user_id' => $this->staff->id,
+        ]);
+        $routes = [
+            '/incidents',
+            route('operations.clients.incidents.store', $this->client),
+            route('shifts.incidents.store', $shift),
+        ];
+        foreach ([
+            ['2026-01-15T09:30', '2026-01-14T20:30:00Z'],
+            ['2026-07-15T09:30', '2026-07-14T21:30:00Z'],
+            ['2026-07-14T21:30:00Z', '2026-07-14T21:30:00Z'],
+        ] as [$input, $expected]) {
+            foreach ($routes as $route) {
+                $identity = (string) Str::uuid();
+                $this->actingAs($this->staff)->post($route, $this->reportPayload([
+                    'occurred_at' => $input,
+                    'description' => 'Time boundary '.$identity,
+                ]))->assertRedirect()->assertSessionHasNoErrors();
+                $incident = ClientIncident::where('description', 'Time boundary '.$identity)->sole();
+                $this->assertSame($expected, $incident->occurred_at->utc()->format('Y-m-d\TH:i:s\Z'));
+                if ($incident->hsEvent) {
+                    $this->assertTrue($incident->hsEvent->occurred_at->equalTo($incident->occurred_at));
+                }
+            }
+        }
+    }
+
+    public function test_draft_edit_normalizes_nz_wall_time_without_moving_locked_occurrence(): void
+    {
+        $this->mockNotificationService();
+        $incident = ClientIncident::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'reported_by' => $this->staff->id,
+            'status' => 'draft',
+            'occurred_at' => '2026-07-14 21:30:00',
+        ]);
+        $this->actingAs($this->staff)->put('/incidents/'.$incident->id, [
+            'occurred_at' => '2026-07-15T09:30',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('2026-07-14 21:30:00', $incident->fresh()->occurred_at->utc()->format('Y-m-d H:i:s'));
+        $this->put('/incidents/'.$incident->id, ['description' => 'Amended draft narrative.'])
+            ->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('2026-07-14 21:30:00', $incident->fresh()->occurred_at->utc()->format('Y-m-d H:i:s'));
+        $incident->update(['status' => 'submitted']);
+        $this->actingAs($this->admin)->put('/incidents/'.$incident->id, [
+            'occurred_at' => '2026-01-15T09:30',
+            'review_notes' => 'Core occurrence stays locked.',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('2026-07-14 21:30:00', $incident->fresh()->occurred_at->utc()->format('Y-m-d H:i:s'));
+    }
+
     private function assignCoordinatorToPrimarySite(): void
     {
         HrEmployeeProfile::factory()->create([
@@ -190,7 +248,8 @@ class IncidentControllerTest extends TestCase
             ->values()
             ->all();
 
-        $this->assertSame(['incidents.create'], $healthSafetyIncidentKeys);
+        // Stephan, 25 Oct (decision 8): H&S officers also read incidents, still limited by Site and privacy rules.
+        $this->assertSame(['incidents.create', 'incidents.viewAny'], $healthSafetyIncidentKeys);
 
         $coordinator = Role::query()->where('name', 'coordinator')->firstOrFail();
         $this->assertTrue($coordinator->permissions()->where('key', 'controlRoom.alerts.create')->exists());
@@ -248,12 +307,12 @@ class IncidentControllerTest extends TestCase
             'updated_by' => $this->admin->id,
         ]);
 
+        // The overview's client picker lists names only to viewers with client read (Codex's privacy rule, kept);
+        // the H&S officer role has none, so the picker is empty and no client name is sent.
         $this->actingAs($officer)
             ->get(route('health-safety.dashboard'))
             ->assertOk()
-            ->assertInertia(fn ($page) => $page
-                ->has('clients', 1)
-                ->where('clients.0.id', $this->client->id));
+            ->assertInertia(fn ($page) => $page->has('clients', 0));
 
         $this->actingAs($officer)
             ->post('/incidents', $this->reportPayload(['client_id' => $remoteClient->id]))
@@ -281,7 +340,11 @@ class IncidentControllerTest extends TestCase
             'approved_at' => now(),
             'email_verified_at' => now(),
         ]);
-        $officer->roles()->attach(Role::where('name', 'health_safety_officer')->firstOrFail());
+        $officerRole = Role::where('name', 'health_safety_officer')->firstOrFail();
+        $officer->roles()->attach($officerRole);
+        // The officer role reads incidents since decision 8 (25 Oct); this keeps testing that the create permission
+        // alone never widens incident visibility.
+        $officerRole->permissions()->detach($officerRole->permissions()->where('key', 'incidents.viewAny')->firstOrFail());
 
         $this->actingAs($officer)->get('/incidents')->assertForbidden();
         $this->actingAs($officer)->get("/incidents/{$localIncident->id}")->assertForbidden();
@@ -544,6 +607,37 @@ class IncidentControllerTest extends TestCase
             );
     }
 
+    public function test_recent_header_meters_open_matching_rows_without_losing_register_filters(): void
+    {
+        $this->freezeTime();
+        $make = fn (array $changes) => ClientIncident::withoutEvents(fn () => ClientIncident::factory()->create([
+            'client_id' => $this->client->id, 'site_id' => $this->site->id,
+            'title' => 'Meter fixture', 'severity' => 'high', 'source' => 'manual',
+            'status' => 'submitted', 'occurred_at' => now()->subDays(2), 'closed_at' => null,
+            ...$changes,
+        ]));
+        $recent = $make([]);
+        $recentClosed = $make(['status' => 'closed', 'closed_at' => now()->subDay()]);
+        $oldClosedRecently = $make(['status' => 'closed', 'occurred_at' => now()->subDays(50), 'closed_at' => now()->subDay()]);
+        $make(['occurred_at' => now()->subDays(40)]);
+        $make(['status' => 'closed', 'occurred_at' => now()->subDays(60), 'closed_at' => now()->subDays(45)]);
+        $make(['severity' => 'low']);
+        $make(['source' => 'automated']);
+        $make(['title' => 'Unrelated record']);
+        $filters = 'site_id='.$this->site->id.'&q=Meter%20fixture&severity=high&source=manual';
+        foreach ([
+            'reported_recent' => ['reported', [$recent->id, $recentClosed->id]],
+            'closed_recent' => ['closed', [$recentClosed->id, $oldClosedRecently->id]],
+        ] as $tab => [$meter, $ids]) {
+            $this->actingAs($this->admin)->get('/incidents?'.$filters.'&tab='.$tab)->assertOk()
+                ->assertInertia(fn ($page) => $page
+                    ->where('hero.period.'.$meter.'.value', 2)->where('tabCounts.'.$tab, 2)
+                    ->has('rows.data', 2)->where('rows.data', fn ($rows) => collect($rows)->pluck('id')->sort()->values()->all() === collect($ids)->sort()->values()->all()));
+        }
+        $this->get('/incidents?'.$filters.'&tab=closed_recent&from='.now()->subDays(10)->toDateString())->assertOk()
+            ->assertInertia(fn ($page) => $page->where('hero.period.closed.value', 1)->has('rows.data', 1)->where('rows.data.0.id', $recentClosed->id));
+    }
+
     public function test_tab_near_misses_filters_type(): void
     {
         ClientIncident::factory()->create(['type' => 'near_miss']);
@@ -764,6 +858,33 @@ class IncidentControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/incidents/create')
             ->assertRedirect(route('incidents.index', ['report' => 'incident']));
+    }
+
+    public function test_create_relays_only_literal_my_day_return_and_keeps_client_prefill(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/incidents/create?client_id='.$this->client->id.'&return_to=%2Fmy-day')
+            ->assertRedirect(route('incidents.index', [
+                'report' => 'incident', 'return_to' => '/my-day', 'report_client_id' => $this->client->id,
+            ]));
+
+        foreach (['/my-day?tab=tasks', '/my-day#tasks', '//outside.test/my-day', 'https://outside.test/my-day', '/my-day/', '/incidents'] as $source) {
+            $this->get('/incidents/create?return_to='.rawurlencode($source))
+                ->assertRedirect(route('incidents.index', ['report' => 'incident']));
+        }
+        $this->get('/incidents/create?return_to%5B%5D=%2Fmy-day')
+            ->assertRedirect(route('incidents.index', ['report' => 'incident']));
+    }
+
+    public function test_create_resume_preserves_legacy_destination_and_relays_only_my_day(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/incidents/create?incident=42&return_to=%2Fmy-day')
+            ->assertRedirect(route('incidents.index', ['incident' => 42, 'return_to' => '/my-day']));
+        $this->get('/incidents/create?incident=42&return_to=%2Fmy-day%3Ftab%3Dtasks')
+            ->assertRedirect(route('incidents.index', ['incident' => 42]));
+        $this->get('/incidents/create?incident=42')
+            ->assertRedirect(route('incidents.index', ['incident' => 42]));
     }
 
     public function test_create_near_miss_redirects_with_near_miss_report(): void
@@ -1230,7 +1351,7 @@ class IncidentControllerTest extends TestCase
         $this->actingAs($this->staff)
             ->post('/incidents', $this->reportPayload([
                 'intent' => 'submit',
-                'occurred_at' => $occurredAt->format('Y-m-d H:i:s'),
+                'occurred_at' => $occurredAt->toIso8601String(),
                 'severity' => 'high',
                 'reported_severity' => 'critical',
                 'harm_or_injury' => 'hospitalisation',
@@ -1854,9 +1975,10 @@ class IncidentControllerTest extends TestCase
         $otherClient = Client::factory()->create();
         $incident = ClientIncident::factory()->create(['client_id' => $otherClient->id]);
 
+        // A record outside the reader's scope is concealed (404); only missing module authority is 403.
         $this->actingAs($this->staff)
             ->get("/incidents/{$incident->id}")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -2256,6 +2378,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_changes_status_to_reviewed(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->submitted()->create([
@@ -2267,7 +2390,9 @@ class IncidentControllerTest extends TestCase
             ->post("/incidents/{$incident->id}/review", [
                 'review_notes' => 'Reviewed and noted.',
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Incident reviewed.');
 
         $incident->refresh();
         $this->assertEquals('reviewed', $incident->status);
@@ -2278,6 +2403,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_rolls_back_incident_and_journey_mutations_when_synchronous_verification_fails(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $incident = ClientIncident::factory()->submitted()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -2326,6 +2452,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_sends_notification(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $mock = $this->mockNotificationService();
         $mock->shouldReceive('notifyCrud')->once()->andReturnNull();
 
@@ -2336,7 +2463,9 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review")
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Incident reviewed.');
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -2610,6 +2739,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_close_requires_closed_outcome(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $incident = ClientIncident::factory()->reviewed()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -3148,7 +3278,8 @@ class IncidentControllerTest extends TestCase
 
     public function test_reopen_requires_reopened_reason(): void
     {
-        $incident = ClientIncident::factory()->create(['status' => 'closed']);
+        $this->assignCoordinatorToPrimarySite();
+        $incident = ClientIncident::factory()->create(['status' => 'closed', 'site_id' => $this->site->id, 'client_id' => $this->client->id]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/reopen", [])
@@ -3157,7 +3288,8 @@ class IncidentControllerTest extends TestCase
 
     public function test_reopen_validates_reason_max_length(): void
     {
-        $incident = ClientIncident::factory()->create(['status' => 'closed']);
+        $this->assignCoordinatorToPrimarySite();
+        $incident = ClientIncident::factory()->create(['status' => 'closed', 'site_id' => $this->site->id, 'client_id' => $this->client->id]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/reopen", [
@@ -3516,15 +3648,16 @@ class IncidentControllerTest extends TestCase
 
     public function test_attachment_download_accessible_by_admin(): void
     {
-        Storage::fake('public');
-        Storage::disk('public')->put('incident_attachments/test.txt', 'file content');
+        // Uploads store on the private disk (and 2026_06_21 moved older ones there); downloads serve only that disk.
+        Storage::fake('private');
+        Storage::disk('private')->put('incident_attachments/test.txt', 'file content');
 
         $incident = ClientIncident::factory()->create();
 
         $attachment = ClientIncidentAttachment::create([
             'incident_id' => $incident->id,
             'uploaded_by' => $this->admin->id,
-            'disk' => 'public',
+            'disk' => 'private',
             'original_name' => 'test.txt',
             'path' => 'incident_attachments/test.txt',
             'mime' => 'text/plain',
@@ -3553,9 +3686,10 @@ class IncidentControllerTest extends TestCase
             'size' => 1024,
         ]);
 
+        // Out-of-scope record: concealed as 404, the same shape as the detail page.
         $this->actingAs($this->staff)
             ->get("/incidents/{$incident->id}/attachments/{$attachment->id}/download")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     public function test_attachment_download_returns_404_for_mismatched_incident(): void
@@ -3693,8 +3827,9 @@ class IncidentControllerTest extends TestCase
     public function test_followup_create_by_coordinator(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
-        $incident = ClientIncident::factory()->submitted()->create();
+        $incident = ClientIncident::factory()->submitted()->create(['site_id' => $this->site->id, 'client_id' => $this->client->id]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/followups", [
@@ -3759,8 +3894,9 @@ class IncidentControllerTest extends TestCase
     public function test_followup_complete_by_coordinator_with_manage_permission(): void
     {
         $this->mockNotificationService();
+        $this->assignCoordinatorToPrimarySite();
 
-        $incident = ClientIncident::factory()->create();
+        $incident = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $this->client->id]);
         $followup = IncidentFollowup::factory()->create([
             'client_incident_id' => $incident->id,
             'completed_at' => null,
@@ -3799,8 +3935,9 @@ class IncidentControllerTest extends TestCase
 
     public function test_followup_complete_returns_404_for_mismatched_incident(): void
     {
-        $incidentA = ClientIncident::factory()->create();
-        $incidentB = ClientIncident::factory()->create();
+        $this->assignCoordinatorToPrimarySite();
+        $incidentA = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $this->client->id]);
+        $incidentB = ClientIncident::factory()->create(['site_id' => $this->site->id, 'client_id' => $this->client->id]);
         $followup = IncidentFollowup::factory()->create([
             'client_incident_id' => $incidentB->id,
             'completed_at' => null,
@@ -3968,6 +4105,7 @@ class IncidentControllerTest extends TestCase
 
     public function test_review_preserves_existing_review_notes_when_not_provided(): void
     {
+        $this->assignCoordinatorToPrimarySite();
         $this->mockNotificationService();
 
         $incident = ClientIncident::factory()->submitted()->create([
@@ -3978,7 +4116,9 @@ class IncidentControllerTest extends TestCase
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/review")
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('success', 'Incident reviewed.');
 
         $incident->refresh();
         $this->assertEquals('reviewed', $incident->status);
@@ -3987,7 +4127,8 @@ class IncidentControllerTest extends TestCase
 
     public function test_close_validates_closed_outcome_max_length(): void
     {
-        $incident = ClientIncident::factory()->reviewed()->create();
+        $this->assignCoordinatorToPrimarySite();
+        $incident = ClientIncident::factory()->reviewed()->create(['site_id' => $this->site->id, 'client_id' => $this->client->id]);
 
         $this->actingAs($this->coordinator)
             ->post("/incidents/{$incident->id}/close", [

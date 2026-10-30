@@ -1,7 +1,6 @@
-import { OpsStatCard } from '@/components/ops-stat-card';
+import { PageHeaderRail } from '@/components/page';
 import PageShell from '@/components/page-shell';
-import { ReasonDialog } from '@/components/reason-dialog';
-import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
+import type { RosterTabItem } from '@/components/rostering/tab-strip';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import CreateTimesheetDialog, {
     type ClientOption,
@@ -11,7 +10,18 @@ import CreateTimesheetDialog, {
 import EditTimesheetDialog, {
     type EditTimesheetRow,
 } from '@/components/timesheets/edit-timesheet-dialog';
-import TimesheetsHero from '@/components/timesheets/timesheets-hero';
+import {
+    TimesheetActionDialog,
+    type TimesheetReviewAction,
+} from '@/components/timesheets/timesheet-action-dialog';
+import { timesheetEditContext } from '@/components/timesheets/timesheet-wizard';
+import TimesheetsHero, {
+    type TimesheetsHeroSummary,
+} from '@/components/timesheets/timesheets-hero';
+import {
+    useTimesheetFilters,
+    type TimesheetFilters,
+} from '@/components/timesheets/use-timesheet-filters';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
 } from '@/components/timesheets/view-timesheet-dialog';
@@ -19,8 +29,10 @@ import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly, WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { Head, router } from '@inertiajs/react';
+import type { LucideIcon } from 'lucide-react';
 import {
     AlertTriangle,
     Archive,
@@ -31,73 +43,48 @@ import {
     CheckCircle2,
     ClipboardCheck,
     Coffee,
-    Copy,
-    DollarSign,
     Eye,
-    FileDown,
-    Filter,
     Link2,
     ListChecks,
     MapPin,
-    MessageSquareWarning,
     Moon,
     MoreHorizontal,
     Pencil,
-    Receipt,
     RotateCcw,
-    Search,
     Send,
     Sun,
-    Trash2,
-    Undo2,
     User,
-    UserPlus,
     Users,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────
-type TimesheetRow = ViewTimesheetRow & {
+export type TimesheetRow = ViewTimesheetRow & {
     hours?: number;
     total_hours?: number;
-};
-
-type HeroSummary = {
-    firstName: string;
-    week_start: string;
-    week_end: string;
-    week_number: number;
-    timesheets_total: number;
-    timesheets_submitted: number;
-    timesheets_approved: number;
-    timesheets_returned: number;
-    unapproved: number;
-    hours_this_week: number;
-    hours_target: number;
-    next_payroll_date: string;
-    sites_count: number;
-    regions_count: number;
-    rostered_today: number;
-    staff_on_shift: number;
+    staff_employee_profile_id?: number | null;
+    staff_profile_url?: string | null;
 };
 
 type TabCounts = Record<string, number>;
 
 type Props = {
-    timesheets: { data: TimesheetRow[]; meta?: any };
-    filters: {
-        tab?: string;
-        from?: string;
-        to?: string;
-        client_id?: string;
-        staff_id?: string;
-        search?: string;
+    timesheets: { data: TimesheetRow[] };
+    filters: TimesheetFilters & { view?: number | null; edit?: number | null };
+    pagination: {
+        current_page: number;
+        last_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
     };
+    lists: { timesheets: { includes_detail_record: boolean; shown: number } };
+    evidence: { scope: string; checked_at: string; timezone: string };
     tabCounts: TabCounts;
-    heroSummary: HeroSummary;
+    heroSummary: TimesheetsHeroSummary;
     isOwnOnlyView: boolean;
     clients: ClientOption[];
     sites: SiteOption[];
@@ -105,6 +92,7 @@ type Props = {
     availableShifts: ShiftOption[];
     canApprove: boolean;
     canCreate: boolean;
+    canSubmit?: boolean;
 };
 
 const TABS: Array<{
@@ -117,40 +105,52 @@ const TABS: Array<{
     { key: 'draft', label: 'Drafts', icon: Pencil, tone: 'info' },
     {
         key: 'submitted',
-        label: 'Pending',
+        label: 'Awaiting approval',
         icon: ClipboardCheck,
         tone: 'warning',
     },
     { key: 'returned', label: 'Returned', icon: RotateCcw, tone: 'critical' },
     { key: 'approved', label: 'Approved', icon: CheckCircle2, tone: 'success' },
+    { key: 'rejected', label: 'Rejected', icon: XCircle, tone: 'critical' },
     { key: 'paid', label: 'Paid', icon: Banknote, tone: 'success' },
     { key: 'archived', label: 'Archive', icon: Archive, tone: 'primary' },
 ];
 
 // Preserved export — index.test.ts references this constant.
 export const needsApprovalBadgeClassName =
-    'border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning';
+    'border-status-warning/30 bg-status-warning-bg text-xs text-status-warning';
 
 export function canEditTimesheetRow(
-    row: Pick<TimesheetRow, 'can_edit' | 'attendance_session_id'>,
+    row: Pick<
+        TimesheetRow,
+        'can_edit' | 'can_update' | 'attendance_session_id'
+    >,
 ): boolean {
-    return Boolean(row.can_edit && row.attendance_session_id == null);
+    return Boolean(
+        row.can_edit &&
+        row.can_update === true &&
+        row.attendance_session_id == null,
+    );
 }
 
-function fmtTime(iso: string) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
+export function formatTimesheetTime(iso: string, timezone = WORKER_TIMEZONE) {
+    const date = new Date(iso);
+    if (!iso || Number.isNaN(date.getTime())) return '—';
+    return new Intl.DateTimeFormat('en-NZ', {
+        timeZone: timezone,
+        hour: 'numeric',
         minute: '2-digit',
-    });
+    }).format(date);
 }
+function hasLinkedShift(row: TimesheetRow): boolean {
+    return (row.shift_id ?? row.shift?.id ?? null) !== null;
+}
+function recordedActivityCount(row: TimesheetRow): number {
+    return hasLinkedShift(row) ? 0 : (row.activity_items?.length ?? 0);
+}
+
 function fmtDate(iso: string) {
-    if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
+    return formatDateOnly(iso?.slice(0, 10));
 }
 function initials(name?: string | null) {
     if (!name) return '?';
@@ -174,8 +174,10 @@ function hueFor(name?: string | null) {
 // ─────────────────────────────────────────────────────────────────────
 function HoverPopover({
     hover,
+    timezone,
 }: {
     hover: { row: TimesheetRow; rect: DOMRect } | null;
+    timezone: string;
 }) {
     if (!hover) return null;
     const { row: t, rect } = hover;
@@ -202,7 +204,7 @@ function HoverPopover({
         returned: 'Returned to staff for changes.',
         approved: 'Approved · ready for payroll.',
         rejected: 'Rejected — see notes.',
-        paid: 'Paid in the most recent pay run.',
+        paid: 'Recorded as paid. Open the record for payment history.',
         archived: 'Archived from the active list.',
     };
 
@@ -217,10 +219,10 @@ function HoverPopover({
             >
                 <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
                     <div className="min-w-0">
-                        <div className="text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                        <div className="text-xs tracking-wider text-muted-foreground uppercase">
                             Timesheet #{t.id}
                         </div>
-                        <div className="truncate text-[13px] font-semibold">
+                        <div className="truncate text-sm font-semibold">
                             {t.client
                                 ? `${t.client.first_name} ${t.client.last_name}`
                                 : (t.activity_type ?? 'Manual entry')}
@@ -229,46 +231,47 @@ function HoverPopover({
                     <TimesheetStatusBadge status={t.status} />
                 </div>
                 <div className="space-y-2.5 px-3 py-3 text-xs">
-                    <div className="text-[11.5px] text-muted-foreground italic">
+                    <div className="text-sm text-muted-foreground italic">
                         {blurb[t.status] ?? ''}
                     </div>
                     <div className="grid grid-cols-3 gap-1.5">
                         <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                            <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                 Hours
                             </div>
-                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                            <div className="mt-0.5 text-sm font-semibold tabular-nums">
                                 {hours.toFixed(2)}h
                             </div>
                         </div>
                         <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                            <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                 Break
                             </div>
-                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                            <div className="mt-0.5 text-sm font-semibold tabular-nums">
                                 {t.break_minutes}m
                             </div>
                         </div>
                         <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
-                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
+                            <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                 Mileage
                             </div>
-                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                            <div className="mt-0.5 text-sm font-semibold tabular-nums">
                                 {(t.mileage_km ?? 0) > 0
                                     ? `${t.mileage_km}km`
                                     : '—'}
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-[11.5px] text-muted-foreground">
+                    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm text-muted-foreground">
                         <span className="tabular-nums">
-                            {fmtTime(t.starts_at)} – {fmtTime(t.ends_at)}
+                            {formatTimesheetTime(t.starts_at, timezone)} –{' '}
+                            {formatTimesheetTime(t.ends_at, timezone)}
                         </span>
                         <span className="ml-auto">{fmtDate(t.work_date)}</span>
                     </div>
                     {t.shift ? (
                         <div className="rounded-md border border-border px-2 py-1.5">
-                            <div className="flex items-center justify-between text-[11.5px]">
+                            <div className="flex items-center justify-between text-sm">
                                 <span className="font-medium">
                                     Shift #{t.shift.id}
                                 </span>
@@ -280,20 +283,24 @@ function HoverPopover({
                                 </span>
                             </div>
                             {t.shift.location ? (
-                                <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <div className="mt-0.5 inline-flex items-center gap-1 text-xs text-muted-foreground">
                                     <MapPin className="h-3 w-3" />
                                     {t.shift.location}
                                 </div>
                             ) : null}
                         </div>
                     ) : null}
-                    {(t.tasks_total ?? 0) > 0 ? (
+                    {recordedActivityCount(t) > 0 ? (
+                        <div className="text-sm">
+                            Activity items: {recordedActivityCount(t)} recorded
+                        </div>
+                    ) : hasLinkedShift(t) && (t.tasks_total ?? 0) > 0 ? (
                         <div>
                             <div className="mb-1 flex items-center justify-between">
-                                <span className="text-[11.5px] font-medium">
+                                <span className="text-sm font-medium">
                                     Tasks pulled from shift
                                 </span>
-                                <span className="text-[11px] text-muted-foreground tabular-nums">
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                     {t.tasks_completed ?? 0}/
                                     {t.tasks_total ?? 0}
                                 </span>
@@ -311,7 +318,7 @@ function HoverPopover({
                             </div>
                         </div>
                     ) : null}
-                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-[11.5px] text-muted-foreground">
+                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-sm text-muted-foreground">
                         <div>
                             <span className="text-muted-foreground/70">
                                 Worked by
@@ -322,13 +329,13 @@ function HoverPopover({
                         </div>
                     </div>
                     {t.status === 'returned' && t.returned_notes ? (
-                        <div className="flex items-start gap-1.5 rounded-md bg-status-critical-bg px-2 py-1.5 text-[11.5px] text-status-critical">
+                        <div className="flex items-start gap-1.5 rounded-md bg-status-critical-bg px-2 py-1.5 text-sm text-status-critical">
                             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
                             <span>{t.returned_notes}</span>
                         </div>
                     ) : null}
                 </div>
-                <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-[10.5px] text-muted-foreground">
+                <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
                     Click to open · right-click for actions
                 </div>
             </GuardrailCard>
@@ -342,117 +349,76 @@ function HoverPopover({
 type MenuItem = {
     id?: string;
     label?: string;
-    icon?: any;
+    icon?: LucideIcon;
     tone?: 'primary' | 'success' | 'warning' | 'danger';
     separator?: boolean;
 };
 
-function menuItemsFor(t: TimesheetRow): MenuItem[] {
-    const common: MenuItem[] = [
+export function menuItemsFor(t: TimesheetRow): MenuItem[] {
+    const items: MenuItem[] = [
         { id: 'view', label: 'View timesheet', icon: Eye },
-        {
+    ];
+    if (t.shift)
+        items.push({
             id: 'shift',
-            label: 'Open linked shift → #' + (t.shift?.id ?? '—'),
+            label: `Open linked shift #${t.shift.id}`,
             icon: CalendarDays,
-        },
-        { id: 'client', label: 'Open client profile', icon: User },
-        { id: 'staff', label: 'Open staff profile', icon: Users },
-        { separator: true },
-    ];
-    const tail: MenuItem[] = [
-        { separator: true },
-        { id: 'copy', label: 'Copy timesheet link', icon: Link2 },
-        { id: 'pdf', label: 'Export as PDF', icon: FileDown },
-    ];
-    const byStatus: Record<string, MenuItem[]> = {
-        draft: [
-            { id: 'edit', label: 'Edit hours & breaks', icon: Pencil },
-            {
+        });
+    if (t.client)
+        items.push({ id: 'client', label: 'Open client profile', icon: User });
+    if (t.staff_profile_url)
+        items.push({ id: 'staff', label: 'Open staff profile', icon: Users });
+    if (t.can_mutate) {
+        if (['draft', 'returned'].includes(t.status) && canEditTimesheetRow(t))
+            items.push({
+                id: 'edit',
+                label: 'Edit hours & breaks',
+                icon: Pencil,
+            });
+        if (['draft', 'returned'].includes(t.status) && t.can_submit === true)
+            items.push({
                 id: 'submit',
                 label: 'Submit for approval',
                 icon: Send,
-                tone: 'primary',
-            },
-            { id: 'duplicate', label: 'Duplicate as new draft', icon: Copy },
-            {
-                id: 'discard',
-                label: 'Discard draft',
-                icon: Trash2,
-                tone: 'danger',
-            },
-        ],
-        submitted: [
-            {
-                id: 'approve',
-                label: 'Approve',
-                icon: CheckCircle2,
-                tone: 'success',
-            },
-            {
-                id: 'return',
-                label: 'Return for changes…',
-                icon: RotateCcw,
-                tone: 'warning',
-            },
-            { id: 'reject', label: 'Reject…', icon: XCircle, tone: 'danger' },
-            { id: 'reassign', label: 'Re-assign approver', icon: UserPlus },
-        ],
-        returned: [
-            { id: 'edit', label: 'Edit & resubmit', icon: Pencil },
-            {
-                id: 'notes',
-                label: 'View return notes',
-                icon: MessageSquareWarning,
-            },
-            {
-                id: 'discard',
-                label: 'Discard timesheet',
-                icon: Trash2,
-                tone: 'danger',
-            },
-        ],
-        approved: [
-            { id: 'reopen', label: 'Re-open for correction', icon: Undo2 },
-            { id: 'payroll', label: 'View payroll impact', icon: DollarSign },
-        ],
-        paid: [
-            { id: 'payslip', label: 'View payslip line', icon: Receipt },
-            { id: 'archive', label: 'Archive timesheet', icon: Archive },
-            {
-                id: 'correction',
-                label: 'Raise correction request',
-                icon: AlertTriangle,
-                tone: 'warning',
-            },
-        ],
-        rejected: [
-            {
-                id: 'reason',
-                label: 'View rejection reason',
-                icon: MessageSquareWarning,
-            },
-            { id: 'recreate', label: 'Recreate from this', icon: Copy },
-            { id: 'archive', label: 'Archive timesheet', icon: Archive },
-        ],
-        archived: [
-            {
+            });
+        if (t.status === 'submitted') {
+            if (t.can_approve)
+                items.push({
+                    id: 'approve',
+                    label: 'Approve',
+                    icon: CheckCircle2,
+                    tone: 'success',
+                });
+            if (t.can_return)
+                items.push({
+                    id: 'return',
+                    label: 'Return for changes',
+                    icon: RotateCcw,
+                    tone: 'warning',
+                });
+            if (t.can_reject)
+                items.push({
+                    id: 'reject',
+                    label: 'Reject',
+                    icon: XCircle,
+                    tone: 'danger',
+                });
+        }
+        if (!t.archived_at && ['paid', 'rejected'].includes(t.status))
+            items.push({
+                id: 'archive',
+                label: 'Archive timesheet',
+                icon: Archive,
+            });
+        if (t.archived_at || t.status === 'archived')
+            items.push({
                 id: 'restore',
                 label: 'Restore to active list',
                 icon: ArchiveRestore,
-                tone: 'primary',
-            },
-            { id: 'pdf', label: 'Download archived copy', icon: FileDown },
-        ],
-    };
-    const statusItems = (byStatus[t.status] ?? []).filter(
-        (item) => item.id !== 'edit' || canEditTimesheetRow(t),
-    );
-
-    return [
-        ...common,
-        ...(t.can_mutate ? statusItems : []),
-        ...tail,
-    ];
+            });
+    }
+    items.push({ id: 'copy', label: 'Copy timesheet link', icon: Link2 });
+    return items;
 }
 
 function ContextMenu({
@@ -471,27 +437,31 @@ function ContextMenu({
                 onClose();
         };
         const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+        if (menu)
+            ref.current
+                ?.querySelector<HTMLButtonElement>('[role=menuitem]')
+                ?.focus();
         document.addEventListener('mousedown', onAway);
         document.addEventListener('keydown', onKey);
         return () => {
             document.removeEventListener('mousedown', onAway);
             document.removeEventListener('keydown', onKey);
         };
-    }, [onClose]);
+    }, [onClose, menu]);
 
     if (!menu) return null;
     const { x, y, row } = menu;
     const items = menuItemsFor(row);
     const W = 260;
     const H = Math.min(440, 36 * items.length + 56);
-    const left = Math.min(x, window.innerWidth - W - 8);
-    const top = Math.min(y, window.innerHeight - H - 8);
+    const left = Math.max(8, Math.min(x, window.innerWidth - W - 8));
+    const top = Math.max(8, Math.min(y, window.innerHeight - H - 8));
 
     const toneCls: Record<string, string> = {
         primary: 'text-foreground',
-        success: 'text-emerald-700 hover:bg-emerald-50',
-        warning: 'text-amber-700 hover:bg-amber-50',
-        danger: 'text-rose-700 hover:bg-rose-50',
+        success: 'text-status-success hover:bg-status-success-bg',
+        warning: 'text-status-warning hover:bg-status-warning-bg',
+        danger: 'text-status-critical hover:bg-status-critical-bg',
     };
 
     return (
@@ -499,18 +469,43 @@ function ContextMenu({
             unstyled
             ref={ref}
             role="menu"
+            aria-label={`Timesheet ${row.id} actions`}
+            onKeyDown={(event) => {
+                const buttons = Array.from(
+                    ref.current?.querySelectorAll<HTMLButtonElement>(
+                        '[role=menuitem]',
+                    ) ?? [],
+                );
+                const current = buttons.indexOf(
+                    document.activeElement as HTMLButtonElement,
+                );
+                const index =
+                    event.key === 'Home'
+                        ? 0
+                        : event.key === 'End'
+                          ? buttons.length - 1
+                          : event.key === 'ArrowDown'
+                            ? (current + 1) % buttons.length
+                            : event.key === 'ArrowUp'
+                              ? (current + buttons.length - 1) % buttons.length
+                              : -1;
+                if (index >= 0) {
+                    event.preventDefault();
+                    buttons[index]?.focus();
+                }
+            }}
             className="fixed z-[60] w-[260px] overflow-hidden rounded-xl border border-border bg-card py-1.5 shadow-2xl ring-1 ring-black/5"
             style={{ left, top }}
         >
             <div className="flex items-center justify-between gap-2 px-3 py-1.5">
                 <div className="min-w-0">
-                    <div className="truncate text-[11.5px] font-semibold">
+                    <div className="truncate text-sm font-semibold">
                         #{row.id} ·{' '}
                         {row.client
                             ? `${row.client.first_name} ${row.client.last_name}`
                             : (row.activity_type ?? 'Manual')}
                     </div>
-                    <div className="text-[10.5px] text-muted-foreground">
+                    <div className="text-xs text-muted-foreground">
                         {row.staff?.name ?? 'Staff'} · {fmtDate(row.work_date)}
                     </div>
                 </div>
@@ -532,7 +527,7 @@ function ContextMenu({
                             onClose();
                         }}
                         className={cn(
-                            'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] hover:bg-muted',
+                            'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-sm hover:bg-muted',
                             toneCls[it.tone ?? 'primary'] ?? 'text-foreground',
                         )}
                         role="menuitem"
@@ -577,6 +572,9 @@ function weekStartFor(iso: string): string {
 export default function TimesheetsIndex({
     timesheets,
     filters,
+    pagination,
+    lists,
+    evidence,
     tabCounts,
     heroSummary,
     isOwnOnlyView,
@@ -586,9 +584,18 @@ export default function TimesheetsIndex({
     availableShifts,
     canApprove,
     canCreate,
+    canSubmit = false,
 }: Props) {
-    const [tab, setTab] = useState(filters.tab ?? 'all');
-    const [search, setSearch] = useState(filters.search ?? '');
+    const reads = useTimesheetFilters({
+        tab: filters.tab ?? 'all',
+        from: filters.from ?? null,
+        to: filters.to ?? null,
+        client_id: filters.client_id ?? null,
+        staff_id: filters.staff_id ?? null,
+        search: filters.search ?? '',
+        page: filters.page ?? 1,
+    });
+    const tab = filters.tab ?? 'all';
     const [menu, setMenu] = useState<{
         x: number;
         y: number;
@@ -600,10 +607,17 @@ export default function TimesheetsIndex({
     } | null>(null);
     const [viewing, setViewing] = useState<TimesheetRow | null>(null);
     const [editing, setEditing] = useState<TimesheetRow | null>(null);
+    const [editingOpen, setEditingOpen] = useState(false);
+    const [reasonOpen, setReasonOpen] = useState(false);
     const [reasonTarget, setReasonTarget] = useState<{
-        action: 'reject' | 'return';
+        action: TimesheetReviewAction;
         row: TimesheetRow;
     } | null>(null);
+    // Event callbacks retained by a viewer must read the committed current cohort.
+    const dialogContext = useRef({ rows: timesheets.data, canApprove });
+    useLayoutEffect(() => {
+        dialogContext.current = { rows: timesheets.data, canApprove };
+    }, [timesheets.data, canApprove]);
     const [createOpen, setCreateOpen] = useState(false);
     const [initialShiftId, setInitialShiftId] = useState<number | null>(null);
     const [selectedApprovalIds, setSelectedApprovalIds] = useState<number[]>(
@@ -629,20 +643,91 @@ export default function TimesheetsIndex({
         const editId = params.get('edit');
         if (editId) {
             const row = timesheets.data.find((r) => String(r.id) === editId);
-            if (row && canEditTimesheetRow(row)) setEditing(row);
+            if (row && canEditTimesheetRow(row)) openEditing(row);
             else if (row) setViewing(row);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const rows = timesheets.data;
-    const submittedCount = tabCounts.submitted ?? 0;
+    // The legacy deep-link record is intentionally outside the filtered page.
+    const rows = lists.timesheets.includes_detail_record
+        ? timesheets.data.slice(1)
+        : timesheets.data;
+    const detailRecord = lists.timesheets.includes_detail_record
+        ? timesheets.data[0]
+        : null;
+    const selectionKey = JSON.stringify(
+        rows.map((row) => [row.id, row.status, row.can_approve]),
+    );
+    useEffect(() => {
+        setSelectedApprovalIds([]);
+        setMenu(null);
+        setHover(null);
+    }, [selectionKey]);
+    useEffect(
+        () => () => {
+            if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+        },
+        [],
+    );
     const selectableApprovalIds = rows
         .filter((row) => row.status === 'submitted' && row.can_approve)
         .map((row) => row.id);
     const allVisibleApprovalsSelected =
         selectableApprovalIds.length > 0 &&
         selectableApprovalIds.every((id) => selectedApprovalIds.includes(id));
+
+    const currentViewed = timesheets.data.find((row) => row.id === viewing?.id);
+    const currentEdited = timesheets.data.find((row) => row.id === editing?.id);
+    const currentReason = timesheets.data.find(
+        (row) => row.id === reasonTarget?.row.id,
+    );
+    const currentMenuRow = timesheets.data.find(
+        (row) => row.id === menu?.row.id,
+    );
+    const currentHoverRow = timesheets.data.find(
+        (row) => row.id === hover?.row.id,
+    );
+    const reasonAllowed = Boolean(
+        currentReason?.can_mutate &&
+        (reasonTarget?.action === 'submit'
+            ? currentReason.can_submit === true
+            : canApprove &&
+              (reasonTarget?.action === 'approve'
+                  ? currentReason.can_approve === true
+                  : reasonTarget?.action === 'reject'
+                    ? currentReason.can_reject === true
+                    : currentReason.can_return === true)),
+    );
+
+    function openEditing(row: TimesheetRow) {
+        const current = dialogContext.current.rows.find(
+            (candidate) => candidate.id === row.id,
+        );
+        if (!current || !canEditTimesheetRow(current)) return;
+        setEditing(current);
+        setEditingOpen(true);
+    }
+
+    function openReview(row: ViewTimesheetRow, action: TimesheetReviewAction) {
+        const context = dialogContext.current;
+        const current = context.rows.find(
+            (candidate) => candidate.id === row.id,
+        );
+        if (!current?.can_mutate) return;
+        const allowed =
+            action === 'submit'
+                ? current.can_submit === true
+                : context.canApprove &&
+                  (action === 'approve'
+                      ? current.can_approve === true
+                      : action === 'reject'
+                        ? current.can_reject === true
+                        : current.can_return === true);
+        if (!allowed) return;
+        setReasonTarget({ action, row: current });
+        setReasonOpen(true);
+    }
 
     function toggleApprovalSelection(id: number, checked: boolean) {
         setSelectedApprovalIds((current) =>
@@ -672,59 +757,14 @@ export default function TimesheetsIndex({
     }
 
     function switchTab(next: string) {
-        setTab(next);
-        router.get(
-            '/operations/timesheets',
-            { ...filters, tab: next, search: search || undefined },
-            { preserveScroll: true, preserveState: true, replace: true },
-        );
+        reads.change({ tab: next });
     }
-
-    function submitSearch() {
-        router.get(
-            '/operations/timesheets',
-            { ...filters, tab, search: search || undefined },
-            { preserveScroll: true, preserveState: true, replace: true },
-        );
-    }
-
-    // Week stepper — writes the existing from/to filters (one source of
-    // truth); the default view stays unfiltered so the approval queue never
-    // week-hides unless the user explicitly steps into a week.
-    const weekFilterActive = Boolean(
-        filters.from &&
-        filters.to &&
-        weekStartFor(filters.from) === filters.from &&
-        addDaysIso(filters.from, 6) === filters.to,
-    );
-
     function gotoWeek(iso: string) {
         const start = weekStartFor(iso);
-        router.get(
-            '/operations/timesheets',
-            {
-                ...filters,
-                tab,
-                search: search || undefined,
-                from: start,
-                to: addDaysIso(start, 6),
-            },
-            { preserveScroll: true, preserveState: true, replace: true },
-        );
+        reads.change({ from: start, to: addDaysIso(start, 6) });
     }
-
     function clearWeek() {
-        router.get(
-            '/operations/timesheets',
-            {
-                ...filters,
-                tab,
-                search: search || undefined,
-                from: undefined,
-                to: undefined,
-            },
-            { preserveScroll: true, preserveState: true, replace: true },
-        );
+        reads.change({ from: null, to: null });
     }
 
     function handleAction(id: string, row: TimesheetRow) {
@@ -755,7 +795,7 @@ export default function TimesheetsIndex({
                 setViewing(row);
                 return;
             case 'edit':
-                if (canEditTimesheetRow(row)) setEditing(row);
+                if (canEditTimesheetRow(row)) openEditing(row);
                 else setViewing(row);
                 return;
             case 'shift':
@@ -767,27 +807,13 @@ export default function TimesheetsIndex({
                     router.visit(`/operations/clients/${row.client.id}`);
                 return;
             case 'staff':
-                if (row.staff) router.visit(`/hr/people/${row.staff.id}`);
+                if (row.staff_profile_url) router.visit(row.staff_profile_url);
                 return;
             case 'submit':
-                router.post(
-                    `/operations/timesheets/${row.id}/submit`,
-                    {},
-                    { preserveScroll: true },
-                );
-                return;
             case 'approve':
-                router.post(
-                    `/operations/timesheets/${row.id}/approve`,
-                    {},
-                    { preserveScroll: true },
-                );
-                return;
             case 'return':
-                setReasonTarget({ action: 'return', row });
-                return;
             case 'reject':
-                setReasonTarget({ action: 'reject', row });
+                openReview(row, id);
                 return;
             case 'archive':
                 router.post(
@@ -816,116 +842,115 @@ export default function TimesheetsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Workforce', href: '/operations/timesheets' },
                 {
                     title: isOwnOnlyView ? 'My timesheets' : 'Timesheets',
                     href: '/operations/timesheets',
                 },
             ]}
         >
-            <Head title={isOwnOnlyView ? 'My Timesheets' : 'Timesheets'} />
+            <Head title={isOwnOnlyView ? 'My timesheets' : 'Timesheets'} />
 
             <PageShell>
                 <TimesheetsHero
                     summary={heroSummary}
+                    counts={tabCounts}
+                    filters={reads.draft}
+                    clients={clients.map((client) => ({
+                        id: client.id,
+                        name: `${client.first_name} ${client.last_name}`,
+                    }))}
+                    staff={staff}
                     canCreate={canCreate}
-                    sitesCount={sites?.length ?? heroSummary.sites_count}
-                    staffCount={staff?.length ?? 0}
+                    canReviewAdjustments={canApprove}
+                    ownOnly={isOwnOnlyView}
+                    loading={reads.loading}
                     onCreateTimesheet={() => {
                         setInitialShiftId(null);
                         setCreateOpen(true);
                     }}
+                    onSearch={reads.editSearch}
+                    onSearchSubmit={() => reads.change()}
+                    onChange={reads.change}
+                    onClear={reads.clear}
                     onPrevWeek={() =>
                         gotoWeek(addDaysIso(heroSummary.week_start, -7))
                     }
                     onNextWeek={() =>
                         gotoWeek(addDaysIso(heroSummary.week_start, 7))
                     }
-                    onPickWeek={(d) => gotoWeek(toLocalIsoDate(d))}
-                    onClearWeek={weekFilterActive ? clearWeek : undefined}
-                    weekFilterActive={weekFilterActive}
+                    onPickWeek={(date) => gotoWeek(toLocalIsoDate(date))}
+                    onClearWeek={clearWeek}
+                    rangeLabel={`Showing ${pagination.from ?? 0}–${pagination.to ?? 0} of ${pagination.total} matching timesheets · Page ${pagination.current_page} of ${pagination.last_page}`}
+                    notice={
+                        reads.error
+                            ? `${reads.error} The list still shows the previous successful results.`
+                            : null
+                    }
+                    rail={
+                        <fieldset
+                            disabled={reads.loading}
+                            className="w-full min-w-0"
+                        >
+                            <PageHeaderRail
+                                value={tab}
+                                onSelect={switchTab}
+                                ariaLabel="Timesheet status"
+                                items={TABS.map((item) => ({
+                                    key: item.key,
+                                    label: item.label,
+                                    icon: item.icon,
+                                    alert: ['submitted', 'returned'].includes(
+                                        item.key,
+                                    ),
+                                    count: tabCounts[item.key] ?? 0,
+                                }))}
+                            />
+                        </fieldset>
+                    }
                 />
-
-                {/* KPI strip */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <OpsStatCard
-                        label="Awaiting approval"
-                        value={heroSummary.timesheets_submitted}
-                        icon={ClipboardCheck}
-                        color="amber"
-                    />
-                    <OpsStatCard
-                        label="Returned to staff"
-                        value={heroSummary.timesheets_returned}
-                        icon={AlertTriangle}
-                        color="red"
-                    />
-                    <OpsStatCard
-                        label="Approved this week"
-                        value={heroSummary.timesheets_approved}
-                        icon={Send}
-                        color="emerald"
-                    />
-                    <OpsStatCard
-                        label="Hours logged"
-                        value={`${heroSummary.hours_this_week}h`}
-                        icon={DollarSign}
-                        color="indigo"
-                    />
-                </div>
-
-                {/* Table */}
-                <section className="rounded-2xl border border-border bg-card shadow-sm">
-                    {/* Tab strip */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
-                        <TabStrip
-                            value={tab}
-                            onChange={switchTab}
-                            ariaLabel="Timesheet status"
-                            className="border-0 bg-transparent p-0 shadow-none"
-                            items={TABS.map((tabDef) => ({
-                                id: tabDef.key,
-                                label: tabDef.label,
-                                icon: tabDef.icon,
-                                tone: tabDef.tone,
-                                badge: tabCounts[tabDef.key] ?? 0,
-                            }))}
-                        />
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') submitSearch();
-                                    }}
-                                    placeholder="Search timesheets…"
-                                    className="h-8 w-56 pl-8 text-xs"
-                                />
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5 text-xs"
-                                onClick={submitSearch}
-                            >
-                                <Filter className="h-3.5 w-3.5" /> Search
-                            </Button>
-                            {submittedCount > 0 ? (
-                                <Button
-                                    size="sm"
-                                    className="gap-1.5 text-xs"
-                                    onClick={() => switchTab('submitted')}
-                                >
-                                    Review {submittedCount} pending
-                                </Button>
-                            ) : null}
-                        </div>
-                    </div>
-
+                {reads.error && (
+                    <Button
+                        variant="outline"
+                        disabled={reads.loading}
+                        onClick={reads.retry}
+                    >
+                        Retry loading timesheets
+                    </Button>
+                )}
+                <p className="text-subtle">
+                    {evidence.scope === 'own_and_permitted_submitted_records'
+                        ? 'This review queue includes your records and other staff’s submitted timesheets that you may review. Other status tabs keep their own permitted scope.'
+                        : isOwnOnlyView
+                          ? canApprove
+                              ? 'Showing your records. The approval tab may include other submitted timesheets you are permitted to review.'
+                              : 'Showing your records for permitted sites.'
+                          : 'Showing records for sites you are permitted to view.'}{' '}
+                    Status counts cover every matching page in each destination.
+                </p>
+                {detailRecord && (
+                    <GuardrailCard className="flex flex-wrap items-center justify-between gap-2 p-3">
+                        <p className="text-subtle">
+                            Linked timesheet #{detailRecord.id} is outside these
+                            filters.
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={() => setViewing(detailRecord)}
+                        >
+                            Open linked timesheet
+                        </Button>
+                    </GuardrailCard>
+                )}
+                <section
+                    aria-label="Timesheet records"
+                    aria-busy={reads.loading}
+                    className="rounded-2xl border border-border bg-card shadow-sm"
+                >
                     {canApprove && selectedApprovalIds.length > 0 ? (
                         <div className="flex flex-wrap items-end gap-3 border-b border-border bg-status-warning-bg/40 px-4 py-3">
-                            <div className="min-w-[260px] flex-1">
+                            <div className="min-w-0 flex-1">
                                 <label
                                     htmlFor="timesheet-approval-notes"
                                     className="mb-1 block text-xs font-semibold"
@@ -955,10 +980,151 @@ export default function TimesheetsIndex({
                         </div>
                     ) : null}
 
-                    {/* Table */}
-                    <div className="overflow-x-auto">
+                    <div className="space-y-3 p-3 md:hidden">
+                        {rows.map((row) => (
+                            <GuardrailCard
+                                key={row.id}
+                                className="space-y-3 p-3"
+                                aria-label={`Timesheet ${row.id}`}
+                            >
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div>
+                                        <p className="font-semibold">
+                                            {fmtDate(row.work_date)}
+                                        </p>
+                                        <p className="text-subtle">
+                                            {formatTimesheetTime(
+                                                row.starts_at,
+                                                evidence.timezone,
+                                            )}{' '}
+                                            –{' '}
+                                            {formatTimesheetTime(
+                                                row.ends_at,
+                                                evidence.timezone,
+                                            )}
+                                        </p>
+                                    </div>
+                                    <TimesheetStatusBadge status={row.status} />
+                                </div>
+                                {!isOwnOnlyView && (
+                                    <p className="text-sm">
+                                        {row.staff?.name ?? 'Staff unavailable'}
+                                    </p>
+                                )}
+                                <p className="text-sm">
+                                    {row.client
+                                        ? `${row.client.first_name} ${row.client.last_name}`
+                                        : (row.activity_type ?? 'Manual entry')}
+                                    {row.shift?.location || row.site?.name
+                                        ? ` · ${row.shift?.location ?? row.site?.name}`
+                                        : ''}
+                                </p>
+                                <dl className="grid grid-cols-2 gap-2 text-sm">
+                                    <div>
+                                        <dt className="text-subtle">
+                                            Recorded hours
+                                        </dt>
+                                        <dd>
+                                            {Number(
+                                                row.total_hours ??
+                                                    row.hours ??
+                                                    0,
+                                            ).toFixed(2)}
+                                            h
+                                        </dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-subtle">Break</dt>
+                                        <dd>{row.break_minutes} min</dd>
+                                    </div>
+                                </dl>
+                                <p className="text-subtle">
+                                    {row.shift?.shift_type?.replaceAll(
+                                        '_',
+                                        ' ',
+                                    ) ??
+                                        row.activity_type ??
+                                        'Manual activity'}
+                                    {Number(row.mileage_km ?? 0) > 0
+                                        ? ` · ${row.mileage_km}km`
+                                        : ''}
+                                    {row.sleepover ? ' · Sleepover' : ''}
+                                    {row.on_call ? ' · On call' : ''}
+                                </p>
+                                {recordedActivityCount(row) > 0 ? (
+                                    <p className="text-subtle">
+                                        Activity items:{' '}
+                                        {recordedActivityCount(row)} recorded
+                                    </p>
+                                ) : hasLinkedShift(row) &&
+                                  (row.tasks_total ?? 0) > 0 ? (
+                                    <p className="text-subtle">
+                                        Recorded shift tasks:{' '}
+                                        {row.tasks_completed ?? 0}/
+                                        {row.tasks_total}
+                                    </p>
+                                ) : null}
+                                {row.returned_notes &&
+                                    row.status === 'returned' && (
+                                        <p className="text-sm text-status-critical">
+                                            Returned: {row.returned_notes}
+                                        </p>
+                                    )}
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {canApprove &&
+                                        row.status === 'submitted' &&
+                                        row.can_approve && (
+                                            <label className="frontline-tap flex items-center gap-2 text-sm">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedApprovalIds.includes(
+                                                        row.id,
+                                                    )}
+                                                    onChange={(event) =>
+                                                        toggleApprovalSelection(
+                                                            row.id,
+                                                            event.target
+                                                                .checked,
+                                                        )
+                                                    }
+                                                />{' '}
+                                                Select #{row.id}
+                                            </label>
+                                        )}
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setViewing(row)}
+                                    >
+                                        Open timesheet #{row.id}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={(event) => {
+                                            const rect =
+                                                event.currentTarget.getBoundingClientRect();
+                                            setMenu({
+                                                x: rect.left,
+                                                y: rect.bottom,
+                                                row,
+                                            });
+                                        }}
+                                    >
+                                        Actions for #{row.id}
+                                    </Button>
+                                </div>
+                            </GuardrailCard>
+                        ))}
+                        {rows.length === 0 && (
+                            <p className="text-subtle p-4">
+                                No timesheets match these filters. Choose
+                                another status or clear filters.
+                            </p>
+                        )}
+                    </div>
+                    {/* Desktop table keeps the full comparison columns. */}
+                    <div className="hidden overflow-x-auto md:block">
                         <table className="w-full text-sm">
-                            <thead className="bg-muted/40 text-[11.5px] tracking-wider text-muted-foreground uppercase">
+                            <thead className="bg-muted/40 text-sm tracking-wider text-muted-foreground uppercase">
                                 <tr className="text-left">
                                     <th className="w-10 py-2.5 pl-4">
                                         <input
@@ -992,7 +1158,9 @@ export default function TimesheetsIndex({
                                         Shift / activity
                                     </th>
                                     <th className="px-2 py-2.5">Hours</th>
-                                    <th className="px-2 py-2.5">Tasks</th>
+                                    <th className="px-2 py-2.5">
+                                        Tasks / activities
+                                    </th>
                                     <th className="px-2 py-2.5">Status</th>
                                     <th className="py-2.5 pr-4 text-right">
                                         Actions
@@ -1091,16 +1259,23 @@ export default function TimesheetsIndex({
                                                 <div className="font-semibold">
                                                     {fmtDate(t.work_date)}
                                                 </div>
-                                                <div className="text-[11px] text-muted-foreground tabular-nums">
-                                                    {fmtTime(t.starts_at)} –{' '}
-                                                    {fmtTime(t.ends_at)}
+                                                <div className="text-xs text-muted-foreground tabular-nums">
+                                                    {formatTimesheetTime(
+                                                        t.starts_at,
+                                                        evidence.timezone,
+                                                    )}{' '}
+                                                    –{' '}
+                                                    {formatTimesheetTime(
+                                                        t.ends_at,
+                                                        evidence.timezone,
+                                                    )}
                                                 </div>
                                             </td>
                                             {!isOwnOnlyView ? (
                                                 <td className="px-2 py-3">
                                                     <div className="flex items-center gap-2">
                                                         <div
-                                                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                                                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-white"
                                                             style={{
                                                                 background: `oklch(0.55 0.14 ${hueFor(t.staff?.name)})`,
                                                             }}
@@ -1115,7 +1290,7 @@ export default function TimesheetsIndex({
                                                                     ?.name ??
                                                                     '—'}
                                                             </div>
-                                                            <div className="text-[11px] text-muted-foreground">
+                                                            <div className="text-xs text-muted-foreground">
                                                                 #{t.staff?.id}
                                                             </div>
                                                         </div>
@@ -1135,7 +1310,7 @@ export default function TimesheetsIndex({
                                                 </div>
                                                 {t.shift?.location ||
                                                 t.site?.name ? (
-                                                    <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                    <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                                         <MapPin className="h-3 w-3" />
                                                         {t.shift?.location ??
                                                             t.site?.name}
@@ -1143,7 +1318,7 @@ export default function TimesheetsIndex({
                                                 ) : null}
                                             </td>
                                             <td className="px-2 py-3">
-                                                <div className="text-[12px] capitalize">
+                                                <div className="text-sm capitalize">
                                                     {t.shift
                                                         ? (
                                                               t.shift
@@ -1153,7 +1328,7 @@ export default function TimesheetsIndex({
                                                         : (t.activity_type ??
                                                           'manual')}
                                                 </div>
-                                                <div className="text-[11px] text-muted-foreground">
+                                                <div className="text-xs text-muted-foreground">
                                                     {typeof t.shift
                                                         ?.service_context ===
                                                     'string'
@@ -1168,7 +1343,7 @@ export default function TimesheetsIndex({
                                                 <div className="font-semibold tabular-nums">
                                                     {hours.toFixed(2)}h
                                                 </div>
-                                                <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
                                                     <Coffee className="h-3 w-3" />
                                                     {t.break_minutes}m
                                                     {(t.mileage_km ?? 0) > 0 ? (
@@ -1188,7 +1363,21 @@ export default function TimesheetsIndex({
                                                 </div>
                                             </td>
                                             <td className="w-[120px] px-2 py-3">
-                                                {(t.tasks_total ?? 0) > 0 ? (
+                                                {recordedActivityCount(t) >
+                                                0 ? (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {recordedActivityCount(
+                                                            t,
+                                                        )}{' '}
+                                                        activity{' '}
+                                                        {recordedActivityCount(
+                                                            t,
+                                                        ) === 1
+                                                            ? 'item'
+                                                            : 'items'}
+                                                    </span>
+                                                ) : hasLinkedShift(t) &&
+                                                  (t.tasks_total ?? 0) > 0 ? (
                                                     <div className="flex items-center gap-1.5">
                                                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                                             <div
@@ -1206,13 +1395,13 @@ export default function TimesheetsIndex({
                                                                 }}
                                                             />
                                                         </div>
-                                                        <span className="w-9 text-right text-[11px] text-muted-foreground tabular-nums">
+                                                        <span className="w-9 text-right text-xs text-muted-foreground tabular-nums">
                                                             {t.tasks_completed}/
                                                             {t.tasks_total}
                                                         </span>
                                                     </div>
                                                 ) : (
-                                                    <span className="text-[11px] text-muted-foreground/60">
+                                                    <span className="text-xs text-muted-foreground/60">
                                                         —
                                                     </span>
                                                 )}
@@ -1236,7 +1425,7 @@ export default function TimesheetsIndex({
                                                         }
                                                         aria-label="View timesheet"
                                                         title="View timesheet"
-                                                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                                        className="frontline-hit grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                                                     >
                                                         <Eye className="h-3.5 w-3.5" />
                                                     </Button>
@@ -1253,7 +1442,7 @@ export default function TimesheetsIndex({
                                                         }}
                                                         aria-label="Row actions"
                                                         title="More actions"
-                                                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                                        className="frontline-hit grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                                                     >
                                                         <MoreHorizontal className="h-3.5 w-3.5" />
                                                     </Button>
@@ -1278,42 +1467,93 @@ export default function TimesheetsIndex({
                         ) : null}
                     </div>
 
-                    {/* Pagination footer */}
-                    <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+                    <nav
+                        aria-label="Timesheet pages"
+                        className="text-subtle flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3"
+                    >
                         <span>
-                            Showing{' '}
-                            <span className="font-medium text-foreground">
-                                {rows.length}
-                            </span>{' '}
-                            of{' '}
-                            <span className="font-medium text-foreground">
-                                {tabCounts[tab] ?? rows.length}
-                            </span>{' '}
-                            timesheets ·{' '}
-                            <span>right-click any row for actions</span>
+                            Showing {pagination.from ?? 0}–{pagination.to ?? 0}{' '}
+                            of {pagination.total} timesheets · Page{' '}
+                            {pagination.current_page} of {pagination.last_page}
                         </span>
-                    </div>
+                        <div className="flex max-w-full min-w-0 flex-wrap gap-2">
+                            <Button
+                                variant="outline"
+                                className="max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
+                                disabled={
+                                    reads.loading ||
+                                    pagination.current_page <= 1
+                                }
+                                onClick={() =>
+                                    reads.page(pagination.current_page - 1)
+                                }
+                            >
+                                Previous page
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="max-md:min-h-[44px] max-md:max-w-full max-md:whitespace-normal"
+                                disabled={
+                                    reads.loading ||
+                                    pagination.current_page >=
+                                        pagination.last_page
+                                }
+                                onClick={() =>
+                                    reads.page(pagination.current_page + 1)
+                                }
+                            >
+                                Next page
+                            </Button>
+                        </div>
+                    </nav>
 
                     <ContextMenu
-                        menu={menu}
+                        menu={
+                            menu && currentMenuRow
+                                ? { ...menu, row: currentMenuRow }
+                                : null
+                        }
                         onClose={() => setMenu(null)}
                         onAction={handleAction}
                     />
-                    <HoverPopover hover={hover} />
+                    <HoverPopover
+                        hover={
+                            hover && currentHoverRow
+                                ? { ...hover, row: currentHoverRow }
+                                : null
+                        }
+                        timezone={evidence.timezone}
+                    />
                 </section>
             </PageShell>
 
             <ViewTimesheetDialog
-                open={!!viewing}
-                timesheet={viewing}
+                open={Boolean(viewing && currentViewed)}
+                timesheet={currentViewed ?? null}
                 onOpenChange={(o) => !o && setViewing(null)}
-                canApprove={Boolean(viewing?.can_approve)}
+                canApprove={Boolean(
+                    canApprove &&
+                    currentViewed?.can_approve &&
+                    currentViewed.can_mutate &&
+                    currentViewed.status === 'submitted',
+                )}
+                canSubmit={Boolean(currentViewed?.can_submit === true)}
+                onReviewAction={openReview}
             />
             <EditTimesheetDialog
-                open={!!editing}
-                timesheet={editing as EditTimesheetRow | null}
-                onOpenChange={(o) => !o && setEditing(null)}
+                open={editingOpen}
+                timesheet={(currentEdited ?? null) as EditTimesheetRow | null}
+                canEdit={Boolean(
+                    currentEdited &&
+                    canEditTimesheetRow(currentEdited) &&
+                    timesheetEditContext(editing) ===
+                        timesheetEditContext(currentEdited) &&
+                    ['draft', 'returned'].includes(currentEdited.status),
+                )}
+                onOpenChange={setEditingOpen}
                 clients={clients}
+                workerTimezone={evidence.timezone}
+                canSubmit={currentEdited?.can_resubmit === true}
             />
             <CreateTimesheetDialog
                 open={createOpen}
@@ -1322,43 +1562,16 @@ export default function TimesheetsIndex({
                 clients={clients}
                 sites={sites}
                 initialShiftId={initialShiftId}
+                canCreate={canCreate}
+                canSubmit={canSubmit}
+                workerTimezone={evidence.timezone}
             />
-            <ReasonDialog
-                open={reasonTarget !== null}
-                onClose={() => setReasonTarget(null)}
-                title={
-                    reasonTarget?.action === 'reject'
-                        ? 'Reject timesheet?'
-                        : 'Return for changes?'
-                }
-                description={
-                    reasonTarget?.action === 'reject'
-                        ? 'The staff member will see this timesheet as rejected, with your reason.'
-                        : 'The timesheet goes back to the staff member to fix and resubmit.'
-                }
-                label={
-                    reasonTarget?.action === 'reject'
-                        ? 'Reason for rejection'
-                        : 'What needs changing?'
-                }
-                confirmLabel={
-                    reasonTarget?.action === 'reject'
-                        ? 'Reject timesheet'
-                        : 'Return to staff'
-                }
-                destructive={reasonTarget?.action === 'reject'}
-                onConfirm={(reason) => {
-                    if (!reasonTarget) return;
-                    const { action, row } = reasonTarget;
-                    router.post(
-                        `/operations/timesheets/${row.id}/${action}`,
-                        action === 'reject'
-                            ? { decision_notes: reason }
-                            : { returned_notes: reason },
-                        { preserveScroll: true },
-                    );
-                    setReasonTarget(null);
-                }}
+            <TimesheetActionDialog
+                open={reasonOpen}
+                action={reasonTarget?.action ?? null}
+                record={currentReason ?? null}
+                canAct={reasonAllowed}
+                onOpenChange={setReasonOpen}
             />
         </AppLayout>
     );

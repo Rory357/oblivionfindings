@@ -1613,7 +1613,7 @@ function ConvertWizard({ onClose, ctx }: WizProps) {
                     type="button"
                     disabled={!ctx.offerId || processing}
                     onClick={submit}
-                    className="h-[38px] rounded-[10px] bg-primary px-5 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                    className="h-[38px] rounded-[10px] bg-primary-fill px-5 text-[13px] font-bold text-primary-fill-foreground disabled:opacity-50"
                 >
                     {processing ? 'Converting…' : 'Create employee'}
                 </button>
@@ -2108,7 +2108,7 @@ function DocumentWizard({ onClose, support, ctx }: WizProps) {
                     type="button"
                     disabled={!canSubmit || form.processing}
                     onClick={submit}
-                    className="h-[38px] rounded-[10px] bg-primary px-5 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                    className="h-[38px] rounded-[10px] bg-primary-fill px-5 text-[13px] font-bold text-primary-fill-foreground disabled:opacity-50"
                 >
                     Upload
                 </button>
@@ -2211,7 +2211,7 @@ function FooterNav({
                 type="button"
                 onClick={onPrimary}
                 disabled={primaryDisabled}
-                className="h-[38px] rounded-[10px] bg-primary px-5 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                className="h-[38px] rounded-[10px] bg-primary-fill px-5 text-[13px] font-bold text-primary-fill-foreground disabled:opacity-50"
             >
                 {primaryLabel}
             </button>
@@ -2250,7 +2250,7 @@ function WizardSuccessShell({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="h-[38px] rounded-[10px] bg-primary px-5 text-[13px] font-bold text-primary-foreground"
+                            className="h-[38px] rounded-[10px] bg-primary-fill px-5 text-[13px] font-bold text-primary-fill-foreground"
                         >
                             Done
                         </button>

@@ -143,7 +143,7 @@ export function DatePopover({
                                     !isToday &&
                                     'text-foreground hover:bg-muted',
                                 isToday &&
-                                    'bg-primary font-semibold text-primary-foreground',
+                                    'bg-primary-fill font-semibold text-primary-fill-foreground',
                                 isSelected &&
                                     !isToday &&
                                     'ring-2 ring-primary/40',

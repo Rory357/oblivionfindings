@@ -27,7 +27,10 @@ use Illuminate\Support\Facades\Event;
 use Inertia\Testing\AssertableInertia;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+
+require_once __DIR__.'/../../Support/RespiteCommencementFixtures.php';
 
 class RespiteStateTransitionIntegrityTest extends TestCase
 {
@@ -309,6 +312,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
     public function test_stay_lifecycle_is_atomic_and_discharge_is_terminal_until_a_new_episode(): void
     {
         $booking = $this->booking('confirmed');
+        prepareRespiteCommencement($booking);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -423,6 +427,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
     {
         Event::fake([RespiteEvent::class]);
         $booking = $this->booking('confirmed');
+        prepareRespiteCommencement($booking);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
@@ -501,6 +506,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
         $this->assertSame('pending', $conflictingSourceBooking->refresh()->status);
 
         $booking = $this->booking('confirmed');
+        prepareRespiteCommencement($booking);
         $stay = RespiteStay::query()->create([
             'booking_id' => $booking->id,
             'client_id' => $this->client->id,
@@ -664,6 +670,7 @@ class RespiteStateTransitionIntegrityTest extends TestCase
 
     public function test_two_mysql_workers_serialize_linked_booking_creation_to_one_effect(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $request = $this->bookingRequest('approved');

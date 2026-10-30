@@ -1,0 +1,120 @@
+{
+  "method": "TypeScript noResolve; unresolved dependency diagnostics excluded, not a full project typecheck",
+  "findings": [
+    {
+      "code": 2792,
+      "line": 1,
+      "message": "Cannot find module 'react'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 10,
+      "message": "Cannot find module 'lucide-react'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 11,
+      "message": "Cannot find module '@/components/ui/button'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 12,
+      "message": "Cannot find module '@/components/ui/status-badge'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 16,
+      "message": "Cannot find module '@/components/fleet-assets/vehicle-workspace/record-collection'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 37,
+      "message": "Cannot find module 'react/jsx-runtime'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 2,
+      "message": "Cannot find module 'react'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 3,
+      "message": "Cannot find module 'react-dom/client'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 54,
+      "message": "Cannot find module 'lucide-react'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 55,
+      "message": "Cannot find module '@/components/ui/button'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 56,
+      "message": "Cannot find module '@/components/ui/status-badge'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 57,
+      "message": "Cannot find module '@/components/ui/tooltip'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 68,
+      "message": "Cannot find module '@/components/page/page-header'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 69,
+      "message": "Cannot find module '@/components/page/grouped-profile-nav'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 76,
+      "message": "Cannot find module '@/components/wizard/shell'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 82,
+      "message": "Cannot find module '@/components/ui/dialog'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 87,
+      "message": "Cannot find module '@/components/ui/popover'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 95,
+      "message": "Cannot find module '@/components/ui/command'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 96,
+      "message": "Cannot find module '@/components/ui/file-dropzone'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 100,
+      "message": "Cannot find module '@/components/fleet-assets/vehicle-workspace/record-collection'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 101,
+      "message": "Cannot find module '@/components/ui/input'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 102,
+      "message": "Cannot find module '@/lib/fleet-navigation'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    },
+    {
+      "code": 2792,
+      "line": 308,
+      "message": "Cannot find module 'react/jsx-runtime'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?"
+    }
+  ]
+}

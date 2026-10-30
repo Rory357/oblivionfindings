@@ -11,7 +11,7 @@ class ClientVisitRequestController extends Controller
 {
     public function index(Request $request, Client $client)
     {
-        $this->authorize('view', $client);
+        $this->authorize('viewVisitRequests', $client);
 
         $filter = $request->query('filter', 'pending');
 
@@ -48,12 +48,13 @@ class ClientVisitRequestController extends Controller
             'requests' => $requests,
             'filter' => $filter,
             'stats' => $stats,
+            'can_review' => $request->user()->can('reviewVisitRequests', $client),
         ]);
     }
 
     public function approve(Request $request, Client $client, FamilyVisitRequest $visit)
     {
-        $this->authorize('view', $client);
+        $this->authorize('reviewVisitRequests', $client);
         abort_unless($visit->client_id === $client->id, 404);
         abort_unless($visit->status === 'pending', 422);
 
@@ -88,7 +89,7 @@ class ClientVisitRequestController extends Controller
 
     public function decline(Request $request, Client $client, FamilyVisitRequest $visit)
     {
-        $this->authorize('view', $client);
+        $this->authorize('reviewVisitRequests', $client);
         abort_unless($visit->client_id === $client->id, 404);
         abort_unless($visit->status === 'pending', 422);
 

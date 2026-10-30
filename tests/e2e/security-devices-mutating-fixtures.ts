@@ -301,19 +301,23 @@ export async function chooseSelectOption(
     label: string,
     optionName: string,
 ) {
-    await scope.getByLabel(label, { exact: true }).click();
-    const page = 'page' in scope && typeof scope.page === 'function' ? scope.page() : scope as Page;
+    const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    await scope.getByLabel(new RegExp(`^${escapedLabel}\\s*\\*?$`)).click();
+    const page =
+        'page' in scope && typeof scope.page === 'function'
+            ? scope.page()
+            : (scope as Page);
     await page.getByRole('option', { name: optionName, exact: true }).click();
 }
 
 export async function confirmPasswordIfAsked(page: Page) {
     const password = page.locator('#password');
-    if ((await password.count()) === 0) {
-        return;
-    }
+    // Called after choosing Confirm identity. Wait for that navigation before
+    // inspecting the password field; an immediate count sees the old page.
     await expect(password).toBeVisible();
     await password.fill('password');
     await page.getByTestId('confirm-password-button').click();
+    await expect(password).toHaveCount(0);
 }
 
 export async function loginAsCommandReviewer(page: Page, email: string) {

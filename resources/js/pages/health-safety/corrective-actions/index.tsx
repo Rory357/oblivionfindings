@@ -1,60 +1,73 @@
-/* H&S Corrective actions — the verification register. The governance twin of the
- * Events register: every corrective/preventive action raised from a safety event,
- * tracked from open → in progress → awaiting verification → verified → closed.
- * Rows open the parent HsEvent detail modal on the corrective-actions pane (and
- * deep-link straight onto the Complete / Verify / Return panes), so the register
- * stays cross-linked to the governance workspace. Shares the gold-standard
- * `hs-hero-kit` hero chrome + rostering TabStrip/ShiftContextMenu with /incidents,
- * /safeguarding and /fleet-assets/incidents so the whole safety workflow reads as
- * one product. Row helpers come from the neutral register-row-kit. NZ-only, web-only. */
 import {
-    EVENT_CATEGORY_LABELS,
     EventDetailDialog,
     type EventActionKey,
     type EventDetail,
     type EventSectionKey,
 } from '@/components/health-safety/event-detail-dialog';
 import {
+    SafetyDateFilter,
+    SafetyRegisterSearch,
+    SafetyWorkspaceRail,
+} from '@/components/health-safety/workspace-header';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+} from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
+import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import AppLayout from '@/layouts/app-layout';
-import { formatDateOnly } from '@/lib/datetime';
-import { cn } from '@/lib/utils';
 import {
-    fmt,
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    type Tone,
-} from '@/pages/health-safety/components/hs-hero-kit';
+    PersonChip,
+    Ring,
+    Surface,
+    type SgTone,
+} from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { Field, SelectInput } from '@/components/wizard/primitives';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { hsLabel } from '@/lib/health-safety/hs-labels';
+import AppLayout from '@/layouts/app-layout';
+import { formatDate, formatDateOnly, toDateInput } from '@/lib/datetime';
+import {
+    correctiveActionHref,
+    safetyReviewHref,
+} from '@/lib/health-safety/navigation';
+import { cn } from '@/lib/utils';
+import { type Tone } from '@/pages/health-safety/components/hs-hero-kit';
 import {
     entityTone,
     FlagBadge,
     initials,
-    RegisterTableHeader,
-    titleCase,
     TONE_BG,
     TONE_DOT,
 } from '@/pages/health-safety/components/register-row-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    Bell,
     CheckCircle2,
     ClipboardCheck,
     Clock,
+    Columns3,
     Eye,
     FileText,
     Flame,
@@ -63,10 +76,10 @@ import {
     HeartPulse,
     LayoutList,
     Link2,
+    List,
     ListChecks,
     Lock,
     MoreVertical,
-    MousePointer2,
     Play,
     Plus,
     RotateCcw,
@@ -74,6 +87,7 @@ import {
     Shield,
     ShieldAlert,
     ShieldCheck,
+    SlidersHorizontal,
     Truck,
     UserRound,
     Wrench,
@@ -172,6 +186,7 @@ type Props = {
     sites: Array<{ id: number; name: string }>;
     detail: EventDetail | null;
     can: { manage: boolean; viewReports?: boolean };
+    monitoringReviewUrl: string;
 };
 
 /* ------------------------------------------------------------------ */
@@ -179,49 +194,49 @@ type Props = {
 /* ------------------------------------------------------------------ */
 
 const PRI: Record<string, { tone: Tone; label: string }> = {
-    low: { tone: 'success', label: 'Low' },
-    medium: { tone: 'warning', label: 'Medium' },
-    high: { tone: 'critical', label: 'High' },
-    critical: { tone: 'critical', label: 'Critical' },
+    low: { tone: 'neutral', label: hsLabel('action_priority', 'low') },
+    medium: { tone: 'warning', label: hsLabel('action_priority', 'medium') },
+    high: { tone: 'warning', label: hsLabel('action_priority', 'high') },
+    critical: { tone: 'critical', label: hsLabel('action_priority', 'critical') },
 };
 
 const ACTION_STAGE: Record<
     string,
-    { label: string; cls: string; icon: LucideIcon }
+    { label: string; variant: StatusVariant; icon: LucideIcon }
 > = {
     open: {
-        label: 'Open',
-        cls: 'bg-status-info-bg text-status-info',
+        label: hsLabel('action_status', 'open'),
+        variant: 'info',
         icon: ListChecks,
     },
     in_progress: {
-        label: 'In progress',
-        cls: 'bg-primary/10 text-primary',
+        label: hsLabel('action_status', 'in_progress'),
+        variant: 'info',
         icon: Activity,
     },
     completed: {
-        label: 'Awaiting verification',
-        cls: 'bg-status-warning-bg text-status-warning',
+        label: hsLabel('action_status', 'completed'),
+        variant: 'warning',
         icon: ShieldCheck,
     },
     verified: {
-        label: 'Verified',
-        cls: 'bg-status-success-bg text-status-success',
+        label: hsLabel('action_status', 'verified'),
+        variant: 'success',
         icon: CheckCircle2,
     },
     closed: {
-        label: 'Closed',
-        cls: 'bg-muted text-muted-foreground',
+        label: hsLabel('action_status', 'closed'),
+        variant: 'neutral',
         icon: CheckCircle2,
     },
 };
 
 const EVENT_STAGE: Record<string, { label: string; icon: LucideIcon }> = {
-    open: { label: 'Open', icon: AlertTriangle },
-    investigating: { label: 'Investigating', icon: Search },
-    corrective_action: { label: 'Corrective action', icon: ListChecks },
-    monitoring: { label: 'Monitoring', icon: Activity },
-    closed: { label: 'Closed', icon: CheckCircle2 },
+    open: { label: hsLabel('review_status', 'open'), icon: AlertTriangle },
+    investigating: { label: hsLabel('review_status', 'investigating'), icon: Search },
+    corrective_action: { label: hsLabel('review_status', 'corrective_action'), icon: ListChecks },
+    monitoring: { label: hsLabel('review_status', 'monitoring'), icon: Activity },
+    closed: { label: hsLabel('review_status', 'closed'), icon: CheckCircle2 },
 };
 
 /** Parent-event category → icon + chip tint for the source-style cell, mirroring
@@ -262,40 +277,11 @@ const TABLE_TITLE: Record<string, string> = {
     overdue: 'Overdue actions',
     verified: 'Verified actions',
     closed: 'Closed actions',
+    critical_open: 'High / critical open actions',
+    unassigned: 'Actions needing an owner',
 };
 
-const TRACEABILITY_REPORT =
-    '/health-safety/reports/corrective-action-traceability';
-
-/* date helpers (browser-local) */
-const todayStr = () => {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-const daysAgoStr = (n: number) => {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-};
-
-const RANGE_ITEMS = [
-    { key: 'all', label: 'All' },
-    { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
-    { key: 'quarter', label: 'Quarter' },
-];
-
-const PRIORITY_ITEMS = [
-    { key: 'all', label: 'All' },
-    { key: 'low', label: 'Low' },
-    { key: 'medium', label: 'Med' },
-    { key: 'high', label: 'High' },
-    { key: 'critical', label: 'Crit' },
-];
+const TRACEABILITY_REPORT = '/health-safety/reports?view=action-traceability';
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -310,7 +296,9 @@ export default function CorrectiveActionsIndex({
     sites,
     detail,
     can,
+    monitoringReviewUrl,
 }: Props) {
+    const pageUrl = usePage().url;
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [pendingSection, setPendingSection] =
         useState<EventSectionKey>('actions');
@@ -321,23 +309,45 @@ export default function CorrectiveActionsIndex({
         actionId: number;
         pane: ActionPane;
     } | null>(null);
+    // Closing from the list menu asks first, the same as on the action's own page.
+    const [closing, setClosing] = useState<{ href: string; title: string } | null>(null);
+    const [closeBusy, setCloseBusy] = useState(false);
+
+    // Board (default, pg-hsn-42) or the register List; the choice rides in the URL with the filters.
+    const view: 'board' | 'list' =
+        new URLSearchParams(pageUrl.split('?')[1]?.split('#')[0] ?? '').get(
+            'view',
+        ) === 'list'
+            ? 'list'
+            : 'board';
+    const keepView = view === 'list' ? { view: 'list' } : {};
 
     const go = (next: Partial<Filters>) =>
         router.get(
             '/health-safety/corrective-actions',
-            { ...filters, ...next },
+            { ...filters, ...next, ...keepView },
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
-    const setTab = (id: string) =>
+    const setTab = (id: string, nextView: 'board' | 'list' = view) =>
         router.get(
             '/health-safety/corrective-actions',
-            { ...filters, tab: id },
+            {
+                ...filters,
+                tab: id,
+                ...(nextView === 'list' ? { view: 'list' } : {}),
+            },
             { preserveScroll: true },
         );
 
-    // Detail-over-list: fetch only the `detail` prop and open the dialog without
-    // navigating away; closing drops the param so `detail` comes back null.
+    const setView = (nextView: 'board' | 'list') =>
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...filters, ...(nextView === 'list' ? { view: 'list' } : {}) },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
+
+    // Normal entry opens a permanent page; the filtered register remains the return.
     const openEvent = (
         id: number,
         opts?: {
@@ -349,20 +359,36 @@ export default function CorrectiveActionsIndex({
         setPendingSection(opts?.section ?? 'actions');
         setPendingAction(opts?.action ?? null);
         setPendingActionTarget(opts?.actionTarget ?? null);
-        router.get(
-            '/health-safety/corrective-actions',
-            { ...filters, event: id },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        router.visit(
+            safetyReviewHref(id, {
+                section: opts?.section ?? 'actions',
+                action: opts?.action,
+                pane: opts?.actionTarget
+                    ? {
+                          kind: (
+                              {
+                                  complete: 'ca_complete',
+                                  verify: 'ca_verify',
+                                  return: 'ca_return',
+                              } as const
+                          )[opts.actionTarget.pane],
+                          actionId: opts.actionTarget.actionId,
+                      }
+                    : null,
+                returnTo: pageUrl,
+            }),
         );
     };
     // Deep-link a row straight onto a lifecycle pane (Complete / Verify / Return)
     // of its parent event's Corrective actions section.
     const openActionPane = (action: ActionRow, pane: ActionPane) => {
         if (!action.event) return;
-        openEvent(action.event.id, {
-            section: 'actions',
-            actionTarget: { actionId: action.id, pane },
-        });
+        router.visit(
+            correctiveActionHref(action.id, {
+                action: pane,
+                returnTo: pageUrl,
+            }),
+        );
     };
     const closeDetail = () => {
         setPendingActionTarget(null);
@@ -376,7 +402,15 @@ export default function CorrectiveActionsIndex({
     const clearFilters = () =>
         router.get(
             '/health-safety/corrective-actions',
-            { tab },
+            { tab, ...keepView },
+            { preserveState: true, preserveScroll: true, replace: true },
+        );
+
+    // An empty view or filter is not an empty register (found in the 30 Oct user test).
+    const showAll = () =>
+        router.get(
+            '/health-safety/corrective-actions',
+            { ...keepView },
             { preserveState: true, preserveScroll: true, replace: true },
         );
 
@@ -441,30 +475,11 @@ export default function CorrectiveActionsIndex({
         },
     ];
 
-    /* ---- due-date range (footer pills) ---- */
-    const activeRange = !filters.from
-        ? 'all'
-        : filters.from === daysAgoStr(7)
-          ? 'week'
-          : filters.from === daysAgoStr(30)
-            ? '30d'
-            : filters.from === daysAgoStr(90)
-              ? 'quarter'
-              : 'custom';
-    const onRange = (key: string) => {
-        if (key === 'all') {
-            go({ from: null, to: null });
-            return;
-        }
-        const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
-        go({ from: daysAgoStr(map[key]), to: todayStr() });
-    };
-
     /* ---- status-aware lifecycle menu (right-click + kebab share one payload) ---- */
     const menuItems = (action: ActionRow): ShiftCtxItem[] => {
         if (!action.event) return [];
         const base = `/health-safety/events/${action.event.id}/corrective-actions/${action.id}`;
-        const canWrite = can.manage && action.event.status !== 'closed';
+        const canWrite = can.manage;
 
         const lifecycle: ShiftCtxItem[] = [];
         if (canWrite) {
@@ -508,11 +523,7 @@ export default function CorrectiveActionsIndex({
                     icon: <Lock className="h-3.5 w-3.5" />,
                     label: 'Close action',
                     onClick: () =>
-                        router.post(
-                            `${base}/close`,
-                            {},
-                            { preserveScroll: true },
-                        ),
+                        setClosing({ href: `${base}/close`, title: action.title }),
                 });
             }
         }
@@ -520,20 +531,22 @@ export default function CorrectiveActionsIndex({
         const tail: ShiftCtxItem[] = [
             {
                 icon: <ListChecks className="h-3.5 w-3.5" />,
-                label: 'Open corrective actions',
+                label: 'Open corrective action',
                 sub: action.reference_number,
                 tone: 'primary',
                 onClick: () =>
-                    openEvent(action.event!.id, { section: 'actions' }),
+                    router.visit(
+                        correctiveActionHref(action.id, { returnTo: pageUrl }),
+                    ),
             },
             {
                 icon: <Eye className="h-3.5 w-3.5" />,
-                label: 'View parent event',
+                label: 'Open safety review',
                 sub: action.event.reference_number,
                 onClick: () =>
                     openEvent(action.event!.id, { section: 'overview' }),
             },
-            ...(canWrite
+            ...(canWrite && action.event.status !== 'closed'
                 ? [
                       {
                           icon: <Plus className="h-3.5 w-3.5" />,
@@ -545,12 +558,6 @@ export default function CorrectiveActionsIndex({
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
-            {
-                icon: <Link2 className="h-3.5 w-3.5" />,
-                label: 'Open event full page',
-                onClick: () =>
-                    router.visit(`/health-safety/events/${action.event!.id}`),
-            },
         ];
 
         return lifecycle.length ? [...lifecycle, { sep: true }, ...tail] : tail;
@@ -567,14 +574,19 @@ export default function CorrectiveActionsIndex({
         });
     };
 
-    const live = hero.live;
     const attention = hero.attention;
     const tableTitle = TABLE_TITLE[tab] ?? 'Corrective actions';
+    const moreFilterCount = [filters.priority, filters.unassigned].filter(
+        Boolean,
+    ).length;
+    const openAction = (id: number) =>
+        router.visit(correctiveActionHref(id, { returnTo: pageUrl }));
 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
                 {
                     title: 'Corrective actions',
                     href: '/health-safety/corrective-actions',
@@ -582,233 +594,262 @@ export default function CorrectiveActionsIndex({
             ]}
         >
             <Head title="Corrective actions" />
+            <ConfirmDialog
+                open={closing !== null}
+                onClose={() => { if (!closeBusy) setClosing(null); }}
+                frontline
+                processing={closeBusy}
+                variant="default"
+                title="Close this checked action?"
+                description={`This closes “${closing?.title ?? 'this action'}”. Closing the incident and its safety review are separate decisions.`}
+                confirmText="Close action"
+                cancelText="Keep it open"
+                onConfirm={() => {
+                    if (!closing) return;
+                    setCloseBusy(true);
+                    router.post(closing.href, {}, {
+                        preserveScroll: true,
+                        onFinish: () => { setCloseBusy(false); setClosing(null); },
+                    });
+                }}
+            />
 
-            <div className="flex w-full max-w-full min-w-0 flex-col gap-6 p-6">
-                {/* ---- Hero ---- */}
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented
-                                label="Due"
-                                variant="pill"
-                                ariaLabel="Due date range"
-                                items={RANGE_ITEMS}
-                                value={activeRange}
-                                onChange={onRange}
+            <div className="flex w-full max-w-full min-w-0 flex-col gap-5">
+                {/* ---- Header (pg-hsn-42) ---- */}
+                <PageHeader
+                    wrapTitle
+                    icon={ListChecks}
+                    title="Corrective actions"
+                    subline="Agree the work, name an owner and check it’s done"
+                    actions={
+                        <>
+                            <SafetyRegisterSearch
+                                key={filters.q}
+                                query={filters.q ?? ''}
+                                onSearch={(q) => go({ q })}
+                                placeholder="Search corrective actions"
                             />
-                            {sites?.length ? (
+                            {can.viewReports && (
+                                <PageHeaderGlassButton
+                                    icon={FileText}
+                                    onClick={() =>
+                                        router.visit(TRACEABILITY_REPORT)
+                                    }
+                                >
+                                    Traceability report
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
+                    }
+                    strip={
+                        <PageHeaderNumbers>
+                            <PageHeaderNumber
+                                value={attention.overdue}
+                                label="Overdue"
+                                caption="Past the due date"
+                                tone={attention.overdue ? 'critical' : undefined}
+                                pressed={tab === 'overdue'}
+                                onClick={() => setTab('overdue')}
+                            />
+                            <PageHeaderNumber
+                                value={attention.critical_open}
+                                label="High or critical"
+                                caption="Not yet checked or closed"
+                                tone={
+                                    attention.critical_open
+                                        ? 'critical'
+                                        : undefined
+                                }
+                                pressed={tab === 'critical_open'}
+                                onClick={() => setTab('critical_open')}
+                            />
+                            <PageHeaderNumber
+                                value={attention.monitoring_events}
+                                label="Reviews in monitoring"
+                                caption="With matching actions"
+                                href={monitoringReviewUrl}
+                            />
+                        </PageHeaderNumbers>
+                    }
+                    filters={
+                        <>
+                            {sites.length > 0 && (
                                 <EntityFilter
                                     label="Site"
                                     allLabel="All sites"
                                     items={sites}
                                     value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
+                                    onChange={(site_id) => go({ site_id })}
                                     onDark
                                 />
-                            ) : null}
-                            <HeroSegmented
-                                label="Priority"
-                                variant="pill"
-                                ariaLabel="Priority"
-                                items={PRIORITY_ITEMS}
-                                value={filters.priority ?? 'all'}
-                                onChange={(key) =>
-                                    go({ priority: key === 'all' ? null : key })
-                                }
+                            )}
+                            <PageHeaderFilterSelect
+                                label="Action view"
+                                value={tab}
+                                options={[
+                                    ...TABS,
+                                    {
+                                        id: 'critical_open',
+                                        label: 'High / critical open',
+                                    },
+                                    {
+                                        id: 'unassigned',
+                                        label: 'Needs an owner',
+                                    },
+                                ].map((item) => ({
+                                    value: item.id,
+                                    label: `${item.label} (${tabCounts[item.id] ?? 0})`,
+                                }))}
+                                onChange={(id) => setTab(id)}
                             />
-                            <div className="relative ml-auto">
-                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                <input
-                                    type="search"
-                                    placeholder="Search action or event…"
-                                    defaultValue={filters.q ?? ''}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            go({
-                                                q:
-                                                    (
-                                                        e.target as HTMLInputElement
-                                                    ).value || null,
-                                            });
-                                    }}
-                                    className="w-52 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                                />
-                            </div>
-                            {hasFilters ? (
-                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
+                            <SafetyDateFilter
+                                label="Due"
+                                from={filters.from}
+                                to={filters.to}
+                                onChange={go}
+                            />
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <PageHeaderFilterButton
+                                        icon={SlidersHorizontal}
+                                        active={moreFilterCount > 0}
+                                    >
+                                        {moreFilterCount
+                                            ? `More filters · ${moreFilterCount}`
+                                            : 'More filters'}
+                                    </PageHeaderFilterButton>
+                                </PopoverTrigger>
+                                <PopoverContent
+                                    align="start"
+                                    className="w-80 max-w-[calc(100vw-2rem)] space-y-4"
                                 >
-                                    <X className="h-3 w-3" /> Clear
-                                </button>
-                            ) : null}
-                        </div>
+                                    <Field label="Priority">
+                                        <SelectInput
+                                            ariaLabel="Priority"
+                                            placeholder="All priorities"
+                                            value={filters.priority ?? 'all'}
+                                            options={[
+                                                {
+                                                    value: 'all',
+                                                    label: 'All priorities',
+                                                },
+                                                {
+                                                    value: 'high,critical',
+                                                    label: 'High / critical',
+                                                },
+                                                ...Object.entries(PRI).map(
+                                                    ([value, { label }]) => ({
+                                                        value,
+                                                        label,
+                                                    }),
+                                                ),
+                                            ]}
+                                            onChange={(value) =>
+                                                go({
+                                                    priority:
+                                                        value === 'all'
+                                                            ? null
+                                                            : value,
+                                                })
+                                            }
+                                        />
+                                    </Field>
+                                    <label className="flex items-center gap-2 text-sm font-medium">
+                                        <Checkbox
+                                            checked={!!filters.unassigned}
+                                            onCheckedChange={(value) =>
+                                                go({
+                                                    unassigned:
+                                                        value === true || null,
+                                                })
+                                            }
+                                        />
+                                        Without an owner
+                                    </label>
+                                </PopoverContent>
+                            </Popover>
+                            {hasFilters && (
+                                <PageHeaderGlassButton
+                                    icon={X}
+                                    onClick={clearFilters}
+                                >
+                                    Clear filters
+                                </PageHeaderGlassButton>
+                            )}
+                        </>
                     }
-                >
-                    <WorkflowRibbon current="resolve" />
-
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={Wrench} />
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <HeroStatusPill>
-                                        Safety actions · verification register
-                                    </HeroStatusPill>
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-primary-foreground/85 uppercase">
-                                        <ShieldCheck className="h-3.5 w-3.5" />{' '}
-                                        Verifier ≠ completer
-                                    </span>
-                                </div>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                    Corrective actions
-                                </h1>
-                                <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    Every corrective and preventive action
-                                    raised from a safety event — driven from
-                                    open through completion to independent
-                                    verification, then closed to advance the
-                                    parent event. Open a row to complete, verify
-                                    and close inside the governance workspace.
-                                </p>
-                            </div>
-                        </div>
-
-                        {can.viewReports ? (
-                            <Button
-                                size="sm"
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                onClick={() =>
-                                    router.visit(TRACEABILITY_REPORT)
-                                }
-                            >
-                                <FileText className="mr-1.5 h-4 w-4" />{' '}
-                                Traceability report
-                            </Button>
-                        ) : null}
-                    </div>
-
-                    {/* stat clusters */}
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster
-                            title="Live · action lifecycle"
-                            icon={ListChecks}
-                        >
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?tab=open"
-                                label="Open"
-                                value={fmt(live.open)}
-                                caption="ready to start"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?tab=in_progress"
-                                label="In progress"
-                                value={fmt(live.in_progress)}
-                                caption="being resolved"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?tab=awaiting_verification"
-                                label="Await verify"
-                                value={fmt(live.awaiting_verification)}
-                                caption="needs verifier"
-                                tone="warning"
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?tab=verified"
-                                label="Verified"
-                                value={fmt(live.verified)}
-                                caption="effectiveness ✓"
-                                tone="success"
-                            />
-                        </HeroCluster>
-                        <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?tab=overdue"
-                                label="Overdue"
-                                value={fmt(attention.overdue)}
-                                caption={
-                                    attention.overdue > 0
-                                        ? 'past due'
-                                        : 'all on track'
-                                }
-                                tone={
-                                    attention.overdue > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?priority=high,critical"
-                                label="High / critical"
-                                value={fmt(attention.critical_open)}
-                                caption="priority open"
-                                tone={
-                                    attention.critical_open > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/corrective-actions?unassigned=true"
-                                label="Unassigned"
-                                value={fmt(attention.unassigned)}
-                                caption="needs an owner"
-                                tone={
-                                    attention.unassigned > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/health-safety/events?tab=monitoring"
-                                label="Events monitoring"
-                                value={fmt(attention.monitoring_events)}
-                                caption="auto-advanced"
-                                tone="success"
-                            />
-                        </HeroCluster>
-                    </div>
-                </HeroShell>
-
-                {/* ---- Tabs ---- */}
-                <TabStrip
-                    value={tab}
-                    items={TABS}
-                    onChange={setTab}
-                    ariaLabel="Corrective action views"
+                    rail={
+                        <SafetyWorkspaceRail hub="concerns" current="actions" />
+                    }
                 />
 
-                {/* ---- Table ---- */}
-                <section className="max-w-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                    <RegisterTableHeader
-                        icon={Wrench}
-                        title={tableTitle}
-                        subtitle="the verification view"
-                        hint="Right-click or ⋮ for the full lifecycle"
-                        hintIcon={MousePointer2}
-                    />
-                    <ActionTable
-                        rows={actions.data}
-                        canViewReports={!!can.viewReports}
-                        onOpen={openEvent}
-                        onMenu={openMenu}
-                    />
-                </section>
+                <TierTwoTabs
+                    tabs={[
+                        { key: 'board', label: 'Board', icon: Columns3 },
+                        { key: 'list', label: 'List', icon: List },
+                    ]}
+                    activeTab={view}
+                    onTab={(key) => setView(key === 'list' ? 'list' : 'board')}
+                    testIdPrefix="corrective-actions-view"
+                    ariaLabel="Corrective action views"
+                    renderLink={() => null}
+                />
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">
-                        {actions.total > 0
-                            ? `Showing ${actions.from}–${actions.to} of ${actions.total}`
-                            : 'No corrective actions found'}
-                    </p>
-                    {actions.last_page > 1 ? (
-                        <LaravelPagination links={actions.links} />
-                    ) : null}
-                </div>
+                {view === 'board' ? (
+                    actions.data.length ? (
+                        <ActionBoard
+                            rows={actions.data}
+                            tab={tab}
+                            tabCounts={tabCounts}
+                            unassigned={attention.unassigned}
+                            total={actions.total}
+                            morePages={actions.last_page > 1}
+                            onOpen={openAction}
+                            onMenu={openMenu}
+                            onColumn={(id) => setTab(id, 'list')}
+                        />
+                    ) : (
+                        <Surface>
+                            <ActionTable
+                                rows={[]}
+                                canViewReports={!!can.viewReports}
+                                onOpen={openAction}
+                                onMenu={openMenu}
+                                narrowed={tab !== 'all' || hasFilters}
+                                onShowAll={showAll}
+                            />
+                        </Surface>
+                    )
+                ) : (
+                    <>
+                        <Surface
+                            title={tableTitle}
+                            sub="The verification view · right-click or ⋮ for the full lifecycle"
+                        >
+                            <div className="mt-3">
+                                <ActionTable
+                                    rows={actions.data}
+                                    canViewReports={!!can.viewReports}
+                                    onOpen={openAction}
+                                    onMenu={openMenu}
+                                    narrowed={tab !== 'all' || hasFilters}
+                                    onShowAll={showAll}
+                                />
+                            </div>
+                        </Surface>
+
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <p className="text-sm text-muted-foreground">
+                                {actions.total > 0
+                                    ? `Showing ${actions.from}–${actions.to} of ${actions.total}`
+                                    : 'No corrective actions found'}
+                            </p>
+                            {actions.last_page > 1 ? (
+                                <LaravelPagination links={actions.links} />
+                            ) : null}
+                        </div>
+                    </>
+                )}
             </div>
 
             {ctx ? (
@@ -827,6 +868,302 @@ export default function CorrectiveActionsIndex({
                 />
             ) : null}
         </AppLayout>
+    );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Board (pg-hsn-42)                                                  */
+/* ------------------------------------------------------------------ */
+
+const PRIORITY_VARIANT: Record<string, StatusVariant> = {
+    low: 'success',
+    medium: 'warning',
+    high: 'critical',
+    critical: 'critical',
+};
+
+type BoardColumn = {
+    key: string;
+    title: string;
+    /** The List view lens behind "N more". */
+    tab: string;
+    tone?: SgTone;
+    sub?: string;
+    count: number;
+    match: (action: ActionRow) => boolean;
+};
+
+const DAY_MS = 86_400_000;
+
+function needsOwner(action: ActionRow): boolean {
+    return (
+        !action.assigned_to_name &&
+        action.status !== 'verified' &&
+        action.status !== 'closed'
+    );
+}
+
+/**
+ * The actions by stage — Needs an owner, To do, In progress, Waiting to be checked, Checked and closed — so the
+ * independent check before an action closes is a column you can see. Column counts are the register's real totals
+ * (same filters); the cards are the ones on this page of the register, and "N more" opens the List on that lens.
+ */
+export function ActionBoard({
+    rows,
+    tab,
+    tabCounts,
+    unassigned,
+    total,
+    morePages,
+    onOpen,
+    onMenu,
+    onColumn,
+}: {
+    rows: ActionRow[];
+    tab: string;
+    tabCounts: Record<string, number>;
+    unassigned: number;
+    total: number;
+    morePages: boolean;
+    onOpen: (id: number) => void;
+    onMenu: (action: ActionRow, x: number, y: number) => void;
+    onColumn: (tab: string) => void;
+}) {
+    const today = toDateInput(new Date());
+    // Real totals only on the unfiltered lens; a lens (Overdue, a stage …) counts what it shows.
+    const totals = tab === 'all';
+    const columns: BoardColumn[] = [
+        {
+            key: 'unassigned',
+            title: 'Needs an owner',
+            tab: 'unassigned',
+            tone: 'warning',
+            count: tabCounts.unassigned ?? unassigned,
+            match: needsOwner,
+        },
+        {
+            key: 'open',
+            title: 'To do',
+            tab: 'open',
+            count: tabCounts.open ?? 0,
+            match: (action) => action.status === 'open' && !needsOwner(action),
+        },
+        {
+            key: 'in_progress',
+            title: 'In progress',
+            tab: 'in_progress',
+            count: tabCounts.in_progress ?? 0,
+            match: (action) =>
+                action.status === 'in_progress' && !needsOwner(action),
+        },
+        {
+            key: 'completed',
+            title: 'Waiting to be checked',
+            tab: 'awaiting_verification',
+            tone: 'info',
+            sub: 'Someone other than the owner checks it',
+            count: tabCounts.awaiting_verification ?? 0,
+            match: (action) =>
+                action.status === 'completed' && !needsOwner(action),
+        },
+        {
+            key: 'checked',
+            title: 'Checked and closed',
+            tab:
+                (tabCounts.verified ?? 0) >
+                rows.filter((action) => action.status === 'verified').length
+                    ? 'verified'
+                    : 'closed',
+            tone: 'success',
+            count: (tabCounts.verified ?? 0) + (tabCounts.closed ?? 0),
+            match: (action) =>
+                action.status === 'verified' || action.status === 'closed',
+        },
+    ];
+    const placed = new Set<number>();
+
+    return (
+        <section aria-label="Corrective actions board" className="grid gap-5">
+            {morePages ? (
+                <p className="text-sm text-muted-foreground">
+                    The board shows the first {rows.length} of {total} matching
+                    actions. Open the List for every one.
+                </p>
+            ) : null}
+            <div className="grid items-start gap-5 md:grid-cols-3 xl:grid-cols-5">
+                {columns.map((column) => {
+                    const cards = rows.filter((action) => {
+                        if (placed.has(action.id) || !column.match(action))
+                            return false;
+                        placed.add(action.id);
+                        return true;
+                    });
+                    const count = totals ? column.count : cards.length;
+                    const shown = cards.slice(0, 3);
+                    const more = count - shown.length;
+                    return (
+                        <section
+                            key={column.key}
+                            aria-label={column.title}
+                            className="grid gap-3 rounded-2xl border border-border bg-muted/40 p-3"
+                        >
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    {column.tone ? (
+                                        <Ring tone={column.tone} />
+                                    ) : null}
+                                    <h3 className="min-w-0 flex-1 text-sm font-semibold">
+                                        {column.title}
+                                    </h3>
+                                    <span className="rounded-md bg-card px-1.5 text-caption font-semibold text-muted-foreground tabular-nums">
+                                        {count}
+                                    </span>
+                                </div>
+                                {column.sub ? (
+                                    <p className="mt-1 text-caption text-muted-foreground">
+                                        {column.sub}
+                                    </p>
+                                ) : null}
+                            </div>
+                            {shown.length ? (
+                                <ul className="grid gap-2.5">
+                                    {shown.map((action) => (
+                                        <BoardCard
+                                            key={action.id}
+                                            action={action}
+                                            today={today}
+                                            onOpen={onOpen}
+                                            onMenu={onMenu}
+                                        />
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p className="text-caption text-muted-foreground">
+                                    {count ? 'Not on this page' : 'Nothing here'}
+                                </p>
+                            )}
+                            {more > 0 ? (
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="h-auto justify-start px-0"
+                                    onClick={() => onColumn(column.tab)}
+                                >
+                                    {more} more
+                                </Button>
+                            ) : null}
+                        </section>
+                    );
+                })}
+            </div>
+        </section>
+    );
+}
+
+function BoardCard({
+    action,
+    today,
+    onOpen,
+    onMenu,
+}: {
+    action: ActionRow;
+    today: string;
+    onOpen: (id: number) => void;
+    onMenu: (action: ActionRow, x: number, y: number) => void;
+}) {
+    const overdue =
+        action.is_overdue &&
+        action.status !== 'verified' &&
+        action.status !== 'closed';
+    const daysOverdue =
+        overdue && action.due_date
+            ? Math.max(
+                  1,
+                  Math.round(
+                      (Date.parse(today) - Date.parse(action.due_date)) /
+                          DAY_MS,
+                  ),
+              )
+            : 0;
+    const context =
+        overdue && daysOverdue
+            ? `${daysOverdue} day${daysOverdue === 1 ? '' : 's'} overdue`
+            : action.status === 'completed' && action.completed_at
+              ? `done ${formatDate(action.completed_at)}`
+              : (action.status === 'verified' || action.status === 'closed') &&
+                  action.verified_at
+                ? `checked ${formatDate(action.verified_at)}`
+                : (action.event?.site_name ?? null);
+    const due = action.due_date
+        ? action.due_date === today
+            ? 'Today'
+            : formatDate(`${action.due_date}T00:00:00`)
+        : null;
+    const priority = PRI[action.priority] ?? PRI.medium;
+    return (
+        <li
+            className="relative rounded-xl border border-border bg-card shadow-sm transition-colors focus-within:ring-2 focus-within:ring-ring hover:border-primary/40"
+            onContextMenu={(event: ReactMouseEvent) => {
+                event.preventDefault();
+                onMenu(action, event.clientX, event.clientY);
+            }}
+        >
+            {/* eslint-disable-next-line no-restricted-syntax -- the board card body is a custom selector-card layout that opens the action */}
+            <button
+                type="button"
+                onClick={() => onOpen(action.id)}
+                className="block w-full rounded-xl p-3 pr-9 text-left outline-none"
+            >
+                <span className="block text-sm font-semibold [overflow-wrap:anywhere] text-foreground">
+                    {action.title}
+                </span>
+                <span className="mt-1 block text-caption text-muted-foreground">
+                    {action.reference_number}
+                    {context ? ` · ${context}` : ''}
+                </span>
+                <span className="mt-2.5 flex flex-wrap items-center gap-2">
+                    {action.assigned_to_name ? (
+                        <PersonChip name={action.assigned_to_name} />
+                    ) : null}
+                    <StatusBadge
+                        size="sm"
+                        variant={PRIORITY_VARIANT[action.priority] ?? 'neutral'}
+                    >
+                        {priority.label}
+                    </StatusBadge>
+                    {due ? (
+                        <span
+                            // A plain join: tailwind-merge reads text-caption as a colour and would drop it.
+                            className={`ml-auto text-caption ${
+                                overdue
+                                    ? 'font-semibold text-status-critical'
+                                    : due === 'Today'
+                                      ? 'font-semibold text-foreground'
+                                      : 'text-muted-foreground'
+                            }`}
+                        >
+                            {due}
+                        </span>
+                    ) : null}
+                </span>
+            </button>
+            {action.event ? (
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Lifecycle actions for ${action.reference_number}`}
+                    onClick={(event) => {
+                        const rect =
+                            event.currentTarget.getBoundingClientRect();
+                        onMenu(action, rect.left, rect.bottom);
+                    }}
+                    className="frontline-hit absolute top-2 right-1.5 size-7 text-muted-foreground"
+                >
+                    <MoreVertical className="size-4" />
+                </Button>
+            ) : null}
+        </li>
     );
 }
 
@@ -887,12 +1224,8 @@ function ActionCard({
                         <Button
                             type="button"
                             variant="ghost"
-                            onClick={() =>
-                                onOpen(action.event!.id, {
-                                    section: 'actions',
-                                })
-                            }
-                            aria-label={`Open parent event for action ${action.reference_number}`}
+                            onClick={() => onOpen(action.id)}
+                            aria-label={`Open corrective action ${action.reference_number}`}
                             className="frontline-focus h-auto min-h-11 min-w-0 flex-1 justify-start px-0 py-1 text-left whitespace-normal hover:bg-transparent"
                         >
                             {title}
@@ -913,7 +1246,6 @@ function ActionCard({
                                 onMenu(action, rect.left, rect.bottom);
                             }}
                             className="frontline-focus frontline-tap shrink-0 text-muted-foreground"
-                            style={{ minHeight: 44, minWidth: 44 }}
                         >
                             <MoreVertical className="h-4 w-4" />
                         </Button>
@@ -944,15 +1276,10 @@ function ActionCard({
                             Stage
                         </dt>
                         <dd className="mt-1">
-                            <span
-                                className={cn(
-                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                    stage.cls,
-                                )}
-                            >
+                            <StatusBadge variant={stage.variant}>
                                 <StageIcon className="h-3 w-3" />
                                 {stage.label}
-                            </span>
+                            </StatusBadge>
                         </dd>
                     </div>
 
@@ -992,9 +1319,7 @@ function ActionCard({
                                         {action.event.reference_number}
                                     </span>{' '}
                                     ·{' '}
-                                    {EVENT_CATEGORY_LABELS[
-                                        action.event.event_category
-                                    ] ?? titleCase(action.event.event_category)}
+                                    {hsLabel('review_category', action.event.event_category)}
                                     {action.event.site_name
                                         ? ` · ${action.event.site_name}`
                                         : ''}
@@ -1012,7 +1337,7 @@ function ActionCard({
                     </p>
                     <div className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5">
                         <span className="inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {titleCase(action.action_type)}
+                            {hsLabel('action_type', action.action_type)}
                         </span>
                         {action.is_overdue ? (
                             <FlagBadge
@@ -1104,15 +1429,40 @@ export function ActionTable({
     canViewReports,
     onOpen,
     onMenu,
+    narrowed = false,
+    onShowAll,
 }: {
     rows: ActionRow[];
     canViewReports: boolean;
+    /** True when a view (tab) or filter is narrowing the list. */
+    narrowed?: boolean;
+    onShowAll?: () => void;
     onOpen: (
         id: number,
         opts?: { section?: EventSectionKey; action?: EventActionKey },
     ) => void;
     onMenu: (action: ActionRow, x: number, y: number) => void;
 }) {
+    if (!rows.length && narrowed) {
+        return (
+            <div className="px-4 py-16 text-center">
+                <Wrench className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                <p className="font-semibold text-foreground">
+                    Nothing in this view
+                </p>
+                <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                    No actions match this view or your filters right now.
+                </p>
+                {onShowAll ? (
+                    <div className="mt-4 flex justify-center">
+                        <Button size="sm" variant="outline" onClick={onShowAll}>
+                            Show all actions
+                        </Button>
+                    </div>
+                ) : null}
+            </div>
+        );
+    }
     if (!rows.length) {
         return (
             <div className="px-4 py-16 text-center">
@@ -1122,17 +1472,17 @@ export function ActionTable({
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
                     Corrective and preventive actions are raised from a safety
-                    event — open an event in the register and add an action, or
-                    promote an investigation recommendation. They'll appear here
-                    to drive, verify and close.
+                    review — open a review and add an action, or promote an
+                    investigation recommendation. They'll appear here to drive,
+                    verify and close.
                 </p>
                 <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                     <Button
                         size="sm"
                         onClick={() => router.visit('/health-safety/events')}
                     >
-                        <ListChecks className="mr-1.5 h-4 w-4" /> Go to Events
-                        register
+                        <ListChecks className="mr-1.5 h-4 w-4" /> Go to safety
+                        reviews
                     </Button>
                     {canViewReports ? (
                         <Button
@@ -1178,12 +1528,12 @@ export function ActionTable({
                         <tr className="border-b border-border text-left text-[11px] font-bold tracking-wide text-muted-foreground uppercase">
                             <th className="px-4 py-3">Due</th>
                             <th className="px-4 py-3">Action</th>
+                            <th className="px-4 py-3">Stage</th>
                             <th className="px-4 py-3">Priority</th>
                             <th className="px-4 py-3">Owner</th>
                             <th className="px-4 py-3">Parent event</th>
-                            <th className="px-4 py-3">Stage</th>
                             <th className="px-4 py-3">Flags</th>
-                            <th className="px-4 py-3">
+                            <th className="sticky right-0 bg-muted px-4 py-3">
                                 <span className="sr-only">Actions</span>
                             </th>
                         </tr>
@@ -1213,10 +1563,7 @@ export function ActionTable({
                                 action.status === 'closed';
 
                             const open = () => {
-                                if (action.event)
-                                    onOpen(action.event.id, {
-                                        section: 'actions',
-                                    });
+                                if (action.event) onOpen(action.id);
                             };
 
                             return (
@@ -1230,12 +1577,13 @@ export function ActionTable({
                                     tabIndex={action.event ? 0 : -1}
                                     aria-label={
                                         action.event
-                                            ? `Open parent event for action ${action.reference_number}`
+                                            ? `Open corrective action ${action.reference_number}`
                                             : undefined
                                     }
                                     onKeyDown={(e) => {
                                         if (
                                             action.event &&
+                                            e.target === e.currentTarget &&
                                             (e.key === 'Enter' || e.key === ' ')
                                         ) {
                                             e.preventDefault();
@@ -1318,15 +1666,20 @@ export function ActionTable({
                                                     </span>
                                                 ) : null}
                                                 <span className="mt-1 inline-flex rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                                                    {titleCase(
-                                                        action.action_type,
-                                                    )}
+                                                    {hsLabel('action_type', action.action_type)}
                                                 </span>
                                             </span>
                                         </div>
                                     </td>
 
                                     {/* Priority */}
+                                    <td className="px-4 py-3 align-top">
+                                        <StatusBadge variant={stage.variant}>
+                                            <StageIcon className="h-3 w-3" />
+                                            {stage.label}
+                                        </StatusBadge>
+                                    </td>
+
                                     <td className="px-4 py-3 align-top">
                                         <span
                                             className={cn(
@@ -1395,14 +1748,7 @@ export function ActionTable({
                                                         }
                                                     </span>
                                                     <span className="block truncate text-[11px] font-medium text-muted-foreground">
-                                                        {EVENT_CATEGORY_LABELS[
-                                                            action.event
-                                                                .event_category
-                                                        ] ??
-                                                            titleCase(
-                                                                action.event
-                                                                    .event_category,
-                                                            )}
+                                                        {hsLabel('review_category', action.event.event_category)}
                                                         {action.event.site_name
                                                             ? ` · ${action.event.site_name}`
                                                             : ''}
@@ -1415,19 +1761,6 @@ export function ActionTable({
                                                 parent event
                                             </span>
                                         )}
-                                    </td>
-
-                                    {/* Action stage */}
-                                    <td className="px-4 py-3 align-top">
-                                        <span
-                                            className={cn(
-                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
-                                                stage.cls,
-                                            )}
-                                        >
-                                            <StageIcon className="h-3 w-3" />
-                                            {stage.label}
-                                        </span>
                                     </td>
 
                                     {/* Flags */}
@@ -1497,7 +1830,7 @@ export function ActionTable({
                                     </td>
 
                                     {/* Kebab — same payload as right-click (a11y / discoverability) */}
-                                    <td className="px-2 py-3 text-right align-top">
+                                    <td className="sticky right-0 bg-card px-2 py-3 text-right align-top">
                                         {action.event ? (
                                             // eslint-disable-next-line no-restricted-syntax -- icon-only row affordance; opens the shared ShiftContextMenu
                                             <button
@@ -1513,7 +1846,7 @@ export function ActionTable({
                                                         r.bottom,
                                                     );
                                                 }}
-                                                className="inline-grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                                                className="frontline-hit inline-grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                                             >
                                                 <MoreVertical className="h-4 w-4" />
                                             </button>

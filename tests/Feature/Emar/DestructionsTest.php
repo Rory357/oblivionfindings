@@ -3,6 +3,7 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
@@ -16,8 +17,12 @@ use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Controlled\ControlledPolicy;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -42,6 +47,7 @@ class DestructionsTest extends TestCase
             'medications.view',
             'medications.controlled.view',
             'medications.controlled.record',
+            'medications.controlled.manage',
         ]);
         $w1 = $this->makeRoleUser('coordinator');
         $w2 = $this->makeRoleUser('coordinator');
@@ -57,6 +63,18 @@ class DestructionsTest extends TestCase
             ]);
         }
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $client->supportWorkers()->syncWithoutDetaching([$user->id]);
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'service_context_id' => $client->service_context_id,
+            'user_id' => $user->id,
+            'starts_at' => now()->utc()->subHour(),
+            'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(),
+            'status' => 'in_progress',
+            'created_by' => $user->id,
+        ]);
         foreach ([$w1, $w2] as $witness) {
             MedicationCompetencyAssessment::query()->create([
                 'user_id' => $witness->id,
@@ -67,16 +85,18 @@ class DestructionsTest extends TestCase
                 'expiry_date' => today()->addYear(),
                 'assessor_declared_at' => now()->subMonth(),
                 'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+                'controlled_drugs' => true,
                 'can_witness_controlled' => true,
+                'restricted' => false,
             ]);
             Shift::factory()->create([
                 'client_id' => $client->id,
                 'site_id' => $site->id,
                 'service_context_id' => $client->service_context_id,
                 'user_id' => $witness->id,
-                'starts_at' => now()->subHour(),
-                'ends_at' => now()->addHour(),
-                'actual_starts_at' => now()->subHour(),
+                'starts_at' => now()->utc()->subHour(),
+                'ends_at' => now()->utc()->addHour(),
+                'actual_starts_at' => now()->utc()->subHour(),
                 'status' => 'in_progress',
                 'created_by' => $user->id,
             ]);
@@ -109,7 +129,8 @@ class DestructionsTest extends TestCase
     public function test_void_marks_record_voided_not_deleted(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupRegister();
-        $rec = $this->record(['client_id' => $client->id]);
+        // Lane C2: the old route voids ordinary records; controlled ones void in the register.
+        $rec = $this->record(['client_id' => $client->id, 'is_controlled_drug' => false]);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -151,24 +172,23 @@ class DestructionsTest extends TestCase
             'quantity' => 0.5,
         ]);
 
+        // EA-173 (Lane C2): the old route no longer voids a controlled record
+        // around the register; nothing changes and nothing is audited as voided.
         $this->actingAs($user)
             ->post(route('emar.destructions.void', $record), ['void_reason' => 'Duplicate administrative record'])
-            ->assertSessionHasNoErrors()
-            ->assertSessionHas('success', 'Destruction record voided. Stock and register balances were not changed; record any correction through witnessed reconciliation.');
+            ->assertStatus(422);
 
         $this->assertSame(8.5, (float) $stock->refresh()->on_hand);
         $this->assertDatabaseHas('client_controlled_drug_entries', ['id' => $entry->id]);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
-        $audit = AuditLog::query()->where('action', 'medications.destruction.void')->latest('id')->firstOrFail();
-        $this->assertSame(MedicationDestruction::VOID_STOCK_SEMANTICS, $audit->meta['void_stock_semantics'] ?? null);
-        $this->assertFalse((bool) ($audit->meta['stock_effect_reversed'] ?? true));
-        $this->assertTrue((bool) ($audit->meta['requires_governed_stock_reconciliation'] ?? false));
+        $this->assertNull($record->refresh()->voided_at);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'medications.destruction.void']);
     }
 
     public function test_void_requires_a_reason(): void
     {
         ['user' => $user, 'client' => $client] = $this->setupRegister();
-        $rec = $this->record(['client_id' => $client->id]);
+        $rec = $this->record(['client_id' => $client->id, 'is_controlled_drug' => false]);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -181,6 +201,12 @@ class DestructionsTest extends TestCase
     public function test_cd_destruction_rejects_duplicate_witnesses(): void
     {
         ['user' => $user, 'w1' => $w1, 'client' => $client, 'med' => $med] = $this->setupRegister();
+        AppSetting::query()->create(['key' => ControlledPolicy::ONSITE_DESTRUCTION, 'value' => 'on']);
+        ClientMedicationStock::create([
+            'client_medication_id' => $med->id,
+            'on_hand' => 10,
+            'unit' => 'tablets',
+        ]);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -192,6 +218,13 @@ class DestructionsTest extends TestCase
                 'unit' => 'tablets',
                 'reason' => 'expired',
                 'disposal_method' => 'denaturing',
+                'method' => 'denaturing',
+                'expected_entry_id' => null,
+                'expected_balance' => '10.00',
+                'witnessed_by' => $w1->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'second_witness_id' => $w1->id,
+                'second_witness_credential' => 'second-witness-secret',
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
                 'witness_1_credential' => 'first-witness-secret',
@@ -201,7 +234,7 @@ class DestructionsTest extends TestCase
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
-            ->assertSessionHasErrors('witness_2_id');
+            ->assertSessionHasErrors('second_witness_id');
 
         $oldInput = session()->getOldInput();
         $this->assertArrayNotHasKey('witness_1_credential', $oldInput);
@@ -252,10 +285,12 @@ class DestructionsTest extends TestCase
         ];
 
         foreach ($invalid as [$payload, $field]) {
-            $this->actingAs($user)
-                ->postJson(route('emar.destructions.store'), $payload)
-                ->assertUnprocessable()
-                ->assertJsonValidationErrors($field);
+            $response = $this->actingAs($user)->postJson(route('emar.destructions.store'), $payload)->assertUnprocessable();
+            if ($payload['queued_offline']) {
+                $this->assertStringContainsString('connection', $response->json('message'));
+            } else {
+                $response->assertJsonValidationErrors('captured_offline_at');
+            }
         }
 
         $this->assertDatabaseCount('medication_destructions', 0);
@@ -264,6 +299,7 @@ class DestructionsTest extends TestCase
     public function test_cd_destruction_records_with_two_distinct_witnesses(): void
     {
         ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client, 'med' => $med] = $this->setupRegister();
+        AppSetting::query()->create(['key' => ControlledPolicy::ONSITE_DESTRUCTION, 'value' => 'on']);
         ClientMedicationStock::create([
             'client_medication_id' => $med->id,
             'on_hand' => 10,
@@ -280,18 +316,34 @@ class DestructionsTest extends TestCase
                 'unit' => 'tablets',
                 'reason' => 'expired',
                 'disposal_method' => 'denaturing',
+                'method' => 'denaturing',
+                'expected_entry_id' => null,
+                'expected_balance' => '10.00',
+                'witnessed_by' => $w1->id,
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+                'second_witness_id' => $w2->id,
+                'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'is_controlled_drug' => true,
                 'witness_1_id' => $w1->id,
-                'witness_1_credential' => 'password',
+                'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
                 'witness_2_id' => $w2->id,
-                'witness_2_credential' => 'password',
+                'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
                 'authorised_by_name' => 'Pharmacist Pat',
                 'denaturing_confirmed' => true,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
+            ->assertRedirect()
             ->assertSessionHasNoErrors();
 
         $this->assertSame(1, MedicationDestruction::count());
+        $this->assertDatabaseHas('medication_destructions', [
+            'client_medication_id' => $med->id,
+            'witness_1_id' => $w1->id,
+            'witness_2_id' => $w2->id,
+            'disposal_method' => 'denaturing',
+        ]);
+        $this->assertSame(8.0, (float) $med->stock()->firstOrFail()->on_hand);
+        $this->assertDatabaseCount('client_controlled_drug_entries', 1);
     }
 
     public function test_destruction_replay_is_single_effect_and_changed_payload_conflicts(): void
@@ -303,7 +355,12 @@ class DestructionsTest extends TestCase
             'unit' => 'tablets',
         ]);
         $uuid = (string) Str::uuid();
+        AppSetting::query()->updateOrCreate(['key' => ControlledPolicy::ONSITE_DESTRUCTION], ['value' => 'on']);
         $payload = [
+            'method' => 'denaturing', 'expected_entry_id' => null, 'expected_balance' => 10,
+            'witnessed_by' => $w1->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'second_witness_id' => $w2->id, 'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
+
             'client_id' => $client->id,
             'client_medication_id' => $med->id,
             'medication_name' => 'Ignored client label',
@@ -316,9 +373,9 @@ class DestructionsTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $w1->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $w2->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => $uuid,
@@ -339,8 +396,8 @@ class DestructionsTest extends TestCase
         $this->assertSame(8.0, (float) $stock->refresh()->on_hand);
 
         $this->actingAs($user)
-            ->post(route('emar.destructions.store'), [...$payload, 'quantity' => 3])
-            ->assertSessionHasErrors('client_request_uuid');
+            ->postJson(route('emar.destructions.store'), [...$payload, 'quantity' => 3])
+            ->assertConflict()->assertJsonPath('sync.status', 'conflict');
         $this->assertDatabaseCount('medication_destructions', 1);
         $this->assertDatabaseCount('client_controlled_drug_entries', 1);
         $this->assertSame(8.0, (float) $stock->refresh()->on_hand);
@@ -354,7 +411,12 @@ class DestructionsTest extends TestCase
             'on_hand' => 10,
             'unit' => 'tablets',
         ]);
+        AppSetting::query()->updateOrCreate(['key' => ControlledPolicy::ONSITE_DESTRUCTION], ['value' => 'on']);
         $payload = [
+            'method' => 'denaturing', 'expected_entry_id' => null, 'expected_balance' => 10,
+            'witnessed_by' => $w1->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'second_witness_id' => $w2->id, 'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
+
             'client_id' => $client->id,
             'client_medication_id' => $medication->id,
             'medication_name' => $medication->name,
@@ -364,9 +426,9 @@ class DestructionsTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $w1->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $w2->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => (string) Str::uuid(),
@@ -412,7 +474,12 @@ class DestructionsTest extends TestCase
             'unit' => 'tablets',
         ]);
         $uuid = (string) Str::uuid();
+        AppSetting::query()->updateOrCreate(['key' => ControlledPolicy::ONSITE_DESTRUCTION], ['value' => 'on']);
         $payload = [
+            'method' => 'denaturing', 'expected_entry_id' => null, 'expected_balance' => 10,
+            'witnessed_by' => $w1->id, 'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'second_witness_id' => $w2->id, 'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
+
             'client_id' => $client->id,
             'client_medication_id' => $firstMedication->id,
             'medication_name' => 'Ignored label',
@@ -422,28 +489,29 @@ class DestructionsTest extends TestCase
             'disposal_method' => 'denaturing',
             'is_controlled_drug' => true,
             'witness_1_id' => $w1->id,
-            'witness_1_credential' => 'password',
+            'witness_1_credential' => UserFactory::TEST_WITNESS_PIN,
             'witness_2_id' => $w2->id,
-            'witness_2_credential' => 'password',
+            'witness_2_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => $uuid,
         ];
 
         $this->actingAs($user)->post(route('emar.destructions.store'), $payload)->assertSessionHasNoErrors();
-        $binding = MedicationIdempotencyResult::query()->sole();
-        $this->assertSame('emar-destruction', $binding->scope);
-        $this->assertNull($binding->expires_at);
-        $binding->forceFill(['expires_at' => now()->subDay()])->save();
+        $binding = DB::table('controlled_product_requests')->where('actor_id', $user->id)->where('request_uuid', $uuid)->sole();
+        DB::table('controlled_product_requests')->where('id', $binding->id)->update(['created_at' => now()->subDays(8)]);
+        Cache::flush();
+        (new MedicationIdempotencyResult)->prunable()->delete();
+        $this->assertSame(1, DB::table('controlled_product_requests')->where('id', $binding->id)->count());
 
         $this->actingAs($user)->post(route('emar.destructions.store'), $payload)->assertSessionHasNoErrors();
         $this->actingAs($user)
-            ->post(route('emar.destructions.store'), [
+            ->postJson(route('emar.destructions.store'), [
                 ...$payload,
                 'client_medication_id' => $secondMedication->id,
                 'medication_name' => $secondMedication->name,
             ])
-            ->assertSessionHasErrors('client_request_uuid');
+            ->assertConflict()->assertJsonPath('sync.status', 'conflict');
 
         $secondActor = $this->makeRoleUser('admin');
         $this->grantPermissions($secondActor, [
@@ -457,6 +525,11 @@ class DestructionsTest extends TestCase
             'start_date' => now()->subYear()->toDateString(),
             'end_date' => null,
         ]);
+        $this->grantPermissions($secondActor, ['medications.view']);
+        $client->supportWorkers()->syncWithoutDetaching([$secondActor->id]);
+        Shift::factory()->create(['user_id' => $secondActor->id, 'client_id' => $client->id, 'site_id' => $client->site_id,
+            'starts_at' => now()->subHour()->utc(), 'ends_at' => now()->addHour()->utc(),
+            'actual_starts_at' => now()->subMinutes(20)->utc(), 'status' => 'in_progress']);
         $this->actingAs($secondActor)
             ->postJson(route('emar.destructions.store'), $payload)
             ->assertConflict()
@@ -561,6 +634,9 @@ class DestructionsTest extends TestCase
         ])->saveQuietly();
         $this->setPermission($user, 'medications.controlled.view', false);
 
+        $this->actingAs($user)->post(route('emar.destructions.void', $record), ['void_reason' => 'Historical ordinary entry correction'])->assertNotFound();
+        $this->assertNull($record->fresh()->voided_at);
+        $this->setPermission($user, 'medications.controlled.view', true);
         $this->actingAs($user)
             ->post(route('emar.destructions.void', $record), ['void_reason' => 'Historical ordinary entry correction'])
             ->assertSessionHasNoErrors();
@@ -648,66 +724,31 @@ class DestructionsTest extends TestCase
         $this->assertSame(10.0, (float) $ordinary->stock()->firstOrFail()->on_hand);
     }
 
-    public function test_page_serves_brand_colour_and_payload(): void
+    /** EA-074/075/089/173 (Lane C2): a controlled reader lands on the register's view. */
+    public function test_the_old_destructions_page_lands_controlled_readers_on_the_register(): void
     {
-        ['user' => $user, 'site' => $site] = $this->setupRegister();
+        ['user' => $user, 'site' => $site, 'client' => $client] = $this->setupRegister();
 
-        $this->actingAs($user)
-            ->get('/emar/destructions?site_id='.$site->id)
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Destructions')
-                ->where('site_brand_colour', '#5E35B1')
-                ->has('medications', 1)
-                ->has('destructions')
-                ->has('sites')
-                ->has('staff')
-                // The hero footer Client EntityFilter (Gap A) is driven by `clients`.
-                ->has('clients')
-            );
+        $this->actingAs($user)->get('/emar/destructions?site_id='.$site->id.'&client_id='.$client->id)
+            ->assertRedirect('/emar/controlled?'.http_build_query(['view' => 'destructions', 'site_id' => $site->id, 'client_id' => $client->id]));
+
+        // A stock-only reader keeps the ordinary disposal history page.
+        $this->setPermission($user, 'medications.controlled.view', false);
+        $this->setPermission($user, 'medications.stock.update', true);
+        $this->actingAs($user->fresh())->get('/emar/destructions?site_id='.$site->id)->assertOk();
     }
 
-    /**
-     * The read-only detail modal (Gap B) and the immutable-register UI render
-     * entirely from the page payload: it must carry the witnesses, authoriser,
-     * controlled-drug flags, human labels and the full void trail so a record can
-     * be inspected without an extra round-trip. (Backend gap BK1.)
-     */
-    public function test_payload_carries_detail_fields_for_voided_cd_record(): void
+    /** EA-173 (Lane C2): a controlled destruction is voided only through the register command. */
+    public function test_a_controlled_destruction_cannot_be_voided_through_the_old_route(): void
     {
-        ['user' => $user, 'w1' => $w1, 'w2' => $w2, 'client' => $client] = $this->setupRegister();
-        $rec = $this->record([
-            'client_id' => $client->id,
-            'witness_1_id' => $w1->id,
-            'witness_2_id' => $w2->id,
-            'authorised_by_name' => 'Pharmacist Pat',
-            'reason' => 'expired',
-            'disposal_method' => 'denaturing',
-        ]);
+        ['user' => $user, 'client' => $client] = $this->setupRegister();
+        $record = $this->record(['client_id' => $client->id, 'is_controlled_drug' => true]);
 
-        // Void it so the payload also exercises the void trail (immutable: retained).
-        $this->actingAs($user)
-            ->from('/emar/destructions')
-            ->post("/emar/destructions/{$rec->id}/void", ['void_reason' => 'Wrong quantity recorded'])
-            ->assertSessionHasNoErrors();
+        $this->actingAs($user)->post("/emar/destructions/{$record->id}/void", ['void_reason' => 'Duplicate entry'])
+            ->assertStatus(422);
 
-        $this->actingAs($user)
-            ->get('/emar/destructions')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Destructions')
-                ->where('destructions.0.witness_1_name', $w1->name)
-                ->where('destructions.0.witness_2_name', $w2->name)
-                ->where('destructions.0.authorised_by_name', 'Pharmacist Pat')
-                ->where('destructions.0.is_controlled_drug', true)
-                ->where('destructions.0.reason_label', 'Expired')
-                ->where('destructions.0.disposal_method_label', 'Denaturing')
-                ->where('destructions.0.is_voided', true)
-                ->where('destructions.0.void_stock_semantics', MedicationDestruction::VOID_STOCK_SEMANTICS)
-                ->where('destructions.0.requires_governed_stock_reconciliation', true)
-                ->where('destructions.0.void_reason', 'Wrong quantity recorded')
-                ->where('destructions.0.voided_by_name', $user->name)
-            );
+        $this->assertNull($record->refresh()->voided_at);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'medications.destruction.void']);
     }
 
     protected function makeRoleUser(string $roleName): User

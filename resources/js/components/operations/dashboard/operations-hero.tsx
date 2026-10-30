@@ -16,6 +16,7 @@ import {
 import { useRef, useState, type ReactNode } from 'react';
 
 import { PageHero } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
 import { WeekPicker, startOfWeek } from '@/components/rostering/week-picker';
 import { Button } from '@/components/ui/button';
@@ -126,16 +127,11 @@ export function OperationsHero({
             ]}
             actions={
                 <>
-                    <Button
-                        asChild
-                        size="sm"
-                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                    >
+                    <PageHeaderPrimaryButton asChild icon={CalendarPlus}>
                         <Link href="/operations/shifts?create=1">
-                            <CalendarPlus className="mr-1 h-3.5 w-3.5" /> Create
-                            shift
+                            Create shift
                         </Link>
-                    </Button>
+                    </PageHeaderPrimaryButton>
                     <Button
                         asChild
                         size="sm"

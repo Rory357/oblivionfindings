@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\SiteGeocodingController;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\LoneWorkerAlert;
@@ -13,14 +14,24 @@ use App\Models\LoneWorkerSession;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Policies\ClientPolicy;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\ControlRoom\ControlRoomAlertLifecycleService;
+use App\Services\CurrentAuthorizationReads;
+use App\Services\HealthSafety\LoneWorkerCoverageService;
+use App\Services\HealthSafety\LoneWorkerSessionAccessService;
+use App\Services\HealthSafety\LoneWorkerSessionScope;
+use App\Services\HealthSafety\LoneWorkerSessionService;
 use App\Services\HealthSafety\LoneWorkerSignalService;
 use App\Services\HealthSafety\ShiftGpsAccessService;
 use App\Services\Queclink\LocateNowService;
 use App\Services\UserSiteAccessService;
+use App\Support\HealthSafety\LoneWorkerSessionPresenter;
+use App\Support\HealthSafety\LoneWorkerSessionReturn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,12 +71,83 @@ class LoneWorkerController extends Controller
         private readonly CanonicalDeviceSiteResolver $deviceSites,
     ) {}
 
+    /** This adapter reports transport failures without changing the shared Site endpoint. */
+    public function searchAddress(Request $request): JsonResponse
+    {
+        $authorize = fn () => app(LoneWorkerSessionAccessService::class)->withCurrentViewer($request->user(), function ($current) {
+            abort_unless($current->canDo('hazards.view'), 403);
+        });
+        $authorize();
+        try {
+            $result = app(SiteGeocodingController::class)->search($request, true);
+        } catch (ValidationException $error) {
+            throw $error;
+        } catch (\Throwable) {
+            return response()->json(['message' => 'Address search is temporarily unavailable. Try again.', 'retryable' => true], 503)
+                ->header('Cache-Control', 'private, no-store');
+        }
+        $authorize();
+
+        return $result->header('Cache-Control', 'private, no-store');
+    }
+
+    private function clientForViewer(?int $clientId, User $viewer): ?array
+    {
+        if ($clientId === null) {
+            return null;
+        }
+
+        return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($viewer, function ($current, $reads, $sites) use ($clientId) {
+            $client = $reads->query(Client::query())->whereIn('site_id', $sites)->find($clientId);
+
+            return $client && app(ClientPolicy::class)->viewFromCurrentEvidence($current, $client, $reads)
+                ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)] : null;
+        });
+    }
+
     /**
      * The coordinator watch-tower: live register, alerts, hero KPIs, detail.
      */
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse|JsonResponse
     {
-        $user = $request->user();
+        return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($request->user(), function ($current, $reads, $sites) use ($request) {
+            abort_unless($current->canDo('hazards.view'), 403);
+
+            return $this->currentIndex($request, $current, $reads, $sites);
+        });
+    }
+
+    private function currentIndex(Request $request, User $user, CurrentAuthorizationReads $reads, array $sites): Response|RedirectResponse|JsonResponse
+    {
+        if ($request->has('session')) {
+            abort_unless($this->nullablePositiveId($request->input('session')) !== null, 404);
+        }
+        if ($request->has('alert')) {
+            $rawAlert = $request->input('alert');
+            abort_unless(is_string($rawAlert) && preg_match('/^(?:cr|legacy)_([1-9][0-9]*)$/D', $rawAlert, $alertId) === 1 && $this->nullablePositiveId($alertId[1]) !== null, 404);
+        }
+        $request->validate(['site_id' => ['nullable', 'integer', 'min:1'], 'user_id' => ['nullable', 'integer', 'min:1'], 'q' => ['nullable', 'string', 'max:200']]);
+        if ($request->has('session') && ! $request->expectsJson() && ! $request->headers->has('X-Inertia')) {
+            $selected = $reads->query(app(LoneWorkerSessionScope::class)->applyForSites(LoneWorkerSession::query(), $sites))->findOrFail($request->integer('session'));
+            app(LoneWorkerSessionAccessService::class)->assertRecord($selected, $user, $sites);
+
+            return redirect(LoneWorkerSessionReturn::href($selected->id, LoneWorkerSessionReturn::fromRegister($request->except(['session', 'return_to']))));
+        }
+        if ($request->has('alert') && ! $request->expectsJson() && ! $request->headers->has('X-Inertia') && is_string($request->input('alert')) && str_starts_with($request->input('alert'), 'cr_')) {
+            $raw = $request->input('alert');
+            abort_unless(preg_match('/^cr_([1-9][0-9]*)$/D', $raw, $match) === 1 && $this->nullablePositiveId($match[1]) !== null, 404);
+            $alertQuery = ControlRoomAlert::query()->where('source', 'lone_worker');
+            $this->siteAccess->applyAlertScope($alertQuery, $user, self::SITE_BYPASS_PERMISSIONS);
+            app(ControlRoomAlertAccessService::class)->applyReadableScope($alertQuery, $user);
+            $selectedAlert = $reads->query($alertQuery)->findOrFail((int) $match[1]);
+            $source = $this->verifiedSessionForCanonicalAlert($selectedAlert, $user);
+            abort_unless($source, 404);
+            $back = LoneWorkerSessionReturn::href($source->id, LoneWorkerSessionReturn::fromRegister($request->except(['session', 'alert', 'return_to'])), 'response');
+            $destination = app(ControlRoomAlertAccessService::class)->destinationFor($selectedAlert, $user, $back);
+            abort_unless(is_string($destination['href'] ?? null), 404);
+
+            return redirect($destination['href']);
+        }
         $tab = $request->input('tab') === 'alerts' ? 'alerts' : 'sessions';
         $requestedSiteId = $request->integer('site_id') ?: null;
         if ($requestedSiteId !== null) {
@@ -86,8 +168,11 @@ class LoneWorkerController extends Controller
             'week' => now()->subDays(7),
             '30d' => now()->subDays(30),
             'all' => null,
-            default => now()->startOfDay(),
+            default => now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay()->utc(),
         };
+
+        $readableClientIds = $filters['q'] ? $reads->query(Client::query())->whereIn('site_id', $sites)->get()
+            ->filter(fn ($client) => app(ClientPolicy::class)->viewFromCurrentEvidence($user, $client, $reads))->modelKeys() : [];
 
         // ── Sessions register (default tab) ──────────────────────────────
         if ($tab === 'sessions') {
@@ -99,18 +184,17 @@ class LoneWorkerController extends Controller
                         (int) $filters['site_id'],
                     ),
                 )
-                ->when($filters['status'], fn ($q) => $q->where('status', $filters['status']))
+                ->when($filters['status'], fn ($q) => $filters['status'] === 'overdue' ? $q->checkInOverdue() : $q->where('status', $filters['status']))
                 ->when($filters['user_id'], fn ($q) => $q->where('user_id', $filters['user_id']))
                 ->when($boundary, fn ($q) => $q->where(function ($w) use ($boundary) {
                     $w->where('started_at', '>=', $boundary)
                         ->orWhereIn('status', self::LIVE_STATUSES);
                 }))
-                ->when($filters['q'], fn ($q) => $q->where(function ($w) use ($filters) {
+                ->when($filters['q'], fn ($q) => $q->where(function ($w) use ($filters, $readableClientIds) {
                     $term = '%'.$filters['q'].'%';
                     $w->whereHas('user', fn ($u) => $u->where('name', 'like', $term))
-                        ->orWhereHas('client', fn ($c) => $c
-                            ->where('first_name', 'like', $term)
-                            ->orWhere('last_name', 'like', $term))
+                        ->orWhereHas('client', fn ($c) => $c->whereIn('id', $readableClientIds)
+                            ->where(fn ($name) => $name->where('first_name', 'like', $term)->orWhere('last_name', 'like', $term)))
                         ->orWhere('activity_description', 'like', $term)
                         ->orWhere('location', 'like', $term);
                 }))
@@ -118,9 +202,9 @@ class LoneWorkerController extends Controller
                 ->orderByRaw("FIELD(status, 'emergency', 'overdue', 'active', 'completed')")
                 ->orderByDesc('started_at');
             $this->applySessionScope($sessionsQuery, $user);
-            $sessions = $sessionsQuery->paginate(25)
+            $sessions = $reads->query($sessionsQuery)->paginate(25)
                 ->withQueryString()
-                ->through(fn ($s) => $this->mapSession($s));
+                ->through(fn ($s) => app(LoneWorkerSessionPresenter::class)->row($s, $user, LoneWorkerSessionReturn::fromRegister($request->except(['session', 'return_to']))));
         } else {
             $sessions = $this->emptyPaginator();
         }
@@ -140,23 +224,23 @@ class LoneWorkerController extends Controller
                     $w->where('triggered_at', '>=', $boundary)
                         ->orWhereIn('status', ControlRoomAlert::ACTIVE_STATUSES);
                 }))
-                ->when($filters['q'], fn ($q) => $q->where(function ($w) use ($filters) {
+                ->when($filters['q'], fn ($q) => $q->where(function ($w) use ($filters, $readableClientIds) {
                     $term = '%'.$filters['q'].'%';
                     $w->where('notes', 'like', $term)
-                        ->orWhereHas('client', fn ($c) => $c
-                            ->where('first_name', 'like', $term)
-                            ->orWhere('last_name', 'like', $term))
+                        ->orWhereHas('client', fn ($c) => $c->whereIn('id', $readableClientIds)
+                            ->where(fn ($name) => $name->where('first_name', 'like', $term)->orWhere('last_name', 'like', $term)))
                         ->orWhereHas('site', fn ($s) => $s->where('name', 'like', $term));
                 }))
                 ->orderByDesc('triggered_at');
             $this->siteAccess->applyAlertScope($alertsQuery, $user, self::SITE_BYPASS_PERMISSIONS);
-            $alerts = $alertsQuery->paginate(25)
+            app(ControlRoomAlertAccessService::class)->applyReadableScope($alertsQuery, $user);
+            $alerts = $reads->query($alertsQuery)->paginate(25)
                 ->withQueryString();
             $sessionsById = $this->scopedSessionsForCanonicalAlerts(
                 $alerts->getCollection(),
                 $user,
             );
-            $alerts->through(function (ControlRoomAlert $alert) use ($sessionsById): array {
+            $alerts->through(function (ControlRoomAlert $alert) use ($sessionsById, $user): array {
                 $sessionId = $this->nullablePositiveId(
                     data_get($alert->context, 'normalized_data.lone_worker_session_id'),
                 );
@@ -164,6 +248,7 @@ class LoneWorkerController extends Controller
                 return $this->mapCanonicalAlert(
                     $alert,
                     $sessionId === null ? null : $sessionsById->get($sessionId),
+                    $user,
                 );
             });
         } else {
@@ -179,46 +264,33 @@ class LoneWorkerController extends Controller
         }
 
         $shiftData = $this->monitorableShifts($user);
-        $siteQuery = Site::select('id', 'name', 'address_line_1', 'suburb', 'city', 'postcode', 'latitude', 'longitude')
-            ->where('is_active', true)
-            ->orderBy('name');
-        $this->siteAccess->applySiteScope($siteQuery, $user, self::SITE_BYPASS_PERMISSIONS);
-        $staffQuery = User::select('id', 'name')->orderBy('name');
-        $this->siteAccess->applyStaffScope($staffQuery, $user, self::SITE_BYPASS_PERMISSIONS);
-        $clientQuery = Client::select('id', 'first_name', 'last_name')->orderBy('last_name');
-        $this->siteAccess->applyClientScope($clientQuery, $user, self::SITE_BYPASS_PERMISSIONS);
+        $pickers = app(LoneWorkerSessionPresenter::class)->pickers($user);
 
-        return Inertia::render('health-safety/lone-workers/index', [
+        $props = [
             'tab' => $tab,
             'sessions' => $sessions,
             'alerts' => $alerts,
             'detail' => $detail,
+            'lone_worker_confirmation' => app(LoneWorkerSessionService::class)->confirmationForViewer($user, $request->session()->get('lone_worker_confirmation')),
             'tabCounts' => $this->tabCounts($user),
-            'hero' => $this->heroBlock($shiftData['unmonitored_lone'], $user),
+            'hero' => $this->heroBlock($shiftData['unmonitored_lone'], $user, $reads, $sites),
+            'coverage' => app(LoneWorkerCoverageService::class)->summary($user, $requestedSiteId),
+            'pickers' => $pickers,
             'filters' => $filters,
             'options' => [
-                'sites' => $siteQuery->get()
-                    ->map(fn ($s) => [
-                        'id' => $s->id,
-                        'name' => $s->name,
-                        // Composed one-line address so the wizard can prefill the location
-                        // field when a site is chosen ("selectable from site").
-                        'address' => collect([$s->address_line_1, $s->suburb, $s->city, $s->postcode])
-                            ->filter()->implode(', ') ?: null,
-                        'latitude' => $s->latitude,
-                        'longitude' => $s->longitude,
-                    ]),
-                'staff' => $staffQuery->get(),
-                'clients' => $clientQuery->get()
-                    ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]),
+                'sites' => $pickers['sites'],
+                'staff' => $pickers['workers'],
+                'clients' => $pickers['clients'],
                 'shifts' => $shiftData['shifts'],
             ],
             'can' => [
-                'manage' => $request->user()?->canDo('hazards.manage') ?? false,
-                'view' => $request->user()?->canDo('hazards.view') ?? false,
-                'view_control_room' => $request->user()?->canDo('controlRoom.viewAny') ?? false,
+                'manage' => $user->canDo('hazards.view') && $user->canDo('hazards.manage'),
+                'view' => $user->canDo('hazards.view'),
+                'view_control_room' => $user->canDo('controlRoom.alerts.view') || $user->canDo('controlRoom.alerts.manage'),
             ],
-        ]);
+        ];
+
+        return $request->expectsJson() ? response()->json($props) : Inertia::render('health-safety/lone-workers/index', $props);
     }
 
     /**
@@ -226,172 +298,9 @@ class LoneWorkerController extends Controller
      */
     public function startSession(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'user_id' => ['required', 'exists:users,id'],
-            'site_id' => ['nullable', 'exists:sites,id'],
-            'client_id' => ['nullable', 'exists:clients,id'],
-            'shift_id' => ['nullable', 'exists:shifts,id'],
-            'expected_end_at' => ['required', 'date', 'after:now'],
-            'activity_description' => ['nullable', 'string', 'max:2000'],
-            'check_in_interval_minutes' => ['nullable', 'integer', 'min:15', 'max:480'],
-            'location' => ['nullable', 'string', 'max:500'],
-            'location_lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'location_lng' => ['nullable', 'numeric', 'between:-180,180'],
-        ]);
+        $row = app(LoneWorkerSessionService::class)->create($request->user(), $request->all());
 
-        DB::transaction(function () use ($request, $validated): void {
-            $actor = User::query()
-                ->whereKey($request->user()->id)
-                ->lockForUpdate()
-                ->firstOrFail();
-            abort_unless($actor->canDo('hazards.manage'), 403);
-
-            $shift = ! empty($validated['shift_id'])
-                ? Shift::query()->whereKey($validated['shift_id'])->lockForUpdate()->firstOrFail()
-                : null;
-            if ($shift && $shift->client_id !== null) {
-                $shift->setRelation(
-                    'client',
-                    Client::query()->whereKey($shift->client_id)->lockForUpdate()->first(),
-                );
-                foreach (collect([$shift->site_id, $shift->client?->site_id])
-                    ->map(fn (mixed $siteId): ?int => $this->nullablePositiveId($siteId))
-                    ->filter()
-                    ->unique() as $candidateSiteId) {
-                    $this->siteAccess->assertCanAccessSiteId(
-                        $actor,
-                        $candidateSiteId,
-                        self::SITE_BYPASS_PERMISSIONS,
-                    );
-                }
-                if ($shift->site_id !== null
-                    && $shift->client?->site_id !== null
-                    && (int) $shift->site_id !== (int) $shift->client->site_id) {
-                    throw ValidationException::withMessages([
-                        'shift_id' => 'The rostered shift has conflicting site and client details. Correct the shift before starting monitoring.',
-                    ]);
-                }
-            }
-            if ($shift) {
-                $this->siteAccess->assertCanAccessShift($actor, $shift, self::SITE_BYPASS_PERMISSIONS);
-            }
-
-            $workerQuery = User::query()->staff()->whereKey($validated['user_id']);
-            $this->siteAccess->applyStaffScope($workerQuery, $actor, self::SITE_BYPASS_PERMISSIONS);
-            $worker = $workerQuery->lockForUpdate()->first();
-            abort_unless($worker, 403, 'You are not authorized to start monitoring for that worker.');
-
-            if ($shift && (int) $shift->user_id !== (int) $worker->id) {
-                throw ValidationException::withMessages([
-                    'user_id' => 'The selected worker must match the worker rostered on the shift.',
-                ]);
-            }
-
-            $requestedClientId = ! empty($validated['client_id'])
-                ? (int) $validated['client_id']
-                : null;
-            $shiftClientId = $shift && $shift->client_id !== null
-                ? (int) $shift->client_id
-                : null;
-            if ($shift && $shiftClientId !== $requestedClientId) {
-                throw ValidationException::withMessages([
-                    'client_id' => 'The selected client must exactly match the client rostered on the shift.',
-                ]);
-            }
-            $clientId = $shift ? $shiftClientId : $requestedClientId;
-            $client = null;
-            if ($clientId !== null) {
-                $clientQuery = Client::query()->whereKey($clientId);
-                $this->siteAccess->applyClientScope($clientQuery, $actor, self::SITE_BYPASS_PERMISSIONS);
-                $client = $clientQuery->lockForUpdate()->first();
-                abort_unless($client, 403, 'You are not authorized to start monitoring for that client.');
-            }
-
-            $shiftSiteId = $shift ? $this->siteAccess->shiftSiteId($shift) : null;
-            $requestedSiteId = ! empty($validated['site_id'])
-                ? (int) $validated['site_id']
-                : null;
-            if ($shiftSiteId !== null
-                && $requestedSiteId !== null
-                && $shiftSiteId !== $requestedSiteId) {
-                throw ValidationException::withMessages([
-                    'site_id' => 'The selected site must match the site for the rostered shift.',
-                ]);
-            }
-            $siteId = $shiftSiteId
-                ?? $requestedSiteId
-                ?? ($client?->site_id ? (int) $client->site_id : null);
-            if ($siteId === null) {
-                throw ValidationException::withMessages([
-                    'site_id' => 'Select an accessible site, client, or rostered shift for this session.',
-                ]);
-            }
-            if ($client && (int) $client->site_id !== $siteId) {
-                throw ValidationException::withMessages([
-                    'client_id' => 'The selected client must belong to the authoritative site for this session.',
-                ]);
-            }
-
-            $siteQuery = Site::query()->whereKey($siteId);
-            $this->siteAccess->applySiteScope($siteQuery, $actor, self::SITE_BYPASS_PERMISSIONS);
-            $site = $siteQuery->lockForUpdate()->first();
-            abort_unless(
-                $site
-                    && in_array(
-                        (int) $site->id,
-                        $this->siteAccess->accessibleSiteIds($worker),
-                        true,
-                    ),
-                403,
-                'You are not authorized to start monitoring at that site.',
-            );
-
-            $sessionData = $validated;
-            $sessionData['user_id'] = $worker->id;
-            $sessionData['shift_id'] = $shift?->id;
-            $sessionData['client_id'] = $client?->id;
-            $sessionData['site_id'] = $siteId;
-
-            $session = LoneWorkerSession::query()->create(array_merge($sessionData, [
-                'started_at' => now(),
-                'last_check_in_at' => now(),
-                'status' => 'active',
-                'check_in_interval_minutes' => $sessionData['check_in_interval_minutes'] ?? 60,
-                'created_by' => $actor->id,
-                'updated_by' => $actor->id,
-            ]));
-
-            // A Shift GPS ping is staff location evidence. It may be reused only
-            // after the authorised lone-worker safety session is live, and only
-            // through the canonical Shift Site and worker assignment boundary.
-            if ($shift
-                && $actor->canDo('assets.telemetry.view')
-                && blank($sessionData['location_lat'] ?? null)
-                && blank($sessionData['location_lng'] ?? null)) {
-                $ping = $this->shiftGpsAccess->latestForLiveSession($actor, $shift, $session);
-                if ($ping) {
-                    $session->update([
-                        'location_lat' => $ping->latitude,
-                        'location_lng' => $ping->longitude,
-                    ]);
-                }
-            }
-
-            AuditLogger::logOrFail('healthSafety.loneWorker.session.start', $session, [
-                'actor_id' => $actor->id,
-                'worker_user_id' => $worker->id,
-                'site_id' => $site->id,
-                'shift_id' => $shift?->id,
-                'client_id' => $client?->id,
-            ]);
-        }, 3);
-
-        if ($request->boolean('stay')) {
-            return back()->with('success', 'Lone worker session started successfully.');
-        }
-
-        return redirect()->route('health-safety.lone-workers.index')
-            ->with('success', 'Lone worker session started successfully.');
+        return $this->confirmedSession($request, $row, 'Session started. No check-in has been received yet.');
     }
 
     /**
@@ -400,44 +309,9 @@ class LoneWorkerController extends Controller
      */
     public function updateSession(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $validated = $request->validate([
-            'expected_end_at' => ['required', 'date'],
-            'check_in_interval_minutes' => ['nullable', 'integer', 'min:15', 'max:480'],
-            'activity_description' => ['nullable', 'string', 'max:2000'],
-            'location' => ['nullable', 'string', 'max:500'],
-            'location_lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'location_lng' => ['nullable', 'numeric', 'between:-180,180'],
-        ]);
+        $row = app(LoneWorkerSessionService::class)->update($session, $request->user(), $request->all());
 
-        $updated = DB::transaction(function () use ($request, $session, $validated): bool {
-            $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
-            $lockedSession = $this->lockedSessionContext((int) $session->id);
-            $this->assertCanAccessSession($actor, $lockedSession);
-
-            if (! in_array($lockedSession->status, ['active', 'overdue'], true)) {
-                return false;
-            }
-
-            $lockedSession->update(array_merge($validated, [
-                // Extending an overdue session deliberately resumes monitoring.
-                'status' => 'active',
-                'updated_by' => $actor->id,
-            ]));
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.session.update',
-                $lockedSession,
-                $actor,
-            );
-
-            return true;
-        }, 3);
-
-        if (! $updated) {
-            return back()->with('error', 'Only active or overdue sessions can be edited.');
-        }
-
-        return back()->with('success', 'Session updated.');
+        return $this->confirmedSession($request, $row, 'Session updated.');
     }
 
     /**
@@ -452,66 +326,9 @@ class LoneWorkerController extends Controller
      */
     public function checkIn(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $validated = $request->validate([
-            'status' => ['sometimes', 'string', 'in:ok,concern,emergency'],
-            'notes' => ['nullable', 'string', 'max:1000'],
-            'location_lat' => ['nullable', 'numeric', 'between:-90,90'],
-            'location_lng' => ['nullable', 'numeric', 'between:-180,180'],
-        ]);
+        $row = app(LoneWorkerSessionService::class)->checkIn($session, $request->user(), $request->all());
 
-        $recorded = DB::transaction(function () use ($request, $session, $validated): bool {
-            $actor = $this->lockedActor($request);
-            $lockedSession = $this->lockedSessionContext((int) $session->id);
-            $lockedOwner = $actor->id === $lockedSession->user_id;
-            abort_unless($lockedOwner || $actor->canDo('hazards.manage'), 403);
-            $this->assertCanAccessSession($actor, $lockedSession, $lockedOwner);
-
-            if (! in_array($lockedSession->status, ['active', 'overdue'], true)) {
-                return false;
-            }
-
-            $checkedInAt = now();
-            $lockedSession->checkIns()->create(array_merge($validated, [
-                'checked_in_at' => $checkedInAt,
-                'status' => $validated['status'] ?? 'ok',
-            ]));
-
-            $lockedSession->update([
-                'last_check_in_at' => $checkedInAt,
-                'status' => 'active',
-                'updated_by' => $actor->id,
-            ]);
-
-            // If check-in status is emergency, trigger emergency flow.
-            if (($validated['status'] ?? 'ok') === 'emergency') {
-                $lockedSession->update([
-                    'status' => 'emergency',
-                    'emergency_triggered_at' => $checkedInAt,
-                    'emergency_notes' => $validated['notes'] ?? null,
-                ]);
-
-                // Canonical signal → Control Room (operational source of truth)
-                app(LoneWorkerSignalService::class)->emitEmergency(
-                    $lockedSession,
-                    $validated['notes'] ?? null,
-                );
-            }
-
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.session.checkIn',
-                $lockedSession,
-                $actor,
-                ['check_in_status' => $validated['status'] ?? 'ok'],
-            );
-
-            return true;
-        }, 3);
-
-        if (! $recorded) {
-            return back()->with('error', 'Only active or overdue sessions can receive a check-in.');
-        }
-
-        return redirect()->back()->with('success', 'Check-in recorded successfully.');
+        return $this->confirmedSession($request, $row, $row->status === 'emergency' ? 'Emergency request recorded. Review delivery and the response separately.' : 'Check-in recorded.');
     }
 
     /**
@@ -519,35 +336,9 @@ class LoneWorkerController extends Controller
      */
     public function endSession(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $ended = DB::transaction(function () use ($request, $session): bool {
-            $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
-            $lockedSession = $this->lockedSessionContext((int) $session->id);
-            $this->assertCanAccessSession($actor, $lockedSession);
+        $row = app(LoneWorkerSessionService::class)->end($session, $request->user(), $request->all());
 
-            if (! in_array($lockedSession->status, ['active', 'overdue'], true)) {
-                return false;
-            }
-
-            $lockedSession->update([
-                'ended_at' => now(),
-                'status' => 'completed',
-                'updated_by' => $actor->id,
-            ]);
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.session.end',
-                $lockedSession,
-                $actor,
-            );
-
-            return true;
-        }, 3);
-
-        if (! $ended) {
-            return back()->with('error', 'Only active or overdue sessions can be ended. Resolve an emergency in Control Room first.');
-        }
-
-        return redirect()->back()->with('success', 'Lone worker session ended successfully.');
+        return $this->confirmedSession($request, $row, 'Session ended.');
     }
 
     /**
@@ -559,33 +350,9 @@ class LoneWorkerController extends Controller
      */
     public function destroy(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $removed = DB::transaction(function () use ($request, $session): bool {
-            $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
-            $lockedSession = $this->lockedSessionContext((int) $session->id);
-            $this->assertCanAccessSession($actor, $lockedSession);
+        $confirmed = app(LoneWorkerSessionService::class)->remove($session, $request->user(), $request->all());
 
-            if ($lockedSession->status !== 'completed') {
-                return false;
-            }
-
-            $lockedSession->update(['updated_by' => $actor->id]);
-            $lockedSession->delete();
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.session.delete',
-                $lockedSession,
-                $actor,
-            );
-
-            return true;
-        }, 3);
-
-        if (! $removed) {
-            return back()->with('error', 'Only completed sessions can be removed. End the session first.');
-        }
-
-        return redirect()->route('health-safety.lone-workers.index')
-            ->with('success', 'Session removed from the register (retained for audit).');
+        return redirect()->route('health-safety.lone-workers.index')->with('success', 'Session removed from the register; its safety record is retained.')->with('lone_worker_confirmation', ['id' => (int) $confirmed->id, 'lock_version' => (int) $confirmed->lock_version, 'idempotency_key' => $request->input('idempotency_key')]);
     }
 
     /**
@@ -593,135 +360,70 @@ class LoneWorkerController extends Controller
      */
     public function triggerEmergency(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $validated = $request->validate([
-            'emergency_notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $row = app(LoneWorkerSessionService::class)->panic($session, $request->user(), $request->all());
 
-        $outcome = DB::transaction(function () use ($request, $session, $validated): string {
-            $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
-            $lockedSession = $this->lockedSessionContext((int) $session->id);
-            $this->assertCanAccessSession($actor, $lockedSession);
-
-            if ($lockedSession->status === 'emergency') {
-                return 'already_emergency';
-            }
-
-            if (! in_array($lockedSession->status, ['active', 'overdue'], true)) {
-                return 'not_live';
-            }
-
-            $triggeredAt = now();
-            $lockedSession->update([
-                'status' => 'emergency',
-                'emergency_triggered_at' => $triggeredAt,
-                'emergency_notes' => $validated['emergency_notes'] ?? null,
-                'updated_by' => $actor->id,
-            ]);
-
-            // Canonical signal → Control Room (operational source of truth)
-            app(LoneWorkerSignalService::class)->emitEmergency(
-                $lockedSession,
-                $validated['emergency_notes'] ?? null,
-            );
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.session.emergency',
-                $lockedSession,
-                $actor,
-            );
-
-            return 'triggered';
-        });
-
-        if ($outcome === 'already_emergency') {
-            return redirect()->back()->with('success', 'Emergency alert is already active in Control Room.');
-        }
-
-        if ($outcome === 'not_live') {
-            return back()->with('error', 'Only active or overdue sessions can trigger an emergency.');
-        }
-
-        return redirect()->back()->with('success', 'Emergency alert sent to Control Room.');
+        return $this->confirmedSession($request, $row, 'Emergency request recorded. Review delivery and the response separately.');
     }
 
     /**
      * Acknowledge the canonical operational alert. Replays are idempotent.
      */
-    public function acknowledgeAlert(
-        Request $request,
-        ControlRoomAlert $alert,
-        ControlRoomAlertLifecycleService $lifecycle,
-    ): RedirectResponse {
-        $validated = $request->validate([
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
-
-        DB::transaction(function () use ($request, $alert, $lifecycle, $validated): void {
+    public function acknowledgeAlert(Request $request, ControlRoomAlert $alert, ControlRoomAlertLifecycleService $lifecycle): RedirectResponse
+    {
+        $validated = $request->validate(['notes' => ['nullable', 'string', 'max:2000']]);
+        $row = DB::transaction(function () use ($request, $alert, $lifecycle, $validated) {
             $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
-            [$canonical] = $this->lockedCanonicalAlertContext((int) $alert->id, $actor);
-            if ($canonical->status === ControlRoomAlert::STATUS_OPEN) {
-                $lifecycle->acknowledge($canonical, $actor, $validated['notes'] ?? null);
-            } elseif (! in_array($canonical->status, [
-                ControlRoomAlert::STATUS_ACK,
-                ControlRoomAlert::STATUS_TRIAGING,
-                ControlRoomAlert::STATUS_CONFIRMED,
-                ControlRoomAlert::STATUS_RESOLVED,
-                ControlRoomAlert::STATUS_CLOSED,
-            ], true)) {
-                abort(409, 'This canonical alert cannot be acknowledged in its current state.');
-            }
+            abort_unless($actor->canDo('hazards.manage') && $actor->canDo('controlRoom.alerts.manage'), 403);
+            [$canonical, $session] = $this->lockedCanonicalAlertContext((int) $alert->id, $actor);
+            abort_unless(app(LoneWorkerSessionAccessService::class)->canViewCanonicalAlert($session, $canonical, $actor), 403);
+
+            return app(LoneWorkerSessionService::class)->external($session, $actor, [...$request->all(), 'alert_id' => $canonical->id], 'response', 'responseAcknowledged', function () use ($canonical, $actor, $lifecycle, $validated) {
+                if ($canonical->status === ControlRoomAlert::STATUS_OPEN) {
+                    $lifecycle->acknowledge($canonical, $actor, $validated['notes'] ?? null);
+                } else {
+                    abort_unless(in_array($canonical->status, [ControlRoomAlert::STATUS_ACK, ControlRoomAlert::STATUS_TRIAGING, ControlRoomAlert::STATUS_CONFIRMED, ControlRoomAlert::STATUS_RESOLVED, ControlRoomAlert::STATUS_CLOSED], true), 409);
+                }
+
+                return ['alert_id' => $canonical->id, 'note' => $validated['notes'] ?? null];
+            });
         }, 3);
 
-        return redirect()->back()
-            ->with('success', 'Control Room alert acknowledged.');
+        return $this->confirmedSession($request, $row, 'Operational response acknowledged. This does not record worker safety or a check-in.');
     }
 
     /**
      * Resolve the canonical operational alert. Replays are idempotent.
      */
-    public function resolveAlert(
-        Request $request,
-        ControlRoomAlert $alert,
-        ControlRoomAlertLifecycleService $lifecycle,
-    ): RedirectResponse {
-        $validated = $request->validate([
-            'resolution_notes' => ['required', 'string', 'max:2000'],
-        ]);
-
-        DB::transaction(function () use ($request, $alert, $validated, $lifecycle): void {
+    public function resolveAlert(Request $request, ControlRoomAlert $alert, ControlRoomAlertLifecycleService $lifecycle): RedirectResponse
+    {
+        $validated = $request->validate(['resolution_notes' => ['required', 'string', 'max:2000']]);
+        abort_if(trim($validated['resolution_notes']) === '', 422);
+        $row = DB::transaction(function () use ($request, $alert, $validated, $lifecycle) {
             $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
-            [$canonical, $lockedSession] = $this->lockedCanonicalAlertContext((int) $alert->id, $actor);
-            if (! in_array($canonical->status, [
-                ControlRoomAlert::STATUS_RESOLVED,
-                ControlRoomAlert::STATUS_CLOSED,
-            ], true)) {
-                if ($canonical->status === ControlRoomAlert::STATUS_OPEN) {
-                    $canonical = $lifecycle->acknowledge($canonical, $actor);
-                }
-                if ($canonical->status === ControlRoomAlert::STATUS_ACK) {
-                    $canonical = $lifecycle->startTriage($canonical, $actor);
-                }
-                if (in_array($canonical->status, [
-                    ControlRoomAlert::STATUS_TRIAGING,
-                    ControlRoomAlert::STATUS_CONFIRMED,
-                ], true)) {
-                    $canonical = $lifecycle->resolve(
-                        $canonical,
-                        $actor,
-                        $validated['resolution_notes'],
-                        'resolved_in_health_safety',
-                    );
-                }
-                abort_unless($canonical->status === ControlRoomAlert::STATUS_RESOLVED, 409);
-            }
+            abort_unless($actor->canDo('hazards.manage') && $actor->canDo('controlRoom.alerts.manage'), 403);
+            [$canonical, $session] = $this->lockedCanonicalAlertContext((int) $alert->id, $actor);
+            abort_unless(app(LoneWorkerSessionAccessService::class)->canViewCanonicalAlert($session, $canonical, $actor), 403);
 
-            $this->resumeResolvedEmergencySession($canonical, $lockedSession, $actor);
+            return app(LoneWorkerSessionService::class)->external($session, $actor, [...$request->all(), 'alert_id' => $canonical->id], 'response', 'responseResolved', function ($row) use ($canonical, $actor, $validated, $lifecycle) {
+                if (! in_array($canonical->status, [ControlRoomAlert::STATUS_RESOLVED, ControlRoomAlert::STATUS_CLOSED], true)) {
+                    if ($canonical->status === ControlRoomAlert::STATUS_OPEN) {
+                        $canonical = $lifecycle->acknowledge($canonical, $actor);
+                    }
+                    if ($canonical->status === ControlRoomAlert::STATUS_ACK) {
+                        $canonical = $lifecycle->startTriage($canonical, $actor);
+                    }
+                    if (in_array($canonical->status, [ControlRoomAlert::STATUS_TRIAGING, ControlRoomAlert::STATUS_CONFIRMED], true)) {
+                        $canonical = $lifecycle->resolve($canonical, $actor, $validated['resolution_notes'], 'resolved_in_health_safety');
+                    }
+                    abort_unless($canonical->status === ControlRoomAlert::STATUS_RESOLVED, 409);
+                }
+                $this->resumeResolvedEmergencySession($canonical, $row, $actor);
+
+                return ['alert_id' => $canonical->id, 'note' => $validated['resolution_notes']];
+            });
         }, 3);
 
-        return redirect()->back()
-            ->with('success', 'Control Room alert resolved.');
+        return $this->confirmedSession($request, $row, 'Operational response resolved. Session monitoring uses the last actual checkpoint.');
     }
 
     /**
@@ -729,99 +431,114 @@ class LoneWorkerController extends Controller
      */
     public function locateNow(Request $request, LoneWorkerSession $session, LocateNowService $locateNow): RedirectResponse
     {
-        $managementUrl = DB::transaction(function () use ($request, $session, $locateNow): ?string {
+        $row = DB::transaction(function () use ($request, $session, $locateNow) {
             $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
+            abort_unless($actor->canDo('hazards.manage') && $actor->canDo('assets.telemetry.view'), 403);
             [$lockedSession, $device] = $this->lockedTrackerSessionContext((int) $session->id);
             $this->assertCanAccessSession($actor, $lockedSession);
-
             if (! $device) {
-                return null;
+                throw ValidationException::withMessages(['tracker' => 'This worker has no available paired tracker.']);
             }
 
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.location.management_opened',
-                $lockedSession,
-                $actor,
-                [
-                    'device_id' => $device->id,
-                    'capability' => 'tracking.location_refresh',
-                ],
-            );
-
-            return $locateNow->managementUrlForDevice($device);
+            return app(LoneWorkerSessionService::class)->external($lockedSession, $actor, $request->all(), 'locate', 'locationManagementOpened', fn () => ['device_id' => $device->id, 'management_href' => $locateNow->managementUrlForDevice($device)]);
         }, 3);
 
-        if ($managementUrl === null) {
-            return back()->with('error', 'This worker does not have a paired GPS tracker.');
-        }
-
-        return redirect()->to($managementUrl)->with(
-            'success',
-            'Review the governed location refresh, confirm your identity, and record the operational reason before dispatch.',
-        );
+        return redirect()->to($row->getRelation('commandResult')['management_href'])->with('success', 'Review the governed location refresh, confirm your identity and record the reason before dispatch.');
     }
 
     /**
      * Acknowledge a tracker panic: clear the device panic flag and ack the open
      * Control Room lone-worker alerts for this session.
      */
-    public function acknowledgePanic(
-        Request $request,
-        LoneWorkerSession $session,
-        ControlRoomAlertLifecycleService $lifecycle,
-    ): RedirectResponse {
-        DB::transaction(function () use ($request, $session, $lifecycle): void {
+    public function acknowledgePanic(Request $request, LoneWorkerSession $session, ControlRoomAlertLifecycleService $lifecycle): RedirectResponse
+    {
+        $row = DB::transaction(function () use ($request, $session, $lifecycle) {
             $actor = $this->lockedActor($request);
-            abort_unless($actor->canDo('hazards.manage'), 403);
+            abort_unless($actor->canDo('hazards.manage') && $actor->canDo('controlRoom.alerts.manage') && $actor->canDo('assets.telemetry.view'), 403);
             [$lockedSession, $device] = $this->lockedTrackerSessionContext((int) $session->id);
             $this->assertCanAccessSession($actor, $lockedSession);
 
-            if ($device) {
-                $meta = $device->meta ?? [];
-                $meta['panic_active'] = false;
-                $meta['panic_acknowledged_at'] = now()->toISOString();
-                $meta['panic_acknowledged_by'] = $actor->id;
-                $device->forceFill(['meta' => $meta])->save();
-            }
+            return app(LoneWorkerSessionService::class)->external($lockedSession, $actor, $request->all(), 'acknowledge_panic', 'trackerPanicAcknowledged', function () use ($lockedSession, $device, $actor, $lifecycle) {
+                if ($device) {
+                    $meta = $device->meta ?? [];
+                    $meta['panic_active'] = false;
+                    $meta['panic_acknowledged_at'] = now()->toISOString();
+                    $meta['panic_acknowledged_by'] = $actor->id;
+                    $device->forceFill(['meta' => $meta])->save();
+                }
+                $query = ControlRoomAlert::query()->where('source', 'lone_worker')->where('alert_type', LoneWorkerSignalService::canonicalAlertType(LoneWorkerSignalService::TYPE_EMERGENCY))
+                    ->where('context->normalized_data->lone_worker_session_id', $lockedSession->id)->where('status', ControlRoomAlert::STATUS_OPEN);
+                $this->siteAccess->applyAlertScope($query, $actor, self::SITE_BYPASS_PERMISSIONS);
+                $alerts = $query->lockForUpdate()->get()->filter(fn ($alert) => app(LoneWorkerSessionAccessService::class)->alertMatchesSession($alert, $lockedSession));
+                abort_if($alerts->count() > 1, 409, 'This emergency has contradictory canonical alerts.');
+                if ($alerts->isNotEmpty()) {
+                    $lifecycle->acknowledge($alerts->first(), $actor);
+                }
 
-            $alertsQuery = ControlRoomAlert::where('source', 'lone_worker')
-                ->where('alert_type', LoneWorkerSignalService::canonicalAlertType(
-                    LoneWorkerSignalService::TYPE_EMERGENCY,
-                ))
-                ->where('context->normalized_data->lone_worker_session_id', $lockedSession->id)
-                ->where('status', ControlRoomAlert::STATUS_OPEN);
-            $this->siteAccess->applyAlertScope($alertsQuery, $actor, self::SITE_BYPASS_PERMISSIONS);
-            $alerts = $alertsQuery->lockForUpdate()->get()
-                ->filter(fn (ControlRoomAlert $alert) => $this->canonicalAlertMatchesSession(
-                    $alert,
-                    $lockedSession,
-                ));
-            abort_if($alerts->count() > 1, 409, 'This emergency has contradictory canonical alerts.');
-            if ($alerts->isNotEmpty()) {
-                $lifecycle->acknowledge($alerts->first(), $actor);
-            }
-            $this->auditSessionMutation(
-                'healthSafety.loneWorker.panic.acknowledge',
-                $lockedSession,
-                $actor,
-            );
+                return ['device_id' => $device?->id, 'alert_id' => $alerts->first()?->id];
+            });
         }, 3);
 
-        return back()->with('success', 'Panic acknowledged.');
+        return $this->confirmedSession($request, $row, 'Tracker panic acknowledged. This does not confirm worker safety or end the session.');
     }
-
-    /* ───────────────────────────── Payload builders ───────────────────────────── */
 
     /**
      * Tab badge counts (application-wide totals, never filter-scoped).
      */
+    public function options(Request $request): JsonResponse
+    {
+        return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($request->user(), function ($current) {
+            $pickers = app(LoneWorkerSessionPresenter::class)->pickers($current);
+
+            return response()->json(['pickers' => $pickers, 'can' => ['start' => $current->canDo('hazards.view') && $current->canDo('hazards.manage'),
+                'start_own' => collect($pickers['shifts'])->contains(fn ($shift) => (int) $shift['user_id'] === (int) $current->id)]]);
+        });
+    }
+
+    public function startOwnSession(Request $request): RedirectResponse
+    {
+        $row = app(LoneWorkerSessionService::class)->create($request->user(), $request->all(), true);
+
+        return $this->confirmedSession($request, $row, 'Session started. No check-in has been received yet.');
+    }
+
+    public function endOwnSession(Request $request, LoneWorkerSession $session): RedirectResponse
+    {
+        $row = app(LoneWorkerSessionService::class)->end($session, $request->user(), $request->all(), true);
+
+        return $this->confirmedSession($request, $row, 'Session ended.');
+    }
+
+    public function show(Request $request, LoneWorkerSession $session): Response|JsonResponse
+    {
+        $access = app(LoneWorkerSessionAccessService::class);
+        $row = $access->recordForViewer($session, $request->user());
+        $returnTo = LoneWorkerSessionReturn::sanitize($request->input('return_to'));
+        $presenter = app(LoneWorkerSessionPresenter::class);
+        $props = ['lone_worker_confirmation' => app(LoneWorkerSessionService::class)->confirmationForViewer($request->user(), $request->session()->get('lone_worker_confirmation')), 'detail' => $presenter->detail($row, $request->user(), $returnTo), 'pickers' => $presenter->pickers($request->user(), $row),
+            'return_to' => $returnTo, 'section' => in_array($request->input('section'), ['overview', 'check-ins', 'response', 'location', 'history', 'connections'], true) ? $request->input('section') : 'overview'];
+
+        return $request->expectsJson() ? response()->json($props) : Inertia::render('health-safety/lone-workers/show', $props);
+    }
+
+    private function confirmedSession(Request $request, LoneWorkerSession $row, string $message): RedirectResponse
+    {
+        $section = in_array($request->input('section'), ['overview', 'check-ins', 'response', 'location', 'history', 'connections'], true) ? $request->input('section') : null;
+        $href = LoneWorkerSessionReturn::href((int) $row->id, $request->input('return_to'), $section);
+        if (in_array($request->input('action'), ['edit', 'check-in', 'end', 'panic', 'locate', 'acknowledge-panic'], true)) {
+            $href .= (str_contains($href, '?') ? '&' : '?').'action='.rawurlencode($request->input('action'));
+        }
+
+        return redirect($href)->with('success', $message)->with('lone_worker_confirmation', ['id' => $row->id, 'lock_version' => $row->lock_version, 'idempotency_key' => $request->input('idempotency_key')]);
+    }
+
     private function tabCounts(User $user): array
     {
-        $sessionsQuery = LoneWorkerSession::whereIn('status', self::LIVE_STATUSES);
+        $sessionsQuery = LoneWorkerSession::whereIn('status', self::LIVE_STATUSES)->whereNull('ended_at');
         $this->applySessionScope($sessionsQuery, $user);
         $alertsQuery = ControlRoomAlert::where('source', 'lone_worker')->actionable();
         $this->siteAccess->applyAlertScope($alertsQuery, $user, self::SITE_BYPASS_PERMISSIONS);
+        app(ControlRoomAlertAccessService::class)->applyReadableScope($alertsQuery, $user);
 
         return [
             'sessions' => $sessionsQuery->count(),
@@ -833,41 +550,45 @@ class LoneWorkerController extends Controller
      * Hero KPI clusters + NZ compliance badge counts/booleans.
      * Counts & booleans only — the page formats the copy (never pre-format here).
      */
-    private function heroBlock(int $loneShiftsUnmonitored, User $user): array
+    private function heroBlock(int $loneShiftsUnmonitored, User $user, CurrentAuthorizationReads $reads, array $sites): array
     {
         // Load active sessions once; derive the check-in freshness counts in PHP via the
         // model's Carbon helper (UTC-correct) rather than SQL NOW(), which can sit in a
         // different timezone than the stored UTC datetimes and skew the comparison.
-        $activeRowsQuery = LoneWorkerSession::where('status', 'active');
-        $this->applySessionScope($activeRowsQuery, $user);
-        $activeRows = $activeRowsQuery->get([
-            'id', 'status', 'last_check_in_at', 'started_at', 'check_in_interval_minutes',
+        $activeRowsQuery = LoneWorkerSession::where('status', 'active')->whereNull('ended_at');
+        app(LoneWorkerSessionScope::class)->applyForSites($activeRowsQuery, $sites);
+        $activeRows = $reads->query($activeRowsQuery)->get([
+            'id', 'status', 'ended_at', 'last_check_in_at', 'started_at', 'check_in_interval_minutes',
         ]);
-        $active = $activeRows->count();
-        $overdueQuery = LoneWorkerSession::where('status', 'overdue');
-        $this->applySessionScope($overdueQuery, $user);
-        $overdue = $overdueQuery->count();
-        $emergencyQuery = LoneWorkerSession::where('status', 'emergency');
-        $this->applySessionScope($emergencyQuery, $user);
-        $emergency = $emergencyQuery->count();
+        $overdueQuery = LoneWorkerSession::query()->checkInOverdue();
+        app(LoneWorkerSessionScope::class)->applyForSites($overdueQuery, $sites);
+        $overdueIds = $reads->query($overdueQuery)->pluck('id');
+        $overdue = $overdueIds->count();
+        $emergencyQuery = LoneWorkerSession::where('status', 'emergency')->whereNull('ended_at');
+        app(LoneWorkerSessionScope::class)->applyForSites($emergencyQuery, $sites);
+        $emergency = $reads->query($emergencyQuery)->count();
 
-        $endingSoonQuery = LoneWorkerSession::where('status', 'active')
+        $endingSoonQuery = LoneWorkerSession::where('status', 'active')->whereNull('ended_at')
             ->whereBetween('expected_end_at', [now(), now()->addHour()]);
-        $this->applySessionScope($endingSoonQuery, $user);
-        $endingSoon = $endingSoonQuery->count();
+        app(LoneWorkerSessionScope::class)->applyForSites($endingSoonQuery, $sites);
+        $endingSoon = $reads->query($endingSoonQuery)->count();
 
         // Active sessions already past their check-in window (not yet flipped by the 5-min job).
-        $noRecentCheckIn = $activeRows->filter->isCheckInOverdue()->count();
-        // Active sessions still within their check-in window (genuinely "checked in").
-        $checkedIn = $active - $noRecentCheckIn;
+        $checks = $activeRows->mapWithKeys(fn ($row) => [$row->id => $reads->query($row->latestReceivedCheckInQuery())->first()]);
+        $noRecentCheckIn = $activeRows->filter(fn ($row) => $row->isCheckInOverdue($row->checkInDueAt($checks->get($row->id))))->count();
+        // The live buckets are exclusive: elapsed active deadlines are counted once as overdue.
+        $active = $activeRows->whereNotIn('id', $overdueIds)->count();
+        // Actual recent check-in records; startup scheduling evidence never counts as receipt.
+        $checkedIn = $activeRows->filter(fn ($row) => $reads->query($row->checkIns()->getQuery())->where('checked_in_at', '<=', now())->where('checked_in_at', '>', now()->subMinutes($row->check_in_interval_minutes))->where(fn ($receipt) => $receipt->whereNull('received_at')->orWhere('received_at', '<=', now()))->exists())->count();
 
         $alertBase = ControlRoomAlert::where('source', 'lone_worker');
         $this->siteAccess->applyAlertScope($alertBase, $user, self::SITE_BYPASS_PERMISSIONS);
-        $alertsToday = (clone $alertBase)
-            ->where('triggered_at', '>=', now()->startOfDay())
+        app(ControlRoomAlertAccessService::class)->applyReadableScope($alertBase, $user);
+        $alertsToday = $reads->query(clone $alertBase)
+            ->where('triggered_at', '>=', now(config('app.worker_timezone', 'Pacific/Auckland'))->startOfDay()->utc())
             ->count();
-        $awaitingAck = (clone $alertBase)->where('status', 'open')->count();
-        $unresolved = (clone $alertBase)->actionable()->count();
+        $awaitingAck = $reads->query(clone $alertBase)->where('status', 'open')->count();
+        $unresolved = $reads->query(clone $alertBase)->actionable()->count();
 
         $nzHour = (int) now()->setTimezone('Pacific/Auckland')->format('G');
         $afterHours = $nzHour < 7 || $nzHour >= 19;
@@ -908,78 +629,27 @@ class LoneWorkerController extends Controller
      */
     private function monitorableShifts(User $user): array
     {
-        $shiftQuery = Shift::with(['staff:id,name', 'site:id,name', 'client:id,first_name,last_name'])
-            ->whereNotNull('actual_starts_at')
-            ->whereNull('actual_ends_at')
-            ->where('status', '!=', 'cancelled')
-            ->where('ends_at', '>=', now()->subHours(2))
-            ->whereDoesntHave('loneWorkerSession', fn ($q) => $q->whereIn('status', self::LIVE_STATUSES))
-            ->orderBy('ends_at')
-            ->limit(100);
-        $this->siteAccess->applyShiftScope($shiftQuery, $user, self::SITE_BYPASS_PERMISSIONS);
-        $shifts = $shiftQuery->get();
-
-        $siteCounts = $shifts->whereNotNull('site_id')->groupBy('site_id')->map->count();
-
-        $list = $shifts->map(function (Shift $shift) use ($siteCounts) {
-            $isSolo = $shift->site_id && ($siteCounts[$shift->site_id] ?? 0) === 1;
-            // Explicit roster flag is authoritative; fall back to the heuristic
-            // (on-call, or solo cover at the site) for shifts not yet flagged.
-            $isLone = (bool) $shift->is_lone_worker || (bool) $shift->is_on_call || $isSolo;
-
-            return [
-                'id' => $shift->id,
-                'worker' => $shift->staff ? ['id' => $shift->staff->id, 'name' => $shift->staff->name] : null,
-                'site' => $shift->site ? ['id' => $shift->site->id, 'name' => $shift->site->name] : null,
-                'client' => $shift->client
-                    ? ['id' => $shift->client->id, 'name' => trim($shift->client->first_name.' '.$shift->client->last_name)]
-                    : null,
-                'starts_at' => $shift->starts_at,
-                'ends_at' => $shift->ends_at,
-                'location' => $shift->location,
-                // Staff GPS remains redacted until an authorised lone-worker
-                // safety session is active. The Site's fixed coordinates remain
-                // available separately to the wizard for its location field.
-                'location_lat' => null,
-                'location_lng' => null,
-                'is_on_call' => (bool) $shift->is_on_call,
-                'is_lone' => $isLone,
-            ];
-        })
-            ->sortByDesc('is_lone')
-            ->values();
-
-        return [
-            'shifts' => $list,
-            'unmonitored_lone' => $list->where('is_lone', true)->count(),
-        ];
+        return app(LoneWorkerCoverageService::class)->monitorableShifts($user);
     }
 
     /**
      * Shared session display shape (list rows + detail).
      */
-    private function mapSession(LoneWorkerSession $s): array
+    private function mapSession(LoneWorkerSession $source, User $viewer): array
     {
-        return [
-            'id' => $s->id,
-            'user' => $s->user ? ['id' => $s->user->id, 'name' => $s->user->name] : null,
-            'site' => $s->site ? ['id' => $s->site->id, 'name' => $s->site->name] : null,
-            'client' => $s->client
-                ? ['id' => $s->client->id, 'name' => trim($s->client->first_name.' '.$s->client->last_name)]
-                : null,
-            'shift_id' => $s->shift_id,
-            'started_at' => $s->started_at,
-            'expected_end_at' => $s->expected_end_at,
-            'ended_at' => $s->ended_at,
-            'last_check_in_at' => $s->last_check_in_at,
-            'status' => $s->status,
-            'activity_description' => $s->activity_description,
-            'check_in_interval_minutes' => $s->check_in_interval_minutes,
-            'location' => $s->location,
-            'location_lat' => $s->location_lat,
-            'location_lng' => $s->location_lng,
-            'is_check_in_overdue' => $s->isCheckInOverdue(),
-        ];
+        return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($viewer, function ($current, $reads, $sites) use ($source) {
+            $s = $reads->query(LoneWorkerSession::query())->findOrFail($source->id);
+            app(LoneWorkerSessionAccessService::class)->assertRecord($s, $current, $sites);
+            $check = $reads->query($s->latestReceivedCheckInQuery())->first();
+
+            return ['id' => $s->id, 'user' => $s->user ? ['id' => $s->user->id, 'name' => $s->user->name] : null,
+                'site' => $s->site ? ['id' => $s->site->id, 'name' => $s->site->name] : null,
+                'client' => $this->clientForViewer($s->client_id, $current),
+                'shift_id' => $s->shift_id, 'started_at' => $s->started_at, 'expected_end_at' => $s->expected_end_at, 'ended_at' => $s->ended_at,
+                'last_check_in_at' => $check?->checked_in_at, 'status' => $s->status, 'activity_description' => $s->activity_description,
+                'check_in_interval_minutes' => $s->check_in_interval_minutes, 'location' => $s->location, 'lock_version' => $s->lock_version,
+                'href' => LoneWorkerSessionReturn::href($s->id), 'is_check_in_overdue' => $s->isCheckInOverdue($s->checkInDueAt($check))];
+        });
     }
 
     /**
@@ -987,74 +657,9 @@ class LoneWorkerController extends Controller
      */
     private function sessionDetail(int $id, User $user): ?array
     {
-        $sessionQuery = LoneWorkerSession::with([
-            ...$this->canonicalSessionSecurityRelations(),
-            'checkIns',
-            'alerts',
-        ]);
-        $this->applySessionScope($sessionQuery, $user);
-        $s = $sessionQuery->find($id);
+        $row = app(LoneWorkerSessionAccessService::class)->readableQuery($user)->find($id);
 
-        if (! $s) {
-            return null;
-        }
-
-        $data = $this->mapSession($s);
-        $data['_type'] = 'session';
-        $data['emergency_triggered_at'] = $s->emergency_triggered_at;
-        $data['emergency_notes'] = $s->emergency_notes;
-
-        $data['check_ins'] = $s->checkIns->sortByDesc('checked_in_at')->values()->map(fn ($c) => [
-            'id' => $c->id,
-            'status' => $c->status,
-            'notes' => $c->notes,
-            'checked_in_at' => $c->checked_in_at,
-            'location_lat' => $c->location_lat,
-            'location_lng' => $c->location_lng,
-        ]);
-
-        $canonicalQuery = ControlRoomAlert::where('source', 'lone_worker')
-            ->where('context->normalized_data->lone_worker_session_id', $s->id)
-            ->orderByDesc('triggered_at');
-        $this->siteAccess->applyAlertScope($canonicalQuery, $user, self::SITE_BYPASS_PERMISSIONS);
-        $canonical = $canonicalQuery->get()
-            ->filter(fn (ControlRoomAlert $alert) => $this->canonicalAlertMatchesSession($alert, $s))
-            ->map(fn ($a) => [
-                'id' => 'cr_'.$a->id,
-                'type' => $a->alert_type,
-                'triggered_at' => $a->triggered_at,
-                'status' => $this->mapCrStatus($a->status),
-                'source' => 'control_room',
-            ]);
-
-        $data['alerts'] = $canonical->sortByDesc('triggered_at')->values();
-        $data['legacy_alert_history'] = $s->alerts
-            ->sortByDesc('triggered_at')
-            ->values()
-            ->map(fn (LoneWorkerAlert $alert) => [
-                'id' => 'legacy_'.$alert->id,
-                'type' => $alert->alert_type,
-                'triggered_at' => $alert->triggered_at,
-                'status' => 'historical',
-                'source' => 'legacy_history',
-                'label' => 'Historical record — read only',
-            ]);
-        $data['shift'] = $s->shift ? [
-            'id' => $s->shift->id,
-            'starts_at' => $s->shift->starts_at,
-            'ends_at' => $s->shift->ends_at,
-            'status' => $s->shift->status,
-            'is_on_call' => (bool) $s->shift->is_on_call,
-        ] : null;
-
-        // Paired GPS tracker (staff/lone-worker Queclink device), if any — last-known
-        // location + Locate-now / acknowledge-panic actions for the detail card.
-        $trackerState = 'not_assigned';
-        $device = $this->workerTrackerDevice($s, availability: $trackerState);
-        $data['tracker'] = $device ? $this->buildWorkerTrackerPayload($device, (int) $s->id) : null;
-        $data['tracker_state'] = $trackerState;
-
-        return $data;
+        return $row ? ['_type' => 'session', ...app(LoneWorkerSessionPresenter::class)->detail($row, $user)] : null;
     }
 
     /**
@@ -1137,6 +742,12 @@ class LoneWorkerController extends Controller
             return;
         }
 
+        if ((int) $session->emergency_episode_number > 0) {
+            $episode = $session->emergencyEpisodes()->where('episode_number', $session->emergency_episode_number)->lockForUpdate()->first();
+            if (! $episode || $episode->status !== 'delivered' || (int) $episode->control_room_alert_id !== (int) $alert->id) {
+                return;
+            }
+        }
         $now = now();
         $lastCheckIn = $session->last_check_in_at ?? $session->started_at;
         $checkInOverdue = $lastCheckIn !== null
@@ -1221,6 +832,7 @@ class LoneWorkerController extends Controller
                     'clientIncident.client:id,site_id',
                 ]);
             $this->siteAccess->applyAlertScope($alertQuery, $request->user(), self::SITE_BYPASS_PERMISSIONS);
+            app(ControlRoomAlertAccessService::class)->applyReadableScope($alertQuery, $request->user());
             $alert = $alertQuery->find((int) substr($rawId, 3));
             if (! $alert) {
                 return null;
@@ -1229,11 +841,12 @@ class LoneWorkerController extends Controller
             if (! $session) {
                 return null;
             }
-            $data = $this->mapCanonicalAlert($alert, $session);
+            $data = $this->mapCanonicalAlert($alert, $session, $request->user());
             $data['_type'] = 'alert';
             $data['cr_id'] = $alert->id;
-            $data['can_view_control_room'] = $request->user()?->canDo('controlRoom.viewAny') ?? false;
-            $data['incident_id'] = $this->verifiedIncidentId($alert, $session);
+            $data['can_view_control_room'] = app(LoneWorkerSessionAccessService::class)->canViewCanonicalAlert($session, $alert, $request->user());
+            $incidentId = $this->verifiedIncidentId($alert, $session);
+            $data['incident_id'] = app(LoneWorkerSessionAccessService::class)->readableIncidentForAlert($session, $alert, $request->user())?->id;
 
             return $data;
         }
@@ -1249,7 +862,7 @@ class LoneWorkerController extends Controller
             if (! $alert) {
                 return null;
             }
-            $data = $this->mapLegacyAlert($alert);
+            $data = $this->mapLegacyAlert($alert, $request->user());
             $data['_type'] = 'alert';
             $data['cr_id'] = null;
             $data['can_view_control_room'] = false;
@@ -1304,115 +917,12 @@ class LoneWorkerController extends Controller
 
     private function applySessionScope(Builder $query, ?User $user): Builder
     {
-        $this->applySessionIntrinsicIntegrity($query);
-
-        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
-            return $query;
-        }
-
-        $siteIds = $this->siteAccess->accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS);
-        if ($siteIds === []) {
-            return $query->whereRaw('1 = 0');
-        }
-
-        return $query->where(function (Builder $sessionScope) use ($siteIds) {
-            $siteColumn = $sessionScope->qualifyColumn('site_id');
-            $clientColumn = $sessionScope->qualifyColumn('client_id');
-            $shiftColumn = $sessionScope->qualifyColumn('shift_id');
-
-            // The session's own site is authoritative. Client and shift data
-            // may enrich it only when their resolved site agrees.
-            $sessionScope->where(function (Builder $directSite) use (
-                $siteIds,
-                $siteColumn,
-                $clientColumn,
-                $shiftColumn,
-            ) {
-                $directSite->whereIn($siteColumn, $siteIds)
-                    ->where(function (Builder $clientAgreement) use ($clientColumn, $siteColumn) {
-                        $clientAgreement->whereNull($clientColumn)
-                            ->orWhereHas('client', fn (Builder $clientQuery) => $clientQuery
-                                ->whereColumn('clients.site_id', $siteColumn));
-                    })
-                    ->where(function (Builder $shiftAgreement) use ($shiftColumn, $siteColumn) {
-                        $shiftAgreement->whereNull($shiftColumn)
-                            ->orWhereHas('shift', function (Builder $shiftQuery) use ($siteColumn) {
-                                $shiftQuery->where(function (Builder $resolvedShiftSite) use ($siteColumn) {
-                                    $resolvedShiftSite->whereColumn('shifts.site_id', $siteColumn)
-                                        ->orWhere(function (Builder $shiftClientFallback) use ($siteColumn) {
-                                            $shiftClientFallback->whereNull('shifts.site_id')
-                                                ->whereHas('client', fn (Builder $clientQuery) => $clientQuery
-                                                    ->whereColumn('clients.site_id', $siteColumn));
-                                        });
-                                });
-                            });
-                    });
-            })
-                // With no direct site, the client site is authoritative. A
-                // linked shift must be for that same client or the row is
-                // treated as conflicting legacy data and hidden.
-                ->orWhere(function (Builder $clientFallback) use (
-                    $siteIds,
-                    $siteColumn,
-                    $clientColumn,
-                    $shiftColumn,
-                ) {
-                    $clientFallback->whereNull($siteColumn)
-                        ->whereNotNull($clientColumn)
-                        ->whereHas('client', fn (Builder $clientQuery) => $clientQuery
-                            ->whereIn('site_id', $siteIds))
-                        ->where(function (Builder $shiftAgreement) use ($shiftColumn, $clientColumn) {
-                            $shiftAgreement->whereNull($shiftColumn)
-                                ->orWhereHas('shift', fn (Builder $shiftQuery) => $shiftQuery
-                                    ->whereColumn('shifts.client_id', $clientColumn));
-                        });
-                })
-                // Shift provenance is the final fallback. The shift's direct
-                // site wins; its client site is used only when that is absent.
-                ->orWhere(function (Builder $shiftFallback) use (
-                    $siteIds,
-                    $siteColumn,
-                    $clientColumn,
-                ) {
-                    $shiftFallback->whereNull($siteColumn)
-                        ->whereNull($clientColumn)
-                        ->whereHas('shift', function (Builder $shiftQuery) use ($siteIds) {
-                            $shiftQuery->where(function (Builder $resolvedShiftSite) use ($siteIds) {
-                                $resolvedShiftSite->whereIn('shifts.site_id', $siteIds)
-                                    ->orWhere(function (Builder $shiftClientFallback) use ($siteIds) {
-                                        $shiftClientFallback->whereNull('shifts.site_id')
-                                            ->whereHas('client', fn (Builder $clientQuery) => $clientQuery
-                                                ->whereIn('site_id', $siteIds));
-                                    });
-                            });
-                        });
-                });
-        });
-    }
-
-    private function applySessionIntrinsicIntegrity(Builder $query): Builder
-    {
-        $table = $query->getModel()->getTable();
-        $row = "`{$table}`";
-        $clientSite = "(SELECT `site_id` FROM `clients` WHERE `clients`.`id` = {$row}.`client_id` LIMIT 1)";
-        $shiftSite = "(SELECT COALESCE(`lw_shift`.`site_id`, `lw_shift_client`.`site_id`) FROM `shifts` AS `lw_shift` LEFT JOIN `clients` AS `lw_shift_client` ON `lw_shift_client`.`id` = `lw_shift`.`client_id` WHERE `lw_shift`.`id` = {$row}.`shift_id` LIMIT 1)";
-        $authoritativeSite = "COALESCE({$row}.`site_id`, {$clientSite}, {$shiftSite})";
-        $today = now()->toDateString();
-
-        return $query
-            ->whereRaw("{$authoritativeSite} IS NOT NULL")
-            ->whereRaw("EXISTS (SELECT 1 FROM `sites` AS `lw_site` WHERE `lw_site`.`id` = {$authoritativeSite} AND `lw_site`.`is_active` = 1 AND `lw_site`.`archived` = 0 AND `lw_site`.`archived_at` IS NULL)")
-            ->whereRaw("EXISTS (SELECT 1 FROM `users` AS `lw_worker` JOIN `hr_employee_profiles` AS `lw_profile` ON `lw_profile`.`user_id` = `lw_worker`.`id` AND `lw_profile`.`deleted_at` IS NULL WHERE `lw_worker`.`id` = {$row}.`user_id` AND `lw_worker`.`approved_at` IS NOT NULL AND `lw_profile`.`is_active` = 1 AND (`lw_profile`.`start_date` IS NULL OR DATE(`lw_profile`.`start_date`) <= ?) AND (`lw_profile`.`end_date` IS NULL OR DATE(`lw_profile`.`end_date`) >= ?) AND (`lw_profile`.`primary_site_id` = {$authoritativeSite} OR JSON_CONTAINS(COALESCE(`lw_profile`.`secondary_site_ids`, JSON_ARRAY()), JSON_ARRAY({$authoritativeSite}))))", [$today, $today])
-            ->whereRaw("({$row}.`client_id` IS NULL OR EXISTS (SELECT 1 FROM `clients` AS `lw_client` WHERE `lw_client`.`id` = {$row}.`client_id` AND `lw_client`.`site_id` = {$authoritativeSite}))")
-            ->whereRaw("({$row}.`shift_id` IS NULL OR EXISTS (SELECT 1 FROM `shifts` AS `lw_linked_shift` LEFT JOIN `clients` AS `lw_linked_client` ON `lw_linked_client`.`id` = `lw_linked_shift`.`client_id` WHERE `lw_linked_shift`.`id` = {$row}.`shift_id` AND `lw_linked_shift`.`user_id` = {$row}.`user_id` AND (`lw_linked_shift`.`client_id` <=> {$row}.`client_id`) AND (`lw_linked_shift`.`client_id` IS NULL OR (`lw_linked_client`.`site_id` IS NOT NULL AND (`lw_linked_shift`.`site_id` IS NULL OR `lw_linked_shift`.`site_id` = `lw_linked_client`.`site_id`))) AND COALESCE(`lw_linked_shift`.`site_id`, `lw_linked_client`.`site_id`) = {$authoritativeSite}))");
+        return app(LoneWorkerSessionScope::class)->apply($query, $user);
     }
 
     private function lockedActor(Request $request): User
     {
-        return User::query()
-            ->whereKey($request->user()->id)
-            ->lockForUpdate()
-            ->firstOrFail();
+        return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($request->user(), fn ($current) => $current);
     }
 
     private function lockedSessionContext(int $sessionId): LoneWorkerSession
@@ -1485,118 +995,10 @@ class LoneWorkerController extends Controller
         ], $extra));
     }
 
-    private function assertCanAccessSession(
-        User $user,
-        LoneWorkerSession $session,
-        bool $allowOwnerWithoutSiteAssignment = false,
-    ): void {
-        $session->loadMissing([
-            'user:id,approved_at',
-            'site:id,is_active,archived,archived_at',
-            'client:id,site_id',
-            'shift:id,site_id,client_id,user_id',
-            'shift.client:id,site_id',
-        ]);
-
-        abort_unless(
-            $session->user,
-            403,
-            UserSiteAccessService::DEFAULT_MESSAGE,
-        );
-
-        $clientSiteId = null;
-        if ($session->client_id !== null) {
-            abort_unless(
-                $session->client
-                    && $session->client->site_id !== null,
-                403,
-                UserSiteAccessService::DEFAULT_MESSAGE,
-            );
-            $clientSiteId = (int) $session->client->site_id;
-        }
-
-        $shiftSiteId = null;
-        $shiftClientSiteId = null;
-        if ($session->shift_id !== null) {
-            abort_unless(
-                $session->shift
-                    && $this->nullablePositiveId($session->shift->user_id) === $this->nullablePositiveId($session->user_id)
-                    && $this->nullablePositiveId($session->shift->client_id) === $this->nullablePositiveId($session->client_id),
-                403,
-                UserSiteAccessService::DEFAULT_MESSAGE,
-            );
-
-            if ($session->shift->client_id !== null) {
-                abort_unless(
-                    $session->shift->client
-                        && $session->shift->client->site_id !== null,
-                    403,
-                    UserSiteAccessService::DEFAULT_MESSAGE,
-                );
-                $shiftClientSiteId = (int) $session->shift->client->site_id;
-                abort_if(
-                    $session->shift->site_id !== null
-                        && (int) $session->shift->site_id !== $shiftClientSiteId,
-                    403,
-                    UserSiteAccessService::DEFAULT_MESSAGE,
-                );
-            }
-
-            $shiftSiteId = $session->shift->site_id !== null
-                ? (int) $session->shift->site_id
-                : $shiftClientSiteId;
-            abort_if($shiftSiteId === null, 403, UserSiteAccessService::DEFAULT_MESSAGE);
-
-        }
-
-        $siteIds = collect([
-            $session->site_id,
-            $clientSiteId,
-            $session->shift?->site_id,
-            $shiftClientSiteId,
-        ])
-            ->filter(fn ($siteId) => $siteId !== null)
-            ->map(fn ($siteId) => (int) $siteId)
-            ->unique()
-            ->values();
-
-        abort_unless($siteIds->count() === 1, 403, UserSiteAccessService::DEFAULT_MESSAGE);
-        $siteId = (int) $siteIds->first();
-        abort_unless(
-            Site::query()
-                ->whereKey($siteId)
-                ->active()
-                ->notArchived()
-                ->whereNull('archived_at')
-                ->exists(),
-            403,
-            UserSiteAccessService::DEFAULT_MESSAGE,
-        );
-        abort_unless(
-            in_array($siteId, $this->siteAccess->accessibleSiteIds($session->user), true),
-            403,
-            UserSiteAccessService::DEFAULT_MESSAGE,
-        );
-
-        if ($this->siteAccess->canBypass($user, self::SITE_BYPASS_PERMISSIONS)) {
-            return;
-        }
-
-        if ($allowOwnerWithoutSiteAssignment) {
-            abort_unless(
-                (int) $session->user_id === (int) $user->id,
-                403,
-                UserSiteAccessService::DEFAULT_MESSAGE,
-            );
-
-            return;
-        }
-
-        $this->siteAccess->assertCanAccessSiteId(
-            $user,
-            $siteId,
-            self::SITE_BYPASS_PERMISSIONS,
-        );
+    private function assertCanAccessSession(User $user, LoneWorkerSession $session, bool $allowOwnerWithoutSiteAssignment = false): void
+    {
+        app(LoneWorkerSessionAccessService::class)
+            ->assertCanAccessSession($user, $session, $allowOwnerWithoutSiteAssignment);
     }
 
     /** @return array{ControlRoomAlert, LoneWorkerSession} */
@@ -1655,47 +1057,9 @@ class LoneWorkerController extends Controller
             : null;
     }
 
-    private function canonicalAlertMatchesSession(
-        ControlRoomAlert $alert,
-        LoneWorkerSession $session,
-    ): bool {
-        if ($alert->source !== 'lone_worker') {
-            return false;
-        }
-
-        $context = data_get($alert->context, 'normalized_data', []);
-        if (! is_array($context)
-            || $this->nullablePositiveId($context['lone_worker_session_id'] ?? null) !== (int) $session->id) {
-            return false;
-        }
-
-        $session->loadMissing($this->canonicalSessionSecurityRelations());
-        $sessionSiteId = $this->resolvedSessionSiteId($session);
-        if ($sessionSiteId === null
-            || $this->nullablePositiveId($alert->site_id) !== $sessionSiteId
-            || ! $this->nullableIdMatches($alert->client_id, $this->nullablePositiveId($session->client_id))) {
-            return false;
-        }
-
-        $expectedContextIds = [
-            'worker_user_id' => $this->nullablePositiveId($session->user_id),
-            'site_id' => $sessionSiteId,
-            'client_id' => $this->nullablePositiveId($session->client_id),
-        ];
-        foreach ($expectedContextIds as $key => $expectedId) {
-            if (! array_key_exists($key, $context)) {
-                continue;
-            }
-
-            $matches = $key === 'client_id'
-                ? $this->nullableIdMatches($context[$key], $expectedId)
-                : $this->nullablePositiveId($context[$key]) === $expectedId;
-            if (! $matches) {
-                return false;
-            }
-        }
-
-        return true;
+    private function canonicalAlertMatchesSession(ControlRoomAlert $alert, LoneWorkerSession $session): bool
+    {
+        return app(LoneWorkerSessionAccessService::class)->alertMatchesSession($alert, $session);
     }
 
     private function canonicalOperationalTypeMatches(ControlRoomAlert $alert): bool
@@ -1806,7 +1170,7 @@ class LoneWorkerController extends Controller
     /**
      * Map a legacy LoneWorkerAlert to the shared alert display shape (historical only).
      */
-    private function mapLegacyAlert(LoneWorkerAlert $alert): array
+    private function mapLegacyAlert(LoneWorkerAlert $alert, User $viewer): array
     {
         return [
             'id' => 'legacy_'.$alert->id,
@@ -1820,10 +1184,7 @@ class LoneWorkerController extends Controller
                     'id' => $alert->session->site->id,
                     'name' => $alert->session->site->name,
                 ] : null,
-                'client' => $alert->session->client ? [
-                    'id' => $alert->session->client->id,
-                    'name' => trim($alert->session->client->first_name.' '.$alert->session->client->last_name),
-                ] : null,
+                'client' => $this->clientForViewer($alert->session->client_id, $viewer),
                 'started_at' => $alert->session->started_at,
                 'expected_end_at' => $alert->session->expected_end_at,
                 'last_check_in_at' => $alert->session->last_check_in_at,
@@ -1866,7 +1227,7 @@ class LoneWorkerController extends Controller
             ->whereIn('id', $sessionIds);
         $this->applySessionScope($query, $user);
 
-        return $query->get()->keyBy('id');
+        return CurrentAuthorizationReads::within(fn ($reads) => $reads->query($query)->get()->keyBy('id'));
     }
 
     /** @return array<int, string> */
@@ -1884,6 +1245,7 @@ class LoneWorkerController extends Controller
     private function mapCanonicalAlert(
         ControlRoomAlert $alert,
         ?LoneWorkerSession $candidate,
+        User $viewer,
     ): array {
         $session = $candidate && $this->canonicalAlertMatchesSession($alert, $candidate)
             ? $candidate
@@ -1891,12 +1253,13 @@ class LoneWorkerController extends Controller
 
         return [
             'id' => 'cr_'.$alert->id,
-            'session' => $session ? $this->mapSession($session) : null,
+            'session' => $session ? $this->mapSession($session, $viewer) : null,
             'type' => $alert->alert_type,
             'triggered_at' => $alert->triggered_at,
             'status' => $this->mapCrStatus($alert->status),
+            'canonical_status' => $alert->status,
             'source' => 'control_room',
-            'notes' => $alert->notes,
+            'notes' => $session ? $alert->notes : null,
         ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Notifications\Fleet;
 
 use App\Models\FleetVehicleBooking;
+use App\Services\Fleet\FleetNotificationPreferences;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -17,22 +18,22 @@ class FleetBookingApprovedNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return app(FleetNotificationPreferences::class)->channels($notifiable, 'fleet.booking_decisions');
     }
 
     public function toMail(object $notifiable): MailMessage
     {
         $vehicleName = $this->booking->asset?->name ?? 'Vehicle';
         $dateRange = optional($this->booking->starts_at)->format('d M Y H:i')
-            . ' - '
-            . optional($this->booking->ends_at)->format('d M Y H:i');
+            .' - '
+            .optional($this->booking->ends_at)->format('d M Y H:i');
 
         return (new MailMessage)
             ->subject("Vehicle Booking Approved: {$vehicleName}")
-            ->greeting('Kia ora ' . ($notifiable->name ?? 'there') . ',')
+            ->greeting('Kia ora '.($notifiable->name ?? 'there').',')
             ->line("Your booking for **{$vehicleName}** has been approved.")
             ->line("Date: {$dateRange}")
-            ->action('View Booking', url('/fleet-assets/bookings/' . $this->booking->id))
+            ->action('View Booking', url('/fleet-assets/bookings/'.$this->booking->id))
             ->line('Please ensure you complete the pre-trip inspection before departure.');
     }
 
@@ -40,8 +41,8 @@ class FleetBookingApprovedNotification extends Notification
     {
         $vehicleName = $this->booking->asset?->name ?? 'Vehicle';
         $dateRange = optional($this->booking->starts_at)->format('d M Y H:i')
-            . ' - '
-            . optional($this->booking->ends_at)->format('d M Y H:i');
+            .' - '
+            .optional($this->booking->ends_at)->format('d M Y H:i');
 
         return [
             'title' => 'Vehicle Booking Approved',

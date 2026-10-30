@@ -1,0 +1,96 @@
+/*
+ * Vehicle Map tab (Location & geofences, Vehicle telemetry): product
+ * adjustments on top of the ported PKG-02B v13 design in mockup-port.css.
+ * Tokens only. Rules for content rendered in portals (menus, dialogs) are
+ * namespaced by their own class instead of .vehicle-studio. Components import
+ * this after './studio.css'.
+ */
+
+/* The recorded-sample selector replaces the design's preview-only bar. */
+.vehicle-studio .telemetry-sample-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 11px;
+}
+.vehicle-studio .telemetry-sample-bar > span {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: auto;
+    min-width: 0;
+}
+.vehicle-studio .telemetry-sample-bar label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.vehicle-studio .telemetry-sample-bar select {
+    max-width: min(60vw, 340px);
+}
+
+/* The vehicle hover card's action hint (shared map stats card). */
+.vehicle-studio .leaflet-map-stats-card > footer {
+    margin-top: 10px;
+    padding-top: 9px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+
+/* Keyboard focus on the design's custom controls. */
+.vehicle-studio .motion-tile:focus-visible,
+.vehicle-studio .reported-health > button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+.vehicle-studio .reported-health > button {
+    cursor: pointer;
+    text-align: left;
+}
+.vehicle-studio .map-coordinate strong,
+.vehicle-studio .map-coordinate small {
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .map-bottom > span {
+    min-width: 0;
+}
+
+/* Right-click menu (rendered in a portal). */
+.vehicle-map-context-menu {
+    min-width: 245px;
+}
+.vehicle-map-context-menu small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    font-weight: 400;
+    margin-top: 5px;
+}
+
+/* Select shared geofences (dialog content carries .vehicle-studio). */
+.vehicle-geofence-dialog .geofence-select-list {
+    margin-top: 12px;
+}
+.vehicle-geofence-dialog .geofence-select-list label {
+    cursor: pointer;
+}
+.vehicle-geofence-dialog .geofence-select-list input:disabled,
+.vehicle-geofence-dialog .geofence-select-list input:disabled + span {
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.vehicle-geofence-dialog .geofence-select-note {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding: 16px 5px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+}

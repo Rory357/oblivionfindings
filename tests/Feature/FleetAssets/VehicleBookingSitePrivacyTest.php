@@ -35,7 +35,9 @@ class VehicleBookingSitePrivacyTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
-        $this->travelTo(Carbon::parse('2026-08-17 09:00:00', 'Pacific/Auckland'));
+        // Held in UTC like the application: a zoned frozen clock makes Carbon
+        // read stored UTC datetimes (booking ends) in that zone.
+        $this->travelTo(Carbon::parse('2026-08-17 09:00:00', 'Pacific/Auckland')->utc());
 
         $this->primarySite = Site::factory()->create(['name' => 'Harbour House']);
         $this->secondarySite = Site::factory()->create(['name' => 'Kauri House']);
@@ -284,9 +286,9 @@ class VehicleBookingSitePrivacyTest extends TestCase
     public function test_global_site_scope_never_replaces_the_exact_booking_action(): void
     {
         Notification::fake();
-        $owner = $this->siteUser([$this->foreignSite], []);
+        $owner = $this->siteUser([$this->foreignSite], [], driverEligible: true);
         $booking = $this->booking(
-            $this->vehicle($this->foreignSite, 'Global scope van'),
+            $this->readyVehicle($this->foreignSite, 'Global scope van'),
             $owner,
             'Global scope approval',
         );
@@ -316,15 +318,16 @@ class VehicleBookingSitePrivacyTest extends TestCase
     public function test_exact_lifecycle_action_permissions_use_canonical_site_scope_without_incidental_read_permission(): void
     {
         Notification::fake();
-        $owner = $this->siteUser([$this->primarySite], []);
+        $owner = $this->siteUser([$this->primarySite], [], driverEligible: true);
         $assetViewer = $this->siteUser([$this->primarySite], ['assets.viewAny']);
         $approver = $this->siteUser([$this->primarySite], ['fleet.bookings.approve']);
         $manager = $this->siteUser([$this->primarySite], ['fleet.manage']);
-        $localVehicle = $this->vehicle($this->primarySite, 'Action-only local van');
+        $localVehicle = $this->readyVehicle($this->primarySite, 'Action-only local van');
         $foreignVehicle = $this->vehicle($this->foreignSite, 'Action-only foreign van');
         $readOnly = $this->booking($localVehicle, $owner, 'Asset read permission is not an action');
-        $approval = $this->booking($localVehicle, $owner, 'Approval without read permission');
-        $cancellation = $this->booking($localVehicle, $owner, 'Cancellation without read permission', 'approved');
+        $approval = $this->booking($localVehicle, $owner, 'Approval without read permission', 'pending', 4);
+        // A confirmed booking for the same hour would rightly block approval.
+        $cancellation = $this->booking($localVehicle, $owner, 'Cancellation without read permission', 'approved', 7);
         $foreign = $this->booking($foreignVehicle, $owner, 'Foreign action-only booking', 'approved');
 
         $this->actingAs($assetViewer)
@@ -361,8 +364,8 @@ class VehicleBookingSitePrivacyTest extends TestCase
             [$this->primarySite],
             ['fleet.viewAny', 'fleet.bookings.approve'],
         );
-        $owner = $this->siteUser([$this->primarySite], []);
-        $vehicle = $this->vehicle($this->primarySite, 'Lifecycle van');
+        $owner = $this->siteUser([$this->primarySite], [], driverEligible: true);
+        $vehicle = $this->readyVehicle($this->primarySite, 'Lifecycle van');
         $booking = $this->booking($vehicle, $owner, 'Lifecycle booking');
         $queries = [];
         DB::listen(function ($query) use (&$queries): void {
@@ -482,6 +485,35 @@ class VehicleBookingSitePrivacyTest extends TestCase
         ]);
     }
 
+    /**
+     * PKG-02B: approval and checkout recheck recorded compliance evidence, so
+     * lifecycle fixtures that expect success start from a valid evidence set.
+     */
+    private function readyVehicle(Site $site, string $name): Asset
+    {
+        $vehicle = $this->vehicle($site, $name);
+        foreach ([
+            'registration' => ['applicable', 'recorded', 'REG-FIXTURE', '2027-12-31', null],
+            'wof' => ['applicable', 'passed', 'WOF-FIXTURE', '2027-12-31', null],
+            'cof' => ['not_applicable', 'needs_assessment', null, null, 'Light vehicle; a WoF applies instead.'],
+            'ruc' => ['not_applicable', 'needs_assessment', null, null, 'Recorded by the fleet owner.'],
+        ] as $kind => [$applicability, $outcome, $reference, $expires, $basis]) {
+            $recordId = DB::table('fleet_vehicle_compliance_records')->insertGetId([
+                'asset_id' => $vehicle->id, 'kind' => $kind, 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $versionId = DB::table('fleet_vehicle_compliance_versions')->insertGetId([
+                'record_id' => $recordId, 'version' => 1, 'applicability' => $applicability,
+                'applicability_basis' => $basis, 'outcome' => $outcome, 'evidence_reference' => $reference,
+                'expires_on' => $expires, 'request_key' => "fixture-{$kind}",
+                'request_fingerprint' => str_repeat('a', 64), 'content_sha256' => str_repeat('a', 64),
+                'created_at' => now(),
+            ]);
+            DB::table('fleet_vehicle_compliance_records')->where('id', $recordId)->update(['current_version_id' => $versionId]);
+        }
+
+        return $vehicle;
+    }
+
     private function client(Site $site, string $firstName, string $lastName): Client
     {
         return Client::factory()->create([
@@ -498,13 +530,14 @@ class VehicleBookingSitePrivacyTest extends TestCase
         User $owner,
         string $purpose,
         string $status = 'pending',
+        int $startsInHours = 1,
     ): FleetVehicleBooking {
         return FleetVehicleBooking::query()->create([
             'asset_id' => $vehicle->id,
             'user_id' => $owner->id,
             'purpose' => $purpose,
-            'starts_at' => now()->addHour(),
-            'ends_at' => now()->addHours(2),
+            'starts_at' => now()->addHours($startsInHours),
+            'ends_at' => now()->addHours($startsInHours + 1),
             'pickup_site_id' => $vehicle->site_id,
             'return_site_id' => $vehicle->site_id,
             'status' => $status,

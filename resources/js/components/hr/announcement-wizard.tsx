@@ -43,6 +43,12 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import {
+    announcementDayEnd,
+    announcementDayInput,
+    announcementPublishInstant,
+    announcementTimeInput,
+} from './announcement-time';
 
 export type SegmentOption = { key: string; label: string; count: number };
 export type AnnouncementSegments = {
@@ -50,6 +56,7 @@ export type AnnouncementSegments = {
     sites: SegmentOption[];
     departments: SegmentOption[];
     roles: SegmentOption[];
+    people?: SegmentOption[];
 };
 export type AnnouncementTarget = {
     type: 'all' | 'site' | 'department' | 'role' | 'user';
@@ -69,6 +76,7 @@ export type AnnouncementWizardInitial = {
     recurrence_ends_at?: string | null;
     is_pinned?: boolean;
     requires_acknowledgement?: boolean;
+    push_to_bell?: boolean;
 };
 
 type Priority = 'low' | 'normal' | 'high' | 'urgent';
@@ -137,22 +145,6 @@ const PRIORITY_TILES: {
     },
 ];
 
-function toDatetimeLocal(value?: string | null): string {
-    if (!value) return '';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function toDateOnly(value?: string | null): string {
-    if (!value) return '';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '';
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
 /** Selected-segment keys split from an initial targets list. */
 function splitInitialTargets(targets?: AnnouncementTarget[]) {
     const all =
@@ -168,6 +160,7 @@ function splitInitialTargets(targets?: AnnouncementTarget[]) {
         sites: pick('site'),
         departments: pick('department'),
         roles: pick('role'),
+        people: pick('user'),
     };
 }
 
@@ -189,6 +182,10 @@ export function AnnouncementWizard({
     const editing = Boolean(announcementId);
     const wizard = useWizard(STEPS.length);
     const [done, setDone] = useState(false);
+    const [updatedExisting, setUpdatedExisting] = useState(false);
+    const [savedIntent, setSavedIntent] = useState<
+        'publish' | 'schedule' | 'draft'
+    >('draft');
     const [recipientCount, setRecipientCount] = useState<number | null>(null);
     const [staffPreview, setStaffPreview] = useState(false);
     const [keepOpen, setKeepOpen] = useState(false);
@@ -204,12 +201,18 @@ export function AnnouncementWizard({
         initialSplit.departments,
     );
     const [roleKeys, setRoleKeys] = useState<string[]>(initialSplit.roles);
+    const [personKeys, setPersonKeys] = useState<string[]>(initialSplit.people);
+    const [dateErrors, setDateErrors] = useState<Record<string, string>>({});
     const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>(
-        initial?.status === 'scheduled' ? 'later' : 'now',
+        initial?.status === 'scheduled' ||
+            (initial?.status === 'draft' && initial?.published_at)
+            ? 'later'
+            : 'now',
     );
 
     const form = useForm<{
         title: string;
+        targets?: AnnouncementTarget[];
         content: string;
         priority: Priority;
         published_at: string;
@@ -225,15 +228,16 @@ export function AnnouncementWizard({
         title: initial?.title ?? '',
         content: initial?.content ?? '',
         priority: (initial?.priority as Priority) ?? 'normal',
-        published_at: toDatetimeLocal(initial?.published_at),
-        expires_at: toDateOnly(initial?.expires_at),
-        ack_deadline: toDateOnly(initial?.ack_deadline),
+        published_at: announcementTimeInput(initial?.published_at),
+        expires_at: announcementDayInput(initial?.expires_at),
+        ack_deadline: announcementDayInput(initial?.ack_deadline),
         recurrence: initial?.recurrence ?? '',
-        recurrence_ends_at: toDateOnly(initial?.recurrence_ends_at),
+        recurrence_ends_at: announcementDayInput(initial?.recurrence_ends_at),
         is_pinned: initial?.is_pinned ?? false,
         requires_acknowledgement: initial?.requires_acknowledgement ?? false,
         push_to_bell:
-            initial?.priority === 'high' || initial?.priority === 'urgent',
+            initial?.push_to_bell ??
+            (initial?.priority === 'high' || initial?.priority === 'urgent'),
         attachments: [] as File[],
     });
 
@@ -243,6 +247,7 @@ export function AnnouncementWizard({
         siteKeys.forEach((v) => out.push({ type: 'site', value: v }));
         deptKeys.forEach((v) => out.push({ type: 'department', value: v }));
         roleKeys.forEach((v) => out.push({ type: 'role', value: v }));
+        personKeys.forEach((v) => out.push({ type: 'user', value: v }));
         return out;
     };
 
@@ -251,6 +256,7 @@ export function AnnouncementWizard({
         siteKeys,
         deptKeys,
         roleKeys,
+        personKeys,
     });
 
     // Live recipient count — debounced, cancellable.
@@ -262,6 +268,8 @@ export function AnnouncementWizard({
             return;
         }
         const controller = new AbortController();
+        let active = true;
+        setRecipientCount(null);
         const timer = setTimeout(() => {
             fetch(
                 `/hr/announcements/preview?targets=${encodeURIComponent(JSON.stringify(targets))}`,
@@ -270,15 +278,18 @@ export function AnnouncementWizard({
                     signal: controller.signal,
                 },
             )
-                .then((r) => r.json())
-                .then((d) =>
-                    setRecipientCount(
-                        typeof d.count === 'number' ? d.count : null,
-                    ),
+                .then((r) => (r.ok ? r.json() : Promise.reject()))
+                .then(
+                    (d) =>
+                        active &&
+                        setRecipientCount(
+                            typeof d.count === 'number' ? d.count : null,
+                        ),
                 )
                 .catch(() => {});
         }, 300);
         return () => {
+            active = false;
             clearTimeout(timer);
             controller.abort();
         };
@@ -289,7 +300,13 @@ export function AnnouncementWizard({
         let pct = 0;
         if (form.data.title.trim()) pct += 30;
         if (form.data.content.trim()) pct += 30;
-        if (targetAll || siteKeys.length || deptKeys.length || roleKeys.length)
+        if (
+            targetAll ||
+            siteKeys.length ||
+            deptKeys.length ||
+            roleKeys.length ||
+            personKeys.length
+        )
             pct += 25;
         pct += Math.round((wizard.index / (STEPS.length - 1)) * 15);
         return Math.min(100, pct);
@@ -300,6 +317,7 @@ export function AnnouncementWizard({
         siteKeys,
         deptKeys,
         roleKeys,
+        personKeys,
         wizard.index,
     ]);
 
@@ -310,6 +328,8 @@ export function AnnouncementWizard({
         setSiteKeys([]);
         setDeptKeys([]);
         setRoleKeys([]);
+        setPersonKeys([]);
+        setDateErrors({});
         setScheduleMode('now');
         wizard.reset();
         setRecipientCount(null);
@@ -321,25 +341,58 @@ export function AnnouncementWizard({
     };
 
     const submit = (intent: 'publish' | 'schedule' | 'draft') => {
+        const converted: Record<string, string | null> = {};
+        const errors: Record<string, string> = {};
+        for (const field of [
+            'published_at',
+            'expires_at',
+            'ack_deadline',
+            'recurrence_ends_at',
+        ] as const) {
+            try {
+                converted[field] =
+                    field === 'published_at'
+                        ? intent === 'publish'
+                            ? null
+                            : announcementPublishInstant(
+                                  form.data[field],
+                                  initial?.[field],
+                              )
+                        : announcementDayEnd(
+                              form.data[field],
+                              initial?.[field],
+                          );
+            } catch (error) {
+                errors[field] =
+                    error instanceof Error
+                        ? error.message
+                        : 'Choose a valid New Zealand date and time.';
+            }
+        }
+        if (
+            intent === 'schedule' &&
+            !errors.published_at &&
+            (!converted.published_at ||
+                Date.parse(converted.published_at) <= Date.now())
+        ) {
+            errors.published_at =
+                'Choose a future publication time, or choose Publish now.';
+        }
+        setDateErrors(errors);
+        if (Object.keys(errors).length) {
+            wizard.goTo(2);
+            return;
+        }
         form.transform((data) => {
             const payload: Record<string, unknown> = {
                 ...data,
                 intent,
                 targets: buildTargets(),
-                expires_at: data.expires_at || null,
-                ack_deadline: data.ack_deadline || null,
-                recurrence:
-                    intent === 'schedule' ? data.recurrence || null : null,
-                recurrence_ends_at:
-                    intent === 'schedule'
-                        ? data.recurrence_ends_at || null
-                        : null,
-                published_at:
-                    intent === 'schedule'
-                        ? data.published_at || null
-                        : intent === 'draft'
-                          ? data.published_at || null
-                          : null,
+                ...converted,
+                recurrence: data.recurrence || null,
+                recurrence_ends_at: data.recurrence
+                    ? converted.recurrence_ends_at
+                    : null,
             };
             if (editing) payload._method = 'put';
             return payload as unknown as typeof data;
@@ -348,10 +401,13 @@ export function AnnouncementWizard({
         const url = editing
             ? `/hr/announcements/${announcementId}`
             : '/hr/announcements';
+        const wasPublished = editing && initial?.status === 'published';
         form.post(url, {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
+                setSavedIntent(intent);
+                setUpdatedExisting(wasPublished);
                 onSuccess?.();
                 if (
                     intent === 'publish' &&
@@ -367,14 +423,18 @@ export function AnnouncementWizard({
                 }
                 setDone(true);
             },
-            onError: () => {
+            onError: (errors) => {
                 // Jump to the earliest step holding an error.
-                if (
-                    form.errors.title ||
-                    form.errors.content ||
-                    form.errors.priority
-                )
+                if (errors.title || errors.content || errors.priority)
                     wizard.goTo(0);
+                else if (errors.targets) wizard.goTo(1);
+                else if (
+                    errors.published_at ||
+                    errors.expires_at ||
+                    errors.ack_deadline ||
+                    errors.recurrence_ends_at
+                )
+                    wizard.goTo(2);
             },
         });
     };
@@ -383,20 +443,30 @@ export function AnnouncementWizard({
         targetAll ||
         siteKeys.length > 0 ||
         deptKeys.length > 0 ||
-        roleKeys.length > 0;
+        roleKeys.length > 0 ||
+        personKeys.length > 0;
     const primaryLabel =
         scheduleMode === 'later'
             ? 'Schedule'
-            : editing
+            : editing && initial?.status === 'published'
               ? 'Save changes'
               : 'Publish';
     const primaryIntent: 'publish' | 'schedule' =
         scheduleMode === 'later' ? 'schedule' : 'publish';
 
-    const scheduledInPast =
-        scheduleMode === 'later' &&
-        form.data.published_at &&
-        new Date(form.data.published_at).getTime() < Date.now();
+    let scheduledInPast = false;
+    try {
+        const instant = announcementPublishInstant(
+            form.data.published_at,
+            initial?.published_at,
+        );
+        scheduledInPast =
+            scheduleMode === 'later' &&
+            !!instant &&
+            Date.parse(instant) <= Date.now();
+    } catch {
+        /* Submission displays the specific clock-change error. */
+    }
     const urgentNoDeadline =
         form.data.priority === 'urgent' &&
         form.data.requires_acknowledgement &&
@@ -417,22 +487,36 @@ export function AnnouncementWizard({
             parts.push(
                 `${siteKeys.length} site${siteKeys.length > 1 ? 's' : ''}`,
             );
+        if (personKeys.length)
+            parts.push(
+                personKeys
+                    .map(
+                        (key) =>
+                            segments.people?.find((p) => p.key === key)
+                                ?.label ?? 'Unavailable colleague',
+                    )
+                    .join(', '),
+            );
         return parts.join(' · ') || 'No one yet';
-    }, [targetAll, roleKeys, deptKeys, siteKeys]);
+    }, [targetAll, roleKeys, deptKeys, siteKeys, personKeys, segments.people]);
 
     const success = done ? (
         <WizardSuccessPane
             title={
-                editing
-                    ? 'Announcement updated'
-                    : scheduleMode === 'later'
+                savedIntent === 'draft'
+                    ? 'Draft saved'
+                    : savedIntent === 'schedule'
                       ? 'Announcement scheduled'
-                      : 'Announcement published'
+                      : updatedExisting
+                        ? 'Announcement updated'
+                        : 'Announcement published'
             }
             blurb={
-                scheduleMode === 'later'
-                    ? 'It will send automatically at the time you set and alert the audience then.'
-                    : `Delivered to ${recipientCount ?? '—'} recipients across in-app and the header bell.`
+                savedIntent === 'draft'
+                    ? 'Only announcement managers can see this draft. It has not been sent.'
+                    : savedIntent === 'schedule'
+                      ? 'Saved for the scheduled time. It is not visible to staff yet.'
+                      : 'The announcement is available to its selected audience. Delivery follows their notification settings.'
             }
             actions={<Button onClick={close}>Done</Button>}
         />
@@ -487,7 +571,9 @@ export function AnnouncementWizard({
             footerEnd={
                 wizard.isLast ? (
                     <>
-                        {!editing && (
+                        {(!editing ||
+                            initial?.status === 'draft' ||
+                            initial?.status === 'scheduled') && (
                             <Button
                                 variant="outline"
                                 onClick={() => submit('draft')}
@@ -603,11 +689,12 @@ export function AnnouncementWizard({
                     <StepHead
                         icon={Users}
                         title="Audience"
-                        blurb="Target any combination of sites, departments and roles."
+                        blurb="Choose sites, departments, roles or individual colleagues. Selected groups are combined."
                     />
                     <button
                         type="button"
                         onClick={() => setTargetAll((v) => !v)}
+                        aria-pressed={targetAll}
                         className={cn(
                             'flex w-full items-center justify-between rounded-xl border p-3.5 text-left transition-colors',
                             targetAll
@@ -631,7 +718,7 @@ export function AnnouncementWizard({
                             className={cn(
                                 'grid h-5 w-5 place-items-center rounded-full border',
                                 targetAll
-                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                     : 'border-border',
                             )}
                         >
@@ -659,7 +746,20 @@ export function AnnouncementWizard({
                                 selected={roleKeys}
                                 onChange={setRoleKeys}
                             />
+                            <PeopleTargets
+                                options={segments.people ?? []}
+                                selected={personKeys}
+                                onChange={setPersonKeys}
+                            />
                         </div>
+                    )}
+                    {form.errors.targets && (
+                        <p
+                            role="alert"
+                            className="mt-3 text-sm text-destructive"
+                        >
+                            {form.errors.targets}
+                        </p>
                     )}
 
                     <div className="mt-6">
@@ -702,15 +802,19 @@ export function AnnouncementWizard({
                             />
                         </div>
 
-                        {scheduleMode === 'later' && (
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            {scheduleMode === 'later' && (
                                 <Field
-                                    label="Publish at"
+                                    label="Publish at (New Zealand time)"
                                     required
-                                    error={form.errors.published_at}
+                                    error={
+                                        dateErrors.published_at ||
+                                        form.errors.published_at
+                                    }
                                 >
                                     <Input
                                         type="datetime-local"
+                                        aria-label="Publish at (New Zealand time)"
                                         value={form.data.published_at}
                                         onChange={(e) =>
                                             form.setData(
@@ -720,31 +824,63 @@ export function AnnouncementWizard({
                                         }
                                     />
                                 </Field>
-                                <Field label="Repeats">
-                                    <select
-                                        value={form.data.recurrence}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'recurrence',
-                                                e.target.value,
-                                            )
-                                        }
-                                        className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                                    >
-                                        <option value="">
-                                            Does not repeat
-                                        </option>
-                                        <option value="weekly">Weekly</option>
-                                        <option value="monthly">Monthly</option>
-                                    </select>
-                                </Field>
-                            </div>
+                            )}
+                            <Field
+                                label="Repeats"
+                                hint="Repeat settings apply to upcoming dates. Text and audience edits affect only this announcement."
+                            >
+                                <select
+                                    aria-label="Repeats"
+                                    value={form.data.recurrence}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'recurrence',
+                                            e.target.value,
+                                        )
+                                    }
+                                    className="h-10 w-full rounded-md border border-border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                    <option value="">Does not repeat</option>
+                                    <option value="weekly">Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </Field>
+                        </div>
+                        {form.data.recurrence && (
+                            <Field
+                                label="Repeat until"
+                                hint="Optional · end of the selected New Zealand day"
+                                error={
+                                    dateErrors.recurrence_ends_at ||
+                                    form.errors.recurrence_ends_at
+                                }
+                            >
+                                <Input
+                                    type="date"
+                                    aria-label="Repeat until"
+                                    value={form.data.recurrence_ends_at}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'recurrence_ends_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
+                            </Field>
                         )}
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <Field label="Expires" hint="optional">
+                            <Field
+                                label="Expires"
+                                hint="End of the selected New Zealand day"
+                                error={
+                                    dateErrors.expires_at ||
+                                    form.errors.expires_at
+                                }
+                            >
                                 <Input
                                     type="date"
+                                    aria-label="Expires"
                                     value={form.data.expires_at}
                                     onChange={(e) =>
                                         form.setData(
@@ -756,10 +892,15 @@ export function AnnouncementWizard({
                             </Field>
                             <Field
                                 label="Acknowledgement deadline"
-                                hint="optional"
+                                hint="End of the selected New Zealand day"
+                                error={
+                                    dateErrors.ack_deadline ||
+                                    form.errors.ack_deadline
+                                }
                             >
                                 <Input
                                     type="date"
+                                    aria-label="Acknowledgement deadline"
                                     value={form.data.ack_deadline}
                                     onChange={(e) =>
                                         form.setData(
@@ -843,7 +984,9 @@ export function AnnouncementWizard({
                                 label="When"
                                 value={
                                     scheduleMode === 'later'
-                                        ? form.data.published_at || 'Scheduled'
+                                        ? form.data.published_at
+                                            ? `${form.data.published_at.replace('T', ' ')} · New Zealand time`
+                                            : 'Choose a publication time'
                                         : 'Immediately'
                                 }
                             />
@@ -853,6 +996,34 @@ export function AnnouncementWizard({
                                     form.data.requires_acknowledgement
                                         ? 'Yes'
                                         : 'No'
+                                }
+                            />
+                            <ReviewRow
+                                label="Expires"
+                                value={
+                                    form.data.expires_at
+                                        ? `${form.data.expires_at} · end of day (NZ)`
+                                        : 'No expiry'
+                                }
+                            />
+                            {form.data.requires_acknowledgement && (
+                                <ReviewRow
+                                    label="Confirmation deadline"
+                                    value={
+                                        form.data.ack_deadline
+                                            ? `${form.data.ack_deadline} · end of day (NZ)`
+                                            : 'No deadline'
+                                    }
+                                />
+                            )}
+                            <ReviewRow
+                                label="Repeats"
+                                value={
+                                    form.data.recurrence
+                                        ? `${form.data.recurrence}${form.data.recurrence_ends_at ? ` · until ${form.data.recurrence_ends_at}` : ''}`
+                                        : initial?.recurrence
+                                          ? 'Stops upcoming repeats'
+                                          : 'Does not repeat'
                                 }
                             />
                             <ReviewRow
@@ -873,8 +1044,8 @@ export function AnnouncementWizard({
                         )}
                         {scheduledInPast && (
                             <InfoCard icon={AlertTriangle} tone="warn">
-                                The scheduled time is in the past — it will
-                                publish immediately.
+                                Choose a future publication time, or choose
+                                Publish now.
                             </InfoCard>
                         )}
                         {urgentNoDeadline && (
@@ -942,6 +1113,86 @@ export function AnnouncementWizard({
     );
 }
 
+function PeopleTargets({
+    options,
+    selected,
+    onChange,
+}: {
+    options: SegmentOption[];
+    selected: string[];
+    onChange: (value: string[]) => void;
+}) {
+    const [query, setQuery] = useState('');
+    const results = options
+        .filter(
+            (person) =>
+                !selected.includes(person.key) &&
+                person.label.toLowerCase().includes(query.toLowerCase()),
+        )
+        .slice(0, 12);
+    return (
+        <section className="space-y-3" aria-label="Individual recipients">
+            <h3 className="text-sm font-semibold">Individual colleagues</h3>
+            <Input
+                aria-label="Search individual recipients"
+                placeholder="Find a colleague by name…"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+            />
+            {selected.length > 0 && (
+                <div
+                    className="flex flex-wrap gap-2"
+                    aria-label="Selected colleagues"
+                >
+                    {selected.map((key) => {
+                        const name =
+                            options.find((person) => person.key === key)
+                                ?.label ?? 'Unavailable colleague';
+                        return (
+                            <Button
+                                key={key}
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                aria-label={`Remove ${name} from recipients`}
+                                onClick={() =>
+                                    onChange(
+                                        selected.filter((id) => id !== key),
+                                    )
+                                }
+                            >
+                                {name} ×
+                            </Button>
+                        );
+                    })}
+                </div>
+            )}
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
+                {results.map((person) => (
+                    <Button
+                        key={person.key}
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => onChange([...selected, person.key])}
+                    >
+                        Add {person.label}
+                    </Button>
+                ))}
+                {!results.length && (
+                    <p className="p-3 text-sm text-muted-foreground">
+                        No additional colleagues match. Try another name.
+                    </p>
+                )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+                Only current approved staff can be selected. These colleagues
+                are included alongside any selected groups.
+            </p>
+        </section>
+    );
+}
+
 function SegmentGroup({
     title,
     options,
@@ -973,6 +1224,7 @@ function SegmentGroup({
                             key={o.key}
                             type="button"
                             onClick={() => toggle(o.key)}
+                            aria-pressed={active}
                             className={cn(
                                 'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
                                 active
@@ -1041,6 +1293,7 @@ function ToggleRow({
     return (
         <button
             type="button"
+            aria-pressed={checked}
             onClick={() => onChange(!checked)}
             className="flex w-full items-center justify-between gap-3 bg-card px-4 py-3.5 text-left"
         >

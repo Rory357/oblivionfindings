@@ -20,9 +20,11 @@ use Database\Seeders\RbacSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-04 23:30:00', 'UTC'));
     $this->seed(RbacSeeder::class);
     $this->runtimeHouse = Site::factory()->create([
         'name' => 'Compliance Runtime House',
@@ -32,6 +34,10 @@ beforeEach(function () {
         'name' => 'Compliance Runtime Facility',
         'type' => 'facility',
     ]);
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
 });
 
 function complianceRuntimeStaff(
@@ -99,10 +105,10 @@ test('application evaluator uses current staff and role plus Site type instead o
     $house = complianceRuntimeStaff('Runtime House Worker', $this->runtimeHouse);
     $facility = complianceRuntimeStaff('Runtime Facility Worker', $this->runtimeFacility);
     $ended = complianceRuntimeStaff('Runtime Ended Worker', $this->runtimeHouse, profileOverrides: [
-        'end_date' => now()->subDay()->toDateString(),
+        'end_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->subDay()->toDateString(),
     ]);
     $future = complianceRuntimeStaff('Runtime Future Worker', $this->runtimeHouse, profileOverrides: [
-        'start_date' => now()->addDay()->toDateString(),
+        'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->addDay()->toDateString(),
     ]);
     $inactive = complianceRuntimeStaff('Runtime Inactive Worker', $this->runtimeHouse, profileOverrides: [
         'is_active' => false,

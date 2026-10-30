@@ -17,13 +17,16 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MedicationScanVerificationService;
+use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class MedicationsApiControllerTest extends TestCase
 {
@@ -87,6 +90,9 @@ class MedicationsApiControllerTest extends TestCase
             'frequency' => 'Once daily',
             'dose_times' => ['09:00'],
             'controlled_drug' => false,
+            'nz_controlled_class' => ($overrides['controlled_drug'] ?? false) ? 'B' : null,
+            'controlled_class_source' => ($overrides['controlled_drug'] ?? false) ? 'Synthetic reviewed test configuration' : null,
+            'approval_status' => 'verified',
             'active' => true,
             'state' => 'active',
         ], $overrides));
@@ -167,6 +173,20 @@ class MedicationsApiControllerTest extends TestCase
 
     public function test_controlled_api_administration_conceals_missing_and_foreign_witnesses_before_eligible_credentials_without_mutation(): void
     {
+        // The test records today's 09:00 dose: a fixed NZ morning, with the
+        // order entered the day before (P01 recording guard).
+        $this->travelTo(Carbon::parse('2026-07-01 09:10:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc()->subDay());
+        $medication = $this->createMedicationForClient($this->client, [
+            'name' => 'API controlled witness boundary',
+            'controlled_drug' => true,
+            'approval_status' => 'verified',
+        ]);
+        $this->travelTo(Carbon::parse('2026-07-01 09:10:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
+        // setUp dated the recorder's employment from the real clock; it must
+        // have started before the fixed morning this test records on.
+        HrEmployeeProfile::query()
+            ->where('user_id', $this->actor->id)
+            ->update(['start_date' => now()->subMonth()->toDateString()]);
         $administrationPermission = Permission::query()->where('key', 'medications.administer.record')->firstOrFail();
         $controlledPermission = Permission::query()->where('key', 'medications.controlled.record')->firstOrFail();
         $controlledViewPermission = Permission::query()->where('key', 'medications.controlled.view')->firstOrFail();
@@ -191,11 +211,6 @@ class MedicationsApiControllerTest extends TestCase
             'ends_at' => now()->addHours(2),
             'actual_starts_at' => now()->subHour(),
             'status' => 'in_progress',
-        ]);
-        $medication = $this->createMedicationForClient($this->client, [
-            'name' => 'API controlled witness boundary',
-            'controlled_drug' => true,
-            'approval_status' => 'verified',
         ]);
         $stock = ClientMedicationStock::create([
             'client_medication_id' => $medication->id,
@@ -233,6 +248,7 @@ class MedicationsApiControllerTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         $witnessShift = Shift::factory()->create([
@@ -253,7 +269,7 @@ class MedicationsApiControllerTest extends TestCase
             'reason' => 'Test request may run outside the configured administration window.',
             'quantity_administered' => 0.5,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
         ];
         $url = "/api/medications/clients/{$this->client->id}/medications/{$medication->id}/administrations";
 
@@ -851,6 +867,7 @@ class MedicationsApiControllerTest extends TestCase
 
     public function test_concurrent_same_uuid_scheduled_count_create_publishes_one_durable_result(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

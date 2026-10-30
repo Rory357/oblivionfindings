@@ -15,6 +15,7 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Permission;
+use App\Models\Queclink\QueclinkAuditEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\Role;
@@ -503,13 +504,46 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             'model_hint' => 'GV500CG',
         ]);
 
+        $this->assertFalse($manager->canDo('securityDevices.devices.viewUnassigned'));
+        $this->assertFalse($manager->canDo('securityDevices.devices.viewAllSites'));
+        $before = [
+            'tracker' => $tracker->refresh()->getRawOriginal(),
+            'asset' => $asset->refresh()->getRawOriginal(),
+            'devices' => Device::query()->count(),
+            'links' => DeviceAssetLink::query()->count(),
+            'assignments' => DeviceAssignment::query()->count(),
+            'audit_events' => QueclinkAuditEvent::query()->count(),
+        ];
         $this->actingAs($manager)
             ->post("/security-devices/integrations/queclink/devices/{$tracker->id}/claim", [
                 'pairing_type' => 'vehicle',
                 'target_id' => $asset->id,
             ])
-            ->assertRedirect();
+            ->assertNotFound();
+        $this->assertSame($before, [
+            'tracker' => $tracker->fresh()->getRawOriginal(),
+            'asset' => $asset->fresh()->getRawOriginal(),
+            'devices' => Device::query()->count(),
+            'links' => DeviceAssetLink::query()->count(),
+            'assignments' => DeviceAssignment::query()->count(),
+            'audit_events' => QueclinkAuditEvent::query()->count(),
+        ]);
 
+        $viewUnassigned = Permission::query()->where('key', 'securityDevices.devices.viewUnassigned')->firstOrFail();
+        $manager->permissionOverrides()->syncWithoutDetaching([$viewUnassigned->id => ['allowed' => true]]);
+        $manager = $manager->fresh();
+        $this->assertTrue($manager->canDo('securityDevices.integrations.manage'));
+        $this->assertTrue($manager->canDo('securityDevices.devices.viewUnassigned'));
+        $this->assertFalse($manager->canDo('securityDevices.devices.viewAllSites'));
+        $this->actingAs($manager)
+            ->post("/security-devices/integrations/queclink/devices/{$tracker->id}/claim", [
+                'pairing_type' => 'vehicle',
+                'target_id' => $asset->id,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertSame(QueclinkDevice::STATUS_PAIRED, $tracker->fresh()->status);
         $canonicalDeviceId = (int) $tracker->fresh()->device_id;
         $link = DeviceAssetLink::query()
             ->where('device_id', $canonicalDeviceId)
@@ -520,12 +554,21 @@ class ProviderConnectionsSingleApplicationTest extends TestCase
             'device_id' => $canonicalDeviceId,
             'assignable_type' => DeviceAssignment::TARGET_VEHICLE,
             'assignable_id' => $asset->id,
+            'custody_site_id' => $site->id,
+            'assigned_by_user_id' => $manager->id,
             'released_at' => null,
         ]);
+        $assignment = DeviceAssignment::query()
+            ->where('device_id', $canonicalDeviceId)
+            ->where('assignable_type', DeviceAssignment::TARGET_VEHICLE)
+            ->where('assignable_id', $asset->id)
+            ->sole();
 
         $this->actingAs($manager)
             ->post("/security-devices/integrations/queclink/devices/{$tracker->id}/release")
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->assertNotNull($assignment->fresh()->released_at);
 
         $this->assertNotNull($link->fresh()->unlinked_at);
         $this->assertSame(QueclinkDevice::STATUS_PENDING, $tracker->fresh()->status);

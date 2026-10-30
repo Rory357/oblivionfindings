@@ -12,7 +12,7 @@ use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
-    Carbon::setTestNow(Carbon::parse('2026-06-08 10:00:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-06-08 10:00:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {

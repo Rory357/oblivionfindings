@@ -1,0 +1,11 @@
+PKG-05 v6 - exact design review candidate
+Frozen: 2026-09-26T23:51:39.504Z
+URL: http://127.0.0.1:4400/#/fleet-assets/transports/overview
+Runtime SHA-256: 21c6f2a28a60bfdffd933917db20a0705d89b48ce9c263ef2dda45aee2c606bb
+File-set SHA-256: 240befd230d37dc1951155209f6c2292807e28e142b2ee540287b6947384562a
+Manifest SHA-256: 8bc1e7f92e9aba1df4911313f091943100a584ba1e92c3dfdd6cfa54606c21c9
+Files: 105
+Screenshots/renders: 39
+168 browser assertions; 93 synthetic domain assertions; 3 local server checks; zero TypeScript errors. Three PDF downloads smoke-tested.
+420 prior frozen files preserved. Actual browser zoom unverified.
+No application implementation or operational effects. Preserve this version.

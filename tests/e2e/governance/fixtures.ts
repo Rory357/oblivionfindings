@@ -1,4 +1,4 @@
-import { type Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { runLaravelJson } from '../helpers';
 
 export interface GovernanceFixturesData {
@@ -175,8 +175,17 @@ export async function loginAsGovernancePersona(
         // Ignore if throttle reset encounters issue
     }
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    // Staff sign-in is email first: Continue reveals the password step
+    // (same flow as loginAs in ../helpers.ts).
     await page.locator('#email').fill(persona.email);
+    await page.getByTestId('login-continue').click();
     await page.locator('#password').fill(persona.password);
-    await page.locator('button[type="submit"]').click();
-    await page.waitForURL((url) => !url.pathname.includes('/login'));
+    const loginButton = page.getByTestId('login-button');
+    await expect(loginButton).toBeEnabled();
+    await Promise.all([
+        page.waitForURL((url) => !url.pathname.includes('/login'), {
+            waitUntil: 'commit',
+        }),
+        loginButton.click(),
+    ]);
 }

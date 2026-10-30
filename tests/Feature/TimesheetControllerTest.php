@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -14,7 +15,9 @@ use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\TimesheetReconciliationService;
+use Database\Seeders\FrontlineLifecycleDemoSeeder;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\SystemUsersSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -825,6 +828,13 @@ class TimesheetControllerTest extends TestCase
             'timesheets.submit',
             'timesheets.manageAny',
         ]);
+        // Since cd5d34e6b timesheet mutations are Site-scoped with no global
+        // read bypass, so reassigning to another Site's client also needs the
+        // actor to work at that Site.
+        HrEmployeeProfile::query()
+            ->where('user_id', $this->finance->id)
+            ->firstOrFail()
+            ->update(['secondary_site_ids' => [$globalSite->id]]);
 
         $this->actingAs($this->finance)
             ->post(route('operations.timesheets.resubmit', $timesheet), $this->validUpdatePayload($timesheet, [
@@ -1035,6 +1045,99 @@ class TimesheetControllerTest extends TestCase
             'status' => 'approved',
             'approved_by' => $this->finance->id,
         ]);
+    }
+
+    public function test_pending_tab_hides_ineligible_linked_worker_and_preserves_scoped_bulk_approval(): void
+    {
+        $valid = $this->makeSubmittedTimesheet($this->staff);
+        $invalid = $this->makeSubmittedTimesheet($this->otherStaff);
+        $otherSite = Site::factory()->create();
+        $this->otherStaff->hrEmployeeProfile->update(['primary_site_id' => $otherSite->id]);
+        $beforeRows = DB::table('timesheets')->whereIn('id', [$valid->id, $invalid->id])->orderBy('id')->get()->toArray();
+        $beforeEntries = DB::table('hr_time_entries')->orderBy('id')->get()->toArray();
+        $beforeEffects = $this->timesheetSideEffectCounts();
+
+        $this->actingAs($this->finance)
+            ->get(route('operations.timesheets.index', ['tab' => 'submitted']))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/timesheets/index')
+                ->has('timesheets.data', 1)
+                ->where('timesheets.data.0.id', $valid->id)
+                ->where('timesheets.data.0.can_mutate', true)
+                ->where('timesheets.data.0.can_approve', true)
+            );
+        $this->getJson(route('operations.timesheets.show', [$invalid, 'modal' => 1]))->assertForbidden();
+        $this->postJson(route('operations.timesheets.bulkApprove'), [
+            'ids' => [$valid->id, $invalid->id],
+            'decision_notes' => 'Must not approve an ineligible linked-worker row.',
+        ])->assertForbidden();
+
+        $this->assertEquals($beforeRows, DB::table('timesheets')->whereIn('id', [$valid->id, $invalid->id])->orderBy('id')->get()->toArray());
+        $this->assertEquals($beforeEntries, DB::table('hr_time_entries')->orderBy('id')->get()->toArray());
+        $this->assertSame($beforeEffects, $this->timesheetSideEffectCounts());
+
+        $this->post(route('operations.timesheets.bulkApprove'), [
+            'ids' => [$valid->id],
+            'decision_notes' => 'Approved the current-site row.',
+        ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success', 'Selected timesheets approved.');
+        $this->assertDatabaseHas('timesheets', [
+            'id' => $valid->id,
+            'status' => 'approved',
+            'approved_by' => $this->finance->id,
+            'decision_notes' => 'Approved the current-site row.',
+        ]);
+        $this->assertEquals((array) $beforeRows[1], (array) DB::table('timesheets')->where('id', $invalid->id)->first());
+    }
+
+    public function test_frontline_attendance_reset_projects_canonical_time_before_real_bulk_approval_and_preserves_it_afterward(): void
+    {
+        $this->seed([SystemUsersSeeder::class, FrontlineLifecycleDemoSeeder::class]);
+        $loadFixture = fn (): Timesheet => Timesheet::query()
+            ->with(['shift', 'attendanceSession'])
+            ->whereHas('shift', fn ($shift) => $shift->where('notes', 'PW:submitted-approval:sw2@demo.test'))
+            ->sole();
+        $timesheet = $loadFixture();
+        $session = $timesheet->attendanceSession;
+        $entry = HrTimeEntry::query()->where('attendance_session_id', $session->id)->sole();
+
+        $this->assertSame('Playwright submitted timesheet.', $timesheet->notes);
+        $this->assertSame('submitted', $timesheet->status);
+        $this->assertSame((int) $entry->id, (int) $timesheet->hr_time_entry_id);
+        $this->assertSame((int) $timesheet->user_id, (int) $entry->user_id);
+        $this->assertSame((int) $timesheet->shift_id, (int) $entry->shift_id);
+        $this->assertSame((int) $timesheet->client_id, (int) $entry->client_id);
+        $this->assertSame((int) $timesheet->shift_site_id, (int) $entry->site_id);
+        $this->assertSame('attendance', $entry->source_type);
+        $this->assertSame((int) $session->id, (int) $entry->source_id);
+        $this->assertTrue($entry->clock_in->equalTo($session->clock_in_at));
+        $this->assertTrue($entry->clock_out->equalTo($session->clock_out_at));
+        $this->assertSame(30, $entry->break_minutes);
+        $this->assertSame(7.5, (float) $entry->total_hours);
+        $this->assertSame($timesheet->work_date->toDateString(), $entry->entry_date->toDateString());
+        $beforeEntry = $entry->getRawOriginal();
+        $this->seed(FrontlineLifecycleDemoSeeder::class);
+        $this->assertSame($beforeEntry, $entry->fresh()->getRawOriginal());
+        $this->assertSame((int) $entry->id, (int) $loadFixture()->hr_time_entry_id);
+
+        $this->actingAs($this->admin)
+            ->post(route('operations.timesheets.bulkApprove'), [
+                'ids' => [$timesheet->id],
+                'decision_notes' => 'Approved dedicated readiness attendance.',
+            ])->assertRedirect()->assertSessionHasNoErrors()->assertSessionHas('success', 'Selected timesheets approved.');
+        $this->assertDatabaseHas('timesheets', [
+            'id' => $timesheet->id,
+            'status' => 'approved',
+            'approved_by' => $this->admin->id,
+            'hr_time_entry_id' => $entry->id,
+        ]);
+        $this->assertSame('approved', $entry->fresh()->status);
+        $approvedTimesheet = $timesheet->fresh()->getRawOriginal();
+        $approvedEntry = $entry->fresh()->getRawOriginal();
+        $this->seed(FrontlineLifecycleDemoSeeder::class);
+        $this->assertSame($approvedTimesheet, $timesheet->fresh()->getRawOriginal());
+        $this->assertSame($approvedEntry, $entry->fresh()->getRawOriginal());
+        $this->assertSame(1, HrTimeEntry::query()->where('attendance_session_id', $session->id)->count());
     }
 
     public function test_show_serves_timesheet_card_json_for_reviewers(): void
@@ -1348,6 +1451,26 @@ class TimesheetControllerTest extends TestCase
     protected function makeSubmittedTimesheet(User $staff, array $overrides = []): Timesheet
     {
         [$shift, $attendance] = $this->makeCompletedShiftWithAttendance($staff, $overrides['shift_overrides'] ?? []);
+        // Since cd5d34e6b approving an attendance-backed timesheet needs the
+        // one canonical attendance HR time entry that clock-out projects
+        // (AttendanceTimeEntryProjector, which only runs inside its lock path).
+        HrTimeEntry::factory()->create([
+            'user_id' => $staff->id,
+            'shift_id' => $shift->id,
+            'attendance_session_id' => $attendance->id,
+            'site_id' => $shift->site_id,
+            'client_id' => $shift->client_id,
+            'entry_date' => $shift->actual_starts_at->toDateString(),
+            'clock_in' => $attendance->clock_in_at,
+            'clock_out' => $attendance->clock_out_at,
+            'break_minutes' => 0,
+            'total_hours' => 8,
+            'entry_type' => 'clock',
+            'status' => 'active',
+            'source_type' => 'attendance',
+            'source_id' => $attendance->id,
+            'created_by' => $staff->id,
+        ]);
 
         return Timesheet::query()->create(array_merge([
             'user_id' => $staff->id,

@@ -1,19 +1,25 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationReview;
+use App\Models\Permission;
+use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Medication\Controlled\ControlledPolicy;
 use App\Services\MedicationOverviewService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
-    Carbon::setTestNow(Carbon::parse('2026-06-14 11:15:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-06-14 11:15:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function () {
@@ -53,6 +59,110 @@ it('surfaces an INR-out-of-range item in the action centre', function () {
         ->and($inr['status'])->toBe('Above range')
         ->and($inr['code'])->toBe('INR')
         ->and($inr['client'])->toBe('Margaret Sole');
+});
+
+it('labels an INR reading with no medicine linked instead of hiding it', function () {
+    $user = User::factory()->create();
+    $client = makeOverviewClient();
+    $linkedClient = Client::factory()->create([
+        'site_id' => $client->site_id,
+        'first_name' => 'Linked',
+        'last_name' => 'Reading',
+    ]);
+    $warfarin = ClientMedication::factory()->create([
+        'client_id' => $linkedClient->id,
+        'name' => 'Warfarin',
+        'controlled_drug' => false,
+    ]);
+    foreach ([[$client, null], [$linkedClient, $warfarin->id]] as [$owner, $medicationId]) {
+        ClientInrRecord::create([
+            'client_id' => $owner->id,
+            'client_medication_id' => $medicationId,
+            'inr_value' => 4.8,
+            'target_range_low' => 2.0,
+            'target_range_high' => 3.0,
+            'tested_on' => today()->toDateString(),
+            'recorded_by' => $user->id,
+        ]);
+    }
+
+    $service = app(MedicationOverviewService::class);
+    $inr = collect($service->actionCentre(today()))
+        ->where('type', 'inr')
+        ->keyBy('client_id');
+    // The /emar watch card labels the reading from its missing medicine link.
+    $watch = collect($service->inrWatch())->keyBy('client_id');
+
+    expect($inr->keys()->sort()->values()->all())->toBe([$client->id, $linkedClient->id])
+        ->and($inr[$client->id]['summary'])->toStartWith('No medicine linked · Target 2–3')
+        ->and($inr[$linkedClient->id]['summary'])->toStartWith('Target 2–3')
+        ->and($inr[$linkedClient->id]['summary'])->not->toContain('No medicine linked')
+        ->and($watch->keys()->sort()->values()->all())->toBe([$client->id, $linkedClient->id])
+        ->and($watch[$client->id]['client_medication_id'])->toBeNull()
+        ->and($watch[$linkedClient->id]['client_medication_id'])->toBe($warfarin->id);
+});
+
+it('keeps controlled, cross-client and other-Site INR readings concealed from a scoped reader', function () {
+    $this->seed(RbacSeeder::class);
+    $recorder = User::factory()->create();
+    $visible = makeOverviewClient();
+    $controlledOwner = Client::factory()->create(['site_id' => $visible->site_id]);
+    $crossLinked = Client::factory()->create(['site_id' => $visible->site_id]);
+    $otherSite = Client::factory()->create(['site_id' => Site::factory()->create()->id]);
+    $morphine = ClientMedication::factory()->create([
+        'client_id' => $controlledOwner->id,
+        'name' => 'Morphine sulfate',
+        'controlled_drug' => true,
+    ]);
+    $visibleWarfarin = ClientMedication::factory()->create([
+        'client_id' => $visible->id,
+        'name' => 'Warfarin',
+        'controlled_drug' => false,
+    ]);
+    foreach ([
+        [$visible, null],
+        [$controlledOwner, $morphine->id],
+        // Linked to another resident's order — not canonical, stays hidden.
+        [$crossLinked, $visibleWarfarin->id],
+        [$otherSite, null],
+    ] as [$owner, $medicationId]) {
+        ClientInrRecord::create([
+            'client_id' => $owner->id,
+            'client_medication_id' => $medicationId,
+            'inr_value' => 4.8,
+            'target_range_low' => 2.0,
+            'target_range_high' => 3.0,
+            'tested_on' => today()->toDateString(),
+            'recorded_by' => $recorder->id,
+        ]);
+    }
+
+    $reader = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $reader->permissionOverrides()->sync([
+        Permission::query()->where('key', 'medications.view')->value('id') => ['allowed' => true],
+        Permission::query()->where('key', 'medications.controlled.view')->value('id') => ['allowed' => false],
+    ]);
+    HrEmployeeProfile::factory()->create([
+        'user_id' => $reader->id,
+        'primary_site_id' => $visible->site_id,
+        'secondary_site_ids' => [],
+        'start_date' => today()->subYear(),
+        'end_date' => null,
+        'is_active' => true,
+    ]);
+    // EA-066: the overview follows the person rule, so the reader supports
+    // each same-house resident; what stays hidden is hidden for the
+    // controlled, cross-link and other-house reasons this test is about.
+    foreach ([$visible, $controlledOwner, $crossLinked] as $supported) {
+        $supported->supportWorkers()->attach($reader->id);
+    }
+
+    $payload = app(MedicationOverviewService::class)->payload(today(), $reader);
+
+    expect(collect($payload['actionCentre'])->where('type', 'inr')->pluck('client_id')->all())
+        ->toBe([$visible->id])
+        ->and(collect($payload['inrWatch'])->pluck('client_id')->all())
+        ->toBe([$visible->id]);
 });
 
 it('surfaces an open CD discrepancy in the action centre', function () {
@@ -101,6 +211,10 @@ it('keeps med cd scope balance checks due when today entry has noncanonical owne
         'active' => true,
         'state' => 'active',
     ]);
+    AppSetting::updateOrCreate(['key' => ControlledPolicy::COUNT_CADENCE], ['value' => 'shift']);
+    DB::table('client_medications')->where('id', $medication->id)->update(['created_at' => now()->subDay(), 'approval_status' => 'verified']);
+    Shift::factory()->create(['site_id' => $owner->site_id, 'client_id' => $owner->id,
+        'starts_at' => now()->subHours(2), 'ends_at' => now()->addHours(2), 'status' => 'in_progress', 'is_on_call' => false]);
     ClientControlledDrugEntry::query()->create([
         'client_id' => $otherClient->id,
         'client_medication_id' => $medication->id,
@@ -109,6 +223,7 @@ it('keeps med cd scope balance checks due when today entry has noncanonical owne
         'on_hand_after' => '10.00',
         'recorded_at' => now(),
         'recorded_by' => $user->id,
+        'witnessed_by' => User::factory()->create()->id,
     ]);
 
     $feed = app(MedicationOverviewService::class)->actionCentre(today());
@@ -117,7 +232,7 @@ it('keeps med cd scope balance checks due when today entry has noncanonical owne
     expect($due)->not->toBeNull()
         ->and($due['type'])->toBe('cd_balance')
         ->and($due['client_id'])->toBe($owner->id)
-        ->and($due['summary'])->toContain('no balance count recorded today');
+        ->and($due['summary'])->toContain('a witnessed count is due under the configured policy');
 });
 
 it('surfaces an overdue medication review in the action centre', function () {
@@ -198,33 +313,45 @@ it('builds a complete dashboard payload with all merged keys', function () {
     expect($payload['outcomeBreakdown'])->toHaveKeys(['total', 'givenPct', 'segments']);
 });
 
-it('computes admin rate from the day\'s administrations', function () {
-    $payload = app(MedicationOverviewService::class)->payload(today());
+it('reports the admin rate as not applicable when no scheduled dose is eligible yet', function () {
+    $payload = app(MedicationOverviewService::class)->payload();
 
-    // No administrations seeded → rate is 0, not a divide-by-zero error.
-    expect($payload['stats']['adminRate'])->toBe(0.0);
+    // No scheduled doses → "n/a" (null), never a reassuring 0 %.
+    expect($payload['stats']['adminRate'])->toBeNull()
+        ->and($payload['stats']['eligibleToday'])->toBe(0)
+        ->and($payload['date'])->toBe('2026-06-14')
+        ->and($payload['isToday'])->toBeTrue()
+        ->and($payload['nowLabel'])->toBe('11:15 AM');
 });
 
-it('attaches a RecordDoseWizard context to overdue dose action items', function () {
+it('attaches a RecordDoseWizard context to an unrecorded past scheduled dose', function () {
+    // EM-01: an overdue dose is an unrecorded scheduled slot whose time has
+    // passed — no `pending` administration row exists in production.
     $client = makeOverviewClient();
+    // Entered this morning, before its 09:00 dose (a dose due before an
+    // order's entry is not owed).
+    $now = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
     $med = ClientMedication::factory()->create([
         'client_id' => $client->id,
         'name' => 'Clozapine',
         'dosage' => '200 mg',
         'route' => 'Oral',
+        'frequency' => 'Daily',
+        'dose_times' => ['09:00'],
+        // The factory's random start/end dates can fall outside today.
+        'start_date' => null,
+        'end_date' => null,
         'controlled_drug' => false,
         'is_prn' => false,
+        'active' => true,
+        'state' => 'active',
     ]);
+    Carbon::setTestNow($now);
 
-    ClientMedicationAdministration::create([
-        'client_id' => $client->id,
-        'client_medication_id' => $med->id,
-        'status' => 'pending',
-        'scheduled_for' => today()->setTime(9, 0),
-        'administered_by' => User::factory()->create()->id,
-    ]);
-
-    $feed = app(MedicationOverviewService::class)->actionCentre(today());
+    $service = app(MedicationOverviewService::class);
+    $workerToday = Carbon::now('Pacific/Auckland')->startOfDay();
+    $feed = $service->actionCentre($workerToday);
     $dose = collect($feed)->firstWhere('type', 'overdue_dose');
 
     expect($dose)->not->toBeNull()
@@ -233,6 +360,13 @@ it('attaches a RecordDoseWizard context to overdue dose action items', function 
         ->and($dose['record']['row']['medication_name'])->toBe('Clozapine')
         ->and($dose['record']['row']['client_name'])->toBe('Margaret Sole')
         ->and($dose['record']['row']['status'])->toBe('overdue')
+        ->and($dose['record']['row']['time'])->toBe('09:00')
         ->and($dose['record']['client']['name'])->toBe('Margaret Sole')
-        ->and($dose['record']['client']['allergies'])->toBe([]);
+        ->and($dose['record']['client']['allergies'])->toBe([])
+        ->and($dose['record']['client']['allergy_status'])->toBe('none_recorded');
+
+    $stats = $service->stats($workerToday);
+    expect($stats['overdue'])->toBe(1)
+        ->and($stats['dueNow'])->toBe(1)
+        ->and($stats['adminRate'])->toBe(0.0);
 });

@@ -179,6 +179,39 @@ final class MonitoringCollectorOperatorWorkflowTest extends TestCase
         );
     }
 
+    public function test_scope_requests_do_not_consume_the_collector_budget_and_the_seventh_collector_request_is_denied(): void
+    {
+        [$operator, $site] = $this->siteScopedViewer([
+            'securityDevices.integrations.view',
+            'securityDevices.integrations.manage',
+        ]);
+
+        // Validation failures still pass through the actual scope limiter.
+        for ($attempt = 0; $attempt < 4; $attempt++) {
+            $this->actingAs($operator)
+                ->postJson('/security-devices/discovery/scopes', [])
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('site_id');
+        }
+        $this->assertDatabaseCount('monitoring_collector_enrollments', 0);
+
+        for ($attempt = 0; $attempt < 6; $attempt++) {
+            $this->actingAs($operator)
+                ->postJson('/security-devices/discovery/collectors/enrolments', ['site_id' => $site->id])
+                ->assertCreated();
+        }
+        $this->assertDatabaseCount('monitoring_collector_enrollments', 6);
+        $auditCount = AuditLog::query()->count();
+
+        $this->actingAs($operator)
+            ->postJson('/security-devices/discovery/collectors/enrolments', ['site_id' => $site->id])
+            ->assertTooManyRequests();
+
+        $this->assertDatabaseCount('monitoring_collector_enrollments', 6);
+        $this->assertSame($auditCount, AuditLog::query()->count());
+        $this->assertDatabaseCount('monitoring_collectors', 0);
+    }
+
     /** @param list<string> $permissions */
     private function siteScopedViewer(array $permissions): array
     {

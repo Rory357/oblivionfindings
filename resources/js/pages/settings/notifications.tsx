@@ -36,10 +36,12 @@ import {
     Volume2,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { ChatNotificationFields } from './chat-notification-fields';
 import {
     friendlyNotificationDescription,
     friendlyNotificationName,
     groupNotificationKeysByModule,
+    isChatNotificationKey,
     type NotificationModuleGroup,
 } from './notification-catalog';
 
@@ -109,18 +111,20 @@ export default function NotificationPreferences({
 }: Props) {
     const webPush = useWebPush();
     // Build initial prefs: merge role defaults with user prefs, with channel data
-    const buildInitialPrefs = (): Record<string, ChannelPref> => {
+    const buildInitialPrefs = (): Record<string, ChannelPref | null> => {
         const allKeys = Object.values(groups).flat();
-        const prefs: Record<string, ChannelPref> = {};
+        const prefs: Record<string, ChannelPref | null> = {};
         allKeys.forEach((k) => {
             const roleDef = roleDefaults[k];
             const userPref = userPrefs[k];
-            prefs[k] = userPref ?? roleDef ?? { ...DEFAULT_PREF };
+            prefs[k] = isChatNotificationKey(k)
+                ? (userPref ?? null)
+                : (userPref ?? roleDef ?? { ...DEFAULT_PREF });
         });
         return prefs;
     };
 
-    const { data, setData, put, processing } = useForm({
+    const { data, setData, put, processing, errors } = useForm({
         prefs: buildInitialPrefs(),
     });
 
@@ -157,13 +161,16 @@ export default function NotificationPreferences({
     const [saveSuccess, setSaveSuccess] = useState(false);
 
     const enabledCount = (keys: string[]) =>
-        keys.filter((k) => data.prefs[k]?.enabled).length;
+        keys.filter(
+            (k) => (data.prefs[k] ?? roleDefaults[k] ?? DEFAULT_PREF).enabled,
+        ).length;
 
     const setPref = (key: string, field: keyof ChannelPref, value: boolean) => {
+        setSaveSuccess(false);
         setData('prefs', {
             ...data.prefs,
             [key]: {
-                ...(data.prefs[key] ?? DEFAULT_PREF),
+                ...(data.prefs[key] ?? roleDefaults[key] ?? DEFAULT_PREF),
                 [field]: value,
             },
         });
@@ -171,6 +178,7 @@ export default function NotificationPreferences({
 
     const handleSave = () => {
         put('/settings/notifications', {
+            preserveScroll: true,
             onSuccess: () => {
                 setSaveSuccess(true);
                 setTimeout(() => setSaveSuccess(false), 3000);
@@ -213,9 +221,8 @@ export default function NotificationPreferences({
                                     emergencies) cannot be disabled to ensure
                                     safety compliance. Use the toggles below to
                                     customise your notification preferences per
-                                    module. Each notification can be delivered
-                                    via In-App, Email, or Push channels
-                                    independently.
+                                    module. Available delivery channels depend
+                                    on the notification.
                                 </p>
                             </div>
                         </CardContent>
@@ -331,12 +338,39 @@ export default function NotificationPreferences({
                                                       'denied'
                                                         ? 'Blocked in this browser'
                                                         : 'Send alerts even when the app is closed'
-                                                    : 'VAPID keys are not configured'
+                                                    : 'Browser notifications have not been set up yet'
                                                 : 'Not supported by this browser'}
                                         </div>
                                         {webPush.error ? (
                                             <div className="mt-1 text-xs text-destructive">
                                                 {webPush.error}
+                                            </div>
+                                        ) : null}
+                                        {webPush.needsUpgrade ? (
+                                            <div className="mt-2 space-y-2">
+                                                <p className="text-xs text-muted-foreground">
+                                                    Update this device to
+                                                    receive Chat alerts.
+                                                </p>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="min-h-[44px] max-w-full whitespace-normal"
+                                                    disabled={
+                                                        webPush.processing ||
+                                                        !webPush.configured ||
+                                                        webPush.permission ===
+                                                            'denied'
+                                                    }
+                                                    onClick={() =>
+                                                        void webPush.subscribe()
+                                                    }
+                                                >
+                                                    {webPush.processing
+                                                        ? 'Updating…'
+                                                        : 'Update this device'}
+                                                </Button>
                                             </div>
                                         ) : null}
                                     </div>
@@ -359,7 +393,7 @@ export default function NotificationPreferences({
                             </div>
 
                             {/* Email digest */}
-                            <div className="flex items-center justify-between gap-4 rounded-lg border px-4 py-3">
+                            <div className="flex flex-col items-stretch justify-between gap-4 rounded-lg border px-4 py-3 sm:flex-row sm:items-center">
                                 <div className="flex items-center gap-3">
                                     <Mail className="h-4 w-4 text-muted-foreground" />
                                     <div>
@@ -373,6 +407,7 @@ export default function NotificationPreferences({
                                     </div>
                                 </div>
                                 <select
+                                    aria-label="Email digest frequency"
                                     value={deliveryState.email_digest_frequency}
                                     onChange={(e) =>
                                         saveDelivery({
@@ -380,7 +415,7 @@ export default function NotificationPreferences({
                                                 .value as DeliveryPrefs['email_digest_frequency'],
                                         })
                                     }
-                                    className="h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+                                    className="min-h-[44px] max-w-full min-w-0 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
                                 >
                                     <option value="instant">Instant</option>
                                     <option value="daily">Daily Summary</option>
@@ -399,14 +434,17 @@ export default function NotificationPreferences({
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="min-h-[44px]"
+                            disabled={processing}
                             onClick={() => {
+                                setSaveSuccess(false);
                                 const next: Record<string, ChannelPref> = {};
                                 allKeys.forEach((k) => {
                                     next[k] = {
                                         enabled: true,
                                         inapp: true,
-                                        email: true,
-                                        push: true,
+                                        email: !isChatNotificationKey(k),
+                                        push: !isChatNotificationKey(k),
                                     };
                                 });
                                 setData('prefs', next);
@@ -418,7 +456,10 @@ export default function NotificationPreferences({
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="min-h-[44px]"
+                            disabled={processing}
                             onClick={() => {
+                                setSaveSuccess(false);
                                 const next: Record<string, ChannelPref> = {};
                                 allKeys.forEach((k) => {
                                     // Critical keys stay enabled
@@ -463,8 +504,11 @@ export default function NotificationPreferences({
                                 }
                             >
                                 <Card>
-                                    <CollapsibleTrigger asChild>
-                                        <CardHeader className="cursor-pointer select-none">
+                                    <CardHeader>
+                                        <CollapsibleTrigger
+                                            className="min-h-[44px] cursor-pointer text-left select-none focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                                            aria-label={`${mod.label} notifications`}
+                                        >
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
@@ -506,44 +550,103 @@ export default function NotificationPreferences({
                                                     )}
                                                 </div>
                                             </div>
-                                        </CardHeader>
-                                    </CollapsibleTrigger>
+                                        </CollapsibleTrigger>
+                                    </CardHeader>
                                     <CollapsibleContent>
                                         <CardContent className="pt-0">
                                             {/* Channel header row */}
-                                            <div className="mb-2 flex items-center gap-4 border-b pb-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                                        Notification
-                                                    </span>
+                                            {mod.moduleKey !== 'chat' && (
+                                                <div className="mb-2 flex items-center gap-4 border-b pb-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
+                                                            Notification
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex shrink-0 items-center gap-4">
+                                                        <div className="flex w-16 flex-col items-center gap-0.5">
+                                                            <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                                In-App
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex w-16 flex-col items-center gap-0.5">
+                                                            <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                                Email
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex w-16 flex-col items-center gap-0.5">
+                                                            <Smartphone className="h-3.5 w-3.5 text-muted-foreground/60" />
+                                                            <span className="text-[10px] font-medium text-muted-foreground/60">
+                                                                Push
+                                                            </span>
+                                                        </div>
+                                                        <div className="w-14 text-center">
+                                                            <span className="text-[10px] font-medium text-muted-foreground">
+                                                                Enable
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex shrink-0 items-center gap-4">
-                                                    <div className="flex w-16 flex-col items-center gap-0.5">
-                                                        <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <span className="text-[10px] font-medium text-muted-foreground">
-                                                            In-App
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex w-16 flex-col items-center gap-0.5">
-                                                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <span className="text-[10px] font-medium text-muted-foreground">
-                                                            Email
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex w-16 flex-col items-center gap-0.5">
-                                                        <Smartphone className="h-3.5 w-3.5 text-muted-foreground/60" />
-                                                        <span className="text-[10px] font-medium text-muted-foreground/60">
-                                                            Push
-                                                        </span>
-                                                    </div>
-                                                    <div className="w-14 text-center">
-                                                        <span className="text-[10px] font-medium text-muted-foreground">
-                                                            Enable
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                            )}
                                             {mod.keys.map((key, idx) => {
+                                                if (isChatNotificationKey(key))
+                                                    return (
+                                                        <div
+                                                            key={key}
+                                                            className="border-b border-border/40 px-3 py-3 last:border-b-0"
+                                                        >
+                                                            <ChatNotificationFields
+                                                                eventKey={key}
+                                                                value={
+                                                                    data.prefs[
+                                                                        key
+                                                                    ] ??
+                                                                    roleDefaults[
+                                                                        key
+                                                                    ] ??
+                                                                    DEFAULT_PREF
+                                                                }
+                                                                disabled={
+                                                                    processing
+                                                                }
+                                                                onChange={(
+                                                                    field,
+                                                                    value,
+                                                                ) =>
+                                                                    setPref(
+                                                                        key,
+                                                                        field,
+                                                                        value,
+                                                                    )
+                                                                }
+                                                                inherited={
+                                                                    data.prefs[
+                                                                        key
+                                                                    ] === null
+                                                                }
+                                                                inheritSource={
+                                                                    roleDefaults[
+                                                                        key
+                                                                    ]
+                                                                        ? 'role'
+                                                                        : 'organisation'
+                                                                }
+                                                                onInherit={() => {
+                                                                    setSaveSuccess(
+                                                                        false,
+                                                                    );
+                                                                    setData(
+                                                                        'prefs',
+                                                                        {
+                                                                            ...data.prefs,
+                                                                            [key]: null,
+                                                                        },
+                                                                    );
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    );
                                                 const pref =
                                                     data.prefs[key] ??
                                                     DEFAULT_PREF;
@@ -608,6 +711,7 @@ export default function NotificationPreferences({
                                                             {/* In-App checkbox */}
                                                             <div className="flex w-16 justify-center">
                                                                 <Checkbox
+                                                                    aria-label={`${friendlyNotificationName(key)}: in-app`}
                                                                     checked={
                                                                         pref.inapp
                                                                     }
@@ -630,6 +734,7 @@ export default function NotificationPreferences({
                                                             {/* Email checkbox */}
                                                             <div className="flex w-16 justify-center">
                                                                 <Checkbox
+                                                                    aria-label={`${friendlyNotificationName(key)}: email`}
                                                                     checked={
                                                                         pref.email
                                                                     }
@@ -652,11 +757,16 @@ export default function NotificationPreferences({
                                                             {/* Push checkbox (slightly muted) */}
                                                             <div className="flex w-16 justify-center opacity-60">
                                                                 <Checkbox
+                                                                    aria-label={`${friendlyNotificationName(key)}: push`}
                                                                     checked={
+                                                                        key !==
+                                                                            'hr.calendar.reminder' &&
                                                                         pref.push
                                                                     }
                                                                     disabled={
-                                                                        !masterEnabled
+                                                                        !masterEnabled ||
+                                                                        key ===
+                                                                            'hr.calendar.reminder'
                                                                     }
                                                                     onCheckedChange={(
                                                                         v,
@@ -674,6 +784,7 @@ export default function NotificationPreferences({
                                                             {/* Master toggle */}
                                                             <div className="flex w-14 justify-center">
                                                                 <Switch
+                                                                    aria-label={`Enable ${friendlyNotificationName(key)}`}
                                                                     checked={
                                                                         masterEnabled
                                                                     }
@@ -705,6 +816,12 @@ export default function NotificationPreferences({
                     })}
 
                     {/* Save */}
+                    {Object.keys(errors).length > 0 && (
+                        <p role="alert" className="text-sm text-destructive">
+                            Preferences were not saved.{' '}
+                            {Object.values(errors).join(' ')}
+                        </p>
+                    )}
                     <div className="flex items-center justify-end gap-3">
                         {saveSuccess && (
                             <div className="flex items-center gap-1.5 text-sm font-medium text-status-success">
@@ -712,7 +829,11 @@ export default function NotificationPreferences({
                                 Preferences saved successfully
                             </div>
                         )}
-                        <Button disabled={processing} onClick={handleSave}>
+                        <Button
+                            className="min-h-[44px]"
+                            disabled={processing}
+                            onClick={handleSave}
+                        >
                             {processing ? 'Saving...' : 'Save Preferences'}
                         </Button>
                     </div>

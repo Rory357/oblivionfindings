@@ -1,0 +1,27 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\people-locations-implementation\oblivionfindings\phpunit.xml
+
+[41;37mF[0m[41;37mF[0m                                                                  2 / 2 (100%)
+
+Time: 04:52.555, Memory: 110.00 MB
+
+There were 2 failures:
+
+1) OPSPL01MainBoundaryTest::test_control_room_permission_revoked_during_observation_read_withholds_alerts
+Failed to assert that the response count matched the expected 0
+Failed asserting that actual size 1 matches expected size 0.
+
+C:\Users\steph\.codex\worktrees\people-locations-implementation\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\AssertableJsonString.php:74
+C:\Users\steph\.codex\worktrees\people-locations-implementation\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:1051
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\OPSPL01MainBoundaryTest.php:59
+
+2) OPSPL01MainBoundaryTest::test_transport_permission_revoked_during_report_read_withholds_journey
+A revoked Transport reader must not receive the previously selected journey.
+Failed asserting that an array contains 200.
+
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\OPSPL01MainBoundaryTest.php:89
+
+[37;41mFAILURES![0m
+[37;41mTests: 2[0m[37;41m, Assertions: 6[0m[37;41m, Failures: 2[0m[37;41m.[0m

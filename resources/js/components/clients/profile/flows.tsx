@@ -1744,7 +1744,7 @@ const requestLeave: FlowFactory = (ctx) => ({
                     full: true,
                 },
             ],
-            info: 'Approved leave pauses rostered shifts for these dates and notifies the coordinator.',
+            info: 'Approval records the plan. Record the actual departure and return in Leave & Excursions so medication shows Away only during the absence.',
             infoIcon: CalendarClock,
         },
     ],

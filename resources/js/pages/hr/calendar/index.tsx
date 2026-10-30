@@ -114,6 +114,8 @@ interface Props {
     teams: string[];
     categories: EventCategoryOption[];
     staff: PersonOption[];
+    storyOptions?: { id: number; title: string }[];
+    emailAvailable?: boolean;
     archivedEvents: ArchivedEvent[];
     stats: HeroStats;
     upNext: UpNextEntry[];
@@ -207,6 +209,8 @@ export default function CalendarIndex({
     teams,
     categories,
     staff,
+    storyOptions = [],
+    emailAvailable = true,
     archivedEvents,
     stats,
     upNext,
@@ -266,6 +270,7 @@ export default function CalendarIndex({
     const [archiveTarget, setArchiveTarget] = useState<{
         id: number;
         title: string;
+        version: number;
     } | null>(null);
     const [dayDetail, setDayDetail] = useState<{
         label: string;
@@ -527,11 +532,21 @@ export default function CalendarIndex({
         const props = info.event.extendedProps as Record<string, unknown>;
         return {
             id: Number(props.eventId),
+            edit_version: Number(props.editVersion),
+            recurrence_parent_id: (props.recurrenceParentId as number) ?? null,
             title: info.event.title,
             description: (props.description as string) ?? null,
             event_type: (props.category as string) ?? 'company',
-            starts_at: (props.startRaw as string) ?? info.event.startStr,
+            starts_at:
+                (scope === 'all' && !props.recurrenceParentId
+                    ? (props.seriesStart as string)
+                    : null) ??
+                (props.startRaw as string) ??
+                info.event.startStr,
             ends_at:
+                (scope === 'all' && !props.recurrenceParentId
+                    ? (props.seriesEnd as string)
+                    : null) ??
                 (props.endRaw as string) ??
                 info.event.endStr ??
                 info.event.startStr,
@@ -541,6 +556,14 @@ export default function CalendarIndex({
             site_id: (props.siteId as number) ?? null,
             rrule: (props.rrule as string) ?? null,
             recurrence_until: (props.recurrenceUntil as string) ?? null,
+            recurrence_timezone:
+                (props.recurrenceTimezone as 'UTC' | 'Pacific/Auckland') ??
+                'UTC',
+            hub_content: (
+                props.hubContent as
+                    | { editor?: CalendarEventInitial['hub_content'] }
+                    | undefined
+            )?.editor,
             audience_type:
                 (props.audienceType as
                     | 'org'
@@ -634,12 +657,18 @@ export default function CalendarIndex({
         const id = Number(
             (info.event.extendedProps as Record<string, unknown>).eventId,
         );
-        if (id) setArchiveTarget({ id, title: info.event.title });
+        if (id)
+            setArchiveTarget({
+                id,
+                title: info.event.title,
+                version: Number(info.event.extendedProps.editVersion),
+            });
     };
 
     const confirmArchive = () => {
         if (!archiveTarget) return;
         router.delete(`/hr/calendar/events/${archiveTarget.id}`, {
+            data: { edit_version: archiveTarget.version, scope: 'all' },
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => refetch(),
@@ -1188,6 +1217,8 @@ export default function CalendarIndex({
                         teams={teams}
                         categories={categories}
                         staff={staff}
+                        storyOptions={storyOptions}
+                        emailAvailable={emailAvailable}
                         initial={editingEvent}
                         defaultDate={createDate}
                     />
@@ -1879,7 +1910,7 @@ function QuickAddPopover({
                         type="button"
                         disabled={!title.trim()}
                         onClick={() => onCreate(title.trim())}
-                        className="rounded-lg bg-primary px-3.5 py-1.5 text-[12.5px] font-bold text-primary-foreground disabled:opacity-50"
+                        className="rounded-lg bg-primary-fill px-3.5 py-1.5 text-[12.5px] font-bold text-primary-fill-foreground disabled:opacity-50"
                     >
                         Add
                     </button>

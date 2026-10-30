@@ -2393,6 +2393,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
         title: string;
         description: string;
         confirmLabel: string;
+        destructive: boolean;
         onConfirm: () => void;
     } | null>(null);
 
@@ -2545,6 +2546,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
                                 title: 'Repeat last week?',
                                 description: `Copy last week's plan into ${rangeLabel}. This adds to the ${weekMealCount} meal${weekMealCount === 1 ? '' : 's'} already planned this week.`,
                                 confirmLabel: 'Repeat week',
+                                destructive: false,
                                 onConfirm: () => copyWeek(-7, 0),
                             })
                         }
@@ -2554,6 +2556,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
                                 title: 'Replace this week?',
                                 description: `Replace this week's ${weekMealCount} meal${weekMealCount === 1 ? '' : 's'} with “${t.name}” (${t.meals.length} meal${t.meals.length === 1 ? '' : 's'}). This can't be undone.`,
                                 confirmLabel: 'Replace week',
+                                destructive: true,
                                 onConfirm: () => applyTemplate(t, true),
                             })
                         }
@@ -2563,6 +2566,7 @@ export default function CalendarGrid(props: CalendarGridProps) {
                                 title: 'Clear this week?',
                                 description: `Clear all ${weekMealCount} planned meal${weekMealCount === 1 ? '' : 's'} for ${rangeLabel}? This can't be undone.`,
                                 confirmLabel: 'Clear week',
+                                destructive: true,
                                 onConfirm: clearWeek,
                             })
                         }
@@ -3110,7 +3114,11 @@ export default function CalendarGrid(props: CalendarGridProps) {
                                 Cancel
                             </Button>
                             <Button
-                                className="bg-status-critical text-white hover:bg-status-critical/90 focus-visible:ring-status-critical"
+                                variant={
+                                    confirmBulk.destructive
+                                        ? 'destructive'
+                                        : 'default'
+                                }
                                 onClick={() => {
                                     confirmBulk.onConfirm();
                                     setConfirmBulk(null);

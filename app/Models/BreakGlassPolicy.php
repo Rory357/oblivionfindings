@@ -21,6 +21,8 @@ class BreakGlassPolicy extends Model
         'reason_required',
         'repeat_threshold_count',
         'repeat_window_days',
+        'second_person',
+        'review_days',
     ];
 
     protected $casts = [
@@ -30,6 +32,7 @@ class BreakGlassPolicy extends Model
         'reason_required' => 'boolean',
         'repeat_threshold_count' => 'integer',
         'repeat_window_days' => 'integer',
+        'review_days' => 'integer',
     ];
 
     /** Canonical defaults (single source of truth = the access-model constants). */
@@ -42,6 +45,8 @@ class BreakGlassPolicy extends Model
             'reason_required' => true,
             'repeat_threshold_count' => 4,
             'repeat_window_days' => 7,
+            'second_person' => 'optional',
+            'review_days' => 2,
         ];
     }
 
@@ -49,6 +54,10 @@ class BreakGlassPolicy extends Model
      * The effective application policy: the stored record, or an unsaved
      * instance carrying the constant defaults so callers always read usable values.
      */
+    public function snapshot(): array
+    {
+        return collect(self::defaults())->mapWithKeys(fn ($default, $key) => [$key => $this->getAttribute($key) ?? $default])->all();
+    }
     public static function current(): self
     {
         $policy = self::query()->oldest('id')->first();

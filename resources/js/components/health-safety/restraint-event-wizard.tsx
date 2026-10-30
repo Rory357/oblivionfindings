@@ -471,6 +471,10 @@ export function RestraintEventWizard({
             footerEnd={
                 submitted ? undefined : (
                     <div className="flex items-center gap-2">
+                        {/* A way out on every step, not only the corner ✕. */}
+                        <Button variant="ghost" onClick={onClose}>
+                            Cancel
+                        </Button>
                         {stepIndex > 0 ? (
                             <Button
                                 variant="outline"

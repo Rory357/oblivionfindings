@@ -1,0 +1,50 @@
+{
+  "scope": "Five simultaneous PHP service reads, each with its own 250-person synthetic transaction; all fixtures rolled back",
+  "budget": {
+    "queriesPer250People": 1000,
+    "singleSeconds": 2,
+    "concurrentSeconds": 5
+  },
+  "results": [
+    {
+      "scope": "250 permitted people",
+      "people": 250,
+      "queries": 869,
+      "seconds": 1.31,
+      "bytes": 187302,
+      "worker": 1
+    },
+    {
+      "scope": "250 permitted people",
+      "people": 250,
+      "queries": 869,
+      "seconds": 1.318,
+      "bytes": 186943,
+      "worker": 2
+    },
+    {
+      "scope": "250 permitted people",
+      "people": 250,
+      "queries": 869,
+      "seconds": 1.314,
+      "bytes": 186827,
+      "worker": 3
+    },
+    {
+      "scope": "250 permitted people",
+      "people": 250,
+      "queries": 869,
+      "seconds": 1.343,
+      "bytes": 187209,
+      "worker": 4
+    },
+    {
+      "scope": "250 permitted people",
+      "people": 250,
+      "queries": 869,
+      "seconds": 1.308,
+      "bytes": 187055,
+      "worker": 5
+    }
+  ]
+}

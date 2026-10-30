@@ -148,9 +148,10 @@ test('Site A catering receives an authorised read-only projection and cannot rew
         ->assertJsonPath('clients.0.restriction_authority.status', 'authorised')
         ->assertJsonPath('clients.0.restriction_authority.restriction_id', $restriction->id);
 
+    // An out-of-scope Site is concealed as not found (SitePolicy, ba5348925).
     $this->actingAs($this->planner)
         ->getJson("/sites/{$this->siteB->id}/meal-planner/bootstrap")
-        ->assertForbidden();
+        ->assertNotFound();
 
     $this->actingAs($this->planner)
         ->putJson("/sites/{$this->siteA->id}/meal-planner/residents/{$this->clientA->id}", [
@@ -206,9 +207,10 @@ test('wrong-Site and unqualified clinical mutations are denied before side effec
         ->postJson("/sites/{$this->siteA->id}/clinical-meal-restrictions/residents/{$this->clientB->id}", $payload)
         ->assertNotFound();
 
+    // An out-of-scope Site is concealed as not found (SitePolicy, ba5348925).
     $this->actingAs($this->author)
         ->postJson("/sites/{$this->siteB->id}/clinical-meal-restrictions/residents/{$this->clientB->id}", $payload)
-        ->assertForbidden();
+        ->assertNotFound();
 
     expect(ClientMealRestriction::query()->count())->toBe(0);
 });
@@ -446,12 +448,13 @@ test('discrepancy reporting is Site-scoped and idempotent without changing autho
             'idempotency_key' => (string) Str::uuid(),
         ])
         ->assertNotFound();
+    // An out-of-scope Site is concealed as not found (SitePolicy, ba5348925).
     $this->actingAs($this->planner)
         ->postJson("/sites/{$this->siteB->id}/meal-planner/residents/{$this->clientB->id}/restriction-discrepancies", [
             'details' => $details,
             'idempotency_key' => (string) Str::uuid(),
         ])
-        ->assertForbidden();
+        ->assertNotFound();
     expect(ClientMealRestrictionDiscrepancy::query()->count())->toBe(1);
 });
 

@@ -49,7 +49,7 @@ class MedicationScopeDecisionLockOrderTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-08-27 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-27 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 
         $this->site = Site::factory()->create([
             'is_active' => true,
@@ -192,6 +192,7 @@ class MedicationScopeDecisionLockOrderTest extends TestCase
                 'shifts', // Complete performer/witness presence union.
                 'shifts', // Selected canonical performer assignment.
                 'medication_rounds',
+                'client_medications', // Recheck the canonical order after the round lock.
             ],
         );
     }

@@ -15,7 +15,9 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
 import { careQualityStatusLabel } from '@/lib/governance-labels';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
+import { RecordPicker } from '@/components/people-locations/record-picker';
+import { MedicationTarget } from './_medication-target';
 import {
     ArrowUpRight,
     HeartPulse,
@@ -60,6 +62,8 @@ type Props = {
     latestSnapshot: Snapshot | null;
     sourceHint: string;
     filters?: { status?: string };
+    medicationScope?: { site_id: number | null; sites: { id: number; name: string }[] };
+    canConfigureMedicationTarget?: boolean;
 };
 
 const STATUS_FILTERS = [
@@ -79,6 +83,8 @@ export default function ClinicalDashboard({
     latestSnapshot,
     sourceHint,
     filters = {},
+    medicationScope,
+    canConfigureMedicationTarget = false,
 }: Props) {
     const [status, setStatus] = useState(filters.status ?? 'all');
 
@@ -98,7 +104,7 @@ export default function ClinicalDashboard({
         },
         {},
     );
-    const withData = indicators.length - (counts.no_data ?? 0);
+    const withData = (counts.normal ?? 0) + (counts.warning ?? 0) + (counts.critical ?? 0);
     const onTargetPct =
         withData > 0 ? ((counts.normal ?? 0) / withData) * 100 : 0;
     const visible = indicators.filter(
@@ -206,7 +212,8 @@ export default function ClinicalDashboard({
             }
             filters={
                 <>
-                    <ClinicalViewToggle value="dashboard" />
+                    <ClinicalViewToggle value="dashboard" siteId={medicationScope?.site_id} />
+                    {medicationScope && medicationScope.sites.length > 0 && <RecordPicker variant="header" label="Medication house" value={medicationScope.site_id ? String(medicationScope.site_id) : ''} options={[{ value: '', label: 'Medication: all permitted houses' }, ...medicationScope.sites.map((site) => ({ value: String(site.id), label: site.name }))]} onChange={(value) => router.get('/governance/clinical', value ? { site_id: value } : {}, { preserveScroll: true })} />}
                     <PageHeaderFilterSelect
                         label="Status"
                         value={status}
@@ -320,11 +327,12 @@ export default function ClinicalDashboard({
                                             </div>
 
                                             <p className="text-caption">
-                                                {targetLabel(
+                                                {indicator.indicator_code === 'HCG-005' ? 'No RAG target' : indicator.indicator_code === 'HCG-001' && indicator.target_value === null ? 'Not configured' : targetLabel(
                                                     indicator.target_direction,
                                                     indicator.target_value,
                                                 )}
                                             </p>
+                                            {indicator.indicator_code === 'HCG-001' && canConfigureMedicationTarget && <MedicationTarget target={indicator.target_value} />}
 
                                             {value?.source_href &&
                                             value.source_label ? (

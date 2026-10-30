@@ -1,0 +1,91 @@
+{
+  "base": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+  "reviewedFocusCommit": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+  "build": {
+    "job": "build",
+    "attempt": "",
+    "command": {
+      "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+      "args": [
+        "C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-1548-7873-a062-e0db43eed7e1/final-focus-vite-worker.mjs",
+        "build"
+      ],
+      "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+    },
+    "configLoader": "runner with repository-root __dirname shim",
+    "cacheDirectory": "storage/framework/pkg08-map-regression/final-focus-qa-cache",
+    "startedAt": "2026-09-28T05:00:03.389Z",
+    "finishedAt": "2026-09-28T05:05:29.177Z",
+    "exitCode": 0,
+    "signal": null
+  },
+  "sourceManifestSha256": "5c8d393ece87fde81446ff32ace8b40d24b984c1d71aeabeea023ca3b46c1cb7",
+  "viteManifest": {
+    "path": "public/build/manifest.json",
+    "copy": "vite-manifest.json",
+    "sha256": "4021ec927a3670f5b91be36f8a8880b251de0587c32fc01dfb4853f76f0ad648",
+    "bytes": 3893215
+  },
+  "assetManifest": {
+    "path": "build-assets.json",
+    "sha256": "474214fb6bbf3974669947f5ee43e869ed641a7d8c22385069a76a78a2b5aa11",
+    "files": 1704,
+    "totalBytes": 29664004
+  },
+  "entries": [
+    {
+      "entry": "resources/css/app.css",
+      "file": "assets/app-DX0jNUF-.css",
+      "sha256": "bd7390db03c3fef05a24b2176cd04b4e628758287fd40202f8c996f9f514d01a",
+      "bytes": 446066
+    },
+    {
+      "entry": "resources/js/app.tsx",
+      "file": "assets/app-CX3LJdOI.js",
+      "sha256": "f19703a06390a41700173fce415bafa06916e56b8250fc5331b358db82823fc0",
+      "bytes": 536268
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_map-tools.tsx",
+      "file": "assets/_map-tools-XEq5-660.js",
+      "sha256": "22f0a3608726f8847fe8b9cdaece5e7efbfd713bffdb5c670fc6dcb6d093ad22",
+      "bytes": 6270
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_maps.tsx",
+      "file": "assets/_maps-DmIp8QAf.js",
+      "sha256": "4487ecc24dccb2a2737b953d6d50e341af8772c690a3d57be8c0ec318ed24f41",
+      "bytes": 12091
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_notifications.tsx",
+      "file": "assets/_notifications-B2fGY1dY.js",
+      "sha256": "cea01ca44276e16eb66d9619c180672618623aecef2c988fb665c47a36aed526",
+      "bytes": 17225
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_owners.tsx",
+      "file": "assets/_owners-BxmRzwAZ.js",
+      "sha256": "ef0b11bcb84afb65e23cb4077b403df226b10debbeb258912dd2beda1bc85c48",
+      "bytes": 16879
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_ui.tsx",
+      "file": "assets/_ui-9zXJCEdp.js",
+      "sha256": "60d334777f58d0aabb92ac87bb35a5463f4238070e597039f7412e090bd62131",
+      "bytes": 3207
+    },
+    {
+      "entry": "resources/js/pages/operations/people-locations/index.tsx",
+      "file": "assets/index-By-gDl0l.js",
+      "sha256": "f9d9796c0e1cdb385e4097b551a266428b6036b801c59e6b40f8fafbfb60ff33",
+      "bytes": 89146
+    },
+    {
+      "entry": "resources/js/pages/reporting/workspace.tsx",
+      "file": "assets/workspace-BVk4sh82.js",
+      "sha256": "563ac7d4d2da395d770b3fb9d9527ed39b0379349993e763711723b3de43d6b7",
+      "bytes": 55370
+    }
+  ]
+}

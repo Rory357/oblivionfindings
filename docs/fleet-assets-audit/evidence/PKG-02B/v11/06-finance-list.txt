@@ -1,0 +1,205 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview" [selected]:
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Readiness":
+      - text: Readiness
+    - tab "Vehicle details":
+      - text: Vehicle details
+    - tab "Documents":
+      - text: Documents
+    - tab "Finance" [active] [selected]:
+      - text: Finance
+  - tabpanel:
+    - generic: FINANCE CONNECTION · VH-014
+    - heading "Ownership, purchasing & costs" [level=2]
+    - paragraph: Linked records keep approvals and payment with Finance.
+    - button "Link records":
+      - text: Link records
+    - button "Request Finance review":
+      - text: Request Finance review
+    - strong: Fixed asset
+    - generic: FA-DEMO-14
+    - generic: Financial asset recognition
+    - strong: Cost centre
+    - generic: Kōwhai House
+    - generic: CC-KOWHAI
+    - strong: Review queue
+    - generic: 0 pending
+    - generic: Finance owns the next decision
+    - heading "Linked Finance records" [level=3]
+    - group "Finance records layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - generic: NZD · synthetic
+    - generic "Linked Finance records":
+      - generic: Linked Finance records
+      - generic: 3 records shown
+      - table:
+        - row "Record Type Status Amount (NZD) Actions":
+          - columnheader "Record"
+          - columnheader "Type"
+          - columnheader "Status"
+          - columnheader "Amount (NZD)"
+          - columnheader "Actions"
+        - row "KWH014 · Toyota Hiace FA-DEMO-14 Fixed asset Active $42,000.00 Actions for KWH014 · Toyota Hiace":
+          - cell "KWH014 · Toyota Hiace FA-DEMO-14":
+            - generic: KWH014 · Toyota Hiace
+            - generic: FA-DEMO-14
+          - cell "Fixed asset":
+            - generic: Fixed asset
+          - cell "Active":
+            - generic: Active
+          - cell "$42,000.00":
+            - strong: $42,000.00
+          - cell "Actions for KWH014 · Toyota Hiace":
+            - button "Actions for KWH014 · Toyota Hiace":
+        - row "Harbour Workshop · routine service PO-DEMO-188 Purchase order Approved $408.25 Actions for Harbour Workshop · routine service":
+          - cell "Harbour Workshop · routine service PO-DEMO-188":
+            - generic: Harbour Workshop · routine service
+            - generic: PO-DEMO-188
+          - cell "Purchase order":
+            - generic: Purchase order
+          - cell "Approved":
+            - generic: Approved
+          - cell "$408.25":
+            - strong: $408.25
+          - cell "Actions for Harbour Workshop · routine service":
+            - button "Actions for Harbour Workshop · routine service":
+        - row "Harbour Workshop · service invoice BILL-DEMO-188 Supplier invoice Awaiting payment $408.25 Actions for Harbour Workshop · service invoice":
+          - cell "Harbour Workshop · service invoice BILL-DEMO-188":
+            - generic: Harbour Workshop · service invoice
+            - generic: BILL-DEMO-188
+          - cell "Supplier invoice":
+            - generic: Supplier invoice
+          - cell "Awaiting payment":
+            - generic: Awaiting payment
+          - cell "$408.25":
+            - strong: $408.25
+          - cell "Actions for Harbour Workshop · service invoice":
+            - button "Actions for Harbour Workshop · service invoice":
+    - paragraph: Purchase orders and invoices represent different stages of the same spend. They are not added together as vehicle costs.
+    - heading "Finance review requests" [level=3]
+    - generic "Finance review requests":
+      - generic: Finance review requests
+      - generic: 0 records shown
+      - generic: No requests yet. Submit a quote, invoice or ownership correction with its supporting files.
+    - status:
+      - strong: Finance remains the owner
+      - paragraph: Vehicle edits and Maintenance completion do not approve spend, pay invoices, post depreciation or dispose of the fixed asset. This mockup shows the linked record and review queue; nothing is sent externally.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

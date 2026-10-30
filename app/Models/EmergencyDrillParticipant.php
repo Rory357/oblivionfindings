@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EmergencyDrillParticipant extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'emergency_drill_id',
@@ -18,6 +18,7 @@ class EmergencyDrillParticipant extends Model
         'role',
         'attended',
         'notes',
+        'accommodations',
     ];
 
     protected $casts = [
@@ -25,7 +26,7 @@ class EmergencyDrillParticipant extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function emergencyDrill(): BelongsTo
@@ -39,7 +40,7 @@ class EmergencyDrillParticipant extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeAttended($query)

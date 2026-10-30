@@ -75,14 +75,16 @@ class IntegrationsHubTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/integrations')
-                ->has('providers', 3)
+                ->where('actor_id', $this->admin->id)
+                ->has('as_of')
+                ->has('providers', 4)
                 ->has('stats.providers_total')
                 ->missing('stats.providers_live')
                 ->has('stats.providers_connected')
                 ->has('stats.providers_errored')
                 ->has('stats.imported_devices')
                 ->has('stats.events_24h')
-                ->where('stats.providers_total', 3)
+                ->where('stats.providers_total', 4)
                 ->has('can.manage')
             );
     }
@@ -95,7 +97,12 @@ class IntegrationsHubTest extends TestCase
             $providers = collect($page->toArray()['props']['providers']);
 
             $slugs = $providers->pluck('slug')->all();
-            $this->assertEqualsCanonicalizing(['unifi', 'queclink', 'milesight'], $slugs);
+            $this->assertEqualsCanonicalizing(['unifi', 'queclink', 'milesight', 'intune'], $slugs);
+
+            $intune = $providers->firstWhere('slug', 'intune');
+            $this->assertSame('/security-devices/integrations/intune', $intune['docs_href']);
+            $this->assertSame('inventory_sync', $intune['runtime']['contract_state']);
+            $this->assertSame('Inventory and sync', $intune['runtime']['contract_label']);
 
             $unifi = $providers->firstWhere('slug', 'unifi');
             $this->assertSame('/security-devices/integrations/unifi', $unifi['docs_href']);
@@ -524,6 +531,7 @@ class IntegrationsHubTest extends TestCase
         $this->assertSame('/security-devices/integrations/unifi', route('security-devices.integrations.unifi', absolute: false));
         $this->assertSame('/security-devices/integrations/milesight', route('security-devices.integrations.milesight', absolute: false));
         $this->assertSame('/security-devices/integrations/queclink', route('security-devices.integrations.queclink', absolute: false));
+        $this->assertSame('/security-devices/integrations/intune', route('security-devices.integrations.intune', absolute: false));
     }
 
     public function test_missing_credentials_are_actionable_and_native_device_monitoring_support_is_reported(): void
@@ -829,7 +837,7 @@ class IntegrationsHubTest extends TestCase
 
     public function test_all_provider_drill_down_get_routes_remain_usable_for_manager(): void
     {
-        foreach (['unifi', 'milesight', 'queclink'] as $provider) {
+        foreach (['unifi', 'milesight', 'queclink', 'intune'] as $provider) {
             $response = $this->actingAs($this->admin)->get("/security-devices/integrations/{$provider}");
             $response->assertOk();
             $encoded = $response->getContent();
@@ -839,13 +847,21 @@ class IntegrationsHubTest extends TestCase
 
     public function test_non_unifi_provider_read_models_expose_only_bounded_connection_and_sync_state(): void
     {
-        foreach (['milesight'] as $provider) {
+        foreach (['milesight', 'intune'] as $provider) {
+            $config = $provider === 'intune'
+                ? [
+                    'directory_id' => '11111111-1111-4111-8111-111111111111',
+                    'client_id' => '22222222-2222-4222-8222-222222222222',
+                    'token' => 'RAW-CONFIG',
+                ]
+                : ['base_url' => 'https://RAW-'.$provider.'-HOST.test', 'token' => 'RAW-CONFIG'];
+
             IntegrationProviderConnection::create([
                 'provider' => $provider,
                 'secret_encrypted' => 'RAW-'.$provider.'-SECRET', 'secret_last4' => '0042',
                 'status' => IntegrationProviderConnection::STATUS_ERROR,
                 'last_error' => 'https://RAW-'.$provider.'-ERROR.test/?token=secret',
-                'config' => ['base_url' => 'https://RAW-'.$provider.'-HOST.test', 'token' => 'RAW-CONFIG'],
+                'config' => $config,
             ]);
             IntegrationSyncLog::create([
                 'provider' => $provider, 'action' => 'sync_devices',
@@ -864,5 +880,41 @@ class IntegrationsHubTest extends TestCase
                 }
             });
         }
+    }
+
+    public function test_provider_events_use_an_inclusive_past_window_and_exclude_future_events(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $device = Device::factory()->create(['provider' => 'unifi']);
+        foreach ([now()->subDay(), now(), now()->subDay()->subSecond(), now()->addSecond()] as $index => $at) {
+            DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'window_'.$index, 'severity' => 'warning', 'occurred_at' => $at]);
+        }
+        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $this->admin->id)
+            ->where('as_of', now()->toISOString())
+            ->where('stats.events_24h', 2)
+            ->where('providers.0.events_24h', 2));
+    }
+
+    public function test_provider_counts_do_not_inherit_foreign_occurrence_history_after_a_device_moves(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $allowed = Site::factory()->create();
+        $hidden = Site::factory()->create();
+        $viewer = User::factory()->create(['approved_at' => now()]);
+        HrEmployeeProfile::factory()->create(['user_id' => $viewer->id, 'primary_site_id' => $allowed->id, 'secondary_site_ids' => [], 'is_active' => true]);
+        foreach (['securityDevices.viewAny', 'securityDevices.integrations.view', 'securityDevices.devices.view'] as $key) {
+            $permission = Permission::query()->where('key', $key)->firstOrFail();
+            $viewer->permissionOverrides()->attach($permission->id, ['allowed' => true]);
+        }
+        $device = Device::factory()->create(['provider' => 'unifi']);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $hidden->id, 'assigned_at' => now()->subDays(2), 'released_at' => now()->subHour()]);
+        DeviceAssignment::create(['device_id' => $device->id, 'assignable_type' => DeviceAssignment::TARGET_SITE, 'assignable_id' => $allowed->id, 'assigned_at' => now()->subHour()]);
+        DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'foreign_history', 'severity' => 'critical', 'occurred_at' => now()->subHours(2)]);
+        DeviceEvent::create(['device_id' => $device->id, 'source' => 'unifi', 'event_type' => 'current_permitted', 'severity' => 'warning', 'occurred_at' => now()->subMinutes(30)]);
+        $this->actingAs($viewer)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $viewer->id)->where('can.manage', false)
+            ->where('stats.events_24h', 1)->where('providers.0.events_24h', 1));
+        $this->actingAs($this->admin)->get('/security-devices/integrations')->assertOk()->assertInertia(fn ($page) => $page->where('stats.events_24h', 2));
     }
 }

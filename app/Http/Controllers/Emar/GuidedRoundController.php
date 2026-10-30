@@ -4,17 +4,24 @@ namespace App\Http\Controllers\Emar;
 
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
+use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Recording\OfflineReplayReview;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use App\Services\Timeline\TimelineEmitter;
 use App\Support\Medication\MedicationStockQuantity;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -44,14 +51,13 @@ class GuidedRoundController extends Controller
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
 
-        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) {
-            // The guided walk-through is now a modal on /emar/rounds (and surfaced
-            // on /meds/today). Redirect deep links there with the round pre-opened.
+        return $this->medicationScope->forRound($user, $round, now(), function (MedicationScopeDecision $scope) use ($request) {
+            // Keep the selected day when opening the shared board walk-through.
             $dateStr = $scope->round->round_date instanceof \DateTimeInterface
                 ? $scope->round->round_date->format('Y-m-d')
                 : (string) $scope->round->round_date;
 
-            return redirect()->route('emar.rounds', ['date' => $dateStr, 'guided' => $scope->round->id]);
+            return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr, ...$this->boardContext($request, $scope)]);
         });
     }
 
@@ -71,7 +77,8 @@ class GuidedRoundController extends Controller
             $user,
             $round,
             now(),
-            function (MedicationScopeDecision $scope) {
+            function (MedicationScopeDecision $scope) use ($request) {
+                $context = $this->boardContext($request, $scope);
                 if ($scope->round->status === 'pending') {
                     $scope->round->forceFill([
                         'status' => 'in_progress',
@@ -86,6 +93,10 @@ class GuidedRoundController extends Controller
                     ? $scope->round->round_date->format('Y-m-d')
                     : (string) $scope->round->round_date;
 
+                if ($request->input('return_to') === 'meds-today') {
+                    return redirect()->route('meds.today', ['view' => 'rounds', 'round' => $scope->round->id, 'date' => $dateStr, ...$context]);
+                }
+
                 return redirect()->route('emar.rounds', [
                     'date' => $dateStr,
                     'guided' => $scope->round->id,
@@ -95,252 +106,68 @@ class GuidedRoundController extends Controller
         );
     }
 
+    /** Shown on the device when a retired round item (including a queued offline one) is refused. */
+    public const RETIRED_MESSAGE = 'Round doses are recorded in Meds today now. Nothing was recorded from this round item — record the dose in Meds today, where its time window and checks apply.';
+
     /**
-     * Record one administration from inside the guided flow.
+     * EA-151 (Lane C10): retired. The guided round records each dose through
+     * Meds today (RecordDoseDialog → /meds/today/record), which enforces the
+     * dose window and the full recording contract. This endpoint forced
+     * override_window and so saved late doses with no late reason. It now
+     * refuses without any effect; the answer is 409 so a device's queued
+     * offline round item shows as rejected with this message rather than
+     * replaying. Remove the route once offline queues have drained.
      *
-     * Uses EnhancedMarService so all existing safety checks, witness rules,
-     * controlled-drug register entries and audit trails still run. The only
-     * guided-round-specific concerns handled here are:
-     *   - linking the administration to the round (medication_round_id)
-     *   - blocking duplicate administration of the same dose in the same round
+     * Lane A3 floor (Main, 13 Oct): a queued replay (the device's replay
+     * header) is never silently discarded — a lead gets the same "Dose saved
+     * on a device, not recorded" follow-up as any refused queued dose, so
+     * someone checks whether it was given. A live tap just gets the message.
      */
-    public function administer(Request $request, MedicationRound $round, ClientMedication $medication)
+    public function administer(Request $request, MedicationRound $round, int $medication)
     {
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
-        $actionAt = $this->medicationConcealmentActionAt(
-            $request,
-            $this->scheduleService,
-            now(),
-            acceptAdministeredAt: false,
-        );
+        if (OfflineReplayReview::replayCapturedAt($request) !== null) {
+            $this->raiseRetiredReplayReview($request, $user, $medication);
+        }
 
-        return $this->medicationScope->forAdministration(
-            $user,
-            null,
-            $medication,
-            $actionAt,
-            null,
-            null,
-            $round,
-            function (MedicationScopeDecision $scope, ?array $data) use ($request, $user) {
-                abort_unless($data !== null, 404);
-                $scheduled = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
-                $submittedAdministrationAt = $this->medicationSubmittedAdministrationAt($data);
-                // Worker vocabulary: "held" → backend "withheld".
-                $backendStatus = $data['status'] === 'held' ? 'withheld' : $data['status'];
+        return $request->expectsJson()
+            ? response()->json(['success' => false, 'message' => self::RETIRED_MESSAGE], 409)
+            : back()->with('error', self::RETIRED_MESSAGE);
+    }
 
-                if ($backendStatus !== 'given' && empty($data['reason_code'])) {
-                    if ($request->expectsJson()) {
-                        return response()->json(
-                            $this->withMedicationSync(
-                                ['success' => false, 'error' => 'Please choose why this dose was not given.', 'error_field' => 'reason_code'],
-                                $data,
-                                'rejected',
-                                false,
-                                'Please choose why this dose was not given.',
-                            ),
-                            422,
-                        );
-                    }
+    /** What the lead's follow-up says about a refused round item. */
+    public const RETIRED_REVIEW_REASON = 'Saved on a device during a guided round, which no longer records doses — nothing was added to the chart. Check whether it was given and record it.';
 
-                    return back()->withErrors([
-                        'reason_code' => 'Please choose why this dose was not given.',
-                    ]);
-                }
-
-                $round = $scope->round;
-                $medication = $scope->medication;
-
-                // Offline queues retain their stale-state conflict contract,
-                // but only effective clinical evidence can occupy the round
-                // slot. Online retries always reach EnhancedMarService so the
-                // durable request fingerprint is checked before a duplicate is
-                // disclosed.
-                if (($data['queued_offline'] ?? false) && $request->expectsJson()) {
-                    $sameRequestReplay = filled($data['client_request_uuid'] ?? null)
-                        && ClientMedicationAdministration::withTrashed()
-                            ->where('client_id', $scope->client->id)
-                            ->where('client_medication_id', $medication->id)
-                            ->where('client_request_uuid', $data['client_request_uuid'])
-                            ->exists();
-                    $existing = $sameRequestReplay
-                        ? null
-                        : $medication->administrations()
-                            ->effectiveClinicalEvidence()
-                            ->where('medication_round_id', $round->id)
-                            ->whereBetween('scheduled_for', $this->scheduleService->utcSlotWindow($scheduled))
-                            ->first();
-
-                    if ($existing !== null) {
-                        return response()->json(
-                            $this->buildMedicationConflictPayload(
-                                $data,
-                                'Medication state changed before this offline round item could sync. Supervisor review is required.',
-                            ),
-                            409,
-                        );
-                    }
-                }
-
-                $result = $this->marService->recordAdministration(
-                    $scope->client,
-                    $medication,
-                    [
-                        'status' => $backendStatus,
-                        'reason' => $data['reason'] ?? null,
-                        'reason_code' => $data['reason_code'] ?? null,
-                        'scheduled_for' => $scheduled->toIso8601String(),
-                        'administered_at' => $submittedAdministrationAt,
-                        'witnessed_by' => $data['witnessed_by'] ?? null,
-                        'witness_credential' => $data['witness_credential'] ?? null,
-                        'quantity_administered' => $data['quantity_administered'] ?? null,
-                        'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
-                        'pulse_bpm' => $data['pulse_bpm'] ?? null,
-                        'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
-                        'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
-                        'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                        'captured_offline_at' => $data['captured_offline_at'] ?? null,
-                        'origin_device_id' => $data['origin_device_id'] ?? null,
-                        'queued_offline' => (bool) ($data['queued_offline'] ?? false),
-                        'scope_authorized' => true,
-                        'medication_round_id' => $round->id,
-                        // The round's own window_minutes is the authoritative
-                        // schedule for a guided round; skip the narrower MAR
-                        // time-window check here so workers aren't blocked by it
-                        // while walking through a round that's still inside its
-                        // own legitimate window.
-                        'override_window' => true,
-                    ],
-                    $user->id,
-                    $scope->shiftId(),
-                    $user->canDo('medications.controlled.view'),
-                    prelockedPresenceShifts: $scope->lockedPresenceShifts,
-                    prelockedPresenceEffectiveAt: $scope->lockedPresenceEffectiveAt,
-                );
-
-                if (! ($result['success'] ?? false)) {
-                    if ($request->expectsJson()) {
-                        return response()->json(
-                            $this->withMedicationSync(
-                                $result,
-                                $data,
-                                'rejected',
-                                false,
-                                $result['error'] ?? 'Could not record this dose.',
-                            ),
-                            422,
-                        );
-                    }
-
-                    return back()->withErrors([
-                        'status' => $result['error'] ?? 'Could not record this dose.',
-                    ]);
-                }
-
-                // EnhancedMarService links an unclaimed effective row while the
-                // Client, medication, round and administration remain locked.
-                // Original shift/actor/request provenance is never rewritten.
-                $admin = $result['administration'];
-                abort_unless(
-                    (int) $admin->medication_round_id === (int) $round->id,
-                    409,
-                    'Medication state changed before this round item could be recorded.',
-                );
-
-                $duplicate = (bool) ($result['duplicate'] ?? false);
-                if (! $duplicate) {
-                    $statusLabel = ucfirst(str_replace('_', ' ', $backendStatus));
-                    app(TimelineEmitter::class)->record([
-                        'source_type' => ClientMedicationAdministration::class,
-                        'source_id' => $admin->id,
-                        'occurred_at' => $admin->administered_at ?? now(),
-                        'type' => 'medication_'.$backendStatus,
-                        'actor_user_id' => $user->id,
-                        'client_id' => $medication->client_id,
-                        'shift_id' => $scope->shiftId(),
-                        'site_id' => $medication->client?->site_id,
-                        'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
-                        'body' => null,
-                        'meta' => array_filter([
-                            'medication_name' => $medication->name,
-                            'dosage' => $medication->dosage,
-                            'status' => $backendStatus,
-                            'reason' => $data['reason'] ?? null,
-                            'witnessed_by' => $data['witnessed_by'] ?? null,
-                            'medication_round_id' => $round->id,
-                            'client_request_uuid' => $data['client_request_uuid'] ?? null,
-                            'captured_offline_at' => $data['captured_offline_at'] ?? null,
-                            'origin_device_id' => $data['origin_device_id'] ?? null,
-                            'queued_offline' => (bool) ($data['queued_offline'] ?? false),
-                        ]),
-                        'visibility' => 'internal',
-                        'is_pinned' => false,
-                        'created_by' => $user->id,
-                    ]);
-
-                    $this->medicationScope->recordBreakGlassUse(
-                        $scope,
-                        'recorded_round_dose',
-                        'Administration '.$admin->id,
-                    );
-                }
-
-                $round->updateCounts();
-
-                $payload = $this->withMedicationSync([
-                    'success' => true,
-                    'administration' => [
-                        'id' => $admin->id,
-                        'status' => $admin->status,
-                        'administered_at' => $admin->administered_at?->toIso8601String(),
-                        'round_id' => $round->id,
-                    ],
-                    'safety_check' => $result['safety_check'] ?? null,
-                ],
-                    $data,
-                    $duplicate ? 'duplicate' : $this->medicationProcessedStatus($data),
-                    $duplicate,
-                    $duplicate ? 'Dose already recorded for this round.' : null,
-                );
-
-                $this->rememberMedicationSyncResponse('round_admin', $data, $payload);
-
-                if ($request->expectsJson()) {
-                    return response()->json($payload);
-                }
-
-                return $duplicate
-                    ? back()->with('status', 'Dose already recorded for this round.')
-                    : back();
-            },
-            scopedInputResolver: function () use ($actionAt, $request): array {
-                $data = $request->validate([
-                    'status' => ['required', 'in:given,refused,held'],
-                    'reason' => ['nullable', 'string', 'max:500'],
-                    'reason_code' => ['nullable', 'string', 'max:60'],
-                    'scheduled_for' => ['required', 'date'],
-                    'witnessed_by' => ['nullable', 'integer', 'min:1'],
-                    'witness_credential' => ['nullable', 'string', 'max:255'],
-                    'quantity_administered' => ['nullable', 'numeric', MedicationStockQuantity::VALIDATION_RULE, 'min:0.01', 'max:10000'],
-                    'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
-                    'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
-                    'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
-                    'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
-                    ...$this->medicationOfflineSubmissionRules($request),
-                ]);
-
-                $submittedAdministrationAt = $this->medicationSubmittedAdministrationAt($data);
-
-                return [
-                    'payload' => $data,
-                    'scheduled_for' => $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']),
-                    'action_at' => $submittedAdministrationAt !== null
-                        ? $this->scheduleService->parseWorkerDateTime($submittedAdministrationAt)
-                        : $actionAt,
-                ];
-            },
-        );
+    /**
+     * The lead follow-up for a refused round item replayed from a device. As
+     * Meds today's refusals do: only for someone who could record for this
+     * person now (anyone else learns nothing), never twice for one request,
+     * and never for a request that already reached the chart.
+     */
+    private function raiseRetiredReplayReview(Request $request, User $user, int $medicationId): void
+    {
+        $data = $request->only(['client_request_uuid', 'status', 'scheduled_for', 'administered_at', 'captured_offline_at', 'origin_device_id']);
+        $uuid = $data['client_request_uuid'] ?? null;
+        if (! is_string($uuid) || ! Str::isUuid($uuid)) {
+            return;
+        }
+        $data['status'] = in_array($data['status'] ?? null, ['given', 'refused', 'held', 'withheld'], true) ? $data['status'] : 'given';
+        $medication = ClientMedication::query()->find($medicationId);
+        if ($medication === null || ($medication->controlled_drug && ! $user->canDo('medications.controlled.record'))) {
+            return;
+        }
+        if (! in_array((int) $medication->client_id, $this->medicationScope->clientIdsWithCurrentAuthority($user, [(int) $medication->client_id], now()), true)) {
+            return;
+        }
+        if (ClientMedicationAdministration::withTrashed()->where('client_request_uuid', $uuid)->exists()) {
+            return;
+        }
+        DB::transaction(function () use ($user, $medication, $data): void {
+            $client = Client::query()->whereKey($medication->client_id)->lockForUpdate()->firstOrFail();
+            $locked = ClientMedication::query()->whereKey($medication->id)->where('client_id', $client->id)->lockForUpdate()->firstOrFail();
+            app(OfflineReplayReview::class)->raise($client, $locked, $user, $data, OfflineReplayReview::REFUSED, self::RETIRED_REVIEW_REASON);
+        });
     }
 
     /**
@@ -356,7 +183,8 @@ class GuidedRoundController extends Controller
             $user,
             $round,
             now(),
-            function (MedicationScopeDecision $scope) {
+            function (MedicationScopeDecision $scope) use ($request) {
+                $context = $this->boardContext($request, $scope);
                 if ($scope->round->status !== 'completed') {
                     if (! $this->guidedRoundService->canCompleteCanonicalRoundUnderLock($scope->round)) {
                         throw ValidationException::withMessages([
@@ -373,11 +201,57 @@ class GuidedRoundController extends Controller
                     $this->medicationScope->recordBreakGlassUse($scope, 'completed_medication_round');
                 }
 
-                return redirect()->route('meds.round.show', $scope->round);
+                if ($request->input('return_to') === 'meds-today') {
+                    return redirect()->route('meds.today', [
+                        'view' => 'rounds', 'round' => $scope->round->id,
+                        'date' => $scope->round->round_date->toDateString(), ...$context,
+                    ]);
+                }
+
+                return redirect()->route('meds.round.show', ['round' => $scope->round->id, ...$context]);
             },
             ['in_progress', 'completed'],
             lockCanonicalMembership: true,
         );
+    }
+
+    /** Only canonical person/Site context, never a caller-provided return URL. */
+    private function boardContext(Request $request, MedicationScopeDecision $scope): array
+    {
+        $context = [];
+        foreach (['client_id', 'client', 'pp'] as $key) {
+            if (! $request->exists($key)) {
+                continue;
+            }
+            $value = $request->input($key);
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                break;
+            }
+            $id = is_string($value) || is_int($value)
+                ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+            abort_unless($id !== false
+                && in_array($id, DoseSlotReaderScope::forViewerClients($scope->performer, [$id])->clientIds ?? [], true), 404);
+            abort_unless($this->guidedRoundService->items($scope->round, true, [$id]) !== [], 404);
+            $context['client_id'] = $id;
+            break;
+        }
+        foreach (['site_id', 'site'] as $key) {
+            if (! $request->exists($key)) {
+                continue;
+            }
+            $value = $request->input($key);
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                break;
+            }
+            $id = is_string($value) || is_int($value)
+                ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) : false;
+            // forRound already rechecked current approval and this exact Site.
+            abort_unless($id !== false && $id === (int) $scope->round->site_id, 404);
+            $context['site_id'] = $id;
+            break;
+        }
+
+        return $context;
     }
 
     private function canWork($user): bool

@@ -1,0 +1,271 @@
+[
+  {
+    "primary": {
+      "href": "/fleet-assets",
+      "label": "Overview"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets",
+    "links": [
+      {
+        "href": "/fleet-assets",
+        "label": "Overview"
+      }
+    ],
+    "menus": [
+      {
+        "label": "Alerts & safety pages",
+        "links": [
+          {
+            "href": "/fleet-assets/alerts",
+            "label": "Fleet alerts"
+          },
+          {
+            "href": "/fleet-assets/incidents",
+            "label": "Fleet incidents"
+          },
+          {
+            "href": "/control-room",
+            "label": "Control Room"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "primary": {
+      "href": "/fleet-assets/vehicles",
+      "label": "Fleet"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets/vehicles",
+    "links": [
+      {
+        "href": "/fleet-assets/vehicles",
+        "label": "Vehicles"
+      },
+      {
+        "href": "/fleet-assets/bookings",
+        "label": "Bookings"
+      }
+    ],
+    "menus": [
+      {
+        "label": "Transport pages",
+        "links": [
+          {
+            "href": "/fleet-assets/transports",
+            "label": "Transport journeys"
+          },
+          {
+            "href": "/fleet-assets/outings",
+            "label": "Outings"
+          },
+          {
+            "href": "/fleet-assets/transports/medications",
+            "label": "Medication transit"
+          }
+        ]
+      },
+      {
+        "label": "Operating records pages",
+        "links": [
+          {
+            "href": "/fleet-assets/trips",
+            "label": "Trips"
+          },
+          {
+            "href": "/fleet-assets/fuel",
+            "label": "Fuel logs"
+          },
+          {
+            "href": "/fleet-assets/compliance",
+            "label": "Compliance"
+          }
+        ]
+      },
+      {
+        "label": "People & custody pages",
+        "links": [
+          {
+            "href": "/fleet-assets/drivers",
+            "label": "Drivers & eligibility"
+          },
+          {
+            "href": "/fleet-assets/keys",
+            "label": "Keys"
+          },
+          {
+            "href": "/fleet-assets/handovers",
+            "label": "Shift handovers"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "primary": {
+      "href": "/fleet-assets/assets",
+      "label": "Assets"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets/assets",
+    "links": [
+      {
+        "href": "/fleet-assets/assets",
+        "label": "Inventory"
+      },
+      {
+        "href": "/hr/assets",
+        "label": "HR asset register"
+      }
+    ],
+    "menus": []
+  },
+  {
+    "primary": {
+      "href": "/fleet-assets/maintenance/work-orders",
+      "label": "Maintenance"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets/maintenance/work-orders",
+    "links": [
+      {
+        "href": "/fleet-assets/maintenance/schedules",
+        "label": "Service schedules"
+      }
+    ],
+    "menus": [
+      {
+        "label": "Work pages",
+        "links": [
+          {
+            "href": "/fleet-assets/maintenance/work-orders",
+            "label": "Work queue"
+          },
+          {
+            "href": "/fleet-assets/maintenance/dashboard",
+            "label": "Maintenance overview"
+          }
+        ]
+      },
+      {
+        "label": "Checks & inspections pages",
+        "links": [
+          {
+            "href": "/fleet-assets/daily-check",
+            "label": "Daily checks"
+          },
+          {
+            "href": "/fleet-assets/maintenance/checklists",
+            "label": "Checklists"
+          },
+          {
+            "href": "/fleet-assets/inspections",
+            "label": "Inspections"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "primary": {
+      "href": "/fleet-assets/map",
+      "label": "Maps & boundaries"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets/map",
+    "links": [
+      {
+        "href": "/fleet-assets/map",
+        "label": "Map"
+      },
+      {
+        "href": "/fleet-assets/geofences",
+        "label": "Boundaries"
+      }
+    ],
+    "menus": [
+      {
+        "label": "Client location pages",
+        "links": [
+          {
+            "href": "/operations/clients",
+            "label": "Clients"
+          },
+          {
+            "href": "/fleet-assets/resident-tracking",
+            "label": "Authorised client tracking"
+          }
+        ]
+      },
+      {
+        "label": "Devices pages",
+        "links": [
+          {
+            "href": "/fleet-assets/devices",
+            "label": "Tracking devices & pairing"
+          },
+          {
+            "href": "/security-devices/devices",
+            "label": "Security & Devices registry"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "primary": {
+      "href": "/fleet-assets/reports",
+      "label": "Reports"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets/reports",
+    "links": [
+      {
+        "href": "/fleet-assets/reports",
+        "label": "Reports & analytics"
+      }
+    ],
+    "menus": [
+      {
+        "label": "Resource use pages",
+        "links": [
+          {
+            "href": "/fleet-assets/reports/by-house",
+            "label": "Usage by house"
+          },
+          {
+            "href": "/fleet-assets/reports/community-access",
+            "label": "Community access"
+          }
+        ]
+      },
+      {
+        "label": "Costs & mileage pages",
+        "links": [
+          {
+            "href": "/fleet-assets/reports/cost-allocation",
+            "label": "Cost allocation"
+          },
+          {
+            "href": "/fleet-assets/reports/reimbursement",
+            "label": "Mileage reimbursement"
+          },
+          {
+            "href": "/fleet-assets/mileage",
+            "label": "Mileage claims"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "primary": {
+      "href": "/fleet-assets/settings/notifications",
+      "label": "Settings"
+    },
+    "url": "http://127.0.0.1:8876/fleet-assets/settings/notifications",
+    "links": [
+      {
+        "href": "/fleet-assets/settings/notifications",
+        "label": "Notifications"
+      }
+    ],
+    "menus": []
+  }
+]

@@ -1,5 +1,17 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EntityCard, EntityCardGrid } from '@/components/lists/entity-card';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
 import {
     CredentialReferenceManagement,
     type CredentialReferenceWorkspace,
@@ -8,11 +20,29 @@ import {
     MonitoringPolicySettings,
     type MonitoringPolicyWorkspace,
 } from '@/components/security-devices/monitoring-policy-settings';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
+import { SettingsNotice } from '@/components/settings/settings-notice';
+import { Button } from '@/components/ui/button';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowRight, FileClock, Settings2 } from 'lucide-react';
+import { formatDateTime } from '@/lib/datetime';
+import { readableKey, readablePhrase } from '@/lib/security-devices-labels';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    Activity,
+    ArrowUpRight,
+    ClipboardList,
+    FileClock,
+    KeyRound,
+    Layers,
+    LayoutDashboard,
+    ListChecks,
+    RadioTower,
+    Settings2,
+    ShieldCheck,
+} from 'lucide-react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 export type AuditEntry = {
     id: number;
@@ -57,6 +87,93 @@ type RuntimeQueue = {
     dispatch_lag_seconds: number | null;
 };
 
+const actionLabels: Record<string, string> = {
+    'device.update': 'Device updated',
+    'monitoring.maintenance.created': 'Maintenance scheduled',
+    'monitoring.maintenance.updated': 'Maintenance changed',
+    'monitoring.maintenance.cancelled': 'Maintenance cancelled',
+    'monitoring.maintenance.command_committed': 'Maintenance request saved',
+    'monitoring.profile.created': 'Monitoring profile created',
+    'monitoring.profile.updated': 'Monitoring profile changed',
+    'monitoring.profile.deactivated': 'Monitoring profile turned off',
+    'monitoring.threshold.created': 'Threshold rule added',
+    'monitoring.threshold.updated': 'Threshold rule changed',
+    'monitoring.threshold.deactivated': 'Threshold rule turned off',
+    'monitoring.threshold.reactivated': 'Threshold rule turned on',
+    'monitoring.alert_route.created': 'Alert route added',
+    'monitoring.alert_route.updated': 'Alert route changed',
+    'monitoring.alert_route.deactivated': 'Alert route turned off',
+    'monitoring.alert_route.reactivated': 'Alert route turned on',
+};
+/** Plain sentence-case names for settings keys; the keys stay for logic. */
+const settingLabels: Record<string, string> = {
+    // Supported features
+    classification_taxonomy: 'Classification',
+    monitoring_profiles: 'Monitoring profiles',
+    integration_site_mapping: 'Site mapping for integrations',
+    discovery_candidates: 'Discovery results',
+    monitoring_retention: 'Monitoring data retention',
+    provider_capabilities: 'Provider capabilities',
+    credential_leases: 'Credential leases',
+    database_audit_immutability: 'Audit log protection',
+    // Monitoring service states and queues
+    operational: 'Operational',
+    attention: 'Needs attention',
+    not_observed: 'Not observed',
+    scope_restricted: 'Restricted',
+    events: 'Device events',
+    checks: 'Monitoring checks',
+    discovery: 'Discovery',
+    provider: 'Provider sync',
+    topology: 'Topology',
+    maintenance: 'Maintenance',
+    orchestration: 'Task scheduling',
+    commands: 'Device commands',
+    // Source defaults
+    refresh_interval_minutes: 'Refresh interval (minutes)',
+    alert_motion_events: 'Alert on motion events',
+    alert_device_offline: 'Alert when a device goes offline',
+    quiet_hours_start: 'Quiet hours start',
+    quiet_hours_end: 'Quiet hours end',
+    // Sources
+    unifi: 'UniFi',
+    hikvision: 'Hikvision',
+    hikvision_recorder: 'Hikvision recorder',
+    milesight: 'Milesight',
+    queclink: 'Queclink',
+};
+const settingLabel = (key: string) => settingLabels[key] ?? readableKey(key);
+const recordTypeLabels: Record<string, string> = {
+    DeviceAssetLink: 'Device asset link',
+    DeviceMaintenanceRecord: 'Maintenance record',
+    MonitoringThresholdRule: 'Threshold rule',
+    MonitoringAlertRoute: 'Alert route',
+    MonitoringCoverageExpectation: 'Coverage expectation',
+    MonitoringMaintenanceWindow: 'Maintenance window',
+    MonitoringRetentionPolicy: 'Retention policy',
+    IntegrationProviderConnection: 'Provider connection',
+    IntegrationSiteConfig: 'Site integration settings',
+    IntegrationSiteSecret: 'Site integration credential',
+    IntegrationSyncLog: 'Sync log',
+};
+const recordTypeLabel = (type: string) =>
+    recordTypeLabels[type] ?? readableKey(type);
+/** Changed-field names, read mid-sentence ("Changed: name, Site"). */
+const fieldLabels: Record<string, string> = {
+    site_id: 'Site',
+    device_id: 'device',
+    monitor_id: 'monitor',
+    upstream_monitor_id: 'upstream monitor',
+    downstream_monitor_id: 'downstream monitor',
+    assignable_id: 'assigned record',
+    assignable_type: 'assigned record type',
+    is_active: 'active',
+    is_enabled: 'enabled',
+    secret_last4: 'secret ending',
+    mapped_external_site_name: 'provider Site name',
+};
+const fieldLabel = (key: string) => fieldLabels[key] ?? readablePhrase(key);
+
 export function AuditEvidence({
     visible,
     entries,
@@ -66,45 +183,93 @@ export function AuditEvidence({
 }) {
     if (!visible)
         return (
-            <p className="text-sm text-muted-foreground">
-                Audit evidence requires Security & Devices report permission.
-            </p>
+            <SettingsNotice>
+                You need report permission to view change history.
+            </SettingsNotice>
         );
-    if (entries.length === 0)
+    if (!entries.length)
         return (
-            <p className="text-sm text-muted-foreground">
-                No Security & Devices audit evidence is available in the current
-                scope.
-            </p>
+            <SettingsNotice>
+                No changes are recorded in your current scope.
+            </SettingsNotice>
         );
     return (
-        <div className="divide-y rounded-xl border">
+        <EntityCardGrid>
             {entries.map((entry) => (
-                <article key={entry.id} className="space-y-1 p-4 text-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium">{entry.action}</span>
-                        <Badge variant="outline">
-                            {entry.record_type} {entry.record_reference}
-                        </Badge>
-                    </div>
-                    <p className="text-muted-foreground">
-                        {entry.actor} ·{' '}
-                        {entry.created_at
-                            ? new Date(entry.created_at).toLocaleString()
-                            : 'Time unavailable'}
-                    </p>
-                    <p>
-                        {entry.fields.length
-                            ? `Changed: ${entry.fields.join(', ')}`
-                            : 'No safe changed-field names recorded.'}
-                    </p>
-                </article>
+                <EntityCard
+                    key={entry.id}
+                    meridian="neutral"
+                    actions={[]}
+                    icon={FileClock}
+                    name={actionLabels[entry.action] ?? 'Configuration changed'}
+                    subline={
+                        <>
+                            {entry.actor} ·{' '}
+                            {entry.created_at
+                                ? formatDateTime(entry.created_at)
+                                : 'Time unavailable'}
+                        </>
+                    }
+                    chips={
+                        <StatusBadge variant="neutral">
+                            {recordTypeLabel(entry.record_type)}
+                        </StatusBadge>
+                    }
+                    footer={{
+                        primary: entry.record_reference ?? 'Recorded change',
+                        secondary: entry.fields.length
+                            ? 'Changed: ' +
+                              entry.fields.map(fieldLabel).join(', ')
+                            : 'No changed-field details recorded',
+                    }}
+                />
             ))}
-        </div>
+        </EntityCardGrid>
     );
 }
 
-export default function SettingsAudit(props: {
+function Sections({
+    tabs,
+    value,
+    onChange,
+    label,
+}: {
+    tabs: GroupedProfileNavTab[];
+    value: string;
+    onChange: (value: string) => void;
+    label: string;
+}) {
+    const tabId = useId();
+    return (
+        <TierTwoTabs
+            tabs={tabs}
+            testIdPrefix={tabId}
+            activeTab={value}
+            onTab={onChange}
+            ariaLabel={label}
+            renderLink={(tab, className, inner, accessibility) => (
+                <Button
+                    variant="ghost"
+                    key={tab.key}
+                    className={className}
+                    {...accessibility}
+                    onClick={() => onChange(tab.key)}
+                >
+                    {inner}
+                </Button>
+            )}
+        />
+    );
+}
+
+type SettingsView = 'overview' | 'monitoring' | 'sources' | 'audit';
+const views = [
+    { key: 'overview' as const, label: 'Overview', icon: LayoutDashboard },
+    { key: 'monitoring' as const, label: 'Monitoring', icon: Activity },
+    { key: 'sources' as const, label: 'Sources & access', icon: KeyRound },
+    { key: 'audit' as const, label: 'Change history', icon: FileClock },
+];
+export type SettingsAuditProps = {
     summary: { device_groups: number; audit_entries: number };
     areas: SettingsArea[];
     classificationDefaults: {
@@ -155,22 +320,123 @@ export default function SettingsAudit(props: {
         entries: AuditEntry[];
         limit: number;
     };
-}) {
+};
+
+export default function SettingsAudit(props: SettingsAuditProps) {
+    const actorId =
+        usePage<{ auth: { user: { id: number } | null } }>().props.auth.user
+            ?.id ?? 0;
+    const workspace = props.monitoringPolicyWorkspace,
+        credentials = props.credentialReferences;
+    const authorityIdentity = JSON.stringify([
+        actorId,
+        workspace.actor_id ?? 0,
+        workspace.visible,
+        workspace.can_manage,
+        workspace.can_manage_application,
+        workspace.sites.map((site) => site.id),
+        workspace.devices.map((device) => [device.id, device.site_id]),
+        workspace.monitors.map((monitor) => [
+            monitor.id,
+            monitor.device_id,
+            monitor.site_id,
+        ]),
+        credentials.visible,
+        credentials.sites.map((site) => site.id),
+        props.audit.visible,
+    ]);
+    return <SettingsAuditWorkspace key={authorityIdentity} {...props} />;
+}
+
+function SettingsAuditWorkspace(props: SettingsAuditProps) {
     const {
         summary,
         areas,
         classificationDefaults,
         providerOperationalDefaults,
         credentialReferences,
-        monitoringPolicyWorkspace,
-        monitoringRuntime,
+        monitoringPolicyWorkspace: workspace,
+        monitoringRuntime: runtime,
         dataQuality,
         featureSupport,
         audit,
     } = props;
+    const [view, setView] = useState<SettingsView>('overview'),
+        [sourceView, setSourceView] = useState('overview'),
+        [auditView, setAuditView] = useState('overview'),
+        [query, setQuery] = useState(''),
+        [draftOpen, setDraftOpen] = useState(false);
+    const [leaving, setLeaving] = useState<{
+        view?: SettingsView;
+        href?: string;
+    } | null>(null);
+    const draft = useRef(false),
+        confirmedLeave = useRef(false);
+    useEffect(() => {
+        draft.current = draftOpen;
+    }, [draftOpen]);
+    const select = (next: SettingsView) => {
+        if (next === view) return;
+        if (draftOpen) {
+            setLeaving({ view: next });
+            return;
+        }
+        setView(next);
+        setQuery('');
+    };
+    useEffect(() => {
+        const beforeUnload = (event: BeforeUnloadEvent) => {
+            if (draft.current) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        };
+        window.addEventListener('beforeunload', beforeUnload);
+        const stop = router.on('before', (event) => {
+            if (
+                !draft.current ||
+                confirmedLeave.current ||
+                event.detail.visit.method !== 'get' ||
+                event.detail.visit.url.pathname === window.location.pathname
+            )
+                return;
+            event.preventDefault();
+            setLeaving({ href: event.detail.visit.url.href });
+        });
+        return () => {
+            window.removeEventListener('beforeunload', beforeUnload);
+            stop();
+        };
+    }, []);
+    const policyCount =
+        workspace.profiles.length +
+        (workspace.thresholds?.length ?? 0) +
+        (workspace.alert_routes?.length ?? 0) +
+        workspace.coverage.length +
+        workspace.dependencies.length +
+        workspace.maintenance.length +
+        workspace.retention.length;
+    const review = (label: string, next: SettingsView) => (
+        <Button variant="link" className="px-0" onClick={() => select(next)}>
+            Review {label} <ArrowUpRight aria-hidden className="size-3.5" />
+        </Button>
+    );
+    const matches = (...text: string[]) =>
+        text.join(' ').toLowerCase().includes(query.toLowerCase());
+    const sourceTabs = [
+        { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { key: 'credentials', label: 'Access references', icon: KeyRound },
+        { key: 'defaults', label: 'Source defaults', icon: Layers },
+    ];
+    const auditTabs = [
+        { key: 'overview', label: 'Overview', icon: LayoutDashboard },
+        { key: 'changes', label: 'Changes', icon: FileClock },
+        { key: 'runtime', label: 'Monitoring service', icon: RadioTower },
+    ];
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
                 {
                     title: 'Settings & audit',
@@ -179,254 +445,522 @@ export default function SettingsAudit(props: {
             ]}
         >
             <Head title="Settings & audit - Security & Devices" />
-            <PageShell>
-                <PageHero
-                    variant="compact"
+            <div className="space-y-5">
+                <PageHeader
                     icon={Settings2}
                     title="Settings & audit"
-                    description="Govern monitoring behaviour, integration defaults, data quality, and safe audit evidence from one workspace."
-                    stats={[
-                        {
-                            label: 'Device groups',
-                            value: summary.device_groups,
-                        },
-                        {
-                            label: 'Scoped audit entries',
-                            value: summary.audit_entries,
-                        },
-                        {
-                            label: 'Unassigned devices',
-                            value: dataQuality.unassigned_devices,
-                        },
-                        {
-                            label: 'Duplicate candidates',
-                            value: dataQuality.duplicate_candidates,
-                        },
-                    ]}
-                />
-                <nav
-                    aria-label="Settings destinations"
-                    className="grid gap-3 md:grid-cols-3"
-                >
-                    {areas.map((area) => (
-                        <Link
-                            key={area.href}
-                            href={area.href}
-                            className="frontline-focus flex min-h-11 items-center justify-between rounded-xl border p-4"
-                        >
-                            <span>
-                                <strong className="block">{area.title}</strong>
-                                <span className="text-sm text-muted-foreground">
-                                    {area.description}
-                                </span>
-                            </span>
-                            <ArrowRight className="h-4 w-4" />
-                        </Link>
-                    ))}
-                </nav>
-                <div className="grid gap-4 lg:grid-cols-2">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Classification defaults</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <Badge variant="secondary">
-                                {classificationDefaults.state.replaceAll(
-                                    '_',
-                                    ' ',
-                                )}
-                            </Badge>
-                            <p className="mt-3 text-sm text-muted-foreground">
-                                {classificationDefaults.note}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Assignment and data quality</CardTitle>
-                        </CardHeader>
-                        <CardContent className="grid grid-cols-3 gap-3 text-sm">
-                            <div>
-                                <strong className="text-xl">
-                                    {dataQuality.visible_devices}
-                                </strong>
-                                <p>Visible devices</p>
-                            </div>
-                            <div>
-                                <strong className="text-xl">
-                                    {dataQuality.unassigned_devices}
-                                </strong>
-                                <p>Unassigned</p>
-                            </div>
-                            <div>
-                                <strong className="text-xl">
-                                    {dataQuality.duplicate_candidates}
-                                </strong>
-                                <p>Duplicates</p>
-                            </div>
-                            <p className="col-span-3 text-muted-foreground">
-                                {dataQuality.note}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Provider operational defaults</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {providerOperationalDefaults.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                No authorised provider operational defaults are
-                                configured.
-                            </p>
-                        ) : (
-                            providerOperationalDefaults.map((row) => (
-                                <div
-                                    key={row.provider}
-                                    className="rounded-lg border p-3"
-                                >
-                                    <strong className="capitalize">
-                                        {row.provider}
-                                    </strong>
-                                    <dl className="mt-2 grid gap-2 sm:grid-cols-2">
-                                        {Object.entries(row.values).map(
-                                            ([key, value]) => (
-                                                <div
-                                                    key={key}
-                                                    className="text-sm"
-                                                >
-                                                    <dt className="text-muted-foreground">
-                                                        {key.replaceAll(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </dt>
-                                                    <dd>{String(value)}</dd>
-                                                </div>
-                                            ),
-                                        )}
-                                    </dl>
-                                </div>
-                            ))
-                        )}
-                    </CardContent>
-                </Card>
-                <CredentialReferenceManagement
-                    workspace={credentialReferences}
-                />
-                <MonitoringPolicySettings
-                    workspace={monitoringPolicyWorkspace}
-                />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            Runtime workers, queues and dead letters
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="flex flex-wrap items-center gap-2 text-sm">
-                            <Badge variant="outline">
-                                {monitoringRuntime.state.replaceAll('_', ' ')}
-                            </Badge>
-                            <span className="text-muted-foreground">
-                                {monitoringRuntime.workers.note}
-                            </span>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            {Object.entries(monitoringRuntime.queues).map(
-                                ([name, queue]) => (
-                                    <article
-                                        key={name}
-                                        className="rounded-lg border p-3 text-sm"
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <strong className="capitalize">
-                                                {name.replaceAll('_', ' ')}
-                                            </strong>
-                                            <Badge variant="outline">
-                                                {queue.state.replaceAll(
-                                                    '_',
-                                                    ' ',
-                                                )}
-                                            </Badge>
-                                        </div>
-                                        <p className="mt-2 text-muted-foreground">
-                                            {queue.pending === null
-                                                ? 'Counts restricted to authorised operators'
-                                                : `${queue.pending} pending · ${queue.dead_letters ?? 0} dead letters`}
-                                        </p>
-                                        <p className="mt-1 text-muted-foreground">
-                                            Worker{' '}
-                                            {queue.worker_state.replaceAll(
-                                                '_',
-                                                ' ',
-                                            )}
-                                            {queue.heartbeat_age_seconds ===
-                                            null
-                                                ? ' · no heartbeat consumed'
-                                                : ` · heartbeat ${queue.heartbeat_age_seconds}s ago`}
-                                        </p>
-                                    </article>
-                                ),
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Feature support</CardTitle>
-                    </CardHeader>
-                    <CardContent className="grid gap-3 md:grid-cols-2">
-                        {Object.entries(featureSupport).map(
-                            ([key, feature]) => (
-                                <div
-                                    key={key}
-                                    className="rounded-lg border p-3 text-sm"
-                                >
-                                    <div className="flex flex-wrap justify-between gap-2">
-                                        <strong>
-                                            {key.replaceAll('_', ' ')}
-                                        </strong>
-                                        <Badge
-                                            variant={
-                                                feature.state === 'supported'
-                                                    ? 'outline'
-                                                    : 'secondary'
-                                            }
-                                        >
-                                            {feature.state}
-                                        </Badge>
-                                    </div>
-                                    <p className="mt-1 text-muted-foreground">
-                                        {feature.note}
-                                    </p>
-                                </div>
-                            ),
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <FileClock className="h-4 w-4" />
-                            Audit evidence
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="mb-3 text-sm text-muted-foreground">
-                            Newest-first, bounded to {audit.limit} safe Security
-                            & Devices records. Application evidence is presented
-                            as read-only and append-only; database immutability
-                            is not claimed.
-                        </p>
-                        <AuditEvidence
-                            visible={audit.visible}
-                            entries={audit.entries}
+                    subline="Security & Devices · monitoring, source access and change history"
+                    titleChip={
+                        draftOpen ? (
+                            <StatusBadge variant="warning">
+                                Draft open
+                            </StatusBadge>
+                        ) : undefined
+                    }
+                    actions={
+                        view === 'monitoring' || view === 'audit' ? (
+                            <PageHeaderSearch
+                                value={query}
+                                onChange={setQuery}
+                                placeholder={
+                                    view === 'monitoring'
+                                        ? 'Search monitoring rules…'
+                                        : 'Search recorded changes…'
+                                }
+                            />
+                        ) : undefined
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Monitoring rules"
+                                onClick={() => select('monitoring')}
+                            >
+                                <PageHeaderMeterBig>
+                                    {workspace.visible
+                                        ? policyCount
+                                        : 'Restricted'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Saved rules in your scope
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Source references"
+                                onClick={() => {
+                                    select('sources');
+                                    setSourceView('credentials');
+                                }}
+                            >
+                                <PageHeaderMeterBig>
+                                    {credentialReferences.visible
+                                        ? credentialReferences.rows.length
+                                        : 'Restricted'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Review access and rotation
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Device groups"
+                                href="/security-devices/device-groups"
+                            >
+                                <PageHeaderMeterBig>
+                                    {summary.device_groups}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Review grouped equipment
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Recorded changes"
+                                onClick={() => {
+                                    select('audit');
+                                    setAuditView('changes');
+                                }}
+                            >
+                                <PageHeaderMeterBig>
+                                    {audit.visible
+                                        ? summary.audit_entries
+                                        : 'Restricted'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Current report scope
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={views}
+                            value={view}
+                            onSelect={select}
+                            ariaLabel="Security & Devices settings views"
                         />
-                    </CardContent>
-                </Card>
-            </PageShell>
+                    }
+                />
+                <SecurityDevicesSectionTabs
+                    section="setup"
+                    activeTab="settings"
+                />
+                {view === 'overview' && (
+                    <>
+                        <div className="grid gap-5 md:grid-cols-2">
+                            <ReviewCard icon={Activity} title="Monitoring">
+                                <ReviewRow
+                                    label="Saved rules"
+                                    value={
+                                        workspace.visible
+                                            ? policyCount
+                                            : 'Restricted'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Approved Sites"
+                                    value={
+                                        workspace.visible
+                                            ? workspace.sites.length
+                                            : 'Restricted'
+                                    }
+                                />
+                                {review('monitoring', 'monitoring')}
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={KeyRound}
+                                title="Sources & access"
+                            >
+                                <ReviewRow
+                                    label="Access references"
+                                    value={
+                                        credentialReferences.visible
+                                            ? credentialReferences.rows.length
+                                            : 'Restricted'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Source defaults"
+                                    value={providerOperationalDefaults.length}
+                                />
+                                {review('sources & access', 'sources')}
+                            </ReviewCard>
+                            <ReviewCard icon={ListChecks} title="Inventory">
+                                <ReviewRow
+                                    label="Visible devices"
+                                    value={dataQuality.visible_devices}
+                                />
+                                <ReviewRow
+                                    label="Unassigned"
+                                    value={dataQuality.unassigned_devices}
+                                />
+                                <ReviewRow
+                                    label="Possible duplicates"
+                                    value={dataQuality.duplicate_candidates}
+                                />
+                                <Button variant="link" asChild className="px-0">
+                                    <Link href="/security-devices/devices">
+                                        Review equipment{' '}
+                                        <ArrowUpRight className="size-3.5" />
+                                    </Link>
+                                </Button>
+                            </ReviewCard>
+                            <ReviewCard icon={FileClock} title="Change history">
+                                <ReviewRow
+                                    label="Recorded changes"
+                                    value={
+                                        audit.visible
+                                            ? summary.audit_entries
+                                            : 'Restricted'
+                                    }
+                                />
+                                <ReviewRow
+                                    label="Monitoring service"
+                                    value={settingLabel(runtime.state)}
+                                />
+                                {review('change history', 'audit')}
+                            </ReviewCard>
+                        </div>
+                        <section className="space-y-3">
+                            <h2 className="text-section-title flex items-center gap-2">
+                                <ShieldCheck className="size-4 text-primary" />
+                                Related settings
+                            </h2>
+                            <div className="flex flex-wrap gap-x-5 gap-y-2">
+                                {areas.map((area) => (
+                                    <Button
+                                        key={area.href}
+                                        variant="link"
+                                        asChild
+                                        className="px-0"
+                                    >
+                                        <Link
+                                            href={area.href}
+                                            title={area.description}
+                                        >
+                                            {area.title}
+                                            <ArrowUpRight className="size-3.5" />
+                                        </Link>
+                                    </Button>
+                                ))}
+                            </div>
+                        </section>
+                    </>
+                )}
+                {view === 'monitoring' && (
+                    <MonitoringPolicySettings
+                        workspace={workspace}
+                        initialView="overview"
+                        searchQuery={query}
+                        onDraftChange={setDraftOpen}
+                    />
+                )}
+                {view === 'sources' && (
+                    <section className="space-y-5">
+                        <Sections
+                            tabs={sourceTabs}
+                            value={sourceView}
+                            onChange={setSourceView}
+                            label="Source settings sections"
+                        />
+                        {sourceView === 'overview' && (
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <ReviewCard
+                                    icon={KeyRound}
+                                    title="Access references"
+                                >
+                                    <ReviewRow
+                                        label="References"
+                                        value={
+                                            credentialReferences.visible
+                                                ? credentialReferences.rows
+                                                      .length
+                                                : 'Restricted'
+                                        }
+                                    />
+                                    <p className="text-subtle">
+                                        {credentialReferences.driver_note}
+                                    </p>
+                                    <Button
+                                        variant="link"
+                                        className="px-0"
+                                        onClick={() =>
+                                            setSourceView('credentials')
+                                        }
+                                    >
+                                        Review access references{' '}
+                                        <ArrowUpRight className="size-3.5" />
+                                    </Button>
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={Layers}
+                                    title="Source defaults"
+                                >
+                                    <ReviewRow
+                                        label="Sources"
+                                        value={
+                                            providerOperationalDefaults.length
+                                        }
+                                    />
+                                    <p className="text-subtle">
+                                        Review the defaults supplied by each
+                                        owning integration.
+                                    </p>
+                                    <Button
+                                        variant="link"
+                                        className="px-0"
+                                        onClick={() =>
+                                            setSourceView('defaults')
+                                        }
+                                    >
+                                        Review source defaults{' '}
+                                        <ArrowUpRight className="size-3.5" />
+                                    </Button>
+                                </ReviewCard>
+                            </div>
+                        )}
+                        {sourceView === 'credentials' && (
+                            <CredentialReferenceManagement
+                                workspace={credentialReferences}
+                            />
+                        )}
+                        {sourceView === 'defaults' && (
+                            <div className="space-y-5">
+                                <ReviewCard
+                                    icon={Layers}
+                                    title="Classification"
+                                >
+                                    <p className="text-subtle">
+                                        {classificationDefaults.note}
+                                    </p>
+                                </ReviewCard>
+                                {providerOperationalDefaults.length ? (
+                                    providerOperationalDefaults.map(
+                                        (source) => (
+                                            <ReviewCard
+                                                key={source.provider}
+                                                icon={RadioTower}
+                                                title={settingLabel(
+                                                    source.provider,
+                                                )}
+                                            >
+                                                <ReviewRow
+                                                    label="Recorded state"
+                                                    value={
+                                                        <StatusBadge
+                                                            status={
+                                                                source.state
+                                                            }
+                                                        />
+                                                    }
+                                                />
+                                                {Object.entries(
+                                                    source.values,
+                                                ).map(([key, value]) => (
+                                                    <ReviewRow
+                                                        key={key}
+                                                        label={settingLabel(
+                                                            key,
+                                                        )}
+                                                        value={
+                                                            typeof value ===
+                                                            'boolean'
+                                                                ? value
+                                                                    ? 'On'
+                                                                    : 'Off'
+                                                                : typeof value ===
+                                                                        'string' ||
+                                                                    typeof value ===
+                                                                        'number'
+                                                                  ? String(
+                                                                        value,
+                                                                    )
+                                                                  : 'Review in the owning integration'
+                                                        }
+                                                    />
+                                                ))}
+                                            </ReviewCard>
+                                        ),
+                                    )
+                                ) : (
+                                    <SettingsNotice>
+                                        No source defaults are recorded in your
+                                        scope.
+                                    </SettingsNotice>
+                                )}
+                            </div>
+                        )}
+                    </section>
+                )}
+                {view === 'audit' && (
+                    <section className="space-y-5">
+                        <Sections
+                            tabs={auditTabs}
+                            value={auditView}
+                            onChange={setAuditView}
+                            label="Change history sections"
+                        />
+                        {auditView === 'overview' && (
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <ReviewCard
+                                    icon={FileClock}
+                                    title="Recorded changes"
+                                >
+                                    <ReviewRow
+                                        label="Records shown"
+                                        value={
+                                            audit.visible
+                                                ? audit.entries.length
+                                                : 'Restricted'
+                                        }
+                                    />
+                                    <Button
+                                        variant="link"
+                                        className="px-0"
+                                        onClick={() => setAuditView('changes')}
+                                    >
+                                        Review recorded changes{' '}
+                                        <ArrowUpRight className="size-3.5" />
+                                    </Button>
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={RadioTower}
+                                    title="Monitoring service"
+                                >
+                                    <ReviewRow
+                                        label="Available workers"
+                                        value={runtime.workers.available}
+                                    />
+                                    <ReviewRow
+                                        label="Need attention"
+                                        value={runtime.workers.attention}
+                                    />
+                                    <Button
+                                        variant="link"
+                                        className="px-0"
+                                        onClick={() => setAuditView('runtime')}
+                                    >
+                                        Review monitoring service{' '}
+                                        <ArrowUpRight className="size-3.5" />
+                                    </Button>
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={ClipboardList}
+                                    title="Supported features"
+                                >
+                                    {Object.entries(featureSupport).map(
+                                        ([key, feature]) => (
+                                            <ReviewRow
+                                                key={key}
+                                                label={settingLabel(key)}
+                                                value={
+                                                    <StatusBadge
+                                                        status={feature.state}
+                                                        title={feature.note}
+                                                    />
+                                                }
+                                            />
+                                        ),
+                                    )}
+                                </ReviewCard>
+                            </div>
+                        )}
+                        {auditView === 'changes' && (
+                            <AuditEvidence
+                                visible={audit.visible}
+                                entries={audit.entries.filter((entry) =>
+                                    matches(
+                                        actionLabels[entry.action] ??
+                                            'Configuration changed',
+                                        entry.actor,
+                                        recordTypeLabel(entry.record_type),
+                                        ...entry.fields.map(fieldLabel),
+                                    ),
+                                )}
+                            />
+                        )}
+                        {auditView === 'runtime' && (
+                            <>
+                                <SettingsNotice>
+                                    {runtime.workers.note}
+                                </SettingsNotice>
+                                <div className="grid gap-5 md:grid-cols-2">
+                                    {Object.entries(runtime.queues).map(
+                                        ([name, queue]) => (
+                                            <ReviewCard
+                                                key={name}
+                                                icon={RadioTower}
+                                                title={settingLabel(name)}
+                                            >
+                                                <ReviewRow
+                                                    label="State"
+                                                    value={
+                                                        <StatusBadge
+                                                            status={queue.state}
+                                                        />
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Pending"
+                                                    value={
+                                                        queue.pending === null
+                                                            ? 'Restricted'
+                                                            : queue.pending
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Needs follow-up"
+                                                    value={
+                                                        queue.dead_letters ===
+                                                        null
+                                                            ? 'Restricted'
+                                                            : queue.dead_letters
+                                                    }
+                                                />
+                                                <ReviewRow
+                                                    label="Worker"
+                                                    value={settingLabel(
+                                                        queue.worker_state,
+                                                    )}
+                                                />
+                                                <ReviewRow
+                                                    label="Last heartbeat"
+                                                    value={
+                                                        queue.heartbeat_age_seconds ===
+                                                        null
+                                                            ? 'Not observed'
+                                                            : queue.heartbeat_age_seconds +
+                                                              ' seconds ago'
+                                                    }
+                                                />
+                                            </ReviewCard>
+                                        ),
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </section>
+                )}
+            </div>
+            <ConfirmDialog
+                open={leaving !== null}
+                onClose={() => setLeaving(null)}
+                title="Leave this settings draft?"
+                description="The open draft may contain unsaved changes. An unconfirmed maintenance request remains available for recovery when you return."
+                confirmText="Leave draft"
+                cancelText="Keep reviewing"
+                variant="default"
+                onConfirm={() => {
+                    const target = leaving;
+                    setLeaving(null);
+                    if (target?.href) {
+                        confirmedLeave.current = true;
+                        router.visit(target.href);
+                    } else if (target?.view) {
+                        setView(target.view);
+                        setQuery('');
+                        setDraftOpen(false);
+                    }
+                }}
+            />
         </AppLayout>
     );
 }

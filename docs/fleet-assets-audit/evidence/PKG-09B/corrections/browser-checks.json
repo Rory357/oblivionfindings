@@ -1,0 +1,3236 @@
+{
+  "origin": "http://127.0.0.1:8974",
+  "root": "C:/Users/steph/.codex/worktrees/fleet-personal-reports/oblivionfindings",
+  "authentication": "Normal Fortify password + MFA, no middleware bypass. Invalid factory placeholder replaced only in owned synthetic account.",
+  "viewports": [
+    {
+      "width": 1366,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "flows": {
+    "fleet": {
+      "default": {
+        "rows": 20,
+        "distanceKm": 570
+      },
+      "groupedFilters": {
+        "rows": 16,
+        "distanceKm": 506
+      },
+      "pivot": {
+        "rows": 20,
+        "groups": 4,
+        "total": 570
+      },
+      "savedReport": "Fleet planning — synthetic QA",
+      "reopenedVersion": 1,
+      "staleDownloadDenied": true,
+      "exports": [
+        "xlsx",
+        "pdf",
+        "csv",
+        "json"
+      ],
+      "privateEvidenceExposed": false
+    },
+    "client": {
+      "subject": "Alex Sample (synthetic)",
+      "source": "client_locations",
+      "rows": 1
+    },
+    "staff": {
+      "subject": "Sam Worker (Synthetic)",
+      "source": "staff_locations",
+      "rows": 1
+    }
+  },
+  "accessibility": {
+    "desktop": [],
+    "mobileLibrary": []
+  },
+  "errors": [
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    },
+    {
+      "kind": "request",
+      "url": "https://fonts.bunny.net/css?family=instrument-sans:400,500,600",
+      "failure": {
+        "errorText": "net::ERR_NETWORK_ACCESS_DENIED"
+      }
+    },
+    {
+      "kind": "console",
+      "message": "Failed to load resource: net::ERR_NETWORK_ACCESS_DENIED"
+    }
+  ],
+  "responses": [
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/login"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-react-C99fm9h8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-inertia-L00mYErJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-DkbjUGTW.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-ui-w1Ikxf0L.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/login-DHwW8AZG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sso-sign-in-buttons-DpBRs1ND.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/alert-CF50OPgI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utils-COkJOzsg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/button-BUrF8eld.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-utils-Dr6D9L7d.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-LdbdHTAR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/checkbox-guEFao1b.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/globe-B420Xtmn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/input-error-DCYErTdJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/text-link-RogODYI2.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/check-BsaZvJ7g.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/input-49RbooBa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/label-DnayXvci.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/loader-circle-BkKtpPeZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/spinner-BNJuMmed.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/auth-layout-CZtzJmh4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/i18n-Dncd9j2h.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-CSEUMRIG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-Dlg97wMc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-B0Z-ysPe.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-BjmjDcUN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/images/auth/BackgroundImageOF4.jpg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/login"
+    },
+    {
+      "status": 302,
+      "url": "http://127.0.0.1:8974/login"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/two-factor-challenge"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/two-factor-challenge-C5SWHMNx.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/minus--IzTnaCE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/use-two-factor-auth-CjSs7W6c.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-Bpzl9rqK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/two-factor-challenge"
+    },
+    {
+      "status": 302,
+      "url": "http://127.0.0.1:8974/two-factor-challenge"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/dashboard"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dashboard-TEnN0XM4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/badge-sVjmv35H.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/card-C9LxLdKv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/select-Clt9R9Fv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-down-CRr8arVc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-up-k5Nxo-PI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/tabs-72shSju7.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/x-DyxLeehn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-left-dxTnbMsK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-right-Di0XmTXQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-layout-CoCsXh-f.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/staff-page-shell-DfHE8BE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/fleet-navigation-DlwLKINM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-grid-CbldjNdE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/truck-Bu2Ws-eD.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/route-BV0ScKbh.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/package-DUBPD5gr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wrench-B-vlBkOr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chart-column-BwvZtlRa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/bell-D9w1izjY.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/overlay-focus-return-4ESXsuki.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/tooltip-D-a-5XaZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-dashboard-BfiXAqHw.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-up-BvjbOq26.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/building-2-Boln8z5y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wallet-nyJNc6py.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-days-BVcVjN9j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/book-open-BnxMLdqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-text-CCfjbuHQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/landmark-BUpjXh67.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-range-LZGXevCR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/coins-CKdS9aGf.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/receipt-17KIqin_.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-spreadsheet-BPXwFwxJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/banknote-BbU2rqFE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/car-C3RPwkVl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/repeat-CDVZEWSt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dollar-sign-CUVyrCNQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-right-M2l76D8W.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scale-DOdFejmr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sparkles-BB8ATk2P.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/credit-card-C4FDLjYU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-DhHSCPp-.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/link-2-CETTjkL4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wand-sparkles-DUAq9obN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/settings-DqbERAvH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scroll-text-C5oggVEM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/gavel-BwgGqEsN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-list-Ox7iCv1V.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/target-D9SBo1S4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-pulse-CCzXbl6h.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-check-DSqe-zQb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/user-check-C2kS7rQZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/users-RNQJcWQn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-check-yhW_lfQM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pinned-LFA7o1BV.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/cpu-1Uaht0Ya.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/network-Ch0Typzk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/activity-BOeT3FF8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/radar-mXnYM7sB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-check-D3_RgTK9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/list-checks-BPEvwfSa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/briefcase-kmggLHDt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/pill-DGKG16G2.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/stethoscope-DnuGNY1G.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/server-CVC5glqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-clock-BYwhgYNa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/house-CvSrKdi8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utensils-CIXlWqc9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-qY5QJ0rp.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/git-branch-BzLdTVVU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/timer-DEDFBKE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/triangle-alert-B-kPMtTM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-text-wJxpAYty.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pin-ByK-F_kc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/person-standing-Bs5LYqGB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-alert-BgzG2_2j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trash-2-D712tlRq.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/octagon-alert-Ie7q7YDI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/siren-DLpdKKaP.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/flask-conical-Cj5UTvHv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/hard-hat-TwHpm1nd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/megaphone-CEdGqGOy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-icuaRuh5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/smartphone-blycXJpy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/graduation-cap-CtQmVOc3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/menu-v_QnaheS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-BNy9AwTz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/search-DTA3ilYl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-3--OzyUhr0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/command-9x_1OwTk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dialog-B1dDzuuR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ticket-DxC6ZAGz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/separator-C7fe0Vgu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dropdown-menu-B8EOaGf7.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-BQ90ammz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-right-D3RsQ715.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/avatar-D2DsKi5Y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/use-initials-U-N8N3-N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/log-out-TlUBX7lC.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/datetime-Cj7rLFb1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-Btv0s268.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/index-ubtH2xcj.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/donut-chart-BjEVgtH7.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/mini-sparkline-D7i7f6lZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-up-BNphU38H.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/my-day-list-CcRvqKRF.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-warning-B-c6_dQq.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/list-todo-1YQuVFXz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-charts-DKFvUt4j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/images/avatar-placeholder.svg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/dashboard"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/fleet-assets/reports/builder"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-react-C99fm9h8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-inertia-L00mYErJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-DkbjUGTW.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-ui-w1Ikxf0L.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-kTBoimet.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-table-DzB-BBEl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/card-C9LxLdKv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utils-COkJOzsg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-menu-BTUHGMcA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/checkbox-guEFao1b.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/check-BsaZvJ7g.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-utils-Dr6D9L7d.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-vertical-CB9zZGLc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/page-header-RxMlIkp1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/popover-Bwbch3JK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dropdown-menu-B8EOaGf7.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-BQ90ammz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/status-badge-3QlJuqdd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-Bd2kW8NQ.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-down-C1YbRZx3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/avatar-D2DsKi5Y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dialog-B1dDzuuR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-Bdje7DHE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/overlay-focus-return-4ESXsuki.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/x-DyxLeehn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-up-right-znZiTK9O.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/tooltip-D-a-5XaZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-up-BvjbOq26.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/search-DTA3ilYl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/textarea-C_9uu-fb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-left-dxTnbMsK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-down-CRr8arVc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/button-BUrF8eld.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/input-49RbooBa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/label-DnayXvci.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/select-Clt9R9Fv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-up-k5Nxo-PI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-layout-CoCsXh-f.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/staff-page-shell-DfHE8BE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/fleet-navigation-DlwLKINM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-grid-CbldjNdE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/truck-Bu2Ws-eD.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/route-BV0ScKbh.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/package-DUBPD5gr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wrench-B-vlBkOr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chart-column-BwvZtlRa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/bell-D9w1izjY.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-dashboard-BfiXAqHw.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/building-2-Boln8z5y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wallet-nyJNc6py.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-days-BVcVjN9j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/book-open-BnxMLdqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-text-CCfjbuHQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/landmark-BUpjXh67.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-range-LZGXevCR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/coins-CKdS9aGf.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/receipt-17KIqin_.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-spreadsheet-BPXwFwxJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/banknote-BbU2rqFE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/car-C3RPwkVl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/repeat-CDVZEWSt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dollar-sign-CUVyrCNQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-right-M2l76D8W.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scale-DOdFejmr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sparkles-BB8ATk2P.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/credit-card-C4FDLjYU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-DhHSCPp-.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/link-2-CETTjkL4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wand-sparkles-DUAq9obN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/settings-DqbERAvH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scroll-text-C5oggVEM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/gavel-BwgGqEsN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-list-Ox7iCv1V.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/target-D9SBo1S4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-LdbdHTAR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-pulse-CCzXbl6h.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-check-DSqe-zQb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/user-check-C2kS7rQZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/users-RNQJcWQn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-check-yhW_lfQM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pinned-LFA7o1BV.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/cpu-1Uaht0Ya.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/network-Ch0Typzk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/activity-BOeT3FF8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/radar-mXnYM7sB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-check-D3_RgTK9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/list-checks-BPEvwfSa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/briefcase-kmggLHDt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/pill-DGKG16G2.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/stethoscope-DnuGNY1G.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/server-CVC5glqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-clock-BYwhgYNa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/house-CvSrKdi8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utensils-CIXlWqc9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-qY5QJ0rp.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/git-branch-BzLdTVVU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/timer-DEDFBKE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/triangle-alert-B-kPMtTM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-text-wJxpAYty.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pin-ByK-F_kc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/person-standing-Bs5LYqGB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-alert-BgzG2_2j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trash-2-D712tlRq.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/octagon-alert-Ie7q7YDI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/siren-DLpdKKaP.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/flask-conical-Cj5UTvHv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/hard-hat-TwHpm1nd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/megaphone-CEdGqGOy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-icuaRuh5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/smartphone-blycXJpy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/graduation-cap-CtQmVOc3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-right-Di0XmTXQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/menu-v_QnaheS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-BNy9AwTz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-3--OzyUhr0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/command-9x_1OwTk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ticket-DxC6ZAGz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/separator-C7fe0Vgu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-right-D3RsQ715.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/use-initials-U-N8N3-N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/log-out-TlUBX7lC.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/datetime-Cj7rLFb1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/_dialogs-CvmWTYYo.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-controls-BDsYSUEA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/leave-calendar-range-Dd_qWk4O.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/grip-vertical-BV6tmybS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/plus-BeKXm1hd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-library-BQ2VnlnQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-plus-2-BcBZC9ag.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/upload-CGI3T4zc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/database-BWwaJb39.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/download-CGBtH_MU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sliders-horizontal-Bjyv2VDO.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/rotate-ccw-BKyKLA-K.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/copy-BOfdJ6aG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/history-D-3bCwZx.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/save-BoDOW5x5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/columns-3-BaGHPYIg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/filter-BJNZWuX0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-template-DjlHE7lH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/play-BivEUwR3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-charts-DKFvUt4j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/images/avatar-placeholder.svg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/fleet-assets/reports/builder"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/targets?source=journeys&q="
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 202,
+      "url": "http://127.0.0.1:8974/report-builder/runs"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/b164fcfd-222f-4a11-94af-a1f91a81918d"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 202,
+      "url": "http://127.0.0.1:8974/report-builder/runs"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/d0d6878e-f39a-44cf-a038-b9f04376090c"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 202,
+      "url": "http://127.0.0.1:8974/report-builder/runs"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/272996fa-f584-4989-953d-cd2554683b35"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/reports"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/272996fa-f584-4989-953d-cd2554683b35/export"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/272996fa-f584-4989-953d-cd2554683b35/export"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/272996fa-f584-4989-953d-cd2554683b35/export"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/272996fa-f584-4989-953d-cd2554683b35/export"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/operations/people-location-reports/client"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-react-C99fm9h8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-inertia-L00mYErJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-DkbjUGTW.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-ui-w1Ikxf0L.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-kTBoimet.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-table-DzB-BBEl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/card-C9LxLdKv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utils-COkJOzsg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/checkbox-guEFao1b.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/check-BsaZvJ7g.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-menu-BTUHGMcA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-utils-Dr6D9L7d.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dropdown-menu-B8EOaGf7.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-BQ90ammz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-vertical-CB9zZGLc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/avatar-D2DsKi5Y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dialog-B1dDzuuR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/page-header-RxMlIkp1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-Bd2kW8NQ.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/overlay-focus-return-4ESXsuki.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/x-DyxLeehn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/popover-Bwbch3JK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/status-badge-3QlJuqdd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/tooltip-D-a-5XaZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-up-BvjbOq26.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-down-C1YbRZx3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-Bdje7DHE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/search-DTA3ilYl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-left-dxTnbMsK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-up-right-znZiTK9O.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-down-CRr8arVc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/button-BUrF8eld.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/input-49RbooBa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/label-DnayXvci.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/select-Clt9R9Fv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-up-k5Nxo-PI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/textarea-C_9uu-fb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-layout-CoCsXh-f.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/staff-page-shell-DfHE8BE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/fleet-navigation-DlwLKINM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-grid-CbldjNdE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/truck-Bu2Ws-eD.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/route-BV0ScKbh.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/package-DUBPD5gr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wrench-B-vlBkOr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chart-column-BwvZtlRa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/bell-D9w1izjY.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-dashboard-BfiXAqHw.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/building-2-Boln8z5y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wallet-nyJNc6py.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-days-BVcVjN9j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/book-open-BnxMLdqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-text-CCfjbuHQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/landmark-BUpjXh67.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-range-LZGXevCR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/coins-CKdS9aGf.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/receipt-17KIqin_.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-spreadsheet-BPXwFwxJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/banknote-BbU2rqFE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/car-C3RPwkVl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/repeat-CDVZEWSt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dollar-sign-CUVyrCNQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-right-M2l76D8W.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scale-DOdFejmr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sparkles-BB8ATk2P.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/credit-card-C4FDLjYU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-DhHSCPp-.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/link-2-CETTjkL4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wand-sparkles-DUAq9obN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/settings-DqbERAvH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scroll-text-C5oggVEM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/gavel-BwgGqEsN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-list-Ox7iCv1V.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/target-D9SBo1S4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-LdbdHTAR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-pulse-CCzXbl6h.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-check-DSqe-zQb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/user-check-C2kS7rQZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/users-RNQJcWQn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-check-yhW_lfQM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pinned-LFA7o1BV.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/cpu-1Uaht0Ya.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/network-Ch0Typzk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/activity-BOeT3FF8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/radar-mXnYM7sB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-check-D3_RgTK9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/list-checks-BPEvwfSa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/briefcase-kmggLHDt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/pill-DGKG16G2.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/stethoscope-DnuGNY1G.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/server-CVC5glqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-clock-BYwhgYNa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/house-CvSrKdi8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utensils-CIXlWqc9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-qY5QJ0rp.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/git-branch-BzLdTVVU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/timer-DEDFBKE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/triangle-alert-B-kPMtTM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-text-wJxpAYty.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pin-ByK-F_kc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/person-standing-Bs5LYqGB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-alert-BgzG2_2j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trash-2-D712tlRq.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/octagon-alert-Ie7q7YDI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/siren-DLpdKKaP.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/flask-conical-Cj5UTvHv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/hard-hat-TwHpm1nd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/megaphone-CEdGqGOy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-icuaRuh5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/smartphone-blycXJpy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/graduation-cap-CtQmVOc3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-right-Di0XmTXQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/menu-v_QnaheS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-BNy9AwTz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-3--OzyUhr0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/command-9x_1OwTk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ticket-DxC6ZAGz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/separator-C7fe0Vgu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-right-D3RsQ715.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/use-initials-U-N8N3-N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/log-out-TlUBX7lC.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/datetime-Cj7rLFb1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/_dialogs-CvmWTYYo.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-controls-BDsYSUEA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/leave-calendar-range-Dd_qWk4O.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/grip-vertical-BV6tmybS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/plus-BeKXm1hd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-library-BQ2VnlnQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-plus-2-BcBZC9ag.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/upload-CGI3T4zc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/database-BWwaJb39.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/download-CGBtH_MU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sliders-horizontal-Bjyv2VDO.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/rotate-ccw-BKyKLA-K.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/copy-BOfdJ6aG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/history-D-3bCwZx.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/save-BoDOW5x5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/columns-3-BaGHPYIg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/filter-BJNZWuX0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-template-DjlHE7lH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/play-BivEUwR3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-charts-DKFvUt4j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/images/avatar-placeholder.svg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/operations/people-location-reports/client"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/targets?source=client_locations&q="
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 202,
+      "url": "http://127.0.0.1:8974/report-builder/runs"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/7ea21f38-f3f4-4a29-b355-da136b3f079d"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/operations/people-location-reports/staff"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-react-C99fm9h8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-inertia-L00mYErJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-DkbjUGTW.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-ui-w1Ikxf0L.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-kTBoimet.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-table-DzB-BBEl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/card-C9LxLdKv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utils-COkJOzsg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/checkbox-guEFao1b.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/check-BsaZvJ7g.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-menu-BTUHGMcA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dropdown-menu-B8EOaGf7.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-utils-Dr6D9L7d.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-BQ90ammz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-vertical-CB9zZGLc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/avatar-D2DsKi5Y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/page-header-RxMlIkp1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dialog-B1dDzuuR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-Bd2kW8NQ.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/overlay-focus-return-4ESXsuki.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/x-DyxLeehn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/popover-Bwbch3JK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/status-badge-3QlJuqdd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/tooltip-D-a-5XaZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-up-BvjbOq26.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-down-C1YbRZx3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-Bdje7DHE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/search-DTA3ilYl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-left-dxTnbMsK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-up-right-znZiTK9O.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-down-CRr8arVc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/button-BUrF8eld.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/input-49RbooBa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/label-DnayXvci.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/select-Clt9R9Fv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-up-k5Nxo-PI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/textarea-C_9uu-fb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-layout-CoCsXh-f.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/staff-page-shell-DfHE8BE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/fleet-navigation-DlwLKINM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-grid-CbldjNdE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/truck-Bu2Ws-eD.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/route-BV0ScKbh.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/package-DUBPD5gr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wrench-B-vlBkOr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chart-column-BwvZtlRa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/bell-D9w1izjY.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-dashboard-BfiXAqHw.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/building-2-Boln8z5y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wallet-nyJNc6py.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-days-BVcVjN9j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/book-open-BnxMLdqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-text-CCfjbuHQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/landmark-BUpjXh67.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-range-LZGXevCR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/coins-CKdS9aGf.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/receipt-17KIqin_.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-spreadsheet-BPXwFwxJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/banknote-BbU2rqFE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/car-C3RPwkVl.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/repeat-CDVZEWSt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dollar-sign-CUVyrCNQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-right-M2l76D8W.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scale-DOdFejmr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sparkles-BB8ATk2P.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/credit-card-C4FDLjYU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-DhHSCPp-.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/link-2-CETTjkL4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wand-sparkles-DUAq9obN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/settings-DqbERAvH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scroll-text-C5oggVEM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/gavel-BwgGqEsN.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-list-Ox7iCv1V.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/target-D9SBo1S4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-LdbdHTAR.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-pulse-CCzXbl6h.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-check-DSqe-zQb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/user-check-C2kS7rQZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/users-RNQJcWQn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-check-yhW_lfQM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pinned-LFA7o1BV.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/cpu-1Uaht0Ya.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/network-Ch0Typzk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/activity-BOeT3FF8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/radar-mXnYM7sB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-check-D3_RgTK9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/list-checks-BPEvwfSa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/briefcase-kmggLHDt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/pill-DGKG16G2.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/stethoscope-DnuGNY1G.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/server-CVC5glqE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-clock-BYwhgYNa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/house-CvSrKdi8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utensils-CIXlWqc9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-qY5QJ0rp.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/git-branch-BzLdTVVU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/timer-DEDFBKE0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/triangle-alert-B-kPMtTM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-text-wJxpAYty.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pin-ByK-F_kc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/person-standing-Bs5LYqGB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-alert-BgzG2_2j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trash-2-D712tlRq.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/octagon-alert-Ie7q7YDI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/siren-DLpdKKaP.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/flask-conical-Cj5UTvHv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/hard-hat-TwHpm1nd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/megaphone-CEdGqGOy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-icuaRuh5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/smartphone-blycXJpy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/graduation-cap-CtQmVOc3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-right-Di0XmTXQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/menu-v_QnaheS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-BNy9AwTz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-3--OzyUhr0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/command-9x_1OwTk.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ticket-DxC6ZAGz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/separator-C7fe0Vgu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-right-D3RsQ715.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/use-initials-U-N8N3-N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/log-out-TlUBX7lC.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/datetime-Cj7rLFb1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/_dialogs-CvmWTYYo.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-controls-BDsYSUEA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/leave-calendar-range-Dd_qWk4O.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/grip-vertical-BV6tmybS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/plus-BeKXm1hd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-library-BQ2VnlnQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-plus-2-BcBZC9ag.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/upload-CGI3T4zc.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/database-BWwaJb39.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/download-CGBtH_MU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sliders-horizontal-Bjyv2VDO.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/rotate-ccw-BKyKLA-K.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/copy-BOfdJ6aG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/history-D-3bCwZx.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/save-BoDOW5x5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/columns-3-BaGHPYIg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/filter-BJNZWuX0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-template-DjlHE7lH.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/play-BivEUwR3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-charts-DKFvUt4j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/images/avatar-placeholder.svg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/operations/people-location-reports/staff"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/targets?source=staff_sessions&q="
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/targets?source=staff_locations&q="
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 202,
+      "url": "http://127.0.0.1:8974/report-builder/runs"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/a86d711d-ecd1-4d3a-b451-1a93d90f682c"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/fleet-assets/reports/builder"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-react-C99fm9h8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-inertia-L00mYErJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-Blb7C51n.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-ui-w1Ikxf0L.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-B6pVkbws.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-table-Do1m9x0k.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/card-C9LxLdKv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/checkbox-DEh2zUEz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/check-Do9prvu6.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utils-COkJOzsg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/entity-menu-C5-7yfIf.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-utils-Dr6D9L7d.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dropdown-menu-BA3MHm8N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-DTZYn2cY.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-BgwMGqJT.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/workspace-Bd2kW8NQ.css"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-vertical-DgfhOx6k.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dialog-DDGBesMu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/page-header-DfbXXy0A.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/x-DYRN2swA.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-up-CZajW0GX.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/avatar-D2DsKi5Y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trending-down-HT1De-bb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ellipsis-B5pvFlkG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/search-D3mb25nT.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/overlay-focus-return-4ESXsuki.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-left-zrqS-8iO.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-up-right-BkbW9pT9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-down-Dk1A7v7Z.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/popover-Bwbch3JK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/status-badge-3QlJuqdd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/tooltip-D-a-5XaZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/select-DV64OaiM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-up-DLqFLDmg.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/app-layout-UhXjUCd4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/button-BUrF8eld.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/staff-page-shell-D9XV2-W3.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/fleet-navigation-DwYshBt0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/input-49RbooBa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/label-DnayXvci.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-grid-BnTklxYG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/textarea-C_9uu-fb.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/truck-BIOxoa-J.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/route-k6TTPX3f.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/package-C5yGzbnu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wrench-I5yct4iT.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chart-column-CgPEnbKa.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/bell-Bk6UKW6T.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-dashboard-ThR7J1NK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/building-2-C6myv4_Y.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wallet-BaJwK9WQ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-days-D9pVuhHd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/book-open-BF_vP0l8.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-text-C_RX8RNG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/landmark-d2wqOCWm.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-range-Cj33ol-x.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/coins-DC7tf9PJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/receipt-Cduq50lJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-spreadsheet-DsuJVqHK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/banknote-B6tyICPv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/car-DMF1GpsG.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/repeat-CPbAiVYr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/dollar-sign-A2WcxvTz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-right-CcUfP0VY.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scale-5_jQQ9xh.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sparkles-CJvXZQab.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/credit-card-COTxRxmE.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-D0C8JIXB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/link-2-CLVPC7OS.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/wand-sparkles-DzhlJ9Oz.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/settings-BEKsphve.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/scroll-text-z2fHBiwv.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/gavel-VJq7f2pL.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-list-FRBX-Z9v.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/target-DPaVPWZ0.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-BXJ8tURr.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/heart-pulse-nMfPwZAU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-check-DPDueVjj.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/user-check-BAOGXJzt.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/users-DZ8PaR1F.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clipboard-check-fezWxuv-.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pinned-CKgn9nCK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/cpu-B7K96fRd.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/network-Bm7iOMNZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/activity-Df_u3pxO.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/radar-eSPZ767z.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/circle-check-D6RjkbhT.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/list-checks-eS_3y19F.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/briefcase-o0yiOKNo.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/pill-Bg_PAM-c.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/stethoscope-DGOjwqEy.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/server-CUf3WGHm.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/calendar-clock-Bfe7Q_-d.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/house-Df3p-sM_.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/utensils-gWX7zlmX.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-C3WH6StD.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/git-branch-DX1hQmS4.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/timer-CL1WiBBO.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/triangle-alert-ChCX3vxj.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-text-ChPphxMf.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/map-pin-IjxxuS4i.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/person-standing-kZ3hHI1n.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/shield-alert-B3FyLE4x.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/trash-2-gwbDzxZZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/octagon-alert-BovAO1t9.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/siren-C-KoAZRp.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/flask-conical-DJ9KXT_-.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/hard-hat-Bp_T2eFW.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/megaphone-COx_-7Ww.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/message-square-C4TnggjX.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/smartphone-8dnYg3uX.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/graduation-cap-jYqzEImn.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/chevron-right-BBgogco5.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/menu-Dl5UAtRh.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-left-BGqrBwpi.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/clock-3-BDN1rv_x.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/command-0D_pm6wI.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/ticket-DRIdx2G6.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/arrow-right-DcGFV2WZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/log-out-BxMxwC8M.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/_dialogs-6kdYTf8L.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-controls-0hKGu-7G.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/leave-calendar-range-VLffFqzK.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/separator-C7fe0Vgu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/grip-vertical-C0iWc95D.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/use-initials-U-N8N3-N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/plus-DNUWKJ90.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/studio-library-BeeIHnfj.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/datetime-Cj7rLFb1.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/file-plus-2-DjMuO_QM.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/upload-Cf4Y6QqZ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/database-DPgHLuZB.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/download-Cfb7xC2N.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/sliders-horizontal-Dx73ZxCu.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/rotate-ccw-Cee_FynU.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/copy-C8iiDGcJ.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/history-D3nUeS-A.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/save-BJKa5mff.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/columns-3-NUn7qZV_.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/filter-XVEIAX8E.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/layout-template-wNWWskwi.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/play-Cd2Gh5NP.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/build/assets/vendor-charts-DKFvUt4j.js"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/images/avatar-placeholder.svg"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/fleet-assets/reports/builder"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/targets?source=journeys&q="
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/validate"
+    },
+    {
+      "status": 202,
+      "url": "http://127.0.0.1:8974/report-builder/runs"
+    },
+    {
+      "status": 200,
+      "url": "http://127.0.0.1:8974/report-builder/runs/59a60572-4319-404d-921e-60a6f7902df3"
+    }
+  ],
+  "genuineBrowserZoom": "Unverified; viewport checks are not zoom evidence.",
+  "status": "Complete for authenticated application shell at tested desktop/mobile sizes",
+  "finalCaption": [
+    {
+      "className": "text-xs text-primary-foreground/80",
+      "color": "oklab(1 0 0 / 0.8)"
+    }
+  ],
+  "finalAxe": {
+    "desktop": [],
+    "mobileLibrary": []
+  },
+  "finalPreview": {
+    "rows": 20,
+    "distanceKm": 570
+  },
+  "visibleReviewTab": {
+    "origin": "http://127.0.0.1:8974/fleet-assets/reports/builder",
+    "syntheticAccount": "reports-qa@example.invalid",
+    "passwordAndMfa": true,
+    "populated": true
+  },
+  "completedAt": "2026-09-27T22:50:26.093Z"
+}

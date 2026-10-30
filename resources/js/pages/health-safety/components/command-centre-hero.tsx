@@ -1,43 +1,44 @@
-/* Health & Safety command-centre hero. Composes the shared `hs-hero-kit` primitives (the gold
- * standard, now extracted): eyebrow status pill + action row (＋Report · Export board summary),
- * medallion + title + NZ compliance badges, the Leading/Lagging stat clusters, and a footer band
- * (period range · site · role lens · "this week" summary strip). Semantic tokens only; plain
- * string URLs. The kit is the single implementation — analytics composes the same pieces. */
-import { EntityFilter } from '@/components/rostering';
+/** H&S overview uses the shared PageHeader; attention is separate, source-aware content. */
+import { LeaveCalendarRange } from '@/components/hr/leave-calendar-range';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+} from '@/components/page/page-header';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+    type PageHeaderStripTone,
+} from '@/components/page/page-header-strip';
+import { Tally, type TallyItem } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import {
     Popover,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import { type SharedData } from '@/types';
+import { formatDateOnly, toDateInput, workerDayRange } from '@/lib/datetime';
+import {
+    BOARD_REPORTS_LABEL,
+    boardReportLinks,
+} from '@/lib/health-safety/board-reports';
+import type { SharedData } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
-    BarChart3,
+    CalendarDays,
     ChevronDown,
-    Clock,
-    Download,
+    FileText,
     Plus,
     ShieldCheck,
-    TrendingDown,
 } from 'lucide-react';
-import { useState } from 'react';
-
-import {
-    fmt,
-    HeroCluster,
-    HeroClusterTile,
-    HeroComplianceBadges,
-    HeroMedallion,
-    type HeroSegItem,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    HeroSummaryMetric,
-    HeroSummaryStrip,
-} from './hs-hero-kit';
+import { useEffect, useState, type ReactNode } from 'react';
+import type { PpeExpiringState } from './worklists';
 
 export type HeroLeadingLagging = {
+    source_scope?: 'readable_subset';
+    source_completeness?: 'unknown';
     lagging: {
         incidents: number;
         ltifr: number | null;
@@ -47,86 +48,35 @@ export type HeroLeadingLagging = {
     };
     leading: {
         near_miss_ratio: number | null;
+        /** Why the ratio is empty: no recordable injuries yet, or not shown to this role. */
+        near_miss_ratio_reason?: 'none' | 'restricted' | null;
         actions_on_time_pct: number | null;
         training_pct: number | null;
         open_hazards: number;
     };
 };
-
 export type HeroFilters = {
     from: string;
     to: string;
     site: number | null;
     lens: string;
 };
-
-const LENS_ITEMS: HeroSegItem[] = [
-    { key: 'governance', label: 'Governance' },
-    { key: 'manager', label: 'Manager' },
-    { key: 'frontline', label: 'Frontline' },
-];
-
-const GOV_REPORTS = [
-    { label: 'Board summary', href: '/health-safety/reports/board-summary' },
-    {
-        label: 'WorkSafe register',
-        href: '/health-safety/reports/worksafe-register',
-    },
-    {
-        label: 'Investigation outcomes',
-        href: '/health-safety/reports/investigation-outcomes',
-    },
-    {
-        label: 'Corrective-action traceability',
-        href: '/health-safety/reports/corrective-action-traceability',
-    },
-    {
-        label: 'Risk-assessment register',
-        href: '/health-safety/reports/risk-assessment-register',
-    },
-];
-
-function toISODate(d: Date): string {
-    return d.toISOString().slice(0, 10);
-}
-
-function presetRange(key: string): { from: string; to: string } {
-    const now = new Date();
-    const from = new Date(now);
-    if (key === 'week') {
-        const mondayOffset = (now.getDay() + 6) % 7;
-        from.setDate(now.getDate() - mondayOffset);
-    } else if (key === 'quarter') {
-        from.setDate(now.getDate() - 90);
-    } else {
-        from.setDate(now.getDate() - 30);
-    }
-    return { from: toISODate(from), to: toISODate(now) };
-}
-
-export function CommandCentreHero({
-    leadingLagging,
-    filters,
-    sites,
-    expiring,
-    worksafePending,
-    activeAlerts,
-    openSafeguarding,
-    fleetUnresolved,
-    fleetIncidents30d,
-    procedures,
-    onReport,
-    orgName,
-}: {
+type AttentionProps = {
+    expiring: Array<{ type: string }>;
+    ppeState?: PpeExpiringState;
+    worksafePending: number | null;
+    activeAlerts: number | null;
+    /** Exposure managers only: exposures not on the H&S register yet (a count, no details). Absent for everyone else. */
+    exposureDeliveryProblems?: number | null;
+};
+export type CommandCentreHeroProps = AttentionProps & {
+    sourceCompleteness?: 'unknown';
     leadingLagging: HeroLeadingLagging;
     filters: HeroFilters;
     sites: Array<{ id: number; name: string }>;
-    expiring: Array<{ type: string }>;
-    worksafePending: number;
-    activeAlerts: number;
-    openSafeguarding: number;
-    fleetUnresolved: number;
-    fleetIncidents30d: number;
+    openSafeguarding: number | null;
+    fleetUnresolved: number | null;
+    fleetIncidents30d: number | null;
     procedures: {
         approved: number;
         review_due: number;
@@ -134,363 +84,501 @@ export function CommandCentreHero({
     };
     onReport?: () => void;
     orgName?: string | null;
-}) {
-    // The board-summary export targets governance.view-gated report routes; hide
-    // it for register-only roles so they don't hit a 403 from the command centre.
+    rail?: ReactNode;
+    search?: { value: string; onChange: (value: string) => void };
+};
+// One board-report list, linking the readable report pages (lib/health-safety/board-reports).
+const GOV_REPORTS = boardReportLinks();
+function presetRange(
+    key: string,
+    asAt: Date = new Date(),
+): { from: string; to: string } {
+    if (key !== 'week')
+        return workerDayRange(key === 'quarter' ? 90 : 30, asAt);
+    const to = toDateInput(asAt);
+    const calendar = new Date(to + 'T00:00:00Z');
+    calendar.setUTCDate(
+        calendar.getUTCDate() - ((calendar.getUTCDay() + 6) % 7),
+    );
+    return { from: calendar.toISOString().slice(0, 10), to };
+}
+const fmt = (value: number | null, suffix = '') =>
+    value === null ? '—' : String(value) + suffix;
+/** One of the four header numbers (the drawing's labels; every number links to where it lives). */
+type Headline = {
+    label: string;
+    value: string;
+    caption?: string;
+    href: string;
+    tone?: PageHeaderStripTone;
+};
+
+export function CommandCentreHero({
+    leadingLagging,
+    filters,
+    sites,
+    onReport,
+    rail,
+    search,
+}: CommandCentreHeroProps) {
     const canViewBoardReports =
         usePage<SharedData>().props.auth.can?.governance?.view ?? false;
-
     const [customFrom, setCustomFrom] = useState(filters.from);
     const [customTo, setCustomTo] = useState(filters.to);
-
-    const lagging = leadingLagging.lagging;
-    const leading = leadingLagging.leading;
-
-    const sdsExpiring = expiring.filter((e) => e.type === 'sds').length;
-    const drillsDue = expiring.filter((e) => e.type === 'drill').length;
-    const ppeDue = expiring.filter(
-        (e) => e.type === 'ppe_inspection' || e.type === 'ppe_expiry',
-    ).length;
-
-    const go = (
-        params: Partial<HeroFilters> & { from?: string; to?: string },
-    ) => {
+    const [calendarRevision, setCalendarRevision] = useState(
+        `${filters.from}:${filters.to}`,
+    );
+    const [datesOpen, setDatesOpen] = useState(false);
+    useEffect(() => {
+        setCustomFrom(filters.from);
+        setCustomTo(filters.to);
+        setCalendarRevision(`${filters.from}:${filters.to}`);
+    }, [filters.from, filters.to]);
+    const changeDatesOpen = (open: boolean) => {
+        if (open) {
+            setCustomFrom(filters.from);
+            setCustomTo(filters.to);
+        }
+        setDatesOpen(open);
+    };
+    const go = (params: Partial<HeroFilters>) => {
         const merged: Record<string, string | number> = {
             from: filters.from,
             to: filters.to,
             lens: filters.lens,
         };
-        if (filters.site != null) merged.site = filters.site;
-        for (const [k, v] of Object.entries(params)) {
-            if (v == null) delete merged[k];
-            else merged[k] = v as string | number;
+        if (filters.site !== null) merged.site = filters.site;
+        for (const [key, value] of Object.entries(params)) {
+            if (value == null) delete merged[key];
+            else merged[key] = value;
         }
-        router.get('/health-safety', merged, { preserveScroll: true });
+        router.get('/health-safety', merged, {
+            preserveScroll: true,
+            preserveState: true,
+        });
     };
-
-    const activePeriod = ((): string => {
-        for (const key of ['week', '30d', 'quarter']) {
-            if (presetRange(key).from === filters.from) return key;
-        }
-        return 'custom';
-    })();
-
-    const activeSite =
-        filters.site != null ? sites.find((s) => s.id === filters.site) : null;
-    const siteLabel = activeSite ? activeSite.name : 'All sites';
-
-    const periodItems: HeroSegItem[] = [
-        { key: 'week', label: 'This week' },
-        { key: '30d', label: '30 days' },
-        { key: 'quarter', label: 'Quarter' },
-        {
-            key: 'custom',
-            label: 'Custom range',
-            popover: (
-                <>
-                    <div className="flex items-end gap-2">
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            From
-                            <input
-                                type="date"
-                                value={customFrom}
-                                max={customTo}
-                                onChange={(e) => setCustomFrom(e.target.value)}
-                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                            />
-                        </label>
-                        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                            To
-                            <input
-                                type="date"
-                                value={customTo}
-                                min={customFrom}
-                                onChange={(e) => setCustomTo(e.target.value)}
-                                className="rounded-md border border-border bg-background px-2 py-1 text-sm text-foreground"
-                            />
-                        </label>
-                    </div>
-                    <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={() => go({ from: customFrom, to: customTo })}
-                    >
-                        Apply range
-                    </Button>
-                </>
-            ),
-        },
-    ];
-
-    const footer = (
-        <>
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                {/* Period range control */}
-                <HeroSegmented
-                    variant="pill"
-                    label="Period"
-                    ariaLabel="Period range"
-                    items={periodItems}
-                    value={activePeriod}
-                    onChange={(k) => go(presetRange(k))}
-                />
-
-                {/* Site filter + role lens */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <EntityFilter
-                        onDark
-                        label="Site"
-                        allLabel="All sites"
-                        items={sites.map((s) => ({ id: s.id, name: s.name }))}
-                        value={filters.site}
-                        onChange={(v) => go({ site: v ?? undefined })}
-                    />
-                    <HeroSegmented
-                        variant="segmented"
-                        label="Lens"
-                        ariaLabel="Role lens"
-                        items={LENS_ITEMS}
-                        value={filters.lens}
-                        onChange={(k) => go({ lens: k })}
-                    />
-                </div>
-            </div>
-
-            {/* "This week" summary strip */}
-            <HeroSummaryStrip label="This week">
-                <HeroSummaryMetric tone="warning">
-                    {lagging.incidents} incidents
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="critical">
-                    {worksafePending} WorkSafe-notifiable
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="warning">
-                    {leading.open_hazards} hazards open
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone="warning">
-                    {drillsDue} drills due
-                </HeroSummaryMetric>
-                <HeroSummaryMetric tone={ppeDue > 0 ? 'warning' : 'success'}>
-                    {ppeDue > 0 ? `${ppeDue} PPE due` : 'PPE all current'}
-                </HeroSummaryMetric>
-                <HeroSummaryMetric
-                    tone={activeAlerts > 0 ? 'critical' : 'success'}
-                >
-                    {activeAlerts > 0
-                        ? `${activeAlerts} lone-worker alert${activeAlerts === 1 ? '' : 's'}`
-                        : 'lone-workers all checked in'}
-                </HeroSummaryMetric>
-            </HeroSummaryStrip>
-        </>
-    );
-
+    const period =
+        ['week', '30d', 'quarter'].find((key) => {
+            const range = presetRange(key);
+            return range.from === filters.from && range.to === filters.to;
+        }) ?? 'custom';
+    const activeSite = sites.find((site) => site.id === filters.site);
+    // Someone who can see only one house sees its name, not "All sites" (drawing D1).
+    const siteLabel =
+        filters.site === null
+            ? sites.length === 1
+                ? sites[0].name
+                : 'All sites'
+            : (activeSite?.name ?? 'Site access unconfirmed');
+    const lagging = leadingLagging.lagging;
+    const leading = leadingLagging.leading;
+    // These keys are consumed by the destination controllers. Current-state
+    // registers deliberately receive no occurrence-date filter.
+    const destination = (path: string, params: Record<string, string> = {}) => {
+        const query = new URLSearchParams(params);
+        if (filters.site !== null) query.set('site_id', String(filters.site));
+        return path + (query.size ? '?' + query.toString() : '');
+    };
+    const selectedPeriod = { from: filters.from, to: filters.to };
+    const analytics = destination('/health-safety/analytics', {
+        period: 'custom',
+        ...selectedPeriod,
+        lens: filters.lens,
+    });
+    // Four header numbers per lens (approved H&S drawings, 23 Oct). The fifth and sixth
+    // measures (procedures and fleet, or safeguarding and fleet) live in the page body.
+    const headline: Headline[] =
+        filters.lens === 'governance'
+            ? [
+                  {
+                      label: 'Incidents',
+                      value: fmt(lagging.incidents),
+                      caption: 'This period',
+                      href: destination('/incidents', {
+                          ...selectedPeriod,
+                          kind: 'incidents',
+                          tab: 'all',
+                      }),
+                  },
+                  {
+                      label: 'Lost-time injury rate',
+                      value: fmt(lagging.ltifr),
+                      caption: 'LTIFR',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Recordable injury rate',
+                      value: fmt(lagging.trifr),
+                      caption: 'TRIFR',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Days since a lost-time injury',
+                      value: fmt(lagging.days_since_lti),
+                      caption:
+                          lagging.days_since_lti === null
+                              ? 'Not confirmed'
+                              : undefined,
+                      href: analytics,
+                  },
+              ]
+            : [
+                  {
+                      label: 'Near misses per injury',
+                      value: fmt(leading.near_miss_ratio, '×'),
+                      // An empty tile says why (30 Oct user test).
+                      caption:
+                          leading.near_miss_ratio !== null
+                              ? 'This year'
+                              : leading.near_miss_ratio_reason === 'restricted'
+                                ? 'Injury figures not shown for your role'
+                                : 'No recordable injuries yet this year',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Actions on time',
+                      value: fmt(leading.actions_on_time_pct, '%'),
+                      caption:
+                          leading.actions_on_time_pct === null
+                              ? 'No actions due this period'
+                              : 'Due this period',
+                      href: destination('/health-safety/corrective-actions', {
+                          ...selectedPeriod,
+                          tab: 'all',
+                      }),
+                  },
+                  {
+                      label: 'Training',
+                      value: fmt(leading.training_pct, '%'),
+                      caption:
+                          leading.training_pct === null
+                              ? 'No training records yet'
+                              : 'Up to date',
+                      href: analytics,
+                  },
+                  {
+                      label: 'Open hazards',
+                      value: fmt(leading.open_hazards),
+                      caption: 'Open or in progress',
+                      href: destination('/compliance/hazards', {
+                          tab: 'active',
+                      }),
+                  },
+              ];
+    const validRange =
+        !!formatDateOnly(customFrom, '') &&
+        !!formatDateOnly(customTo, '') &&
+        customFrom <= customTo;
     return (
-        <HeroShell footer={footer}>
-            {/* Eyebrow + action row */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <HeroStatusPill>Safety system · synced just now</HeroStatusPill>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    {onReport ? (
-                        <Button
-                            onClick={onReport}
-                            className="bg-primary-foreground text-primary shadow-sm hover:bg-primary-foreground/90"
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Report
-                        </Button>
-                    ) : null}
-                    <Link
-                        href="/health-safety/analytics"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                    >
-                        <BarChart3 className="h-4 w-4" />
-                        View analytics
-                    </Link>
-                    {canViewBoardReports ? (
+        <PageHeader
+            frontline={filters.lens === 'frontline'}
+            wrapTitle
+            icon={ShieldCheck}
+            title="Health and safety"
+            subline={[
+                siteLabel,
+                formatDateOnly(filters.from) +
+                    ' – ' +
+                    formatDateOnly(filters.to),
+            ]
+                .filter(Boolean)
+                .join(' · ')}
+            actions={
+                <>
+                    {search && (
+                        <PageHeaderSearch
+                            value={search.value}
+                            onChange={search.onChange}
+                            placeholder="Search this overview…"
+                            ariaLabel="Search this overview"
+                        />
+                    )}
+                    {canViewBoardReports && (
                         <Popover>
                             <PopoverTrigger asChild>
-                                {/* eslint-disable-next-line no-restricted-syntax -- translucent action pill on the dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                >
-                                    <Download className="h-4 w-4" />
-                                    Export board summary
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                </button>
+                                <PageHeaderGlassButton icon={FileText}>
+                                    {BOARD_REPORTS_LABEL}
+                                    <ChevronDown className="size-3.5" />
+                                </PageHeaderGlassButton>
                             </PopoverTrigger>
                             <PopoverContent align="end" className="w-60 p-1">
-                                {GOV_REPORTS.map((r) => (
+                                {GOV_REPORTS.map((report) => (
                                     <Link
-                                        key={r.href}
-                                        href={r.href}
-                                        className="block rounded-md px-2.5 py-2 text-[13px] text-foreground transition-colors hover:bg-muted"
+                                        key={report.href}
+                                        href={report.href}
+                                        className="frontline-hit text-subtle block rounded-md px-3 py-2 text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                                     >
-                                        {r.label}
+                                        {report.label}
                                     </Link>
                                 ))}
                             </PopoverContent>
                         </Popover>
-                    ) : null}
-                </div>
-            </div>
-
-            {/* Title block */}
-            <div className="flex items-start gap-4 md:gap-5">
-                <HeroMedallion icon={ShieldCheck} />
-                <div className="min-w-0 flex-1">
-                    <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">
-                        Health &amp; Safety command centre
-                    </h1>
-                    <p className="mt-1 text-sm text-primary-foreground/75">
-                        <span className="underline decoration-primary-foreground/40 underline-offset-4">
-                            {siteLabel}
-                        </span>
-                        {orgName ? ` · ${orgName}` : ''}
-                        {` · ${sites.length} site${sites.length === 1 ? '' : 's'} · PCBU duty-holder view`}
-                    </p>
-                    <HeroComplianceBadges
-                        worksafeAwaiting={worksafePending}
-                        sdsExpiring={sdsExpiring}
-                        drillsDue={drillsDue}
-                    />
-                </div>
-            </div>
-
-            {/* Stat clusters */}
-            <div className="grid gap-3 lg:grid-cols-2">
-                <HeroCluster title="Lagging · outcomes" icon={TrendingDown}>
-                    <HeroClusterTile
-                        href="/incidents"
-                        label="Incidents"
-                        value={fmt(lagging.incidents)}
-                        caption="this period"
-                        tone={lagging.incidents > 0 ? 'warning' : 'success'}
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/injuries"
-                        label="LTIFR"
-                        value={fmt(lagging.ltifr)}
-                        caption="per M hrs"
-                        tone="neutral"
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/injuries"
-                        label="TRIFR"
-                        value={fmt(lagging.trifr)}
-                        caption="per M hrs"
-                        tone="neutral"
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/injuries"
-                        label="Days LTI-free"
-                        value={fmt(lagging.days_since_lti)}
-                        caption="since last LTI"
-                        tone={
-                            (lagging.days_since_lti ?? 0) >= 30
-                                ? 'success'
-                                : 'warning'
-                        }
-                    />
-                </HeroCluster>
-
-                <HeroCluster title="Leading · proactive" icon={Clock}>
-                    <HeroClusterTile
-                        href="/incidents?type=near_miss"
-                        label="Near-miss"
-                        value={fmt(leading.near_miss_ratio, '×')}
-                        caption=": incident"
-                        tone={
-                            (leading.near_miss_ratio ?? 0) >= 3
-                                ? 'success'
-                                : 'warning'
-                        }
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/corrective-actions"
-                        label="Actions on time"
-                        value={fmt(leading.actions_on_time_pct, '%')}
-                        caption="30-day"
-                        tone={
-                            (leading.actions_on_time_pct ?? 0) >= 90
-                                ? 'success'
-                                : 'warning'
-                        }
-                    />
-                    <HeroClusterTile
-                        href="/health-safety/worker-participation"
-                        label="Train / audit"
-                        value={fmt(leading.training_pct, '%')}
-                        caption="compliance"
-                        tone={
-                            (leading.training_pct ?? 0) >= 90
-                                ? 'success'
-                                : 'warning'
-                        }
-                    />
-                    <HeroClusterTile
-                        href="/compliance/hazards"
-                        label="Open hazards"
-                        value={fmt(leading.open_hazards)}
-                        caption="open now"
-                        tone={leading.open_hazards > 0 ? 'warning' : 'success'}
-                    />
-                </HeroCluster>
-            </div>
-
-            {/* Cross-module · related safety workflows reachable from the hub */}
-            <HeroCluster title="Across the safety system" icon={ShieldCheck}>
-                <HeroClusterTile
-                    href="/safeguarding"
-                    label="Safeguarding"
-                    value={fmt(openSafeguarding)}
-                    caption="open concerns"
-                    tone={openSafeguarding > 0 ? 'warning' : 'success'}
-                />
-                <HeroClusterTile
-                    href="/fleet-assets/incidents"
-                    label="Fleet incidents"
-                    value={fmt(fleetUnresolved)}
-                    caption="unresolved"
-                    tone={fleetUnresolved > 0 ? 'warning' : 'success'}
-                />
-                <HeroClusterTile
-                    href="/fleet-assets/incidents"
-                    label="Fleet · 30d"
-                    value={fmt(fleetIncidents30d)}
-                    caption="reported this period"
-                    tone={fleetIncidents30d > 0 ? 'warning' : 'success'}
-                />
-                <HeroClusterTile
-                    href="/health-safety/procedures"
-                    label="Procedures"
-                    value={fmt(procedures.approved)}
-                    caption={
-                        procedures.review_due > 0
-                            ? `${procedures.review_due} review due`
-                            : procedures.coverage_gap_categories > 0
-                              ? `${procedures.coverage_gap_categories} coverage gap${procedures.coverage_gap_categories === 1 ? '' : 's'}`
-                              : 'all in review window'
-                    }
-                    tone={
-                        procedures.coverage_gap_categories > 0
-                            ? 'critical'
-                            : procedures.review_due > 0
-                              ? 'warning'
-                              : 'success'
-                    }
-                />
-                <HeroClusterTile
-                    href="/health-safety/analytics"
-                    label="Analytics"
-                    value="View"
-                    caption="trends & root cause"
-                    tone="neutral"
-                />
-            </HeroCluster>
-        </HeroShell>
+                    )}
+                    {onReport && (
+                        <PageHeaderPrimaryButton icon={Plus} onClick={onReport}>
+                            Report something
+                        </PageHeaderPrimaryButton>
+                    )}
+                </>
+            }
+            strip={
+                // The frontline start keeps the header to the title and Report something (drawing D1).
+                filters.lens === 'frontline' ? undefined : (
+                    <PageHeaderNumbers>
+                        {headline.map((n) => (
+                            <PageHeaderNumber
+                                key={n.label}
+                                value={n.value}
+                                label={n.label}
+                                caption={n.caption}
+                                tone={n.tone}
+                                href={n.href}
+                            />
+                        ))}
+                    </PageHeaderNumbers>
+                )
+            }
+            filters={
+                // The frontline start keeps the header to the title and Report something (drawing D1).
+                filters.lens === 'frontline' ? undefined : (
+                    <>
+                        <PageHeaderFilterSelect
+                            label="Period"
+                            value={period}
+                            allValue="30d"
+                            options={[
+                                { value: 'week', label: 'This week' },
+                                { value: '30d', label: '30 days' },
+                                { value: 'quarter', label: '90 days' },
+                                { value: 'custom', label: 'Custom range' },
+                            ]}
+                            onChange={(value) => {
+                                if (value === 'custom') changeDatesOpen(true);
+                                else go(presetRange(value));
+                            }}
+                        />
+                        <Popover
+                            open={datesOpen}
+                            onOpenChange={changeDatesOpen}
+                        >
+                            <PopoverTrigger asChild>
+                                <PageHeaderGlassButton icon={CalendarDays}>
+                                    Set dates
+                                </PageHeaderGlassButton>
+                            </PopoverTrigger>
+                            <PopoverContent
+                                className="date-picker-popover space-y-3"
+                                data-compact
+                                aria-label="Safety overview period picker"
+                                collisionPadding={16}
+                                align="start"
+                            >
+                                <div
+                                    role="group"
+                                    aria-label="Safety overview period"
+                                    className="space-y-3"
+                                >
+                                    <h3 className="text-section-title">
+                                        Safety overview period
+                                    </h3>
+                                    <p className="text-subtle">
+                                        Choose a start and end day. Select the
+                                        same day twice for one day. Both dates
+                                        are included.
+                                    </p>
+                                    <div className="date-time-calendar scrollbar-pretty overflow-x-auto [&_button[aria-pressed]]:min-h-11 [&_button[aria-pressed]]:min-w-11">
+                                        <div className="min-w-[308px]">
+                                            <LeaveCalendarRange
+                                                key={calendarRevision}
+                                                start={customFrom || null}
+                                                end={customTo || null}
+                                                required={false}
+                                                onChange={(start, end) => {
+                                                    setCustomFrom(start ?? '');
+                                                    setCustomTo(end ?? '');
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-caption sm:hidden">
+                                        Scroll sideways to see more days if
+                                        needed.
+                                    </p>
+                                    <p
+                                        role="status"
+                                        aria-live="polite"
+                                        className="text-subtle"
+                                    >
+                                        {validRange
+                                            ? `${formatDateOnly(customFrom)} – ${formatDateOnly(customTo)} · inclusive`
+                                            : customFrom
+                                              ? `Starts ${formatDateOnly(customFrom)} · choose the end day`
+                                              : 'Choose the start day'}
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap justify-end gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="frontline-tap"
+                                        onClick={() => setDatesOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        className="frontline-tap"
+                                        disabled={!validRange}
+                                        onClick={() => {
+                                            go({
+                                                from: customFrom,
+                                                to: customTo,
+                                            });
+                                            setDatesOpen(false);
+                                        }}
+                                    >
+                                        Apply range
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                        <PageHeaderFilterSelect
+                            label="Site"
+                            value={
+                                filters.site === null
+                                    ? 'all'
+                                    : String(filters.site)
+                            }
+                            options={[
+                                { value: 'all', label: 'All approved sites' },
+                                ...sites.map((site) => ({
+                                    value: String(site.id),
+                                    label: site.name,
+                                })),
+                            ]}
+                            onChange={(value) =>
+                                go({
+                                    site:
+                                        value === 'all' ? null : Number(value),
+                                })
+                            }
+                        />
+                    </>
+                )
+            }
+            mobileSummary="Safety overview · filters and measures"
+            rail={rail}
+        />
     );
 }
 
+/**
+ * Recorded counts and capped previews describe attention, never overall safety clearance.
+ * Drawn as one tally (approved H&S drawings, 23 Oct): each number opens its register (keeping the
+ * selected Site); zeros fold into one sentence about the records you can see; an unconfirmed count
+ * shows a dash with the reason, never a zero.
+ */
+export function CommandCentreAttention({
+    expiring,
+    ppeState,
+    worksafePending,
+    activeAlerts,
+    exposureDeliveryProblems = null,
+    site = null,
+}: AttentionProps & { site?: number | null }) {
+    const ppeRestricted = ppeState?.source_integrity === 'restricted';
+    // No PPE state from the source = not confirmed: a dash, never a zero.
+    const ppeDue =
+        ppeRestricted || !ppeState
+            ? null
+            : expiring.filter(
+                  (item) =>
+                      item.type === 'ppe_inspection' ||
+                      item.type === 'ppe_expiry',
+              ).length;
+    const ppeNote = ppeRestricted
+        ? 'Access restricted'
+        : ppeState?.source_integrity === 'repair_required'
+          ? 'Facts need review'
+          : !ppeState
+            ? 'Not confirmed'
+            : ppeState.truncated
+              ? 'More records than shown'
+              : undefined;
+    const count = (type: string) =>
+        expiring.filter((item) => item.type === type).length;
+    const register = (path: string, params: Record<string, string> = {}) => {
+        const query = new URLSearchParams(params);
+        if (site !== null) query.set('site_id', String(site));
+        return path + (query.size ? '?' + query.toString() : '');
+    };
+    const items: TallyItem[] = [
+        {
+            value: worksafePending === null ? '—' : String(worksafePending),
+            label: 'WorkSafe reviews to do',
+            sub: worksafePending === null ? 'Not confirmed' : undefined,
+            tone: (worksafePending ?? 0) > 0 ? 'critical' : undefined,
+            href: register('/health-safety/events', {
+                tab: 'worksafe_pending',
+            }),
+        },
+        {
+            value: activeAlerts === null ? '—' : String(activeAlerts),
+            label: 'Lone-worker alerts active',
+            sub: activeAlerts === null ? 'Not confirmed' : undefined,
+            tone: (activeAlerts ?? 0) > 0 ? 'critical' : undefined,
+            href: register('/health-safety/lone-workers'),
+        },
+        ...(exposureDeliveryProblems === null
+            ? []
+            : [
+                  {
+                      value: String(exposureDeliveryProblems),
+                      label: 'Exposures not on the H&S register yet',
+                      tone:
+                          exposureDeliveryProblems > 0
+                              ? ('critical' as const)
+                              : undefined,
+                      href: '/tasks?sources=chemical_exposure_delivery',
+                  },
+              ]),
+        {
+            value: String(count('sds')),
+            label: 'Safety data sheets to review',
+            href: register('/health-safety/substances'),
+        },
+        {
+            value: String(count('drill')),
+            label: 'Drills due',
+            href: register('/health-safety/drills'),
+        },
+        {
+            value: ppeDue === null ? '—' : String(ppeDue),
+            label: 'Protective equipment (PPE) due',
+            sub: ppeNote,
+            // A caveat on a zero (facts need review, more records than shown) must stay visible.
+            keep: ppeNote !== undefined,
+            tone:
+                (ppeDue ?? 0) > 0 ||
+                ppeState?.source_integrity === 'repair_required'
+                    ? 'warning'
+                    : undefined,
+            href: register('/health-safety/ppe'),
+        },
+    ];
+    // A zero here only covers the records this person can see, so the folded sentence says so.
+    const zeros = items.filter((item) => item.value === '0' && !item.keep);
+    return (
+        <Tally
+            title="Needs attention"
+            sub="Open and due work from records you can see — it may not be everything. Open a register for the full list."
+            items={items}
+            calm={
+                zeros.length
+                    ? `None in the records you can see: ${zeros.map((item) => item.label).join(', ')}`
+                    : undefined
+            }
+        />
+    );
+}
 export default CommandCentreHero;

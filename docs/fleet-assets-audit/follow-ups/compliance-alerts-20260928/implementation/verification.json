@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-09-28 11:05:03 UTC",
+  "scope": "Approved v5 Fleet Compliance & Alerts implementation",
+  "checks": {
+    "frontend": {
+      "status": "passed",
+      "tests": 43,
+      "files": 6,
+      "log": "frontend.log"
+    },
+    "backend": {
+      "status": "passed",
+      "distinctTests": 21,
+      "logs": [
+        "backend-final.log",
+        "bulk-recovery.log"
+      ],
+      "note": "20 regressions passed; corrected bulk activity-log assertion and snapshot checks passed in focused rerun."
+    },
+    "typescript": {
+      "status": "passed",
+      "exitCode": 0,
+      "log": "types.log"
+    },
+    "eslint": {
+      "status": "passed",
+      "exitCode": 0,
+      "maxWarnings": 0,
+      "log": "lint-final.log"
+    },
+    "pint": {
+      "status": "passed"
+    },
+    "build": {
+      "status": "passed",
+      "exitCode": 0,
+      "duration": "5m 58s",
+      "log": "build-final.log",
+      "advisory": "Existing large output chunks"
+    },
+    "diffWhitespace": {
+      "status": "passed"
+    },
+    "frozenPreviews": {
+      "status": "unchanged",
+      "files": 254,
+      "log": "frozen-preview-integrity.json"
+    }
+  },
+  "browser": {
+    "status": "awaiting_existing_account_sign_in",
+    "url": "http://127.0.0.1:8768/fleet-assets/alerts",
+    "note": "Real application reached login. Privileged QA account/fixture creation was rejected by automatic approval review and not executed. Unused seed script removed; no authenticated browser checks claimed."
+  },
+  "delivery": {
+    "committed": false,
+    "pushed": false,
+    "deployed": false
+  }
+}

@@ -17,7 +17,13 @@ class SeedAllPermissionsToAdminSeeder extends Seeder
             return;
         }
 
-        $allPermissionIds = Permission::pluck('id')->all();
+        // Independent decisions are assigned only by RbacSeeder's explicit
+        // product policy, so this backfill never gives them to admin.
+        $allPermissionIds = Permission::query()
+            ->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+            ->where('key', 'not like', 'securityDevices.endpoints.script%')
+            ->pluck('id')
+            ->all();
         $existing = $adminRole->permissions()->pluck('permissions.id')->all();
         $toAttach = array_diff($allPermissionIds, $existing);
 

@@ -72,7 +72,7 @@ test('site overview contact card uses site contacts and locked role creation', a
 
     await loginAsStaff(page);
     await page.goto(`/sites/${siteId}`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('tab', { name: /^Overview/ }).click();
+    await page.getByTestId('site-profile-tab-overview').click();
 
     const card = page.getByTestId('site-contact-information-card');
     await expect(card).toBeVisible();

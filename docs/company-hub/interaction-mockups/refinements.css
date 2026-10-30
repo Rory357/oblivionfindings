@@ -1,0 +1,89 @@
+#hub-interactions .hi-choice-copy{display:grid;gap:3px;min-width:0;text-align:left}
+#hub-interactions .hi-choice-copy b{font-size:13px;font-weight:500;line-height:1.35}
+#hub-interactions .hi-choice-copy small{font-size:12px;color:var(--hi-muted);font-weight:400;line-height:1.4}
+#hub-interactions .hi-choice-mark{width:32px;height:32px;border-radius:9px;background:var(--hi-subtle);display:grid;place-items:center;flex-shrink:0;color:var(--hi-accent)}
+#hub-interactions .hi-choice-mark svg{width:17px;height:17px}
+#hub-interactions .hi-picker-trigger{width:100%;display:flex;align-items:center;gap:10px;min-height:46px;padding:10px 12px;border:1px solid var(--hi-line);border-radius:10px;background:var(--hi-surface);color:var(--hi-ink);font-size:13px;text-align:left;transition:border-color .15s,box-shadow .15s}
+#hub-interactions .hi-picker-trigger>.hi-choice-copy{flex:1}
+#hub-interactions .hi-picker-trigger>.hi-choice-mark{width:25px;height:25px;background:transparent}
+#hub-interactions .hi-picker-trigger>.hi-avatar{width:27px;height:27px;font-size:10px}
+#hub-interactions .hi-picker-trigger>svg:last-child{width:15px;height:15px;color:var(--hi-muted);flex-shrink:0;transition:transform .15s}
+#hub-interactions .hi-picker-trigger:hover{border-color:color-mix(in srgb,var(--hi-accent) 55%,var(--hi-line))}
+#hub-interactions .hi-picker-trigger[aria-expanded=true]{border-color:var(--hi-accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--hi-accent) 12%,transparent)}
+#hub-interactions .hi-picker-trigger[aria-expanded=true]>svg:last-child{transform:rotate(180deg)}
+#hub-interactions .hi-picker-trigger.compact{width:auto;min-height:36px;padding:5px 9px;gap:7px;border-radius:8px;background:var(--hi-subtle)}
+#hub-interactions .hi-picker-trigger.compact .hi-choice-copy{display:flex;align-items:center;gap:7px;white-space:nowrap}
+#hub-interactions .hi-picker-trigger.compact .hi-choice-copy small{font-size:11px}
+#hub-interactions .hi-picker-trigger.compact>.hi-choice-mark{width:19px;height:19px}
+#hub-interactions .hi-picker-menu{position:fixed;inset:auto;margin:0;padding:5px;border:1px solid var(--hi-line);border-radius:13px;background:var(--hi-surface);color:var(--hi-ink);box-shadow:0 8px 28px light-dark(#29203922,#00000070),0 2px 6px light-dark(#2920390d,#00000030);overflow:hidden;font-family:inherit;z-index:80}
+#hub-interactions .hi-picker-menu:popover-open{display:flex;flex-direction:column}
+#hub-interactions .hi-picker-menu::backdrop{background:transparent;pointer-events:none}
+#hub-interactions .hi-picker-list{overflow:auto;min-height:0;overscroll-behavior:contain;scroll-padding:5px}
+#hub-interactions .hi-picker-option{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;min-height:44px}
+#hub-interactions .hi-picker-option[data-active=true]{background:var(--hi-subtle)}
+#hub-interactions .hi-picker-option[aria-selected=true]{background:var(--hi-soft)}
+#hub-interactions .hi-picker-option[aria-selected=true][data-active=true]{box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--hi-accent) 30%,transparent)}
+#hub-interactions .hi-picker-option>.hi-choice-copy{flex:1}
+#hub-interactions .hi-picker-option .hi-avatar{width:32px;height:32px}
+#hub-interactions .hi-option-check{display:grid;place-items:center;width:18px;flex-shrink:0;color:var(--hi-accent)}
+#hub-interactions .hi-picker-search{display:flex;align-items:center;gap:9px;padding:8px 9px 11px;margin-bottom:4px;border-bottom:1px solid var(--hi-line);flex-shrink:0;color:var(--hi-muted)}
+#hub-interactions .hi-picker-search input{border:0;outline:0!important;box-shadow:none!important;background:transparent;color:var(--hi-ink);font-size:13px;min-width:0;width:100%;min-height:28px}
+#hub-interactions .hi-picker-search:focus-within{border-bottom-color:var(--hi-accent)}
+#hub-interactions .hi-picker-hint{display:flex;align-items:center;gap:6px;border-top:1px solid var(--hi-line);margin:5px 5px 0;padding:9px 4px 3px;font-size:11px;color:var(--hi-muted);flex-shrink:0}
+#hub-interactions .hi-picker-hint>svg{width:12px;height:12px}
+#hub-interactions .hi-picker-hint>span{margin-left:auto}
+#hub-interactions .hi-picker-empty{display:grid;justify-items:center;text-align:center;gap:9px;padding:22px 14px;font-size:12px;color:var(--hi-muted)}
+#hub-interactions .hi-picker-empty b{font-weight:500;color:var(--hi-ink);overflow-wrap:anywhere;max-width:100%}
+#hub-interactions .hi-inline-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#hub-interactions .hi-inline-choices.vertical{grid-template-columns:1fr}
+#hub-interactions .hi-inline-choice{position:relative;display:flex;align-items:center;gap:10px;min-height:62px;border:1px solid var(--hi-line);border-radius:10px;padding:11px;text-align:left;background:var(--hi-surface);color:var(--hi-ink)}
+#hub-interactions .hi-inline-choice:hover{background:var(--hi-subtle)}
+#hub-interactions .hi-inline-choice[aria-checked=true]{background:var(--hi-soft);border-color:var(--hi-accent)}
+#hub-interactions .hi-choice-tick{margin-left:auto;display:none;flex-shrink:0;color:var(--hi-accent)}
+#hub-interactions .hi-choice-tick svg{width:14px;height:14px}
+#hub-interactions .hi-inline-choice[aria-checked=true]>.hi-choice-tick,#hub-interactions .hi-value[aria-pressed=true]>.hi-choice-tick{display:grid}
+#hub-interactions .hi-inline-choice[aria-checked=true]>.hi-choice-mark,#hub-interactions .hi-value[aria-pressed=true]>.hi-choice-mark{background:var(--hi-surface)}
+#hub-interactions .hi-designer-grid .hi-inline-choice{flex-wrap:wrap;gap:7px;padding:9px}
+#hub-interactions .hi-designer-grid .hi-inline-choice .hi-choice-copy{width:100%}
+#hub-interactions .hi-designer-grid .hi-inline-choice .hi-choice-tick{position:absolute;right:9px;top:14px}
+#hub-interactions .hi-field{font-size:13px;gap:8px}
+#hub-interactions .hi-dialog-head h2{font-size:24px;line-height:1.25;letter-spacing:-.65px}
+#hub-interactions .hi-dialog-head p{font-size:13px;margin-top:7px}
+#hub-interactions .hi-field input:not([type=checkbox]):not([type=range]),#hub-interactions .hi-field textarea,#hub-interactions .hi-search{border-radius:10px;font-size:14px}
+#hub-interactions .hi-person{border-radius:10px;min-height:69px;padding:12px}
+#hub-interactions .hi-person b{font-size:13px}
+#hub-interactions .hi-person small{font-size:12px}
+#hub-interactions .hi-value{min-height:76px;border-radius:10px;padding:12px;align-items:center;font-size:13px}
+#hub-interactions .hi-value[aria-pressed=true]{box-shadow:none}
+#hub-interactions .hi-value>.hi-choice-mark{width:34px;height:34px}
+#hub-interactions .hi-value .hi-choice-copy small{font-size:12px}
+#hub-interactions .hi-recipient-mode{padding:0;gap:9px;background:transparent;border:0;border-radius:0}
+#hub-interactions .hi-recipient-mode button{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--hi-line);background:var(--hi-surface);border-radius:10px;color:var(--hi-ink);text-align:left}
+#hub-interactions .hi-recipient-mode button[aria-pressed=true]{background:var(--hi-soft);border-color:var(--hi-accent);box-shadow:none;color:var(--hi-ink)}
+#hub-interactions .hi-recipient-mode button[aria-pressed=true]>.hi-choice-mark{background:var(--hi-surface)}
+#hub-interactions .hi-recipient-mode .hi-choice-copy small{font-size:11px}
+#hub-interactions .hi-compose .hi-grid2:has(.hi-value){gap:9px}
+#hub-interactions .hi-toolbar>.hi-row:last-child{gap:8px}
+#hub-interactions .hi-rec-for{margin-bottom:13px}
+#hub-interactions .hi-rec-message-form>.hi-field{margin-bottom:5px}
+#hub-interactions .hi-rec-message-form textarea{min-height:104px}
+#hub-interactions .hi-rec-writing-help{margin-bottom:12px}
+#hub-interactions .hi-rec-field-label{font-size:13px;font-weight:500;display:block;margin-bottom:8px}
+#hub-interactions .hi-rec-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#hub-interactions .hi-rec-values .hi-value{display:grid;grid-template-columns:20px 1fr;column-gap:7px;row-gap:5px;align-content:start;align-items:center;position:relative;min-height:70px;padding:10px}
+#hub-interactions .hi-rec-values .hi-choice-mark{width:20px;height:20px;background:transparent!important}
+#hub-interactions .hi-rec-values .hi-choice-copy{display:contents}
+#hub-interactions .hi-rec-values .hi-choice-copy b{font-size:12px;line-height:1.35;padding-right:6px}
+#hub-interactions .hi-rec-values .hi-choice-copy small{grid-column:1/-1;font-size:11px;line-height:1.45}
+#hub-interactions .hi-rec-values .hi-choice-tick{position:absolute;right:5px;top:5px;background:var(--hi-soft)}
+#hub-interactions .hi-rec-values .hi-choice-tick svg{width:11px;height:11px}
+#hub-interactions .hi-rec-impact{margin-top:18px}
+#hub-interactions .hi-rec-impact .hi-inline-choices{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+#hub-interactions .hi-rec-impact .hi-inline-choice{min-height:44px;padding:8px;gap:6px;justify-content:center}
+#hub-interactions .hi-rec-impact .hi-inline-choice .hi-choice-copy b{font-size:12px;white-space:nowrap}
+#hub-interactions .hi-rec-impact .hi-inline-choice .hi-choice-copy small,#hub-interactions .hi-rec-impact .hi-inline-choice .hi-choice-tick{display:none}
+#hub-interactions .hi-rec-impact .hi-inline-choice .hi-choice-mark{background:transparent;width:17px;height:17px}
+#hub-interactions .hi-rec-impact .hi-field{margin:0}
+#hub-interactions #hi-dialog-title:focus-visible{outline:none}
+#hub-interactions .hi-dialog-content,#hub-interactions .hi-picker-list{scrollbar-width:thin;scrollbar-color:var(--hi-line) transparent}
+@media(max-width:1120px){#hub-interactions .hi-demo-caption{display:none}#hub-interactions .hi-recipient-mode .hi-choice-copy small{font-size:11px}#hub-interactions .hi-inline-choice{gap:7px;padding:10px}#hub-interactions .hi-inline-choice>.hi-choice-mark{width:26px;height:26px}#hub-interactions .hi-value{padding:10px;gap:8px}}

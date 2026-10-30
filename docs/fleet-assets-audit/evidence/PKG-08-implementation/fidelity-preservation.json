@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-09-27T19:05:48.473Z",
+  "parent": "b07888e9b413696649ceceb03bbae3ee38edf166",
+  "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
+  "sourceCount": 40,
+  "changed": [
+    "resources/js/pages/fleet-assets/settings/_notifications.tsx",
+    "resources/js/pages/fleet-assets/settings/index.tsx"
+  ],
+  "mainCommittedOverlap": [],
+  "previewCounts": {
+    "v1": 70,
+    "v2": 85,
+    "v3": 46,
+    "v4": 65,
+    "v5": 75,
+    "v6": 96
+  },
+  "previewEntries": 437,
+  "protectedAuthorities": 10,
+  "protectedBladeUnchanged": true,
+  "mismatches": [],
+  "manifestSha256": "50e3df5741943eb76cc2c2b78ccb750bb56ca9cffe58d9f022d134a78b89dfb7",
+  "bundleSha256": "0851383d39dccf21d2618a4a8e9c622bc0e7fc1590960679a432531a2634a578"
+}

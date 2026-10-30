@@ -25,6 +25,7 @@ class ClientInrRecord extends Model
         'disabled_by',
         'disabled_at',
         'notes',
+        'unlinked_reason', 'instruction', 'instruction_source', 'linked_at', 'linked_by', 'disabled_reason',
     ];
 
     protected $casts = [
@@ -35,6 +36,7 @@ class ClientInrRecord extends Model
         'tested_on' => 'date',
         'next_test_date' => 'date',
         'disabled_at' => 'datetime',
+        'linked_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
@@ -44,7 +46,7 @@ class ClientInrRecord extends Model
 
     public function medication(): BelongsTo
     {
-        return $this->belongsTo(ClientMedication::class, 'client_medication_id');
+        return $this->belongsTo(ClientMedication::class, 'client_medication_id')->withTrashed();
     }
 
     public function recordedBy(): BelongsTo

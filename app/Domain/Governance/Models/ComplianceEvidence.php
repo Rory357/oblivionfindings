@@ -81,7 +81,9 @@ class ComplianceEvidence extends Model
 
     public function isExpiringSoon(int $days = 30): bool
     {
-        return $this->valid_until && $this->valid_until->diffInDays(now()) <= $days;
+        // Same window as scopeExpiringSoon; Carbon 3's signed diffInDays()
+        // made every future date pass.
+        return $this->valid_until && $this->valid_until->between(now(), now()->addDays($days));
     }
 
     public function verify(int $userId, ?string $notes = null): void

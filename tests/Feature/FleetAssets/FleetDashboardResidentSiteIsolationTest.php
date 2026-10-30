@@ -85,52 +85,26 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             'fleet.viewAny',
             'securityDevices.devices.view',
         ]);
-        $ids = $this->seedDashboardSurfaces($user);
+        $this->seedDashboardSurfaces($user);
 
         $this->actingAs($user)
             ->get('/fleet-assets')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
-                ->has('vehicles', 1)
-                ->where('vehicles.0.id', $this->localVehicle->id)
-                ->where('stats.total_vehicles', 1)
-                ->where('stats.total_assets', 1)
-                ->where('stats.wof_due_30', 1)
-                ->where('stats.rego_due_30', 1)
-                ->where('stats.cof_due', 1)
-                ->where('stats.recent_bookings_count', 1)
-                ->where('stats.checked_out_count', 1)
-                ->where('stats.overdue_count', 1)
-                ->where('stats.active_outings', 1)
-                ->where('stats.outings_past_return', 1)
-                ->where('stats.upcoming_maintenance_count', 1)
-                ->where('stats.trips_today', 1)
-                ->where('stats.fuel_cost_mtd', 10)
-                ->where('stats.distance_mtd', 5)
-                ->where('stats.total_devices', 1)
-                ->where('stats.online_devices', 1)
-                ->where('can.view_technology', true)
-                ->where('asset_status_breakdown.active', 1)
-                ->missing('asset_status_breakdown.retired')
-                ->where('maintenance_stats.open', 1)
-                ->missing('maintenance_stats.in_progress')
-                ->has('recent_signals', 1)
-                ->where('recent_signals.0.id', $ids['local_signal'])
-                ->missing('recent_signals.0.payload')
-                ->has('after_hours_trips', 1)
-                ->where('after_hours_trips.0.id', $ids['local_trip'])
-                ->has('today_outings', 1)
-                ->where('today_outings.0.id', $ids['local_outing'])
-                ->has('houses', 1)
-                ->where('houses.0.id', $this->localSite->id)
-                ->has('fleet_by_site', 1)
-                ->where('fleet_by_site.0.id', $this->localSite->id)
-                ->missing('vehicles.0.trackers')
+                ->has('overview.vehicles', 1)
+                ->where('overview.vehicles.0.id', $this->localVehicle->id)
+                ->where('overview.vehicles.0.site_id', $this->localSite->id)
+                ->has('overview.sites', 1)
+                ->where('overview.sites.0.id', $this->localSite->id)
+                ->where('overview.attention', fn ($rows) => collect($rows)
+                    ->every(fn ($row) => (int) $row['site_id'] === $this->localSite->id))
+                ->missing('stats')->missing('recent_signals')
+                ->missing('recent_alerts')->missing('today_outings')
             );
     }
 
-    public function test_explicit_fleet_manage_permission_bypasses_dashboard_site_scope(): void
+    public function test_explicit_all_site_access_broadens_only_the_overview_resource_scope(): void
     {
         $manager = $this->makeSiteUser($this->localSite, [
             'fleet.viewAny',
@@ -145,33 +119,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
-                ->has('vehicles', 2)
-                ->where('stats.total_vehicles', 2)
-                ->where('stats.total_assets', 2)
-                ->where('stats.wof_due_30', 2)
-                ->where('stats.rego_due_30', 2)
-                ->where('stats.cof_due', 2)
-                ->where('stats.recent_bookings_count', 2)
-                ->where('stats.checked_out_count', 2)
-                ->where('stats.overdue_count', 2)
-                ->where('stats.active_outings', 2)
-                ->where('stats.outings_past_return', 2)
-                ->where('stats.upcoming_maintenance_count', 2)
-                ->where('stats.trips_today', 2)
-                ->where('stats.fuel_cost_mtd', 100)
-                ->where('stats.distance_mtd', 55)
-                ->where('stats.total_devices', 2)
-                ->where('stats.online_devices', 2)
-                ->where('can.view_technology', true)
-                ->where('asset_status_breakdown.active', 1)
-                ->where('asset_status_breakdown.retired', 1)
-                ->where('maintenance_stats.open', 1)
-                ->where('maintenance_stats.in_progress', 1)
-                ->has('recent_signals', 2)
-                ->has('after_hours_trips', 2)
-                ->has('today_outings', 2)
-                ->has('houses', 2)
-                ->has('fleet_by_site', 2)
+                ->has('overview.vehicles', 2)
+                ->has('overview.sites', 2)
+                ->missing('stats')->missing('recent_signals')
+                ->missing('recent_alerts')->missing('today_outings')
             );
     }
 
@@ -185,12 +136,9 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
-                ->where('can.view_technology', false)
-                ->where('stats.total_devices', null)
-                ->where('stats.online_devices', null)
-                ->where('stats.tracked_residents', null)
-                ->missing('vehicles.0.trackers')
-                ->missing('recent_signals.0.payload')
+                ->has('overview.vehicles', 1)
+                ->missing('stats')->missing('recent_signals')
+                ->missing('today_outings')->missing('after_hours_trips')
             );
     }
 
@@ -229,14 +177,27 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
     public function test_cross_site_resident_tracking_requires_fleet_and_security_devices_permissions(): void
     {
-        $manager = $this->makeSiteUser($this->localSite, [
+        $permissions = [
             'fleet.viewAny',
             'fleet.manage',
             'assets.telemetry.view',
             'clients.viewAny',
             'securityDevices.devices.viewAllSites',
-        ], 'manager');
-        $this->seedResidentTrackingSurfaces();
+        ];
+        // Residents are client records: seeing another Site's also needs the
+        // explicit all-Sites client grant, not device or Fleet reach alone.
+        $siteScopedManager = $this->makeSiteUser($this->localSite, $permissions, 'manager');
+        $manager = $this->makeSiteUser($this->localSite, [...$permissions, 'sites.viewAll'], 'manager');
+        $ids = $this->seedResidentTrackingSurfaces();
+
+        $this->actingAs($siteScopedManager)
+            ->get('/fleet-assets/resident-tracking?new=1')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/resident-tracking/index')
+                ->has('residents', 1)
+                ->where('residents.0.client_id', $ids['local_client'])
+            );
 
         $this->actingAs($manager)
             ->get('/fleet-assets/resident-tracking?new=1')
@@ -266,6 +227,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             'assets.telemetry.view',
             'clients.viewAny',
             'securityDevices.devices.viewAllSites',
+            'sites.viewAll',
         ], 'manager');
         $foreignClient = Client::factory()->create([
             'site_id' => $this->foreignSite->id,
@@ -305,16 +267,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/fleet-assets/map')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/map')
-                ->has('geofences', 2)
-                ->where('geofences', fn ($geofences) => collect($geofences)
-                    ->pluck('id')
-                    ->sort()
-                    ->values()
-                    ->all() === collect([$local->id, $localFallback->id])->sort()->values()->all())
-            );
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
+        $boundaries = $this->getJson('/fleet-assets/geofences/catalogue')->assertOk()
+            ->assertJsonCount(2, 'data')->json('data');
+        $this->assertEqualsCanonicalizing([$local->id, $localFallback->id], collect($boundaries)->pluck('id')->all());
     }
 
     public function test_dashboard_fleet_manage_is_application_wide_across_operational_sites(): void
@@ -357,12 +313,10 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
-                ->has('vehicles', 3)
-                ->has('houses', 3)
-                ->has('fleet_by_site', 3)
-                ->where('stats.total_devices', 3)
-                ->where('stats.online_devices', 3)
-                ->where('vehicles', fn ($vehicles) => collect($vehicles)
+                ->has('overview.vehicles', 3)
+                ->has('overview.sites', 3)
+                ->missing('stats')->missing('recent_signals')
+                ->where('overview.vehicles', fn ($vehicles) => collect($vehicles)
                     ->pluck('id')
                     ->contains($remoteVehicle->id))
             );
@@ -651,15 +605,12 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
 
         $this->actingAs($user)
             ->get('/fleet-assets/map')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/map')
-                ->where('geofences', function ($geofences) use ($poisonedFence): bool {
-                    $fence = collect($geofences)->firstWhere('id', $poisonedFence->id);
-
-                    return $fence !== null && $fence['asset'] === null;
-                })
-            );
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
+        $boundaries = $this->getJson('/fleet-assets/geofences/catalogue')->assertOk()->json('data');
+        $fence = collect($boundaries)->firstWhere('id', $poisonedFence->id);
+        $this->assertNotNull($fence);
+        $this->assertArrayNotHasKey('asset', $fence);
+        $this->assertArrayNotHasKey('asset_id', $fence);
     }
 
     /**
@@ -953,7 +904,7 @@ class FleetDashboardResidentSiteIsolationTest extends TestCase
             ],
         );
 
-        return AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin, array_merge([
+        return AuthoritativeConsentFixture::manualSelf($client, $type, User::factory()->create(), array_merge([
             'status' => 'given',
             'given_at' => now(),
         ], $overrides));

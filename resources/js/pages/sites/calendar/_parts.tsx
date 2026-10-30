@@ -3,8 +3,14 @@
  * Ported from the prototype's cal-views.jsx; icons swapped for lucide-react and
  * shared UI state threaded via context to keep view signatures small.
  */
+import { PageHeaderFilterButton } from '@/components/page/page-header';
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import {
     colorVars,
     parseDT,
@@ -18,12 +24,14 @@ import {
     CalendarDays,
     CheckCircle2,
     CheckSquare,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     ClipboardCheck,
     ClipboardList,
     Clock,
     Dot,
+    GripVertical,
     Hammer,
     HardHat,
     KeyRound,
@@ -46,11 +54,14 @@ import {
     createContext,
     useContext,
     useEffect,
+    useId,
     useRef,
     useState,
     type CSSProperties,
     type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
+import { bindProtectedPress } from './protected-press';
 import { CalendarDayHeading } from './work-schedule';
 export { CalendarWorkRows, WorkSchedule } from './work-schedule';
 export type { CalendarWorkEntry } from './work-schedule';
@@ -231,7 +242,7 @@ export function MiniMonth({
                     const isToday = sameDay(d, today);
                     const isSelected = sameDay(d, selected);
                     const tone = isSelected
-                        ? 'bg-primary font-semibold text-primary-foreground'
+                        ? 'bg-primary-fill font-semibold text-primary-fill-foreground'
                         : isToday
                           ? 'font-semibold text-primary ring-1 ring-primary/40 hover:bg-muted'
                           : inMonth
@@ -256,6 +267,416 @@ export function MiniMonth({
     );
 }
 
+/* ---- period label + jump to date (Site Calendar filter row) ------------- */
+
+export type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
+
+export function viewRange(
+    view: CalView,
+    navDate: Date,
+): { start: Date; end: Date } {
+    if (view === 'week') {
+        const s = startOfWeek(navDate);
+        return { start: s, end: addDays(s, 7) };
+    }
+    if (view === 'day') {
+        const s = new Date(navDate);
+        s.setHours(0, 0, 0, 0);
+        return { start: s, end: addDays(s, 1) };
+    }
+    const s = startOfWeek(startOfMonth(navDate));
+    return { start: s, end: addDays(s, 42) };
+}
+
+/** The browsed period; a week across December/January names both years. */
+export function periodLabel(view: CalView, navDate: Date): string {
+    if (view === 'day') {
+        return navDate.toLocaleDateString('en-NZ', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+        });
+    }
+    if (view === 'week') {
+        const s = startOfWeek(navDate);
+        const e = addDays(s, 6);
+        const startYear =
+            s.getFullYear() !== e.getFullYear() ? ` ${s.getFullYear()}` : '';
+        return `${s.getDate()} ${MO[s.getMonth()].slice(0, 3)}${startYear} – ${e.getDate()} ${MO[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
+    }
+    return `${MO[navDate.getMonth()]} ${navDate.getFullYear()}`;
+}
+
+/**
+ * Clickable period label that opens a mini-month so the user can jump straight to any
+ * date instead of stepping period-by-period. `pill` renders it as an Event Horizon
+ * filter-row field; the light variant is used by the profile-embed toolbar.
+ */
+export function JumpToDate({
+    view,
+    navDate,
+    onPick,
+    pill = false,
+}: {
+    view: CalView;
+    navDate: Date;
+    onPick: (d: Date) => void;
+    pill?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                {pill ? (
+                    <PageHeaderFilterButton
+                        icon={CalendarDays}
+                        aria-label="Jump to date"
+                        className="tnum"
+                    >
+                        {periodLabel(view, navDate)}
+                        <ChevronDown className="size-3 opacity-70" />
+                    </PageHeaderFilterButton>
+                ) : (
+                    // eslint-disable-next-line no-restricted-syntax -- calendar jump trigger; not a shadcn Button.
+                    <button
+                        type="button"
+                        aria-label="Jump to date"
+                        className="tnum inline-flex min-w-[150px] items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors hover:bg-muted"
+                    >
+                        <CalendarDays className="h-3.5 w-3.5" />
+                        {periodLabel(view, navDate)}
+                        <ChevronDown className="h-3 w-3 opacity-70" />
+                    </button>
+                )}
+            </PopoverTrigger>
+            <PopoverContent
+                align={pill ? 'end' : 'start'}
+                className="w-auto p-0"
+            >
+                <MiniMonth
+                    selected={navDate}
+                    onSelect={(d) => {
+                        onPick(d);
+                        setOpen(false);
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+/* ---- source pills ------------------------------------------------------- */
+
+/** The calendar's source filter pills; `counts` (optional) shows how many entries each source has. */
+export function CalendarSourcePills({
+    sources,
+    enabled,
+    onToggle,
+    counts,
+}: {
+    sources: SourceDef[];
+    enabled: ReadonlySet<string>;
+    onToggle: (key: string) => void;
+    counts?: Record<string, number>;
+}) {
+    // From md up the pills are drawn compact (about 27 px) and frontline-hit
+    // gives each a 44 px target; the 18 px row gap keeps wrapped rows'
+    // targets from overlapping.
+    return (
+        <div className="flex flex-wrap items-center gap-1.5 md:gap-y-[18px]">
+            {sources.map((s) => {
+                const on = enabled.has(s.key);
+                return (
+                    <GuardrailButton
+                        unstyled
+                        key={s.key}
+                        onClick={() => onToggle(s.key)}
+                        className={`frontline-hit inline-flex min-h-[44px] items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none md:min-h-0 ${on ? '' : 'opacity-40'}`}
+                        style={{
+                            background: `var(--src-${s.key}-bg)`,
+                            borderColor: `var(--src-${s.key}-ln)`,
+                            color: `var(--src-${s.key})`,
+                        }}
+                        aria-pressed={on}
+                    >
+                        <span
+                            aria-hidden="true"
+                            className="h-2 w-2 rounded-full"
+                            style={{ background: `var(--src-${s.key})` }}
+                        />
+                        {s.short}
+                        {counts && (
+                            <span className="tnum opacity-80">
+                                {counts[s.key] ?? 0}
+                            </span>
+                        )}
+                    </GuardrailButton>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ---- right-click menu --------------------------------------------------- */
+
+export type CalendarMenuItem = {
+    key: string;
+    label: string;
+    icon?: LucideIcon;
+    /** A custom leading tile (e.g. a coloured event-type icon) instead of `icon`. */
+    leading?: ReactNode;
+    trailing?: ReactNode;
+    /** A second line, e.g. why the item is unavailable. */
+    detail?: string;
+    disabled?: boolean;
+    /**
+     * Why the item can't be used right now (the list menus' `MenuItem.disabled`).
+     * Unlike `disabled`, the item stays focusable in the arrow-key order so a
+     * screen reader announces the reason: it is aria-disabled, shows the
+     * reason as its second line (and description), and does nothing when
+     * chosen, leaving the menu open.
+     */
+    disabledReason?: string;
+    destructive?: boolean;
+    /** A quieter secondary item, such as "Open full form…". */
+    muted?: boolean;
+    onSelect: () => void;
+};
+
+export type CalendarMenuSection = {
+    key: string;
+    /** An optional caption above the section's items. */
+    note?: string;
+    items: CalendarMenuItem[];
+    /** Keep a long list scrollable within the menu. */
+    scroll?: boolean;
+};
+
+/**
+ * The shared calendar right-click menu: a small "Add"-style chip and where/when
+ * heading, then sections of items. It stays on screen, takes arrow keys,
+ * Home/End, Esc and Tab, and returns focus to where it was opened from.
+ */
+export function CalendarContextMenu({
+    x,
+    y,
+    chip,
+    chipIcon: ChipIcon = Plus,
+    heading,
+    subheading,
+    sections,
+    ariaLabel,
+    onClose,
+    returnFocus,
+}: {
+    x: number;
+    y: number;
+    chip: string;
+    chipIcon?: LucideIcon;
+    heading: string;
+    subheading?: string;
+    sections: CalendarMenuSection[];
+    ariaLabel: string;
+    onClose: () => void;
+    /** Where focus goes back to on close (defaults to the element focused at open). */
+    returnFocus?: HTMLElement | null;
+}) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    const openerRef = useRef<HTMLElement | null>(null);
+    const [pos, setPos] = useState({ top: y, left: x });
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        let left = x;
+        let top = y;
+        if (left + r.width + 8 > window.innerWidth)
+            left = window.innerWidth - r.width - 8;
+        if (top + r.height + 8 > window.innerHeight)
+            top = window.innerHeight - r.height - 8;
+        setPos({ top: Math.max(8, top), left: Math.max(8, left) });
+    }, [x, y]);
+
+    // Focus the first item on open; remember the opener so a keyboard
+    // dismiss (Esc / Tab) restores focus to where it came from.
+    useEffect(() => {
+        openerRef.current =
+            returnFocus ?? (document.activeElement as HTMLElement) ?? null;
+        ref.current
+            ?.querySelector<HTMLButtonElement>('[data-menuitem]:not(:disabled)')
+            ?.focus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- the opener is captured once, at open
+    }, []);
+
+    useEffect(() => {
+        const onDown = (e: MouseEvent) => {
+            if (!ref.current?.contains(e.target as Node)) onClose();
+        };
+        window.addEventListener('mousedown', onDown);
+        return () => window.removeEventListener('mousedown', onDown);
+    }, [onClose]);
+
+    const dismiss = () => {
+        const opener = openerRef.current;
+        onClose();
+        if (opener?.isConnected) opener.focus?.();
+    };
+
+    const onMenuKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Escape' || e.key === 'Tab') {
+            e.preventDefault();
+            dismiss();
+            return;
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+        e.preventDefault();
+        const items = ref.current
+            ? Array.from(
+                  ref.current.querySelectorAll<HTMLButtonElement>(
+                      '[data-menuitem]:not(:disabled)',
+                  ),
+              )
+            : [];
+        if (items.length === 0) return;
+        const idx = items.indexOf(document.activeElement as HTMLButtonElement);
+        const next =
+            e.key === 'ArrowDown'
+                ? idx < 0
+                    ? 0
+                    : (idx + 1) % items.length
+                : e.key === 'ArrowUp'
+                  ? idx <= 0
+                      ? items.length - 1
+                      : idx - 1
+                  : e.key === 'Home'
+                    ? 0
+                    : items.length - 1;
+        items[next]?.focus();
+    };
+
+    const choose = (item: CalendarMenuItem) => {
+        const opener = openerRef.current;
+        onClose();
+        item.onSelect();
+        // Dialogs opened by the item take focus themselves; otherwise go back.
+        requestAnimationFrame(() => {
+            if (document.activeElement === document.body && opener?.isConnected)
+                opener.focus?.();
+        });
+    };
+
+    return createPortal(
+        <div
+            ref={ref}
+            role="menu"
+            aria-label={ariaLabel}
+            onKeyDown={onMenuKey}
+            style={{ top: pos.top, left: pos.left }}
+            className="fixed z-[60] w-[286px] rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+        >
+            <div className="mb-1 flex items-start gap-2 border-b px-2 py-1.5">
+                <span className="mt-px flex shrink-0 items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-primary uppercase">
+                    <ChipIcon aria-hidden="true" className="h-3 w-3" /> {chip}
+                </span>
+                <span className="min-w-0 text-[11px] text-muted-foreground">
+                    <span className="block truncate">{heading}</span>
+                    {subheading && (
+                        <span className="block truncate">{subheading}</span>
+                    )}
+                </span>
+            </div>
+            {sections
+                .filter((section) => section.items.length > 0 || section.note)
+                .map((section, index) => (
+                    <Fragment key={section.key}>
+                        {index > 0 && (
+                            <div className="my-1 h-px bg-border/60" />
+                        )}
+                        {section.note && (
+                            <p className="px-2 py-1 text-[11px] text-muted-foreground">
+                                {section.note}
+                            </p>
+                        )}
+                        <ul
+                            className={`space-y-px ${section.scroll ? 'scrollbar-pretty max-h-[260px] overflow-y-auto' : ''}`}
+                        >
+                            {section.items.map((item) => (
+                                <li key={item.key}>
+                                    <CalendarMenuButton
+                                        item={item}
+                                        onChoose={() => choose(item)}
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    </Fragment>
+                ))}
+        </div>,
+        document.body,
+    );
+}
+
+function CalendarMenuButton({
+    item,
+    onChoose,
+}: {
+    item: CalendarMenuItem;
+    onChoose: () => void;
+}) {
+    const ItemIcon = item.icon;
+    const ids = useId();
+    const blocked = Boolean(item.disabledReason);
+    const detail = item.disabledReason || item.detail;
+    const tone = item.destructive
+        ? 'text-destructive'
+        : item.muted
+          ? 'text-muted-foreground'
+          : 'text-foreground';
+    return (
+        <GuardrailButton
+            unstyled
+            role="menuitem"
+            data-menuitem
+            tabIndex={-1}
+            disabled={item.disabled}
+            aria-disabled={item.disabled || blocked || undefined}
+            aria-labelledby={blocked ? `${ids}-label` : undefined}
+            aria-describedby={blocked ? `${ids}-reason` : undefined}
+            onClick={blocked ? undefined : onChoose}
+            className={`grid w-full grid-cols-[26px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent max-md:min-h-[44px] ${blocked ? 'cursor-not-allowed opacity-60 aria-disabled:hover:bg-transparent' : ''} ${tone}`}
+        >
+            {item.leading ?? (
+                <span
+                    aria-hidden="true"
+                    className={`inline-flex h-[26px] w-[26px] items-center justify-center rounded-md ${item.destructive ? 'bg-destructive/10' : 'bg-muted'}`}
+                >
+                    {ItemIcon ? <ItemIcon className="h-3.5 w-3.5" /> : null}
+                </span>
+            )}
+            <span className="min-w-0">
+                <span
+                    id={blocked ? `${ids}-label` : undefined}
+                    className={`block truncate ${item.muted ? '' : 'font-medium'}`}
+                >
+                    {item.label}
+                </span>
+                {detail && (
+                    <span
+                        id={blocked ? `${ids}-reason` : undefined}
+                        className="block text-[11px] leading-snug font-normal text-muted-foreground"
+                    >
+                        {detail}
+                    </span>
+                )}
+            </span>
+            {item.trailing ?? <span />}
+        </GuardrailButton>
+    );
+}
+
 export function decorate(item: CalendarItem): Decorated {
     const start = parseDT(item.start) ?? new Date();
     return {
@@ -276,7 +697,22 @@ interface CalendarUI {
     onPreviewEnd?: () => void;
     onCreateAt?: (d: Date, hour?: number) => void;
     onContext?: (e: React.MouseEvent, d: Date, hour?: number) => void;
-    onMove?: (ev: Decorated, start: Date, end?: Date) => void;
+    /**
+     * Right-click (or Shift+F10) on an entry, including the Today rail. When
+     * omitted, a right-click opens the entry like a click does.
+     */
+    onEntryContext?: (ev: Decorated, e: React.MouseEvent) => void;
+    onMove?: (
+        ev: Decorated,
+        start: Date,
+        end?: Date,
+        mode?: 'move' | 'resize',
+        intent?: {
+            kind: 'move' | 'resize';
+            startLocal: string;
+            endLocal: string;
+        },
+    ) => void;
     /** Drill into a single day (Month "+N more" → Day view for that date). */
     onMore?: (d: Date) => void;
 }
@@ -302,6 +738,15 @@ export function CalendarUIProvider({
     );
 }
 const useCalUI = () => useContext(CalendarUICtx);
+
+/** Right-click on an entry: its actions where the calendar offers them, never a new entry underneath. */
+function contextEntry(event: React.MouseEvent, ev: Decorated, ui: CalendarUI) {
+    event.preventDefault();
+    event.stopPropagation();
+    ui.onPreviewEnd?.();
+    if (ui.onEntryContext) ui.onEntryContext(ev, event);
+    else ui.onSelect(ev);
+}
 
 const cv = (ev: Decorated, colorBy: ColorBy): CSSProperties =>
     colorVars(ev, colorBy);
@@ -426,7 +871,8 @@ function MiniChip({
     ev: Decorated;
     onDragStart?: (e: React.DragEvent, ev: Decorated) => void;
 }) {
-    const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
+    const ui = useCalUI();
+    const { colorBy, onSelect, onPreview, onPreviewEnd } = ui;
     const overdue = ev.status === 'overdue';
     const draggable =
         !!onDragStart && ev.editable && !ev.recurrence && !ev.isOccurrence;
@@ -438,12 +884,7 @@ function MiniChip({
                 onPreviewEnd?.();
                 onSelect(ev);
             }}
-            onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onPreviewEnd?.();
-                onSelect(ev);
-            }}
+            onContextMenu={(e) => contextEntry(e, ev, ui)}
             draggable={draggable}
             onDragStart={
                 draggable && onDragStart
@@ -501,7 +942,7 @@ const topFor = (min: number): number => ((min - GRID_START * 60) / 60) * HOUR_H;
 
 /** One tab stop per day; arrow keys reach the other hours without 168 tab stops. */
 export function CalendarTimeSlot({ day, hour }: { day: Date; hour: number }) {
-    const { onCreateAt } = useCalUI();
+    const { onCreateAt, onContext } = useCalUI();
     if (!onCreateAt)
         return (
             <div
@@ -512,14 +953,28 @@ export function CalendarTimeSlot({ day, hour }: { day: Date; hour: number }) {
     const time = new Date(day);
     time.setHours(hour, 0, 0, 0);
     return (
-        <GuardrailButton unstyled
+        <GuardrailButton
+            unstyled
             type="button"
             data-calendar-slot
+            data-calendar-day={`${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`}
+            data-calendar-hour={hour}
             tabIndex={hour === 9 ? 0 : -1}
             aria-label={`Create entry on ${time.toLocaleString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`}
             className="block w-full border-b border-border/60 text-left hover:bg-primary/5 focus-visible:relative focus-visible:z-10 focus-visible:bg-primary/10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
             style={{ height: HOUR_H }}
             onClick={() => onCreateAt(day, hour)}
+            // The slot knows its own hour, so Shift+F10 on a focused slot
+            // (which reports no pointer position) still opens that hour.
+            onContextMenu={
+                onContext
+                    ? (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onContext(e, day, hour);
+                      }
+                    : undefined
+            }
             onKeyDown={(e) => {
                 if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key))
                     return;
@@ -583,9 +1038,16 @@ type Packed = Decorated & {
 };
 
 export function occursOnDay(entry: Decorated, day: Date): boolean {
-    const start = new Date(day); start.setHours(0, 0, 0, 0);
-    const end = new Date(start); end.setDate(end.getDate() + 1);
-    return entry._start < end && (entry._end && entry._end > entry._start ? entry._end > start : entry._start >= start);
+    const start = new Date(day);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return (
+        entry._start < end &&
+        (entry._end && entry._end > entry._start
+            ? entry._end > start
+            : entry._start >= start)
+    );
 }
 
 export function packDay(list: Decorated[], day: Date): Packed[] {
@@ -621,10 +1083,16 @@ export function packDay(list: Decorated[], day: Date): Packed[] {
         clusterEnd = -1;
     };
     evs.forEach((e) => {
-        const boundary = new Date(day); boundary.setHours(0, 0, 0, 0);
-        const next = new Date(boundary); next.setDate(next.getDate() + 1);
+        const boundary = new Date(day);
+        boundary.setHours(0, 0, 0, 0);
+        const next = new Date(boundary);
+        next.setDate(next.getDate() + 1);
         const s = e._start < boundary ? 0 : minutes(e._start);
-        const en = e._end ? (e._end >= next ? 1440 : minutes(e._end)) : Math.min(s + 45, 1440);
+        const en = e._end
+            ? e._end >= next
+                ? 1440
+                : minutes(e._end)
+            : Math.min(s + 45, 1440);
         e._s = s;
         e._e = en;
         if (cluster.length && s >= clusterEnd) flush();
@@ -636,8 +1104,8 @@ export function packDay(list: Decorated[], day: Date): Packed[] {
 }
 
 function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
-    const { colorBy, srcByKey, onSelect, onMove, onPreview, onPreviewEnd } =
-        useCalUI();
+    const ui = useCalUI();
+    const { colorBy, srcByKey, onSelect, onMove, onPreview, onPreviewEnd } = ui;
     const top = topFor(ev._s);
     const canDrag =
         !!onMove &&
@@ -662,7 +1130,14 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
         if (e.button !== 0) return;
         onPreviewEnd?.();
         if (!canDrag || !onMove) {
-            if (mode === 'move') onSelect(ev);
+            if (mode === 'move') {
+                dragCleanup.current?.();
+                dragCleanup.current = bindProtectedPress(
+                    e,
+                    e.currentTarget,
+                    () => onSelect(ev),
+                );
+            }
             return;
         }
         e.preventDefault();
@@ -701,7 +1176,33 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                     e2.setMinutes(e2.getMinutes() + snap);
                     if (e2 <= s) e2.setTime(s.getTime() + 15 * 60000);
                 }
-                onMove(ev, s, e2);
+                // Retain the requested wall time even if the browser's Date
+                // normalises a skipped DST hour. Consumers can then validate it.
+                const wallShift = (date: Date, minutes: number) =>
+                    new Date(
+                        Date.UTC(
+                            date.getFullYear(),
+                            date.getMonth(),
+                            date.getDate(),
+                            date.getHours(),
+                            date.getMinutes(),
+                        ) +
+                            minutes * 60000,
+                    )
+                        .toISOString()
+                        .slice(0, 16);
+                const startLocal = wallShift(
+                    ev._start,
+                    mode === 'move' ? snap : 0,
+                );
+                let endLocal = wallShift(ev._end ?? ev._start, snap);
+                if (mode === 'resize' && endLocal <= startLocal)
+                    endLocal = wallShift(ev._start, 15);
+                onMove(ev, s, e2, mode, {
+                    kind: mode,
+                    startLocal,
+                    endLocal,
+                });
             } else if (!moved) {
                 onSelect(ev);
             }
@@ -726,9 +1227,16 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
             role="button"
             tabIndex={0}
             aria-label={ariaLabel}
+            aria-description={
+                canDrag
+                    ? 'Drag to propose a change, or press Enter for details.'
+                    : 'Cannot move. Short click or press Enter for details.'
+            }
+            data-calendar-editable={!!canDrag}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
+                    dragCleanup.current?.();
                     onPreviewEnd?.();
                     onSelect(ev);
                 }
@@ -737,12 +1245,7 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
             onClick={() => {
                 if (touch.current) onSelect(ev);
             }}
-            onContextMenu={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onPreviewEnd?.();
-                onSelect(ev);
-            }}
+            onContextMenu={(e) => contextEntry(e, ev, ui)}
             onMouseEnter={(e) => {
                 if (!drag) onPreview?.(ev, e.currentTarget);
             }}
@@ -768,9 +1271,20 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
                 <span className="tnum truncate text-[10px] font-semibold">
                     {fmtTime(ev._start)}
                 </span>
+                {canDrag ? (
+                    <GripVertical
+                        aria-hidden="true"
+                        className="ml-auto h-2.5 w-2.5 shrink-0"
+                    />
+                ) : (
+                    <Lock
+                        aria-hidden="true"
+                        className="ml-auto h-2.5 w-2.5 shrink-0"
+                    />
+                )}
                 <RecurGlyph
                     ev={ev}
-                    className="ml-auto h-2.5 w-2.5 shrink-0 opacity-60"
+                    className="h-2.5 w-2.5 shrink-0 opacity-60"
                 />
             </div>
             <div
@@ -778,6 +1292,11 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
             >
                 {ev.title}
             </div>
+            {!canDrag && w >= 45 && liveH > 52 && (
+                <div className="truncate text-[10px] text-muted-foreground">
+                    Cannot move
+                </div>
+            )}
             {!compact && liveH > 52 && ev.room && (
                 <div className="mt-0.5 flex items-center gap-1 text-[10.5px] text-muted-foreground">
                     <MapPin className="h-2.5 w-2.5" />
@@ -811,7 +1330,8 @@ function AllDayRow({
     events: Decorated[];
     padRight?: number;
 }) {
-    const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
+    const ui = useCalUI();
+    const { colorBy, onSelect, onPreview, onPreviewEnd } = ui;
     if (!events.some((e) => e.allDay)) return null;
     return (
         <div
@@ -842,7 +1362,9 @@ function AllDayRow({
                                         onPreviewEnd?.();
                                         onSelect(e);
                                     }}
-                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onPreviewEnd?.(); onSelect(e); }}
+                                    onContextMenu={(event) =>
+                                        contextEntry(event, e, ui)
+                                    }
                                     style={cv(e, colorBy)}
                                     aria-label={`${e.title}, all day, ${d.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}`}
                                     className="flex w-full items-center gap-1 rounded border px-1.5 py-1 text-left text-[11px] font-medium focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
@@ -1011,12 +1533,13 @@ export function MonthView({
     return (
         <GuardrailCard
             unstyled
+            role="grid"
+            aria-label={`${MO[navDate.getMonth()]} ${navDate.getFullYear()}`}
+            aria-rowcount={rows + 1}
+            aria-colcount={7}
             className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
         >
-            <div
-                role="presentation"
-                className="grid grid-cols-7 border-b bg-muted/40"
-            >
+            <div role="row" className="grid grid-cols-7 border-b bg-muted/40">
                 {WD.map((d, idx) => (
                     <div
                         key={d}
@@ -1029,10 +1552,7 @@ export function MonthView({
                 ))}
             </div>
             <div
-                role="grid"
-                aria-label={`${MO[navDate.getMonth()]} ${navDate.getFullYear()}`}
-                aria-rowcount={rows}
-                aria-colcount={7}
+                role="rowgroup"
                 className="scroll-pretty grid flex-1 grid-cols-7 overflow-y-auto"
                 style={{
                     gridTemplateRows: `repeat(${rows}, minmax(118px, 1fr))`,
@@ -1125,7 +1645,7 @@ export function MonthView({
                                     )}
                                     <div className="mb-1 flex items-center justify-between px-0.5">
                                         <span
-                                            className={`tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? 'bg-primary text-primary-foreground shadow-sm' : inMonth ? 'text-foreground' : 'text-muted-foreground/60'}`}
+                                            className={`tnum inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground shadow-sm' : inMonth ? 'text-foreground' : 'text-muted-foreground'}`}
                                         >
                                             {d.getDate()}
                                         </span>
@@ -1217,7 +1737,7 @@ export function WeekView({
                                 {WD[d.getDay()]}
                             </span>
                             <span
-                                className={`tnum flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}
+                                className={`tnum flex h-7 w-7 items-center justify-center rounded-full text-[13px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground' : 'text-foreground'}`}
                             >
                                 {d.getDate()}
                             </span>
@@ -1248,7 +1768,8 @@ export function WeekView({
                     </div>
                     {days.map((d, i) => {
                         const packed = packDay(
-                            events.filter((e) => occursOnDay(e, d)), d,
+                            events.filter((e) => occursOnDay(e, d)),
+                            d,
                         );
                         return (
                             <div
@@ -1307,7 +1828,11 @@ export function DayView({
             className="flex h-full flex-col overflow-hidden rounded-xl border bg-card"
         >
             <CalendarDayHeading
-                date={Date.UTC(day.getFullYear(), day.getMonth(), day.getDate())}
+                date={Date.UTC(
+                    day.getFullYear(),
+                    day.getMonth(),
+                    day.getDate(),
+                )}
                 caption={`${dayEvents.length} ${dayEvents.length === 1 ? 'entry' : 'entries'} scheduled`}
             />
             <AllDayRow days={[day]} events={events} padRight={sbw} />
@@ -1354,6 +1879,7 @@ export function AgendaView({
     navDate,
     sourcesOff = false,
     filtersActive = false,
+    responsive = false,
 }: {
     events: Decorated[];
     navDate: Date;
@@ -1361,15 +1887,18 @@ export function AgendaView({
     sourcesOff?: boolean;
     /** Some — but not all — sources/houses are filtered out. */
     filtersActive?: boolean;
+    responsive?: boolean;
 }) {
-    const { colorBy, srcByKey, onSelect, onContext } = useCalUI();
+    const ui = useCalUI();
+    const { colorBy, srcByKey, onSelect, onContext } = ui;
     const TODAY = new Date();
     const monthStart = new Date(navDate.getFullYear(), navDate.getMonth(), 1);
     const monthEnd = new Date(navDate.getFullYear(), navDate.getMonth() + 1, 1);
     const inMonth = events
         .filter(
             (e) =>
-                e._start < monthEnd && (e._end ? e._end > monthStart : e._start >= monthStart),
+                e._start < monthEnd &&
+                (e._end ? e._end > monthStart : e._start >= monthStart),
         )
         .sort((a, b) => a._start.getTime() - b._start.getTime());
     const groups: { key: string; date: Date; items: Decorated[] }[] = [];
@@ -1417,7 +1946,7 @@ export function AgendaView({
                         }
                     >
                         <div
-                            className={`sticky top-0 flex w-24 shrink-0 flex-col items-center gap-0.5 border-r py-4 ${isToday ? 'bg-primary/5' : 'bg-muted/30'}`}
+                            className={`sticky top-0 flex ${responsive ? 'w-16 sm:w-24' : 'w-24'} shrink-0 flex-col items-center gap-0.5 border-r py-4 ${isToday ? 'bg-primary/5' : 'bg-muted/30'}`}
                         >
                             <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
                                 {WD[g.date.getDay()]}
@@ -1431,22 +1960,26 @@ export function AgendaView({
                                 {MO[g.date.getMonth()].slice(0, 3)}
                             </span>
                         </div>
-                        <div className="flex-1 divide-y">
+                        <div className="min-w-0 flex-1 divide-y">
                             {g.items.map((e) => (
                                 <GuardrailButton
                                     unstyled
                                     key={e.id}
                                     onClick={() => onSelect(e)}
-                                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onSelect(e); }}
-                                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40"
+                                    onContextMenu={(event) =>
+                                        contextEntry(event, e, ui)
+                                    }
+                                    className={`${responsive ? 'grid grid-cols-[2rem_minmax(0,1fr)] gap-x-2 gap-y-1 px-3 sm:flex sm:gap-3 sm:px-4' : 'flex gap-3 px-4'} w-full items-center py-3 text-left transition-colors hover:bg-accent/40`}
                                 >
-                                    <span className="tnum w-20 shrink-0 text-[12px] font-medium text-muted-foreground">
+                                    <span
+                                        className={`tnum ${responsive ? 'col-start-2 sm:w-20' : 'w-20'} shrink-0 text-[12px] font-medium text-muted-foreground`}
+                                    >
                                         {e.allDay
                                             ? 'All day'
                                             : fmtTime(e._start)}
                                     </span>
                                     <span
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                                        className={`${responsive ? 'row-start-2' : ''} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg`}
                                         style={{
                                             color: 'var(--c)',
                                             background: 'var(--cb)',
@@ -1458,9 +1991,11 @@ export function AgendaView({
                                             className="h-4 w-4"
                                         />
                                     </span>
-                                    <span className="min-w-0 flex-1">
+                                    <span
+                                        className={`${responsive ? 'col-start-2 row-start-2' : ''} min-w-0 flex-1`}
+                                    >
                                         <span
-                                            className={`flex items-center gap-1.5 truncate text-sm font-medium ${e.status === 'overdue' ? 'text-status-critical' : 'text-foreground'}`}
+                                            className={`${responsive ? 'block break-words whitespace-normal sm:flex sm:truncate' : 'flex truncate'} items-center gap-1.5 text-sm font-medium ${e.status === 'overdue' ? 'text-status-critical' : 'text-foreground'}`}
                                         >
                                             {e.title}
                                             <RecurGlyph
@@ -1468,7 +2003,9 @@ export function AgendaView({
                                                 className="h-3 w-3 shrink-0 text-muted-foreground"
                                             />
                                         </span>
-                                        <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                                        <span
+                                            className={`flex ${responsive ? 'flex-wrap' : ''} items-center gap-1.5 text-[12px] text-muted-foreground`}
+                                        >
                                             <span
                                                 style={{
                                                     color: `var(--src-${e.source})`,
@@ -1494,7 +2031,14 @@ export function AgendaView({
                                             )}
                                         </span>
                                     </span>
-                                    {e.owner && <Avatar person={e.owner} />}
+                                    {e.owner &&
+                                        (responsive ? (
+                                            <span className="hidden sm:block">
+                                                <Avatar person={e.owner} />
+                                            </span>
+                                        ) : (
+                                            <Avatar person={e.owner} />
+                                        ))}
                                     <StatusBadge
                                         status={e.status}
                                         label={e.statusLabel}
@@ -1519,8 +2063,8 @@ export function TimelineView({
     navDate: Date;
     sources: SourceDef[];
 }) {
-    const { colorBy, onSelect, onContext, onPreview, onPreviewEnd } =
-        useCalUI();
+    const ui = useCalUI();
+    const { colorBy, onSelect, onContext, onPreview, onPreviewEnd } = ui;
     const TODAY = new Date();
     const first = startOfMonth(navDate);
     const last = endOfMonth(navDate);
@@ -1554,7 +2098,7 @@ export function TimelineView({
                                         {WD[d.getDay()][0]}
                                     </span>
                                     <span
-                                        className={`tnum flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'}`}
+                                        className={`tnum flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-semibold ${isToday ? 'bg-primary-fill text-primary-fill-foreground' : 'text-foreground'}`}
                                     >
                                         {d.getDate()}
                                     </span>
@@ -1624,7 +2168,15 @@ export function TimelineView({
                                                                     onPreviewEnd?.();
                                                                     onSelect(e);
                                                                 }}
-                                                                onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); onSelect(e); }}
+                                                                onContextMenu={(
+                                                                    event,
+                                                                ) =>
+                                                                    contextEntry(
+                                                                        event,
+                                                                        e,
+                                                                        ui,
+                                                                    )
+                                                                }
                                                                 onMouseEnter={(
                                                                     me,
                                                                 ) =>
@@ -1679,6 +2231,15 @@ function srcLabel(key: string): string {
     return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
+/** Right-click on a Today rail entry opens its actions when the calendar offers them. */
+function useRailContext() {
+    const ui = useCalUI();
+    return (ev: Decorated) =>
+        ui.onEntryContext
+            ? (e: React.MouseEvent) => contextEntry(e, ev, ui)
+            : undefined;
+}
+
 function RailRow({
     ev,
     onSelect,
@@ -1688,10 +2249,13 @@ function RailRow({
     onSelect: (ev: Decorated) => void;
     showDay?: boolean;
 }) {
+    const railContext = useRailContext();
+    const { srcByKey } = useCalUI();
     return (
         <GuardrailButton
             unstyled
             onClick={() => onSelect(ev)}
+            onContextMenu={railContext(ev)}
             className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent/40"
         >
             <span className="tnum w-16 shrink-0 text-[11.5px] font-medium text-muted-foreground">
@@ -1713,7 +2277,9 @@ function RailRow({
                     className="block truncate text-[11px]"
                     style={{ color: `var(--src-${ev.source})` }}
                 >
-                    {ev.typeLabel || srcLabel(ev.source)}
+                    {ev.typeLabel ||
+                        srcByKey[ev.source]?.short ||
+                        srcLabel(ev.source)}
                 </span>
             </span>
             {ev.owner && <Avatar person={ev.owner} size="h-6 w-6" />}
@@ -1742,6 +2308,7 @@ export function TodayRail({
     onJumpToday: () => void;
     viewingToday: boolean;
 }) {
+    const railContext = useRailContext();
     const now = today;
     const dayStart = (d: Date) => {
         const r = new Date(d);
@@ -1833,6 +2400,7 @@ export function TodayRail({
                         <GuardrailButton
                             unstyled
                             onClick={() => onSelect(focus)}
+                            onContextMenu={railContext(focus)}
                             className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-md"
                             style={{
                                 borderColor: `var(--src-${focus.source}-ln)`,
@@ -1907,6 +2475,7 @@ export function TodayRail({
                                 unstyled
                                 key={`${e.id}-${e.start}`}
                                 onClick={() => onSelect(e)}
+                                onContextMenu={railContext(e)}
                                 className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent/40"
                             >
                                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
@@ -1920,7 +2489,9 @@ export function TodayRail({
                                         {e.title}
                                     </span>
                                     <span className="block text-[11px] font-medium text-status-critical">
-                                        Overdue · {Math.abs(dayDiff(e._start))}d
+                                        {/* An entry's own wording (e.g. "Restricted") reads better than a generic "Overdue". */}
+                                        {e.statusLabel || 'Overdue'} ·{' '}
+                                        {Math.abs(dayDiff(e._start))}d
                                     </span>
                                 </span>
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

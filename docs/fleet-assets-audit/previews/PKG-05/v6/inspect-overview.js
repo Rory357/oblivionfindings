@@ -1,0 +1,1 @@
+async(page)=>{await page.setViewportSize({width:1440,height:1100});await page.screenshot({path:'C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v6/review-overview.png',fullPage:true});return await page.locator('main').innerText()}

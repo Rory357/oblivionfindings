@@ -1,0 +1,8 @@
+{
+  "fuelHref": "/fleet-assets/fuel?site_id=7&page=2",
+  "focusAfterEscape": {
+    "focusVisible": true,
+    "label": null
+  },
+  "back": "http://127.0.0.1:8876/fleet-assets/fuel?site_id=7&page=2#logs"
+}

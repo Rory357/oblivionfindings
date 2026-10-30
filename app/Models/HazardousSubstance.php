@@ -45,6 +45,11 @@ class HazardousSubstance extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'current_sds_id' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
         'hazard_classifications' => 'array',
         'ghs_pictograms' => 'array',
         'requires_tracking' => 'boolean',
@@ -78,6 +83,17 @@ class HazardousSubstance extends Model
         return $this->hasOne(SafetyDataSheet::class)
             ->where('status', 'current')
             ->latest('issue_date');
+    }
+
+    /** Explicit governed identity; legacy currentSds remains a compatibility relation, not proof. */
+    public function governedCurrentSds(): BelongsTo
+    {
+        return $this->belongsTo(SafetyDataSheet::class, 'current_sds_id');
+    }
+
+    public function sourceVersions(): HasMany
+    {
+        return $this->hasMany(ChemicalSourceVersion::class, 'root_id')->where('root_type', 'catalogue');
     }
 
     public function creator(): BelongsTo

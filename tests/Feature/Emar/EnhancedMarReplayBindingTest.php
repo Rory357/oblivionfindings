@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\TestCase;
+use Database\Factories\UserFactory;
 
 class EnhancedMarReplayBindingTest extends TestCase
 {
@@ -457,7 +458,11 @@ class EnhancedMarReplayBindingTest extends TestCase
             $controlledRecord->id => ['allowed' => true],
         ]);
         $this->actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-        $this->medication->forceFill(['controlled_drug' => true])->saveQuietly();
+        $this->medication->forceFill([
+            'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
+        ])->saveQuietly();
         $stock = ClientMedicationStock::query()->create([
             'client_medication_id' => $this->medication->id,
             'on_hand' => 10,
@@ -489,6 +494,7 @@ class EnhancedMarReplayBindingTest extends TestCase
             'expiry_date' => today()->addYear(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         Shift::factory()->create([
@@ -507,7 +513,7 @@ class EnhancedMarReplayBindingTest extends TestCase
             'dose_given' => '1 tablet',
             'quantity_administered' => 1,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => 'e60df342-917a-4f2b-b97e-c1b478550514',
             'scope_authorized' => true,
         ];

@@ -85,6 +85,24 @@ $critical = static fn (
 );
 
 $capabilities = [
+    'endpoint.script.run' => array_replace($high('Run a reviewed Windows script', 'network_it', 'endpoint_script_execution', [
+        'script_uuid' => ['type' => 'string', 'max_length' => 36],
+        'script_version' => ['type' => 'integer', 'min' => 1, 'max' => 1],
+        'content_hash' => ['type' => 'string', 'max_length' => 64],
+        'policy_version' => ['type' => 'integer', 'min' => 1, 'max' => 4294967295],
+        'inputs_json' => ['type' => 'string', 'max_length' => 8192],
+    ], ['script_uuid', 'script_version']), ['requires_mfa' => true, 'expires_after_seconds' => 900]),
+    'endpoint.software.install' => array_replace($high('Install approved Windows software', 'network_it', 'endpoint_software_product', [
+        'package_uuid' => ['type' => 'string', 'max_length' => 36],
+    ], ['package_uuid']), ['requires_mfa' => true, 'expires_after_seconds' => 900]),
+    'endpoint.computer.restart' => array_replace($high('Schedule Windows restart', 'network_it', 'endpoint_restart_boot', [
+        'execute_at' => ['type' => 'date_time'],
+        'warning_seconds' => ['type' => 'integer', 'min' => 60, 'max' => 3600],
+    ], ['execute_at', 'warning_seconds']), ['requires_mfa' => true, 'expires_after_seconds' => 86405]),
+    'endpoint.service.manage' => array_replace($high('Manage Windows service', 'network_it', 'endpoint_service_state', [
+        'service_name' => ['type' => 'string', 'max_length' => 200],
+        'operation' => ['type' => 'string', 'enum' => ['start', 'stop', 'restart']],
+    ], ['service_name', 'operation']), ['requires_mfa' => true]),
     'diagnostics.ping' => array_replace(
         $definition('Ping device', 'network_it', 'operate', 'low', false, false, false, false, 300, 'diagnostic_result'),
         ['requires_fresh_observation' => false],
@@ -125,6 +143,13 @@ $capabilities = [
     'network.port.disable' => array_replace($high('Disable network port', 'network_it', 'interface_admin_state', [
         'interface' => ['type' => 'string', 'max_length' => 80],
     ], ['interface']), ['requires_change' => true]),
+    'network.port.bounce' => array_replace($definition('Restart network port', 'network_it', 'manage', 'medium', false, false, false, false, 300, 'interface_bounce_state', [
+        'interface' => ['type' => 'string', 'max_length' => 80],
+    ], ['interface'], ['active', 'degraded'], 'reconcile_before_retry'), ['confirmation_mode' => 'acknowledge_impact']),
+    'network.config.backup' => array_replace(
+        $definition('Capture configuration backup', 'network_it', 'manage', 'low', false, false, false, false, 300, 'fresh_configuration_snapshot'),
+        ['requires_fresh_observation' => false, 'confirmation_mode' => 'acknowledge_impact'],
+    ),
     'network.firewall_policy.apply' => array_replace($critical('Apply firewall policy', 'network_it', 'configuration_hash_matches', [
         'policy_reference' => ['type' => 'string', 'max_length' => 120],
     ], ['policy_reference'], false), ['requires_change' => true]),
@@ -222,6 +247,10 @@ $authorise = static function (
     }
 };
 
+$authorise(['endpoint.script.run'], ['it_infrastructure'], ['endpoint', 'server'], ['securityDevices.endpoints.scriptRun'], 'availability_control');
+$authorise(['endpoint.software.install'], ['it_infrastructure'], ['endpoint', 'server', 'workstation', 'computer'], ['securityDevices.endpoints.softwareInstall'], 'availability_control');
+$authorise(['endpoint.computer.restart'], ['it_infrastructure'], ['endpoint', 'server', 'workstation', 'computer'], ['securityDevices.endpoints.restartSchedule'], 'availability_control');
+$authorise(['endpoint.service.manage'], ['it_infrastructure'], ['endpoint', 'server', 'workstation', 'computer'], ['securityDevices.endpoints.serviceManage'], 'availability_control');
 $authorise(['diagnostics.ping', 'diagnostics.trace_route'], $allDeviceDomains);
 $authorise(
     ['tracking.location_refresh'],
@@ -254,7 +283,7 @@ $authorise(
     sensitivity: 'destructive_endpoint',
 );
 $authorise(
-    ['network.port.enable', 'network.port.disable', 'network.firewall_policy.apply'],
+    ['network.port.enable', 'network.port.disable', 'network.port.bounce', 'network.config.backup', 'network.firewall_policy.apply'],
     ['it_infrastructure'],
     ['network', 'networking'],
 );
@@ -321,7 +350,13 @@ $authorise(
     'facilities_control',
 );
 
+// The single source of each capability's impact and expected result; the
+// loop below writes them onto every capability definition.
 $guidance = [
+    'endpoint.script.run' => ['Reviewed scripts run with privileged computer access. Approval applies only to the selected immutable script, inputs and computer policy.', 'An exact-attempt execution receipt can confirm completion. It cannot establish an unmeasured desired state or imply rollback.'],
+    'endpoint.software.install' => ['Install the exact independently reviewed machine MSI release. Installation can interrupt computer features.', 'Completion needs the immutable MSI receipt and independent machine product observation. Exit3010 means a restart is required, never an automatic restart.'],
+    'endpoint.computer.restart' => ['Restarting this computer interrupts active work. A visible warning is required and unsaved work may prevent the restart.', 'An accepted restart API receipt remains awaiting boot. Completion requires a fresh authenticated changed-boot observation for this exact attempt.'],
+    'endpoint.service.manage' => ['Starting, stopping or restarting this approved service can interrupt computer features and active work.', 'An execution receipt followed by a fresh observation confirms service state. Restart completion also requires a successful execution receipt.'],
     'diagnostics.ping' => ['Checks reachability without changing the Device.', 'A bounded diagnostic result is recorded.'],
     'diagnostics.trace_route' => ['Checks the approved network path without changing the Device.', 'A bounded route result is recorded.'],
     'tracking.location_refresh' => ['Requests one current technical location observation.', 'A fresh governed location observation is recorded if the tracker responds.'],
@@ -334,6 +369,8 @@ $guidance = [
     'firmware.update' => ['Changes Device software and may temporarily interrupt service.', 'A fresh observation reports the approved firmware version.'],
     'network.port.enable' => ['Restores traffic on the selected interface and may reconnect downstream equipment.', 'A fresh observation reports the interface enabled.'],
     'network.port.disable' => ['Stops traffic on the selected interface and may disconnect downstream equipment.', 'A fresh observation reports the interface disabled.'],
+    'network.port.bounce' => ['Briefly cycles link or PoE on the selected port. Uplinks, trunks, and ports serving security or care devices require independent approval.', 'A fresh observation reports the interface returned to enabled after cycling.'],
+    'network.config.backup' => ['Reads and stores a redacted running configuration snapshot without changing Device settings.', 'A fresh encrypted, secret-redacted configuration snapshot is verified in private storage.'],
     'network.firewall_policy.apply' => ['Changes network security policy and may affect Site connectivity.', 'A fresh configuration hash matches the approved firewall policy.'],
     'access.door.unlock_timed' => ['Temporarily unlocks this exact door for the approved attendance window.', 'The provider confirms the door returns to locked after the bounded window.'],
     'access.door.lock' => ['Locks this exact door and may prevent physical entry or exit.', 'A fresh provider observation confirms the door is locked.'],

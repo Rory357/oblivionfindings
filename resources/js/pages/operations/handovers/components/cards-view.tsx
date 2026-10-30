@@ -15,10 +15,16 @@ import {
 } from 'lucide-react';
 import { type MouseEvent as ReactMouseEvent, useMemo } from 'react';
 
+import { toDateInput } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
-import { useHandoverContextMenu } from './handover-context-menu';
+import { EmptyState as SharedEmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import {
+    HandoverActionsButton,
+    useHandoverContextMenu,
+} from './handover-context-menu';
 import {
     type Handover,
     HueAvatar,
@@ -27,7 +33,7 @@ import {
     cardCounts,
     clientName,
     fmtShiftRange,
-    handoverDate,
+    handoverCalendarDate,
     humanizeRole,
     relTime,
     ymd,
@@ -35,16 +41,11 @@ import {
 
 export function EmptyState() {
     return (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 py-16 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Inbox className="h-6 w-6" />
-            </div>
-            <h2 className="text-base font-semibold">No handovers match</h2>
-            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Try a different week, clear your filters, or start a new
-                handover.
-            </p>
-        </div>
+        <SharedEmptyState
+            icon={Inbox}
+            title="No handovers match"
+            description="Try a different week, clear your filters, or start a new handover."
+        />
     );
 }
 
@@ -58,13 +59,17 @@ export type CardHandlers = {
 
 function HandoverCard({
     h,
+    timeZone,
     onOpen,
     onSubmit,
     onAcknowledge,
     onContextMenu,
+    onActions,
 }: {
     h: Handover;
+    timeZone?: string;
     onContextMenu: (e: ReactMouseEvent, h: Handover) => void;
+    onActions: (e: ReactMouseEvent<HTMLElement>, h: Handover) => void;
 } & CardHandlers) {
     const counts = cardCounts(h);
     const attn = h.status === 'submitted';
@@ -95,10 +100,10 @@ function HandoverCard({
                         <div className="flex items-center gap-2">
                             <HueAvatar name={h.outgoing_staff.name} />
                             <div className="min-w-0 leading-tight">
-                                <div className="truncate text-[13px] font-bold">
+                                <div className="truncate text-sm font-bold">
                                     {h.outgoing_staff.name}
                                 </div>
-                                <div className="truncate text-[11px] text-muted-foreground">
+                                <div className="truncate text-xs text-muted-foreground">
                                     Outgoing{outRole ? ` · ${outRole}` : ''}
                                 </div>
                             </div>
@@ -109,19 +114,22 @@ function HandoverCard({
                         <div className="flex items-center gap-2">
                             <HueAvatar name={h.incoming_staff.name} />
                             <div className="min-w-0 leading-tight">
-                                <div className="truncate text-[13px] font-bold">
+                                <div className="truncate text-sm font-bold">
                                     {h.incoming_staff.name}
                                 </div>
-                                <div className="truncate text-[11px] text-muted-foreground">
+                                <div className="truncate text-xs text-muted-foreground">
                                     Incoming{incRole ? ` · ${incRole}` : ''}
                                 </div>
                             </div>
                         </div>
                     ) : (
-                        <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-status-warning/50 bg-status-warning-bg px-2.5 py-1 text-[11px] font-semibold text-status-warning">
+                        <StatusBadge
+                            variant="warning"
+                            className="border-dashed"
+                        >
                             <ShieldAlert className="h-3.5 w-3.5" />
                             Incoming shift open
-                        </span>
+                        </StatusBadge>
                     )}
                 </div>
 
@@ -132,26 +140,26 @@ function HandoverCard({
                     <StatusPill status={h.status} />
                     {h.status === 'draft' && h.can_submit ? (
                         <GuardrailButton
-                            unstyled
                             type="button"
+                            size="sm"
+                            variant="outline"
                             onClick={() => onSubmit(h)}
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs font-semibold transition-colors hover:bg-accent"
                         >
-                            <Send className="h-3.5 w-3.5" />
+                            <Send className="size-3.5" />
                             Submit
                         </GuardrailButton>
                     ) : null}
                     {h.status === 'submitted' && h.can_acknowledge ? (
                         <GuardrailButton
-                            unstyled
                             type="button"
+                            size="sm"
                             onClick={() => onAcknowledge(h)}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                         >
-                            <Check className="h-3.5 w-3.5" />
+                            <Check className="size-3.5" />
                             Acknowledge
                         </GuardrailButton>
                     ) : null}
+                    <HandoverActionsButton handover={h} onOpen={onActions} />
                 </div>
             </div>
 
@@ -161,21 +169,21 @@ function HandoverCard({
                     <Link
                         href={`/operations/clients/${h.client.id}`}
                         onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-primary-fill/10 px-2.5 py-1 text-xs font-semibold text-primary transition-colors hover:bg-primary/15"
                     >
                         <User className="h-3 w-3" />
                         {clientName(h.client)}
                     </Link>
                 ) : null}
                 {h.outgoing_shift ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
                         <Clock className="h-3 w-3" />
                         {h.outgoing_shift.label} ·{' '}
-                        {fmtShiftRange(h.outgoing_shift)}
+                        {fmtShiftRange(h.outgoing_shift, timeZone)}
                     </span>
                 ) : null}
                 {h.site ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-[11px] font-medium text-foreground">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground">
                         <Home className="h-3 w-3" />
                         {h.site.name}
                     </span>
@@ -184,14 +192,14 @@ function HandoverCard({
             </div>
 
             {/* Narrative */}
-            <p className="mt-3 text-[13.5px] leading-relaxed text-foreground/90">
+            <p className="mt-3 text-base leading-relaxed text-foreground/90">
                 {h.handover_notes.length > 240
                     ? `${h.handover_notes.slice(0, 240)}…`
                     : h.handover_notes}
             </p>
 
             {/* Meta footer */}
-            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-dashed border-border pt-3 text-[11px] text-muted-foreground">
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-dashed border-border pt-3 text-xs text-muted-foreground">
                 {counts.meds > 0 ? (
                     <span className="inline-flex items-center gap-1 text-status-critical">
                         <Pill className="h-3.5 w-3.5" />
@@ -231,9 +239,12 @@ function HandoverCard({
     );
 }
 
-function dayLabel(date: Date): string {
-    const today = ymd(new Date());
-    const yesterday = new Date();
+function dayLabel(date: Date, timeZone?: string): string {
+    if (Number.isNaN(date.getTime())) return 'Date unavailable';
+    const today = timeZone
+        ? toDateInput(new Date(), timeZone)
+        : ymd(new Date());
+    const yesterday = new Date(`${today}T12:00:00`);
     yesterday.setDate(yesterday.getDate() - 1);
     if (ymd(date) === today) return 'Today';
     if (ymd(date) === ymd(yesterday)) return 'Yesterday';
@@ -242,13 +253,14 @@ function dayLabel(date: Date): string {
 
 export function CardsView({
     handovers,
+    timeZone,
     ...handlers
-}: { handovers: Handover[] } & CardHandlers) {
-    const { openCtx, menu } = useHandoverContextMenu(handlers);
+}: { handovers: Handover[]; timeZone?: string } & CardHandlers) {
+    const { openCtx, openFromButton, menu } = useHandoverContextMenu(handlers);
     const groups = useMemo(() => {
         const byDay = new Map<string, { date: Date; items: Handover[] }>();
         for (const h of handovers) {
-            const date = handoverDate(h);
+            const date = handoverCalendarDate(h, timeZone);
             const key = ymd(date);
             if (!byDay.has(key)) byDay.set(key, { date, items: [] });
             byDay.get(key)!.items.push(h);
@@ -262,7 +274,7 @@ export function CardsView({
             );
         arr.sort((a, b) => b.date.getTime() - a.date.getTime());
         return arr;
-    }, [handovers]);
+    }, [handovers, timeZone]);
 
     if (handovers.length === 0) return <EmptyState />;
 
@@ -273,13 +285,15 @@ export function CardsView({
                     <div key={ymd(g.date)} className="space-y-3">
                         <div className="flex items-center gap-3">
                             <span className="text-sm font-bold">
-                                {dayLabel(g.date)}
+                                {dayLabel(g.date, timeZone)}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {g.date.toLocaleDateString('en-NZ', {
-                                    day: 'numeric',
-                                    month: 'long',
-                                })}
+                                {Number.isNaN(g.date.getTime())
+                                    ? 'No recorded date'
+                                    : g.date.toLocaleDateString('en-NZ', {
+                                          day: 'numeric',
+                                          month: 'long',
+                                      })}
                             </span>
                             <span className="h-px flex-1 bg-border" />
                             <span className="text-xs text-muted-foreground tabular-nums">
@@ -291,8 +305,10 @@ export function CardsView({
                             <HandoverCard
                                 key={h.id}
                                 h={h}
+                                timeZone={timeZone}
                                 {...handlers}
                                 onContextMenu={openCtx}
+                                onActions={openFromButton}
                             />
                         ))}
                     </div>

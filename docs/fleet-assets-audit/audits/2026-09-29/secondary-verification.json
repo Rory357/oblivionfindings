@@ -1,0 +1,65 @@
+{
+  "recordedAt": "2026-09-29",
+  "baselineMain": "3ffc4c1c4623f6219a3a1994b458a03c891637be",
+  "scope": "Fleet secondary pages, date-only compliance boundaries, and their local integration",
+  "sourceAssessment": {
+    "inventoryPages": 50,
+    "activeLegacyHeaderPagesAfterFollowUp": 26,
+    "inactiveLegacyBranches": 2,
+    "details": "secondary-page-assessment.md"
+  },
+  "localChecks": {
+    "backend": {
+      "suite": "tests/Feature/FleetAssets/DailyCheckRecordsTest.php",
+      "tests": 8,
+      "assertions": 239,
+      "result": "passed",
+      "database": "separate local synthetic MySQL test schema"
+    },
+    "frontend": {
+      "files": 3,
+      "tests": 8,
+      "result": "passed",
+      "scope": "Fleet devices, fuel, and maps setup"
+    },
+    "typescript": "passed after final source edits",
+    "eslint": "passed on five edited TSX files",
+    "phpSyntax": "passed on four edited PHP files",
+    "pint": "passed on Asset model and DailyCheck controller; VehicleController and FleetAutoAlertJob are not formatting-certified by this follow-up",
+    "viteProductionBuild": "passed after final source edits; existing large chunk advisory only",
+    "gitDiffCheck": "passed"
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:8797",
+    "checkout": "managed fleet-secondary-followup worktree",
+    "database": "existing local synthetic Fleet fixture; one synthetic booking added for detail inspection",
+    "assetSource": "production Vite manifest in this worktree; public/hot absent",
+    "signIn": "normal Laravel login with synthetic Fleet manager",
+    "observed": [
+      "Daily Checks rendered its new header, permission-aware alert link, check counters, and truthful zero-result checked filter",
+      "Populated Daily Checks vehicle cards fit the narrow document after the wrapping correction; the selected count is exposed as pressed",
+      "Bookings rendered the all and pending empty states; pending filter showed no create prompt",
+      "Booking calendar remained inside a focusable horizontal scroll region at narrow width",
+      "Synthetic booking detail rendered the new profile header and status on a narrow viewport",
+      "Vehicle alert configuration rendered its profile header and seven named rule switches"
+    ],
+    "narrowViewport": {
+      "overrideWidth": 375,
+      "measuredCssWidth": 300,
+      "devicePixelRatio": 1.25,
+      "documentScrollWidth": 288,
+      "calendarClientWidth": 251,
+      "calendarScrollWidth": 700,
+      "horizontalDocumentOverflow": false,
+      "measurementPages": "Daily Checks populated and filtered, booking list calendar, booking detail, vehicle alert configuration"
+    },
+    "consoleErrors": 0,
+    "zoom125Percent": "not independently established by the browser controller; DPR alone is not zoom proof"
+  },
+  "external": {
+    "hostedCom": "The public Fleet Reports URL redirected an unauthenticated browser to login. Authenticated content and deployed revision were not verified.",
+    "googleProvider": "Local setup and mocked tests are evidence only. Live Maps, Places, Geocoding and Routes require deployment-managed restricted keys, enabled APIs and billing; no paid provider call was made.",
+    "baselineGitHubActions": "At baseline 3ffc4c1, public Actions showed visual-regression and tests failed, database-bootstrap succeeded, and linter was still running at observation. Detailed job logs required sign-in.",
+    "applicationWideGreen": false
+  }
+}

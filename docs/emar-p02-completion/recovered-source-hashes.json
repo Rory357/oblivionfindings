@@ -1,0 +1,42 @@
+[
+  {
+    "Path": "app/Http/Controllers/Emar/EmarController.php",
+    "SHA256": "C92AC22DB839C6829A99533BB107FFBBD70E530D13658F89FC5CA6CB75DEB292"
+  },
+  {
+    "Path": "config/medications.php",
+    "SHA256": "852EFA8614CDED989B68442788CDED6F50D79CD01890C67E5431390D43570F8B"
+  },
+  {
+    "Path": "resources/js/hooks/use-emar-breadcrumbs.ts",
+    "SHA256": "CA5D215D9433D0F6278C740B58A57A61149C2BD05B15FA8D017C0CB268D9A693"
+  },
+  {
+    "Path": "resources/js/lib/emar-navigation.ts",
+    "SHA256": "3698F6899E7D612380FFD19A33E67375EA4BF5A196854571F5FEE00E26F1322B"
+  },
+  {
+    "Path": "routes/emar.php",
+    "SHA256": "D918DD2C298365B20DEC65E9A86B74D5D05167E417FB9B429C4AE2539CD480F2"
+  },
+  {
+    "Path": "app/Http/Controllers/Emar/PersonMedicationRecordController.php",
+    "SHA256": "822526C986B94FC6EA4C105348C88250182DE5D95F60F89586952C9A5C72E3E6"
+  },
+  {
+    "Path": "resources/js/components/emar/record/sections.ts",
+    "SHA256": "B93678454F52E29113C3DBC0DE2CE469EE652E6520BCE8DB3D9F09D0CDBED521"
+  },
+  {
+    "Path": "resources/js/components/emar/record/types.ts",
+    "SHA256": "D9B895165B85386A53B6631758848F236127CDB58A1CE9275F263C352DE6CB36"
+  },
+  {
+    "Path": "resources/js/components/emar/record/ui.tsx",
+    "SHA256": "A12D0C86A7B40B090359016C145EE3BC75987F8642C3CDFF7DE425C39AF7C6FD"
+  },
+  {
+    "Path": "resources/js/components/emar/record/use-record-json.ts",
+    "SHA256": "40489DBB240FB2A95E9A5B548A86DC05E2B50415A2CCCB9B532C78A734274411"
+  }
+]

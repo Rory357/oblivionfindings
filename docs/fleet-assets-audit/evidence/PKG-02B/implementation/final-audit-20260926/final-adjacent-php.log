@@ -1,0 +1,60 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+.......
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleDrivingAlertsTest[39m
+  [32;1m✓[39;22m[90m [39m[90mdriving insights follow the trip site rule and withhold private trips[39m[90m                                     [39m [90m247.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevent reviews are idempotent version checked audited and recalculate the trip score[39m[90m                         [39m [90m1.11s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma published scoring policy versions the weights and gates a persons score[39m[90m                                   [39m [90m1.07s[39m  
+  [32;1m✓[39;22m[90m [39m[90mmanual speed limits need a second reviewer and evidence before an evaluation uses them[39m[90m                      [39m [90m1.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mthe draft response plan is versioned and owned by site staff[39m[90m                                                [39m [90m0.84s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma recorded overspeed reaches control room and its response links maintenance and a follow up[39m[90m                [39m [90m1.68s[39m  
+  [32;1m✓[39;22m[90m [39m[90man undelivered vehicle signal is retried through recovery and private reports keep no trip or place[39m[90m         [39m [90m1.02s[39m  
+.....................
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest[39m
+  [32;1m✓[39;22m[90m [39m[90mqueue and related-work search retain identity while undated work stays outside All Tasks[39m[90m                    [39m [90m0.24s[39m  
+  [32;1m✓[39;22m[90m [39m[90mFinance projection conceals a bill whose canonical asset or site has changed[39m[90m                                [39m [90m0.15s[39m  
+  [32;1m✓[39;22m[90m [39m[90mAuckland local minutes reject daylight gaps and require an offset for repeated minutes[39m[90m                      [39m [90m0.09s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved configuration versions route, rule and reviewer decisions without default grants[39m[90m                   [39m [90m1.04s[39m  
+  [32;1m✓[39;22m[90m [39m[90mcustody receipt access follows the latest exact recipient and approved site[39m[90m                                 [39m [90m0.22s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma restriction flags existing bookings once and retains an owned follow-up[39m[90m                                   [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreport identity preserves both submissions and requires approved site routing[39m[90m                               [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mreport-only HTTP entry and search stay narrow while selected recipient can accept[39m[90m                           [39m [90m0.37s[39m  
+  [32;1m✓[39;22m[90m [39m[90mchecks keep unknown provenance and only an unchanged exact approved version can pass[39m[90m                        [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90mapproved advisory check failures do not create a booking block while unknown provenance remains unassessed[39m[90m  [39m [90m0.12s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrequired evidence cannot be bypassed by NA or a client claim and a saved private file can satisfy it[39m[90m        [39m [90m0.20s[39m  
+  [32;1m✓[39;22m[90m [39m[90msingle transitions guard completion, replay identity and handover acknowledgement[39m[90m                           [39m [90m0.21s[39m  
+  [32;1m✓[39;22m[90m [39m[90mtriage deadlines and provider responses retain exact Auckland source times[39m[90m                                  [39m [90m0.27s[39m  
+  [32;1m✓[39;22m[90m [39m[90mrelease requires an independent category-granted reviewer, current passing retest and custody[39m[90m               [39m [90m3.86s[39m  
+  [32;1m✓[39;22m[90m [39m[90ma completed held repair can recover a new rule and enabled committed effects deliver once[39m[90m                   [39m [90m2.23s[39m  
+  [32;1m✓[39;22m[90m [39m[90man overlapping booking decision waits for the asset lock and sees a newly committed hold[39m[90m                    [39m [90m2.94s[39m  
+  [32;1m✓[39;22m[90m [39m[90mDesigner review: work detail uses permitted projections for custody fleet and Finance readers[39m[90m               [39m [90m0.29s[39m  
+  [32;1m✓[39;22m[90m [39m[90mDesigner review: actual default administrator seeding withholds safety configuration authority[39m[90m              [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mDesigner review: authored template configures and records standalone check evidence without inventing work[39m[90m  [39m [90m0.35s[39m  
+  [32;1m✓[39;22m[90m [39m[90mDesigner review: Outing booking waits for the asset lock and a hold leaves no partial outing[39m[90m                [39m [90m2.89s[39m  
+  [32;1m✓[39;22m[90m [39m[90mDesigner review: two completed jobs clear only their own holds while the asset remains unavailable[39m[90m          [39m [90m0.28s[39m  
+.
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\Pkg01MaintenanceRollbackTest[39m
+  [32;1m✓[39;22m[90m [39m[90mDesigner review: empty package rolls back and every down preserves standalone and corrected sources[39m[90m        [39m [90m11.05s[39m  
+.........                            38 / 38 (100%)
+  [30;42;1m PASS [39;49;22m[39m Tests\Feature\FleetAssets\VehicleBookingSitePrivacyTest[39m
+  [32;1m✓[39;22m[90m [39m[90mregister export counts calendar and every picker are scoped when filters are omitted[39m[90m                        [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mselected vehicle conflicts status and availability conceal foreign and missing assets[39m[90m                       [39m [90m0.69s[39m  
+  [32;1m✓[39;22m[90m [39m[90mforeign booking and missing booking direct ids are concealed identically[39m[90m                                    [39m [90m0.60s[39m  
+  [32;1m✓[39;22m[90m [39m[90mstore conceals foreign asset client and site ids without booking or audit effects[39m[90m                           [39m [90m0.78s[39m  
+  [32;1m✓[39;22m[90m [39m[90msecondary site store is allowed and client advisory input is not persisted[39m[90m                                  [39m [90m0.67s[39m  
+  [32;1m✓[39;22m[90m [39m[90mevery foreign mutation is concealed before status payload audit or notification effects[39m[90m                     [39m [90m0.66s[39m  
+  [32;1m✓[39;22m[90m [39m[90mglobal site scope never replaces the exact booking action[39m[90m                                                   [39m [90m0.64s[39m  
+  [32;1m✓[39;22m[90m [39m[90mexact lifecycle action permissions use canonical site scope without incidental read permission[39m[90m              [39m [90m0.74s[39m  
+  [32;1m✓[39;22m[90m [39m[90msame site lifecycle replay and competing stale transition have one effect[39m[90m                                   [39m [90m3.85s[39m  
+
+  [90mTests:[39m    [32;1m38 passed[39;22m[90m (1202 assertions)[39m
+  [90mDuration:[39m [39m292.37s[39m
+
+
+
+Time: 04:52.131, Memory: 174.00 MB
+
+[30;42mOK (38 tests, 1202 assertions)[0m

@@ -8,6 +8,7 @@ use App\Models\Asset;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
+use App\Models\ClientEmergencyContact;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -24,6 +25,7 @@ use App\Models\User;
 use App\Services\Fleet\ResidentTransportJourneyService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationScanVerificationService;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -34,6 +36,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Mockery;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class ResidentTransportJourneySecurityTest extends TestCase
@@ -45,6 +48,30 @@ class ResidentTransportJourneySecurityTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+    }
+
+    public function test_pre_check_reads_emergency_contact_relationship_from_canonical_schema(): void
+    {
+        $site = Site::factory()->create();
+        $viewer = $this->siteUser($site, ['fleet.viewAny', 'clients.viewAny']);
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $vehicle = $this->vehicle($site, 'Pre-check vehicle');
+        $transport = $this->transport($site, $client, $vehicle, $viewer);
+        ClientEmergencyContact::query()->create([
+            'client_id' => $client->id,
+            'name' => 'Test contact',
+            'relationship' => 'sibling',
+            'phone' => '0210000000',
+        ]);
+
+        $this->actingAs($viewer)
+            ->get("/fleet-assets/transports/{$transport->id}/pre-check")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/transports/pre-check')
+                ->where('emergency_contacts.0.name', 'Test contact')
+                ->where('emergency_contacts.0.relation', 'sibling')
+                ->where('emergency_contacts.0.phone', '0210000000'));
     }
 
     public function test_site_viewer_gets_only_their_transport_matrix_and_global_transport_role_is_explicitly_positive(): void
@@ -93,6 +120,10 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $clientA = Client::factory()->create(['site_id' => $siteA->id, 'first_name' => 'PickerA', 'last_name' => 'Resident']);
         $clientAOther = Client::factory()->create(['site_id' => $siteA->id, 'first_name' => 'PickerOther', 'last_name' => 'Resident']);
         $clientB = Client::factory()->create(['site_id' => $siteB->id, 'first_name' => 'PickerB', 'last_name' => 'Resident']);
+        // EA-002: transit medicines follow the eMAR person rule, so this
+        // ordinary reader supports both local residents.
+        $clientA->supportWorkers()->syncWithoutDetaching([$viewer->id]);
+        $clientAOther->supportWorkers()->syncWithoutDetaching([$viewer->id]);
         $vehicleA = $this->vehicle($siteA, 'Picker vehicle A');
         $vehicleAOtherResident = Asset::factory()->vehicle()->forSite($siteA)->create([
             'name' => 'Picker resident-bound vehicle',
@@ -423,7 +454,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ...$this->scanPayload($client, $medication),
             'attestation_state' => 'accepted',
             'witnessed_by_user_id' => $witness->id,
-            'witness_credential' => 'packing-witness-secret',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => $uuid,
             'notes' => 'Original custody request',
         ];
@@ -470,7 +501,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             'witness_required' => true,
             'packed_witness_name' => $witness->name,
             'packed_witnessed_by_user_id' => $witness->id,
-            'packing_witness_method' => 'password',
+            'packing_witness_method' => 'witness_pin',
         ]);
         $this->assertNotNull(FleetMedicationTransitLog::query()->sole()->packing_attestation_event_id);
         $this->assertDatabaseCount('fleet_resident_transport_events', 1);
@@ -484,7 +515,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $event = FleetResidentTransportEvent::query()->sole();
         $eventContext = $event->context;
         $this->assertSame('accepted', $eventContext['attestation']['state']);
-        $this->assertSame('password', $eventContext['attestation']['method']);
+        $this->assertSame('witness_pin', $eventContext['attestation']['method']);
         $this->assertSame('medications.controlled.witness', $eventContext['attestation']['authority_permission']);
         $this->assertSame('valid', $eventContext['attestation']['competency_state']);
         $this->assertSame('attendance_session', $eventContext['attestation']['presence_source']);
@@ -533,14 +564,14 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Offline packing vehicle'), $actor);
         $medication = $this->medication($client, 'Offline packing medication');
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
 
         $base = [
             ...$this->medicationPayload($client, $medication),
@@ -643,7 +674,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
                 ...$this->scanPayload($client, $medication),
                 'attestation_state' => 'accepted',
                 'witnessed_by_user_id' => $witness->id,
-                'witness_credential' => 'witness-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertOk();
@@ -652,7 +683,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $payload = [
             ...$this->scanPayload($client, $medication),
             'witnessed_by_user_id' => $witness->id,
-            'witness_credential' => 'witness-secret',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'notes' => 'Given during the authorised journey.',
             'quantity_administered' => '0.25',
             'client_request_uuid' => $uuid,
@@ -662,7 +693,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
                 ...$payload,
                 'witnessed_by_user_id' => $foreignWitness->id,
-                'witness_credential' => 'foreign-witness-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertNotFound();
@@ -734,7 +765,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
@@ -743,7 +774,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Offline administration vehicle'), $actor);
         $medication = $this->medication($client, 'Offline fractional transit dose');
         $log = $this->log($transport, $client, $medication, $actor);
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
 
         foreach ([null, '0', '0.001', '100000000.00'] as $invalidQuantity) {
             $quantityPayload = [
@@ -865,7 +896,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
         $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'medications.administer.record']);
@@ -891,7 +922,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         );
         $medication = $this->medication($client, 'Shift-bound offline administration medication');
         $log = $this->log($transport, $client, $medication, $actor);
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
 
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/administer", [
@@ -1039,6 +1070,14 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ['password' => Hash::make('ineligible-secret')],
         );
         $this->shift($siteB, $clientB, $ineligibleWitness);
+        $areaIneligibleWitness = $this->siteUser(
+            $siteB,
+            ['medications.controlled.witness'],
+        );
+        $this->recordCompetency($areaIneligibleWitness);
+        MedicationCompetencyAssessment::query()->where('user_id', $areaIneligibleWitness->id)
+            ->sole()->update(['controlled_drugs' => false]);
+        $this->shift($siteB, $clientB, $areaIneligibleWitness);
         $eligibleWitness = $this->siteUser(
             $siteB,
             ['medications.controlled.witness'],
@@ -1056,7 +1095,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/transports/{$transportB->id}/pack-medication", [
                 ...$basePayload,
                 'witnessed_by_user_id' => $eligibleWitness->id,
-                'witness_credential' => 'eligible-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertNotFound();
@@ -1065,7 +1104,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/transports/{$transportB->id}/pack-medication", [
                 ...$basePayload,
                 'witnessed_by_user_id' => $globalActor->id,
-                'witness_credential' => 'actor-cannot-self-attest',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertUnprocessable()
@@ -1076,6 +1115,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             [$nonPresentWitness, 'not-present-secret'],
             [$outOfWindowWitness, 'out-of-window-secret'],
             [$ineligibleWitness, 'ineligible-secret'],
+            [$areaIneligibleWitness, UserFactory::TEST_WITNESS_PIN],
         ] as [$witness, $credential]) {
             $this->actingAs($globalActor)
                 ->postJson("/fleet-assets/transports/{$transportB->id}/pack-medication", [
@@ -1104,7 +1144,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ->postJson("/fleet-assets/transports/{$transportB->id}/pack-medication", [
                 ...$basePayload,
                 'witnessed_by_user_id' => $eligibleWitness->id,
-                'witness_credential' => 'eligible-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertOk();
@@ -1117,7 +1157,9 @@ class ResidentTransportJourneySecurityTest extends TestCase
     public function test_refusal_unavailability_and_correction_append_provenance_without_erasure(): void
     {
         $site = Site::factory()->create();
-        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage']);
+        // Reading the packing history (medicine names) needs eMAR read access
+        // to the person (EA-002); packing itself stays a Fleet logistics key.
+        $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.view', 'clients.viewAny', 'medications.controlled.view']);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Attestation history vehicle'), $actor);
         $medication = $this->medication($client, 'Attestation history medication', true);
@@ -1142,7 +1184,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ...$basePayload,
             'attestation_state' => 'refused',
             'witnessed_by_user_id' => $witnessA->id,
-            'witness_credential' => 'witness-a-secret',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'attestation_reason' => 'The checker identified a packing-count discrepancy.',
             'client_request_uuid' => $refusalUuid,
         ];
@@ -1177,7 +1219,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
                 ...$this->scanPayload($client, $medication),
                 'attestation_state' => 'accepted',
                 'witnessed_by_user_id' => $witnessA->id,
-                'witness_credential' => 'witness-a-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ])
             ->assertOk();
@@ -1187,7 +1229,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/correct-packing-attestation", [
                 'witnessed_by_user_id' => $witnessA->id,
-                'witness_credential' => 'witness-a-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'correction_reason' => 'Attempted no-op correction.',
                 'client_request_uuid' => (string) Str::uuid(),
             ])
@@ -1199,7 +1241,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/correct-packing-attestation", [
                 'witnessed_by_user_id' => $witnessB->id,
-                'witness_credential' => 'witness-b-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'correction_reason' => 'The original checker was selected in error; the in-person checker was Witness B.',
                 'client_request_uuid' => $correctionUuid,
             ])
@@ -1208,7 +1250,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/correct-packing-attestation", [
                 'witnessed_by_user_id' => $witnessB->id,
-                'witness_credential' => 'witness-b-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'correction_reason' => 'The original checker was selected in error; the in-person checker was Witness B.',
                 'client_request_uuid' => $correctionUuid,
             ])
@@ -1269,7 +1311,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
                 ...$this->scanPayload($client, $medication),
                 'attestation_state' => 'accepted',
                 'witnessed_by_user_id' => $witness->id,
-                'witness_credential' => 'rollback-witness-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'client_request_uuid' => (string) Str::uuid(),
             ]);
             $this->fail('The forced packing failure was not raised.');
@@ -1294,7 +1336,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         );
         $medication = $this->medication($client, 'Legacy packing evidence medication', true);
         $log = $this->log($transport, $client, $medication, $actor, [
-            'witness_required' => false,
+            'witness_required' => true,
             'packed_witness_name' => 'Unverified historic label',
             'returned_to_house_at' => now(),
             'returned_by_user_id' => $actor->id,
@@ -1322,7 +1364,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $this->actingAs($actor)
             ->postJson("/fleet-assets/medication-transit/{$log->id}/correct-packing-attestation", [
                 'witnessed_by_user_id' => $witness->id,
-                'witness_credential' => 'legacy-correction-secret',
+                'witness_credential' => UserFactory::TEST_WITNESS_PIN,
                 'correction_reason' => 'Replaced the historic free-text label with the authenticated in-person checker.',
                 'client_request_uuid' => (string) Str::uuid(),
             ])
@@ -1342,7 +1384,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
     {
         $journeyStartedAt = Carbon::parse('2026-08-28T09:00:00+12:00');
         $receivedAt = Carbon::parse('2026-08-28T10:00:00+12:00');
-        $this->travelTo($journeyStartedAt);
+        $this->travelTo($journeyStartedAt->copy()->utc());
 
         $site = Site::factory()->create();
         $actor = $this->siteUser($site, ['fleet.viewAny', 'fleet.medication.manage', 'medications.administer.record']);
@@ -1351,7 +1393,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
         $transport = $this->transport($site, $client, $this->vehicle($site, 'Return vehicle'), $actor);
         $medication = $this->medication($client, 'Return medication');
         $log = $this->log($transport, $client, $medication, $actor);
-        $this->travelTo($receivedAt);
+        $this->travelTo($receivedAt->copy()->utc());
         $uuid = (string) Str::uuid();
         $capturedAt = $journeyStartedAt->copy()->addMinutes(30);
         $payload = [
@@ -1465,6 +1507,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
 
     public function test_concurrent_replay_serializes_one_terminal_custody_transition(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -1587,6 +1630,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
 
     public function test_concurrent_authenticated_packing_replay_creates_one_log_and_one_bound_attestation_event(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -1610,7 +1654,7 @@ class ResidentTransportJourneySecurityTest extends TestCase
             ...$this->scanPayload($client, $medication),
             'attestation_state' => 'accepted',
             'witnessed_by_user_id' => $witness->id,
-            'witness_credential' => 'concurrent-witness-secret',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => $requestUuid,
         ];
         $database = $connection->getDatabaseName();
@@ -1983,6 +2027,7 @@ PHP;
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subYear(),
             'staff_acknowledged_at' => now()->subYear()->addMinute(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
     }

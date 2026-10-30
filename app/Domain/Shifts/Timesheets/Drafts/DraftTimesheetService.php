@@ -212,15 +212,20 @@ class DraftTimesheetService
                 (int) $session->user_id,
             );
 
-            $timesheet = Timesheet::query()->create([
+            $timesheet = new Timesheet([
                 ...$payload,
                 'attendance_session_id' => $session->id,
             ]);
+            if ($timesheet->save() !== true) {
+                throw new \LogicException('The attendance Timesheet draft could not be created.');
+            }
         } elseif (in_array($timesheet->status, ['draft', 'returned'], true)) {
-            $timesheet->update([
+            if ($timesheet->update([
                 ...$payload,
                 'attendance_session_id' => $timesheet->attendance_session_id ?: $session->id,
-            ]);
+            ]) !== true) {
+                throw new \LogicException('The attendance Timesheet draft could not be updated.');
+            }
             $timesheet = $timesheet->fresh();
         } else {
             $this->reconciler->reconcile($timesheet->fresh(), $session);
@@ -230,10 +235,12 @@ class DraftTimesheetService
 
         $timesheet->loadMissing(['shift.site:id,name', 'shift.client:id,first_name,last_name,site_id', 'shift.serviceContext:id,name', 'user.hrEmployeeProfile']);
         $rate = $this->payrollRates->resolve($timesheet);
-        $timesheet->forceFill([
+        if ($timesheet->forceFill([
             'pay_type' => $rate['pay_type'],
             'pay_rate' => $rate['pay_rate'],
-        ])->saveQuietly();
+        ])->saveQuietly() !== true) {
+            throw new \LogicException('The attendance Timesheet rates could not be saved.');
+        }
 
         $timesheet = $timesheet->fresh();
         $this->reconciler->reconcile($timesheet, $session);
@@ -317,22 +324,29 @@ class DraftTimesheetService
                 (int) $entry->user_id,
             );
 
-            $timesheet = Timesheet::query()->create([
+            $timesheet = new Timesheet([
                 ...$payload,
                 'created_by' => $actorId,
             ]);
+            if ($timesheet->save() !== true) {
+                throw new \LogicException('The time-entry Timesheet draft could not be created.');
+            }
         } else {
-            $timesheet->update($payload);
+            if ($timesheet->update($payload) !== true) {
+                throw new \LogicException('The time-entry Timesheet draft could not be updated.');
+            }
             $timesheet = $timesheet->fresh();
         }
 
         $timesheet->loadMissing(['shift.site:id,name', 'shift.client:id,first_name,last_name,site_id', 'shift.serviceContext:id,name', 'user.hrEmployeeProfile', 'client:id,service_context_id']);
         $rate = $this->payrollRates->resolve($timesheet);
-        $timesheet->forceFill([
+        if ($timesheet->forceFill([
             'pay_type' => $rate['pay_type'],
             'pay_rate' => $rate['pay_rate'],
             'payroll_segments_exported' => $rate['segments'],
-        ])->saveQuietly();
+        ])->saveQuietly() !== true) {
+            throw new \LogicException('The time-entry Timesheet rates could not be saved.');
+        }
 
         $timesheet = $timesheet->fresh();
         $this->reconciler->reconcile($timesheet);

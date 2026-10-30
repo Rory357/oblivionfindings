@@ -181,6 +181,56 @@ test('converting an accepted offer creates a role-backed user and password reset
     expect($application->status)->toBe('hired');
 });
 
+test('converting with no offer work email keeps the personal email out of the work email and the directory', function () {
+    Notification::fake();
+
+    [$candidate, , $offer] = hrAcceptedOfferFixture(
+        $this->hr,
+        $this->site,
+        'mia.personal@example.test',
+    );
+    // Already started, so the hire is current staff and listed in My HR.
+    $offer->update(['proposed_start_date' => today()->subDay()->toDateString()]);
+
+    $profile = app(RecruitmentService::class)->convertToEmployee($candidate, $offer->fresh(), $this->hr->id);
+
+    // The personal email is still the login and the personal contact…
+    expect($profile->user->email)->toBe('mia.personal@example.test');
+    expect($profile->personal_email)->toBe('mia.personal@example.test');
+    // …but never the work email, and the offer records nothing provisioned.
+    expect($profile->work_email)->toBeNull();
+    expect($offer->fresh())
+        ->work_email->toBeNull()
+        ->work_email_provisioned->toBeFalse();
+
+    $response = $this->actingAs($this->hr)
+        ->get(route('hr.my.directory'))
+        ->assertOk()
+        ->assertDontSee('mia.personal@example.test');
+    $entry = collect($response->inertiaProps('people'))->firstWhere('id', $profile->id);
+
+    expect($entry)->not->toBeNull();
+    expect($entry['email'])->toBeNull();
+});
+
+test('converting with an offer work email records it as the work email and login', function () {
+    Notification::fake();
+
+    [$candidate, , $offer] = hrAcceptedOfferFixture(
+        $this->hr,
+        $this->site,
+        'mia.personal@example.test',
+    );
+    $offer->update(['work_email' => 'mia@care.example.test']);
+
+    $profile = app(RecruitmentService::class)->convertToEmployee($candidate, $offer->fresh(), $this->hr->id);
+
+    expect($profile->work_email)->toBe('mia@care.example.test');
+    expect($profile->user->email)->toBe('mia@care.example.test');
+    expect($profile->personal_email)->toBe('mia.personal@example.test');
+    expect($offer->fresh()->work_email_provisioned)->toBeTrue();
+});
+
 test('converting a candidate cannot rebind an existing user profile from another candidate', function () {
     Notification::fake();
 

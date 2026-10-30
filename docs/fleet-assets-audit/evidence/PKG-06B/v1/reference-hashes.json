@@ -1,0 +1,98 @@
+[
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\AGENTS.md",
+    "Hash": "2972A5612C834F4745010658AEAA2CD4640D4D7A29D932E9952E406C790718ED"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\DESIGN.md",
+    "Hash": "20D9369EA9857ACE9FAA9566C8DF2A4BA82E15743E5E6F2437C02E683E863474"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\architecture\\single-tenant-application.md",
+    "Hash": "3DEA6218DB87CE22BED3CAB6B9C500D1A850445D04E9325CB16C23A604979B3C"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\00-project-rules.md",
+    "Hash": "3ADB146F5B3FA2CE88A4CD45E87A0525763695C08208AFBA17FFBF431481D92B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\01-domain-ownership.md",
+    "Hash": "315123740BAE45D61B173A9A6C53953D7077765ECB9778AADDC8B11426C34E0B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\02-approved-workflows.md",
+    "Hash": "184E88246C45BDD02474148572F641176FC8DE503B6EB31CBC190AB438A7C68C"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\03-dependency-map.md",
+    "Hash": "0F41A924BCD05E6E8841CF3C7976FEAE5FFF5A32D450FF6FAF62CA5148C36F15"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\05-page-register.md",
+    "Hash": "D29FB3BA0C67873C9E8D31B2670669F2A136C044CEB41AE9401466283D1D843B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\09-amendments.md",
+    "Hash": "21C2161DEE1CC308D9A06B56E33A7DEC41AD7D1D50BC235599718066B9C4EB66"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\12-navigation-page-inventory.md",
+    "Hash": "0558C11685C5E78DA1B9ABA912AFFAFEC99D6C523E2D1B8B4051D19DD6FAD336"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\14-scope-workflow-approval.md",
+    "Hash": "D56573A349B53B386DBFF911EE71D2654F35BDB99A2C18364E310C1EAD922D18"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\handoffs\\PKG-06A-DESIGNER.md",
+    "Hash": "4F2685830D6B1FDF1EE44C9574AE703904021557D3475A4D0AB2D26BB8E8C829"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\handoffs\\PKG-06B-DESIGNER.md",
+    "Hash": "48B7EC5FBE888B9B4B9578E7AA75AEB04E803448DA7E5ABCC4BC87E692307ACF"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\handoffs\\PKG-02B-BUILD.md",
+    "Hash": "456F6B94B28A2A20D70534F63D4101CF173EF3E0742E7279C51987BD019EB06C"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\docs\\fleet-assets-audit\\evidence\\PKG-NAV-main-publication.md",
+    "Hash": "5ED7C2B4B4C7AE7B03F69F7DEEB10038E29F71B285F845B8AC4429F1288B3A85"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\PAGE_HEADER_STYLE_GUIDE.md",
+    "Hash": "33AEEB0E4434D3BB4D3023E3CE95FFEE12E95BA1FE62C02F36601F8219827FAA"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\APP_SHELL_STYLE_GUIDE.md",
+    "Hash": "4F433617E4D0DF8B51795F6CEB0DBB125913803949DE8FB421E7DD9624469201"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\NAVIGATION_STYLE_GUIDE.md",
+    "Hash": "9295CDB1386322B8A088AE03DE41BC3C75A0FBE3E8FA3331C92C704CCB15895D"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\POPUP_STYLE_GUIDE.md",
+    "Hash": "2BED42D34D4515B7A4945549F57ED9717CAC9794079D5D03102BB034DD8708FA"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\WORK_RECORD_STYLE_GUIDE.md",
+    "Hash": "66908EF279682E2C9EB67412150B39FDBB403B2C8DE2C41E25260E07FCD5AA29"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\LIST_STYLE_GUIDE.md",
+    "Hash": "56B59B464FD46917446B482B8E355D47D7341105915F6C016B6195E2A58138AC"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\BUTTON_STYLE_GUIDE.md",
+    "Hash": "86259475C987D6E30001604316379EB608AEA9F83E16941B6AA476A94BCA6957"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Herd\\oblivionfindings\\design_styles\\DESIGN_TOKENS.md",
+    "Hash": "43F99F4360DE9C00B75C326F4E0FBAB47378AAA8224D42BE56E62E2B8BA3F48B"
+  },
+  {
+    "Path": "C:\\Users\\steph\\Downloads\\oblivion-findings-fleet-assets-complete-astra-prompt-v10.md",
+    "Hash": "C4837AB675F9DFFDB6A8597636F49D5761DA114E6C155DC08E6BB8A209D63FD0"
+  }
+]

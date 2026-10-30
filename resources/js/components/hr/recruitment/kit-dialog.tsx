@@ -235,7 +235,7 @@ export function KitDialog({
                         type="button"
                         onClick={submit}
                         disabled={!canSubmit || form.processing}
-                        className="h-9 rounded-md bg-primary px-4 text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+                        className="h-9 rounded-md bg-primary-fill px-4 text-[13px] font-bold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {editing ? 'Save kit' : 'Create kit'}
                     </button>

@@ -10,6 +10,7 @@
  *
  * Semantic tokens only; app-primary gradient. NZ / web-only / need-to-know.
  */
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
@@ -241,7 +242,7 @@ function GroupPills({
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors',
                             active
-                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                 : 'bg-muted text-muted-foreground hover:bg-accent hover:text-foreground',
                         )}
                     >
@@ -342,14 +343,12 @@ export function HealthClinicalShell({
                         {canRecordObs || canRecordEvent ? (
                             <div className="flex flex-wrap items-center gap-2">
                                 {canRecordObs ? (
-                                    <Button
-                                        size="sm"
+                                    <PageHeaderPrimaryButton
+                                        icon={Activity}
                                         onClick={() => setObsOpen(true)}
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                     >
-                                        <Activity className="mr-1.5 h-4 w-4" />{' '}
                                         Record observation
-                                    </Button>
+                                    </PageHeaderPrimaryButton>
                                 ) : null}
                                 {canRecordEvent ? (
                                     <Button

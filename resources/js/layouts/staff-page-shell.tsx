@@ -12,6 +12,8 @@ import {
 import { useState, type PropsWithChildren, type ReactNode } from 'react';
 
 import { AppSidebar } from '@/components/app-sidebar';
+import { ChatLauncher } from '@/components/chat/chat-launcher';
+import { MessageSquareText } from 'lucide-react';
 import PullToRefresh from '@/components/pull-to-refresh';
 import {
     StaffBottomNav,
@@ -67,6 +69,7 @@ type MoreLink = {
 };
 
 const MORE_LINKS: MoreLink[] = [
+    { label: 'Chat', description: 'People, messages and care-team conversations', href: '/operations/messages', icon: MessageSquareText },
     {
         label: 'My day',
         description: 'Home, shifts, meds, and action items',
@@ -143,7 +146,21 @@ export default function StaffPageShell({
     mobileOnly = false,
     className,
 }: StaffPageShellProps) {
-    const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
+    const sharedProps = usePage<SharedData>().props;
+    const defaultSidebarOpen = sharedProps.sidebarOpen ?? true;
+    // Same rule as the header's Messages entry and the sidebar.
+    const can = (
+        sharedProps.auth as
+            | {
+                  can?: {
+                      chat?: { use?: boolean };
+                      messages?: { viewAny?: boolean };
+                      shifts?: { viewAny?: boolean };
+                  };
+              }
+            | undefined
+    )?.can;
+    const canMessages = !!(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny);
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isDesktopLg = useIsDesktopLg();
     const [moreOpen, setMoreOpen] = useState(false);
@@ -154,7 +171,7 @@ export default function StaffPageShell({
         <div className="min-h-svh w-full overflow-x-hidden">
             <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+                className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary-fill focus:px-4 focus:py-2 focus:text-primary-fill-foreground"
             >
                 Skip to main content
             </a>
@@ -185,12 +202,13 @@ export default function StaffPageShell({
                 <StaffHeader
                     title={title}
                     subtitle={subtitle}
-                    action={headerAction}
+                    action={<div className="flex flex-wrap items-center gap-2">{canMessages && <ChatLauncher outline />}{headerAction}</div>}
                     backHref={backHref}
                     backLabel={backLabel}
                 />
 
                 <div
+                    data-chat-workspace
                     className={cn(
                         'staff-shell-content flex-1 px-4 pt-4 md:px-6 md:pt-6',
                     )}

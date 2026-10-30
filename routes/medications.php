@@ -20,28 +20,32 @@ Route::middleware(['auth'])->group(function () {
         ->name('medications.index');
 
     // Medication audit log
-    Route::get('/medications/audit', [MedicationAuditController::class, 'index'])
+    Route::get('/medications/audit', [\App\Http\Controllers\Emar\MedicationReportsController::class, 'redirect'])
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
         ])
         ->name('medications.audit.index');
     Route::get('/medications/audit/export', [MedicationAuditController::class, 'exportCsv'])
+        ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':audit')
         ->middleware([
             'permission:medications.view',
             'permission:medications.audit.view',
-            'permission:medications.reports.export',
+            'permission:medications.audit.export',
         ])
         ->name('medications.audit.export');
 
     // Medication reports
-    Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {
-        Route::get('/reports/medications', [MedicationsReportController::class, 'index'])
+    Route::middleware('permission:medications.reports.view')->group(function () {
+        Route::get('/reports/medications', [\App\Http\Controllers\Emar\MedicationReportsController::class, 'redirect'])
             ->name('reports.medications');
         Route::get('/reports/medications/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
+            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':doses')
+            ->middleware('permission:medications.reports.export')
             ->name('reports.medications.export_mar');
         Route::get('/reports/medications/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
-            ->middleware('permission:medications.controlled.view')
+            ->middleware(\App\Http\Middleware\MedicationExportGuard::class.':controlled')
+            ->middleware(['permission:medications.controlled.view', 'permission:medications.reports.export'])
             ->name('reports.medications.export_discrepancies');
     });
 

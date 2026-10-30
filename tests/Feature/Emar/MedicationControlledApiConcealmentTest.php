@@ -85,7 +85,7 @@ class MedicationControlledApiConcealmentTest extends TestCase
 
         foreach ([
             route('api.medications.safety.check', [$client, $medication]),
-            route('api.medications.prn.history', [$client, $medication]),
+            route('api.medications.prnHistory', [$client, $medication]),
             route('api.medications.scan_code.show', [$client, $medication]),
             route('api.medications.scan_code.svg', [$client, $medication]),
             route('api.medications.versions.index', [$client, $medication]),
@@ -218,6 +218,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
             'medications.administer.correct',
             'medications.controlled.record',
         ], $site);
+        // EA-106: corrections follow the person rule; this corrector supports the person.
+        $client->supportWorkers()->attach($actor->id);
         $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => true,
@@ -302,6 +304,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
             'medications.administer.correct',
             'medications.controlled.record',
         ], $site);
+        // EA-106: corrections follow the person rule; this corrector supports the person.
+        $client->supportWorkers()->attach($actor->id);
         $performer = User::factory()->create();
         $witness = User::factory()->create();
         $priorRequester = User::factory()->create();
@@ -388,9 +392,12 @@ class MedicationControlledApiConcealmentTest extends TestCase
             ])
             ->assertNotFound();
 
+        // Approving your own correction is a validation error (P02-1).
         $this->actingAs($actor)
             ->post(route('emar.corrections.approve', $pending))
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors([
+                'correction' => 'A correction must be approved by someone other than the person who raised it.',
+            ]);
         $this->actingAs($approver)
             ->post(route('emar.corrections.approve', $pending))
             ->assertRedirect();
@@ -528,6 +535,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
         $actor = $this->userWithPermissions([
             'medications.view',
             'reports.viewAny',
+            'medications.reports.view',
+            'medications.reports.export',
         ], $site);
 
         foreach ([
@@ -542,8 +551,8 @@ class MedicationControlledApiConcealmentTest extends TestCase
                 ['date_from' => '2026-08-28', 'date_to' => '2026-08-27'],
                 'date_to',
             ],
-            ['api.medications.reports.export', ['type' => 'unknown'], 'type'],
-            ['api.medications.reports.export', ['date_to' => 'not-a-date'], 'date_to'],
+            ['api.medications.reports.export', ['type' => 'unknown', 'purpose' => 'care'], 'type'],
+            ['api.medications.reports.export', ['date_to' => 'not-a-date', 'purpose' => 'care'], 'date_to'],
         ] as [$routeName, $query, $field]) {
             $this->actingAs($actor)
                 ->getJson(route($routeName, $query))
@@ -569,7 +578,7 @@ class MedicationControlledApiConcealmentTest extends TestCase
 
         foreach (['not-a-number', 0, 721] as $hours) {
             $this->actingAs($actor)
-                ->getJson(route('api.medications.prn.history', [
+                ->getJson(route('api.medications.prnHistory', [
                     'client' => $client,
                     'medication' => $medication,
                     'hours' => $hours,
@@ -579,7 +588,7 @@ class MedicationControlledApiConcealmentTest extends TestCase
         }
 
         $this->actingAs($actor)
-            ->getJson(route('api.medications.prn.history', [
+            ->getJson(route('api.medications.prnHistory', [
                 'client' => $client,
                 'medication' => $medication,
                 'hours' => 24,

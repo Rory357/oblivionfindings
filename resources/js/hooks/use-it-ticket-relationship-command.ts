@@ -96,7 +96,7 @@ export function useItTicketRelationshipCommand(
             });
         }
         return () => {
-            ++epoch.current;
+            epoch.current += 1;
             active.current?.abort();
             active.current = null;
         };

@@ -2,6 +2,7 @@
 
 use App\Domain\Finance\Models\FinBill;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -13,7 +14,7 @@ use Inertia\Testing\AssertableInertia as Assert;
  * any of them showed the same rows and none of them agreed with the number
  * above it. These are the filters behind those links.
  */
-function billMeterViewer(): User
+function billMeterViewer(Site $site): User
 {
     $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
     $permission = Permission::firstOrCreate(
@@ -22,39 +23,41 @@ function billMeterViewer(): User
     );
     $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
 
+    ensureCanonicalHrStaffProfile($user, $site);
+
     return $user;
 }
 
-function seedBillMeterFixtures(): array
+function seedBillMeterFixtures(Site $site): array
 {
     return [
         'overdue' => FinBill::factory()->create([
-            'organization_id' => 1, 'status' => 'approved',
+            'organization_id' => 1, 'site_id' => $site->id, 'status' => 'approved',
             'total_amount' => '500.00', 'amount_paid' => '0.00',
             'due_date' => now()->subDays(3)->toDateString(),
         ]),
         'dueThisWeek' => FinBill::factory()->create([
-            'organization_id' => 1, 'status' => 'partially_paid',
+            'organization_id' => 1, 'site_id' => $site->id, 'status' => 'partially_paid',
             'total_amount' => '400.00', 'amount_paid' => '100.00',
             'due_date' => now()->addDays(2)->toDateString(),
         ]),
         'dueLater' => FinBill::factory()->create([
-            'organization_id' => 1, 'status' => 'approved',
+            'organization_id' => 1, 'site_id' => $site->id, 'status' => 'approved',
             'total_amount' => '900.00', 'amount_paid' => '0.00',
             'due_date' => now()->addDays(40)->toDateString(),
         ]),
         'draft' => FinBill::factory()->create([
-            'organization_id' => 1, 'status' => 'draft',
+            'organization_id' => 1, 'site_id' => $site->id, 'status' => 'draft',
             'total_amount' => '100.00', 'amount_paid' => '0.00',
             'due_date' => now()->addDays(10)->toDateString(),
         ]),
         'awaiting' => FinBill::factory()->create([
-            'organization_id' => 1, 'status' => 'awaiting_approval',
+            'organization_id' => 1, 'site_id' => $site->id, 'status' => 'awaiting_approval',
             'total_amount' => '200.00', 'amount_paid' => '0.00',
             'due_date' => now()->addDays(10)->toDateString(),
         ]),
         'paid' => FinBill::factory()->create([
-            'organization_id' => 1, 'status' => 'paid',
+            'organization_id' => 1, 'site_id' => $site->id, 'status' => 'paid',
             'total_amount' => '300.00', 'amount_paid' => '300.00',
             'due_date' => now()->subDays(9)->toDateString(),
         ]),
@@ -72,9 +75,10 @@ function billNumbersFrom(Assert $page): array
 }
 
 it('filters to unpaid bills — approved and owing, the Unpaid meter', function () {
-    $bills = seedBillMeterFixtures();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bills = seedBillMeterFixtures($site);
 
-    $this->actingAs(billMeterViewer())
+    $this->actingAs(billMeterViewer($site))
         ->get(route('finance.bills.index', ['status' => 'unpaid']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => expect(billNumbersFrom($page))->toBe(
@@ -84,9 +88,10 @@ it('filters to unpaid bills — approved and owing, the Unpaid meter', function 
 });
 
 it('filters to overdue bills — the Overdue meter', function () {
-    $bills = seedBillMeterFixtures();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bills = seedBillMeterFixtures($site);
 
-    $this->actingAs(billMeterViewer())
+    $this->actingAs(billMeterViewer($site))
         ->get(route('finance.bills.index', ['due' => 'overdue']))
         ->assertOk()
         // The paid bill is also past its due date; overdue means still owing.
@@ -95,9 +100,10 @@ it('filters to overdue bills — the Overdue meter', function () {
 });
 
 it('filters to bills due in the next seven days — the Due-this-week meter', function () {
-    $bills = seedBillMeterFixtures();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bills = seedBillMeterFixtures($site);
 
-    $this->actingAs(billMeterViewer())
+    $this->actingAs(billMeterViewer($site))
         ->get(route('finance.bills.index', ['due' => 'week']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => expect(billNumbersFrom($page))
@@ -105,9 +111,10 @@ it('filters to bills due in the next seven days — the Due-this-week meter', fu
 });
 
 it('filters to bills awaiting approval — drafts included, as the meter counts them', function () {
-    $bills = seedBillMeterFixtures();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bills = seedBillMeterFixtures($site);
 
-    $this->actingAs(billMeterViewer())
+    $this->actingAs(billMeterViewer($site))
         ->get(route('finance.bills.index', ['status' => 'awaiting']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => expect(billNumbersFrom($page))->toBe(
@@ -117,8 +124,9 @@ it('filters to bills awaiting approval — drafts included, as the meter counts 
 });
 
 it('keeps each meter link agreeing with the number printed above it', function () {
-    seedBillMeterFixtures();
-    $user = billMeterViewer();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    seedBillMeterFixtures($site);
+    $user = billMeterViewer($site);
 
     $summary = null;
     $this->actingAs($user)
@@ -128,11 +136,13 @@ it('keeps each meter link agreeing with the number printed above it', function (
         });
 
     foreach ([
-        ['query' => ['status' => 'unpaid'], 'count' => 'unpaid_count'],
-        ['query' => ['due' => 'overdue'], 'count' => 'overdue_count'],
-        ['query' => ['due' => 'week'], 'count' => 'due_this_week_count'],
-        ['query' => ['status' => 'awaiting'], 'count' => 'awaiting_count'],
+        ['query' => ['status' => 'unpaid'], 'count' => 'unpaid_count', 'expected' => 3],
+        ['query' => ['due' => 'overdue'], 'count' => 'overdue_count', 'expected' => 1],
+        ['query' => ['due' => 'week'], 'count' => 'due_this_week_count', 'expected' => 1],
+        ['query' => ['status' => 'awaiting'], 'count' => 'awaiting_count', 'expected' => 2],
     ] as $case) {
+        expect((int) $summary[$case['count']])->toBe($case['expected']);
+
         $this->actingAs($user)
             ->get(route('finance.bills.index', $case['query']))
             ->assertInertia(fn (Assert $page) => expect(
@@ -142,9 +152,10 @@ it('keeps each meter link agreeing with the number printed above it', function (
 });
 
 it('still honours a literal status filter', function () {
-    $bills = seedBillMeterFixtures();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bills = seedBillMeterFixtures($site);
 
-    $this->actingAs(billMeterViewer())
+    $this->actingAs(billMeterViewer($site))
         ->get(route('finance.bills.index', ['status' => 'draft']))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => expect(billNumbersFrom($page))

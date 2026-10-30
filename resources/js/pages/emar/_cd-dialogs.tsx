@@ -1,3 +1,5 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 /* eslint-disable no-restricted-syntax -- summary/balance panes are custom-layout
    bordered surfaces inside the wizard, not Card components; all colours are tokens. */
 import {
@@ -8,6 +10,7 @@ import {
     type CdMedication,
     type StaffOption,
 } from '@/components/emar/controlled/types';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +22,7 @@ import {
     StepHead,
     TilePicker,
 } from '@/components/wizard/primitives';
+import { WizardSuccessPane } from '@/components/wizard/shell';
 import {
     createMedicationMutationReplayState,
     emarMutationWasAccepted,
@@ -32,12 +36,13 @@ import {
     type OfflineAction,
 } from '@/lib/offline-queue';
 import { cn } from '@/lib/utils';
+import { witnessIsSelectable, witnessOptionLabel } from '@/lib/witness-pin';
 import {
     addMedicationStockQuantities,
     medicationStockQuantitiesEqual,
     subtractMedicationStockQuantities,
 } from '@/pages/emar/medication-stock-governance';
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowDownUp,
@@ -64,13 +69,20 @@ function medOptions(meds: CdMedication[]) {
 function witnessOptions(
     staff: StaffOption[],
     exclude: (number | null | undefined)[],
+    requirePin = true,
 ) {
     const skip = new Set(
         exclude.filter((id): id is number => typeof id === 'number'),
     );
+    // PIN-1: when the witness confirms with a PIN, colleagues without a
+    // usable witness PIN are listed but disabled.
     return staff
         .filter((s) => !skip.has(s.id))
-        .map((s) => ({ value: String(s.id), label: s.name }));
+        .map((s) => ({
+            value: String(s.id),
+            label: requirePin ? witnessOptionLabel(s) : s.name,
+            disabled: requirePin && !witnessIsSelectable(s),
+        }));
 }
 
 const newControlledMutationUuid = createOfflineRequestUuid;
@@ -126,7 +138,11 @@ export function RecordCdEntryDialog({
     onClose: () => void;
 }) {
     const [step, setStep] = useState(0);
-    const entryReplay = useRef(createMedicationMutationReplayState());
+    // Seed the replay ref from state so render never reads ref.current.
+    const [initialEntryReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const entryReplay = useRef(initialEntryReplay);
     const form = useForm({
         medication_id: '',
         client_id: 0,
@@ -142,7 +158,7 @@ export function RecordCdEntryDialog({
         witnessed_by: '',
         witness_credential: '',
         notes: '',
-        client_request_uuid: entryReplay.current.uuid,
+        client_request_uuid: initialEntryReplay.uuid,
     });
     const isReceipt = form.data.entry_type === 'receipt';
     const med = medications.find(
@@ -237,6 +253,7 @@ export function RecordCdEntryDialog({
 
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Record CD entry"
@@ -463,23 +480,15 @@ export function RecordCdEntryDialog({
                                 options={witnessOptions(staff, [currentUserId])}
                             />
                         </Field>
-                        <Field
-                            label="Witness password or PIN"
-                            required
+                        <WitnessPinInput
+                            label="Their witness PIN"
+                            value={form.data.witness_credential}
+                            onChange={(v) =>
+                                form.setData('witness_credential', v)
+                            }
                             error={form.errors.witness_credential}
-                        >
-                            <Input
-                                type="password"
-                                autoComplete="off"
-                                value={form.data.witness_credential}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'witness_credential',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </Field>
+                            atCupboard
+                        />
                         <Field
                             label={
                                 isReceipt
@@ -505,12 +514,19 @@ export function RecordCdEntryDialog({
                             required={isReceipt}
                             error={form.errors.expiry_date}
                         >
-                            <Input
-                                type="date"
-                                value={form.data.expiry_date}
-                                onChange={(e) =>
-                                    form.setData('expiry_date', e.target.value)
+                            <DatePicker
+                                compact
+                                id="emar-cd-dialogs-1"
+                                label={
+                                    isReceipt
+                                        ? 'Expiry date (receipt)'
+                                        : 'Expiry date'
                                 }
+                                value={form.data.expiry_date}
+                                onChange={(value) =>
+                                    form.setData('expiry_date', value)
+                                }
+                                invalid={Boolean(form.errors.expiry_date)}
                             />
                         </Field>
                         <Field label="Notes" span>
@@ -586,7 +602,11 @@ export function BalanceCheckDialog({
     const preset = presetMedId
         ? medications.find((m) => m.id === presetMedId)
         : undefined;
-    const balanceReplay = useRef(createMedicationMutationReplayState());
+    // Seed the replay ref from state so render never reads ref.current.
+    const [initialBalanceReplay] = useState(() =>
+        createMedicationMutationReplayState(),
+    );
+    const balanceReplay = useRef(initialBalanceReplay);
     const form = useForm({
         medication_id: preset ? String(preset.id) : '',
         client_id: preset?.client_id ?? 0,
@@ -598,7 +618,7 @@ export function BalanceCheckDialog({
         witness_credential: '',
         discrepancy_notes: '',
         immediate_action_taken: '',
-        client_request_uuid: balanceReplay.current.uuid,
+        client_request_uuid: initialBalanceReplay.uuid,
     });
     const med = medications.find(
         (m) => String(m.id) === form.data.medication_id,
@@ -673,6 +693,7 @@ export function BalanceCheckDialog({
 
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Balance check"
@@ -784,20 +805,13 @@ export function BalanceCheckDialog({
                         options={witnessOptions(staff, [currentUserId])}
                     />
                 </Field>
-                <Field
-                    label="Witness password or PIN"
-                    required
+                <WitnessPinInput
+                    label="Their witness PIN"
+                    value={form.data.witness_credential}
+                    onChange={(v) => form.setData('witness_credential', v)}
                     error={form.errors.witness_credential}
-                >
-                    <Input
-                        type="password"
-                        autoComplete="off"
-                        value={form.data.witness_credential}
-                        onChange={(e) =>
-                            form.setData('witness_credential', e.target.value)
-                        }
-                    />
-                </Field>
+                    atCupboard
+                />
             </div>
             {mismatch && (
                 <div className="mt-3">
@@ -875,6 +889,7 @@ export function ResolveDiscrepancyDialog({
         });
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title="Resolve discrepancy"
@@ -1059,6 +1074,7 @@ export function ReportLossDialog({
     ];
     return (
         <MedsWizardDialog
+            formState={{ ...form, processing: form.processing || submitting }}
             open
             onClose={resetReplayAndClose}
             title="Report CD loss"
@@ -1092,7 +1108,11 @@ export function ReportLossDialog({
                 <>
                     <Button
                         variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        onClick={
+                            step === 0
+                                ? resetReplayAndClose
+                                : () => setStep(step - 1)
+                        }
                         disabled={submitting}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
@@ -1402,6 +1422,7 @@ export function LossActionDialog({
         });
     return (
         <MedsWizardDialog
+            formState={form}
             open
             onClose={onClose}
             title={
@@ -1510,6 +1531,7 @@ export function RecordDestructionDialog({
     currentUserId?: number | null;
     onClose: () => void;
 }) {
+    const [saved, setSaved] = useState<string | null>(null);
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [initialDestructionRequestUuid] = useState(newControlledMutationUuid);
@@ -1602,7 +1624,14 @@ export function RecordDestructionDialog({
                 },
             );
             if (emarMutationWasAccepted(result.status)) {
-                resetReplayAndClose();
+                setSaved(
+                    result.status === 'queued'
+                        ? 'Disposal waiting to sync'
+                        : 'Disposal recorded',
+                );
+                if (result.status !== 'queued') {
+                    router.reload({ only: ['destructions', 'medications'] });
+                }
             }
         } catch (error) {
             applyFormRequestErrors(
@@ -1637,7 +1666,43 @@ export function RecordDestructionDialog({
     ];
     return (
         <MedsWizardDialog
+            formState={{ ...form, processing: form.processing || submitting }}
             open
+            success={
+                saved ? (
+                    <WizardSuccessPane
+                        title={saved}
+                        blurb={
+                            saved.includes('sync')
+                                ? 'Saved on this device. The shared register will update after a successful sync.'
+                                : 'The disposal has been recorded in the register.'
+                        }
+                        actions={
+                            <Button onClick={resetReplayAndClose}>Done</Button>
+                        }
+                    />
+                ) : undefined
+            }
+            completeness={{
+                completed: [
+                    form.data.medication_name,
+                    form.data.quantity,
+                    form.data.unit,
+                    form.data.reason,
+                    form.data.disposal_method,
+                    form.data.witness_1_id,
+                    ...(isCd
+                        ? [
+                              form.data.witness_2_id,
+                              form.data.witness_1_credential,
+                              form.data.witness_2_credential,
+                              form.data.authorised_by_name,
+                              form.data.denaturing_confirmed,
+                          ]
+                        : []),
+                ].filter(Boolean).length,
+                total: isCd ? 11 : 6,
+            }}
             onClose={resetReplayAndClose}
             title="Record destruction"
             description={
@@ -1674,7 +1739,11 @@ export function RecordDestructionDialog({
                 <>
                     <Button
                         variant="ghost"
-                        onClick={step === 0 ? onClose : () => setStep(step - 1)}
+                        onClick={
+                            step === 0
+                                ? resetReplayAndClose
+                                : () => setStep(step - 1)
+                        }
                         disabled={submitting}
                     >
                         {step === 0 ? 'Cancel' : 'Back'}
@@ -1804,27 +1873,22 @@ export function RecordDestructionDialog({
                                     form.setData('witness_1_id', v)
                                 }
                                 placeholder="First witness…"
-                                options={witnessOptions(staff, [currentUserId])}
+                                options={witnessOptions(
+                                    staff,
+                                    [currentUserId],
+                                    isCd,
+                                )}
                             />
                         </Field>
                         {isCd && (
-                            <Field
-                                label="Witness 1 password or PIN"
-                                required
+                            <WitnessPinInput
+                                label="Witness 1’s PIN"
+                                value={form.data.witness_1_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_1_credential', v)
+                                }
                                 error={form.errors.witness_1_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    autoComplete="off"
-                                    value={form.data.witness_1_credential}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'witness_1_credential',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
+                            />
                         )}
                         {isCd && (
                             <Field
@@ -1848,23 +1912,14 @@ export function RecordDestructionDialog({
                             </Field>
                         )}
                         {isCd && (
-                            <Field
-                                label="Witness 2 password or PIN"
-                                required
+                            <WitnessPinInput
+                                label="Witness 2’s PIN"
+                                value={form.data.witness_2_credential}
+                                onChange={(v) =>
+                                    form.setData('witness_2_credential', v)
+                                }
                                 error={form.errors.witness_2_credential}
-                            >
-                                <Input
-                                    type="password"
-                                    autoComplete="off"
-                                    value={form.data.witness_2_credential}
-                                    onChange={(event) =>
-                                        form.setData(
-                                            'witness_2_credential',
-                                            event.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
+                            />
                         )}
                         {isCd && (
                             <p className="text-xs text-muted-foreground sm:col-span-2">
@@ -1975,7 +2030,8 @@ export function RecordDestructionDialog({
 /**
  * Void a destruction record. The register is immutable (MoD Regs 1977) — a record
  * is never deleted; voiding supersedes it (kept visible, struck through, with the
- * reason) and removes it from live counts.
+ * reason). Stock and register balances are not changed (EmarController::
+ * voidDestruction); a correction goes through witnessed reconciliation.
  */
 export function VoidDestructionDialog({
     destruction,
@@ -1990,6 +2046,9 @@ export function VoidDestructionDialog({
     onClose: () => void;
 }) {
     const form = useForm({ void_reason: '' });
+    // Voiding can't be undone, so "Void record" asks first; the request is
+    // sent only from the ConfirmDialog (GOOD-CATCHES §3, eMAR row 100).
+    const [confirming, setConfirming] = useState(false);
     const submit = () => {
         form.post(`/emar/destructions/${destruction.id}/void`, {
             preserveScroll: true,
@@ -1998,78 +2057,110 @@ export function VoidDestructionDialog({
                 onClose();
             },
             onError: () => toast.error('A reason is required to void a record'),
+            onFinish: () => setConfirming(false),
         });
     };
+    const quantity = [destruction.quantity, destruction.unit]
+        .filter((part) => part !== null && part !== '')
+        .join(' ');
     return (
-        <MedsWizardDialog
-            open
-            onClose={onClose}
-            title="Void destruction record"
-            description="Correct an erroneous entry. The record is retained and shown as voided — it is never deleted."
-            railIcon={Ban}
-            railTitle="Void record"
-            railSubtitle="Immutable register"
-            steps={[
-                {
-                    key: 'reason',
-                    label: 'Reason',
-                    blurb: 'Why void',
-                    icon: Ban,
-                },
-            ]}
-            stepIndex={0}
-            onStepClick={() => {}}
-            footer={
-                <>
-                    <Button
-                        variant="ghost"
-                        onClick={onClose}
-                        disabled={form.processing}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={submit}
-                        disabled={
-                            form.processing || !form.data.void_reason.trim()
-                        }
-                    >
-                        Void record
-                    </Button>
-                </>
-            }
-        >
-            <StepHead
-                icon={Ban}
-                title="Void this record"
-                blurb="Voiding keeps the original entry in the register, struck through, with this reason attached."
+        <>
+            <ConfirmDialog
+                frontline
+                open={confirming}
+                onClose={() => {
+                    if (!form.processing) setConfirming(false);
+                }}
+                onConfirm={submit}
+                processing={form.processing}
+                title="Void this destruction record?"
+                description={
+                    <>
+                        The record of{' '}
+                        <span className="font-medium text-foreground">
+                            {destruction.medication_name ?? 'this medicine'}
+                            {quantity ? ` (${quantity})` : ''}
+                        </span>{' '}
+                        stays in the register, struck through, with your reason.
+                        A void can&rsquo;t be undone. Stock and register
+                        balances don&rsquo;t change: correct any stock
+                        difference with a witnessed count.
+                    </>
+                }
+                confirmText="Void record"
+                variant="destructive"
             />
-            <div className="mb-4 rounded-lg border px-4">
-                <SummaryRow
-                    label="Medication"
-                    value={destruction.medication_name ?? '—'}
-                />
-                <SummaryRow
-                    label="Quantity"
-                    value={`${destruction.quantity ?? '—'} ${destruction.unit ?? ''}`}
-                />
-            </div>
-            <Field
-                label="Reason for voiding"
-                required
-                error={form.errors.void_reason}
-                span
+            <MedsWizardDialog
+                formState={form}
+                open
+                onClose={onClose}
+                title="Void destruction record"
+                description="Correct an erroneous entry. The record is retained and shown as voided — it is never deleted."
+                railIcon={Ban}
+                railTitle="Void record"
+                railSubtitle="Immutable register"
+                steps={[
+                    {
+                        key: 'reason',
+                        label: 'Reason',
+                        blurb: 'Why void',
+                        icon: Ban,
+                    },
+                ]}
+                stepIndex={0}
+                onStepClick={() => {}}
+                footer={
+                    <>
+                        <Button
+                            variant="ghost"
+                            onClick={onClose}
+                            disabled={form.processing}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => setConfirming(true)}
+                            disabled={
+                                form.processing || !form.data.void_reason.trim()
+                            }
+                        >
+                            Void record
+                        </Button>
+                    </>
+                }
             >
-                <Input
-                    value={form.data.void_reason}
-                    onChange={(e) =>
-                        form.setData('void_reason', e.target.value)
-                    }
-                    placeholder="e.g. Duplicate entry / wrong quantity recorded"
+                <StepHead
+                    icon={Ban}
+                    title="Void this record"
+                    blurb="Voiding keeps the original entry in the register, struck through, with this reason attached."
                 />
-            </Field>
-        </MedsWizardDialog>
+                <div className="mb-4 rounded-lg border px-4">
+                    <SummaryRow
+                        label="Medication"
+                        value={destruction.medication_name ?? '—'}
+                    />
+                    <SummaryRow
+                        label="Quantity"
+                        value={`${destruction.quantity ?? '—'} ${destruction.unit ?? ''}`}
+                    />
+                </div>
+                <Field
+                    label="Reason for voiding"
+                    required
+                    error={form.errors.void_reason}
+                    span
+                >
+                    <Input
+                        value={form.data.void_reason}
+                        onChange={(e) =>
+                            form.setData('void_reason', e.target.value)
+                        }
+                        placeholder="e.g. Duplicate entry / wrong quantity recorded"
+                    />
+                </Field>
+            </MedsWizardDialog>
+        </>
     );
 }
 

@@ -5,6 +5,7 @@ namespace App\Services\Eligibility\Rules;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\CoverageRoleService;
+use App\Services\Medication\CompetencyPolicySettings;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 
 /**
@@ -14,8 +15,6 @@ use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
  */
 class MedicationCompetencyRule implements EligibilityRuleInterface
 {
-    protected const EXPIRY_WARNING_DAYS = 30;
-
     public function __construct(
         protected CoverageRoleService $coverageRoles,
         protected MedicationAdministratorCompetencyPolicy $competencyPolicy,
@@ -50,8 +49,10 @@ class MedicationCompetencyRule implements EligibilityRuleInterface
         $validUntil = $decision['valid_until'];
         $daysUntilExpiry = $effectiveAt->copy()->startOfDay()
             ->diffInDays($validUntil->copy()->startOfDay());
+        // Renewal is due this many days before the end date (Settings › Staff & PINs).
+        $warningDays = app(CompetencyPolicySettings::class)->renewalReminderDays();
 
-        if ($daysUntilExpiry <= self::EXPIRY_WARNING_DAYS) {
+        if ($daysUntilExpiry <= $warningDays) {
             $subject = $decision['state'] === 'exempt'
                 ? 'Medication competency exemption'
                 : 'Medication competency';
@@ -61,7 +62,7 @@ class MedicationCompetencyRule implements EligibilityRuleInterface
                 'passed' => false,
                 'severity' => 'warning',
                 'overrideable' => true,
-                'message' => "{$subject} expires on {$validUntil->format('j M Y')} (within ".self::EXPIRY_WARNING_DAYS.' days).',
+                'message' => "{$subject} expires on {$validUntil->format('j M Y')} (within ".$warningDays.' '.($warningDays === 1 ? 'day' : 'days').').',
                 'competency_state' => $decision['state'],
                 'exemption_id' => $decision['exemption_id'],
             ];

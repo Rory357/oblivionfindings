@@ -1,0 +1,13 @@
+{
+    "database": "oblivion_findings_pkg06b_8821_test_36804",
+    "asset": 1,
+    "assignment": 1,
+    "labelTable": true,
+    "labelMigrations": [
+        {
+            "migration": "2026_09_27_130000_create_asset_label_batches",
+            "batch": 3
+        }
+    ],
+    "labelHistoryCount": 3
+}

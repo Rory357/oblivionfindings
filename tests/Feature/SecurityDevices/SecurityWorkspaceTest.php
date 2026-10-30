@@ -3,6 +3,9 @@
 namespace Tests\Feature\SecurityDevices;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
+use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\SecurityDevices\Cctv\Models\CctvSource;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
@@ -165,7 +168,7 @@ class SecurityWorkspaceTest extends TestCase
                 $this->assertSame('healthy', $device['observed']['stream_health']);
                 $this->assertSame('degraded', $device['observed']['recording_health']);
                 $this->assertSame('available', $device['media']['state']);
-                $this->assertSame('/security-devices/devices/preview/reception', $device['media']['href']);
+                $this->assertSame('/security-devices/devices/'.$camera->id.'/live', $device['media']['href']);
                 $this->assertSame(1, $device['maintenance']['open_count']);
                 $this->assertSame('Lens and recording inspection', $device['maintenance']['next']['description']);
             });
@@ -190,13 +193,15 @@ class SecurityWorkspaceTest extends TestCase
             });
     }
 
-    public function test_cctv_media_link_must_be_an_internal_path_even_for_an_authorised_viewer(): void
+    public function test_cctv_media_destination_is_app_owned_and_never_uses_observed_provider_urls(): void
     {
-        Device::factory()->create([
+        $camera = Device::factory()->create([
             'domain' => 'security',
             'category' => 'cctv',
             'config' => ['media_href' => 'https://camera-admin.example.test/live?token=secret'],
         ]);
+
+        $this->assignToSite($camera, Site::factory()->create());
 
         $this->actingAs($this->admin)
             ->get('/security-devices/security?tab=cctv')
@@ -204,8 +209,9 @@ class SecurityWorkspaceTest extends TestCase
             ->assertInertia(function ($page): void {
                 $media = $page->toArray()['props']['securityWorkspace']['activeTab']['devices'][0]['media'];
 
-                $this->assertSame('not_configured', $media['state']);
-                $this->assertArrayNotHasKey('href', $media);
+                $this->assertSame('available', $media['state']);
+                $this->assertMatchesRegularExpression('#^/security-devices/devices/[0-9]+/live$#', $media['href']);
+                $this->assertStringNotContainsString('camera-admin', $media['href']);
             });
     }
 
@@ -650,5 +656,134 @@ class SecurityWorkspaceTest extends TestCase
             'site_id' => $site->id,
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
+    }
+
+    public function test_status_filter_and_cctv_source_readiness_expose_safe_summary_without_leaking_configuration(): void
+    {
+        $site = Site::factory()->create(['name' => 'Harbour House']);
+        $verifiedCamera = Device::factory()->offline()->create([
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'dome_camera',
+            'name' => 'Offline Verified Camera',
+            'provider' => 'unifi',
+        ]);
+        $unconfiguredCamera = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'bullet_camera',
+            'name' => 'Online Unconfigured Camera',
+            'provider' => 'unifi',
+        ]);
+        $this->assignToSite($verifiedCamera, $site);
+        $this->assignToSite($unconfiguredCamera, $site);
+
+        $collectorHost = Device::factory()->itInfrastructure()->create();
+        $this->assignToSite($collectorHost, $site);
+        $collector = MonitoringCollector::factory()->create([
+            'site_id' => $site->id,
+            'collector_device_id' => $collectorHost->id,
+        ]);
+        $scope = DiscoveryScope::factory()->create([
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'cidrs' => ['10.20.0.0/24'],
+            'port_bounds' => ['tcp' => [7441]],
+        ]);
+        CctvSource::query()->create([
+            'camera_id' => $verifiedCamera->id,
+            'recorder_device_id' => null,
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'discovery_scope_id' => $scope->id,
+            'actor_id' => $this->admin->id,
+            'provider' => 'unifi',
+            'revision' => 1,
+            'enabled' => true,
+            'stream_state' => 'verified',
+            'stream_verified_at' => now(),
+            'fingerprint' => str_repeat('a', 64),
+            'provider_fingerprint' => str_repeat('b', 64),
+            'configuration' => ['rtsp_secret' => 'SECRET-RTSP-SOURCE-SENTINEL'],
+            'verified_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/security?status=offline')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($verifiedCamera): void {
+                $workspace = $page->toArray()['props']['securityWorkspace'];
+                $json = json_encode($workspace, JSON_THROW_ON_ERROR);
+
+                $this->assertSame(2, $workspace['overview']['inventory']['cctv']);
+                $this->assertSame('offline', $workspace['activeTab']['statusFilter']['key']);
+                $this->assertSame(
+                    [$verifiedCamera->id],
+                    collect($workspace['activeTab']['devices'])->pluck('id')->all(),
+                );
+                $this->assertSame(
+                    ['state' => 'verified', 'label' => 'Live source verified'],
+                    $workspace['activeTab']['devices'][0]['cctvSource'],
+                );
+                $this->assertStringNotContainsString('SECRET-RTSP-SOURCE-SENTINEL', $json);
+            });
+    }
+
+    public function test_unverified_hikvision_camera_never_presents_as_live_source_verified(): void
+    {
+        $site = Site::factory()->create(['name' => 'Kowhai House']);
+        $camera = Device::factory()->create([
+            'domain' => 'security',
+            'category' => 'cctv',
+            'subcategory' => 'dome_camera',
+            'name' => 'Hikvision Front Door',
+            'provider' => 'hikvision',
+        ]);
+        $this->assignToSite($camera, $site);
+
+        $collectorHost = Device::factory()->itInfrastructure()->create();
+        $this->assignToSite($collectorHost, $site);
+        $collector = MonitoringCollector::factory()->create([
+            'site_id' => $site->id,
+            'collector_device_id' => $collectorHost->id,
+        ]);
+        $scope = DiscoveryScope::factory()->create([
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'cidrs' => ['10.30.0.0/24'],
+            'port_bounds' => ['tcp' => [554]],
+        ]);
+        CctvSource::query()->create([
+            'camera_id' => $camera->id,
+            'recorder_device_id' => null,
+            'site_id' => $site->id,
+            'collector_id' => $collector->id,
+            'discovery_scope_id' => $scope->id,
+            'actor_id' => $this->admin->id,
+            'provider' => 'hikvision',
+            'revision' => 1,
+            'enabled' => true,
+            'stream_state' => 'unverified',
+            'stream_verified_at' => null,
+            'fingerprint' => str_repeat('c', 64),
+            'provider_fingerprint' => str_repeat('d', 64),
+            'configuration' => ['channel' => 1],
+            'verified_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/security?tab=cctv')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($camera): void {
+                $devices = collect($page->toArray()['props']['securityWorkspace']['activeTab']['devices']);
+                $row = $devices->firstWhere('id', $camera->id);
+
+                $this->assertNotNull($row);
+                $this->assertSame('not_monitored', $row['health']);
+                $this->assertSame(
+                    ['state' => 'configured', 'label' => 'Source configured (not verified)'],
+                    $row['cctvSource'],
+                );
+            });
     }
 }

@@ -1,0 +1,45 @@
+{
+  "backendFinal": {
+    "tests": 26,
+    "assertions": 173,
+    "result": "passed",
+    "log": "audit-fix-final-backend.txt"
+  },
+  "dayBoundaryCases": {
+    "tests": 3,
+    "assertions": 21,
+    "result": "passed",
+    "log": "audit-fix-dst.txt"
+  },
+  "broaderIntegrationRun": {
+    "passed": 48,
+    "fixtureFailures": 4,
+    "resolution": "All four used obsolete asset consent for personal history; corrected to canonical Personal Tracker consent and all four passed in final backend run. Product authority was not relaxed.",
+    "log": "audit-fix-regressions.txt"
+  },
+  "frontend": {
+    "tests": 16,
+    "result": "passed"
+  },
+  "typescript": "passed",
+  "eslint": "passed, zero warnings",
+  "productionBuild": "passed, existing chunk-size warnings",
+  "diffCheck": "passed",
+  "frozenV5": {
+    "files": 41,
+    "changed": 0,
+    "digest": "10b27c27220c1be0ca122464f2f4e2ca8e92036a7dfed32b609574f96fb15b7d"
+  },
+  "protectedGuides": "unchanged relative to integrated Main HEAD",
+  "pdf": {
+    "pages": 38,
+    "positions": 500,
+    "samples": 500,
+    "partialNotice": true,
+    "pageFooters": 38,
+    "allPagesHaveText": true
+  },
+  "sourceDigest": "8fd11b434ae835f8aa7c21f490460d560fc43f749faa745d79a1097c935cd977",
+  "mainIntegration": "pending",
+  "publication": "not performed"
+}

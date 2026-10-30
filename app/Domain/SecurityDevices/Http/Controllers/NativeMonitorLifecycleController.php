@@ -2,64 +2,75 @@
 
 namespace App\Domain\SecurityDevices\Http\Controllers;
 
-use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Services\NativeMonitorCommandService;
 use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
-use App\Domain\SecurityDevices\Models\Device;
-use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 final class NativeMonitorLifecycleController extends Controller
 {
     public function __construct(
-        private readonly NativeMonitoringDefinitionService $definitions,
-        private readonly SecurityDevicesAccessService $access,
+        private readonly NativeMonitorCommandService $commands,
     ) {}
 
     public function store(Request $request): JsonResponse
     {
-        $viewer = $this->manager($request);
-        $validated = $request->validate($this->rules(false));
-        $device = $this->accessibleDevice($viewer, (int) $validated['device_id']);
-        $monitor = $this->definitions->createMonitor($viewer, $device, $validated);
-
-        return response()->json(['monitor' => $this->safeMonitor($monitor)], 201);
+        return $this->command($request, 'create', null, $this->rules(false), 201);
     }
 
     public function update(Request $request, int $monitor): JsonResponse
     {
-        $viewer = $this->manager($request);
-        $record = $this->accessibleMonitor($viewer, $monitor);
-        $validated = $request->validate($this->rules(true));
-        $updated = $this->definitions->updateMonitor($viewer, $record, $validated);
-
-        return response()->json(['monitor' => $this->safeMonitor($updated)]);
+        return $this->command($request, 'update', $monitor, $this->rules(true));
     }
 
     public function deactivate(Request $request, int $monitor): JsonResponse
     {
-        $viewer = $this->manager($request);
-        $record = $this->accessibleMonitor($viewer, $monitor);
-        $validated = $request->validate([
-            'reason_code' => ['required', 'string', Rule::in([
-                'replaced',
-                'obsolete',
-                'coverage_removed',
-                'device_retired',
-            ])],
+        return $this->command($request, 'deactivate', $monitor, [
+            ...$this->identityRules(),
+            'review_token' => ['required_with:request_uuid', 'string', 'regex:/^[0-9a-f]{64}$/D'],
+            'reason_code' => ['required', 'string', Rule::in(['replaced', 'obsolete', 'coverage_removed', 'device_retired'])],
         ]);
-        $updated = $this->definitions->deactivateMonitor(
-            $viewer,
-            $record,
-            (string) $validated['reason_code'],
-        );
+    }
 
-        return response()->json([
-            'monitor' => ['id' => (int) $updated->id, 'enabled' => (bool) $updated->is_enabled],
-        ]);
+    public function requests(Request $request): JsonResponse
+    {
+        $viewer = $this->manager($request);
+        if (array_diff(array_keys($request->query()), ['expected_actor_id', 'before_id']) !== []) {
+            abort(400, 'invalid_request');
+        }
+        $values = $request->validate(['expected_actor_id' => ['required', 'integer', 'min:1'], 'before_id' => ['sometimes', 'integer', 'min:1']]);
+
+        return response()->json($this->commands->savedRequests($viewer, (int) $values['expected_actor_id'], isset($values['before_id']) ? (int) $values['before_id'] : null))->header('Cache-Control', 'private, no-store');
+    }
+
+    public function recover(Request $request, string $requestUuid): JsonResponse
+    {
+        $this->queryFree($request);
+        $viewer = $this->manager($request);
+        $values = $request->validate($this->identityRules(true));
+
+        return response()->json($this->commands->recover($viewer, $requestUuid, $values))->header('Cache-Control', 'private, no-store');
+    }
+
+    private function command(Request $request, string $operation, ?int $target, array $rules, int $status = 200): JsonResponse
+    {
+        $this->queryFree($request);
+        $viewer = $this->manager($request);
+        if ($request->filled('request_uuid') && array_diff(array_keys($request->except('_token')), array_keys($rules)) !== []) {
+            throw ValidationException::withMessages(['form' => 'The monitor request contains unsupported fields. Reopen and review the change.']);
+        }
+        $values = $request->validate($rules);
+
+        return response()->json($this->commands->execute($viewer, $operation, $target, $values), $status)->header('Cache-Control', 'private, no-store');
+    }
+
+    private function queryFree(Request $request): void
+    {
+        abort_if($request->query() !== [], 400, 'invalid_request');
     }
 
     private function manager(Request $request): User
@@ -70,30 +81,16 @@ final class NativeMonitorLifecycleController extends Controller
         return $viewer;
     }
 
-    private function accessibleDevice(User $viewer, int $deviceId): Device
-    {
-        return $this->access->visibleDevices($viewer)
-            ->whereKey($deviceId)
-            ->firstOrFail();
-    }
-
-    private function accessibleMonitor(User $viewer, int $monitorId): Monitor
-    {
-        return Monitor::query()
-            ->whereKey($monitorId)
-            ->whereNull('collector_id')
-            ->whereIn('kind', NativeMonitoringDefinitionService::directKindValues())
-            ->whereIn('device_id', $this->access->visibleDevices($viewer)->select('devices.id'))
-            ->firstOrFail();
-    }
-
     /** @return array<string, mixed> */
     private function rules(bool $updating): array
     {
         $sometimes = $updating ? ['sometimes'] : ['required'];
 
         return [
+            ...$this->identityRules(),
+            'review_token' => $updating ? ['required_with:request_uuid', 'string', 'regex:/^[0-9a-f]{64}$/D'] : ['prohibited'],
             'device_id' => $updating ? ['prohibited'] : ['required', 'integer', 'min:1'],
+            'collector_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'profile_id' => [...$sometimes, 'integer', 'min:1'],
             'kind' => $updating
                 ? ['prohibited']
@@ -117,17 +114,13 @@ final class NativeMonitorLifecycleController extends Controller
         ];
     }
 
-    /** @return array<string, mixed> */
-    private function safeMonitor(Monitor $monitor): array
+    private function identityRules(bool $recovering = false): array
     {
         return [
-            'id' => (int) $monitor->id,
-            'name' => $monitor->name,
-            'kind' => $monitor->kind?->value ?? (string) $monitor->kind,
-            'device_id' => (int) $monitor->device_id,
-            'profile_id' => (int) $monitor->profile_id,
-            'collection_mode' => 'central_direct',
-            'enabled' => (bool) $monitor->is_enabled,
+            'request_uuid' => $recovering ? ['prohibited'] : ['sometimes', 'required', 'uuid', 'regex:/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iD'],
+            'expected_actor_id' => [$recovering ? 'required' : 'required_with:request_uuid', 'integer', 'min:1'],
+            'expected_site_id' => [$recovering ? 'required' : 'required_with:request_uuid', 'integer', 'min:1'],
+            'expected_device_id' => [$recovering ? 'required' : 'required_with:request_uuid', 'integer', 'min:1'],
         ];
     }
 }

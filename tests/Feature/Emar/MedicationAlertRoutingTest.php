@@ -1,0 +1,364 @@
+<?php
+
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AppSetting;
+use App\Models\Client;
+use App\Models\ClientBreakGlassAccess;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationStock;
+use App\Models\MedicationCompetencyAssessment;
+use App\Models\Permission;
+use App\Models\Role;
+use App\Models\Site;
+use App\Models\User;
+use App\Models\MedicationAlert;
+use App\Notifications\MedicationAlertNotification;
+use App\Services\Medication\Alerts\MedicationAlertCatalogue;
+use App\Services\Medication\Settings\MedicationSettingsRegistry;
+use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Notification;
+
+/*
+ * Medication alert routing faults found while designing P11
+ * (docs/emar-design/P11/v1/README.md, "Facts from today's app"). Since P11
+ * B2, who is told comes from Medication Settings › Alerts & access, starting
+ * from v5's defaults (B2 Q1); the break-glass daily report keeps the routing
+ * Stephan narrowed it to (29 Sep 2026) until B3.
+ */
+
+/** Was this alert sent to this person? */
+function medicationAlertTo(User $user, string $alert, ?callable $check = null): void
+{
+    Notification::assertSentTo(
+        $user,
+        MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $n) => $n->alert->type === $alert && ($check === null || $check($n)),
+    );
+}
+
+function medicationAlertNotTo(User $user, string $alert): void
+{
+    Notification::assertNotSentTo(
+        $user,
+        MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $n) => $n->alert->type === $alert,
+    );
+}
+
+beforeEach(function () {
+    Cache::flush();
+    Carbon::setTestNow(Carbon::parse('2026-06-08 11:15:00', 'Pacific/Auckland')->utc());
+    $this->seed(RbacSeeder::class);
+});
+
+afterEach(function () {
+    Cache::flush();
+    Carbon::setTestNow();
+});
+
+function medicationAlertStaff(Site $site, ?string $roleName = null, array $allow = []): User
+{
+    $user = User::factory()->create(['approved_at' => now()]);
+    if ($roleName !== null) {
+        $user->roles()->syncWithoutDetaching([Role::query()->where('name', $roleName)->firstOrFail()->id]);
+    }
+    HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $user->id,
+        'employee_number' => 'EMP-'.$user->id,
+        'work_email' => $user->email,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+    ]);
+    if ($allow !== []) {
+        $user->permissionOverrides()->syncWithoutDetaching(
+            Permission::query()->whereIn('key', $allow)->pluck('id')
+                ->mapWithKeys(fn ($id) => [$id => ['allowed' => true]])
+                ->all(),
+        );
+    }
+
+    return $user;
+}
+
+/** Three refusals of one medication in the last seven days. */
+function medicationRefusalCluster(Site $site, array $medication = []): ClientMedication
+{
+    $recorder = User::factory()->create(['approved_at' => now()]);
+    $client = Client::factory()->create(['site_id' => $site->id, 'first_name' => 'Mere', 'last_name' => 'Wilson']);
+    $order = ClientMedication::factory()->create(array_merge([
+        'client_id' => $client->id,
+        'name' => 'Risperidone',
+        'active' => true,
+        'state' => 'active',
+        'is_prn' => false,
+        'controlled_drug' => false,
+        'start_date' => '2026-05-01',
+        'end_date' => null,
+    ], $medication));
+
+    foreach ([1, 2, 3] as $daysAgo) {
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id,
+            'client_medication_id' => $order->id,
+            'administered_by' => $recorder->id,
+            'scheduled_for' => now()->subDays($daysAgo),
+            'status' => 'refused',
+        ]);
+    }
+
+    return $order;
+}
+
+function medicationCompetency(User $staff, User $assessor, array $overrides = []): MedicationCompetencyAssessment
+{
+    return MedicationCompetencyAssessment::query()->create(array_merge([
+        'user_id' => $staff->id,
+        'assessor_id' => $assessor->id,
+        'assessment_type' => 'annual',
+        'status' => 'passed',
+        'assessment_date' => now()->subYear()->addDays(20)->toDateString(),
+        'expiry_date' => now()->addDays(20)->toDateString(),
+        'assessor_declared_at' => now()->subYear()->addDays(20),
+        'staff_acknowledged_at' => now()->subYear()->addDays(21),
+        'restricted' => false,
+    ], $overrides));
+}
+
+it('sends refusal-cluster alerts to team leads at the house instead of failing on a missing roles column (NF-28)', function () {
+    Notification::fake();
+    $site = Site::factory()->create();
+    $lead = medicationAlertStaff($site, 'team_lead');
+    $otherHouseLead = medicationAlertStaff(Site::factory()->create(), 'team_lead');
+    $worker = medicationAlertStaff($site, 'support_worker', ['medications.view']);
+    $order = medicationRefusalCluster($site);
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    medicationAlertTo($lead, 'refusals', fn (MedicationAlertNotification $n) => $n->alert->client_id === $order->client_id
+        && str_contains($n->alert->message, 'Risperidone refused or withheld 3 times'));
+    medicationAlertNotTo($otherHouseLead, 'refusals');
+    medicationAlertNotTo($worker, 'refusals');
+});
+
+it('conceals controlled-drug refusal clusters from team leads without controlled-drug view', function () {
+    Notification::fake();
+    $site = Site::factory()->create();
+    // Since the eMAR role baseline (1 Oct 2026) team leads hold
+    // medications.controlled.view through their role, so the lead without it
+    // is a team lead with a per-user deny.
+    $lead = medicationAlertStaff($site, 'team_lead');
+    $lead->permissionOverrides()->syncWithoutDetaching([
+        Permission::query()->where('key', 'medications.controlled.view')->value('id') => ['allowed' => false],
+    ]);
+    $controlledLead = medicationAlertStaff($site, 'team_lead');
+    expect($lead->canDo('medications.controlled.view'))->toBeFalse()
+        ->and($controlledLead->canDo('medications.controlled.view'))->toBeTrue();
+    medicationRefusalCluster($site, ['name' => 'Morphine', 'controlled_drug' => true]);
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    medicationAlertNotTo($lead, 'refusals');
+    medicationAlertTo($controlledLead, 'refusals');
+});
+
+it('tells people about a refusal cluster once while it lasts, and again only after it has ended', function () {
+    $site = Site::factory()->create();
+    $lead = medicationAlertStaff($site, 'team_lead');
+    medicationRefusalCluster($site);
+    $sent = fn () => $lead->notifications()->where('type', MedicationAlertNotification::class)->where('data->alert_key', 'refusals')->count();
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    Carbon::setTestNow(now()->addMinutes(15));
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    Carbon::setTestNow(now()->addDay());
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    // One open alert, shared by everyone told (P11 B2): no reminder every run or every day.
+    expect($sent())->toBe(1);
+
+    // The refusals fall outside the 7-day window: the alert is dealt with…
+    Carbon::setTestNow(now()->addDays(8));
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    expect(MedicationAlert::query()->where('type', 'refusals')->value('status'))->toBe('dealt_with');
+
+    // …and a new cluster alerts again.
+    medicationRefusalCluster($site);
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    expect($sent())->toBe(2);
+});
+
+it('sends each competency renewal reminder once, not every 15-minute run', function () {
+    $site = Site::factory()->create();
+    $staff = medicationAlertStaff($site);
+    medicationCompetency($staff, medicationAlertStaff($site));
+    $sent = fn () => $staff->notifications()->where('type', MedicationAlertNotification::class)->where('data->alert_key', 'renewals')->count();
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    Carbon::setTestNow(now()->addMinutes(15));
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+    Carbon::setTestNow(now()->addDay());
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    expect($sent())->toBe(1);
+});
+
+it('does not send a renewal reminder for an assessment that has already been renewed', function () {
+    Notification::fake();
+    $site = Site::factory()->create();
+    $assessor = medicationAlertStaff($site);
+    $renewed = medicationAlertStaff($site);
+    $notRenewed = medicationAlertStaff($site);
+    medicationCompetency($renewed, $assessor);
+    medicationCompetency($renewed, $assessor, [
+        'assessment_date' => now()->subDay()->toDateString(),
+        'expiry_date' => now()->addYear()->toDateString(),
+        'assessor_declared_at' => now()->subDay(),
+        'staff_acknowledged_at' => now()->subDay()->addHour(),
+    ]);
+    medicationCompetency($notRenewed, $assessor);
+
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    medicationAlertNotTo($renewed, 'renewals');
+    medicationAlertTo($notRenewed, 'renewals');
+});
+
+function medicationEmergencyReportGrant(Site $site, User $owner): ClientBreakGlassAccess
+{
+    $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+    $created = now('Pacific/Auckland')->subDay()->setTime(10, 0)->utc();
+
+    return ClientBreakGlassAccess::forceCreate([
+        'client_id' => $client->id, 'user_id' => $owner->id,
+        'reason' => 'Historical emergency cover in the previous NZ day',
+        'created_at' => $created, 'expires_at' => $created->copy()->addHour(),
+    ]);
+}
+
+it('uses saved delivery settings for a real emergency-access daily report', function () {
+    Notification::fake();
+    $site = Site::factory()->create(['is_active' => true]);
+    $reviewer = medicationAlertStaff($site, 'auditor');
+    medicationEmergencyReportGrant($site, $reviewer);
+    $definition = app(MedicationSettingsRegistry::class)->definition('alerts', 'breakglass');
+    AppSetting::updateOrCreate(['key' => $definition->storageKey], ['value' => json_encode([
+        'inapp' => false, 'email' => true, 'push' => false, 'follow_up' => false,
+        'groups' => [MedicationAlertCatalogue::EA_REVIEWERS], 'people' => [],
+    ])]);
+
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+
+    expect(MedicationAlert::where('type', 'breakglass')->sole()->subject['used_count'])->toBe(1);
+    // The approved codec requires at least one channel; use a valid email-only choice.
+    $receipt = \App\Models\MedicationAlertRecipient::where('user_id', $reviewer->id)->sole();
+    expect($receipt->channels)->toBe(['email'])->and($receipt->notification_id)->toBeNull();
+    Notification::assertNotSentTo($reviewer, MedicationAlertNotification::class,
+        fn (MedicationAlertNotification $notice): bool => in_array('inapp', $notice->channels, true));
+});
+
+it('retains the in-app safeguard for an invalid stored daily-report choice with every channel off', function () {
+    Notification::fake();
+    $site = Site::factory()->create(['is_active' => true]);
+    $reviewer = medicationAlertStaff($site, 'auditor');
+    medicationEmergencyReportGrant($site, $reviewer);
+    $definition = app(MedicationSettingsRegistry::class)->definition('alerts', 'breakglass');
+    $invalid = json_encode(['inapp' => false, 'email' => false, 'push' => false, 'follow_up' => false,
+        'groups' => [MedicationAlertCatalogue::EA_REVIEWERS], 'people' => []]);
+    expect($definition->accepts($invalid))->toBeFalse();
+    AppSetting::updateOrCreate(['key' => $definition->storageKey], ['value' => $invalid]);
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+    medicationAlertTo($reviewer, 'breakglass', fn (MedicationAlertNotification $notice): bool => $notice->channels === ['inapp']);
+});
+
+it('sends the emergency daily report through current reviewer authority and deduplicates retries', function () {
+    Notification::fake();
+    $site = Site::factory()->create(['is_active' => true]);
+    $recipients = collect(['admin', 'provider_manager', 'auditor', 'coordinator', 'clinical_lead'])
+        ->map(fn (string $role) => medicationAlertStaff($site, $role));
+    // Existing permission evidence qualifies a reviewer independently of role.
+    $recipients->push(medicationAlertStaff($site, 'support_worker', ['medications.audit.view']));
+    $others = collect(['hr', 'finance', 'team_lead', 'support_worker'])
+        ->map(fn (string $role) => medicationAlertStaff($site, $role));
+    $revoked = medicationAlertStaff($site, 'provider_manager');
+    $revoked->permissionOverrides()->syncWithoutDetaching([
+        Permission::where('key', 'medications.audit.view')->sole()->id => ['allowed' => false],
+    ]);
+    $unapproved = medicationAlertStaff($site, 'auditor');
+    $unapproved->update(['approved_at' => null]);
+    $others->push($revoked, $unapproved);
+    $grant = medicationEmergencyReportGrant($site, $recipients->first());
+
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+
+    $recipients->each(fn (User $user) => medicationAlertTo($user, 'breakglass',
+        fn (MedicationAlertNotification $notification): bool =>
+            $notification->alert->site_id === $site->id
+            && $notification->alert->subject['used_count'] === 1
+            && $notification->alert->subject['nz_date'] === '2026-06-07'
+            && str_contains($notification->alert->message, 'EA-'.$grant->id)
+            && $notification->alert->action_url === '/emar/emergency-access?view=review&site_id='.$site->id));
+    $others->each(fn (User $user) => medicationAlertNotTo($user, 'breakglass'));
+    $recipients->each(fn (User $user) => Notification::assertSentToTimes($user, MedicationAlertNotification::class, 1));
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+    expect(MedicationAlert::where('type', 'breakglass')->count())->toBe(1);
+    $recipients->each(fn (User $user) => Notification::assertSentToTimes($user, MedicationAlertNotification::class, 1));
+});
+
+it('does not notify about a day and house with no emergency grants or waiting reviews', function () {
+    Notification::fake();
+    medicationAlertStaff(Site::factory()->create(), 'auditor');
+
+    $this->artisan('breakglass:daily-report')->assertExitCode(0);
+
+    expect(MedicationAlert::where('type', 'breakglass')->count())->toBe(0);
+    Notification::assertNothingSent();
+});
+
+it('still sends the low-stock notification after the 06:00 stock check has run', function () {
+    Notification::fake();
+    $site = Site::factory()->create();
+    // v5's default for "Stock running low": the house lead and people who update stock there.
+    $recipient = medicationAlertStaff($site, 'team_lead');
+    $client = Client::factory()->create(['site_id' => $site->id]);
+    $order = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Paracetamol',
+        'active' => true,
+        'state' => 'active',
+        'controlled_drug' => false,
+        'end_date' => null,
+    ]);
+    ClientMedicationStock::query()->create([
+        'client_medication_id' => $order->id,
+        'on_hand' => 2,
+        'reorder_level' => 10,
+        'unit' => 'tablets',
+    ]);
+
+    $this->artisan('emar:check-medication-stock')->assertExitCode(0);
+    $this->artisan('emar:send-alerts')->assertExitCode(0);
+
+    medicationAlertTo($recipient, 'stock');
+});
+
+it('treats a medication order as expiring soon only inside the window', function () {
+    $endingOn = fn (?string $endDate) => (new ClientMedication)->forceFill(['end_date' => $endDate]);
+    // The window counts days on the New Zealand calendar (11:15 am, 8 June).
+    $inDays = fn (int $days) => now(config('app.worker_timezone'))->addDays($days)->toDateString();
+
+    expect($endingOn($inDays(3))->isExpiringSoon())->toBeTrue()
+        ->and($endingOn($inDays(7))->isExpiringSoon())->toBeTrue()
+        ->and($endingOn($inDays(8))->isExpiringSoon())->toBeFalse()
+        ->and($endingOn($inDays(60))->isExpiringSoon())->toBeFalse()
+        ->and($endingOn($inDays(60))->isExpiringSoon(90))->toBeTrue()
+        ->and($endingOn($inDays(-1))->isExpiringSoon())->toBeFalse()
+        ->and($endingOn(null)->isExpiringSoon())->toBeFalse();
+});

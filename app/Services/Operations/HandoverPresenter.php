@@ -9,9 +9,12 @@ use App\Models\ShiftHandover;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HandoverWorkerNotes;
+use App\Services\MarScheduleService;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
+use App\Support\MedicationJourney;
 
 /**
  * Shared presentation for shift handovers, used by the Shift Handovers
@@ -26,6 +29,36 @@ class HandoverPresenter
         protected UserSiteAccessService $siteAccess,
         protected MedicationGovernanceScopeService $medicationGovernance,
     ) {}
+
+    /**
+     * The existing index search haystack, using only presenter-visible values.
+     * Relations are supplied by the caller's narrowly scoped search eager loads.
+     * No action, lock, worker-note or medication-domain projection runs here.
+     */
+    public function indexSearchText(ShiftHandover $handover, bool $includeControlledMedication): string
+    {
+        $client = $handover->client;
+        $currentIncomingStaff = $handover->incomingShift?->staff;
+        $incomingUserId = $currentIncomingStaff?->id
+            ?? ($handover->incoming_shift_id ? null : $handover->incoming_staff_id);
+        $incomingName = ($currentIncomingStaff || $incomingUserId)
+            ? ($currentIncomingStaff?->name ?? $handover->incomingStaff?->name ?? 'Pending assignment')
+            : null;
+        $values = [
+            $handover->handover_notes,
+            $client ? trim($client->first_name.' '.$client->last_name) : 'Unknown client',
+            $handover->outgoingStaff?->name,
+            $incomingName,
+            $client?->site?->name,
+            $handover->client_mood,
+            ...($includeControlledMedication ? $this->listToDisplayStrings($handover->medications_due) : []),
+            ...$this->listToDisplayStrings($handover->incidents_to_note),
+            ...$this->listToDisplayStrings($handover->follow_up_items),
+            ...$this->listToDisplayStrings($handover->tasks_pending),
+        ];
+
+        return implode(' ', array_filter($values, fn ($value): bool => $value !== null && $value !== ''));
+    }
 
     /**
      * Shape a single handover for index-style surfaces — full record plus the
@@ -50,11 +83,26 @@ class HandoverPresenter
 
         $client = $handover->client;
         $site = $client?->site;
+        $medicationDate = ($handover->outgoingShift?->starts_at ?? $handover->created_at)?->copy()
+            ->timezone(app(MarScheduleService::class)->workerTimezone())->toDateString();
+        $marUrl = app(MarLinkService::class)->urlFor($auth, $client?->id, $medicationDate, [
+            'site_id' => $client?->site_id,
+            'return_to' => MedicationJourney::returnTo(request()->query('return_to'))
+                ?? MedicationJourney::returnTo(request()->getRequestUri()),
+        ]);
         $edit = $this->handoverService->editPermission($handover, $auth);
         $lockHolder = $this->handoverService->activeLockHolder($handover, $auth->id);
 
         return [
             'id' => $handover->id,
+            'medication_date' => $medicationDate,
+            'mar_url' => $marUrl,
+            'cd_register_url' => $marUrl !== null && $includeControlledMedication && $auth->canDo('medications.controlled.view')
+                ? '/emar/controlled?'.http_build_query(array_filter([
+                    'client_id' => $client->id, 'site_id' => $client->site_id, 'date' => $medicationDate,
+                    'return_to' => MedicationJourney::returnTo(request()->query('return_to'))
+                        ?? MedicationJourney::returnTo(request()->getRequestUri()),
+                ], fn ($value) => $value !== null), '', '&', PHP_QUERY_RFC3986) : null,
             'status' => $handover->status,
             'handover_notes' => $handover->handover_notes,
             'worker_notes' => app(HandoverWorkerNotes::class)->present($handover, $auth),

@@ -7,10 +7,12 @@ use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\PlaybookRun;
 use App\Models\ControlRoomAlert;
 use App\Models\HsEvent;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\ControlRoom\AlertWorklistQuery;
+use App\Services\HealthSafety\HsEventClosureService;
 use App\Services\HealthSafety\HsEventService;
 use App\Services\Incidents\IncidentJourney;
 use App\Services\Incidents\IncidentJourneyService;
@@ -144,7 +146,15 @@ class ControlRoomSafetyHandoverTest extends TestCase
         $governanceOpen->alert->forceFill(['status' => ControlRoomAlert::STATUS_RESOLVED])->saveQuietly();
         $complete = $this->journey('CR-2026-0324');
         $complete->alert->forceFill(['status' => ControlRoomAlert::STATUS_CLOSED])->saveQuietly();
-        $complete->hsEvent->forceFill(['status' => HsEvent::STATUS_CLOSED])->saveQuietly();
+        // An admin account needs an explicit independent H&S closure grant.
+        $this->operator->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'healthSafety.events.close')->sole()->id => ['allowed' => true],
+        ]);
+        $this->operator->unsetRelation('permissionOverrides');
+        $hs = app(HsEventService::class);
+        $hs->acceptHandover($complete->hsEvent, $this->operator, $this->operator, 'Accepted for governance');
+        $hs->recordWorksafeDecision($complete->hsEvent, false, 'Reviewed injury does not meet the notifiable threshold.', $this->operator);
+        app(HsEventClosureService::class)->closeEvent($complete->hsEvent, 'All safety handover work completed.', $this->operator);
 
         $expectLens = function (string $lens, int $expectedId): void {
             $this->actingAs($this->operator)
@@ -200,7 +210,7 @@ class ControlRoomSafetyHandoverTest extends TestCase
     private function journey(string $reference): IncidentJourney
     {
         return app(IncidentJourneyService::class)->submitFromAlert(
-            $this->alert(['reference_number' => $reference]),
+            $this->alert(['reference_number' => $reference, 'severity' => HsEvent::SEVERITY_LOW]),
             [
                 'type' => 'injury',
                 'title' => 'Safety handover '.$reference,

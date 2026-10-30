@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
+use App\Models\MedicationEvent;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\SafeguardingConcern;
@@ -216,14 +217,22 @@ class SecurityAccessControlTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_manager_cannot_export_medications_for_a_site_less_client(): void
+    public function test_manager_cannot_export_medications_for_a_hidden_site_less_client(): void
     {
         $manager = $this->providerManager();
         $client = Client::factory()->create(['site_id' => null]);
+        $beforeClient = $client->refresh()->getRawOriginal();
+        $beforeExports = MedicationEvent::query()->where('kind', 'export.created')->count();
+        $this->assertTrue($manager->canDo('medications.reports.view'));
+        $this->assertTrue($manager->canDo('medications.reports.export'));
+        $this->assertFalse($manager->can('viewMedications', $client));
 
         $this->actingAs($manager)
-            ->get("/clients/{$client->id}/mar/export.csv")
-            ->assertForbidden();
+            ->get("/clients/{$client->id}/mar/export.csv?purpose=care")
+            ->assertNotFound();
+
+        $this->assertSame($beforeClient, $client->fresh()->getRawOriginal());
+        $this->assertSame($beforeExports, MedicationEvent::query()->where('kind', 'export.created')->count());
     }
 
     public function test_client_policy_allows_active_sites_and_rejects_missing_or_inactive_sites(): void

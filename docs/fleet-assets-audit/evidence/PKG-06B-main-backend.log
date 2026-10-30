@@ -1,0 +1,26 @@
+
+   WARN  PKG06BMainReviewTest
+  ! dispatch does not move asset and receipt requires every kit item → file_get_contents(C:\Users\steph\.code… 345.25s  
+  ! same command replays once but changed and stale submissions are rejected → file_get_contents(C:\Users\steph… 0.78s  
+  ! profile uses canonical assignment receipts and requires explicit attestation → file_get_contents(C:\Users\s… 0.85s  
+  ! linked components move only with an acknowledged kit receipt → file_get_contents(C:\Users\steph\.codex\work… 0.80s  
+  ! permissions and foreign asset file ids are enforced → file_get_contents(C:\Users\steph\.codex\worktrees\882… 1.04s  
+  ! files are scanned versioned and archived without losing bytes → file_get_contents(C:\Users\steph\.codex\wor… 5.69s  
+  ! profile and printable qr return real authorised content → file_get_contents(C:\Users\steph\.codex\worktrees… 1.70s  
+  ! asset finance requests reuse the finance queue and duplicate boundary → file_get_contents(C:\Users\steph\.c… 0.79s  
+  ! schema probe stays in the configured application schema → file_get_contents(C:\Users\steph\.codex\worktrees… 0.65s  
+  ! source costs exclude estimates drafts reversals old and foreign allocations → file_get_contents(C:\Users\st… 0.80s  
+  ! original check evidence uses source permissions and submitted template → file_get_contents(C:\Users\steph\.… 0.87s  
+  ! scan identity is server owned and foreign observations are withheld → file_get_contents(C:\Users\steph\.cod… 0.75s  
+  ! bulk labels support both media replay protection and access revocation → file_get_contents(C:\Users\steph\.… 2.05s  
+  ! viewers cannot create missing qr identity and expired batches cannot download → file_get_contents(C:\Users</>… 2.26s  
+  ! label workspace filters canonical lifecycle without leaking other sites → file_get_contents(C:\Users\steph</>… 0.62s  
+  ! published label history replays its original layout but new batches use the shared minimum → file_get_conte… 1.00s  
+  ! pending receipt blocks register room edits and rechecks the destination room → file_get_contents(C:\Users\s… 0.75s  
+  ! ownership requires its permission and preserves canonical placement → file_get_contents(C:\Users\steph\.cod… 0.82s  
+  ! replacement review records a request without retiring or posting → file_get_contents(C:\Users\steph\.codex</>… 0.75s  
+
+  Tests:    19 warnings (190 assertions)
+  Duration: 371.72s
+
+

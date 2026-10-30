@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     Carbon::setTestNow('2026-08-15 12:00:00');
@@ -185,6 +186,7 @@ it('rejects an absent organisation before depreciation can inspect another organ
 });
 
 it('blocks duplicate legacy asset-month rows before applying any migration schema change', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     $actorId = $this->actor->id;
@@ -302,6 +304,7 @@ it('surfaces scheduled posting failures so the queue can retry safely', function
 });
 
 it('serializes independent workers onto one asset-month execution on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
@@ -338,6 +341,7 @@ it('serializes independent workers onto one asset-month execution on MySQL', fun
 });
 
 it('keeps capitalisation and depreciation on the shared sequence then asset lock order', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
@@ -360,6 +364,7 @@ it('keeps capitalisation and depreciation on the shared sequence then asset lock
 });
 
 it('lets disposal win before depreciation without deadlock or a stale asset projection', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
@@ -382,6 +387,7 @@ it('lets disposal win before depreciation without deadlock or a stale asset proj
 });
 
 it('locks the journal sequence before a reversal source journal under forced interleaving', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $source = app(JournalPostingService::class)->createAndPost(1, [
         'journal_date' => '2026-08-20',
         'type' => 'standard',

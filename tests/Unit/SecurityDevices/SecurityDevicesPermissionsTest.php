@@ -45,6 +45,15 @@ class SecurityDevicesPermissionsTest extends TestCase
         'securityDevices.commands.admin',
     ];
 
+    private const RESTRICTED_SCRIPT_KEYS = [
+        'securityDevices.endpoints.scriptUpload',
+        'securityDevices.endpoints.scriptReview',
+        'securityDevices.endpoints.scriptPolicyManage',
+        'securityDevices.endpoints.scriptRun',
+        'securityDevices.endpoints.scriptUnattended',
+        'securityDevices.endpoints.scriptOutputView',
+    ];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -66,11 +75,11 @@ class SecurityDevicesPermissionsTest extends TestCase
         }
     }
 
-    public function test_exactly_25_security_devices_permissions(): void
+    public function test_exactly_50_security_devices_permissions(): void
     {
         $count = Permission::where('key', 'like', 'securityDevices.%')->count();
 
-        $this->assertEquals(25, $count);
+        $this->assertEquals(50, $count);
     }
 
     public function test_permissions_have_correct_group_and_module(): void
@@ -93,6 +102,9 @@ class SecurityDevicesPermissionsTest extends TestCase
         foreach (self::ALL_KEYS as $key) {
             $this->assertTrue($admin->canDo($key), "Admin should have '{$key}'.");
         }
+        foreach (self::RESTRICTED_SCRIPT_KEYS as $key) {
+            $this->assertFalse($admin->canDo($key), "Admin must not receive restricted script permission '{$key}' by default.");
+        }
     }
 
     // ── IT Manager gets full set ──────────────────────────────────
@@ -104,6 +116,9 @@ class SecurityDevicesPermissionsTest extends TestCase
 
         foreach (self::ALL_KEYS as $key) {
             $this->assertTrue($user->canDo($key), "IT Manager should have '{$key}'.");
+        }
+        foreach (self::RESTRICTED_SCRIPT_KEYS as $key) {
+            $this->assertFalse($user->canDo($key), "IT Manager must not receive restricted script permission '{$key}' by default.");
         }
 
         $this->assertTrue($user->canDo('it.view'));

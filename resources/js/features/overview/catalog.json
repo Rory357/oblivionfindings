@@ -1,0 +1,1735 @@
+{
+    "worker": {
+        "name": "Support worker",
+        "icon": "heart-handshake",
+        "description": "Your shift, your next steps, your week.",
+        "range": "today",
+        "primary": "Open My Day",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "The work that needs you next.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Your current shift",
+                "description": "Handover and care tasks are ready in My Day.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "trend",
+                "title": "Your week ahead",
+                "description": "Your scheduled work across the selected period.",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "distribution",
+                "title": "Your shift progress",
+                "description": "Scheduled tasks · today",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "sites",
+                "title": "Your personal workspace",
+                "description": "A few things to keep your week moving",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "agenda",
+                "title": "Coming up",
+                "description": "Upcoming work and deadlines.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "worker-notes",
+                "title": "My unfinished notes",
+                "description": "Pick up draft notes before the end of your shift.",
+                "category": "Actions",
+                "icon": "notebook-pen",
+                "kind": "list",
+                "span": 6,
+                "next": "Open My Day, check the draft against the care record and complete your note.",
+                "module": "My Day"
+            },
+            {
+                "id": "worker-learning",
+                "title": "My learning pathway",
+                "description": "See completed learning and your next short course.",
+                "category": "People",
+                "icon": "graduation-cap",
+                "kind": "donut",
+                "span": 4,
+                "next": "Open your learning plan and book the next refresher.",
+                "module": "My learning"
+            },
+            {
+                "id": "worker-readiness",
+                "title": "Ready for my next shift",
+                "description": "A short preparation checklist before you arrive.",
+                "category": "Actions",
+                "icon": "clipboard-check",
+                "kind": "list",
+                "span": 6,
+                "next": "Confirm the latest roster and read the handover when your next shift starts.",
+                "module": "My Day"
+            },
+            {
+                "id": "worker-leave",
+                "title": "My leave requests",
+                "description": "Keep track of requests without opening each record.",
+                "category": "People",
+                "icon": "calendar-heart",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the request to check its dates and review status.",
+                "module": "My leave"
+            },
+            {
+                "id": "worker-reminders",
+                "title": "My reminders",
+                "description": "Small personal follow-ups that should not get lost.",
+                "category": "Actions",
+                "icon": "bell-ring",
+                "kind": "list",
+                "span": 6,
+                "next": "Review your reminder and update it in your personal workspace.",
+                "module": "My reminders"
+            },
+            {
+                "id": "worker-contacts",
+                "title": "Who can help",
+                "description": "Find the right team for help during your shift.",
+                "category": "People",
+                "icon": "phone",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the approved directory for current contact details.",
+                "module": "Team directory"
+            },
+            {
+                "id": "worker-plan-updates",
+                "title": "Care plan updates",
+                "description": "Know which assigned plan updates need to be read before support.",
+                "category": "Actions",
+                "icon": "file-heart",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the care record in My Day and read the current plan before providing support.",
+                "module": "My Day"
+            },
+            {
+                "id": "worker-activities",
+                "title": "Community activities",
+                "description": "See practical arrangements for your assigned outings.",
+                "category": "Actions",
+                "icon": "map-pinned",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the activity plan in My Day and check its current arrangements.",
+                "module": "My Day"
+            },
+            {
+                "id": "worker-requests",
+                "title": "My submitted requests",
+                "description": "Follow the progress of the help you have already requested.",
+                "category": "Actions",
+                "icon": "send",
+                "kind": "list",
+                "span": 6,
+                "next": "Open your submitted request to read the reply or provide the requested information.",
+                "module": "My requests"
+            },
+            {
+                "id": "worker-shift-offers",
+                "title": "Shift offers for me",
+                "description": "Review suitable shift offers before deciding whether to respond.",
+                "category": "People",
+                "icon": "calendar-plus",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the roster to check the offer, hours and requirements before responding.",
+                "module": "My shifts"
+            },
+            {
+                "id": "worker-equipment",
+                "title": "My borrowed equipment",
+                "description": "Keep return dates and practical handover details visible.",
+                "category": "Actions",
+                "icon": "package-check",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the loan record to confirm the return arrangement with the site coordinator.",
+                "module": "My equipment"
+            },
+            {
+                "id": "worker-policy-reading",
+                "title": "Policies to read",
+                "description": "Track your assigned reading without mixing it with training.",
+                "category": "Assurance",
+                "icon": "book-open-check",
+                "kind": "progress",
+                "span": 6,
+                "next": "Read the current policy in full and acknowledge it in the policy workspace.",
+                "module": "My policy reading"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Shift essentials",
+                "description": "Start ready and finish the important work.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "worker-plan-updates",
+                    "worker-notes",
+                    "worker-readiness",
+                    "worker-activities"
+                ]
+            },
+            {
+                "name": "My week",
+                "description": "Plan shifts, time off and practical arrangements.",
+                "ids": [
+                    "attention",
+                    "trend",
+                    "worker-shift-offers",
+                    "worker-leave",
+                    "worker-equipment",
+                    "worker-reminders"
+                ]
+            },
+            {
+                "name": "Learning & preparation",
+                "description": "Keep your learning and reading within reach.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "worker-learning",
+                    "worker-policy-reading",
+                    "worker-readiness",
+                    "worker-contacts"
+                ]
+            }
+        ]
+    },
+    "lead": {
+        "name": "Team lead",
+        "icon": "users-round",
+        "description": "Coverage, care and follow-through across your teams.",
+        "range": "today",
+        "primary": "Open team work",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "The work that needs you next.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "The next handover",
+                "description": "One shift still needs cover before the handover.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "trend",
+                "title": "Shift coverage",
+                "description": "Covered and required shifts",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "distribution",
+                "title": "Today’s shift coverage",
+                "description": "Scheduled shifts · today",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "sites",
+                "title": "Your teams, connected",
+                "description": "Staffing, next handovers and open incident follow-ups by site",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "agenda",
+                "title": "Next on the team calendar",
+                "description": "Upcoming work and deadlines.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "lead-approvals",
+                "title": "Approvals inbox",
+                "description": "See the type of work waiting for your review.",
+                "category": "Actions",
+                "icon": "inbox",
+                "kind": "bars",
+                "span": 6,
+                "next": "Review supporting details and coverage before making an approval.",
+                "module": "Team approvals"
+            },
+            {
+                "id": "lead-learning",
+                "title": "Team learning readiness",
+                "description": "Spot which assigned learning plans need support.",
+                "category": "People",
+                "icon": "graduation-cap",
+                "kind": "donut",
+                "span": 4,
+                "next": "Agree a suitable learning session with staff whose plan is not complete.",
+                "module": "Team learning"
+            },
+            {
+                "id": "lead-supervision",
+                "title": "Supervision planner",
+                "description": "Keep upcoming supervision conversations on track.",
+                "category": "People",
+                "icon": "messages-square",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the scheduled session and prepare the discussion points.",
+                "module": "Team supervision"
+            },
+            {
+                "id": "lead-handover",
+                "title": "Handover readiness",
+                "description": "Check whether each site has prepared its next handover.",
+                "category": "Actions",
+                "icon": "clipboard-list",
+                "kind": "list",
+                "span": 6,
+                "next": "Ask the incoming lead to review the latest handover in the care workspace.",
+                "module": "Team handovers"
+            },
+            {
+                "id": "lead-equipment",
+                "title": "Site checklists",
+                "description": "Track routine environment and equipment checks.",
+                "category": "Assurance",
+                "icon": "clipboard-check",
+                "kind": "bars",
+                "span": 6,
+                "next": "Review the incomplete checklist with its assigned owner.",
+                "module": "Site checklists"
+            },
+            {
+                "id": "lead-availability",
+                "title": "Upcoming team availability",
+                "description": "Plan around approved absences and roster commitments.",
+                "category": "People",
+                "icon": "calendar-range",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the roster to compare approved absence with the planned coverage.",
+                "module": "Team roster"
+            },
+            {
+                "id": "lead-break-cover",
+                "title": "Break cover plan",
+                "description": "Coordinate planned breaks while keeping support covered.",
+                "category": "People",
+                "icon": "coffee",
+                "kind": "list",
+                "span": 6,
+                "next": "Review planned breaks with the shift team and confirm who provides cover.",
+                "module": "Team roster"
+            },
+            {
+                "id": "lead-notes",
+                "title": "Shift note completion",
+                "description": "Check whether required notes have been submitted for completed shifts.",
+                "category": "Assurance",
+                "icon": "notebook-pen",
+                "kind": "progress",
+                "span": 6,
+                "next": "Follow up missing notes with the responsible worker through the care workspace.",
+                "module": "Team care records"
+            },
+            {
+                "id": "lead-capabilities",
+                "title": "Team capability reviews",
+                "description": "Track planned capability sign-offs with assigned reviewers.",
+                "category": "People",
+                "icon": "badge-check",
+                "kind": "progress",
+                "span": 6,
+                "next": "Review the evidence with the authorised assessor before recording a sign-off.",
+                "module": "Team capability reviews"
+            },
+            {
+                "id": "lead-transport",
+                "title": "Transport coordination",
+                "description": "Bring vehicle bookings and journey preparation into one view.",
+                "category": "Actions",
+                "icon": "bus",
+                "kind": "list",
+                "span": 6,
+                "next": "Check the approved booking and assigned driver in the transport workspace.",
+                "module": "Transport planning"
+            },
+            {
+                "id": "lead-supplies",
+                "title": "Site supply requests",
+                "description": "Follow routine supply requests through to delivery.",
+                "category": "Actions",
+                "icon": "package",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the requested item, owner and delivery arrangement in the site request.",
+                "module": "Site supplies"
+            },
+            {
+                "id": "lead-relief",
+                "title": "Relief staff preparation",
+                "description": "Check preparation for relief workers before their first shift.",
+                "category": "Assurance",
+                "icon": "user-round-check",
+                "kind": "list",
+                "span": 6,
+                "next": "Confirm the worker’s approved assignment and complete the site briefing in the staffing workspace.",
+                "module": "Relief staffing"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Daily coordination",
+                "description": "Coverage, handover and approvals in one view.",
+                "ids": [
+                    "attention",
+                    "trend",
+                    "lead-handover",
+                    "lead-break-cover",
+                    "lead-approvals",
+                    "agenda"
+                ]
+            },
+            {
+                "name": "Team support",
+                "description": "Prepare people for their work and development.",
+                "ids": [
+                    "attention",
+                    "lead-supervision",
+                    "lead-learning",
+                    "lead-capabilities",
+                    "lead-availability",
+                    "lead-relief"
+                ]
+            },
+            {
+                "name": "Site readiness",
+                "description": "Stay ahead of routine checks and practical needs.",
+                "ids": [
+                    "attention",
+                    "sites",
+                    "lead-notes",
+                    "lead-equipment",
+                    "lead-transport",
+                    "lead-supplies"
+                ]
+            }
+        ]
+    },
+    "manager": {
+        "name": "Manager",
+        "icon": "building-2",
+        "description": "Site performance, service delivery and decisions that matter.",
+        "range": "week",
+        "primary": "Review decisions",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "The work that needs you next.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Your decision queue",
+                "description": "Open the requests submitted for your review.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "trend",
+                "title": "Service delivery",
+                "description": "Delivered shifts against planned shifts",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "distribution",
+                "title": "Follow-up status",
+                "description": "Incident actions · selected period",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "sites",
+                "title": "Site performance",
+                "description": "Delivered shifts · selected reporting period",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "agenda",
+                "title": "Decisions and reviews",
+                "description": "Upcoming work and deadlines.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "manager-improvements",
+                "title": "Service improvements",
+                "description": "Track the practical changes agreed with your site leads.",
+                "category": "Actions",
+                "icon": "sparkles",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the owner’s latest update and agree the next milestone.",
+                "module": "Service improvements"
+            },
+            {
+                "id": "manager-feedback",
+                "title": "Feedback follow-through",
+                "description": "See whether feedback has been acknowledged and answered.",
+                "category": "Insights",
+                "icon": "message-square-heart",
+                "kind": "donut",
+                "span": 4,
+                "next": "Review open feedback in its source record and confirm a response owner.",
+                "module": "Feedback and complaints"
+            },
+            {
+                "id": "manager-quality",
+                "title": "Quality review coverage",
+                "description": "Compare completed checks with each site’s review plan.",
+                "category": "Assurance",
+                "icon": "shield-check",
+                "kind": "bars",
+                "span": 6,
+                "next": "Confirm the evidence for completed checks and schedule the remaining reviews.",
+                "module": "Quality reviews"
+            },
+            {
+                "id": "manager-visits",
+                "title": "Site visit planner",
+                "description": "Keep observation visits and follow-up dates visible.",
+                "category": "Actions",
+                "icon": "map-pinned",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the visit plan to review its purpose and preparation notes.",
+                "module": "Site visits"
+            },
+            {
+                "id": "manager-capacity",
+                "title": "Service capacity reviews",
+                "description": "Keep upcoming service and staffing changes in view.",
+                "category": "People",
+                "icon": "users-round",
+                "kind": "list",
+                "span": 6,
+                "next": "Check assessed service needs and available staffing before agreeing a change.",
+                "module": "Operations planning"
+            },
+            {
+                "id": "manager-owners",
+                "title": "Action ownership",
+                "description": "Spot improvement actions that still need an accountable owner.",
+                "category": "Assurance",
+                "icon": "user-check",
+                "kind": "donut",
+                "span": 4,
+                "next": "Assign an accountable owner in the source record and agree a due date.",
+                "module": "Service improvements"
+            },
+            {
+                "id": "manager-goal-reviews",
+                "title": "Personal goal review coverage",
+                "description": "See whether planned goal reviews have happened, without personal details.",
+                "category": "Insights",
+                "icon": "target",
+                "kind": "progress",
+                "span": 6,
+                "next": "Review aggregate coverage with the site lead and arrange outstanding reviews in the care workspace.",
+                "module": "Service quality reports"
+            },
+            {
+                "id": "manager-activities",
+                "title": "Planned activity delivery",
+                "description": "Compare delivered community activities with the agreed programme.",
+                "category": "Insights",
+                "icon": "calendar-check",
+                "kind": "progress",
+                "span": 6,
+                "next": "Review undelivered activities with the site lead and confirm any agreed alternatives.",
+                "module": "Activity delivery reports"
+            },
+            {
+                "id": "manager-maintenance",
+                "title": "Maintenance workload",
+                "description": "See the status of open property and equipment work.",
+                "category": "Actions",
+                "icon": "wrench",
+                "kind": "donut",
+                "span": 4,
+                "next": "Review the owner, service impact and expected completion date for each open request.",
+                "module": "Maintenance requests"
+            },
+            {
+                "id": "manager-resources",
+                "title": "Cross-site resource requests",
+                "description": "Coordinate equipment and practical help between your sites.",
+                "category": "Actions",
+                "icon": "arrow-left-right",
+                "kind": "list",
+                "span": 6,
+                "next": "Check availability and ownership with both site leads before agreeing a transfer.",
+                "module": "Operations requests"
+            },
+            {
+                "id": "manager-benefits",
+                "title": "Change outcome reviews",
+                "description": "Check whether completed changes delivered their intended result.",
+                "category": "Insights",
+                "icon": "chart-no-axes-combined",
+                "kind": "list",
+                "span": 6,
+                "next": "Compare the agreed measure before and after the change with its accountable owner.",
+                "module": "Improvement reviews"
+            },
+            {
+                "id": "manager-continuity",
+                "title": "Continuity exercise readiness",
+                "description": "Track preparation for planned service continuity exercises.",
+                "category": "Assurance",
+                "icon": "shield-check",
+                "kind": "progress",
+                "span": 6,
+                "next": "Confirm the exercise plan and review outstanding preparation with the site lead.",
+                "module": "Continuity planning"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Daily operations",
+                "description": "Service delivery and the decisions that need you.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "trend",
+                    "sites",
+                    "manager-maintenance",
+                    "agenda"
+                ]
+            },
+            {
+                "name": "People & services",
+                "description": "Look at delivery and the experience behind it.",
+                "ids": [
+                    "attention",
+                    "manager-capacity",
+                    "manager-goal-reviews",
+                    "manager-activities",
+                    "manager-feedback",
+                    "manager-visits"
+                ]
+            },
+            {
+                "name": "Quality & assurance",
+                "description": "Follow improvements through to evidence and outcomes.",
+                "ids": [
+                    "attention",
+                    "manager-quality",
+                    "manager-improvements",
+                    "manager-owners",
+                    "manager-continuity",
+                    "manager-benefits"
+                ]
+            }
+        ]
+    },
+    "hr": {
+        "name": "HR",
+        "icon": "contact-round",
+        "description": "Your people, their progress and the decisions ahead.",
+        "range": "week",
+        "primary": "Review HR work",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "The work that needs you next.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Joining the team",
+                "description": "A contract signature is needed before Monday’s start.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "trend",
+                "title": "Workforce movement",
+                "description": "Active employees over the reporting period",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "distribution",
+                "title": "Mandatory training",
+                "description": "Staff with all requirements current",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "sites",
+                "title": "Recruitment pipeline",
+                "description": "Active candidates · all your sites",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "agenda",
+                "title": "People deadlines",
+                "description": "Upcoming work and deadlines.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "hr-probation",
+                "title": "Probation reviews",
+                "description": "Keep review milestones visible without exposing personnel details.",
+                "category": "People",
+                "icon": "user-check",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the employee record to prepare the review with their manager.",
+                "module": "Employee reviews"
+            },
+            {
+                "id": "hr-documents",
+                "title": "Document renewals",
+                "description": "See the workload for employment document renewals.",
+                "category": "Assurance",
+                "icon": "files",
+                "kind": "donut",
+                "span": 4,
+                "next": "Open the document register and request the required renewal.",
+                "module": "Staff documents"
+            },
+            {
+                "id": "hr-leave",
+                "title": "Leave planning",
+                "description": "Compare approved leave days across your sites.",
+                "category": "People",
+                "icon": "calendar-heart",
+                "kind": "bars",
+                "span": 6,
+                "next": "Review the roster impact with the relevant site lead.",
+                "module": "Leave planning"
+            },
+            {
+                "id": "hr-interviews",
+                "title": "Interview planner",
+                "description": "Keep the next candidate conversations moving.",
+                "category": "Actions",
+                "icon": "calendar-check",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the recruitment record to check the panel, time and candidate arrangements.",
+                "module": "Recruitment interviews"
+            },
+            {
+                "id": "hr-workforce",
+                "title": "Workforce mix",
+                "description": "Understand employment arrangements across your sites.",
+                "category": "Insights",
+                "icon": "users-round",
+                "kind": "donut",
+                "span": 4,
+                "next": "Open the workforce report to inspect the aggregate breakdown.",
+                "module": "Workforce reports"
+            },
+            {
+                "id": "hr-exits",
+                "title": "Leaver handovers",
+                "description": "Coordinate the practical steps for upcoming departures.",
+                "category": "Assurance",
+                "icon": "door-open",
+                "kind": "list",
+                "span": 6,
+                "next": "Check the leaver checklist and confirm the responsible teams.",
+                "module": "Leaver checklists"
+            },
+            {
+                "id": "hr-survey",
+                "title": "Staff survey participation",
+                "description": "Track response coverage using counts only, without survey answers.",
+                "category": "Insights",
+                "icon": "message-square",
+                "kind": "progress",
+                "span": 6,
+                "next": "Use an organisation-wide reminder to improve participation; individual responses are not shown here.",
+                "module": "Staff survey reports"
+            },
+            {
+                "id": "hr-payroll-checks",
+                "title": "Payroll preparation checks",
+                "description": "Keep authorised change checks visible before the cut-off.",
+                "category": "Actions",
+                "icon": "clipboard-list",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the record and verify supporting approval before passing the change to payroll.",
+                "module": "Payroll preparation"
+            },
+            {
+                "id": "hr-position-descriptions",
+                "title": "Position description reviews",
+                "description": "Keep role responsibilities current with their accountable managers.",
+                "category": "Assurance",
+                "icon": "file-pen-line",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the draft with the role’s accountable manager and record the approved version.",
+                "module": "Position descriptions"
+            },
+            {
+                "id": "hr-development",
+                "title": "Development requests",
+                "description": "See the learning support requested beyond mandatory training.",
+                "category": "People",
+                "icon": "graduation-cap",
+                "kind": "bars",
+                "span": 6,
+                "next": "Review the request with the employee’s manager and agree a development plan.",
+                "module": "Staff development"
+            },
+            {
+                "id": "hr-supervision",
+                "title": "Supervision follow-ups",
+                "description": "Recorded next-session dates, without private discussion notes.",
+                "category": "People",
+                "icon": "messages-square",
+                "kind": "list",
+                "span": 6,
+                "next": "Ask the responsible manager to arrange outstanding sessions; discussion notes stay in the record.",
+                "module": "Supervision reports"
+            },
+            {
+                "id": "hr-recruitment-sources",
+                "title": "Recruitment sources",
+                "description": "Understand where the current applications came from.",
+                "category": "Insights",
+                "icon": "network",
+                "kind": "donut",
+                "span": 4,
+                "next": "Review application sources alongside the campaign’s recruitment measures.",
+                "module": "Recruitment reports"
+            }
+        ],
+        "starters": [
+            {
+                "name": "People priorities",
+                "description": "Recruitment, requests and upcoming milestones.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "sites",
+                    "hr-interviews",
+                    "hr-probation",
+                    "agenda"
+                ]
+            },
+            {
+                "name": "Workforce planning",
+                "description": "Plan with a clear aggregate picture of your people.",
+                "ids": [
+                    "attention",
+                    "hr-workforce",
+                    "hr-leave",
+                    "hr-survey",
+                    "hr-supervision",
+                    "hr-development"
+                ]
+            },
+            {
+                "name": "Readiness & records",
+                "description": "Coordinate renewals, checks and employee changes.",
+                "ids": [
+                    "attention",
+                    "distribution",
+                    "hr-documents",
+                    "hr-payroll-checks",
+                    "hr-position-descriptions",
+                    "hr-exits"
+                ]
+            }
+        ]
+    },
+    "it": {
+        "name": "IT",
+        "icon": "monitor-cog",
+        "description": "Service health, response priorities and reliable support.",
+        "range": "week",
+        "primary": "Open service desk",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "The work that needs you next.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Your next response",
+                "description": "Your response queue and recorded first-response deadline.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "trend",
+                "title": "Support demand",
+                "description": "Tickets opened and resolved",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "distribution",
+                "title": "Ticket workload",
+                "description": "Open support tickets · current queue",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "sites",
+                "title": "Service health",
+                "description": "Current device observations across your sites.",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "agenda",
+                "title": "Planned IT work",
+                "description": "Upcoming work and deadlines.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "it-patching",
+                "title": "Device update readiness",
+                "description": "See which managed devices are ready for the next update.",
+                "category": "Assurance",
+                "icon": "shield-check",
+                "kind": "donut",
+                "span": 4,
+                "next": "Review the device group and confirm the approved maintenance window.",
+                "module": "Device updates"
+            },
+            {
+                "id": "it-backups",
+                "title": "Recovery checks",
+                "description": "Keep restore exercises and backup checks visible.",
+                "category": "Assurance",
+                "icon": "database-backup",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the recovery record and confirm the restore evidence with the service owner.",
+                "module": "Recovery testing"
+            },
+            {
+                "id": "it-access",
+                "title": "Access request queue",
+                "description": "See requests by type before opening the records.",
+                "category": "Actions",
+                "icon": "key-round",
+                "kind": "bars",
+                "span": 6,
+                "next": "Confirm the approved request and record owner before making an access change.",
+                "module": "IT access requests"
+            },
+            {
+                "id": "it-assets",
+                "title": "Asset lifecycle",
+                "description": "Plan around warranty, loan and replacement milestones.",
+                "category": "Insights",
+                "icon": "laptop",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the asset record and confirm the next lifecycle action.",
+                "module": "IT asset register"
+            },
+            {
+                "id": "it-changes",
+                "title": "Maintenance calendar",
+                "description": "Coordinate changes around service delivery.",
+                "category": "Actions",
+                "icon": "calendar-cog",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the change plan, site impact and rollback arrangements before the window.",
+                "module": "IT changes"
+            },
+            {
+                "id": "it-age",
+                "title": "Ticket age",
+                "description": "Find older open work before it is overlooked.",
+                "category": "Insights",
+                "icon": "timer",
+                "kind": "bars",
+                "span": 6,
+                "next": "Open the older tickets and confirm their next response and accountable owner.",
+                "module": "IT service desk"
+            },
+            {
+                "id": "it-certificates",
+                "title": "Certificate renewals",
+                "description": "See upcoming renewal windows for managed services.",
+                "category": "Assurance",
+                "icon": "file-key",
+                "kind": "list",
+                "span": 6,
+                "next": "Check the approved service record, renewal owner and change window before renewing.",
+                "module": "Certificate register"
+            },
+            {
+                "id": "it-licences",
+                "title": "Software licence allocation",
+                "description": "See assigned licences against the approved pool for your sites.",
+                "category": "Insights",
+                "icon": "key-round",
+                "kind": "progress",
+                "span": 6,
+                "next": "Review the licence register and confirm need before assigning or reclaiming a licence.",
+                "module": "Software register"
+            },
+            {
+                "id": "it-inventory",
+                "title": "Asset record completeness",
+                "description": "Find records missing the details needed for support and accountability.",
+                "category": "Assurance",
+                "icon": "list-checks",
+                "kind": "progress",
+                "span": 6,
+                "next": "Review missing ownership, location or support details in the asset register.",
+                "module": "IT asset register"
+            },
+            {
+                "id": "it-support-themes",
+                "title": "Recurring support themes",
+                "description": "Spot repeated requests that could benefit from a lasting fix.",
+                "category": "Insights",
+                "icon": "repeat-2",
+                "kind": "bars",
+                "span": 6,
+                "next": "Review the linked tickets and confirm a common cause before proposing a lasting fix.",
+                "module": "IT problem review"
+            },
+            {
+                "id": "it-knowledge",
+                "title": "Knowledge article reviews",
+                "description": "Keep the instructions staff rely on accurate and useful.",
+                "category": "Actions",
+                "icon": "book-open",
+                "kind": "list",
+                "span": 6,
+                "next": "Check each article against the current approved process before publishing an update.",
+                "module": "IT knowledge base"
+            },
+            {
+                "id": "it-security-reviews",
+                "title": "Security review schedule",
+                "description": "Keep planned technical reviews and their owners visible.",
+                "category": "Assurance",
+                "icon": "shield",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the approved review plan and record findings through the security workspace.",
+                "module": "IT security reviews"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Service response",
+                "description": "Focus on service health and open support work.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "sites",
+                    "it-age",
+                    "it-access",
+                    "agenda"
+                ]
+            },
+            {
+                "name": "Reliable systems",
+                "description": "Prepare updates, recovery checks and renewals.",
+                "ids": [
+                    "attention",
+                    "it-patching",
+                    "it-backups",
+                    "it-certificates",
+                    "it-changes",
+                    "it-security-reviews"
+                ]
+            },
+            {
+                "name": "Improve support",
+                "description": "Understand recurring work and maintain useful records.",
+                "ids": [
+                    "attention",
+                    "trend",
+                    "it-support-themes",
+                    "it-inventory",
+                    "it-licences",
+                    "it-knowledge"
+                ]
+            }
+        ]
+    },
+    "governance": {
+        "name": "Governance",
+        "icon": "landmark",
+        "description": "Risk, assurance and the decisions shaping better care.",
+        "range": "quarter",
+        "primary": "Open board workspace",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "The work that needs you next.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Next board meeting",
+                "description": "Your next board meeting and available papers.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "trend",
+                "title": "Risk and assurance",
+                "description": "Current risks, accountable owners and outstanding assurance evidence.",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "distribution",
+                "title": "Board action status",
+                "description": "Permitted board actions due in the selected period",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "sites",
+                "title": "Strategic priorities",
+                "description": "Recorded goal progress in current approved strategic plans",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "agenda",
+                "title": "Governance calendar",
+                "description": "Upcoming work and deadlines.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "layout-dashboard"
+            },
+            {
+                "id": "governance-policy",
+                "title": "Policy review pipeline",
+                "description": "Track the review stages before papers reach the board.",
+                "category": "Assurance",
+                "icon": "book-open-check",
+                "kind": "donut",
+                "span": 4,
+                "next": "Review the policy owner’s evidence and the planned approval route.",
+                "module": "Policy register"
+            },
+            {
+                "id": "governance-audit",
+                "title": "Audit follow-through",
+                "description": "See how agreed audit findings are progressing.",
+                "category": "Assurance",
+                "icon": "clipboard-check",
+                "kind": "donut",
+                "span": 4,
+                "next": "Open the finding to check its owner, evidence and agreed follow-up date.",
+                "module": "Audit actions"
+            },
+            {
+                "id": "governance-committees",
+                "title": "Committee reports",
+                "description": "See what each committee is preparing for the board.",
+                "category": "Actions",
+                "icon": "landmark",
+                "kind": "list",
+                "span": 6,
+                "next": "Read the committee paper and identify the decision or assurance requested.",
+                "module": "Committee papers"
+            },
+            {
+                "id": "governance-declarations",
+                "title": "Interest declarations",
+                "description": "A private prompt to check your own declarations.",
+                "category": "People",
+                "icon": "file-check-2",
+                "kind": "list",
+                "span": 6,
+                "next": "Review your own register entry and declare any relevant interest through the approved process.",
+                "module": "My declarations"
+            },
+            {
+                "id": "governance-assurance",
+                "title": "Assurance evidence coverage",
+                "description": "Compare evidence packs available from each site.",
+                "category": "Insights",
+                "icon": "shield-check",
+                "kind": "bars",
+                "span": 6,
+                "next": "Review evidence quality and coverage in the assurance register.",
+                "module": "Assurance register"
+            },
+            {
+                "id": "governance-reporting",
+                "title": "Reporting calendar",
+                "description": "Keep upcoming reporting milestones and owners visible.",
+                "category": "Actions",
+                "icon": "calendar-check",
+                "kind": "list",
+                "span": 6,
+                "next": "Confirm the actual agreed due date and evidence owner in the reporting register.",
+                "module": "Governance reporting"
+            },
+            {
+                "id": "governance-risk-milestones",
+                "title": "Risk treatment milestones",
+                "description": "See the next agreed steps for material risk treatments.",
+                "category": "Assurance",
+                "icon": "flag",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the owner’s evidence and confirm whether the treatment remains on track.",
+                "module": "Risk treatment plans"
+            },
+            {
+                "id": "governance-induction",
+                "title": "My board induction",
+                "description": "Keep your own induction reading and briefings on track.",
+                "category": "People",
+                "icon": "book-user",
+                "kind": "progress",
+                "span": 6,
+                "next": "Open your own induction plan and complete the remaining reading or briefing.",
+                "module": "My board induction"
+            },
+            {
+                "id": "governance-engagement",
+                "title": "Stakeholder engagement",
+                "description": "Keep planned listening and consultation opportunities visible.",
+                "category": "People",
+                "icon": "messages-square",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the engagement purpose and approved summary; personal contributions remain in the record.",
+                "module": "Governance engagement"
+            },
+            {
+                "id": "governance-external-review",
+                "title": "External review readiness",
+                "description": "Track evidence-pack preparation for a scheduled external review.",
+                "category": "Assurance",
+                "icon": "folder-check",
+                "kind": "progress",
+                "span": 6,
+                "next": "Review evidence quality with the accountable owner before marking a pack ready.",
+                "module": "External review preparation"
+            },
+            {
+                "id": "governance-delegations",
+                "title": "Delegated decision reviews",
+                "description": "Check that sampled decisions have the required authority recorded.",
+                "category": "Assurance",
+                "icon": "stamp",
+                "kind": "list",
+                "span": 6,
+                "next": "Open the decision record and check it against the current delegation schedule.",
+                "module": "Delegated decisions"
+            },
+            {
+                "id": "governance-dependencies",
+                "title": "Strategic dependencies",
+                "description": "See which external inputs are needed for the next milestones.",
+                "category": "Actions",
+                "icon": "git-branch",
+                "kind": "list",
+                "span": 6,
+                "next": "Review the dependency with its owner and agree a response if the input is delayed.",
+                "module": "Strategic planning"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Board preparation",
+                "description": "Prepare for the next meeting and its decisions.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "governance-committees",
+                    "governance-declarations",
+                    "governance-induction",
+                    "agenda"
+                ]
+            },
+            {
+                "name": "Risk & assurance",
+                "description": "Review treatments and the evidence behind assurance.",
+                "ids": [
+                    "attention",
+                    "trend",
+                    "governance-risk-milestones",
+                    "governance-audit",
+                    "governance-external-review",
+                    "governance-policy"
+                ]
+            },
+            {
+                "name": "Strategy & engagement",
+                "description": "Keep milestones, dependencies and people in view.",
+                "ids": [
+                    "attention",
+                    "sites",
+                    "governance-dependencies",
+                    "governance-engagement",
+                    "governance-reporting",
+                    "governance-delegations"
+                ]
+            }
+        ]
+    },
+    "office": {
+        "name": "Business support",
+        "icon": "briefcase-business",
+        "description": "Money, compliance, safety and assets: the deadlines that keep services running.",
+        "range": "month",
+        "primary": "Open my areas",
+        "blocks": [
+            {
+                "id": "attention",
+                "title": "Needs attention",
+                "description": "Deadlines and approvals across your areas.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 8,
+                "icon": "list-checks"
+            },
+            {
+                "id": "focus",
+                "title": "Your next deadline",
+                "description": "The nearest due date in the areas you look after.",
+                "category": "Actions",
+                "kind": "focus",
+                "span": 4,
+                "icon": "calendar-clock"
+            },
+            {
+                "id": "trend",
+                "title": "Money in and out",
+                "description": "Recorded income against spending by month.",
+                "category": "Insights",
+                "kind": "trend",
+                "span": 8,
+                "icon": "chart-no-axes-combined"
+            },
+            {
+                "id": "distribution",
+                "title": "Money owed to us",
+                "description": "Unpaid invoices by how long they have been outstanding.",
+                "category": "Insights",
+                "kind": "donut",
+                "span": 4,
+                "icon": "hand-coins"
+            },
+            {
+                "id": "sites",
+                "title": "Budget by site",
+                "description": "Spending against budget for each site this period.",
+                "category": "Insights",
+                "kind": "bars",
+                "span": 8,
+                "icon": "building-2"
+            },
+            {
+                "id": "agenda",
+                "title": "Upcoming deadlines",
+                "description": "Filing, renewal and review dates coming up.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "calendar-days"
+            },
+            {
+                "id": "updates",
+                "title": "Latest updates",
+                "description": "Recent changes in your work.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 4,
+                "icon": "bell-ring"
+            },
+            {
+                "id": "shortcuts",
+                "title": "Quick links",
+                "description": "Your useful everyday destinations.",
+                "category": "Actions",
+                "kind": "links",
+                "span": 4,
+                "icon": "arrow-left-right"
+            },
+            {
+                "id": "office-payroll",
+                "title": "Payroll and payday filing",
+                "description": "Pay runs waiting for approval and filings still owed to Inland Revenue.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 6,
+                "icon": "banknote"
+            },
+            {
+                "id": "office-bills",
+                "title": "Bills due",
+                "description": "Supplier bills due in the next 7 days or already overdue.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 6,
+                "icon": "receipt-text"
+            },
+            {
+                "id": "office-funding",
+                "title": "Funding claims",
+                "description": "Claims to funders by stage, so nothing sits unclaimed.",
+                "category": "Insights",
+                "kind": "progress",
+                "span": 6,
+                "icon": "landmark"
+            },
+            {
+                "id": "office-cash",
+                "title": "Cash runway",
+                "description": "Cash on hand and how many days it covers at current spending.",
+                "category": "Insights",
+                "kind": "list",
+                "span": 6,
+                "icon": "wallet"
+            },
+            {
+                "id": "office-vehicle-reviews",
+                "title": "Vehicle costs to review",
+                "description": "Vehicle reviews waiting for a finance decision.",
+                "category": "Actions",
+                "kind": "list",
+                "span": 6,
+                "icon": "car-front"
+            },
+            {
+                "id": "office-compliance",
+                "title": "Compliance due",
+                "description": "Compliance items overdue or due in the next 30 days.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "shield-check"
+            },
+            {
+                "id": "office-safety",
+                "title": "Safety actions",
+                "description": "Corrective actions overdue or due soon, with days since a lost-time injury.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "hard-hat"
+            },
+            {
+                "id": "office-fleet",
+                "title": "Vehicle compliance",
+                "description": "WOF, registration, COF, road user charges and insurance due or expired.",
+                "category": "Assurance",
+                "kind": "bars",
+                "span": 6,
+                "icon": "bus"
+            },
+            {
+                "id": "office-maintenance",
+                "title": "Maintenance work",
+                "description": "Open, urgent and overdue work orders across your sites.",
+                "category": "Actions",
+                "kind": "bars",
+                "span": 6,
+                "icon": "wrench"
+            },
+            {
+                "id": "office-risks",
+                "title": "Risk reviews due",
+                "description": "Risks whose next review date has passed or is close.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "flag"
+            },
+            {
+                "id": "office-audit",
+                "title": "Record changes",
+                "description": "Changes recorded in the audit trail this period, by area.",
+                "category": "Assurance",
+                "kind": "bars",
+                "span": 6,
+                "icon": "file-search"
+            },
+            {
+                "id": "office-tax",
+                "title": "GST and tax returns",
+                "description": "GST and other returns due, with their filing status.",
+                "category": "Assurance",
+                "kind": "list",
+                "span": 6,
+                "icon": "stamp"
+            }
+        ],
+        "starters": [
+            {
+                "name": "Month-end finance",
+                "description": "Pay, bills and what we are owed.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "office-payroll",
+                    "office-bills",
+                    "distribution",
+                    "office-tax"
+                ]
+            },
+            {
+                "name": "Compliance and safety",
+                "description": "Due dates that keep services safe and certified.",
+                "ids": [
+                    "attention",
+                    "focus",
+                    "office-compliance",
+                    "office-safety",
+                    "office-fleet",
+                    "office-risks"
+                ]
+            },
+            {
+                "name": "Money and funding",
+                "description": "Income, budgets, claims and cash.",
+                "ids": [
+                    "attention",
+                    "trend",
+                    "sites",
+                    "office-funding",
+                    "office-cash",
+                    "office-vehicle-reviews"
+                ]
+            }
+        ]
+    }
+}

@@ -1,0 +1,22 @@
+{
+  "candidate": "352ce7006098b227b945a47c4d55400c9aeff429",
+  "parent": "419e4c890c84a322ec031cd07cc06f61acf80d39",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "tree": "9d14682b6a9fc3572c6c5b0987b359c6c46533e8",
+  "mainHead": "926b4981b0289da08a20baca0995117fb53e413e",
+  "sourceFiles": 46,
+  "reportedSourceDigest": "d0fd136de600f8746a9e950b77e0aaf30cf94dd1b7ddf7ec128ff8a777098d79",
+  "sourceManifestGitSha256": "3ea9d9acbc74228d498a2c16cef0c49d8785bcdab70a19aa551fdf2a8eebe2df",
+  "frozenFiles": 41,
+  "protectedReferences": 6,
+  "pageHeaderGuideSha256": "33aeeb0e4434d3bb4d3023e3ce95ffee12e95ba1fe62c02f36601f8219827faa",
+  "masterSha256": "c4837ab675f9dffdb6a8597636f49d5761da114e6c155dc08e6bb8a209d63fd0",
+  "visualSource": [
+    "resources/js/components/people-locations/history-panel.tsx",
+    "resources/js/components/people-locations/record-picker.tsx",
+    "resources/js/components/people-locations/workspace.css",
+    "resources/js/pages/operations/people-locations/index.tsx"
+  ],
+  "mismatches": [],
+  "cleanCandidate": true
+}

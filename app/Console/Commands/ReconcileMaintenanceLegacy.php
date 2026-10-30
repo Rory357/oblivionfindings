@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\FleetWorkOrder;
+use App\Services\Fleet\MaintenanceRestrictionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -30,7 +31,10 @@ class ReconcileMaintenanceLegacy extends Command
                 ->whereNotExists(fn ($query) => $query->selectRaw('1')
                     ->from('fleet_maintenance_reports as report')
                     ->whereColumn('report.work_order_id', 'work.id'))->count(),
+            // Daily checks are recorded observations that no rule evaluates, so they aren't gaps.
             'check_runs_without_exact_rule_snapshot' => DB::table('fleet_checklist_runs')
+                ->where(fn ($kind) => $kind->whereNull('check_kind')
+                    ->orWhereNotIn('check_kind', MaintenanceRestrictionService::OBSERVATION_KINDS))
                 ->where(fn ($query) => $query->whereNull('rule_version_id')
                     ->orWhereNull('rule_snapshot_json')->orWhereNull('rule_sha256'))->count(),
             'out_of_service_assets_without_active_restriction' => DB::table('assets as asset')

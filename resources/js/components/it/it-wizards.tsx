@@ -2718,7 +2718,7 @@ export function SlaPolicyDialog({
                                                     }
                                                     className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none ${
                                                         on
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-border bg-transparent text-muted-foreground hover:bg-muted'
                                                     }`}
                                                 >

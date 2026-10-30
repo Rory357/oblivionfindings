@@ -1,16 +1,16 @@
-/* HazardRegister — the shared, gold-standard Hazards register chrome used by
- * BOTH the global compliance register (/compliance/hazards) and the per-site
- * register (/sites/{id}/hazards). One implementation, two thin pages, so the
- * surfaces can't drift. HeroShell + WorkflowRibbon + clusters + NZ compliance
- * badges + hero-footer filter bar; TabStrip; right-click + click rows;
- * detail-as-modal; create wizard. Semantic tokens only. NZ-only, web-only. */
+/**
+ * Hazards (approved H&S drawing pg-hsn-60 — Stephan 23 Oct 2026): one header
+ * with two number boxes (due in 7 days, needs an owner) and four filter chips,
+ * the hazard views as a tier-two strip, then the register table. Shared by the
+ * global register, the per-Site register and the Site profile link-through;
+ * domain commands stay on the hazard page (rows open it, menus deep-link a pane).
+ */
+import { BOARD_REPORTS_LABEL, boardReportLinks } from '@/lib/health-safety/board-reports';
 import { HazardCreateDialog } from '@/components/health-safety/hazard-create-dialog';
-import { HazardDetailDialog } from '@/components/health-safety/hazard-detail-dialog';
 import {
     RiskChip,
     SeverityChip,
     StatusChip,
-    fmtWhen,
     hazardLabelOf,
     siteTypeLabel,
     type HazardActionKey,
@@ -20,13 +20,38 @@ import {
     type HazardSectionKey,
 } from '@/components/health-safety/hazard-kit';
 import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    SafetyDateFilter,
+    SafetyRegisterSearch,
+    SafetyWorkspaceRail,
+} from '@/components/health-safety/workspace-header';
+import {
+    RecordIdentity,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import {
+    EntityContextMenu,
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+} from '@/components/page';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
+import { EntityFilter } from '@/components/rostering';
+import { Ring } from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
@@ -34,51 +59,37 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { SelectInput } from '@/components/wizard/primitives';
+import { formatDateOnly, formatTime, toDateInput } from '@/lib/datetime';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroComplianceBadges,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import {
-    FlagBadge,
-    RegisterTableHeader,
-    TONE_DOT,
-} from '@/pages/health-safety/components/register-row-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
+    hazardHref,
+    hazardReturn,
+} from '@/lib/health-safety/hazard-navigation';
+import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/react';
 import {
-    Activity,
     AlertTriangle,
     Building2,
     CheckCircle2,
+    CircleDot,
     ClipboardCheck,
-    Clock,
     Copy,
     ExternalLink,
     FileText,
     Flame,
     Home,
+    LayoutList,
     ListChecks,
-    MapPin,
-    MousePointer2,
     Play,
     Plus,
-    Search,
     ShieldAlert,
     ShieldCheck,
+    SlidersHorizontal,
     UserPlus,
+    X,
 } from 'lucide-react';
-import {
-    useEffect,
-    useState,
-    type MouseEvent as ReactMouseEvent,
-    type ReactNode,
-} from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 type Chip = { key: string; label: string; hint: string };
 
@@ -122,12 +133,6 @@ export type HazardRegisterData = {
             closed_period: number;
         };
     };
-    nzBadges: {
-        worksafe_awaiting: number;
-        sds_expiring: number;
-        drills_due: number;
-        drills_overdue: number;
-    };
     filters: HazardFilters;
     sites: Array<{ id: number; name: string; type: string }>;
     assignees: Array<{ id: number; name: string }>;
@@ -139,57 +144,36 @@ export type HazardRegisterData = {
     recommendedBySiteType: Record<string, Chip[]>;
 };
 
-const BOARD_REPORTS = [
-    {
-        label: 'Board safety summary',
-        href: '/health-safety/reports/board-summary',
-    },
-    {
-        label: 'WorkSafe register',
-        href: '/health-safety/reports/worksafe-register',
-    },
-    {
-        label: 'Investigation outcomes',
-        href: '/health-safety/reports/investigation-outcomes',
-    },
-    {
-        label: 'Corrective-action traceability',
-        href: '/health-safety/reports/corrective-action-traceability',
-    },
-    {
-        label: 'Risk-assessment register',
-        href: '/health-safety/reports/risk-assessment-register',
-    },
+const BOARD_REPORTS = boardReportLinks();
+
+/**
+ * The register's views. The five drawn ones are the tier-two strip ("Open"
+ * is the code's open work: open and in progress); the rest stay reachable
+ * from More filters and show as a tab while they are the chosen view.
+ */
+const VIEWS: {
+    key: string;
+    tab: string;
+    option: string;
+    title: string;
+    icon: GroupedProfileNavTab['icon'];
+    drawn: boolean;
+}[] = [
+    { key: 'all', tab: 'All', option: 'All', title: 'All hazards', icon: LayoutList, drawn: true },
+    { key: 'active', tab: 'Open', option: 'Open work', title: 'Open hazards', icon: AlertTriangle, drawn: true },
+    { key: 'overdue', tab: 'Overdue', option: 'Overdue', title: 'Overdue hazards', icon: Flame, drawn: true },
+    { key: 'critical', tab: 'Critical', option: 'Critical', title: 'Critical open', icon: ShieldAlert, drawn: true },
+    { key: 'closed', tab: 'Closed & mitigated', option: 'Closed & mitigated', title: 'Closed & mitigated', icon: CheckCircle2, drawn: true },
+    { key: 'open', tab: 'Not started', option: 'Open', title: 'Open, not started', icon: CircleDot, drawn: false },
+    { key: 'in_progress', tab: 'In progress', option: 'In progress', title: 'In progress', icon: Play, drawn: false },
+    { key: 'due_soon', tab: 'Due in 7 days', option: 'Due in 7 days', title: 'Due in the next 7 days', icon: AlertTriangle, drawn: false },
+    { key: 'unassigned', tab: 'Needs an owner', option: 'Needs an owner', title: 'Hazards needing an owner', icon: UserPlus, drawn: false },
+    { key: 'mitigated', tab: 'Awaiting closure', option: 'Awaiting closure', title: 'Awaiting closure', icon: ShieldCheck, drawn: false },
+    { key: 'closed_only', tab: 'Closed only', option: 'Closed only', title: 'Closed hazards', icon: CheckCircle2, drawn: false },
 ];
 
-const RANGE_ITEMS = [
-    { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
-    { key: 'quarter', label: 'Quarter' },
-    { key: 'all', label: 'All' },
-];
-
-const TABLE_TITLES: Record<string, string> = {
-    all: 'All hazards',
-    open: 'Open hazards',
-    in_progress: 'In progress',
-    overdue: 'Overdue hazards',
-    critical: 'Critical open',
-    closed: 'Closed & mitigated',
-};
-
-function todayStr() {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
-}
-function daysAgoStr(n: number) {
-    const d = new Date();
-    d.setDate(d.getDate() - n);
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
+function sentence(value: string): string {
+    return value ? value[0].toUpperCase() + value.slice(1) : value;
 }
 
 export function HazardRegister({
@@ -211,11 +195,9 @@ export function HazardRegister({
         tab,
         tabCounts,
         hero,
-        nzBadges,
         filters,
         sites,
         assignees,
-        detail,
         can,
         severityOptions,
         likelihoodOptions,
@@ -223,15 +205,11 @@ export function HazardRegister({
         recommendedBySiteType,
     } = data;
 
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [pendingSection, setPendingSection] =
-        useState<HazardSectionKey>('overview');
-    const [pendingAction, setPendingAction] = useState<HazardActionKey | null>(
-        null,
-    );
-    const [intent, setIntent] = useState(0);
+    const headerMenu = useEntityContextMenu<'register'>();
     const [createOpen, setCreateOpen] = useState(false);
     const [boardOpen, setBoardOpen] = useState(false);
+    const canBrowseSites =
+        !!usePage<SharedData>().props.auth.can?.sites?.viewAny;
     const canGovernance = Boolean(
         (
             usePage().props as {
@@ -272,47 +250,34 @@ export function HazardRegister({
         id: number,
         opts?: { section?: HazardSectionKey; action?: HazardActionKey },
     ) => {
-        setPendingSection(opts?.section ?? 'overview');
-        setPendingAction(opts?.action ?? null);
-        setIntent((n) => n + 1);
-        router.get(
-            baseUrl,
-            { ...filters, hazard: id },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
+        const query = new URLSearchParams(
+            Object.entries({ ...filters, tab })
+                .filter(([, value]) => value != null && value !== '')
+                .map(([key, value]) => [key, String(value)]),
+        );
+        router.visit(
+            hazardHref(id, {
+                section: opts?.section,
+                pane: opts?.action ? { kind: opts.action } : null,
+                returnTo: hazardReturn(baseUrl + '?' + query),
+            }),
         );
     };
-    const closeDetail = () =>
-        router.get(
-            baseUrl,
-            { ...filters },
-            { preserveState: true, preserveScroll: true, only: ['detail'] },
-        );
 
+    const moreActive = [
+        filters.severity,
+        filters.risk_rating,
+        filters.assignee_id,
+        filters.due_state,
+    ].filter(Boolean).length;
     const hasFilters = !!(
         filters.q ||
         filters.site_id ||
         filters.site_type ||
-        filters.severity ||
-        filters.risk_rating ||
-        filters.assignee_id ||
-        filters.due_state ||
-        filters.from
+        filters.from ||
+        filters.to ||
+        moreActive
     );
-
-    const activeRange = !filters.from
-        ? 'all'
-        : filters.from === daysAgoStr(7)
-          ? 'week'
-          : filters.from === daysAgoStr(30)
-            ? '30d'
-            : filters.from === daysAgoStr(90)
-              ? 'quarter'
-              : 'all';
-    const onRange = (key: string) => {
-        if (key === 'all') return go({ from: null, to: null });
-        const map: Record<string, number> = { week: 7, '30d': 30, quarter: 90 };
-        go({ from: daysAgoStr(map[key]), to: todayStr() });
-    };
 
     const exportUrl =
         `${baseUrl}/export?` +
@@ -322,511 +287,342 @@ export function HazardRegister({
                 .map(([k, v]) => [k, String(v)]),
         ).toString();
 
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All',
-            icon: ListChecks,
-            tone: 'primary',
-            badge: tabCounts.all || undefined,
-        },
-        {
-            id: 'open',
-            label: 'Open',
-            icon: AlertTriangle,
-            tone: 'info',
-            badge: tabCounts.open || undefined,
-        },
-        {
-            id: 'in_progress',
-            label: 'In progress',
-            icon: Clock,
-            tone: 'info',
-            badge: tabCounts.in_progress || undefined,
-        },
-        {
-            id: 'overdue',
-            label: 'Overdue',
-            icon: Flame,
-            tone: 'critical',
-            badge: tabCounts.overdue || undefined,
-        },
-        {
-            id: 'critical',
-            label: 'Critical',
-            icon: ShieldAlert,
-            tone: 'critical',
-            badge: tabCounts.critical || undefined,
-        },
-        {
-            id: 'closed',
-            label: 'Closed',
-            icon: CheckCircle2,
-            tone: 'success',
-            badge: tabCounts.closed || undefined,
-        },
-    ];
-
-    /* ----- context menus ----- */
-
-    const openRowCtx = (e: ReactMouseEvent, h: HazardRow) => {
-        e.preventDefault();
-        const items: ShiftCtxItem[] = [
-            {
-                icon: <ShieldAlert className="h-3.5 w-3.5" />,
-                label: 'View hazard',
-                sub: h.reference_number,
-                tone: 'primary',
-                onClick: () => openHazard(h.id),
-            },
-        ];
-        if (can.assign && h.status !== 'closed') {
-            items.push({
-                icon: <UserPlus className="h-3.5 w-3.5" />,
-                label: h.assigned_to_id ? 'Reassign' : 'Assign',
-                onClick: () => openHazard(h.id, { action: 'assign' }),
-            });
-        }
-        if (can.manage && h.status === 'open') {
-            items.push({
-                icon: <Play className="h-3.5 w-3.5" />,
-                label: 'Start progress',
-                sub: 'open → in progress',
-                onClick: () => openHazard(h.id, { action: 'start' }),
-            });
-        }
-        if (can.manage && h.status === 'in_progress') {
-            items.push({
-                icon: <ShieldCheck className="h-3.5 w-3.5" />,
-                label: 'Mark mitigated',
-                sub: 'in progress → mitigated',
-                onClick: () => openHazard(h.id, { action: 'mitigate' }),
-            });
-        }
-        if (can.manage && h.status !== 'closed') {
-            items.push({
-                icon: <ListChecks className="h-3.5 w-3.5" />,
-                label: 'Add corrective action',
-                onClick: () =>
-                    openHazard(h.id, {
-                        section: 'actions',
-                        action: 'add_action',
-                    }),
-            });
-            items.push({
-                icon: <ClipboardCheck className="h-3.5 w-3.5" />,
-                label: 'Record review',
-                onClick: () => openHazard(h.id, { action: 'review' }),
-            });
-        }
-        if (can.close && h.status !== 'closed') {
-            items.push({
-                icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-                label: 'Close hazard',
-                tone: 'critical',
-                onClick: () => openHazard(h.id, { action: 'close' }),
-            });
-        }
-        items.push(
-            { sep: true },
-            {
-                icon: <Copy className="h-3.5 w-3.5" />,
-                label: 'Copy link',
-                onClick: () => copyLink(h.id),
-            },
-            {
-                icon: <ExternalLink className="h-3.5 w-3.5" />,
-                label: 'Open full page',
-                sub: `/hazards/${h.id}`,
-                onClick: () => router.visit(`/hazards/${h.id}`),
-            },
-        );
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: (h.risk_rating ?? 'low').toUpperCase(),
-            meta: `${h.reference_number} · ${hazardLabelOf(h)}`,
-            items,
-        });
-    };
-
-    const openHeroCtx = (e: ReactMouseEvent) => {
-        e.preventDefault();
-        const items: ShiftCtxItem[] = [];
-        if (can.create)
-            items.push({
-                icon: <Plus className="h-3.5 w-3.5" />,
-                label: 'Log hazard',
-                tone: 'primary',
-                onClick: () => setCreateOpen(true),
-            });
-        items.push({
-            icon: <FileText className="h-3.5 w-3.5" />,
-            label: 'Export CSV',
-            onClick: () => window.open(exportUrl, '_blank'),
-        });
-        if (canGovernance)
-            items.push({
-                icon: <FileText className="h-3.5 w-3.5" />,
-                label: 'Board reports',
-                sub: 'governance pack',
-                onClick: () => setBoardOpen(true),
-            });
-        if (!scopedSite) {
-            items.push(
-                { sep: true },
-                {
-                    icon: <Building2 className="h-3.5 w-3.5" />,
-                    label: 'Go to sites',
-                    onClick: () => router.visit('/sites'),
-                },
-            );
-        }
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: 'REGISTER',
-            tagBg: 'var(--primary)',
-            tagColor: 'var(--primary-foreground)',
-            meta: scopedSite
-                ? `${scopedSite.name} hazards`
-                : 'Homes & Sites Hazards',
-            items,
-        });
-    };
-
     const copyLink = (id: number) => {
-        const url = `${window.location.origin}${baseUrl}?hazard=${id}`;
+        const url = `${window.location.origin}${hazardHref(id)}`;
         navigator.clipboard?.writeText(url);
     };
 
-    /* ----- hero footer filter bar ----- */
-    const footer = (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <HeroSegmented
-                label="Period"
-                variant="pill"
-                ariaLabel="Date range"
-                items={RANGE_ITEMS}
-                value={activeRange}
-                onChange={onRange}
-            />
-            {!scopedSite && sites.length ? (
-                <EntityFilter
-                    label="Site"
-                    allLabel="All sites"
-                    items={sites.map((s) => ({
-                        id: s.id,
-                        name: s.name,
-                        description: siteTypeLabel(s.type),
-                    }))}
-                    value={filters.site_id}
-                    onChange={(id) => go({ site_id: id })}
-                    onDark
+    /* ----- one action list per row: the kebab and the right-click ----- */
+
+    const hazardActions = (h: HazardRow): MenuItem[] =>
+        compactMenu([
+            {
+                label: 'View hazard',
+                icon: ShieldAlert,
+                onClick: () => openHazard(h.id),
+            },
+            can.assign &&
+                h.status !== 'closed' && {
+                    label: h.assigned_to_id ? 'Reassign' : 'Assign',
+                    icon: UserPlus,
+                    onClick: () => openHazard(h.id, { action: 'assign' }),
+                },
+            can.manage &&
+                h.status === 'open' && {
+                    label: 'Start progress',
+                    icon: Play,
+                    onClick: () => openHazard(h.id, { action: 'start' }),
+                },
+            can.manage &&
+                h.status === 'in_progress' && {
+                    label: 'Mark mitigated',
+                    icon: ShieldCheck,
+                    onClick: () => openHazard(h.id, { action: 'mitigate' }),
+                },
+            can.manage &&
+                h.status !== 'closed' && {
+                    label: 'Add corrective action',
+                    icon: ListChecks,
+                    onClick: () =>
+                        openHazard(h.id, {
+                            section: 'actions',
+                            action: 'add_action',
+                        }),
+                },
+            can.manage &&
+                h.status !== 'closed' && {
+                    label: 'Record review',
+                    icon: ClipboardCheck,
+                    onClick: () => openHazard(h.id, { action: 'review' }),
+                },
+            can.close &&
+                h.status !== 'closed' && {
+                    label: 'Close hazard',
+                    icon: CheckCircle2,
+                    danger: true,
+                    onClick: () => openHazard(h.id, { action: 'close' }),
+                },
+            { separator: true },
+            {
+                label: 'Copy link',
+                icon: Copy,
+                onClick: () => copyLink(h.id),
+            },
+            {
+                label: 'Open full page',
+                icon: ExternalLink,
+                onClick: () => openHazard(h.id),
+            },
+        ]);
+
+    const registerActions: MenuItem[] = compactMenu([
+        can.create && {
+            label: 'Log hazard',
+            icon: Plus,
+            onClick: () => setCreateOpen(true),
+        },
+        {
+            label: 'Export CSV',
+            icon: FileText,
+            onClick: () => window.open(exportUrl, '_blank'),
+        },
+        canGovernance && {
+            label: 'Board reports',
+            icon: FileText,
+            onClick: () => setBoardOpen(true),
+        },
+        !scopedSite && canBrowseSites && { separator: true },
+        !scopedSite &&
+            canBrowseSites && {
+                label: 'Go to sites',
+                icon: Building2,
+                onClick: () => router.visit('/sites'),
+            },
+    ]);
+
+    const reportSite = scopedSite?.id ?? filters.site_id;
+    const views: GroupedProfileNavTab[] = VIEWS.filter(
+        (view) => view.drawn || view.key === tab,
+    ).map((view) => ({
+        key: view.key,
+        label: view.tab,
+        icon: view.icon,
+        count: tabCounts[view.key],
+    }));
+    const current = VIEWS.find((view) => view.key === tab);
+    const range =
+        hazards.from && hazards.to
+            ? `Showing ${hazards.from}–${hazards.to} of ${hazards.total}`
+            : `Showing ${hazards.data.length} of ${hazards.total}`;
+    const pager = (
+        <>
+            <p className="text-subtle">
+                Showing {hazards.data.length} of {hazards.total}
+            </p>
+            {hazards.last_page > 1 ? (
+                <LaravelPagination
+                    links={hazards.links}
+                    lastPage={hazards.last_page}
                 />
             ) : null}
-            {!scopedSite ? (
-                <HeroSelect
-                    label="Type"
-                    value={filters.site_type}
-                    onChange={(v) => go({ site_type: v })}
-                >
-                    <option value="">All types</option>
-                    <option value="house">Houses</option>
-                    <option value="facility">Facilities</option>
-                    <option value="head_office">Head office</option>
-                </HeroSelect>
-            ) : null}
-            <HeroSelect
-                label="Severity"
-                value={filters.severity}
-                onChange={(v) => go({ severity: v })}
-            >
-                <option value="">All</option>
-                {severityOptions.map((s) => (
-                    <option key={s} value={s}>
-                        {s[0].toUpperCase() + s.slice(1)}
-                    </option>
-                ))}
-            </HeroSelect>
-            <HeroSelect
-                label="Risk"
-                value={filters.risk_rating}
-                onChange={(v) => go({ risk_rating: v })}
-            >
-                <option value="">All</option>
-                {riskRatings.map((r) => (
-                    <option key={r} value={r}>
-                        {r[0].toUpperCase() + r.slice(1)}
-                    </option>
-                ))}
-            </HeroSelect>
-            <HeroSelect
-                label="Assignee"
-                value={filters.assignee_id}
-                onChange={(v) => go({ assignee_id: v ? Number(v) : null })}
-            >
-                <option value="">All</option>
-                {assignees.map((a) => (
-                    <option key={a.id} value={a.id}>
-                        {a.name}
-                    </option>
-                ))}
-            </HeroSelect>
-            <HeroSelect
-                label="Due"
-                value={filters.due_state}
-                onChange={(v) => go({ due_state: v })}
-            >
-                <option value="">All</option>
-                <option value="overdue">Overdue</option>
-                <option value="due_soon">Due ≤ 7d</option>
-            </HeroSelect>
-            <div className="relative ml-auto">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                <input
-                    type="search"
-                    placeholder="Search hazards…"
-                    defaultValue={filters.q ?? ''}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter')
-                            go({
-                                q: (e.target as HTMLInputElement).value || null,
-                            });
-                    }}
-                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                />
-            </div>
-            {hasFilters ? (
-                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
-                <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                >
-                    <span aria-hidden>✕</span> Clear
-                </button>
-            ) : null}
-        </div>
+        </>
     );
 
     return (
         <>
-            <div onContextMenu={openHeroCtx}>
-                <HeroShell footer={footer}>
-                    <WorkflowRibbon current="resolve" />
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={ShieldAlert} />
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <HeroStatusPill>
-                                        {scopedSite
-                                            ? `${scopedSite.name} · hazard register`
-                                            : 'Hazard register · live'}
-                                    </HeroStatusPill>
-                                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/15 px-2.5 py-1 text-[11px] font-semibold tracking-[0.04em] text-primary-foreground/85 uppercase">
-                                        <MapPin className="h-3.5 w-3.5" />{' '}
-                                        {scopedSite
-                                            ? siteTypeLabel(scopedSite.type)
-                                            : 'NZ · Ngā Paerewa NZS 8134:2021'}
-                                    </span>
-                                </div>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                    {scopedSite
-                                        ? `${scopedSite.name} hazards`
-                                        : 'Homes & Sites Hazards'}
-                                </h1>
-                                <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    {scopedSite
-                                        ? `Every physical and environmental hazard at ${scopedSite.name}${scopedSite.suburb ? ` · ${scopedSite.suburb}` : ''} — risk-rated, driven through controls and closed through review.`
-                                        : 'Every physical and environmental hazard across our homes and facilities — logged, risk-rated against the WorkSafe matrix, driven through controls and closed through review.'}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {can.create ? (
-                                <Button
-                                    size="sm"
-                                    className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                    onClick={() => setCreateOpen(true)}
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" /> Log
-                                    hazard
-                                </Button>
-                            ) : null}
-                            {canGovernance ? (
+            <div onContextMenu={(event) => headerMenu.open(event, 'register')}>
+                <PageHeader
+                    wrapTitle
+                    icon={ShieldAlert}
+                    title={
+                        scopedSite ? `${scopedSite.name} hazards` : 'Hazards'
+                    }
+                    subline="Find hazards, give each one an owner and keep controls up to date"
+                    actions={
+                        <>
+                            <SafetyRegisterSearch
+                                key={filters.q}
+                                query={filters.q ?? ''}
+                                onSearch={(q) => go({ q })}
+                                placeholder="Search hazards"
+                            />
+                            <PageHeaderGlassButton asChild>
+                                <a href={exportUrl} aria-label="Export CSV">
+                                    Export
+                                </a>
+                            </PageHeaderGlassButton>
+                            {canGovernance && (
                                 <Popover
                                     open={boardOpen}
                                     onOpenChange={setBoardOpen}
                                 >
                                     <PopoverTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="border border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                        >
-                                            <FileText className="mr-1.5 h-4 w-4" />{' '}
-                                            Board reports
-                                            <span aria-hidden className="ml-1">
-                                                ▾
-                                            </span>
-                                        </Button>
+                                        <PageHeaderGlassButton>
+                                            {BOARD_REPORTS_LABEL}
+                                        </PageHeaderGlassButton>
                                     </PopoverTrigger>
                                     <PopoverContent
                                         align="end"
-                                        className="w-64 p-1.5"
+                                        className="w-72 max-w-[calc(100vw-2rem)] p-1.5"
                                     >
                                         {BOARD_REPORTS.map((report) => (
-                                            // eslint-disable-next-line no-restricted-syntax -- popover menu item (report link), not a form control
-                                            <button
+                                            <Button
                                                 key={report.href}
-                                                type="button"
+                                                unstyled
+                                                className="frontline-focus flex w-full items-center rounded-md p-2.5 text-left text-sm hover:bg-muted"
                                                 onClick={() =>
-                                                    router.visit(report.href)
+                                                    router.visit(
+                                                        report.href +
+                                                            (reportSite
+                                                                ? `&site_id=${reportSite}`
+                                                                : ''),
+                                                    )
                                                 }
-                                                className="flex w-full items-center gap-2.5 rounded-md p-2.5 text-left text-sm font-medium transition-colors hover:bg-muted"
                                             >
-                                                <FileText className="h-4 w-4 shrink-0 text-primary" />
                                                 {report.label}
-                                            </button>
+                                            </Button>
                                         ))}
                                     </PopoverContent>
                                 </Popover>
-                            ) : null}
-                        </div>
-                    </div>
-
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster
-                            title="Live · open register"
-                            icon={Activity}
-                        >
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=open`}
-                                label="Open"
-                                value={fmt(hero.live.open)}
-                                caption="awaiting triage"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=in_progress`}
-                                label="In progress"
-                                value={fmt(hero.live.in_progress)}
-                                caption="controls underway"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=overdue`}
-                                label="Overdue"
-                                value={fmt(hero.live.overdue)}
-                                caption={
-                                    hero.live.overdue > 0
-                                        ? 'past due date'
-                                        : 'all on time'
+                            )}
+                            {can.create && (
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => setCreateOpen(true)}
+                                >
+                                    Log hazard
+                                </PageHeaderPrimaryButton>
+                            )}
+                        </>
+                    }
+                    strip={
+                        <PageHeaderNumbers>
+                            <PageHeaderNumber
+                                label="Due in 7 days"
+                                value={hero.attention.due_soon}
+                                caption="Today and the next 7 days"
+                                tone={
+                                    hero.attention.due_soon > 0
+                                        ? 'warning'
+                                        : undefined
                                 }
-                                tone="critical"
+                                onClick={() => setTab('due_soon')}
+                                pressed={tab === 'due_soon'}
                             />
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=critical`}
-                                label="Critical open"
-                                value={fmt(hero.live.critical)}
-                                caption="high / extreme risk"
-                                tone="critical"
-                            />
-                        </HeroCluster>
-                        <HeroCluster
-                            title="Needs attention"
-                            icon={AlertTriangle}
-                        >
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=overdue`}
-                                label="Due ≤ 7d"
-                                value={fmt(hero.attention.due_soon)}
-                                caption="closing window"
-                                tone="warning"
-                            />
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=open`}
-                                label="Unassigned"
-                                value={fmt(hero.attention.unassigned)}
+                            <PageHeaderNumber
+                                label="Needs an owner"
+                                value={hero.attention.unassigned}
                                 caption={
                                     hero.attention.unassigned > 0
-                                        ? 'needs an owner'
-                                        : 'all owned'
+                                        ? 'Choose someone'
+                                        : 'Every open hazard has an owner'
                                 }
-                                tone="warning"
+                                tone={
+                                    hero.attention.unassigned > 0
+                                        ? 'warning'
+                                        : undefined
+                                }
+                                onClick={() => setTab('unassigned')}
+                                pressed={tab === 'unassigned'}
                             />
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=closed`}
-                                label="Mitigated"
-                                value={fmt(hero.attention.mitigated)}
-                                caption="awaiting closure"
-                                tone="neutral"
+                        </PageHeaderNumbers>
+                    }
+                    filters={
+                        <>
+                            {!scopedSite && sites.length > 0 && (
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={sites.map((site) => ({
+                                        id: site.id,
+                                        name: site.name,
+                                        description: siteTypeLabel(site.type),
+                                    }))}
+                                    value={filters.site_id}
+                                    onChange={(id) => go({ site_id: id })}
+                                    onDark
+                                />
+                            )}
+                            <SafetyDateFilter
+                                label="Logged"
+                                from={filters.from ?? null}
+                                to={filters.to ?? null}
+                                onChange={go}
                             />
-                            <HeroClusterTile
-                                href={`${baseUrl}?tab=closed`}
-                                label="Closed"
-                                value={fmt(hero.attention.closed_period)}
-                                caption="this period"
-                                tone="success"
+                            {!scopedSite && (
+                                <PageHeaderFilterSelect
+                                    label="All types"
+                                    allValue=""
+                                    value={filters.site_type ?? ''}
+                                    onChange={(value) =>
+                                        go({ site_type: value || null })
+                                    }
+                                    options={[
+                                        { value: '', label: 'All types' },
+                                        { value: 'house', label: 'Houses' },
+                                        {
+                                            value: 'facility',
+                                            label: 'Facilities',
+                                        },
+                                        {
+                                            value: 'head_office',
+                                            label: 'Head office',
+                                        },
+                                    ]}
+                                />
+                            )}
+                            <MoreFilters
+                                active={moreActive}
+                                filters={filters}
+                                tab={tab}
+                                tabCounts={tabCounts}
+                                severityOptions={severityOptions}
+                                riskRatings={riskRatings}
+                                assignees={assignees}
+                                onTab={setTab}
+                                onChange={go}
                             />
-                        </HeroCluster>
-                    </div>
-
-                    <HeroComplianceBadges
-                        worksafeAwaiting={nzBadges.worksafe_awaiting}
-                        sdsExpiring={nzBadges.sds_expiring}
-                        drillsDue={nzBadges.drills_due}
-                        drillsOverdue={nzBadges.drills_overdue}
-                    />
-                </HeroShell>
-            </div>
-
-            <div className="mt-4">
-                <TabStrip
-                    value={tab}
-                    items={TABS}
-                    onChange={setTab}
-                    ariaLabel="Hazard register views"
+                            {hasFilters && (
+                                <PageHeaderFilterButton
+                                    icon={X}
+                                    onClick={clearFilters}
+                                >
+                                    Clear filters
+                                </PageHeaderFilterButton>
+                            )}
+                        </>
+                    }
+                    rail={
+                        <SafetyWorkspaceRail
+                            hub="prevention"
+                            current="hazards"
+                        />
+                    }
                 />
             </div>
 
-            <section className="mt-4 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                <RegisterTableHeader
-                    icon={ShieldAlert}
-                    title={TABLE_TITLES[tab] ?? 'Hazards'}
-                    subtitle={`${hazards.total} shown`}
-                    hint="Right-click a row for the full lifecycle"
-                    hintIcon={MousePointer2}
-                />
+            <TierTwoTabs
+                tabs={views}
+                activeTab={tab}
+                onTab={(key) => {
+                    if (key !== tab) setTab(key);
+                }}
+                testIdPrefix="hazard-register"
+                ariaLabel="Hazard views"
+                panelId="hazard-register-panel"
+                // Views carry no href, so the strip renders its own buttons.
+                renderLink={() => null}
+            />
+
+            <div
+                id="hazard-register-panel"
+                role="tabpanel"
+                aria-label={current?.title ?? 'Hazards'}
+                className="min-w-0"
+            >
                 <HazardTable
+                    title={current?.title ?? 'Hazards'}
+                    sub={range}
                     rows={hazards.data}
                     scoped={!!scopedSite}
                     onOpen={openHazard}
-                    onRowCtx={openRowCtx}
+                    actionsFor={hazardActions}
+                    footer={pager}
                 />
-                <div className="border-t border-border p-3">
-                    <LaravelPagination
-                        links={hazards.links}
-                        lastPage={hazards.last_page}
-                    />
-                </div>
-            </section>
+            </div>
 
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-
-            {detail ? (
-                <HazardDetailDialog
-                    key={detail.id}
-                    detail={detail}
-                    open
-                    onClose={closeDetail}
-                    initialSection={pendingSection}
-                    initialAction={pendingAction}
-                    intentKey={intent}
-                    registerHref={baseUrl}
+            {headerMenu.ctx && registerActions.length ? (
+                <EntityContextMenu
+                    x={headerMenu.ctx.x}
+                    y={headerMenu.ctx.y}
+                    icon={ShieldAlert}
+                    title={
+                        scopedSite
+                            ? `${scopedSite.name} hazards`
+                            : 'Homes & Sites Hazards'
+                    }
+                    items={registerActions}
+                    onClose={headerMenu.close}
                 />
             ) : null}
 
@@ -855,236 +651,342 @@ export function HazardRegister({
     );
 }
 
-function HeroSelect({
-    label,
-    value,
+/* ------------------------------------------------------------------ */
+/*  Header parts                                                       */
+/* ------------------------------------------------------------------ */
+
+/** The quieter register filters, plus every hazard view, in one place. */
+function MoreFilters({
+    active,
+    filters,
+    tab,
+    tabCounts,
+    severityOptions,
+    riskRatings,
+    assignees,
+    onTab,
     onChange,
-    children,
 }: {
-    label: string;
-    value: string | number | null;
-    onChange: (v: string | null) => void;
-    children: ReactNode;
+    active: number;
+    filters: HazardFilters;
+    tab: string;
+    tabCounts: Record<string, number>;
+    severityOptions: string[];
+    riskRatings: string[];
+    assignees: Array<{ id: number; name: string }>;
+    onTab: (tab: string) => void;
+    onChange: (next: Partial<HazardFilters>) => void;
 }) {
+    const [open, setOpen] = useState(false);
     return (
-        <label className="flex items-center gap-1.5 text-[11px] font-medium text-primary-foreground/70">
-            {label}
-            <select
-                value={value != null ? String(value) : ''}
-                onChange={(e) => onChange(e.target.value || null)}
-                className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 px-2 py-1.5 text-xs text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none [&>option]:text-foreground"
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <PageHeaderFilterButton
+                    icon={SlidersHorizontal}
+                    active={active > 0}
+                >
+                    {active > 0 ? `More filters · ${active}` : 'More filters'}
+                </PageHeaderFilterButton>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                className="grid w-80 max-w-[calc(100vw-2rem)] gap-3"
             >
-                {children}
-            </select>
-        </label>
+                <FilterField label="Hazard view">
+                    <SelectInput
+                        ariaLabel="Hazard view"
+                        placeholder="Hazard view"
+                        value={tab}
+                        onChange={(value) => {
+                            setOpen(false);
+                            onTab(value);
+                        }}
+                        options={VIEWS.map((view) => ({
+                            value: view.key,
+                            label: `${view.option} (${tabCounts[view.key] ?? 0})`,
+                        }))}
+                    />
+                </FilterField>
+                <FilterField label="Severity">
+                    <SelectInput
+                        ariaLabel="Severity"
+                        placeholder="All severities"
+                        value={filters.severity ?? 'all'}
+                        onChange={(value) =>
+                            onChange({ severity: value === 'all' ? null : value })
+                        }
+                        options={[
+                            { value: 'all', label: 'All severities' },
+                            ...severityOptions.map((value) => ({
+                                value,
+                                label: sentence(value),
+                            })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Risk">
+                    <SelectInput
+                        ariaLabel="Risk"
+                        placeholder="All risk ratings"
+                        value={filters.risk_rating ?? 'all'}
+                        onChange={(value) =>
+                            onChange({
+                                risk_rating: value === 'all' ? null : value,
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All risk ratings' },
+                            ...riskRatings.map((value) => ({
+                                value,
+                                label: sentence(value),
+                            })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Owner">
+                    <SelectInput
+                        ariaLabel="Owner"
+                        placeholder="All owners"
+                        value={
+                            filters.assignee_id
+                                ? String(filters.assignee_id)
+                                : 'all'
+                        }
+                        onChange={(value) =>
+                            onChange({
+                                assignee_id:
+                                    value === 'all' ? null : Number(value),
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All owners' },
+                            ...assignees.map((user) => ({
+                                value: String(user.id),
+                                label: user.name,
+                            })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Due">
+                    <SelectInput
+                        ariaLabel="Due"
+                        placeholder="Any due date"
+                        value={filters.due_state ?? 'any'}
+                        onChange={(value) =>
+                            onChange({
+                                due_state: value === 'any' ? null : value,
+                            })
+                        }
+                        options={[
+                            { value: 'any', label: 'Any due date' },
+                            { value: 'overdue', label: 'Overdue' },
+                            { value: 'due_soon', label: 'Due in 7 days' },
+                        ]}
+                    />
+                </FilterField>
+            </PopoverContent>
+        </Popover>
     );
 }
 
-function HazardTable({
-    rows,
-    scoped,
-    onOpen,
-    onRowCtx,
+function FilterField({
+    label,
+    children,
 }: {
-    rows: HazardRow[];
-    scoped: boolean;
-    onOpen: (id: number) => void;
-    onRowCtx: (e: ReactMouseEvent, h: HazardRow) => void;
+    label: string;
+    children: ReactNode;
 }) {
-    if (!rows.length) {
-        return (
-            <div className="px-4 py-16 text-center">
-                <ShieldAlert className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-                <p className="font-medium text-muted-foreground">
-                    No hazards here
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground/70">
-                    Nothing matches this tab and filters.
-                </p>
-            </div>
-        );
-    }
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full min-w-[1040px] text-sm">
-                <thead className="bg-muted/70">
-                    <tr className="text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-                        <th className="px-4 py-3">Ref / When</th>
-                        <th className="px-4 py-3">Hazard</th>
-                        {!scoped ? <th className="px-4 py-3">Site</th> : null}
-                        <th className="px-4 py-3">Severity</th>
-                        <th className="px-4 py-3">Risk</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Flags</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {rows.map((h) => (
-                        <HazardRowView
-                            key={h.id}
-                            h={h}
-                            scoped={scoped}
-                            onOpen={onOpen}
-                            onRowCtx={onRowCtx}
-                        />
-                    ))}
-                </tbody>
-            </table>
+        <div className="grid gap-1.5">
+            <span className="text-caption font-semibold">{label}</span>
+            {children}
         </div>
     );
 }
 
-function HazardRowView({
-    h,
+/* ------------------------------------------------------------------ */
+/*  Hazard table                                                       */
+/* ------------------------------------------------------------------ */
+
+export function HazardTable({
+    title = 'Hazards',
+    sub,
+    rows,
     scoped,
     onOpen,
-    onRowCtx,
+    actionsFor,
+    footer,
 }: {
-    h: HazardRow;
+    title?: string;
+    sub?: ReactNode;
+    rows: HazardRow[];
     scoped: boolean;
     onOpen: (id: number) => void;
-    onRowCtx: (e: ReactMouseEvent, h: HazardRow) => void;
+    actionsFor: (row: HazardRow) => MenuItem[];
+    footer?: ReactNode;
 }) {
-    const when = fmtWhen(h.created_at);
-    const riskTone = (
-        h.risk_rating === 'extreme' || h.risk_rating === 'high'
-            ? 'critical'
-            : h.risk_rating === 'medium'
-              ? 'warning'
-              : 'success'
-    ) as 'critical' | 'warning' | 'success';
-    const SiteIcon = h.site_type === 'house' ? Home : Building2;
-    return (
-        <tr
-            onClick={() => onOpen(h.id)}
-            onContextMenu={(e) => onRowCtx(e, h)}
-            tabIndex={0}
-            aria-label={`Open hazard ${h.reference_number}`}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onOpen(h.id);
-                }
-            }}
-            className="cursor-pointer transition-colors hover:bg-muted/45 focus-visible:bg-muted/45 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-        >
-            <td className="px-4 py-3 align-top whitespace-nowrap">
-                <div
-                    className="text-xs font-bold text-foreground"
-                    title={when.title}
-                >
-                    {when.main}
-                </div>
-                <div className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
-                    {h.reference_number}
-                </div>
-            </td>
-            <td className="max-w-[300px] px-4 py-3 align-top">
-                <div className="flex items-start gap-2">
-                    <span
-                        className={`mt-1 h-2 w-2 shrink-0 rounded-full ${TONE_DOT[riskTone]}`}
-                    />
-                    <span className="min-w-0">
-                        <span className="block text-xs font-bold text-foreground">
-                            {hazardLabelOf(h)}
-                        </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+    const columns: RecordTableColumn<HazardRow>[] = [
+        {
+            key: 'logged',
+            label: 'Logged',
+            className: 'min-w-[11rem] max-w-[14rem]',
+            cell: (h) => (
+                <RecordIdentity
+                    title={
+                        h.created_at
+                            ? formatDateOnly(toDateInput(h.created_at))
+                            : 'Time not recorded'
+                    }
+                    sub={[
+                        h.created_at ? formatTime(h.created_at) : null,
+                        h.reference_number,
+                        h.due_date
+                            ? `Due ${formatDateOnly(h.due_date)}`
+                            : 'No due date',
+                    ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                />
+            ),
+        },
+        {
+            key: 'hazard',
+            label: 'Hazard',
+            className: 'min-w-[14rem] max-w-[22rem]',
+            cell: (h) => (
+                <RecordIdentity
+                    title={hazardLabelOf(h)}
+                    sub={
+                        <span className="line-clamp-2">
                             {h.description}
+                            {h.description ? ' · ' : ''}
+                            {h.assigned_to_name
+                                ? `Owner: ${h.assigned_to_name}`
+                                : 'Needs an owner'}
                         </span>
-                    </span>
-                </div>
-            </td>
-            {!scoped ? (
-                <td className="px-4 py-3 align-top">
-                    <div className="flex items-center gap-2">
-                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
-                            <SiteIcon className="h-3.5 w-3.5" />
-                        </span>
-                        <span className="min-w-0">
-                            <span className="block text-xs font-bold text-foreground">
-                                {h.site_name}
-                            </span>
-                            <span className="block text-[11px] text-muted-foreground">
-                                {siteTypeLabel(h.site_type)}
-                            </span>
-                        </span>
-                    </div>
-                </td>
-            ) : null}
-            <td className="px-4 py-3 align-top">
-                <SeverityChip severity={h.severity} />
-            </td>
-            <td className="px-4 py-3 align-top">
-                <RiskChip rating={h.risk_rating} suffix />
-            </td>
-            <td className="px-4 py-3 align-top">
-                <StatusChip status={h.status} />
-            </td>
-            <td className="px-4 py-3 align-top">
-                <div className="flex flex-wrap items-center gap-1.5">
-                    {h.flags.overdue ? (
-                        <FlagBadge
-                            icon={Flame}
-                            tone="critical"
-                            title="Past due date"
-                        >
-                            Overdue
-                        </FlagBadge>
-                    ) : h.flags.due_soon ? (
-                        <FlagBadge
-                            icon={Clock}
-                            tone="warning"
-                            title="Due within 7 days"
-                        >
-                            Due ≤7d
-                        </FlagBadge>
-                    ) : null}
-                    {h.flags.unassigned ? (
-                        <FlagBadge
-                            icon={UserPlus}
-                            tone="warning"
-                            title="No owner assigned"
-                        >
-                            Unassigned
-                        </FlagBadge>
-                    ) : null}
-                    {h.worksafe && h.status !== 'closed' ? (
-                        <FlagBadge
-                            icon={ShieldAlert}
-                            tone="critical"
-                            title="WorkSafe-notifiable"
-                        >
-                            WorkSafe
-                        </FlagBadge>
-                    ) : null}
-                    {h.flags.awaiting_closure ? (
-                        <FlagBadge
-                            icon={ShieldCheck}
-                            tone="info"
-                            title="Mitigated — awaiting closure"
-                        >
-                            Awaiting closure
-                        </FlagBadge>
-                    ) : null}
-                    {h.open_action_count > 0 ? (
-                        <FlagBadge
-                            icon={ListChecks}
-                            tone="info"
-                            title="Open corrective actions"
-                        >
-                            {h.open_action_count} action
-                        </FlagBadge>
-                    ) : null}
-                    {!h.flags.overdue &&
-                    !h.flags.due_soon &&
-                    !h.flags.unassigned &&
-                    !(h.worksafe && h.status !== 'closed') &&
-                    !h.flags.awaiting_closure &&
-                    h.open_action_count === 0 ? (
-                        <span className="text-xs text-muted-foreground">—</span>
-                    ) : null}
-                </div>
-            </td>
-        </tr>
+                    }
+                />
+            ),
+        },
+        ...(scoped
+            ? []
+            : ([
+                  {
+                      key: 'site',
+                      label: 'Site',
+                      nowrap: true,
+                      cell: (h) => {
+                          const SiteIcon = h.site_type === 'house' ? Home : Building2;
+                          return (
+                              <RecordIdentity
+                                  leading={<SiteIcon className="size-3.5" />}
+                                  title={h.site_name ?? 'Site not recorded'}
+                                  sub={siteTypeLabel(h.site_type) || undefined}
+                              />
+                          );
+                      },
+                  },
+              ] satisfies RecordTableColumn<HazardRow>[])),
+        {
+            key: 'severity',
+            label: 'Severity',
+            nowrap: true,
+            cell: (h) => <SeverityChip severity={h.severity} />,
+        },
+        {
+            key: 'risk',
+            label: 'Risk',
+            nowrap: true,
+            cell: (h) => <RiskChip rating={h.risk_rating} suffix />,
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (h) => <StatusChip status={h.status} />,
+        },
+        {
+            key: 'flags',
+            label: 'Flags',
+            cell: (h) => <HazardFlags h={h} />,
+        },
+    ];
+    return (
+        <RecordTable
+            title={title}
+            sub={sub}
+            ariaLabel="Hazards table"
+            rows={rows}
+            rowKey={(h) => h.id}
+            onOpen={(h) => onOpen(h.id)}
+            actionsFor={actionsFor}
+            menuTitle={(h) => `${h.reference_number} · ${hazardLabelOf(h)}`}
+            menuIcon={ShieldAlert}
+            columns={columns}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No hazards match this view and its filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
     );
+}
+
+/** The row's flags in the drawing's words; nothing to flag reads "—". */
+function HazardFlags({ h }: { h: HazardRow }) {
+    const flags: ReactNode[] = [];
+    if (h.flags.unassigned)
+        flags.push(
+            <StatusBadge key="owner" variant="warning" title="No owner assigned">
+                Needs an owner
+            </StatusBadge>,
+        );
+    if (h.flags.overdue)
+        flags.push(
+            <StatusBadge key="overdue" variant="critical" title="Past due date">
+                Overdue
+            </StatusBadge>,
+        );
+    else if (h.flags.due_soon)
+        flags.push(
+            <StatusBadge key="due" variant="warning" title="Due within 7 days">
+                Due within 7 days
+            </StatusBadge>,
+        );
+    if (h.worksafe && h.status !== 'closed')
+        flags.push(
+            <StatusBadge
+                key="critical"
+                variant="critical"
+                title="Extreme risk rating or critical severity; notification needs a separate decision"
+            >
+                Rated critical
+            </StatusBadge>,
+        );
+    if (h.flags.awaiting_closure)
+        flags.push(
+            <StatusBadge
+                key="close"
+                variant="info"
+                title="Mitigated — awaiting closure"
+            >
+                Ready to close
+            </StatusBadge>,
+        );
+    if (h.open_action_count > 0)
+        flags.push(
+            <StatusBadge
+                key="actions"
+                variant="info"
+                title="Open corrective actions"
+            >
+                {h.open_action_count === 1
+                    ? '1 open action'
+                    : `${h.open_action_count} open actions`}
+            </StatusBadge>,
+        );
+    if (!flags.length) return <span className="text-muted-foreground">—</span>;
+    return <div className="flex flex-wrap items-center gap-1.5">{flags}</div>;
 }

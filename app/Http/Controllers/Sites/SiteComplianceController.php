@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Domain\Hr\Services\HrEligibilityRuleSettings;
 use App\Enums\AssuranceStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -12,12 +13,17 @@ use App\Models\SiteComplianceCheck;
 use App\Models\SiteCoverageRequirement;
 use App\Models\SiteFeedback;
 use App\Models\SiteStaffRequirement;
+use App\Models\WorkforceEligibilityRecheck;
 use App\Services\Assurance\NzsAssuranceResolver;
 use App\Services\Assurance\SiteCertificationService;
+use App\Services\Eligibility\WorkforceEligibilitySources;
+use App\Services\Eligibility\WorkforceRequirementMapping;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class SiteComplianceController extends Controller
 {
@@ -253,70 +259,99 @@ class SiteComplianceController extends Controller
     // Staff Requirements
     public function storeStaffRequirement(Request $request, Site $site)
     {
+        $rootEntry = $this->beginStaffRequirementReceipt($request);
+        $actorId = (int) $request->user()?->id;
         $this->authorize('update', $site);
 
         $validated = $request->validate([
+            'request_id' => ['nullable', 'uuid'],
             'requirement_name' => 'required|string|max:255',
             'category' => 'required|string|in:mandatory,recommended,specialist',
             'description' => 'nullable|string',
             'certification_required' => 'boolean',
             'expiry_period_months' => 'nullable|integer|min:1',
+            'hr_compliance_requirement_id' => app(WorkforceRequirementMapping::class)->validationRules(),
+            'applicability_mode' => ['nullable', 'in:all_workers,minimum_staff'],
+            'minimum_qualified_staff' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
         ]);
 
-        DB::transaction(function () use ($site, $validated): void {
+        $result = DB::transaction(function () use ($site, $validated): array {
             $site = $this->lockedSite($site);
+            $validated = [...$validated, ...SiteStaffRequirement::applicabilityValues(
+                $validated, app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'],
+            )];
             $this->assertStaffRequirementIdentityAvailable($site, trim($validated['requirement_name']));
-            SiteStaffRequirement::create([
-                ...$validated,
-                'site_id' => $site->id,
-                'requirement_name' => trim($validated['requirement_name']),
-                'is_active' => true,
-            ]);
+            unset($validated['request_id']);
+
+            return $this->saveStaffRequirement($site, $validated);
         });
 
-        return redirect()->back()->with('success', 'Staff requirement added successfully.');
+        return $this->withStaffRequirementReceipt($request,
+            redirect()->back()->with('success', 'Staff requirement added successfully.'), $rootEntry, $actorId, $result);
     }
 
     public function updateStaffRequirement(Request $request, Site $site, SiteStaffRequirement $requirement)
     {
+        $rootEntry = $this->beginStaffRequirementReceipt($request);
+        $actorId = (int) $request->user()?->id;
         $this->authorize('update', $site);
 
         $validated = $request->validate([
+            'request_id' => ['nullable', 'uuid'],
             'requirement_name' => 'sometimes|required|string|max:255',
             'category' => 'sometimes|required|string|in:mandatory,recommended,specialist',
             'description' => 'nullable|string',
             'certification_required' => 'boolean',
             'expiry_period_months' => 'nullable|integer|min:1',
+            'hr_compliance_requirement_id' => app(WorkforceRequirementMapping::class)->validationRules(),
+            'applicability_mode' => ['nullable', 'in:all_workers,minimum_staff'],
+            'minimum_qualified_staff' => ['nullable', 'integer', 'min:1', 'max:4294967295'],
             'is_active' => 'boolean',
         ]);
 
-        DB::transaction(function () use ($site, $requirement, $validated): void {
+        $result = DB::transaction(function () use ($site, $requirement, $validated): array {
             $site = $this->lockedSite($site);
             $requirement = $this->lockedSiteRecord(SiteStaffRequirement::class, $site, $requirement->id);
+            $validated = [...$validated, ...SiteStaffRequirement::applicabilityValues(
+                $validated, app(HrEligibilityRuleSettings::class)->values()['house_qualification_approach'], $requirement,
+            )];
             if (array_key_exists('requirement_name', $validated)) {
                 $validated['requirement_name'] = trim($validated['requirement_name']);
-                $this->assertStaffRequirementIdentityAvailable(
-                    $site,
-                    $validated['requirement_name'],
-                    $requirement->id,
-                );
+                $this->assertStaffRequirementIdentityAvailable($site, $validated['requirement_name'], $requirement->id);
             }
-            $requirement->update($validated);
+            unset($validated['request_id']);
+
+            return $this->saveStaffRequirement($site, $validated, $requirement);
         });
 
-        return redirect()->back()->with('success', 'Staff requirement updated successfully.');
+        return $this->withStaffRequirementReceipt($request,
+            redirect()->back()->with('success', 'Staff requirement updated successfully.'), $rootEntry, $actorId, $result);
     }
 
     public function destroyStaffRequirement(Request $request, Site $site, SiteStaffRequirement $requirement)
     {
+        $rootEntry = $this->beginStaffRequirementReceipt($request);
+        $actorId = (int) $request->user()?->id;
         $this->authorize('update', $site);
+        $request->validate(['request_id' => ['nullable', 'uuid']]);
 
-        DB::transaction(function () use ($site, $requirement): void {
+        $result = DB::transaction(function () use ($site, $requirement): array {
             $site = $this->lockedSite($site);
-            $this->lockedSiteRecord(SiteStaffRequirement::class, $site, $requirement->id)->delete();
+            $row = $this->lockedSiteRecord(SiteStaffRequirement::class, $site, $requirement->id);
+            $id = (int) $row->id;
+            $values = $this->staffRequirementValues($row);
+            $prior = $this->staffRequirementIntent($id);
+            abort_unless($row->delete() === true && (int) $row->id === $id
+                && $this->staffRequirementValues($row) === $values
+                && ! SiteStaffRequirement::query()->whereKey($id)->lockForUpdate()->exists(), 409);
+            $refresh = $this->confirmStaffRequirementIntent($row, $prior, true);
+
+            return ['action' => 'deleted', 'site_id' => (int) $site->id, 'requirement_id' => $id,
+                'outcome' => 'deleted', 'changed' => true, 'values' => null, 'refresh' => $refresh];
         });
 
-        return redirect()->back()->with('success', 'Staff requirement removed successfully.');
+        return $this->withStaffRequirementReceipt($request,
+            redirect()->back()->with('success', 'Staff requirement removed successfully.'), $rootEntry, $actorId, $result);
     }
 
     public function storeCoverageRequirement(Request $request, Site $site)
@@ -545,6 +580,154 @@ class SiteComplianceController extends Controller
         });
 
         return redirect()->back()->with('success', 'Feedback status updated successfully.');
+    }
+
+    private function saveStaffRequirement(Site $site, array $data, ?SiteStaffRequirement $row = null): array
+    {
+        $creating = $row === null;
+        $row ??= new SiteStaffRequirement([
+            'description' => null, 'certification_required' => false, 'expiry_period_months' => null,
+            'hr_compliance_requirement_id' => null, 'applicability_mode' => null,
+            'minimum_qualified_staff' => null, 'is_active' => true,
+        ]);
+        $id = $creating ? null : (int) $row->id;
+        $before = $creating ? null : $this->staffRequirementValues($row);
+        $prior = $id ? $this->staffRequirementIntent($id) : null;
+        if (isset($data['hr_compliance_requirement_id'])) {
+            $data['hr_compliance_requirement_id'] = (int) $data['hr_compliance_requirement_id'];
+        }
+        $row->fill($data)->forceFill(['site_id' => (int) $site->id]);
+        if ($creating) {
+            $row->is_active = true;
+            $row->requirement_name = trim($row->requirement_name);
+        }
+        $intended = $this->staffRequirementValues($row);
+        $sourceFields = WorkforceEligibilitySources::definitions()[SiteStaffRequirement::class]['fields'];
+        $structural = $creating || $row->isDirty($sourceFields);
+        abort_unless($row->save() === true && $row->id > 0 && ($creating || (int) $row->id === $id), 409);
+        $stored = SiteStaffRequirement::query()->whereKey($row->id)->lockForUpdate()->firstOrFail();
+        abort_unless($this->staffRequirementValues($stored) === $intended, 409);
+        $refresh = $structural ? $this->confirmStaffRequirementIntent($stored, $prior)
+            : $this->unchangedStaffRequirementIntent((int) $stored->id, $prior);
+        $changed = $creating || $before !== $intended;
+
+        return ['action' => $creating ? 'created' : 'updated', 'site_id' => (int) $site->id,
+            'requirement_id' => (int) $stored->id, 'outcome' => $changed ? 'saved' : 'unchanged',
+            'changed' => $changed, 'values' => $intended, 'refresh' => $refresh];
+    }
+
+    /** Full normalized stored control values; omitted edit fields retain their exact value. */
+    private function staffRequirementValues(SiteStaffRequirement $row): array
+    {
+        return ['site_id' => (int) $row->site_id, 'requirement_name' => $row->requirement_name,
+            'category' => $row->category, 'description' => $row->description,
+            'certification_required' => (bool) $row->certification_required,
+            'expiry_period_months' => $row->expiry_period_months === null ? null : (int) $row->expiry_period_months,
+            'hr_compliance_requirement_id' => $row->hr_compliance_requirement_id === null ? null : (int) $row->hr_compliance_requirement_id,
+            'applicability_mode' => $row->applicability_mode,
+            'minimum_qualified_staff' => $row->minimum_qualified_staff === null ? null : (int) $row->minimum_qualified_staff,
+            'is_active' => (bool) $row->is_active];
+    }
+
+    private function staffRequirementIntent(int $id): ?array
+    {
+        $intent = WorkforceEligibilityRecheck::query()->where('source_type', 'site_staff_requirements')
+            ->where('source_id', $id)->lockForUpdate()->first();
+
+        if (! $intent) {
+            return null;
+        }
+
+        return [...$intent->only(['source_type', 'source_id', 'source_fingerprint', 'source_version',
+            'user_ids', 'site_ids', 'client_ids', 'shift_ids', 'all_assigned', 'status']),
+            'source_id' => (int) $intent->source_id];
+    }
+
+    private function confirmStaffRequirementIntent(SiteStaffRequirement $row, ?array $prior, bool $deleted = false): array
+    {
+        $description = app(WorkforceEligibilitySources::class)->describe($row, $deleted);
+        abort_unless($description !== null, 409);
+        $current = $this->staffRequirementIntent((int) $row->id);
+        $deduplicated = $prior && (int) $prior['source_version'] > 0
+            && $prior['source_fingerprint'] === $description['fingerprint'];
+        if ($deduplicated) {
+            $expected = $prior;
+        } else {
+            $empty = ['user_ids' => [], 'site_ids' => [], 'client_ids' => [], 'shift_ids' => [], 'all_assigned' => false];
+            $previous = $prior && in_array($prior['status'], ['pending', 'processing', 'failed'], true) ? $prior : $empty;
+            $expected = ['source_type' => $row->getTable(), 'source_id' => (int) $row->id,
+                'source_fingerprint' => $description['fingerprint'], 'source_version' => (int) ($prior['source_version'] ?? 0) + 1];
+            foreach (['user_ids', 'site_ids', 'client_ids', 'shift_ids'] as $field) {
+                $expected[$field] = collect([...($previous[$field] ?? []), ...($description['scope'][$field] ?? [])])
+                    ->map(fn ($value): int => (int) $value)->filter(fn (int $value): bool => $value > 0)->unique()->sort()->values()->all();
+            }
+            $expected['all_assigned'] = (bool) (($previous['all_assigned'] ?? false) || ($description['scope']['all_assigned'] ?? false));
+            $expected['status'] = 'pending';
+        }
+        abort_unless($current === $expected && in_array((int) $row->site_id, $current['site_ids'], true), 409);
+
+        return $this->staffRequirementRefreshProjection($row, $current);
+    }
+
+    private function unchangedStaffRequirementIntent(int $id, ?array $prior): ?array
+    {
+        abort_unless($this->staffRequirementIntent($id) === $prior, 409);
+
+        return null;
+    }
+
+    private function staffRequirementRefreshProjection(SiteStaffRequirement $row, array $intent): array
+    {
+        return ['source_type' => $row->getTable(), 'source_id' => (int) $row->id,
+            'source_fingerprint' => $intent['source_fingerprint'], 'source_version' => (int) $intent['source_version'],
+            'site_id' => (int) $row->site_id];
+    }
+
+    private function beginStaffRequirementReceipt(Request $request): bool
+    {
+        $request->session()->forget('house_qualification_result');
+
+        return $this->staffRequirementReceiptIsRoot(true);
+    }
+
+    private function staffRequirementReceiptIsRoot(bool $rootEntry): bool
+    {
+        if (! $rootEntry) {
+            return false;
+        }
+        try {
+            return DB::transactionLevel() === 0 && ! DB::connection()->getPdo()->inTransaction();
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function withStaffRequirementReceipt(Request $request, RedirectResponse $response, bool $rootEntry, int $actorId, array $result): RedirectResponse
+    {
+        if (! $this->staffRequirementReceiptIsRoot($rootEntry) || $actorId < 1 || $request->user()?->id !== $actorId) {
+            return $response;
+        }
+        try {
+            $result = $this->projectStaffRequirementResult(['version' => 1, 'scope' => 'house_requirement',
+                'request_id' => $request->input('request_id'), 'actor_id' => $actorId, ...$result,
+                'committed_at' => now()->utc()->format('Y-m-d\TH:i:s').'.000Z']);
+            if ($this->staffRequirementReceiptIsRoot($rootEntry) && $request->user()?->id === $actorId) {
+                $response->with('house_qualification_result', $result);
+            }
+        } catch (Throwable) {
+            try {
+                $request->session()->forget('house_qualification_result');
+            } catch (Throwable) {
+            }
+        }
+
+        return $response;
+    }
+
+    /** Separate only the post-commit wire projection from mandatory persistence. */
+    protected function projectStaffRequirementResult(array $result): array
+    {
+        return $result;
     }
 
     private function lockedSite(Site $site): Site

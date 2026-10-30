@@ -27,7 +27,8 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { careQualityStatusLabel } from '@/lib/governance-labels';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { RecordPicker } from '@/components/people-locations/record-picker';
 import { Activity, Info } from 'lucide-react';
 import { useState } from 'react';
 
@@ -57,6 +58,7 @@ type Props = {
     snapshots: Snapshot[];
     indicators: Indicator[];
     sourceHint: string;
+    medicationScope?: { site_id: number | null; sites: { id: number; name: string }[] };
 };
 
 const RANGE_OPTIONS = [
@@ -79,6 +81,7 @@ export default function ClinicalTrends({
     snapshots,
     indicators,
     sourceHint,
+    medicationScope,
 }: Props) {
     const [range, setRange] = useState('6');
 
@@ -167,7 +170,8 @@ export default function ClinicalTrends({
             }
             filters={
                 <>
-                    <ClinicalViewToggle value="trends" />
+                    <ClinicalViewToggle value="trends" siteId={medicationScope?.site_id} />
+                    {medicationScope && medicationScope.sites.length > 0 && <RecordPicker variant="header" label="Medication house" value={medicationScope.site_id ? String(medicationScope.site_id) : ''} options={[{ value: '', label: 'Medication: all permitted houses' }, ...medicationScope.sites.map((site) => ({ value: String(site.id), label: site.name }))]} onChange={(value) => router.get('/governance/clinical/trends', value ? { site_id: value } : {}, { preserveScroll: true })} />}
                     <PageHeaderFilterSelect
                         label="Range"
                         value={range}
@@ -236,7 +240,7 @@ export default function ClinicalTrends({
                                                         {indicator.name}
                                                     </div>
                                                     <div className="text-caption">
-                                                        {targetLabel(
+                                                        {indicator.indicator_code === 'HCG-005' ? 'No RAG target' : indicator.indicator_code === 'HCG-001' && indicator.target_value === null ? 'Not configured' : targetLabel(
                                                             indicator.target_direction,
                                                             indicator.target_value,
                                                         )}

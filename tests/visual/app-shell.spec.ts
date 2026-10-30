@@ -83,6 +83,10 @@ async function stabiliseVolatileText(
 }
 
 test.beforeEach(async ({ page }) => {
+    // Match the test-only PHP clock without freezing timers or changing any
+    // acceptance journey outside this dedicated screenshot project.
+    if (process.env.VISUAL_FROZEN_NOW)
+        await page.clock.setFixedTime(new Date(process.env.VISUAL_FROZEN_NOW));
     await loginAs(page, email, password);
 });
 

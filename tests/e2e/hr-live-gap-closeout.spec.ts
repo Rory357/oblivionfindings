@@ -150,6 +150,8 @@ $bandIds = \\Illuminate\\Support\\Facades\\DB::table('hr_salary_bands')
     ->where('band_name', $marker.' Band')->pluck('id');
 $payrollRunIds = \\Illuminate\\Support\\Facades\\DB::table('hr_payroll_runs')
     ->where('notes', $marker.' payroll run')->pluck('id');
+$payrollRunItemIds = \\Illuminate\\Support\\Facades\\DB::table('hr_payroll_run_items')
+    ->whereIn('payroll_run_id', $payrollRunIds)->pluck('id');
 \\Illuminate\\Support\\Facades\\DB::table('hr_approval_chain_steps')->whereIn('approval_chain_id', $chainIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_approval_chains')->whereIn('id', $chainIds)->delete();
 \\Illuminate\\Support\\Facades\\DB::table('hr_salary_bands')->whereIn('id', $bandIds)->delete();
@@ -175,6 +177,7 @@ $auditableIds = [
     \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::class => $leaveChainIds,
     \\App\\Domain\\Hr\\Models\\HrSalaryBand::class => $bandIds,
     \\App\\Domain\\Hr\\Models\\HrPayrollRun::class => $payrollRunIds,
+    \\App\\Domain\\Hr\\Models\\HrPayrollRunItem::class => $payrollRunItemIds,
     \\App\\Domain\\Hr\\Models\\HrPayslip::class => $payslipIds,
     'staff' => $userIds,
 ];
@@ -410,45 +413,10 @@ $leaveTwo = \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()->create([
     'created_by' => $admin->id, 'updated_by' => $admin->id,
 ]);
 
-$run = \\App\\Domain\\Hr\\Models\\HrPayrollRun::query()->create([
-    'period_start' => now()->subWeeks(2)->startOfWeek()->toDateString(),
-    'period_end' => now()->subWeek()->endOfWeek()->toDateString(),
-    'status' => 'locked',
-    'locked_at' => now()->subDay(),
-    'locked_by' => $admin->id,
-    'total_hours' => 80,
-    'total_gross' => 2400,
-    'total_staff' => 1,
-    'notes' => $marker.' payroll run',
-    'created_by' => $admin->id,
-]);
-$payslip = \\App\\Domain\\Hr\\Models\\HrPayslip::query()->create([
-    'payroll_run_id' => $run->id,
-    'employee_profile_id' => $payrollProfile->id,
-    'user_id' => $payrollEmployee->id,
-    'pay_period_start' => $run->period_start,
-    'pay_period_end' => $run->period_end,
-    'payment_date' => now()->subDays(2)->toDateString(),
-    'gross_pay' => 2400,
-    'regular_hours' => 80,
-    'overtime_hours' => 0,
-    'hourly_rate' => 30,
-    'paye' => 480,
-    'acc_levy' => 34,
-    'kiwisaver_employee' => 72,
-    'kiwisaver_employer' => 72,
-    'esct' => 12,
-    'student_loan' => 0,
-    'holiday_pay' => 0,
-    'total_deductions' => 586,
-    'net_pay' => 1814,
-    'allowances' => [],
-    'other_deductions' => [],
-    'tax_code' => 'M',
-    'kiwisaver_rate' => 3,
-    'status' => 'final',
-    'created_by' => $admin->id,
-]);
+$payroll = app(\\Database\\Seeders\\HrLiveGapCloseoutPayrollSeeder::class)
+    ->seedPayroll($marker, $admin, $payrollProfile);
+$run = $payroll['run'];
+$payslip = $payroll['payslip'];
 
 \\App\\Models\\AuditLog::query()->create([
     'user_id' => null,
@@ -1227,10 +1195,11 @@ echo \\App\\Domain\\Hr\\Models\\HrLeaveApprovalChain::query()
             'aria-selected',
             'true',
         );
-        await page.getByRole('button', { name: 'Calendar view' }).click();
-        await expect(
-            page.getByRole('button', { name: 'Calendar view' }),
-        ).toBeVisible();
+        const calendarLayout = page
+            .getByRole('radiogroup', { name: 'Layout', exact: true })
+            .getByRole('radio', { name: 'Calendar', exact: true });
+        await calendarLayout.click();
+        await expect(calendarLayout).toHaveAttribute('aria-checked', 'true');
 
         expectNoConsoleErrors(consoleErrors);
         expect(failedTargetRequests).toEqual([]);

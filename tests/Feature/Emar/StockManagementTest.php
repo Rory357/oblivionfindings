@@ -12,12 +12,14 @@ use App\Models\ClientMedicationStock;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationIdempotencyResult;
 use App\Models\MedicationPharmacyOrder;
+use App\Models\MedicationScheduledStockCount;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Support\Medication\MedicationStockQuantity;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -91,7 +93,10 @@ class StockManagementTest extends TestCase
                 ->has('stockItems', 1)
                 ->where('stockItems.0.on_hand', 12)
                 ->has('controlledRegister', 1)
-                ->where('controlledRegister.0.register_balance', 12) // falls back to on-hand when no balance check
+                ->where('controlledRegister.0.register_balance', null)
+                ->where('controlledRegister.0.on_hand', 12)
+                ->where('controlledRegister.0.last_check_at', null)
+                ->where('controlledRegister.0.last_check_witness', null)
                 ->has('pharmacyOrders', 1)
                 ->where('pharmacyOrders.0.medication_id', $med->id)
                 ->where('pharmacyOrders.0.controlled', true)
@@ -832,6 +837,165 @@ class StockManagementTest extends TestCase
             );
     }
 
+    // ── EM-10: deliveries never blank batch/expiry; earliest expiry kept ────
+
+    public function test_two_deliveries_keep_the_earliest_expiry_on_hand(): void
+    {
+        ['user' => $user, 'client' => $client, 'med' => $med, 'stock' => $stock] = $this->seedStock();
+        $stock->forceFill(['on_hand' => 0])->save();
+
+        $this->deliver($user, $this->dispensedOrder($user, $client, $med, 'LOT-JUN', '2027-06-30'), '10');
+        $stock->refresh();
+        $this->assertSame(['LOT-JUN', '2027-06-30'], [$stock->batch_number, $stock->expiry_date?->toDateString()]);
+
+        // A later-expiring lot arrives while the June lot is still on hand.
+        $this->deliver($user, $this->dispensedOrder($user, $client, $med, 'LOT-JAN', '2028-01-31'), '5');
+        $stock->refresh();
+        $this->assertSame(['LOT-JUN', '2027-06-30'], [$stock->batch_number, $stock->expiry_date?->toDateString()]);
+        $this->assertSame('15.00', (string) $stock->on_hand);
+
+        // An earlier-expiring lot now expires first.
+        $this->deliver($user, $this->dispensedOrder($user, $client, $med, 'LOT-MAR', '2027-03-31'), '5');
+        $stock->refresh();
+        $this->assertSame(['LOT-MAR', '2027-03-31'], [$stock->batch_number, $stock->expiry_date?->toDateString()]);
+    }
+
+    public function test_a_delivery_without_a_batch_keeps_the_existing_batch_and_expiry(): void
+    {
+        ['user' => $user, 'client' => $client, 'med' => $med, 'stock' => $stock] = $this->seedStock();
+        $stock->forceFill(['batch_number' => 'LOT-ON-HAND', 'expiry_date' => '2027-06-30'])->save();
+
+        // One-click "dispensed" no longer blanks a batch the order already carries.
+        $confirmed = MedicationPharmacyOrder::create([
+            'client_id' => $client->id,
+            'client_medication_id' => $med->id,
+            'pharmacy_name' => 'Local Pharmacy',
+            'quantity_ordered' => 28,
+            'status' => 'confirmed',
+            'ordered_by' => $user->id,
+            'batch_number' => 'ORDER-LOT',
+            'batch_expiry' => '2027-09-30',
+        ]);
+        $this->actingAs($user)
+            ->post(route('emar.pharmacy_orders.advance', $confirmed), ['expected_status' => 'confirmed'])
+            ->assertSessionHasNoErrors();
+        $confirmed->refresh();
+        $this->assertSame('dispensed', $confirmed->status);
+        $this->assertSame(['ORDER-LOT', '2027-09-30'], [$confirmed->batch_number, $confirmed->batch_expiry?->toDateString()]);
+
+        // An order with no batch or expiry at all leaves the stock row's alone.
+        $this->deliver($user, $this->dispensedOrder($user, $client, $med, null, null), '28');
+        $stock->refresh();
+        $this->assertSame(['LOT-ON-HAND', '2027-06-30'], [$stock->batch_number, $stock->expiry_date?->toDateString()]);
+        $this->assertSame('40.00', (string) $stock->on_hand);
+    }
+
+    public function test_a_delivery_requires_the_quantity_actually_received(): void
+    {
+        ['user' => $user, 'client' => $client, 'med' => $med, 'stock' => $stock] = $this->seedStock();
+        $order = $this->dispensedOrder($user, $client, $med, 'LOT-1', '2027-06-30');
+
+        $this->actingAs($user)
+            ->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.advance', $order), ['expected_status' => 'dispensed'])
+            ->assertSessionHasErrors('quantity_received');
+
+        $this->assertSame('dispensed', $order->refresh()->status);
+        $this->assertSame('12.00', (string) $stock->refresh()->on_hand);
+    }
+
+    public function test_a_controlled_delivery_keeps_the_earlier_batch_and_expiry(): void
+    {
+        $context = $this->controlledDeliveryContext();
+        $earlier = now()->addMonths(3)->toDateString();
+        $context['stock']->forceFill(['batch_number' => 'CD-ON-HAND', 'expiry_date' => $earlier])->save();
+
+        $this->actingAs($context['user'])
+            ->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.controlled_delivery', $context['order']), $context['payload'])
+            ->assertSessionHasNoErrors();
+
+        $stock = $context['stock']->refresh();
+        $this->assertSame('12.50', (string) $stock->on_hand);
+        $this->assertSame(['CD-ON-HAND', $earlier], [$stock->batch_number, $stock->expiry_date?->toDateString()]);
+        // The register entry still records the lot that was delivered.
+        $this->assertSame('CD-LOT-01', ClientControlledDrugEntry::query()->sole()->batch_number);
+    }
+
+    public function test_controlled_batch_and_expiry_are_not_edited_outside_the_register(): void
+    {
+        ['user' => $user, 'stock' => $stock] = $this->seedStock(true);
+        $stock->forceFill(['batch_number' => 'CD-LOT', 'expiry_date' => '2027-06-30'])->save();
+
+        $this->actingAs($user)
+            ->from('/emar/stock')
+            ->patch(route('emar.stock.update', $stock), [
+                'batch_number' => 'EDITED',
+                'expiry_date' => '2029-01-01',
+            ])
+            ->assertSessionHasErrors(['batch_number', 'expiry_date']);
+        $stock->refresh();
+        $this->assertSame(['CD-LOT', '2027-06-30'], [$stock->batch_number, $stock->expiry_date?->toDateString()]);
+
+        // The edit dialog resends unchanged values alongside real edits.
+        $this->actingAs($user)
+            ->from('/emar/stock')
+            ->patch(route('emar.stock.update', $stock), [
+                'reorder_level' => 9,
+                'batch_number' => 'CD-LOT',
+                'expiry_date' => '2027-06-30',
+            ])
+            ->assertSessionHasNoErrors();
+        $this->assertSame(9, (int) $stock->refresh()->reorder_level);
+    }
+
+    public function test_a_matching_count_is_not_a_discrepancy(): void
+    {
+        ['user' => $user, 'client' => $client, 'med' => $med] = $this->seedStock();
+        foreach (['12', '11'] as $actual) {
+            MedicationScheduledStockCount::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $med->id,
+                'scheduled_date' => today(),
+                'status' => 'pending',
+                'expected_quantity' => '12.00',
+            ])->complete($actual, null, $user->id);
+        }
+
+        $counts = collect(
+            $this->actingAs($user)->getJson(route('emar.medications.detail', $med))->assertOk()->json('movements'),
+        )->where('type', 'count');
+
+        $this->assertSame('counted', $counts->first(fn ($c) => str_starts_with($c['label'], 'Counted 12'))['status']);
+        $this->assertSame('discrepancy', $counts->first(fn ($c) => str_starts_with($c['label'], 'Counted 11'))['status']);
+    }
+
+    private function dispensedOrder(User $user, Client $client, ClientMedication $med, ?string $batch, ?string $expiry): MedicationPharmacyOrder
+    {
+        return MedicationPharmacyOrder::create([
+            'client_id' => $client->id,
+            'client_medication_id' => $med->id,
+            'pharmacy_name' => 'Local Pharmacy',
+            'quantity_ordered' => 28,
+            'status' => 'dispensed',
+            'ordered_by' => $user->id,
+            'batch_number' => $batch,
+            'batch_expiry' => $expiry,
+        ]);
+    }
+
+    private function deliver(User $user, MedicationPharmacyOrder $order, string $quantity): void
+    {
+        $this->actingAs($user)
+            ->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.advance', $order), [
+                'expected_status' => 'dispensed',
+                'quantity_received' => $quantity,
+            ])
+            ->assertSessionHasNoErrors();
+        $this->assertSame('delivered', $order->refresh()->status);
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create(['role' => $roleName, 'approved_at' => now()]);
@@ -876,6 +1040,19 @@ class StockManagementTest extends TestCase
     {
         $context = $this->seedStock(true);
         $this->grantPermissions($context['user'], ['medications.controlled.record']);
+        // The receipt and every durable retry require the recorder at this house.
+        Shift::factory()->create([
+            'client_id' => $context['client']->id,
+            'site_id' => $context['site']->id,
+            'service_context_id' => $context['client']->service_context_id,
+            'user_id' => $context['user']->id,
+            'starts_at' => now()->subHour()->utc(),
+            'ends_at' => now()->addHour()->utc(),
+            'actual_starts_at' => now()->subHour()->utc(),
+            'actual_ends_at' => null,
+            'status' => 'in_progress',
+            'created_by' => $context['user']->id,
+        ]);
         $witness = $this->makeRoleUser('support_worker');
         $witness->forceFill(['password' => Hash::make('password')])->save();
         $this->grantPermissions($witness, ['medications.controlled.witness']);
@@ -897,6 +1074,9 @@ class StockManagementTest extends TestCase
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_witness_controlled' => true,
+            'controlled_drugs' => true,
+            'restricted' => false,
+            'not_seen_areas' => [],
         ]);
         Shift::factory()->create([
             'client_id' => $context['client']->id,
@@ -925,7 +1105,7 @@ class StockManagementTest extends TestCase
             'on_hand_before' => '12.00',
             'on_hand_after' => '12.50',
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'delivery_notes' => 'Sealed pack checked against the order.',
             'client_request_uuid' => '13410594-34f1-4650-b5b7-e99038437aad',
             'queued_offline' => false,
@@ -955,5 +1135,35 @@ class StockManagementTest extends TestCase
         }
 
         $this->assertDatabaseMissing('audit_logs', ['action' => $action]);
+    }
+
+    /** EA-092 (Lane C2): one controlled receipt writer, with the register's own audit and the event chain. */
+    public function test_controlled_pharmacy_delivery_writes_through_the_canonical_register_receipt(): void
+    {
+        $context = $this->controlledDeliveryContext();
+
+        $this->actingAs($context['user'])->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.controlled_delivery', $context['order']), $context['payload'])
+            ->assertSessionHasNoErrors();
+
+        $entry = ClientControlledDrugEntry::query()->sole();
+        $this->assertDatabaseHas('audit_logs', ['action' => 'medications.controlled.entry.record', 'auditable_id' => $entry->id]);
+        $event = \App\Models\MedicationEvent::query()->where('kind', 'stock.receive')->where('controlled', true)->sole();
+        $this->assertSame($context['payload']['client_request_uuid'], $event->facts['request_uuid'] ?? null);
+        $this->assertSame($entry->id, $event->facts['entry_id'] ?? null);
+    }
+
+    /** EA-073 (Lane C2): a held medicine's controlled delivery is still entered in the register. */
+    public function test_a_held_controlled_medicines_pharmacy_delivery_is_still_received(): void
+    {
+        $context = $this->controlledDeliveryContext();
+        $context['med']->forceFill(['state' => 'paused', 'paused_at' => now(), 'active' => false])->saveQuietly();
+
+        $this->actingAs($context['user'])->from('/emar/stock')
+            ->post(route('emar.pharmacy_orders.controlled_delivery', $context['order']), $context['payload'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('12.50', (string) $context['stock']->refresh()->on_hand);
+        $this->assertSame(1, ClientControlledDrugEntry::query()->where('entry_type', 'receipt')->count());
     }
 }

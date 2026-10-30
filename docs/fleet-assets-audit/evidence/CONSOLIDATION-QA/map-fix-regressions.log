@@ -1,0 +1,30 @@
+
+  ................................⨯............................................
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Architecture\ItSecuritySingleTenantBoundaryTest > it keeps active IT Security Devices and Monitorin…   
+  Failed asserting that two arrays are identical.
+--- Expected
++++ Actual
+@@ @@
+-Array &0 []
++Array &0 [
++    0 => 'tests/Feature/SecurityDevices/ConsolidatedIntegrationHistoryTest.php|legacy_storage_read|1|4454eb3b1ee0046d',
++]
+
+  at tests\Architecture\ItSecuritySingleTenantBoundaryTest.php:7
+      3▕ it('keeps active IT Security Devices and Monitoring partition behavior at absolute zero', function () {
+      4▕     $root = str_replace('\\', '/', dirname(__DIR__, 2));
+      5▕     $actual = itSecurityTenantDebtSnapshot($root);
+      6▕ 
+  ➜   7▕     expect($actual)->toBe([])
+      8▕         ->and(itSecurityApprovedTenantDebt())->toBe([]);
+      9▕ });
+     10▕ 
+     11▕ it('keeps the Fleet dashboard on canonical Site and Security Devices projections', function () {
+
+  1   tests\Architecture\ItSecuritySingleTenantBoundaryTest.php:7
+
+
+  Tests:    1 failed, 76 passed (1216 assertions)
+  Duration: 501.18s
+

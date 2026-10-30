@@ -120,6 +120,7 @@ class CollectorRecoveryInterleavingTest extends CommittedDatabaseTestCase
     public function test_recovery_locks_parent_before_attempt_and_a_late_result_preserves_its_outcome(): void
     {
         [$request, $attempt, $collector, $payload, $at] = $this->fixture();
+        Queue::fake(); // Observe recovery and the late result after the signed fixtures.
         $lockQueries = [];
         $capture = true;
         DB::listen(function (QueryExecuted $query) use (&$lockQueries, &$capture): void {

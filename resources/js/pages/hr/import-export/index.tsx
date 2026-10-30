@@ -272,7 +272,12 @@ function ImportWizard({
                             >
                                 blank template
                             </a>{' '}
-                            — it has every supported header pre-filled.
+                            — it has every supported header pre-filled.{' '}
+                            <span className="font-medium">email</span> is the
+                            sign-in address.{' '}
+                            <span className="font-medium">work_email</span> is
+                            optional: leave the column out to keep existing
+                            work emails, or leave a cell empty for none.
                         </div>
                     </div>
                     <div className="mt-4 rounded-xl border border-border p-4">

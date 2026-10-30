@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import AppLayout from '@/layouts/app-layout';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -88,6 +89,8 @@ type RosterRow = {
 };
 
 type TrackingData = {
+    version: string;
+    can_confirm: boolean;
     id: number;
     title: string;
     priority: Priority;
@@ -227,6 +230,7 @@ function fmtDate(value?: string | null): string {
     return Number.isNaN(d.getTime())
         ? value
         : d.toLocaleDateString('en-NZ', {
+              timeZone: WORKER_TIMEZONE,
               day: '2-digit',
               month: 'short',
               year: 'numeric',
@@ -239,6 +243,7 @@ function fmtDateTime(value?: string | null): string {
     return Number.isNaN(d.getTime())
         ? value
         : d.toLocaleString('en-NZ', {
+              timeZone: WORKER_TIMEZONE,
               day: '2-digit',
               month: 'short',
               hour: '2-digit',
@@ -268,6 +273,13 @@ export default function AnnouncementsIndex(props: Props) {
         initial: AnnouncementWizardInitial;
     } | null>(null);
     const searchRef = useRef<HTMLInputElement>(null);
+    const editorRequest = useRef(0);
+    useEffect(
+        () => () => {
+            editorRequest.current += 1;
+        },
+        [],
+    );
     const { open: openCtx, element: ctxElement } = useAnnouncementContextMenu();
     const [defaultTab, setDefaultTab] = useState<string>(
         () =>
@@ -314,15 +326,36 @@ export default function AnnouncementsIndex(props: Props) {
     };
 
     const openComposer = () => {
+        editorRequest.current += 1;
         setEditing(null);
         setWizardOpen(true);
     };
 
-    const openEditor = (
+    const openEditor = async (
         card: { id: number } & Partial<AnnouncementWizardInitial>,
     ) => {
-        setEditing({ id: card.id, initial: card });
-        setWizardOpen(true);
+        const requestId = ++editorRequest.current;
+        try {
+            const response = await fetch(
+                `/hr/announcements/${card.id}/edit-data`,
+                { headers: { Accept: 'application/json' } },
+            );
+            if (!response.ok)
+                throw new Error(
+                    'This announcement could not be opened. Refresh the list and try again.',
+                );
+            const initial: AnnouncementWizardInitial = await response.json();
+            if (requestId !== editorRequest.current) return;
+            setEditing({ id: card.id, initial });
+            setWizardOpen(true);
+        } catch (error) {
+            if (requestId === editorRequest.current)
+                toast.error(
+                    error instanceof Error
+                        ? error.message
+                        : 'This announcement could not be opened.',
+                );
+        }
     };
 
     // Keyboard: / focuses search, n opens composer.
@@ -426,6 +459,7 @@ export default function AnnouncementsIndex(props: Props) {
                                             {new Date().toLocaleDateString(
                                                 'en-NZ',
                                                 {
+                                                    timeZone: WORKER_TIMEZONE,
                                                     weekday: 'long',
                                                     day: 'numeric',
                                                     month: 'long',
@@ -702,7 +736,7 @@ export default function AnnouncementsIndex(props: Props) {
 
             {ctxElement}
 
-            {can.manage && (
+            {can.manage && wizardOpen && (
                 <AnnouncementWizard
                     open={wizardOpen}
                     onClose={() => setWizardOpen(false)}
@@ -986,7 +1020,7 @@ function ListPanel(props: ListPanelProps) {
                 {can.manage && (
                     <button
                         onClick={openComposer}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-4 text-[12.5px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                     >
                         <Plus className="h-4 w-4" /> New
                     </button>
@@ -1092,7 +1126,7 @@ function ListPanel(props: ListPanelProps) {
                                                             ? 'Deselect'
                                                             : 'Select'
                                                     }
-                                                    className={`grid h-4 w-4 place-items-center rounded border ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+                                                    className={`grid h-4 w-4 place-items-center rounded border ${sel ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
                                                 >
                                                     {sel && (
                                                         <CheckCheck className="h-2.5 w-2.5" />
@@ -1184,7 +1218,7 @@ function ListPanel(props: ListPanelProps) {
                                     <button
                                         onClick={() => toggleSelect(a.id)}
                                         aria-label={sel ? 'Deselect' : 'Select'}
-                                        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${sel ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card'}`}
+                                        className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-md border ${sel ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border bg-card'}`}
                                     >
                                         {sel && (
                                             <CheckCheck className="h-3 w-3" />
@@ -1513,7 +1547,7 @@ function TrackingPanel(
                                             'Reminders sent',
                                         )
                                     }
-                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 text-[12.5px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                 >
                                     <BellRing className="h-4 w-4" /> Remind
                                     outstanding
@@ -1633,7 +1667,10 @@ function TrackingPanel(
                                                 onSelect: () =>
                                                     post(
                                                         `/hr/announcements/${t.id}/acknowledge-for`,
-                                                        { user_id: p.id },
+                                                        {
+                                                            user_id: p.id,
+                                                            version: t.version,
+                                                        },
                                                         'Marked acknowledged',
                                                     ),
                                             },
@@ -1789,7 +1826,7 @@ function ScheduledPanel(
                     can.manage ? (
                         <button
                             onClick={openComposer}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-4 text-[12.5px] font-semibold text-primary-foreground hover:bg-primary/90"
+                            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-fill px-4 text-[12.5px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                         >
                             <Plus className="h-4 w-4" /> New announcement
                         </button>
@@ -1806,7 +1843,7 @@ function ScheduledPanel(
                 {can.manage && (
                     <button
                         onClick={openComposer}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-fill px-3 text-xs font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                     >
                         <Plus className="h-4 w-4" /> New draft
                     </button>
@@ -1907,7 +1944,7 @@ function ScheduledPanel(
                                                         'Published',
                                                     )
                                                 }
-                                                className="rounded-lg bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90"
+                                                className="rounded-lg bg-primary-fill px-2.5 py-1 text-[11px] font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                             >
                                                 Publish now
                                             </button>

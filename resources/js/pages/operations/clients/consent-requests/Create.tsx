@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { workerTimeOffsets } from '@/lib/datetime';
 import { Head, useForm } from '@inertiajs/react';
 import { Send, ShieldAlert } from 'lucide-react';
 import { FormEvent } from 'react';
@@ -87,6 +88,7 @@ export default function ConsentRequestsCreate({
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (hasUnresolvedTime) return;
         post(`/operations/clients/${client.id}/consent-requests`);
     };
 
@@ -94,6 +96,11 @@ export default function ConsentRequestsCreate({
     const requiresDecisionEvidence = isSubstituteRelationship(
         data.recipient_relationship,
     );
+    const hasUnresolvedTime =
+        requiresDecisionEvidence &&
+        [data.capacity_assessed_at, data.capacity_assessment_expires_at].some(
+            (value) => Boolean(value) && !isResolvedNzTime(value),
+        );
 
     return (
         <AppLayout>
@@ -434,58 +441,36 @@ export default function ConsentRequestsCreate({
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="capacity_assessed_at">
-                                            Assessed at
-                                        </Label>
-                                        <Input
-                                            id="capacity_assessed_at"
-                                            data-test="capacity-assessed-at-input"
-                                            type="datetime-local"
-                                            required
-                                            value={data.capacity_assessed_at}
-                                            onChange={(e) =>
-                                                setData(
-                                                    'capacity_assessed_at',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        {errors.capacity_assessed_at && (
-                                            <Err
-                                                msg={
-                                                    errors.capacity_assessed_at
-                                                }
-                                            />
-                                        )}
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="capacity_assessment_expires_at">
-                                            Assessment expires at
-                                        </Label>
-                                        <Input
-                                            id="capacity_assessment_expires_at"
-                                            data-test="capacity-expires-at-input"
-                                            type="datetime-local"
-                                            required
-                                            value={
-                                                data.capacity_assessment_expires_at
-                                            }
-                                            onChange={(e) =>
-                                                setData(
-                                                    'capacity_assessment_expires_at',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        {errors.capacity_assessment_expires_at && (
-                                            <Err
-                                                msg={
-                                                    errors.capacity_assessment_expires_at
-                                                }
-                                            />
-                                        )}
-                                    </div>
+                                    <NzEvidenceTime
+                                        id="capacity_assessed_at"
+                                        testId="capacity-assessed-at-input"
+                                        label="Assessed at"
+                                        value={data.capacity_assessed_at}
+                                        onChange={(value) =>
+                                            setData(
+                                                'capacity_assessed_at',
+                                                value,
+                                            )
+                                        }
+                                        error={errors.capacity_assessed_at}
+                                    />
+                                    <NzEvidenceTime
+                                        id="capacity_assessment_expires_at"
+                                        testId="capacity-expires-at-input"
+                                        label="Assessment expires at"
+                                        value={
+                                            data.capacity_assessment_expires_at
+                                        }
+                                        onChange={(value) =>
+                                            setData(
+                                                'capacity_assessment_expires_at',
+                                                value,
+                                            )
+                                        }
+                                        error={
+                                            errors.capacity_assessment_expires_at
+                                        }
+                                    />
                                 </div>
 
                                 <div>
@@ -730,7 +715,9 @@ export default function ConsentRequestsCreate({
                         </Button>
                         <Button
                             type="submit"
-                            disabled={processing || noPortalUsers}
+                            disabled={
+                                processing || noPortalUsers || hasUnresolvedTime
+                            }
                             data-test="consent-request-submit"
                         >
                             <Send className="mr-2 h-4 w-4" />
@@ -740,6 +727,103 @@ export default function ConsentRequestsCreate({
                 </form>
             </PageShell>
         </AppLayout>
+    );
+}
+
+function isResolvedNzTime(value: string): boolean {
+    const offsets = workerTimeOffsets(value.slice(0, 16));
+    return (
+        offsets.length === 1 ||
+        (offsets.length > 1 && offsets.includes(value.slice(19)))
+    );
+}
+
+function NzEvidenceTime({
+    id,
+    testId,
+    label,
+    value,
+    onChange,
+    error,
+}: {
+    id: string;
+    testId: string;
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    error?: string;
+}) {
+    const local = value.slice(0, 16);
+    const offsets = workerTimeOffsets(local);
+    const skipped = Boolean(local) && offsets.length === 0;
+    const repeated = offsets.length > 1;
+    const message = skipped
+        ? 'This NZ clock time does not exist because daylight saving starts. Check the recorded time.'
+        : error;
+
+    return (
+        <div className="space-y-2">
+            <Label htmlFor={id}>{label} (NZ time)</Label>
+            <Input
+                id={id}
+                data-test={testId}
+                type="datetime-local"
+                required
+                value={local}
+                onChange={(event) => onChange(event.target.value)}
+                aria-describedby={`${id}-help${message ? ` ${id}-error` : ''}`}
+                aria-invalid={Boolean(message)}
+            />
+            <p id={`${id}-help`} className="text-xs text-muted-foreground">
+                Use the time recorded in New Zealand (Auckland).
+            </p>
+            {repeated && (
+                <div className="space-y-2">
+                    <Label htmlFor={`${id}-occurrence`}>
+                        {label}: which occurrence?
+                    </Label>
+                    <Select
+                        value={value.slice(19)}
+                        onValueChange={(offset) =>
+                            onChange(`${local}:00${offset}`)
+                        }
+                    >
+                        <SelectTrigger
+                            id={`${id}-occurrence`}
+                            aria-describedby={`${id}-repeat-help`}
+                        >
+                            <SelectValue placeholder="Choose which time was recorded" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {offsets.map((offset, index) => (
+                                <SelectItem key={offset} value={offset}>
+                                    {index === 0
+                                        ? 'First time — daylight time'
+                                        : 'Second time — standard time'}{' '}
+                                    (UTC{offset})
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <p
+                        id={`${id}-repeat-help`}
+                        className="text-xs text-muted-foreground"
+                    >
+                        The clock went back and this hour occurred twice. Check
+                        the source record before choosing.
+                    </p>
+                </div>
+            )}
+            {message && (
+                <p
+                    id={`${id}-error`}
+                    role="alert"
+                    className="text-xs text-status-critical"
+                >
+                    {message}
+                </p>
+            )}
+        </div>
     );
 }
 

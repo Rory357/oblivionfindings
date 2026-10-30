@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\Support\GovernanceTestHelpers;
 use Tests\TestCase;
 
@@ -389,6 +390,7 @@ class GovernanceNestedBindingIntegrityTest extends TestCase
 
     public function test_concurrent_adjustment_approval_replay_applies_one_line_effect_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $this->requireMySql();
         $admin = $this->createAdminUser();
         $budget = $this->createBudget($admin, ['status' => 'approved', 'total_budget' => 100]);
@@ -405,6 +407,7 @@ class GovernanceNestedBindingIntegrityTest extends TestCase
 
     public function test_concurrent_approve_and_reject_reach_one_terminal_decision_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $this->requireMySql();
         $admin = $this->createAdminUser();
         $budget = $this->createBudget($admin, ['status' => 'approved', 'total_budget' => 100]);

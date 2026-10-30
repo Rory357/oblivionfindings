@@ -121,6 +121,21 @@ class ClientControllerTest extends TestCase
     }
 
     /**
+     * Client access is Site-scoped: staff without an all-Sites permission
+     * reach a Client's Site only through a current HR profile.
+     */
+    private function placeAtTestSite(User $user): void
+    {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $user->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'is_active' => true,
+            'end_date' => null,
+        ]);
+    }
+
+    /**
      * Helper to build valid client creation data.
      */
     private function validClientData(array $overrides = []): array
@@ -474,6 +489,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
+        $this->placeAtTestSite($this->coordinator);
         $response = $this->actingAs($this->coordinator)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
@@ -510,6 +526,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
+        $this->placeAtTestSite($this->auditor);
         $response = $this->actingAs($this->auditor)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();
@@ -1009,6 +1026,7 @@ class ClientControllerTest extends TestCase
     {
         $client = Client::factory()->create();
 
+        $this->placeAtTestSite($this->coordinator);
         $response = $this->actingAs($this->coordinator)->get("/operations/clients/{$client->id}");
 
         $response->assertOk();

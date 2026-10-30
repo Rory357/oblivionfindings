@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "ignored": {
+    "docs/fleet-assets-audit/previews/PKG-06B/v9/app.js": true,
+    "docs/fleet-assets-audit/previews/PKG-06B/v9/profile.tsx": true,
+    "docs/fleet-assets-audit/evidence/PKG-06B/v8/qr-export-validation.cjs": true,
+    "resources/js/components/assets/profile/workspace.tsx": false,
+    "resources/js/components/assets/profile/custody-view.test.tsx": false,
+    "resources/js/components/files/file-preview-dialog.tsx": false,
+    "resources/js/components/fleet-assets/maintenance/date-picker.tsx": false,
+    "resources/js/pages/fleet-assets/assets/labels.tsx": false
+  }
+}

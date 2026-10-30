@@ -1,0 +1,84 @@
+[
+  {
+    "file": "AS-104-qr-DEMO.png",
+    "decodedTarget": "https://example.invalid/assets/qr/demo-as-104",
+    "pixels": [
+      980,
+      980
+    ]
+  },
+  {
+    "file": "AS-104-a4-1-labels-DEMO.pdf",
+    "pages": [
+      {
+        "page": 1,
+        "millimetres": [
+          210.0,
+          297.0
+        ],
+        "decodedCodes": 1,
+        "allMatch": true
+      }
+    ]
+  },
+  {
+    "file": "AS-104-a4-3-labels-DEMO.pdf",
+    "pages": [
+      {
+        "page": 1,
+        "millimetres": [
+          210.0,
+          297.0
+        ],
+        "decodedCodes": 1,
+        "allMatch": true
+      },
+      {
+        "page": 2,
+        "millimetres": [
+          210.0,
+          297.0
+        ],
+        "decodedCodes": 2,
+        "allMatch": true
+      }
+    ]
+  },
+  {
+    "file": "AS-104-single-2-labels-DEMO.pdf",
+    "pages": [
+      {
+        "page": 1,
+        "millimetres": [
+          80.0,
+          50.0
+        ],
+        "decodedCodes": 1,
+        "allMatch": true
+      },
+      {
+        "page": 2,
+        "millimetres": [
+          80.0,
+          50.0
+        ],
+        "decodedCodes": 1,
+        "allMatch": true
+      }
+    ]
+  },
+  {
+    "file": "AS-104-single-1-labels-DEMO.pdf",
+    "pages": [
+      {
+        "page": 1,
+        "millimetres": [
+          60.0,
+          40.0
+        ],
+        "decodedCodes": 1,
+        "allMatch": true
+      }
+    ]
+  }
+]

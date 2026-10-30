@@ -12,6 +12,7 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\WorkerComplianceExpiryNotification;
 use App\Domain\Hr\Services\HrComplianceReminderDeliveryService;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
@@ -202,6 +203,12 @@ test('renewals csv includes safe vetting rows for visible current Site staff onl
     $viewer->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'hr')->firstOrFail()->id,
     ]);
+    // This case exercises Site-scoped HR; the seeded central HR role also
+    // grants an explicit all-Sites capability, which is denied for this actor.
+    $allSitesPermission = Permission::query()->where('key', 'hr.employees.viewAllSites')->sole();
+    $viewer->permissionOverrides()->syncWithoutDetaching([$allSitesPermission->id => ['allowed' => false]]);
+    expect($viewer->canDo('hr.employees.viewAllSites'))->toBeFalse();
+
     $visible = applicationReminderStaff('Visible Vetting Renewal', $allowedSite);
     $hidden = applicationReminderStaff('Hidden Vetting Renewal', $hiddenSite);
     $ended = applicationReminderStaff(

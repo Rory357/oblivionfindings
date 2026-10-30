@@ -1,0 +1,38 @@
+/* Owned by BookingWizard so every entry point includes its portal styles. */
+.vehicle-approval-choice legend {
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+.vehicle-approval-choice label {
+    display: flex;
+    gap: 14px;
+    align-items: start;
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    cursor: pointer;
+}
+.vehicle-approval-choice label.selected {
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+.vehicle-approval-choice input {
+    width: 17px;
+    height: 17px;
+    accent-color: var(--primary);
+    margin-top: 2px;
+}
+.vehicle-approval-choice strong,
+.vehicle-approval-choice small {
+    display: block;
+}
+.vehicle-approval-choice small {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 5px;
+}
+.vehicle-approval-choice label:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}

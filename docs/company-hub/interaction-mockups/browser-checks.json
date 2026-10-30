@@ -1,0 +1,167 @@
+{
+  "views": [
+    {
+      "id": "1",
+      "title": "Give a shout-out"
+    },
+    {
+      "id": "2",
+      "title": "Read a shout-out"
+    },
+    {
+      "id": "3",
+      "title": "Celebrations"
+    },
+    {
+      "id": "4",
+      "title": "Conversation"
+    },
+    {
+      "id": "5",
+      "title": "A little time in the garden"
+    },
+    {
+      "id": "7",
+      "title": "An afternoon that brought us together"
+    },
+    {
+      "id": "8",
+      "title": "Share an idea"
+    },
+    {
+      "id": "9",
+      "title": "A shared welcome kit for new starters"
+    },
+    {
+      "id": "10",
+      "title": "Have your say"
+    },
+    {
+      "id": "14",
+      "title": "People"
+    },
+    {
+      "id": "11",
+      "title": "Visitor welcome guidance"
+    },
+    {
+      "id": "12",
+      "title": "A warm welcome, from day one"
+    },
+    {
+      "id": "16",
+      "title": "People & Culture"
+    },
+    {
+      "id": "17",
+      "title": "A warmer welcome for everyone"
+    },
+    {
+      "id": "18",
+      "title": "Staff services"
+    },
+    {
+      "id": "19",
+      "title": "Search the Hub"
+    },
+    {
+      "id": "36",
+      "title": "Resources"
+    },
+    {
+      "id": "37",
+      "title": "Company news"
+    },
+    {
+      "id": "15",
+      "title": "Edit your profile"
+    },
+    {
+      "id": "20",
+      "title": "Saved items and activity"
+    },
+    {
+      "id": "21",
+      "title": "Follow your interests"
+    },
+    {
+      "id": "22",
+      "title": "Notification preferences"
+    },
+    {
+      "id": "23",
+      "title": "Your shortcuts"
+    },
+    {
+      "id": "6",
+      "title": "Edit event"
+    },
+    {
+      "id": "13",
+      "title": "Report a correction"
+    },
+    {
+      "id": "24",
+      "title": "Create a page or story"
+    },
+    {
+      "id": "25",
+      "title": "Edit the page welcome"
+    },
+    {
+      "id": "26",
+      "title": "Add a content block"
+    },
+    {
+      "id": "27",
+      "title": "Page designer"
+    },
+    {
+      "id": "28",
+      "title": "Media library"
+    },
+    {
+      "id": "29",
+      "title": "Shared navigation"
+    },
+    {
+      "id": "30",
+      "title": "Review and publish"
+    },
+    {
+      "id": "31",
+      "title": "Version history"
+    },
+    {
+      "id": "32",
+      "title": "Drafts and recovery"
+    },
+    {
+      "id": "33",
+      "title": "Editorial planning"
+    },
+    {
+      "id": "34",
+      "title": "Hub insights"
+    },
+    {
+      "id": "35",
+      "title": "Preview interaction states"
+    }
+  ],
+  "errors": [],
+  "verified": [
+    "recognition people and team",
+    "live preview",
+    "send failure and retry preserves text",
+    "replies and reactions",
+    "37 family entry points",
+    "dialog bounds",
+    "staff creation permission state",
+    "RSVP/cancellation/waitlist",
+    "exact-version acknowledgement",
+    "draft discard/recovery preserves published state",
+    "keyboard focus remains in dialog"
+  ],
+  "note": "Local mockup behavior only; no production verification."
+}

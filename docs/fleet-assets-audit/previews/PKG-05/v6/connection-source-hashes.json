@@ -1,0 +1,37 @@
+{
+  "baseline": "4ea64c547ed85a5b7504e59599db351f6eba7deb",
+  "files": [
+    {
+      "path": "app/Models/FleetKeyLog.php",
+      "sha256": "ecc995fc12c4ebc8dce209f318fde1148572e0b7f39c8df41b647380a7e668a0"
+    },
+    {
+      "path": "app/Models/SiteRoom.php",
+      "sha256": "31cf8c659caf5d4f13f2898247101d3521582a3503359076983942f8651fdf0d"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/KeyController.php",
+      "sha256": "1092ffd3c6fb580fa7952e5bd9996dbb834ebf57aa1e01aa76f25da933214aef"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleBookingController.php",
+      "sha256": "5c9e355502347874aa98f926f47c06801fad753b91119541ed92be8c0719197f"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleTripHistoryController.php",
+      "sha256": "2f86d90c31af67a693b0e15f052ce4d9a10a02a741cf0d461dd11235b7b9ac21"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleTripHistoryService.php",
+      "sha256": "1a18aa56327ebddfa0cebd09a98a7b94363867fd2715083f705d5059ebf555bc"
+    },
+    {
+      "path": "resources/js/pages/sites/calendar/_parts.tsx",
+      "sha256": "7fa0e8b51312a0b7ca5d3678b215c84af4fb9f3ae3ee3a7421e9ddb5497cd32d"
+    },
+    {
+      "path": "resources/js/lib/calendar/recur.ts",
+      "sha256": "571894509c22f5e5d62764fd14dbbc6f2ef2b8188cc10469e7f5ca978afa33a3"
+    }
+  ]
+}

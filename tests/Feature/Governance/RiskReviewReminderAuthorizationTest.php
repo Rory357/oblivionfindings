@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
     $this->seed(GovernancePermissionsSeeder::class);
-    Carbon::setTestNow(Carbon::parse('2026-08-31 07:45:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-08-31 07:45:00', 'Pacific/Auckland')->utc());
 });
 
 afterEach(function (): void {

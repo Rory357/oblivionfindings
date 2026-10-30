@@ -20,7 +20,7 @@ const acknowledgementController = attendanceController.slice(
 );
 const wizard = readSource(
     'resources/js/pages/attendance/components/clock-out-wizard.tsx',
-);
+).replace(/\s+/g, ' ');
 
 describe('attendance clock-out governance contracts', () => {
     it('defers routine completion without manufacturing a handover waiver', () => {

@@ -447,7 +447,7 @@ function ActionBtn({
             className={cn(
                 'inline-flex h-9 items-center gap-2 rounded-[9px] px-3 text-[12.5px] font-bold transition-colors',
                 primary
-                    ? 'bg-primary-foreground text-primary hover:scale-[1.02]'
+                    ? 'bg-primary-foreground text-primary-strong hover:scale-[1.02]'
                     : 'border border-primary-foreground/[0.28] bg-primary-foreground/[0.12] text-primary-foreground hover:bg-primary-foreground/20',
             )}
         >

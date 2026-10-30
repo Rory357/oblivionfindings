@@ -1,0 +1,17 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+.                                                                   1 / 1 (100%)
+   PASS  Tests\Feature\FleetTelemetryIngestTest
+  ✓ geofence signal emitted when outside                                                                         0.76s
+
+  Tests:    1 passed (3 assertions)
+  Duration: 1.11s
+
+
+
+Time: 00:00.780, Memory: 70.00 MB
+
+OK (1 test, 3 assertions)

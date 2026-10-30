@@ -1,0 +1,190 @@
+{
+  "v6ManifestSha256": "5945331c6c3e8dac3ef05cbb80fc9b776cb09c2161249cf3a8f92edcc7572302",
+  "previousFiles": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/01-upload.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/02-upload-retry.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/03-work-draft.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/04-original-check.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/06-discard-prompt.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/07-edit-ownership.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/08-report-review.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/09-release-assignment.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/10-custody-loan.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/11-receipt-review.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/12-exception-retry-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/13-document-viewer-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/14-archive-retry-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/15-photo-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/16-retirement-blocked-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/17-context-handoff.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/18-profile-find.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/19-quarantined-history-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/20-borrower-departure.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/21-work-read-only-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/22-work-dark-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/23-recipient-error-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/24-report-choices-1600.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/QA-INVENTORY.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/REVIEW.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/browser-results.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/build-inputs.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/final-replace-1600.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/final-work-1600.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/fixtures/transfer-hoist-document-revision-with-a-long-descriptive-filename-for-layout-review.txt",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/scoped-types.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/server.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/source-references.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v6/v5-preservation.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/pages/PKG-06B-asset-profile-v6.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/app.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/app.js",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/asset-records.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/build.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/index.html",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/modal-ui.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/modal.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/profile.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/profile.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/revise-modals.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v6/serve.cjs",
+      "unchanged": true
+    }
+  ],
+  "allUnchanged": true
+}

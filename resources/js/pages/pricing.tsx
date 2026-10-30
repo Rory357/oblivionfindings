@@ -196,7 +196,7 @@ const Pricing: React.FC = () => {
                             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
                             <div className="pointer-events-none absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white/20 opacity-0 transition-all duration-700 group-hover:animate-shine" />
                             {plan.popular && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-sm font-medium text-primary-foreground">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 rounded-full bg-primary-fill px-4 py-1 text-sm font-medium text-primary-fill-foreground">
                                     Most popular
                                 </div>
                             )}
@@ -235,7 +235,7 @@ const Pricing: React.FC = () => {
                                     href={plan.ctaLink}
                                     className={`flex w-full items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-medium transition-all ${
                                         plan.popular
-                                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 hover:bg-primary/90'
+                                            ? 'bg-primary-fill text-primary-fill-foreground shadow-lg shadow-primary/25 hover:bg-primary-fill/90'
                                             : 'border border-border bg-background text-foreground hover:bg-muted'
                                     }`}
                                 >

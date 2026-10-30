@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { ageOnWorkerDay } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     Accessibility,
@@ -123,17 +124,6 @@ function formatDate(value?: string | null) {
     }
 }
 
-function calculateAge(dob?: string | null): number | null {
-    if (!dob) return null;
-    const birth = new Date(dob);
-    if (Number.isNaN(birth.getTime())) return null;
-    const now = new Date();
-    let age = now.getFullYear() - birth.getFullYear();
-    const m = now.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age -= 1;
-    return age;
-}
-
 function joinAddress(client: ClientPersonalDetailsClient): string {
     return [
         client.address_line_1,
@@ -207,7 +197,7 @@ export function PersonalDetailsTab({
     const name = [client.first_name, client.last_name]
         .filter(Boolean)
         .join(' ');
-    const age = calculateAge(client.date_of_birth);
+    const age = ageOnWorkerDay(client.date_of_birth);
     const address = joinAddress(client);
     const languages = (client.languages ?? []).filter(Boolean);
 

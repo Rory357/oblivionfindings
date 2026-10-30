@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import {
     CalendarRange,
@@ -11,6 +12,12 @@ import {
     Sparkles,
     UserCheck,
 } from 'lucide-react';
+import { useState } from 'react';
+import {
+    LEAVE_ACTION_LABEL,
+    LeaveActionDialog,
+    type LeaveAction,
+} from './leave-action-dialog';
 
 export type LeaveItem = {
     id: number;
@@ -25,6 +32,20 @@ export type LeaveItem = {
     approver?: string | null;
     approved_at?: string | null;
     approval_notes?: string | null;
+    version?: number;
+    medication_away_enabled?: boolean;
+    departed_at?: string | null;
+    returned_at?: string | null;
+    withdrawn_at?: string | null;
+    withdrawal_reason?: string | null;
+    allowed_actions?: LeaveAction[];
+    history?: {
+        action: string;
+        occurred_at: string;
+        actor_id: number;
+        version: number;
+        reason: string | null;
+    }[];
 };
 
 export type ExcursionItem = {
@@ -54,32 +75,8 @@ type LeaveExcursionsTabProps = {
     onPlanExcursion?: () => void;
 };
 
-function dateLabel(value?: string | null) {
-    if (!value) return '—';
-    try {
-        return new Intl.DateTimeFormat('en-NZ', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-        }).format(new Date(value));
-    } catch {
-        return value;
-    }
-}
-
-function dateTimeLabel(value?: string | null) {
-    if (!value) return '—';
-    try {
-        return new Intl.DateTimeFormat('en-NZ', {
-            day: 'numeric',
-            month: 'short',
-            hour: 'numeric',
-            minute: '2-digit',
-        }).format(new Date(value));
-    } catch {
-        return value;
-    }
-}
+const dateLabel = formatDateOnly;
+const dateTimeLabel = formatDateTime;
 
 function statusBadge(status?: string | null): string {
     const s = (status ?? '').toLowerCase();
@@ -93,12 +90,27 @@ function statusBadge(status?: string | null): string {
 }
 
 export function LeaveExcursionsTab({
+    clientId,
     leave = [],
     excursions = [],
     canManage = false,
     onRequestLeave,
     onPlanExcursion,
 }: LeaveExcursionsTabProps) {
+    const [selection, setSelection] = useState<{
+        item: LeaveItem;
+        clientId: number;
+        action: LeaveAction;
+    } | null>(null);
+    const selectedItem =
+        selection?.clientId === clientId && canManage
+            ? leave.find(
+                  (item) =>
+                      item.id === selection.item.id &&
+                      item.version === selection.item.version &&
+                      item.allowed_actions?.includes(selection.action),
+              )
+            : undefined;
     return (
         <div className="space-y-6" data-test="client-leave-excursions-tab">
             {/* eslint-disable-next-line no-restricted-syntax -- intro panel without full Card chrome. */}
@@ -183,6 +195,76 @@ export function LeaveExcursionsTab({
                                         </p>
                                     ) : null}
                                 </div>
+                                <div className="text-caption mt-3 space-y-1">
+                                    <p>
+                                        {item.departed_at
+                                            ? 'Actually left: ' +
+                                              formatDateTime(item.departed_at)
+                                            : 'Actual departure not recorded · planned dates do not mark medication Away.'}
+                                    </p>
+                                    {item.returned_at && (
+                                        <p>
+                                            Actually returned:{' '}
+                                            {formatDateTime(item.returned_at)}
+                                        </p>
+                                    )}
+                                    {item.withdrawn_at && (
+                                        <p>
+                                            Withdrawn:{' '}
+                                            {formatDateTime(item.withdrawn_at)}{' '}
+                                            · {item.withdrawal_reason}
+                                        </p>
+                                    )}
+                                </div>
+                                {canManage &&
+                                    !!item.allowed_actions?.length && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {item.allowed_actions.map(
+                                                (action) => (
+                                                    <Button
+                                                        key={action}
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setSelection({
+                                                                clientId,
+                                                                item,
+                                                                action,
+                                                            })
+                                                        }
+                                                    >
+                                                        {
+                                                            LEAVE_ACTION_LABEL[
+                                                                action
+                                                            ]
+                                                        }
+                                                    </Button>
+                                                ),
+                                            )}
+                                        </div>
+                                    )}
+                                {!!item.history?.length && (
+                                    <details className="text-caption mt-3">
+                                        <summary className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring">
+                                            Leave history
+                                        </summary>
+                                        <ul className="mt-2 space-y-1">
+                                            {item.history.map((event) => (
+                                                <li
+                                                    key={`${event.version}:${event.action}`}
+                                                >
+                                                    {event.action} ·{' '}
+                                                    {formatDateTime(
+                                                        event.occurred_at,
+                                                    )}
+                                                    {event.reason
+                                                        ? ' · ' + event.reason
+                                                        : ''}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </details>
+                                )}
                                 {item.support_required ? (
                                     <p className="mt-2 text-xs">
                                         <span className="font-medium">
@@ -316,6 +398,23 @@ export function LeaveExcursionsTab({
                     )}
                 </CardContent>
             </Card>
+            {selection && selectedItem && (
+                <LeaveActionDialog
+                    key={
+                        clientId +
+                        ':' +
+                        selectedItem.id +
+                        ':' +
+                        selectedItem.version +
+                        ':' +
+                        selection.action
+                    }
+                    clientId={clientId}
+                    item={selectedItem}
+                    action={selection.action}
+                    onClose={() => setSelection(null)}
+                />
+            )}
         </div>
     );
 }

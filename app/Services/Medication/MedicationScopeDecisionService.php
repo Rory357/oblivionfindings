@@ -3,7 +3,6 @@
 namespace App\Services\Medication;
 
 use App\Models\BreakGlassAccessEvent;
-use App\Models\BreakGlassPolicy;
 use App\Models\Client;
 use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientMedication;
@@ -15,15 +14,23 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotGenerator;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\Downtime\HistoricalPaperContext;
+use App\Services\Medication\Downtime\PaperAdministrationWriter;
+use App\Services\Medication\Downtime\ReviewedPaperAuthority;
 use App\Services\MedicationRuleService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use LogicException;
 
 /**
  * The server-authoritative relationship and work-scope boundary for medication
@@ -53,6 +60,8 @@ class MedicationScopeDecisionService
         Closure $callback,
         ?Closure $scopedInputResolver = null,
         array $authorizationUserIds = [],
+        ?ReviewedPaperAuthority $reviewedPaper = null,
+        ?HistoricalPaperContext $historicalPaper = null,
     ): mixed {
         return DB::transaction(function () use (
             $performer,
@@ -65,6 +74,8 @@ class MedicationScopeDecisionService
             $callback,
             $scopedInputResolver,
             $authorizationUserIds,
+            $reviewedPaper,
+            $historicalPaper,
         ) {
             abort_unless($performer->canDo('medications.administer.record'), 403);
 
@@ -154,6 +165,10 @@ class MedicationScopeDecisionService
                 }
             }
             $this->notFoundUnless($actionAt->lessThanOrEqualTo(now()->addMinute()));
+            if ($historicalPaper !== null) {
+                $historicalPaper->assertBinding($client, $medication, (int) $performer->id, app(PaperAdministrationWriter::class)->canonicalData($historicalPaper->entry));
+                abort_unless($historicalPaper->entry->given_at->equalTo($actionAt) && $submittedRound === null && $scopedInputResolver === null, 409);
+            }
 
             // Freeze every performer/witness presence Shift as one ascending
             // set before resolving the selected performer Shift and before the
@@ -172,23 +187,31 @@ class MedicationScopeDecisionService
                 $this->clientSiteId($client),
                 $actionAt,
                 $submittedShiftId !== null ? [$submittedShiftId] : [],
+                historical: $historicalPaper !== null,
             );
 
+            // EA-041 (Lane A9): a dose due before its order was stopped or
+            // paused is still owed, so what happened can be recorded for it —
+            // even when the stop committed while this request waited for the
+            // lock. "Given" must be before the stop's effective time
+            // (administered_at, checked in EnhancedMarService).
+            $owedBeforeStop = $roundSnapshot === null && $this->owedBeforeStop($medication, $scheduledFor);
             if ($roundSnapshot === null) {
                 if ($medication->is_prn) {
                     $this->notFoundUnless($scheduledFor === null);
+                } elseif ($owedBeforeStop) {
+                    $this->assertScheduledCellBeforeStop($medication, $scheduledFor);
                 } else {
                     $this->assertScheduledCell($medication, $scheduledFor);
                 }
             }
-            $this->assertMedicationIsActiveFor($medication, $scheduledFor ?? $actionAt);
+            if (! $owedBeforeStop) {
+                $this->assertMedicationIsActiveFor($medication, $scheduledFor ?? $actionAt);
+            }
 
-            [$shift, $breakGlass] = $this->resolveClientAuthority(
-                $performer,
-                $client,
-                $actionAt,
-                $submittedShiftId,
-            );
+            [$shift, $breakGlass] = $reviewedPaper === null ? $this->resolveClientAuthority(
+                $performer, $client, $actionAt, $submittedShiftId,
+            ) : [null, null];
 
             // EnhancedMar re-enters this exact rule-set lock inside the same
             // transaction. Freeze the complete current set before the outer
@@ -206,6 +229,12 @@ class MedicationScopeDecisionService
                 $authorizationUserIds,
                 $lockedPresenceShifts,
             );
+
+            if ($reviewedPaper !== null) {
+                abort_unless($submittedRound === null && $submittedShiftId === null && $scopedInputResolver === null, 409);
+                $users = $this->medicationGovernance->lockControlledWitnessUsers([(int) $performer->id, ...$authorizationUserIds]);
+                $reviewedPaper->assertCurrent($client, $medication, $performer, $actionAt, $users);
+            }
 
             // Round lifecycle mutations use User/Profile -> Site -> Round. The
             // administration path must preserve that prefix: freeze identity
@@ -533,7 +562,7 @@ class MedicationScopeDecisionService
                                     });
                             });
                     })
-                    ->where(function ($binding): void {
+                    ->where(function ($binding) use ($performer): void {
                         $binding->whereColumn('shifts.client_id', 'clients.id');
 
                         if (Schema::hasTable('shift_clients')) {
@@ -544,6 +573,15 @@ class MedicationScopeDecisionService
                                     ->whereColumn('shift_clients.client_id', 'clients.id');
                             });
                         }
+
+                        // EA-006 (D1): clocked in at the person's house and
+                        // assigned to support them — whoever the shift names.
+                        $binding->orWhereExists(function ($assigned) use ($performer): void {
+                            $assigned->selectRaw('1')
+                                ->from('client_user')
+                                ->whereColumn('client_user.client_id', 'clients.id')
+                                ->where('client_user.user_id', $performer->id);
+                        });
                     });
             })
             ->pluck('clients.id')
@@ -789,13 +827,84 @@ class MedicationScopeDecisionService
             ->get(['id']);
     }
 
+    /**
+     * A scheduled dose must be one the order owes (P01 C6k): its dose-slot
+     * projection slot — at the slot's due time (on the spring-forward day a
+     * 02:30 dose is due at 03:00), and nothing due before the order was
+     * entered — or, on a day the projection doesn't hold, the order's
+     * schedule as ScheduledDoseStates reads it. Within a minute either side.
+     * An order that can't be given yet (waiting for its check) keeps the
+     * order's own times here, so recording it is refused with the reason.
+     */
     private function assertScheduledCell(ClientMedication $medication, ?Carbon $scheduledFor): void
     {
         $this->notFoundUnless($scheduledFor !== null && ! $medication->is_prn);
         $date = $this->schedule->dateFromInput(
             $scheduledFor->copy()->timezone($this->schedule->workerTimezone())->toDateString(),
         );
-        $matches = collect($this->schedule->scheduledTimesForDate($medication, $date))
+        $dueTimes = $medication->isAdministrable()
+            ? $this->owedDueTimes($medication, $date)
+            : $this->schedule->scheduledTimesForDate($medication, $date);
+        $matches = collect($dueTimes)
+            ->contains(fn (Carbon $slot): bool => abs($slot->copy()->utc()->diffInSeconds($scheduledFor->copy()->utc(), false)) < 60);
+        $this->notFoundUnless($matches);
+    }
+
+    /**
+     * The due times the order owes on the NZ day of $date. The record path
+     * holds the order's lock, so — as the outcome writer does — the day's
+     * slots are made sure of first: a late or missed hourly generation run
+     * never blocks recording a dose.
+     *
+     * @return list<Carbon>
+     */
+    private function owedDueTimes(ClientMedication $medication, Carbon $date): array
+    {
+        $states = app(ScheduledDoseStates::class);
+        $nzDate = $date->copy()->timezone($this->schedule->workerTimezone())->toDateString();
+        $now = CarbonImmutable::now()->utc();
+        if ($states->holdsDay($nzDate, $now)) {
+            try {
+                app(DoseSlotGenerator::class)->ensureDay($medication, $nzDate, $now);
+            } catch (InvalidArgumentException|LogicException $unreadable) {
+                // An unreadable order history must never block recording:
+                // the order's own times decide, as before the projection.
+                report($unreadable);
+
+                return $this->schedule->scheduledTimesForDate($medication, $date);
+            }
+        }
+
+        return array_map(
+            fn (array $dose): Carbon => $dose['due_at'],
+            $states->dosesOn([$medication], $date, now())[(int) $medication->id] ?? [],
+        );
+    }
+
+    /**
+     * EA-041 (Lane A9): a checked, scheduled order that was stopped or
+     * paused after this dose was due still owes it. (EnhancedMarService
+     * also allows "given" only at a time before the stop.)
+     */
+    private function owedBeforeStop(ClientMedication $medication, ?Carbon $scheduledFor): bool
+    {
+        if ($scheduledFor === null || $medication->is_prn || $medication->superseded_by !== null
+            || $medication->deleted_at !== null || ! $medication->isVerifiedForAdministration()) {
+            return false;
+        }
+        $stoppedAt = ScheduledDoseStates::stoppedAt($medication);
+
+        return $stoppedAt !== null && CarbonImmutable::instance($scheduledFor)->utc()->lt($stoppedAt);
+    }
+
+    /** The dose is one of the order's own times that day, as it was before the stop. */
+    private function assertScheduledCellBeforeStop(ClientMedication $medication, Carbon $scheduledFor): void
+    {
+        $date = $this->schedule->dateFromInput(
+            $scheduledFor->copy()->timezone($this->schedule->workerTimezone())->toDateString(),
+        );
+        $asBefore = (clone $medication)->forceFill(['active' => true]);
+        $matches = collect($this->schedule->scheduledTimesForDate($asBefore, $date))
             ->contains(fn (Carbon $slot): bool => abs($slot->copy()->utc()->diffInSeconds($scheduledFor->copy()->utc(), false)) < 60);
         $this->notFoundUnless($matches);
     }
@@ -828,8 +937,19 @@ class MedicationScopeDecisionService
             $this->siteAccess->accessibleSiteIds($performer, ['clinical.accessAllSites', 'sites.viewAll']),
             true,
         ));
-        $shiftQuery = $this->coveringShiftQuery($performer, $siteId, $actionAt)
-            ->where(function (Builder $scope) use ($client): void {
+        $shiftQuery = $this->coveringShiftQuery($performer, $siteId, $actionAt);
+        // EA-006 (D1): a worker clocked in at the person's house who is
+        // assigned to support them records for them, whoever the shift
+        // names. A locking read, so the assignment is current and can't be
+        // removed until this decision commits; then any covering shift at
+        // the house counts (coveringShiftQuery already pins the house).
+        $assigned = DB::table('client_user')
+            ->where('client_id', $client->id)
+            ->where('user_id', $performer->id)
+            ->sharedLock()
+            ->exists();
+        if (! $assigned) {
+            $shiftQuery->where(function (Builder $scope) use ($client): void {
                 $scope->where('client_id', $client->id);
 
                 if (Schema::hasTable('shift_clients')) {
@@ -841,6 +961,7 @@ class MedicationScopeDecisionService
                     });
                 }
             });
+        }
 
         if ($submittedShiftId !== null) {
             $shiftQuery->whereKey($submittedShiftId);
@@ -1031,8 +1152,8 @@ class MedicationScopeDecisionService
             return false;
         }
 
-        $policy = BreakGlassPolicy::current();
-        if ($policy->reason_required && blank($access->reason)) {
+        $policy = $access->effectivePolicy();
+        if ($policy['reason_required'] && blank($access->reason)) {
             return false;
         }
 
@@ -1050,7 +1171,7 @@ class MedicationScopeDecisionService
 
         $duration = $access->created_at->diffInMinutes($access->expires_at, false);
 
-        return $duration >= 5 && $duration <= (int) $policy->max_minutes;
+        return $duration >= 5 && $duration <= (int) $policy['max_minutes'];
     }
 
     private function clientSiteId(Client $client): int

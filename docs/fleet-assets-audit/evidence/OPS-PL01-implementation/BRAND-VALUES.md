@@ -1,0 +1,23 @@
+# OPS-PL01 — T-PL01-05 branding value correction
+
+Successor to `a69d7f465137b9be0e3ce0c4483e83a71c0c59a9` in the same implementation worktree. Prepared 28 September 2026. **T05 is corrected and verified for Main review. T04 remains pending actual 125% browser zoom. No Main-write slot or integration approval is claimed.**
+
+The Blade template validates each stored value before CSS emission. `BrandThemeTokens` accepts a single supported colour or nonnegative radius length, retaining the exact existing 24-property allowlist. It also filters new saves and the branding editor's existing values. Malformed stored values are omitted, leaving normal CSS defaults, without requiring a save or database migration.
+
+Supported values include hex, named colours, absolute RGB/HSL/HWB/Lab/LCH/OKLab/OKLCH/colour-profile values and structured `color-mix`, including both mixes produced by the branding palette generator. Legacy bare HSL channels normalize to an actual `hsl(...)` colour; the existing save regression expects that equivalent. Radius values remain one supported nonnegative length/percentage or zero. Declaration/block delimiters, comments, escapes, markup, URLs, variable references, unsupported expressions and malformed values are omitted. No dependency or allowed token was added. Personal six-digit hex accents retain inline precedence; malformed historical accents are omitted.
+
+`html:root` and `html.dark` precedence is unchanged. Browser checks cover default and alternate brands in both themes on the actual shared boundary circle and history points. Warning and warning-foreground tokens stay unchanged across corresponding brand cases. Polygon uses the same token in source; no separate polygon fixture is claimed. Original synthetic settings and reviewer preferences were restored and checked. No viewport override was applied.
+
+## Verification
+
+- Unit: **57 tests / 84 assertions passed**. Positive formats and invalid values through every permitted key are evaluated against the actual compiled Blade fragment in both themes; protected/unknown keys and personal accents are covered.
+- Affected feature suite: **19 tests / 85 assertions passed**. It selects existing Branding settings tests, save/editor filtering, direct malformed stored rows on an authenticated page, personal accents, and the existing People Locations light/dark template regression.
+- Main's original pure rendering probe ran unchanged. Its ordinary value renders; its injected value emits no style. The saved jsdom script asserts both warning tokens remain at their original values and the valid primary remains effective. See `brand-values-main-probe.json`, `brand-values-computed-probe.mjs` and `.json`.
+- Browser: **8 ordinary default/alternate light/dark map/history cases**, plus original-state restoration; no console errors. See `brand-values-browser.json` and normal-window images. These are not 125% page-zoom results.
+- PHP syntax and new helper/unit-file formatting passed. No JavaScript changed; the previous full frontend tests/types/lint/build evidence is retained, not presented as a new run.
+- The initial feature log is retained as `brand-values-fixture-error.txt`: a deliberately malformed personal accent exceeded the existing 9-character database column before its render assertion. The fixture now uses `red;`, and the full affected feature selection passed on the final run. Metadata-only verification found no remaining dedicated test schemas. Longer declaration/block cases are tested through stored organisation themes and the pure helper/template tests.
+- Exact source manifest: **46 paths**, digest `b58f80f71b4ac2c185973f93dd05be892afdd95023e5bbaa9b90e468f4f23556`. Frozen v5 matches all 41 entries and six protected references match. `brand-values-checks.json` records these checks and the Main probe hash.
+
+Reproduce from this candidate with `php vendor/bin/pest tests/Unit/BrandThemeTokensTest.php`. Use a unique disposable MySQL test database for `php vendor/bin/pest tests/Feature/SettingsControllerTest.php tests/Feature/Operations/PeopleLocationsTest.php --filter "branding|organisation brand tokens"`. Run Main's unchanged `OPS-PL01-main-brand-token-probe.php` from this candidate directory and the adjacent Node `.mjs` script against its saved output. Browser cases use the existing guarded `correction-brand-fixture.php`; run its restore mode afterwards.
+
+The existing manual 125% setup question is unanswered. No additional request or browser-policy workaround was attempted. No Main write, merge, push, operational migration, permission grant, provider work or Rory guide change occurred. Existing rollout and upstream telemetry-unit limitations remain unchanged.

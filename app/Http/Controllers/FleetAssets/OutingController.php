@@ -4,7 +4,6 @@ namespace App\Http\Controllers\FleetAssets;
 
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Http\Controllers\Controller;
-use App\Models\Asset;
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetOuting;
@@ -12,15 +11,31 @@ use App\Models\FleetOutingResident;
 use App\Models\FleetVehicleBooking;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Fleet\ResidentTransportJourneyScope;
 use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class OutingController extends Controller
 {
-    public function __construct(private readonly UserSiteAccessService $siteAccess) {}
+    /**
+     * FA-T01: every outing, resident row, driver name, count and picker covers
+     * the viewer's approved Sites only. `fleet.manage` is the explicit
+     * all-Sites authority, as in the sibling Fleet report controllers. The
+     * outing rule itself is ResidentTransportJourneyScope::applyOutingScope.
+     */
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ResidentTransportJourneyScope $journeyScope,
+    ) {}
 
     public function index(Request $request)
     {
@@ -54,8 +69,12 @@ class OutingController extends Controller
             ]);
         }
 
-        $query = FleetOuting::query()
-            ->with(['asset:id,name,asset_tag', 'driver:id,name', 'residents']);
+        $user = $request->user();
+
+        $query = $this->outings($user)
+            ->with(['asset:id,name,asset_tag'])
+            ->withCount(['residents as visible_resident_count' => fn (Builder $residents) => $this->journeyScope
+                ->applyOutingResidentScope($residents, $user)]);
 
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));
@@ -78,33 +97,33 @@ class OutingController extends Controller
         }
 
         $outings = $query->latest('planned_departure')->paginate(25)->withQueryString();
+        $drivers = $this->visibleStaff($user, $outings->getCollection()->pluck('driver_user_id')->all());
 
         // Stats
         $weekStart = now()->startOfWeek();
         $weekEnd = now()->endOfWeek();
 
-        $weekQuery = FleetOuting::query()
-            ->whereBetween('planned_departure', [$weekStart, $weekEnd]);
-
-        $outingsThisWeek = (clone $weekQuery)->count();
-
-        $residentsThisWeek = FleetOutingResident::query()
-            ->whereHas('outing', fn ($q) => $q->whereBetween('planned_departure', [$weekStart, $weekEnd]))
+        $outingsThisWeek = $this->outings($user)
+            ->whereBetween('planned_departure', [$weekStart, $weekEnd])
             ->count();
 
-        $avgDuration = FleetOuting::query()
+        $residentsThisWeek = $this->visibleResidents($user, fn (Builder $outing) => $outing
+            ->whereBetween('planned_departure', [$weekStart, $weekEnd]))
+            ->count();
+
+        $avgDuration = $this->outings($user)
             ->whereNotNull('actual_departure')
             ->whereNotNull('actual_return')
             ->selectRaw('AVG(TIMESTAMPDIFF(MINUTE, actual_departure, actual_return)) as avg_min')
             ->value('avg_min');
 
-        $upcoming = FleetOuting::query()
+        $upcoming = $this->outings($user)
             ->where('status', 'planned')
             ->where('planned_departure', '>=', now())
             ->count();
 
         // Chart: outings per day of week (last 4 weeks)
-        $chartData = FleetOuting::query()
+        $chartData = $this->outings($user)
             ->where('planned_departure', '>=', now()->subWeeks(4))
             ->selectRaw('DAYOFWEEK(planned_departure) as dow, COUNT(*) as count')
             ->groupBy('dow')
@@ -132,8 +151,10 @@ class OutingController extends Controller
                     'actual_departure' => optional($o->actual_departure)->toISOString(),
                     'actual_return' => optional($o->actual_return)->toISOString(),
                     'asset' => $o->asset ? ['id' => $o->asset->id, 'name' => $o->asset->name, 'asset_tag' => $o->asset->asset_tag] : null,
-                    'driver' => $o->driver ? ['id' => $o->driver->id, 'name' => $o->driver->name] : null,
-                    'resident_count' => $o->residents->count(),
+                    'driver' => ($driver = $drivers->get((int) $o->driver_user_id))
+                        ? ['id' => $driver->id, 'name' => $driver->name]
+                        : null,
+                    'resident_count' => (int) $o->visible_resident_count,
                     'status' => $o->status,
                     'created_at' => optional($o->created_at)->toISOString(),
                 ])->values(),
@@ -152,27 +173,28 @@ class OutingController extends Controller
                 'upcoming' => $upcoming,
             ],
             'hero' => [
-                'planned_today' => FleetOuting::query()
+                'planned_today' => $this->outings($user)
                     ->where('status', 'planned')
                     ->whereDate('planned_departure', today())
                     ->count(),
-                'active_now' => FleetOuting::query()->where('status', 'active')->count(),
-                'residents_out_now' => FleetOutingResident::query()
-                    ->whereHas('outing', fn ($q) => $q->where('status', 'active'))
+                'active_now' => $this->outings($user)->where('status', 'active')->count(),
+                'residents_out_now' => $this->visibleResidents($user, fn (Builder $outing) => $outing
+                    ->where('status', 'active'))
                     ->whereNull('returned_at')
                     ->count(),
-                'completed_7d' => FleetOuting::query()
+                'completed_7d' => $this->outings($user)
                     ->where('status', 'completed')
                     ->where('planned_departure', '>=', now()->subDays(7))
                     ->count(),
-                // Attention-strip escalations (org-wide, same definitions as
-                // the fleet dashboard hero).
-                'past_return' => FleetOuting::query()
+                // Attention-strip escalations (the viewer's Sites, same
+                // definitions as the fleet dashboard hero).
+                'past_return' => $this->outings($user)
                     ->where('status', 'active')
                     ->where('planned_return', '<', now())
                     ->count(),
                 'overdue_returns' => Schema::hasTable('fleet_vehicle_bookings')
                     ? FleetVehicleBooking::query()
+                        ->whereIn('asset_id', $this->journeyScope->outingVehicles($user)->select('assets.id'))
                         ->where('status', 'checked_out')
                         ->where('ends_at', '<', now())
                         ->count()
@@ -193,13 +215,14 @@ class OutingController extends Controller
         $query = ControlRoomAlert::query()
             ->actionable()
             ->where('severity', 'critical');
-        $this->siteAccess->applyAlertScope($query, $request->user(), ['fleet.manage']);
+        $this->siteAccess->applyAlertScope($query, $request->user(), self::SITE_BYPASS_PERMISSIONS);
 
         return $query->count();
     }
 
     private function formOptions(Request $request): array
     {
+        $user = $request->user();
         $hasTransportNeeds = Schema::hasColumn('clients', 'transport_needs');
         $selectCols = ['id', 'first_name', 'last_name', 'site_id'];
         if ($hasTransportNeeds) {
@@ -207,7 +230,7 @@ class OutingController extends Controller
             $selectCols[] = 'transport_notes';
         }
 
-        $clients = Client::query()
+        $clients = $this->journeyScope->applyClientScope(Client::query(), $user)
             ->where('status', 'active')
             ->orderBy('first_name')
             ->with('site:id,name')
@@ -221,7 +244,7 @@ class OutingController extends Controller
             ])->values();
 
         $hasAccessibility = Schema::hasColumn('assets', 'has_wheelchair_ramp');
-        $vehicles = Asset::vehicles()
+        $vehicles = $this->journeyScope->outingVehicles($user)
             ->where('status', 'active')
             ->orderBy('name')
             ->get(array_merge(
@@ -242,7 +265,7 @@ class OutingController extends Controller
                 'seating_capacity' => $vehicle->seating_capacity,
             ] : []))->values();
 
-        $drivers = User::query()
+        $drivers = $this->journeyScope->applyStaffScope(User::query(), $user)
             ->whereHas('hrDriverEligibility')
             ->orderBy('name')
             ->get(['id', 'name'])
@@ -273,18 +296,36 @@ class OutingController extends Controller
 
     public function store(Request $request)
     {
+        $user = $request->user();
+
+        // Every reference must be one the picker offers this viewer; a foreign
+        // vehicle, resident or driver fails exactly like a missing one and
+        // nothing is written. A vehicle and a resident are required because an
+        // outing without them is outside every viewer's boundary.
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'destination' => ['required', 'string', 'max:255'],
             'purpose' => ['nullable', 'string', 'in:community,medical,social,recreational,shopping'],
             'planned_departure' => ['required', 'date'],
             'planned_return' => ['required', 'date', 'after:planned_departure'],
-            'asset_id' => ['nullable', 'integer', 'exists:assets,id'],
-            'driver_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'asset_id' => ['required', 'integer', Rule::exists('assets', 'id')->where(fn ($assets) => $assets
+                ->where('status', 'active')
+                ->whereIn('id', $this->journeyScope->outingVehicles($user)->select('assets.id')))],
+            'driver_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where(fn ($users) => $users
+                ->whereIn('id', $this->journeyScope->applyStaffScope(User::query(), $user)->select('users.id')))],
             'risk_assessment' => ['nullable', 'string', 'max:5000'],
             'notes' => ['nullable', 'string', 'max:2000'],
-            'resident_ids' => ['nullable', 'array'],
-            'resident_ids.*' => ['integer', 'exists:clients,id'],
+            'resident_ids' => ['required', 'array', 'min:1'],
+            'resident_ids.*' => ['integer', 'distinct', Rule::exists('clients', 'id')->where(fn ($clients) => $clients
+                ->whereIn('id', $this->journeyScope->applyClientScope(Client::query(), $user)->select('clients.id')))],
+        ], [
+            'asset_id.required' => 'Choose a vehicle for the outing.',
+            'asset_id.exists' => 'The selected vehicle is not available.',
+            'driver_user_id.exists' => 'The selected driver is not available.',
+            'resident_ids.required' => 'Choose at least one resident for the outing.',
+            'resident_ids.min' => 'Choose at least one resident for the outing.',
+            'resident_ids.*.exists' => 'A selected resident is not available.',
+            'resident_ids.*.distinct' => 'A resident was selected twice.',
         ]);
 
         // Verify assigned driver has valid eligibility
@@ -303,14 +344,20 @@ class OutingController extends Controller
         }
 
         $outing = DB::transaction(function () use ($data, $request) {
-            // The canonical asset lock serializes this booking producer with
+            // The asset row lock serializes this booking producer with
             // maintenance holds, just like the direct booking/approval paths.
-            if (! empty($data['asset_id'])) {
-                $asset = app(\App\Services\Fleet\MaintenanceAccessService::class)
-                    ->asset($request->user(), (int) $data['asset_id'], true);
-                abort_unless($asset->category === 'vehicle' && $asset->status === 'active', 404);
-                app(\App\Services\Fleet\MaintenanceRestrictionService::class)->assertBookable((int) $asset->id);
+            // It re-resolves the vehicle through the outing boundary, so a
+            // vehicle that left the viewer's Sites since validation still
+            // fails with zero writes.
+            $asset = $this->journeyScope->outingVehicles($request->user())
+                ->whereKey((int) $data['asset_id'])
+                ->where('status', 'active')
+                ->lockForUpdate()
+                ->first();
+            if (! $asset) {
+                throw ValidationException::withMessages(['asset_id' => 'The selected vehicle is not available.']);
             }
+            app(\App\Services\Fleet\MaintenanceRestrictionService::class)->assertBookable((int) $asset->id);
             $outing = FleetOuting::create([
                 'title' => $data['title'],
                 'destination' => $data['destination'],
@@ -364,15 +411,20 @@ class OutingController extends Controller
             ->with('success', 'Outing created successfully.');
     }
 
-    public function show(Request $request, FleetOuting $outing)
+    public function show(Request $request, int $outing)
     {
+        $user = $request->user();
+        $outing = $this->journeyScope->outingFor($user, $outing);
         $outing->load([
             'asset:id,name,asset_tag',
-            'driver:id,name,email',
             'booking',
-            'createdBy:id,name',
-            'residents.client:id,first_name,last_name,transport_needs',
+            'residents' => fn ($residents) => $this->journeyScope
+                ->applyOutingResidentScope($residents->getQuery(), $user)
+                ->with('client:id,first_name,last_name,transport_needs'),
         ]);
+        $people = $this->visibleStaff($user, [$outing->driver_user_id, $outing->created_by_user_id], ['id', 'name', 'email']);
+        $driver = $people->get((int) $outing->driver_user_id);
+        $createdBy = $people->get((int) $outing->created_by_user_id);
 
         // Get vehicle state for live map
         $vehicleState = null;
@@ -403,19 +455,19 @@ class OutingController extends Controller
                     'name' => $outing->asset->name,
                     'asset_tag' => $outing->asset->asset_tag,
                 ] : null,
-                'driver' => $outing->driver ? [
-                    'id' => $outing->driver->id,
-                    'name' => $outing->driver->name,
-                    'email' => $outing->driver->email,
+                'driver' => $driver ? [
+                    'id' => $driver->id,
+                    'name' => $driver->name,
+                    'email' => $driver->email,
                 ] : null,
                 'booking' => $outing->booking ? [
                     'id' => $outing->booking->id,
                     'purpose' => $outing->booking->purpose,
                     'status' => $outing->booking->status,
                 ] : null,
-                'created_by' => $outing->createdBy ? [
-                    'id' => $outing->createdBy->id,
-                    'name' => $outing->createdBy->name,
+                'created_by' => $createdBy ? [
+                    'id' => $createdBy->id,
+                    'name' => $createdBy->name,
                 ] : null,
                 'risk_assessment' => $outing->risk_assessment,
                 'status' => $outing->status,
@@ -440,13 +492,16 @@ class OutingController extends Controller
         ]);
     }
 
-    public function start(Request $request, FleetOuting $outing)
+    public function start(Request $request, int $outing)
     {
+        $outing = $this->journeyScope->outingFor($request->user(), $outing);
+
         if ($outing->status !== 'planned') {
             return back()->with('error', 'Outing can only be started from planned status.');
         }
 
-        // Safety check: all residents must have pre-check and medication packing completed
+        // Safety check: every resident on the outing — including any from
+        // another Site — must have pre-check and medication packing completed
         $residents = $outing->residents()->get();
         if ($residents->isNotEmpty()) {
             $unprepared = $residents->filter(fn ($r) => ! $r->pre_check_completed);
@@ -465,18 +520,28 @@ class OutingController extends Controller
         return back()->with('success', 'Outing started.');
     }
 
-    public function complete(Request $request, FleetOuting $outing)
+    public function complete(Request $request, int $outing)
     {
+        $user = $request->user();
+        $outing = $this->journeyScope->outingFor($user, $outing);
+
         if ($outing->status !== 'active') {
             return back()->with('error', 'Outing can only be completed from active status.');
         }
 
-        $unreturnedResidents = $outing->residents()
+        // Every resident must be back, but only visible residents are counted
+        // or named to this viewer.
+        $unreturnedResidents = $this->journeyScope
+            ->applyOutingResidentScope($outing->residents()->getQuery(), $user)
             ->whereNull('returned_at')
             ->count();
 
         if ($unreturnedResidents > 0) {
             return back()->with('error', "Cannot complete outing: {$unreturnedResidents} resident(s) not yet marked as returned.");
+        }
+
+        if ($outing->residents()->whereNull('returned_at')->exists()) {
+            return back()->with('error', 'Cannot complete outing: residents from another Site have not been marked as returned yet.');
         }
 
         $outing->update([
@@ -489,29 +554,43 @@ class OutingController extends Controller
         return back()->with('success', 'Outing completed.');
     }
 
-    public function markResidentReturned(Request $request, FleetOuting $outing, FleetOutingResident $resident)
+    public function markResidentReturned(Request $request, int $outing, int $resident)
     {
+        $user = $request->user();
+        $outing = $this->journeyScope->outingFor($user, $outing);
+        $resident = $this->journeyScope
+            ->applyOutingResidentScope($outing->residents()->getQuery(), $user)
+            ->whereKey($resident)
+            ->firstOrFail();
+
         abort_unless($outing->status === 'active', 422, 'Outing must be active to mark residents as returned.');
-        abort_unless($resident->outing_id === $outing->id, 404);
 
         $resident->update(['returned_at' => now()]);
 
         return back()->with('success', 'Resident marked as returned.');
     }
 
-    public function returnAllResidents(Request $request, FleetOuting $outing)
+    public function returnAllResidents(Request $request, int $outing)
     {
+        $user = $request->user();
+        $outing = $this->journeyScope->outingFor($user, $outing);
+
         abort_unless($outing->status === 'active', 422, 'Outing must be active to mark residents as returned.');
 
-        $outing->residents()
+        // Only the residents this viewer can see; another Site's residents
+        // are returned by staff who can see them.
+        $this->journeyScope
+            ->applyOutingResidentScope($outing->residents()->getQuery(), $user)
             ->whereNull('returned_at')
             ->update(['returned_at' => now()]);
 
         return back()->with('success', 'All residents marked as returned.');
     }
 
-    public function cancel(Request $request, FleetOuting $outing)
+    public function cancel(Request $request, int $outing)
     {
+        $outing = $this->journeyScope->outingFor($request->user(), $outing);
+
         if (in_array($outing->status, ['completed', 'cancelled'])) {
             return back()->with('error', 'Outing cannot be cancelled.');
         }
@@ -528,5 +607,44 @@ class OutingController extends Controller
         AuditLogger::log('fleet.outing.cancel', $outing);
 
         return back()->with('success', 'Outing cancelled.');
+    }
+
+    private function outings(?User $user): Builder
+    {
+        return $this->journeyScope->applyOutingScope(FleetOuting::query(), $user);
+    }
+
+    /**
+     * Resident rows the viewer may see, on outings the viewer may see.
+     *
+     * @param  callable(Builder): Builder  $outingConstraint
+     */
+    private function visibleResidents(?User $user, callable $outingConstraint): Builder
+    {
+        return $this->journeyScope->applyOutingResidentScope(FleetOutingResident::query(), $user)
+            ->whereHas('outing', fn (Builder $outing) => $outingConstraint(
+                $this->journeyScope->applyOutingScope($outing, $user),
+            ));
+    }
+
+    /**
+     * People the viewer may see as staff, keyed by id — anyone else on an
+     * outing (driver, creator) is left unnamed.
+     *
+     * @param  array<int, int|string|null>  $userIds
+     * @param  list<string>  $columns
+     * @return Collection<int, User>
+     */
+    private function visibleStaff(?User $viewer, array $userIds, array $columns = ['id', 'name']): Collection
+    {
+        $userIds = array_values(array_unique(array_filter(array_map('intval', $userIds), fn (int $id) => $id > 0)));
+        if ($userIds === []) {
+            return collect();
+        }
+
+        return $this->journeyScope->applyStaffScope(User::query(), $viewer)
+            ->whereIn('users.id', $userIds)
+            ->get(array_map(fn (string $column) => "users.{$column}", $columns))
+            ->keyBy('id');
     }
 }

@@ -55,6 +55,7 @@ use App\Http\Controllers\Hr\PolicyAttestationController;
 use App\Http\Controllers\Hr\PolicyController;
 use App\Http\Controllers\Hr\PositionController;
 use App\Http\Controllers\Hr\PublicHolidayController;
+use App\Http\Controllers\Hr\RecognitionReplyController;
 use App\Http\Controllers\Hr\RecruitmentController;
 use App\Http\Controllers\Hr\RecruitmentExportController;
 use App\Http\Controllers\Hr\RecruitmentJobController;
@@ -93,6 +94,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/expenses/{expenseClaim}/withdraw', [MyHrController::class, 'withdrawExpenseClaim'])->name('expenses.withdraw');
         Route::get('/training', [MyHrController::class, 'training'])->name('training');
         Route::get('/benefits', [MyHrController::class, 'benefits'])->name('benefits');
+        // The worker's own workplace injuries, read-only (Stephan, 30 Oct).
+        Route::get('/injuries', [MyHrController::class, 'injuries'])->name('injuries');
         // Owner-gated: a new hire completes their own onboarding task from the
         // Overview's "Getting started" card (subject-only; enforced in-controller).
         Route::post('/onboarding/tasks/{task}/complete', [MyHrController::class, 'completeOnboardingTask'])->name('onboarding.tasks.complete');
@@ -128,6 +131,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/kudos/{kudos}/reply', [MyHrController::class, 'replyKudos'])
             ->middleware('permission:hr.recognition.give')
             ->name('kudos.reply');
+        Route::delete('/kudos/{kudos}/replies/{reply}', [RecognitionReplyController::class, 'destroy'])
+            ->whereNumber('reply')->middleware(['permission:hr.recognition.give', 'throttle:60,1'])->name('kudos.replies.destroy');
         Route::get('/documents', [MyHrController::class, 'documents'])->name('documents');
         Route::get('/documents/{document}/download', [MyHrController::class, 'downloadDocument'])->name('documents.download');
         Route::post('/documents/sign/{signature}', [MyHrController::class, 'signDocument'])->name('documents.sign');
@@ -1076,6 +1081,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             // Feed-scoped react/reply aliases onto the shared HrKudos path.
             Route::post('/kudos/{kudos}/react', [FeedController::class, 'react'])->name('kudos.react');
             Route::post('/kudos/{kudos}/reply', [FeedController::class, 'reply'])->name('kudos.reply');
+            Route::delete('/kudos/{kudos}/replies/{reply}', [RecognitionReplyController::class, 'destroy'])
+                ->whereNumber('reply')->middleware('throttle:60,1')->name('kudos.replies.destroy');
             // Polymorphic react/reply for the wall's non-kudos items (posts + announcements).
             Route::post('/react', [FeedController::class, 'reactFeed'])->name('react');
             Route::post('/reply', [FeedController::class, 'replyFeed'])->name('reply');
@@ -1120,6 +1127,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/create', [AnnouncementController::class, 'create'])->name('create');
             Route::get('/export', [AnnouncementController::class, 'export'])->name('export');
             Route::get('/preview', [AnnouncementController::class, 'preview'])->name('preview');
+            Route::get('/{announcement}/edit-data', [AnnouncementController::class, 'editData'])->name('edit-data');
             Route::post('/', [AnnouncementController::class, 'store'])->name('store');
             Route::post('/bulk', [AnnouncementController::class, 'bulk'])->name('bulk');
             Route::post('/remind-bulk', [AnnouncementController::class, 'remindBulk'])->name('remind-bulk');

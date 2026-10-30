@@ -11,11 +11,22 @@ const source = readFileSync(
 const preciseQuantitySources = [
     'resources/js/pages/meds/today/components/record-dose-wizard.tsx',
     'resources/js/pages/meds/today/components/prn-wizard.tsx',
-    'resources/js/pages/emar/components/cd-register-modal.tsx',
-    'resources/js/pages/emar/components/guided-round-dialog.tsx',
 ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
 const prnWizardSource = preciseQuantitySources[1];
-const guidedRoundSource = preciseQuantitySources[3];
+const guidedRoundSource = readFileSync(
+    resolve(
+        process.cwd(),
+        'resources/js/pages/emar/components/guided-round-dialog.tsx',
+    ),
+    'utf8',
+);
+const recordDoseSource = readFileSync(
+    resolve(
+        process.cwd(),
+        'resources/js/components/emar/record-dose/record-dose-dialog.tsx',
+    ),
+    'utf8',
+);
 const shiftMedicationSource = readFileSync(
     resolve(
         process.cwd(),
@@ -23,19 +34,17 @@ const shiftMedicationSource = readFileSync(
     ),
     'utf8',
 );
-const prnSheetSource = readFileSync(
-    resolve(process.cwd(), 'resources/js/components/prn-sheet.tsx'),
-    'utf8',
-);
 const stockDialogsSource = readFileSync(
     resolve(process.cwd(), 'resources/js/pages/emar/_stock-dialogs.tsx'),
     'utf8',
 );
-const clientAdministrationSources = [
-    'resources/js/components/clients/profile/emar-dialog.tsx',
-    'resources/js/pages/clients/medical.tsx',
-    'resources/js/pages/operations/clients/medical.tsx',
-].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
+const clientEmarDialogSource = readFileSync(
+    resolve(
+        process.cwd(),
+        'resources/js/components/clients/profile/emar-dialog.tsx',
+    ),
+    'utf8',
+);
 
 function dialogSource(start: string, end: string): string {
     return source.slice(source.indexOf(start), source.indexOf(end));
@@ -64,7 +73,9 @@ describe('controlled mutation dialog replay contracts', () => {
     it('keeps CD entry and balance checks online for ephemeral witness verification', () => {
         for (const dialog of credentialDialogs) {
             expect(dialog).toContain("witness_credential: ''");
-            expect(dialog).toContain('Witness password or PIN');
+            // PIN-1: the witness types their own witness PIN, never a password.
+            expect(dialog).toContain('<WitnessPinInput');
+            expect(dialog).not.toContain('password or PIN');
             expect(dialog).toContain(
                 'client_medication_id: Number(medicationId)',
             );
@@ -80,9 +91,9 @@ describe('controlled mutation dialog replay contracts', () => {
     it.each(credentialDialogs)(
         'keeps exact witnessed retries stable and rotates after material edits',
         (dialog) => {
-            expect(dialog).toContain(
-                'useRef(createMedicationMutationReplayState())',
-            );
+            // The replay ref is seeded once from state (never read in render).
+            expect(dialog).toContain('createMedicationMutationReplayState()');
+            expect(dialog).toMatch(/useRef\(initial(Entry|Balance)Replay\)/);
             expect(dialog).toContain('prepareMedicationMutationReplayState(');
             expect(dialog).toContain('witness_credential: _witnessCredential');
             if (dialog.includes('BalanceCheckDialog')) {
@@ -197,8 +208,24 @@ describe('controlled mutation dialog replay contracts', () => {
         }
 
         expect(preciseQuantitySources[0]).toContain('step="0.01"');
-        expect(preciseQuantitySources[2].match(/step="0\.01"/g)).toHaveLength(
-            3,
+
+        // Guided rounds use the shared recorder's decimal text inputs, which
+        // allow hundredths without a browser number-input step restriction.
+        expect(guidedRoundSource).toContain('<RecordDoseDialog');
+        for (const id of ['rd-stockQuantity', 'rd-cdBalance']) {
+            const inputStart = recordDoseSource.indexOf(`id="${id}"`);
+            expect(inputStart).toBeGreaterThanOrEqual(0);
+            const input = recordDoseSource.slice(
+                inputStart,
+                recordDoseSource.indexOf('/>', inputStart),
+            );
+            expect(input).toContain('inputMode="decimal"');
+            expect(input).not.toMatch(/(?:min|step)=[{"]0\.(?:25|5)/);
+        }
+        expect(recordDoseSource).toContain('Number(f.stockQuantity)');
+        expect(recordDoseSource).toContain('Number(f.cdBalance)');
+        expect(recordDoseSource).toContain(
+            String.raw`/^\d+(\.\d{1,2})?$/.test(f.cdBalance.trim())`,
         );
     });
 
@@ -215,8 +242,13 @@ describe('controlled mutation dialog replay contracts', () => {
             'client_request_uuid: submissionReplay.current.uuid,',
         );
         expect(prnWizardSource).toContain('submitEmarMutation(');
+        // A witnessed medicine, or a restricted worker's co-signed dose
+        // (NF-03), needs a live credential and is never queued offline.
         expect(prnWizardSource).toContain(
-            'allowQueueWhenOffline: !med.requires_witness',
+            'const needsWitness = !!med?.requires_witness || cosignerOnly;',
+        );
+        expect(prnWizardSource).toContain(
+            'allowQueueWhenOffline: !needsWitness',
         );
         expect(prnWizardSource).toContain(
             'if (!emarMutationWasAccepted(result.status)) return;',
@@ -230,84 +262,108 @@ describe('controlled mutation dialog replay contracts', () => {
     });
 
     it('keeps guided and shift administration UUIDs stable across uncertain retries', () => {
-        for (const administrationSource of [
-            guidedRoundSource,
-            shiftMedicationSource,
-        ]) {
-            expect(administrationSource).toContain(
-                'uuid: createOfflineRequestUuid()',
-            );
-            expect(administrationSource).toContain(
-                'fingerprint: null as string | null',
-            );
-            expect(administrationSource).toContain('materialFingerprint');
-            expect(administrationSource).toContain(
-                'client_request_uuid: administrationReplay.current.uuid',
-            );
-            expect(administrationSource).not.toContain(
-                'client_request_uuid: crypto.randomUUID()',
-            );
-        }
-        expect(guidedRoundSource).toContain('witness_credential: undefined');
-        expect(guidedRoundSource).toContain('submitEmarMutation(');
         expect(guidedRoundSource).toContain(
-            'emarMutationWasAccepted(result.status)',
+            "import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog'",
         );
-        expect(shiftMedicationSource).toContain("witness_credential: ''");
-        expect(shiftMedicationSource).toContain('Witness password or PIN');
-        expect(shiftMedicationSource).toContain(
-            'witness_credential: witnessCredential',
+        expect(guidedRoundSource).toContain(
+            'orderId: recording.item.medication_id',
         );
-        expect(shiftMedicationSource).toContain(
-            'allowQueueWhenOffline: !needsWitness',
+        expect(guidedRoundSource).toContain(
+            'scheduledFor: recording.item.scheduled_for',
         );
-        expect(shiftMedicationSource).toContain(
-            'if (!emarMutationWasAccepted(result.status))',
+        expect(guidedRoundSource).toContain('entry="round"');
+        expect(guidedRoundSource).toContain('roundId={round.id}');
+        expect(recordDoseSource).toContain(
+            'const replay = useRef(createMedicationMutationReplayState());',
         );
-    });
-
-    it('blocks witness-gated quick PRN actions and gives queueable actions a payload-aware UUID', () => {
-        expect(prnSheetSource).toContain('const submissionReplay = useRef({');
-        expect(prnSheetSource).toContain('materialFingerprint');
-        expect(prnSheetSource).toContain(
-            'client_request_uuid: submissionReplay.current.uuid',
+        expect(recordDoseSource).toContain(
+            'prepareMedicationMutationReplayState(replay.current, material)',
         );
-        expect(prnSheetSource).toContain('submitEmarMutation(');
-        expect(prnSheetSource).toContain(
-            'selected.requires_witness || selected.is_controlled',
+        expect(recordDoseSource).toContain(
+            'delete material.witness_credential;',
         );
-        expect(prnSheetSource).toContain('!selected.requires_witness &&');
-        expect(prnSheetSource).toContain('!selected.is_controlled &&');
-        expect(prnSheetSource).toContain(
-            'Use the full MAR to record this witnessed dose.',
+        expect(recordDoseSource).toContain(
+            'client_request_uuid: replay.current.uuid',
         );
-        expect(prnSheetSource).toContain(
-            'if (!emarMutationWasAccepted(result.status)) return;',
+        expect(recordDoseSource).toContain(
+            'submitEmarMutation<Record<string, unknown>>(',
         );
-    });
-
-    it('binds every direct client-medical administration form to a stable intent UUID', () => {
-        for (const administrationSource of clientAdministrationSources) {
-            expect(administrationSource).toContain(
-                'createMedicationMutationReplayState',
-            );
-            expect(administrationSource).toContain(
-                'prepareMedicationMutationReplayState',
-            );
-            expect(administrationSource).toContain('client_request_uuid:');
-            expect(administrationSource).not.toContain('return `med-admin-');
+        const outcomeSource = recordDoseSource.slice(
+            recordDoseSource.indexOf('function handleOutcome('),
+            recordDoseSource.indexOf('function handleError('),
+        );
+        expect(outcomeSource).toContain("if (status === 'queued')");
+        expect(outcomeSource).toContain(
+            "onRecorded?.({ status: 'queued', administrationId: null });",
+        );
+        expect(outcomeSource).toMatch(
+            /status === 'processed'\s*\|\|\s*status === 'synced'\s*\|\|\s*status === 'duplicate'/,
+        );
+        expect(outcomeSource).toContain("status: 'recorded'");
+        for (const status of [
+            'requires_connection',
+            'storage_unavailable',
+            'requires_authentication',
+        ]) {
+            expect(outcomeSource).toContain(`status === '${status}'`);
         }
+        expect(outcomeSource).toContain("setPhase('uncertain');");
+        expect(recordDoseSource).toMatch(
+            /allowQueueWhenOffline:\s*!needsPin\s*&&\s*!body\.witness_override_id/,
+        );
+        expect(recordDoseSource).not.toContain(
+            'client_request_uuid: crypto.randomUUID()',
+        );
+        expect(shiftMedicationSource).toContain(
+            "import { RecordDoseDialog } from '@/components/emar/record-dose/record-dose-dialog'",
+        );
+        expect(shiftMedicationSource).toContain('<RecordDoseDialog');
+        expect(shiftMedicationSource).toContain(
+            'orderId: activeRow.medication.id',
+        );
+        expect(shiftMedicationSource).toContain(
+            'scheduledFor: activeRow.scheduled_for!',
+        );
+        expect(shiftMedicationSource).toContain('entry="shift"');
+        expect(shiftMedicationSource).toContain('shiftContext={{');
+        expect(shiftMedicationSource).toContain('shiftId,');
+        expect(shiftMedicationSource).toContain(
+            'activeRow.medication.scan_verification',
+        );
+        expect(shiftMedicationSource).toContain(
+            "if (result.status !== 'queued')",
+        );
+        expect(shiftMedicationSource).toContain(
+            'router.reload({ preserveScroll: true })',
+        );
+        expect(shiftMedicationSource).not.toContain(
+            'client_request_uuid: crypto.randomUUID()',
+        );
+        expect(shiftMedicationSource).not.toContain('password or PIN');
     });
 
-    it('keeps witness credentials ephemeral on the client medical administration page', () => {
-        const clientMedicalSource = clientAdministrationSources[1];
+    it('binds the client profile administration dialog to a stable intent UUID', () => {
+        expect(clientEmarDialogSource).toContain(
+            'createMedicationMutationReplayState',
+        );
+        expect(clientEmarDialogSource).toContain(
+            'prepareMedicationMutationReplayState',
+        );
+        expect(clientEmarDialogSource).toContain('client_request_uuid:');
+        expect(clientEmarDialogSource).not.toContain('return `med-admin-');
+    });
 
-        expect(clientMedicalSource).toContain("witness_credential: ''");
-        expect(clientMedicalSource).toContain('Witness password / PIN');
-        expect(clientMedicalSource).toContain(
+    it('keeps witness credentials ephemeral on the client profile administration dialog', () => {
+        expect(clientEmarDialogSource).toContain(
+            "const [witnessCredential, setWitnessCredential] = useState('');",
+        );
+        expect(clientEmarDialogSource).toContain(
             'witness_credential: _witnessCredential',
         );
-        expect(clientMedicalSource).toContain('!navigator.onLine');
+        expect(clientEmarDialogSource).toContain('!navigator.onLine');
+        expect(clientEmarDialogSource).toContain(
+            'Witness credentials are never saved on this device.',
+        );
     });
 
     it('gives the Meds Today dose wizard a material-aware online-only UUID', () => {
@@ -320,14 +376,5 @@ describe('controlled mutation dialog replay contracts', () => {
             'client_request_uuid: doseReplay.current.uuid',
         );
         expect(doseWizard).toContain('!navigator.onLine');
-    });
-
-    it('only exposes manual medication classification when both controlled capabilities are present', () => {
-        for (const medicalPageSource of clientAdministrationSources.slice(1)) {
-            expect(medicalPageSource).toContain(
-                'can_edit && can_controlled_view && can_controlled_record',
-            );
-            expect(medicalPageSource).toContain('{canClassifyMedication &&');
-        }
     });
 });

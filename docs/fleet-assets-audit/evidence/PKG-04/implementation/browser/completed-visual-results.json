@@ -1,0 +1,44 @@
+{
+  "checks": [
+    "Map-specific hero, actionable counts, stacked labelled filters, 12px aligned inspector/legend gap, visible layers control; 1152/1440 no overflow",
+    "Calendar search/date/vehicle controls and single request action live in hero; calendar starts directly below source controls; filtered export and Compare slots handoff work"
+  ],
+  "geometry": [
+    {
+      "width": 1440,
+      "overflow": false,
+      "aligned": 0,
+      "gap": 10.5,
+      "mapHeight": 748,
+      "stacked": true,
+      "layerIcon": true
+    },
+    {
+      "width": 1152,
+      "overflow": false,
+      "aligned": 0,
+      "gap": 10.5,
+      "mapHeight": 713,
+      "stacked": true,
+      "layerIcon": true
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "calendarTop": 361.125,
+      "headerBottom": 361.125,
+      "firstSlotTop": 206.375,
+      "searchOffset": 18
+    },
+    {
+      "width": 1152,
+      "overflow": false,
+      "calendarTop": 361.125,
+      "headerBottom": 361.125,
+      "firstSlotTop": 220.375,
+      "searchOffset": 18
+    }
+  ],
+  "errors": [],
+  "host": "http://127.0.0.1:8767"
+}

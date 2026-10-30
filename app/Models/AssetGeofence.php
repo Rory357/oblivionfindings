@@ -20,6 +20,8 @@ class AssetGeofence extends Model
         'alert_config',
         'time_rules',
         'is_active',
+        'address',
+        'permitted_uses',
     ];
 
     protected $casts = [
@@ -27,6 +29,12 @@ class AssetGeofence extends Model
         'alert_config' => 'array',
         'time_rules' => 'array',
         'is_active' => 'boolean',
+        'geometry_version' => 'integer',
+        'revision' => 'integer',
+        'client_location_eligible' => 'boolean',
+        'permitted_uses' => 'array',
+        'copy_source' => 'array',
+        'retired_at' => 'immutable_datetime',
     ];
 
     public function asset(): BelongsTo
@@ -53,7 +61,7 @@ class AssetGeofence extends Model
 
         return $query
             ->where('site_id', $siteId)
-            ->where('is_active', true)
+            ->where('is_active', true)->whereNull('retired_at')
             ->whereIn('scope', ['house', 'resident']);
     }
 }

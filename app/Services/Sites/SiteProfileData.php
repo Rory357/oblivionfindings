@@ -381,10 +381,12 @@ class SiteProfileData
             ->with('assignedAssets:id')
             ->orderByDesc('is_active')
             ->orderBy('name')
+            ->limit(20)
             ->get()
             ->map(fn ($geofence) => [
                 'id' => $geofence->id,
                 'name' => $geofence->name,
+                'retired_at' => $geofence->retired_at?->toIso8601String(),
                 'type' => $geofence->type,
                 'shape' => $geofence->shape,
                 'breach_type' => $geofence->breach_type,
@@ -510,7 +512,7 @@ class SiteProfileData
             'facilityZones as facility_zones_count' => fn (Builder $query) => $query->active(),
             'hazards as recent_hazards_count' => fn (Builder $query) => $query->where('updated_at', '>=', now()->subDays(90)),
             'hazards as open_hazards_count' => fn (Builder $query) => $query->whereIn('status', ['open', 'in_progress', 'reopened']),
-            'geofences as active_geofences_count' => fn (Builder $query) => $query->where('is_active', true),
+            'geofences as configured_geofences_count' => fn (Builder $query) => $query->whereNull('retired_at')->whereNotNull('shape'),
             'contacts as site_lead_contacts_count' => fn (Builder $query) => $query->whereIn('type', ['site_lead', 'manager']),
             'contacts as after_hours_contacts_count' => fn (Builder $query) => $query->where('type', 'emergency'),
             'contacts as emergency_contacts_count' => fn (Builder $query) => $query->whereIn('type', ['emergency', 'maintenance', 'manager']),

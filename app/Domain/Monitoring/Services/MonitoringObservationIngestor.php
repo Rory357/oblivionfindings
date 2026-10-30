@@ -63,7 +63,9 @@ final class MonitoringObservationIngestor
 
             [$metricDataClass, $metricPrivacyClass] = $this->metricClassification($locked);
 
+            $maintenanceEvidence = app(MaintenanceHistory::class)->resolve($locked, $input->observedAt);
             $observation = MonitorObservation::create([
+                'maintenance_policy_evidence' => $maintenanceEvidence,
                 'monitor_id' => $locked->id,
                 'source_key' => $input->sourceKey,
                 'state' => $input->state,
@@ -107,9 +109,9 @@ final class MonitoringObservationIngestor
             // observation itself remains immutable even when its notification
             // is suppressed by policy.
             $locked->save();
-            $locked->refresh()->load('profile');
+            $locked->refresh()->load(['profile', 'device']);
 
-            [$effectiveTo, $rootCauseMonitorId, $suppressionReason] = $this->effectiveState($locked, $input);
+            [$effectiveTo, $rootCauseMonitorId, $suppressionReason] = $this->effectiveState($locked, $input, $maintenanceEvidence);
             $effectiveChanged = $effectiveTo !== $effectiveFrom;
             $locked->effective_state = $effectiveTo;
             $locked->root_cause_monitor_id = $rootCauseMonitorId;
@@ -144,6 +146,16 @@ final class MonitoringObservationIngestor
             collectorReference: $collectorReference,
         );
         $result->observation->refresh();
+
+        if (! $result->duplicate && $result->stateChanged) {
+            app(MonitoringAlertNotificationDispatcher::class)->dispatchTransition(
+                monitor: $monitor,
+                observation: $result->observation,
+                siteId: $siteId,
+                from: $result->from,
+                to: $result->to,
+            );
+        }
 
         return $result;
     }
@@ -336,17 +348,21 @@ final class MonitoringObservationIngestor
     }
 
     /** @return array{MonitorState, ?int, ?string} */
-    private function effectiveState(Monitor $monitor, ObservationInput $input): array
+    private function effectiveState(Monitor $monitor, ObservationInput $input, array $maintenanceEvidence): array
     {
         if ($monitor->current_state->isFailure()) {
-            $window = $this->maintenance->activeWindow($monitor, $input->observedAt);
-            if ($window !== null && $window->policy === 'suppress_notifications_and_ticketing') {
+            $domain = (string) ($monitor->device?->domain ?? 'it_infrastructure');
+            $lifeSafetyProtected = in_array($domain, ['security', 'iot_healthcare'], true);
+
+            if (! $lifeSafetyProtected && $maintenanceEvidence['state'] === 'applied') {
                 return [MonitorState::Suppressed, null, 'maintenance'];
             }
 
-            $dependency = $this->dependencies->evaluate($monitor, $input->observedAt);
-            if ($dependency->effectiveState === MonitorState::Suppressed) {
-                return [MonitorState::Suppressed, $dependency->rootCauseMonitorId, 'dependency'];
+            if (! $lifeSafetyProtected) {
+                $dependency = $this->dependencies->evaluate($monitor, $input->observedAt);
+                if ($dependency->effectiveState === MonitorState::Suppressed) {
+                    return [MonitorState::Suppressed, $dependency->rootCauseMonitorId, 'dependency'];
+                }
             }
         }
 
@@ -369,8 +385,15 @@ final class MonitoringObservationIngestor
         $episode = MonitoringIssueEpisode::current($monitor, $siteId);
         $failureType = $monitor->affects_availability ? 'offline' : 'monitor_failed';
         $recoveryType = $monitor->affects_availability ? 'online' : 'monitor_recovered';
+        $warningTicketEnabled = false;
+        if ($to === MonitorState::Degraded && ! $monitor->affects_availability && $monitor->device->domain === 'it_infrastructure') {
+            $route = app(EffectiveMonitoringPolicyResolver::class)->resolveAlertRoute($monitor->device, $monitor, $siteId);
+            $warningTicketEnabled = $route['warning_open_it_ticket'] === true;
+        }
+
         $eventType = match (true) {
             $to === MonitorState::Failed && $from !== MonitorState::Failed => $failureType,
+            $to === MonitorState::Degraded && $from !== MonitorState::Degraded && $warningTicketEnabled => $failureType,
             $to === MonitorState::Healthy && ($from === MonitorState::Failed || $episode !== null) => $recoveryType,
             default => null,
         };
@@ -395,7 +418,7 @@ final class MonitoringObservationIngestor
         return DeviceEvent::create([
             'device_id' => $monitor->device_id,
             'event_type' => $eventType,
-            'severity' => $to === MonitorState::Failed ? 'high' : 'info',
+            'severity' => $to === MonitorState::Failed ? 'high' : ($to === MonitorState::Degraded ? 'medium' : 'info'),
             'source' => 'oblivion_monitoring',
             'occurred_at' => $input->observedAt,
             'payload' => [

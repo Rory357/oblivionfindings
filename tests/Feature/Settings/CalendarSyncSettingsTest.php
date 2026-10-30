@@ -312,7 +312,9 @@ test('manual sync rejects a mapping for a site that is no longer operational', f
         'ical_feed_token' => str_repeat('a', 48),
         'is_active' => true,
     ]);
-    $this->actingAs(calSyncAdmin())
+    $admin = calSyncAdmin();
+    Queue::fake(); // Observe manual sync denial after the staff and closed Site fixtures.
+    $this->actingAs($admin)
         ->post('/settings/calendar-sync/sync-now', ['mapping_id' => $mapping->id])
         ->assertForbidden();
 

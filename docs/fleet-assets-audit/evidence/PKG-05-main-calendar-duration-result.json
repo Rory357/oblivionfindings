@@ -1,0 +1,32 @@
+{
+  "candidate": "a285d4fe7dd1139e02a9bfb48c227946b754e199",
+  "sourcePath": "C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/resources/js/components/fleet-assets/transport/calendar-actions.ts",
+  "sourceSha256": "e574e1cd09933d31dca20de3f1b6c60e2fead63dfbc87c738f784ee5e30e3c7a",
+  "canonicalStart": "2027-04-04T01:30:00+13:00",
+  "canonicalEnd": "2027-04-04T03:30:00+12:00",
+  "durationMinutes": 180,
+  "probes": [
+    {
+      "browserTimezone": "UTC",
+      "actual": {
+        "start": "2027-04-05T01:30",
+        "end": "2027-04-05T03:30"
+      },
+      "expected": {
+        "start": "2027-04-05T01:30",
+        "end": "2027-04-05T04:30"
+      }
+    },
+    {
+      "browserTimezone": "Pacific/Auckland",
+      "actual": {
+        "start": "2027-04-05T01:30",
+        "end": "2027-04-05T04:30"
+      },
+      "expected": {
+        "start": "2027-04-05T01:30",
+        "end": "2027-04-05T04:30"
+      }
+    }
+  ]
+}

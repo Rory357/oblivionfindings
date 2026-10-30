@@ -182,7 +182,6 @@ function TaskCard({
                     {can.tasksManage && t.status === 'in_progress' ? (
                         <Button
                             size="sm"
-                            className="bg-status-success text-white hover:bg-status-success/90"
                             onClick={() => respiteActions.completeTask(t.id)}
                         >
                             <Check className="h-3.5 w-3.5" /> Complete

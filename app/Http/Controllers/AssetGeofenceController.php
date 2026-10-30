@@ -4,56 +4,29 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetGeofence;
-use App\Rules\GeofenceShape;
-use App\Services\AuditLogger;
+use App\Services\Fleet\BoundaryService;
 use Illuminate\Http\Request;
 
-class AssetGeofenceController extends Controller
+final class AssetGeofenceController extends Controller
 {
-    public function store(Request $request, Asset $asset)
+    public function store(Request $request, Asset $asset, BoundaryService $boundaries)
     {
         $this->authorize('manageGeofences', $asset);
+        $site = $asset->site_id ?? $asset->home_site_id;
+        abort_unless($site, 422, 'Assign an approved owning site before creating a shared boundary.');
+        $b = $boundaries->save($request->user(), array_replace($request->all(), ['site_id' => $site]));
 
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:150'],
-            'type' => ['required', 'in:circle,polygon'],
-            'shape' => ['required', 'array', new GeofenceShape],
-            'breach_type' => ['required', 'in:soft,hard'],
-            'time_rules' => ['nullable', 'array'],
-            'is_active' => ['boolean'],
-        ]);
-
-        $geofence = AssetGeofence::create([
-            'asset_id' => $asset->id,
-            'name' => $data['name'],
-            'type' => $data['type'],
-            'shape' => $data['shape'],
-            'breach_type' => $data['breach_type'],
-            'time_rules' => $data['time_rules'] ?? null,
-            'is_active' => $data['is_active'] ?? true,
-        ]);
-
-        AuditLogger::log('assets.geofence.created', $asset, [
-            'geofence_id' => $geofence->id,
-        ]);
-
-        return back()->with('success', 'Geofence created.');
+        return redirect('/fleet-assets/geofences?tab=boundaries&selected='.$b->id)
+            ->with('success', 'Shared boundary saved. Add a purpose rule to link this asset; monitoring remains inactive.');
     }
 
-    public function destroy(Request $request, Asset $asset, AssetGeofence $geofence)
+    public function destroy(Request $request, Asset $asset, AssetGeofence $geofence, BoundaryService $boundaries)
     {
         $this->authorize('manageGeofences', $asset);
+        abort_unless((int) $geofence->asset_id === (int) $asset->id, 404);
+        $data = $request->validate(['expected_revision' => ['required', 'integer'], 'reason' => ['required', 'string']]);
+        $boundaries->retire($request->user(), $geofence->id, $data['expected_revision'], $data['reason']);
 
-        if ($geofence->asset_id !== $asset->id) {
-            abort(404);
-        }
-
-        $geofence->delete();
-
-        AuditLogger::log('assets.geofence.deleted', $asset, [
-            'geofence_id' => $geofence->id,
-        ]);
-
-        return back()->with('success', 'Geofence removed.');
+        return back()->with('success', 'Shared boundary retired. Prior evidence retained.');
     }
 }

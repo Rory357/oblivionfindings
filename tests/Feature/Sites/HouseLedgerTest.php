@@ -264,6 +264,16 @@ class HouseLedgerTest extends TestCase
             ->mapWithKeys(fn (int $id) => [$id => ['allowed' => true]])
             ->all();
         $unprivileged->permissionOverrides()->attach($grants);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $unprivileged->id,
+            'primary_site_id' => $this->houseSite->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $this->assertTrue($unprivileged->fresh()->can('view', $this->houseSite));
+        $this->assertFalse($unprivileged->canDo('sites.ledger.view'));
 
         $this->actingAs($unprivileged)
             ->get("/sites/{$this->houseSite->id}/ledger/entries/{$entry->id}/download")
@@ -311,7 +321,12 @@ class HouseLedgerTest extends TestCase
 
         $this->actingAs($siteScopedUser)
             ->get("/sites/{$outsideSite->id}/ledger")
-            ->assertForbidden();
+            ->assertNotFound();
+
+        $missingSiteId = Site::query()->max('id') + 1;
+        $this->actingAs($siteScopedUser)
+            ->get("/sites/{$missingSiteId}/ledger")
+            ->assertNotFound();
     }
 
     public function test_site_show_defers_the_complete_house_ledger_to_its_financials_tab(): void

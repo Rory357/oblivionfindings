@@ -1,0 +1,52 @@
+{
+  "results": [
+    {
+      "name": "Every permitted request has exactly one stage",
+      "pass": true
+    },
+    {
+      "name": "Completed journey with custody exception stays completed in the chart",
+      "pass": true
+    },
+    {
+      "name": "Outstanding receipt survives journey completion in attention list",
+      "pass": true
+    },
+    {
+      "name": "Actual return does not imply journey completion",
+      "pass": true
+    },
+    {
+      "name": "Overdue actual journey is prioritised",
+      "pass": true
+    },
+    {
+      "name": "Cancelled demand is excluded from scheduled departure totals",
+      "pass": true
+    },
+    {
+      "name": "Every expected return is counted once",
+      "pass": true
+    },
+    {
+      "name": "Departure board excludes trips already underway or cancelled",
+      "pass": true
+    },
+    {
+      "name": "Scoped graphs exclude out-of-site request",
+      "pass": true
+    },
+    {
+      "name": "Empty sources give no invented activity",
+      "pass": true
+    },
+    {
+      "name": "Export reflects permitted scope without hidden names",
+      "pass": true
+    },
+    {
+      "name": "Export distinguishes scheduled from actual movement",
+      "pass": true
+    }
+  ]
+}

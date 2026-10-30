@@ -95,7 +95,12 @@ export function MakeRecurringDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
+            >
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Repeat className="h-5 w-5 text-primary" />
@@ -124,7 +129,7 @@ export function MakeRecurringDialog({
                                         className={cn(
                                             'rounded-full border px-3 py-1 text-xs font-medium',
                                             on
-                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                 : 'border-border bg-background text-foreground hover:bg-accent',
                                         )}
                                     >

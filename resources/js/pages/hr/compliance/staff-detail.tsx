@@ -46,7 +46,8 @@ interface ComplianceStatus {
 }
 
 interface Props {
-    staff: { id: number; name: string; email: string };
+    /** email is the HR work email; null when HR hasn't recorded one. */
+    staff: { id: number; name: string; email: string | null };
     complianceStatuses: ComplianceStatus[];
     summary: {
         compliant: number;
@@ -189,9 +190,11 @@ export default function StaffDetail({
                             <h1 className="text-2xl font-bold tracking-tight">
                                 {staff.name}
                             </h1>
-                            <p className="mt-1 text-[13px] text-primary-foreground/75">
-                                {staff.email}
-                            </p>
+                            {staff.email && (
+                                <p className="mt-1 text-[13px] text-primary-foreground/75">
+                                    {staff.email}
+                                </p>
+                            )}
                         </div>
                     </div>
                     <div className="flex items-center gap-5">
@@ -352,7 +355,7 @@ export default function StaffDetail({
                                                                 status: it.status,
                                                             })
                                                         }
-                                                        className="rounded-md bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+                                                        className="rounded-md bg-primary-fill px-2.5 py-1.5 text-[12px] font-semibold text-primary-fill-foreground"
                                                     >
                                                         Record
                                                     </GuardrailButton>

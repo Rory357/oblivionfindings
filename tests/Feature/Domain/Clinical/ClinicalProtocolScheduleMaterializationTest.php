@@ -27,6 +27,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class ClinicalProtocolScheduleMaterializationTest extends TestCase
@@ -559,6 +560,7 @@ class ClinicalProtocolScheduleMaterializationTest extends TestCase
 
     public function test_concurrent_reconciliation_converges_on_one_occurrence_set(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $protocol = ClinicalProtocol::factory()->dailyWeight()->create([

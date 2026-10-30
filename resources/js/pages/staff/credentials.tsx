@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Award } from 'lucide-react';
+import { useState } from 'react';
 
 import { PageHero } from '@/components/page';
 type Credential = {
@@ -36,6 +38,22 @@ export default function StaffCredentials({
         reference: '',
         notes: '',
     });
+
+    // Remove only opens the confirmation; the request is sent from it.
+    const [credentialToRemove, setCredentialToRemove] =
+        useState<Credential | null>(null);
+    const [removing, setRemoving] = useState(false);
+    const removeCredential = () => {
+        if (credentialToRemove === null) return;
+        form.delete(`/staff/${user.id}/credentials/${credentialToRemove.id}`, {
+            preserveScroll: true,
+            onStart: () => setRemoving(true),
+            onFinish: () => {
+                setRemoving(false);
+                setCredentialToRemove(null);
+            },
+        });
+    };
 
     return (
         <AppLayout
@@ -206,18 +224,10 @@ export default function StaffCredentials({
                                     {canManage ? (
                                         <Button
                                             variant="destructive"
-                                            onClick={() => {
-                                                if (
-                                                    !confirm(
-                                                        'Remove this credential?',
-                                                    )
-                                                )
-                                                    return;
-                                                form.delete(
-                                                    `/staff/${user.id}/credentials/${c.id}`,
-                                                    { preserveScroll: true },
-                                                );
-                                            }}
+                                            onClick={() =>
+                                                setCredentialToRemove(c)
+                                            }
+                                            aria-label={`Remove ${c.type}`}
                                         >
                                             Remove
                                         </Button>
@@ -232,6 +242,28 @@ export default function StaffCredentials({
                     </div>
                 </div>
             </PageShell>
+
+            <ConfirmDialog
+                open={credentialToRemove !== null}
+                onClose={() => {
+                    if (!removing) setCredentialToRemove(null);
+                }}
+                onConfirm={removeCredential}
+                title="Remove this credential?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {credentialToRemove?.type}
+                        </span>{' '}
+                        is deleted from {user.name}&apos;s credentials and
+                        can&apos;t be brought back. {user.name} and managers get
+                        a notification.
+                    </>
+                }
+                confirmText="Remove credential"
+                variant="destructive"
+                processing={removing}
+            />
         </AppLayout>
     );
 }

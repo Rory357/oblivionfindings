@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -106,14 +107,39 @@ class MedicationRound extends Model
         return $query->where('status', 'in_progress');
     }
 
+    /**
+     * The round's time: its NZ date and time (wall-clock), as an instant in
+     * the worker timezone. Null without a time.
+     */
+    public function scheduledAt(): ?Carbon
+    {
+        if (! $this->round_date || ! $this->scheduled_time) {
+            return null;
+        }
+
+        return Carbon::parse(
+            $this->round_date->toDateString().' '.substr((string) $this->scheduled_time, 0, 5),
+            (string) config('app.worker_timezone', 'Pacific/Auckland'),
+        );
+    }
+
+    /** The round's window, its time ± window_minutes (60 when unset). */
+    public function windowMinutes(): int
+    {
+        return max(0, (int) ($this->window_minutes ?? 60));
+    }
+
+    public function windowEndsAt(): ?Carbon
+    {
+        return $this->scheduledAt()?->addMinutes($this->windowMinutes());
+    }
+
+    /** Not started once its window has ended. */
     public function isOverdue(): bool
     {
-        if ($this->status !== 'pending') {
-            return false;
-        }
-        $scheduledAt = $this->round_date->copy()->setTimeFromTimeString($this->scheduled_time);
+        $endsAt = $this->windowEndsAt();
 
-        return now()->gt($scheduledAt->addMinutes($this->window_minutes));
+        return $this->status === 'pending' && $endsAt !== null && now()->gt($endsAt);
     }
 
     public function getCompletionPercentageAttribute(): float

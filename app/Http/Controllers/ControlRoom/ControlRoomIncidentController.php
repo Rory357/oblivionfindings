@@ -18,9 +18,12 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\AlertPriorityService;
 use App\Services\ControlRoom\AlertWorklistPresenter;
+use App\Services\ControlRoom\RestraintHsReferenceVisibility;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
 use App\Services\Incidents\IncidentJourneyService;
+use App\Services\Medication\MedicationErrorReadScope;
+use App\Services\Medication\MedicationErrorSummary;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -87,7 +90,7 @@ class ControlRoomIncidentController extends Controller
                 'playbookRun:id,playbook_id,status,current_step,completed_steps,total_steps',
                 'playbookRun.playbook:id,name',
                 'clientIncident:id,reference_number,control_room_alert_id,hs_event_id,status,severity,site_id,client_id,title,type,occurred_at',
-                'hsEvent:id,reference_number,control_room_alert_id,handover_status,status,severity,owner_user_id,accepted_by_user_id,accepted_at,site_id,client_id',
+                'hsEvent:id,reference_number,control_room_alert_id,handover_status,status,severity,owner_user_id,accepted_by_user_id,accepted_at,site_id,client_id,source_type',
                 'hsEvent.owner:id,name',
                 'hsEvent.acceptedBy:id,name',
             ])
@@ -106,17 +109,19 @@ class ControlRoomIncidentController extends Controller
         $sites = $sitesQuery->get(['id', 'name']);
 
         $lenses = collect([
-            ['key' => 'attention', 'label' => 'Needs attention', 'help' => 'Operational or governance work is still open.'],
-            ['key' => 'needs_incident', 'label' => 'Needs incident', 'help' => 'Create the formal incident record and H&S handover.'],
-            ['key' => 'awaiting_health_safety', 'label' => 'Awaiting H&S', 'help' => 'H&S has not accepted ownership yet.'],
-            ['key' => 'accepted_in_progress', 'label' => 'Accepted / in progress', 'help' => 'H&S owns the governance work while operations continue.'],
-            ['key' => 'operational_complete_governance_open', 'label' => 'Operations done / H&S open', 'help' => 'The alert is complete but governance work remains.'],
+            ['key' => 'attention', 'label' => 'Needs attention', 'help' => 'The response or the H&S follow-up is still open.'],
+            ['key' => 'needs_incident', 'label' => 'Needs an incident report', 'help' => 'Report the incident so H&S can take over its follow-up.'],
+            ['key' => 'awaiting_health_safety', 'label' => 'Waiting for H&S', 'help' => 'H&S has not accepted the follow-up yet.'],
+            ['key' => 'accepted_in_progress', 'label' => 'H&S in progress', 'help' => 'H&S owns the follow-up while the response continues.'],
+            ['key' => 'operational_complete_governance_open', 'label' => 'Response done, H&S open', 'help' => 'The response is finished; the H&S follow-up is still open.'],
             ['key' => 'complete', 'label' => 'Complete', 'help' => 'Operational and H&S work are both closed.'],
         ])->map(fn (array $lens) => $lens + [
             'count' => (int) $lensCounts->get($lens['key'], 0),
         ])->values();
 
         return Inertia::render('control-room/incidents', [
+            // Live counts on the Live response tabs (same rules as each tab).
+            'tabCounts' => fn () => app(\App\Services\ControlRoom\LiveResponseTabCounts::class)->for($user),
             'journeys' => $this->paginatorPayload($journeys),
             'filters' => $filters,
             'lenses' => $lenses,
@@ -162,15 +167,17 @@ class ControlRoomIncidentController extends Controller
         }
         if (! empty($filters['search'])) {
             $search = trim((string) $filters['search']);
-            $query->where(function (Builder $searchQuery) use ($search) {
+            $restraintReferences = app(RestraintHsReferenceVisibility::class);
+            $query->where(function (Builder $searchQuery) use ($search, $user, $restraintReferences) {
                 $searchQuery->where('control_room_alerts.reference_number', 'like', "%{$search}%")
                     ->orWhere('control_room_alerts.alert_type', 'like', "%{$search}%")
                     ->orWhere('control_room_alerts.notes', 'like', "%{$search}%")
                     ->orWhereHas('clientIncident', fn (Builder $incident) => $incident
                         ->where('reference_number', 'like', "%{$search}%")
                         ->orWhere('title', 'like', "%{$search}%"))
-                    ->orWhereHas('hsEvent', fn (Builder $event) => $event
-                        ->where('reference_number', 'like', "%{$search}%"));
+                    // A restraint's H&S reference finds its alert only for readers of that restraint.
+                    ->orWhereHas('hsEvent', fn (Builder $event) => $restraintReferences
+                        ->constrainReferenceSearch($event, $user, "%{$search}%"));
             });
         }
 
@@ -242,7 +249,9 @@ class ControlRoomIncidentController extends Controller
         $incident = $alert->clientIncident;
         $event = $alert->hsEvent;
         $canViewIncident = $viewer->canDo('incidents.viewAny') || $viewer->canDo('incidents.viewAssigned');
-        $canViewHealthSafety = $viewer->canDo('hazards.view');
+        // A restraint's H&S event keeps only its workflow state here unless the viewer can read the restraint.
+        $eventVisible = app(RestraintHsReferenceVisibility::class)->canSee($viewer, $event);
+        $canViewHealthSafety = $viewer->canDo('hazards.view') && $eventVisible;
 
         $stage = match (true) {
             $incident === null => 'needs_incident',
@@ -256,7 +265,7 @@ class ControlRoomIncidentController extends Controller
         $nextAction = match ($stage) {
             'needs_incident' => [
                 'key' => 'create_incident',
-                'label' => 'Create incident and hand over',
+                'label' => 'Report incident',
                 'href' => '/control-room/alerts/'.$alert->id,
             ],
             'awaiting_health_safety' => [
@@ -281,7 +290,9 @@ class ControlRoomIncidentController extends Controller
             ],
         };
 
-        return $worklist + [
+        // array_merge, not +: the journey's own next step must replace the
+        // generic "Continue response" the worklist row carries.
+        return array_merge($worklist, [
             'alert' => [
                 'id' => $alert->id,
                 'reference_number' => $alert->reference_number ?: null,
@@ -301,18 +312,18 @@ class ControlRoomIncidentController extends Controller
             ] : null,
             'health_safety' => $event ? [
                 'id' => $event->id,
-                'reference_number' => $event->reference_number ?: null,
+                'reference_number' => $eventVisible ? ($event->reference_number ?: null) : null,
                 'status' => $event->status,
                 'severity' => $event->severity,
                 'handover_status' => $event->handover_status,
-                'owner' => $event->owner ? ['id' => $event->owner->id, 'name' => $event->owner->name] : null,
-                'accepted_by' => $event->acceptedBy ? ['id' => $event->acceptedBy->id, 'name' => $event->acceptedBy->name] : null,
-                'accepted_at' => $event->accepted_at?->toIso8601String(),
+                'owner' => $eventVisible && $event->owner ? ['id' => $event->owner->id, 'name' => $event->owner->name] : null,
+                'accepted_by' => $eventVisible && $event->acceptedBy ? ['id' => $event->acceptedBy->id, 'name' => $event->acceptedBy->name] : null,
+                'accepted_at' => $eventVisible ? $event->accepted_at?->toIso8601String() : null,
                 'href' => $canViewHealthSafety ? '/health-safety/events/'.$event->id : null,
             ] : null,
             'stage' => $stage,
             'next_action' => $nextAction,
-        ];
+        ]);
     }
 
     /** @return array<string, mixed> */
@@ -384,20 +395,18 @@ class ControlRoomIncidentController extends Controller
                     $user,
                     MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
                 );
-                $sourceQuery = $medicationScope->scopeCanonicalClientMedicationRows(
+                $sourceQuery = app(MedicationErrorReadScope::class)->apply(
                     MedicationError::query()->with([
                         'client.site',
                         'medication' => fn ($query) => $query->withTrashed(),
                     ]),
+                    $user,
                     $readerSiteIds,
                 );
-                if (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
-                    $medicationScope->scopeWithoutControlledMedicationRows($sourceQuery);
-                }
                 $source = $sourceQuery->find($data['source_id']);
                 abort_unless($source, 404, 'The requested medication incident source was not found.');
-                $context['title'] = 'Medication Error: '.ucfirst(str_replace('_', ' ', $source->error_type ?? 'Unknown'));
-                $context['description'] = $source->description;
+                $context['title'] = 'Medication error '.$source->reference_number;
+                $context['description'] = MedicationErrorSummary::for($source);
                 $context['normalized_data'] = [
                     'client_medication_id' => $source->client_medication_id,
                     'controlled_drug' => (bool) $source->medication?->controlled_drug,

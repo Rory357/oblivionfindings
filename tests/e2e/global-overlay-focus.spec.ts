@@ -18,9 +18,10 @@ test.describe('shared overlay focus return', () => {
         await loginAsStaff(page);
         await page.goto('/control-room/settings');
 
-        const trigger = page
-            .locator('button[aria-label="Search modules"]:visible')
-            .first();
+        const trigger = page.getByRole('button', {
+            name: 'Search or jump to a page',
+            exact: true,
+        });
         const dialog = page.getByRole('dialog', {
             name: 'Search modules and pages',
         });

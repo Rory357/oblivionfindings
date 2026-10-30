@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Receipt missing kit validation",
+    "result": "passed"
+  },
+  {
+    "name": "Receipt fail/retry retains entries",
+    "result": "passed"
+  },
+  {
+    "name": "Receipt retry does not add another event",
+    "result": "passed"
+  },
+  {
+    "name": "Edit discard keeps authoritative identity",
+    "result": "passed"
+  },
+  {
+    "name": "Edit review/back and failed save retain draft",
+    "result": "passed"
+  },
+  {
+    "name": "Original check retains provenance and safe link retry",
+    "result": "passed"
+  },
+  {
+    "name": "Work details: notes draft and failed progress retained",
+    "result": "passed"
+  },
+  {
+    "name": "Terminal progress uses completion guard",
+    "result": "passed"
+  },
+  {
+    "name": "Private library search and unavailable/quarantined evidence",
+    "result": "failed",
+    "error": "TimeoutError: locator.click: Timeout 4500ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Service reportservice-report/ })\u001b[22m\n"
+  },
+  {
+    "name": "Upload validation, failure/retry and truthful simulated result",
+    "result": "passed"
+  },
+  {
+    "name": "Private library search and unavailable/quarantined evidence (corrected locator)",
+    "result": "passed"
+  },
+  {
+    "name": "Document archive requires reason and retains version",
+    "result": "passed"
+  },
+  {
+    "name": "Retirement does not bypass dependencies or Finance decision",
+    "result": "passed"
+  },
+  {
+    "name": "Cross-site recipient denied at submission",
+    "result": "passed"
+  },
+  {
+    "name": "Loan recipient, expected date and dispatch pending receipt",
+    "result": "passed"
+  },
+  {
+    "name": "Direct-object denial conceals identity and source details",
+    "result": "passed"
+  },
+  {
+    "name": "Read-only editing and Maintenance controls disabled",
+    "result": "passed"
+  },
+  {
+    "name": "Empty, unknown, archived, client-owned and vehicle states",
+    "result": "passed"
+  },
+  {
+    "name": "Concurrent assignment keeps draft for explicit reload",
+    "result": "passed"
+  }
+]

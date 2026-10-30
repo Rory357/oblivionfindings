@@ -49,6 +49,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Mockery\MockInterface;
 use Tests\TestCase;
+use Tests\Support\NotInThisBuild;
 
 class IncidentJourneyServiceTest extends TestCase
 {
@@ -1458,11 +1459,12 @@ class IncidentJourneyServiceTest extends TestCase
 
     public function test_medium_to_critical_promotion_reconciles_queue_sla_playbook_and_delivery_once_on_retry(): void
     {
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         $actor = User::factory()->create();
         $criticalRecipient = User::factory()->create();
         $acceptor = User::factory()->create();
-        $site = Site::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($criticalRecipient, $site);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $mediumQueue = TriageQueue::query()->create([
             'name' => 'Medium promotion queue',
@@ -1563,7 +1565,7 @@ class IncidentJourneyServiceTest extends TestCase
             'worksafe_reference' => 'WS-PROMOTION-CRITICAL',
         ]);
 
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         DB::beginTransaction();
         $promoted = app(IncidentJourneyService::class)->ensureAlertForIncident(
             $incident->fresh(),
@@ -1577,7 +1579,7 @@ class IncidentJourneyServiceTest extends TestCase
             'Critical clinical escalation',
             'critical',
         );
-        Notification::assertNotSentTo($criticalRecipient, ControlRoomAlertNotification::class);
+        $this->assertNotificationRows($criticalRecipient, 0);
         DB::commit();
 
         $alert = $alert->fresh();
@@ -1616,7 +1618,7 @@ class IncidentJourneyServiceTest extends TestCase
                 ->where('queue_id', $mediumQueue->id)
                 ->value('exited_at'),
         );
-        Notification::assertSentToTimes($criticalRecipient, ControlRoomAlertNotification::class, 1);
+        $this->assertNotificationRows($criticalRecipient, 1);
         $this->assertSame(
             1,
             Communication::query()
@@ -1633,11 +1635,13 @@ class IncidentJourneyServiceTest extends TestCase
     public function test_severity_routing_change_supersedes_pending_snapshot_before_delivering_the_new_generation(): void
     {
         Queue::fake([DeliverControlRoomAlertNotificationJob::class]);
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         $actor = User::factory()->create();
         $mediumRecipient = User::factory()->create();
         $criticalRecipient = User::factory()->create();
-        $site = Site::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($mediumRecipient, $site);
+        $this->prepareNotificationRecipient($criticalRecipient, $site);
         $client = Client::factory()->create(['site_id' => $site->id]);
         TriageQueue::query()->create([
             'name' => 'Medium snapshot queue',
@@ -1705,12 +1709,9 @@ class IncidentJourneyServiceTest extends TestCase
         $notifications->deliverStagedNotification($mediumDelivery);
         $notifications->deliverStagedNotification($criticalDelivery);
 
-        Notification::assertNotSentTo($mediumRecipient, ControlRoomAlertNotification::class);
-        Notification::assertSentTo(
-            $criticalRecipient,
-            ControlRoomAlertNotification::class,
-            fn (ControlRoomAlertNotification $notification): bool => $notification->toArray($criticalRecipient)['severity'] === 'critical',
-        );
+        $this->assertNotificationRows($mediumRecipient, 0);
+        $this->assertNotificationRows($criticalRecipient, 1);
+        $this->assertSame(1, $this->notificationRows($criticalRecipient)->where('data->severity', 'critical')->count());
         $this->assertSame('pending', $mediumDelivery->fresh()->status);
         $this->assertSame('sent', $criticalDelivery->fresh()->status);
         $this->assertDatabaseCount('control_room_communications', 2);
@@ -1719,9 +1720,12 @@ class IncidentJourneyServiceTest extends TestCase
     public function test_delivery_reconciles_a_recipient_configuration_change_into_the_current_outbox_generation(): void
     {
         Queue::fake([DeliverControlRoomAlertNotificationJob::class]);
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         $originalRecipient = User::factory()->create();
         $replacementRecipient = User::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($originalRecipient, $site);
+        $this->prepareNotificationRecipient($replacementRecipient, $site);
         $queue = TriageQueue::query()->create([
             'name' => 'Mutable recipient queue',
             'code' => 'mutable-recipient-queue',
@@ -1732,12 +1736,7 @@ class IncidentJourneyServiceTest extends TestCase
             'assigned_users' => [$originalRecipient->id],
             'is_active' => true,
         ]);
-        $alert = ControlRoomAlert::factory()->open()->create([
-            'source' => 'incident',
-            'alert_type' => 'incident.fall',
-            'severity' => 'high',
-            'queue_id' => $queue->id,
-        ]);
+        $alert = $this->canonicalNotificationAlert($site, $queue);
         $notifications = app(ControlRoomNotificationService::class);
         $original = $notifications
             ->stageAlertNotifications($alert, null, $queue)
@@ -1764,8 +1763,8 @@ class IncidentJourneyServiceTest extends TestCase
             'control-room-alert-notification-v2:'.data_get($replacement->notification_payload, 'routing_generation'),
             $replacement->template_used,
         );
-        Notification::assertNotSentTo($originalRecipient, ControlRoomAlertNotification::class);
-        Notification::assertNotSentTo($replacementRecipient, ControlRoomAlertNotification::class);
+        $this->assertNotificationRows($originalRecipient, 0);
+        $this->assertNotificationRows($replacementRecipient, 0);
         Queue::assertPushed(
             DeliverControlRoomAlertNotificationJob::class,
             fn (DeliverControlRoomAlertNotificationJob $job): bool => $job->communicationId === $replacementId,
@@ -1789,7 +1788,7 @@ class IncidentJourneyServiceTest extends TestCase
 
     public function test_new_explicit_incident_alert_initialises_queue_sla_and_automation_exactly_once(): void
     {
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         $actor = User::factory()->create();
         $assignee = User::factory()->create();
         $notificationRole = Role::query()->create([
@@ -1799,7 +1798,8 @@ class IncidentJourneyServiceTest extends TestCase
             'type' => 'custom',
         ]);
         $assignee->roles()->attach($notificationRole);
-        $site = Site::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($assignee, $site);
         $client = Client::factory()->create(['site_id' => $site->id]);
         $queue = TriageQueue::create([
             'name' => 'Critical incident queue',
@@ -1843,7 +1843,7 @@ class IncidentJourneyServiceTest extends TestCase
         );
         $alert = $first->alert->fresh();
 
-        Notification::assertNothingSent();
+        $this->assertDatabaseCount('notifications', 0);
         $this->assertDatabaseHas('control_room_communications', [
             'alert_id' => $alert->id,
             'target_user_id' => $assignee->id,
@@ -1863,8 +1863,8 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('control_room_alert_sla', 1);
         $this->assertDatabaseCount('control_room_alerts', 1);
         $this->assertDatabaseCount('hs_events', 1);
-        Notification::assertSentTo($assignee, ControlRoomAlertNotification::class);
-        Notification::assertCount(1);
+        $this->assertNotificationRows($assignee, 1);
+        $this->assertDatabaseCount('notifications', 1);
         $communication = Communication::query()->sole();
         $this->assertSame($alert->id, $communication->alert_id);
         $this->assertSame($assignee->id, $communication->target_user_id);
@@ -1922,7 +1922,10 @@ class IncidentJourneyServiceTest extends TestCase
 
     public function test_after_commit_delivery_failure_is_persisted_and_retry_succeeds_without_duplicates_or_request_failure(): void
     {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s ControlRoomNotificationService rewrite, which this build doesn\'t port; notifications behave as on live main.', 'port with the Control Room work.'));
         $recipient = User::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($recipient, $site);
         $queue = TriageQueue::query()->create([
             'name' => 'Durable notification queue',
             'code' => 'durable-notification',
@@ -1933,17 +1936,15 @@ class IncidentJourneyServiceTest extends TestCase
             'assigned_users' => [$recipient->id],
             'is_active' => true,
         ]);
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
+        $originalDispatcher = $this->app->make(Dispatcher::class);
         $dispatcher = \Mockery::mock(Dispatcher::class);
         $dispatcher->shouldReceive('send')
             ->once()
             ->andThrow(new \RuntimeException('Forced post-commit notification failure'));
         $this->app->instance(Dispatcher::class, $dispatcher);
         DB::beginTransaction();
-        $alert = ControlRoomAlert::factory()->open()->create([
-            'source' => 'incident',
-            'alert_type' => 'incident.fall',
-            'severity' => 'high',
-        ]);
+        $alert = $this->canonicalNotificationAlert($site);
         app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert);
         $this->assertDatabaseHas('control_room_communications', [
             'alert_id' => $alert->id,
@@ -1965,11 +1966,11 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($recipient->id, $failed->target_user_id);
         $this->assertSame('failed', $failed->status);
         $this->assertSame(1, $failed->retry_count);
-        $this->assertStringContainsString('Forced post-commit notification failure', (string) $failed->status_detail);
+        $this->assertSame('notification_delivery_failed', $failed->status_detail);
         $this->assertSame($queue->id, $alert->fresh()->queue_id);
 
-        $notificationFake = Notification::fake();
-        $this->app->instance(Dispatcher::class, $notificationFake);
+        $this->app->instance(Dispatcher::class, $originalDispatcher);
+        $this->app->forgetInstance(ControlRoomNotificationService::class);
         $this->app->forgetInstance(IncidentAlertOperationalInitializer::class);
         DB::beginTransaction();
         app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert->fresh());
@@ -1979,28 +1980,33 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame('sent', $delivered->status);
         $this->assertNotNull($delivered->sent_at);
         $this->assertNull($delivered->status_detail);
-        Notification::assertSentToTimes($recipient, ControlRoomAlertNotification::class, 1);
+        $this->assertNotificationRows($recipient, 1);
 
         DB::beginTransaction();
         app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert->fresh());
         DB::commit();
 
-        Notification::assertSentToTimes($recipient, ControlRoomAlertNotification::class, 1);
+        $this->assertNotificationRows($recipient, 1);
         $this->assertDatabaseCount('control_room_communications', 1);
         $this->assertDatabaseCount('control_room_alert_queue', 1);
     }
 
     public function test_recovery_sweep_delivers_a_stranded_outbox_row_exactly_once(): void
     {
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         $recipient = User::factory()->create();
         $freshRecipient = User::factory()->create();
         $exhaustedRecipient = User::factory()->create();
-        $alert = ControlRoomAlert::factory()->open()->create([
-            'source' => 'incident',
-            'alert_type' => 'incident.fall',
-            'severity' => 'high',
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($recipient, $site);
+        $this->prepareNotificationRecipient($freshRecipient, $site);
+        $this->prepareNotificationRecipient($exhaustedRecipient, $site);
+        $queue = TriageQueue::query()->create([
+            'name' => 'Stranded notification recipients', 'code' => 'stranded-notification-recipients',
+            'tier' => 1, 'is_active' => true,
+            'assigned_users' => [$recipient->id, $freshRecipient->id, $exhaustedRecipient->id],
         ]);
+        $alert = $this->canonicalNotificationAlert($site, $queue);
         $communication = Communication::query()->create([
             'delivery_key' => hash('sha256', 'stranded-control-room-notification'),
             'alert_id' => $alert->id,
@@ -2053,20 +2059,22 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame('sent', $communication->status);
         $this->assertSame(1, $communication->retry_count);
         $this->assertNull($communication->status_detail);
-        Notification::assertSentToTimes($recipient, ControlRoomAlertNotification::class, 1);
+        $this->assertNotificationRows($recipient, 1);
         $this->assertSame('failed', $freshCommunication->fresh()->status);
         $this->assertSame(1, $freshCommunication->fresh()->retry_count);
-        Notification::assertNotSentTo($freshRecipient, ControlRoomAlertNotification::class);
+        $this->assertNotificationRows($freshRecipient, 0);
         $this->assertSame('failed', $exhaustedCommunication->fresh()->status);
         $this->assertSame(3, $exhaustedCommunication->fresh()->retry_count);
-        Notification::assertNotSentTo($exhaustedRecipient, ControlRoomAlertNotification::class);
+        $this->assertNotificationRows($exhaustedRecipient, 0);
         $this->assertDatabaseCount('control_room_communications', 3);
     }
 
     public function test_incident_alert_operational_initialisation_rolls_back_without_notification_leak(): void
     {
-        Notification::fake();
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
         $recipient = User::factory()->create();
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $this->prepareNotificationRecipient($recipient, $site);
         TriageQueue::create([
             'name' => 'Rollback queue',
             'code' => 'rollback-queue',
@@ -2088,12 +2096,8 @@ class IncidentJourneyServiceTest extends TestCase
         ]);
 
         try {
-            DB::transaction(function (): void {
-                $alert = ControlRoomAlert::factory()->open()->create([
-                    'source' => 'incident',
-                    'alert_type' => 'incident.fall',
-                    'severity' => 'high',
-                ]);
+            DB::transaction(function () use ($site): void {
+                $alert = $this->canonicalNotificationAlert($site);
                 app(IncidentAlertOperationalInitializer::class)->initialiseNewAlert($alert);
 
                 throw new \RuntimeException('Force operational transaction rollback');
@@ -2106,7 +2110,7 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 0);
         $this->assertDatabaseCount('control_room_alert_queue', 0);
         $this->assertDatabaseCount('control_room_alert_sla', 0);
-        Notification::assertNothingSent();
+        $this->assertDatabaseCount('notifications', 0);
     }
 
     public function test_attach_uses_the_sensor_compatible_alert_then_incident_lock_order(): void
@@ -2450,6 +2454,7 @@ class IncidentJourneyServiceTest extends TestCase
             'handover_status',
         ]);
 
+        $alertCountBefore = ControlRoomAlert::query()->count();
         $exception = null;
         try {
             app(IncidentJourneyService::class)->ensureForSubmittedIncident($incident, $actor);
@@ -2462,7 +2467,7 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertSame($incidentBefore, $incident->fresh()->only(array_keys($incidentBefore)));
         $this->assertEquals($alertBefore, $alert->fresh()->only(array_keys($alertBefore)));
         $this->assertSame($directBefore, $directEvent->fresh()->only(array_keys($directBefore)));
-        $this->assertDatabaseCount('control_room_alerts', 1);
+        $this->assertDatabaseCount('control_room_alerts', $alertCountBefore);
         $this->assertDatabaseCount('client_incidents', 1);
         $this->assertDatabaseCount('hs_events', 1);
     }
@@ -2685,6 +2690,76 @@ class IncidentJourneyServiceTest extends TestCase
         $this->assertDatabaseCount('control_room_alerts', 1);
     }
 
+    public function test_notification_does_not_deliver_an_unproved_copied_root_note(): void
+    {
+        $this->markTestSkipped(NotInThisBuild::reason(NotInThisBuild::OTHER_MODULE, 'it needs Codex\'s ControlRoomNotificationService rewrite, which this build doesn\'t port; notifications behave as on live main.', 'port with the Control Room work.'));
+        config(['queue.default' => 'sync', 'cache.default' => 'array']);
+        $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+        $recipient = User::factory()->create();
+        $this->prepareNotificationRecipient($recipient, $site);
+        $queue = TriageQueue::query()->create([
+            'name' => 'Unproved copy notification', 'code' => 'unproved-copy-notification',
+            'tier' => 1, 'is_active' => true, 'assigned_users' => [$recipient->id],
+        ]);
+        $alert = $this->canonicalNotificationAlert($site, $queue);
+        $context = $alert->context;
+        // A hostile persisted origin claim has no canonical copy or normal audit receipt.
+        // It is a negative fixture, never a fabricated source grant.
+        $context['saved_incident_copy'] = [
+            'copy_uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'source_family' => 'client_incident', 'source_version' => 1,
+            'target_family' => \App\Services\Incidents\IncidentSavedCopyService::ALERT_NOTES_TARGET,
+            'target_key' => (string) $alert->id, 'field' => 'notes',
+        ];
+        $alert->forceFill(['notes' => 'PRIVATE unproved root copy', 'context' => $context])->saveQuietly();
+
+        $rows = app(ControlRoomNotificationService::class)->stageAlertNotifications($alert->fresh(), null, $queue);
+
+        $this->assertCount(0, $rows);
+        $this->assertNotificationRows($recipient, 0);
+        $this->assertDatabaseCount('control_room_communications', 0);
+    }
+
+    /** Current, explicitly scoped notification reader; no invented saved-copy grant. */
+    private function prepareNotificationRecipient(User $user, Site $site): void
+    {
+        $user->forceFill(['approved_at' => now(), 'external_clinical_account' => false])->saveOrFail();
+        \ensureCanonicalHrStaffProfile($user, $site);
+        foreach (['controlRoom.viewAny', 'controlRoom.alerts.view', 'incidents.viewAny', 'hazards.view', 'clients.viewAny', 'sites.view'] as $key) {
+            $permission = \App\Models\Permission::query()->firstOrCreate(['key' => $key], ['description' => $key]);
+            $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+        }
+        $user->unsetRelations();
+    }
+
+    /** Genuine consistent persisted source tuple; no journey command or copy receipt is fabricated. */
+    private function canonicalNotificationAlert(Site $site, ?TriageQueue $queue = null): ControlRoomAlert
+    {
+        $reporter = User::factory()->frontlineWorker()->create();
+        $client = Client::factory()->create(['site_id' => $site->id]);
+        $incident = $this->submittedIncidentWithoutEvents($client, $site, $reporter, ['severity' => 'high']);
+        $alert = ControlRoomAlert::factory()->open()->create([
+            'source' => 'incident', 'alert_type' => 'incident.fall', 'severity' => 'high',
+            'site_id' => $site->id, 'client_id' => $client->id, 'queue_id' => $queue?->id,
+            'context' => ['incident_id' => $incident->id], 'notes' => null,
+        ]);
+        $event = HsEvent::factory()->forClientIncident($incident)->create([
+            'control_room_alert_id' => $alert->id, 'handover_status' => HsEvent::HANDOVER_AWAITING_ACCEPTANCE,
+        ]);
+        $incident->updateQuietly(['control_room_alert_id' => $alert->id, 'hs_event_id' => $event->id]);
+        return $alert->fresh();
+    }
+
+    private function notificationRows(User $user): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('notifications')->where('type', ControlRoomAlertNotification::class)
+            ->where('notifiable_type', $user->getMorphClass())->where('notifiable_id', $user->id);
+    }
+
+    private function assertNotificationRows(User $user, int $count): void
+    {
+        $this->assertSame($count, $this->notificationRows($user)->count());
+    }
     /**
      * @param  array<string, mixed>  $overrides
      * @return array<string, mixed>

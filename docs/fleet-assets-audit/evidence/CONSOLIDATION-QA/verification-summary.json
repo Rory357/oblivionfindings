@@ -1,0 +1,52 @@
+{
+  "sourceCommit": "9782faab62efa0cabe518b0a799a3ad6cd1ffbb5",
+  "backend": {
+    "uniqueLatestClassTests": 494,
+    "assertions": 5905,
+    "failures": 0,
+    "skipped": 0,
+    "evidence": "backend-final-summary.json",
+    "singleMonolithicRun": false
+  },
+  "frontend": {
+    "exitCode": 0,
+    "tests": 77,
+    "files": 18,
+    "evidence": "frontend-tests.json",
+    "scope": "frontend-scope.json"
+  },
+  "typescript": {
+    "exitCode": 0,
+    "scope": "Full repository no-emit typecheck",
+    "evidence": "typescript.log"
+  },
+  "eslint": {
+    "exitCode": 0,
+    "scope": "Non-test TS/TSX approved incoming source paths",
+    "evidence": "eslint.log"
+  },
+  "pint": {
+    "exitCode": 0,
+    "scope": "Nine reconciled/QA PHP paths excluding baseline routes/web.php",
+    "evidence": "pint-final.log",
+    "baselineException": "routes/web.php has the same four pre-existing formatter failures in Main; original and baseline logs retained."
+  },
+  "productionBuild": {
+    "exitCode": 0,
+    "duration": "3m57s",
+    "evidence": "production-build.log",
+    "warning": "Existing large chunk warning",
+    "applicationEntry": "assets/app-khc5tsDn.js",
+    "applicationEntrySha256": "87825ac974d5864819ce701ca3db22f3fd3eb6a06c977925061ff0a93591732f",
+    "manifestSha256": "d79912bb00537fb61b8e6fb5611c049946307f5cae0a1db7d6998f606d6152cb",
+    "builtSource": "f3fd2f77657c7fe09022ff69562e8c3487c9668b",
+    "finalFrontendDelta": ""
+  },
+  "hostedCi": {
+    "newRun": false,
+    "historicalRun": "https://github.com/Rory357/oblivionfindings/actions/runs/36360000862/job/108735214135",
+    "historicalEvidence": "published-architecture-ci-failure.log",
+    "unrelatedControlRoomMyTasks": "Unchanged and not claimed fixed"
+  },
+  "externalSideEffects": "No Main branch update, push, publication or deployment."
+}

@@ -7,7 +7,9 @@ use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Enums\AssuranceStatus;
+use App\Models\Client;
 use App\Models\Permission;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
 use App\Models\SiteCertification;
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class NzsAssuranceResolverTest extends TestCase
@@ -187,6 +190,8 @@ class NzsAssuranceResolverTest extends TestCase
         $resolver = app(NzsAssuranceResolver::class);
         $site = Site::factory()->create();
         $staff = User::factory()->create();
+        $context = ServiceContext::factory()->create();
+        $client = Client::factory()->create(['site_id' => $site->id, 'service_context_id' => $context->id]);
         $start = now()->addDay()->startOfHour();
         $end = $start->copy()->addHours(8);
 
@@ -196,8 +201,8 @@ class NzsAssuranceResolverTest extends TestCase
         );
 
         $shift = Shift::factory()->forSite($site)->create([
-            'client_id' => null,
-            'service_context_id' => null,
+            'client_id' => $client->id,
+            'service_context_id' => $context->id,
             'user_id' => $staff->id,
             'starts_at' => $start,
             'ends_at' => $end,
@@ -234,8 +239,8 @@ class NzsAssuranceResolverTest extends TestCase
         $status->forceFill(['expires_at' => $end->copy()->addMonth()])->save();
         $unqualified = User::factory()->create();
         Shift::factory()->forSite($site)->create([
-            'client_id' => null,
-            'service_context_id' => null,
+            'client_id' => $client->id,
+            'service_context_id' => $context->id,
             'user_id' => $unqualified->id,
             'starts_at' => $start,
             'ends_at' => $end->copy()->addHour(),
@@ -333,6 +338,7 @@ class NzsAssuranceResolverTest extends TestCase
 
     public function test_concurrent_replacements_serialize_one_current_head_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $site = Site::factory()->create();

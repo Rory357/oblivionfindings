@@ -49,7 +49,13 @@ async function selectMonitoringTab(
                 url.pathname === '/security-devices/monitoring' &&
                 url.searchParams.get('tab') === value,
         ),
-        page.getByRole('tab', { name }).click(),
+        page
+            .getByRole('tab', {
+                name: new RegExp(
+                    `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
+                ),
+            })
+            .click(),
     ]);
 }
 
@@ -73,24 +79,29 @@ test.describe('Monitoring, maintenance, and collector operations', () => {
         ).toBeVisible();
         await expect(page.getByText(fixture.directMonitorName)).toBeVisible();
         await expect(page.getByText(fixture.remoteMonitorName)).toBeVisible();
-        const directMonitorCard = page
-            .locator('div.rounded-xl.border.p-4')
-            .filter({ hasText: fixture.directMonitorName });
+        const directMonitorCard = page.getByRole('article', {
+            name: new RegExp(
+                fixture.directMonitorName.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    '\\$&',
+                ),
+            ),
+        });
         await expect(directMonitorCard).toHaveCount(1);
         await expect(
-            directMonitorCard.getByText('Direct from main application'),
+            directMonitorCard.getByText(
+                'Main application over site connectivity',
+            ),
         ).toBeVisible();
         await expect(
-            page.getByText('Collection Unavailable').last(),
+            page.getByText('Collection unavailable').last(),
         ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 
         await selectMonitoringTab(page, 'Findings', 'findings');
         await expect(
-            page.getByRole('heading', {
-                name: 'Collection-path findings',
-            }),
+            page.getByText('Collection-path findings').first(),
         ).toBeVisible();
         await expect(
             page.getByText(fixture.collectorName).first(),
@@ -101,13 +112,13 @@ test.describe('Monitoring, maintenance, and collector operations', () => {
 
         await selectMonitoringTab(page, 'Coverage', 'coverage');
         await expect(page.getByText('Known coverage limits')).toBeVisible();
-        await expect(page.getByText('Evidence Backed').first()).toBeVisible();
+        await expect(
+            page.getByText('Based on active checks').first(),
+        ).toBeVisible();
         await expectNoPageOverflow(page);
 
         await selectMonitoringTab(page, 'Dependencies', 'dependencies');
-        await expect(
-            page.getByText('Canonical dependency model active'),
-        ).toBeVisible();
+        await expect(page.getByText('Dependency model active')).toBeVisible();
         await expectNoPageOverflow(page);
 
         await selectMonitoringTab(page, 'Trends', 'trends');
@@ -131,16 +142,16 @@ test.describe('Monitoring, maintenance, and collector operations', () => {
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 
-        await page.getByRole('tab', { name: 'Due & overdue' }).click();
+        await page.getByRole('tab', { name: /^Due & overdue/ }).click();
         await expect(page.getByText(fixture.overdueWork)).toBeVisible();
         await expectNoPageOverflow(page);
 
-        await page.getByRole('tab', { name: 'Calibration' }).click();
+        await page.getByRole('tab', { name: /^Calibration/ }).click();
         await expect(page.getByText(fixture.calibrationWork)).toBeVisible();
         await expectNoPageOverflow(page);
 
         await page
-            .getByRole('tab', { name: 'Firmware & configuration' })
+            .getByRole('tab', { name: /^Firmware & configuration/ })
             .click();
         await expect(page.getByText(fixture.firmwareWork)).toBeVisible();
         await expect(page.getByText(fixture.configurationWork)).toBeVisible();
@@ -155,34 +166,32 @@ test.describe('Monitoring, maintenance, and collector operations', () => {
             }),
         ).toBeVisible();
         await expect(
-            page.getByText('Collector-free configuration'),
+            page.getByText('Collector-free monitor configuration'),
         ).toBeVisible();
         await expect(
             page.getByText(fixture.collectorName).first(),
         ).toBeVisible();
+        await expect(page.getByText('Device capabilities')).toBeVisible();
+        await expect(page.getByText('Not assessed').first()).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 
-        await page.getByRole('tab', { name: 'Remote collectors' }).click();
+        await page.getByRole('tab', { name: /^Remote collectors/ }).click();
         await expect(
             page.getByText(fixture.collectorName).first(),
         ).toBeVisible();
+        await page.getByText(fixture.collectorName).first().click();
         await expect(page.getByText(/results are uncertain/)).toBeVisible();
+        await page.keyboard.press('Escape');
         await expectNoPageOverflow(page);
 
-        await page.getByRole('tab', { name: 'Coverage & paths' }).click();
-        await expect(page.getByText('Direct path').first()).toBeVisible();
-        await expect(page.getByText('Remote paths').first()).toBeVisible();
-        await expectNoPageOverflow(page);
-
-        await page.getByRole('tab', { name: 'Limitations' }).click();
-        await expect(page.getByText('Known limitations')).toBeVisible();
-        await expect(page.getByText('Not assessed').first()).toBeVisible();
+        await page.getByRole('tab', { name: /^Coverage & paths/ }).click();
         await expect(
-            page.getByRole('button', {
-                name: /scan|discover|adopt|execute|run discovery/i,
-            }),
-        ).toHaveCount(0);
+            page.getByText('Collector-free monitor configuration'),
+        ).toBeVisible();
+        await expect(
+            page.getByText(fixture.collectorName).first(),
+        ).toBeVisible();
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 

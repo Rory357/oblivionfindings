@@ -1,0 +1,59 @@
+{
+    "database": "oblivion_findings_pkg07_preview",
+    "migration_exit": 0,
+    "existing_evidence_unchanged": true,
+    "before": {
+        "asset_geofences": {
+            "rows": 127,
+            "sha256": "5a879969d7ad4c96683a2d59e52aedd91ebd131d310ad56ac16b075ec7dfb5b9"
+        },
+        "boundary_versions": {
+            "rows": 128,
+            "sha256": "7c37ebcaadcc204a1f81ff63da04efe8919295e12dfba6034fe0f9056025401d"
+        },
+        "fleet_vehicle_geofence_assignments": {
+            "rows": 11,
+            "sha256": "663aca8c5fa6e54250fc371c58eb5c564e911788b25d41e8f3260fc946f8154f"
+        },
+        "boundary_rule_versions": {
+            "rows": 11,
+            "sha256": "0eddbe4379993c176f3a8d9d87ff286c2aa1d7be2c65f03bf015be0064a13eb9"
+        },
+        "fleet_signals": {
+            "rows": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "audit_logs": {
+            "rows": 252,
+            "sha256": "9caade72f067f3a72e1968c6cf4d99dff8f3c16fadf00b9be330142f0c7839db"
+        }
+    },
+    "after": {
+        "asset_geofences": {
+            "rows": 127,
+            "sha256": "5a879969d7ad4c96683a2d59e52aedd91ebd131d310ad56ac16b075ec7dfb5b9"
+        },
+        "boundary_versions": {
+            "rows": 128,
+            "sha256": "7c37ebcaadcc204a1f81ff63da04efe8919295e12dfba6034fe0f9056025401d"
+        },
+        "fleet_vehicle_geofence_assignments": {
+            "rows": 11,
+            "sha256": "663aca8c5fa6e54250fc371c58eb5c564e911788b25d41e8f3260fc946f8154f"
+        },
+        "boundary_rule_versions": {
+            "rows": 11,
+            "sha256": "0eddbe4379993c176f3a8d9d87ff286c2aa1d7be2c65f03bf015be0064a13eb9"
+        },
+        "fleet_signals": {
+            "rows": 0,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        },
+        "audit_logs": {
+            "rows": 252,
+            "sha256": "9caade72f067f3a72e1968c6cf4d99dff8f3c16fadf00b9be330142f0c7839db"
+        }
+    },
+    "rule_boundary_nullable": "YES",
+    "signal_source_column": true
+}

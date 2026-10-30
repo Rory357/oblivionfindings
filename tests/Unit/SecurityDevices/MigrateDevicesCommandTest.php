@@ -7,7 +7,6 @@ use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
 use App\Models\Client;
-use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\LocationHardware;
 use App\Models\Site;
@@ -17,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class MigrateDevicesCommandTest extends TestCase
@@ -229,18 +229,23 @@ class MigrateDevicesCommandTest extends TestCase
 
     public function test_creates_person_assignment_from_location_hardware(): void
     {
-        $client = Client::factory()->create();
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create([
-                'name' => 'Personal Tracker (Wandering Risk)',
-            ])->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'given_method' => 'verbal',
+        $client = Client::factory()->create([
+            'site_id' => Site::factory()->create(['is_active' => true, 'archived' => false])->id,
+            'status' => 'active',
         ]);
+        $user = User::factory()->create();
+        $consent = AuthoritativeConsentFixture::manualSelf(
+            $client,
+            ConsentType::factory()->create([
+                'name' => 'Personal Tracker (Wandering Risk)',
+                'purpose' => 'Client personal safety tracking',
+                'active' => true,
+            ]),
+            $user,
+        );
         $lhId = $this->insertLocationHardware([
             'category' => 'tracker',
+            'site_id' => $client->site_id,
             'linked_person_type' => 'client',
             'linked_person_id' => $client->id,
         ]);
@@ -255,6 +260,8 @@ class MigrateDevicesCommandTest extends TestCase
         $this->assertNotNull($clientAssignment);
         $this->assertEquals($client->id, $clientAssignment->assignable_id);
         $this->assertEquals($consent->id, $clientAssignment->consent_id);
+        $this->assertEquals($client->site_id, $clientAssignment->custody_site_id);
+        $this->assertSame(1, $device->assignments()->active()->where('assignable_type', DeviceAssignment::TARGET_CLIENT)->count());
     }
 
     public function test_creates_asset_link_from_location_hardware(): void
@@ -460,18 +467,20 @@ class MigrateDevicesCommandTest extends TestCase
 
     public function test_tracker_consent_creates_client_assignment(): void
     {
-        $client = Client::factory()->create();
-        $user = User::factory()->create();
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create([
-                'name' => 'Asset Location Tracking (Safety)',
-            ])->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'given_by_user_id' => $user->id,
-            'given_method' => 'verbal',
+        $client = Client::factory()->create([
+            'site_id' => Site::factory()->create(['is_active' => true, 'archived' => false])->id,
+            'status' => 'active',
         ]);
+        $user = User::factory()->create();
+        $consent = AuthoritativeConsentFixture::manualSelf(
+            $client,
+            ConsentType::factory()->create([
+                'name' => 'Asset Location Tracking (Safety)',
+                'purpose' => 'Client personal safety tracking',
+                'active' => true,
+            ]),
+            $user,
+        );
 
         $atId = $this->insertAssetTracker(['consent_id' => $consent->id]);
 
@@ -485,6 +494,8 @@ class MigrateDevicesCommandTest extends TestCase
         $this->assertNotNull($clientAssignment);
         $this->assertEquals($client->id, $clientAssignment->assignable_id);
         $this->assertEquals($consent->id, $clientAssignment->consent_id);
+        $this->assertEquals($client->site_id, $clientAssignment->custody_site_id);
+        $this->assertSame(1, $device->assignments()->active()->where('assignable_type', DeviceAssignment::TARGET_CLIENT)->count());
     }
 
     // ── Cross-cutting ─────────────────────────────────────────────

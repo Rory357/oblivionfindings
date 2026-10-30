@@ -1,0 +1,199 @@
+{
+  "results": [
+    {
+      "view": "overview",
+      "width": 1280,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "overview",
+      "width": 1366,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "overview",
+      "width": 1440,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "overview",
+      "width": 1920,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "requests",
+      "width": 1280,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "requests",
+      "width": 1366,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "requests",
+      "width": 1440,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "requests",
+      "width": 1920,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "planner",
+      "width": 1280,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "planner",
+      "width": 1366,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "planner",
+      "width": 1440,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "planner",
+      "width": 1920,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "calendar",
+      "width": 1280,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "calendar",
+      "width": 1366,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "calendar",
+      "width": 1440,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "calendar",
+      "width": 1920,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "journeys",
+      "width": 1280,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "journeys",
+      "width": 1366,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "journeys",
+      "width": 1440,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "journeys",
+      "width": 1920,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "returns",
+      "width": 1280,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "returns",
+      "width": 1366,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "returns",
+      "width": 1440,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    },
+    {
+      "view": "returns",
+      "width": 1920,
+      "heroToHeadingGap": 18,
+      "canonicalGap": 18,
+      "sectionBelowHeading": true,
+      "overflow": false
+    }
+  ],
+  "errors": [],
+  "warnings": [],
+  "passed": true
+}

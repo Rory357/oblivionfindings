@@ -80,7 +80,7 @@ function scopeClientProfileFoundationUserToSite(
 it('hydrates every Add Client step when completing an existing profile', function () {
     $site = Site::factory()->create(['is_active' => true]);
     $user = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
-    grantClientProfileFoundationPermissions($user, ['clients.update']);
+    grantClientProfileFoundationPermissions($user, ['clients.update', 'clients.viewAny', 'medications.view']);
     scopeClientProfileFoundationUserToSite($user, $site, 'coordinator');
     $client = Client::factory()->create([
         'site_id' => $site->id,
@@ -113,9 +113,14 @@ it('hydrates every Add Client step when completing an existing profile', functio
         'can_receive_updates' => true,
     ]);
 
+    expect($user->can('update', $client))->toBeTrue()
+        ->and($user->can('view', $client))->toBeTrue()
+        ->and($user->can('viewMedications', $client))->toBeTrue();
+
     $this->actingAs($user)
         ->getJson("/operations/clients/{$client->id}/edit?modal=1")
         ->assertOk()
+        ->assertJsonPath('can_edit_medical', true)
         ->assertJsonPath('initialValues.ethnicity', 'Māori')
         ->assertJsonPath('initialValues.languages.1', 'Te Reo Māori')
         ->assertJsonPath('initialValues.mobility_needs', 'Walking frame')
@@ -143,7 +148,7 @@ it('round trips the complete profile wizard payload through update and edit hydr
         'role' => 'support_worker',
         'approved_at' => now(),
     ]);
-    grantClientProfileFoundationPermissions($manager, ['clients.update']);
+    grantClientProfileFoundationPermissions($manager, ['clients.update', 'clients.viewAny', 'medications.view']);
     scopeClientProfileFoundationUserToSite($manager, $site, 'coordinator');
     scopeClientProfileFoundationUserToSite($worker, $site);
     $room = SiteHouseRoom::query()->create([
@@ -251,6 +256,10 @@ it('round trips the complete profile wizard payload through update and edit hydr
         ],
     ];
 
+    expect($manager->can('update', $client))->toBeTrue()
+        ->and($manager->can('view', $client))->toBeTrue()
+        ->and($manager->can('viewMedications', $client))->toBeTrue();
+
     $this->actingAs($manager)
         ->from("/operations/clients/{$client->id}")
         ->put("/operations/clients/{$client->id}", $payload)
@@ -347,6 +356,7 @@ it('round trips the complete profile wizard payload through update and edit hydr
     $this->actingAs($manager)
         ->getJson("/operations/clients/{$client->id}/edit?modal=1")
         ->assertOk()
+        ->assertJsonPath('can_edit_medical', true)
         ->assertJsonPath('initialValues.first_name', 'Ariana')
         ->assertJsonPath('initialValues.languages.1', 'Te Reo Māori')
         ->assertJsonPath('initialValues.transport_needs.1', 'support_person')
@@ -421,6 +431,8 @@ it('scopes edit wizard options to the canonical client Site and clears ineligibl
     $ownSite = Site::factory()->create(['name' => 'Own house']);
     $otherSite = Site::factory()->create(['name' => 'Other house']);
     $thirdSite = Site::factory()->create(['name' => 'Third house']);
+    // clients.update no longer bypasses the client's Site (a8ffbc6ae).
+    scopeClientProfileFoundationUserToSite($manager, $ownSite, 'manager');
     $ownContext = ServiceContext::factory()->create([
         'site_id' => $ownSite->id,
         'name' => 'Own context',
@@ -595,6 +607,7 @@ it('requires retained Site-bound options to be cleared when the Site is cleared'
     $manager = User::factory()->create();
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
     $site = Site::factory()->create(['name' => 'Current Site']);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'manager');
     $context = ServiceContext::factory()->create(['site_id' => $site->id]);
     $geofence = AssetGeofence::query()->create([
         'site_id' => $site->id,
@@ -643,6 +656,7 @@ it('preserves omitted Site-bound fields on an unrelated profile update', functio
     $manager = User::factory()->create();
     grantClientProfileFoundationPermissions($manager, ['clients.update']);
     $site = Site::factory()->create(['name' => 'Current Site']);
+    scopeClientProfileFoundationUserToSite($manager, $site, 'manager');
     $historicalSite = Site::factory()->create(['name' => 'Historical Site']);
     $historicalContext = ServiceContext::factory()->create([
         'site_id' => $historicalSite->id,
@@ -783,7 +797,10 @@ it('requires granular consent authority and parent client access', function () {
     $accessibleSite = Site::factory()->create(['is_active' => true]);
     $otherSite = Site::factory()->create(['is_active' => true]);
     $updater = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+    // The updater can see the Client, so only the missing consents.record
+    // capability refuses the write (store() 404s Clients it can't view).
     grantClientProfileFoundationRole($updater, 'manager', [
+        'clients.viewAny',
         'clients.update',
     ]);
     scopeClientProfileFoundationUserToSite($updater, $accessibleSite, 'coordinator');
@@ -829,8 +846,10 @@ it('enforces consent nesting and only withdraws a currently given consent once',
     $client = Client::factory()->create(['site_id' => $site->id]);
     $otherClient = Client::factory()->create(['site_id' => $site->id]);
     $consentType = ConsentType::factory()->create(['active' => true]);
+    // Consents carry their canonical Site (1bade924d), as the app records them.
     $given = ClientConsent::query()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'consent_type_id' => $consentType->id,
         'status' => 'given',
         'given_at' => now(),
@@ -840,6 +859,7 @@ it('enforces consent nesting and only withdraws a currently given consent once',
     ]);
     $refused = ClientConsent::query()->create([
         'client_id' => $client->id,
+        'site_id' => $site->id,
         'consent_type_id' => $consentType->id,
         'status' => 'refused',
         'given_at' => now(),

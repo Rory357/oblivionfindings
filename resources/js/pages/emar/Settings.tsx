@@ -1,508 +1,1164 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+    ConnectedEntryPoints,
+    useConnectedAccess,
+} from './connected/_entry-points';
+import { ErrorTriageSettings } from './settings/_error-triage';
+/* Medication › Settings (eMAR P11 v5). The Fleet Settings workspace pattern:
+ * one PageHeader page with a rail of views, Sections (TierTwoTabs) inside each
+ * view, titled groups of Switch rows, drafts that survive moving between tabs
+ * and views, a sticky save bar with "Review … changes", an unsaved-draft
+ * guard, and a change history every save and "Keep today's value" writes. */
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { formatTime } from '@/lib/datetime';
+import { Sections } from '@/pages/fleet-assets/settings/_ui';
 import { Head, router } from '@inertiajs/react';
 import {
+    Bell,
+    History,
+    Home,
+    Layers,
     Pencil,
-    Plus,
-    Settings2,
-    ShieldCheck,
-    Stethoscope,
-    Trash2,
+    Pill,
+    RefreshCw,
+    Repeat,
+    Settings as SettingsIcon,
+    UserCheck,
+    type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
-
-type Option = { value: string; label: string };
-
-type Rule = {
-    id: number;
-    site_id: number | null;
-    site_name: string | null;
-    match_type: string;
-    match_value: string;
-    requires_countersign: boolean;
-    required_observations: string[];
-    active: boolean;
-    created_by: string | null;
-    created_at: string | null;
-};
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    AlertLog,
+    AlertLogView,
+    LOG_RANGE,
+    LOG_SHOW,
+    type AlertLogPage,
+} from './settings/_alert-log';
+import {
+    AlertDialogHost,
+    AlertsDelivery,
+    AlertsOverview,
+    AlertsTable,
+    type AlertAccess,
+    type AlertData,
+    type AlertPerson,
+    type AlertPreview,
+} from './settings/_alerts';
+import {
+    ConnectedServicesSettings,
+    type ConnectedStatus,
+} from './settings/_connected';
+import {
+    SettingsCtx,
+    type Dialog,
+    type SettingsContext,
+} from './settings/_context';
+import { ControlledProductSettings } from './settings/_controlled-product';
+import { DialogHost } from './settings/_dialogs';
+import { EmergencyAccess } from './settings/_emergency';
+import {
+    AllChanges,
+    HISTORY_FILTERS,
+    StillToDecide,
+    type HistoryFilters,
+} from './settings/_history';
+import { HouseLens } from './settings/_house-lens';
+import { hasSettingsMeters, SettingsMeters } from './settings/_meters';
+import {
+    changes,
+    stillToDecide,
+    validateView,
+    type AlertReach,
+    type Draft,
+    type SettingsPayload,
+    type ViewKey,
+} from './settings/_model';
+import {
+    parseHash,
+    sectionLabel,
+    SET_VIEWS,
+    settingsHash,
+    settingsSectionTabs,
+    visibleViews,
+    type Built,
+} from './settings/_nav';
+import {
+    OnCallContacts,
+    OnCallDialogHost,
+    type OnCallData,
+} from './settings/_oncall';
+import { MedicinePhotos } from './settings/_photos';
+import { ReachDialogHost, type ReachGap } from './settings/_reach';
+import { RecordsReporting } from './settings/_records-reporting';
+import { ReviewCadenceSettings } from './settings/_reviews';
+import {
+    MedicineRules,
+    RuleDialogHost,
+    RulesOverview,
+    settingsRuleData,
+    type MedicineRule,
+    type RuleOptions,
+} from './settings/_rules';
+import {
+    PIN_STATUS_OPTIONS,
+    pinHouseOptions,
+    PinStatus,
+    SafetyChecks,
+    WitnessPins,
+    type WitnessPinProps,
+} from './settings/_sections';
+import { Competency, ExemptionLimit, StaffOverview } from './settings/_staff';
+import { useStatusMessage } from './settings/_status';
+import {
+    houseOf,
+    RoundTemplates,
+    TEMPLATE_STATUS_OPTIONS,
+    TemplateDialogHost,
+    type RoundTemplate,
+    type TemplateAccess,
+    type TemplateData,
+    type TemplateStaff,
+} from './settings/_templates';
+import { DoseTiming, RoundsOverview } from './settings/_timing';
+import { SaveBar, StatusMessage } from './settings/_ui';
 
 type Props = {
-    rules: Rule[];
+    rules: MedicineRule[];
+    ruleOptions: RuleOptions;
+    /** Houses this person can see; the house choices for medicine rules. */
     sites: { id: number; name: string }[];
-    observationOptions: Option[];
-    matchTypes: Option[];
-    can: { manage: boolean; manage_global: boolean };
+    settingsCan: { manage: boolean; manage_global: boolean };
+    settings: SettingsPayload;
+    witnessPin: WitnessPinProps;
+    /** false = a house lead who can only reset PINs sees Staff & PINs, read-only. */
+    settingsAccess: boolean;
+    controlledSettingsAccess: { view: boolean; manageable_site_ids: number[] };
+    /** An auditor: every view and the change history, read-only (P11 answer 6). */
+    readOnlyAudit: boolean;
+    /** Round templates this person can read (Rounds & timing › Round templates). */
+    roundTemplates: RoundTemplate[];
+    /** Whether they manage templates (orders.manage at a house), and where. */
+    templateAccess: TemplateAccess;
+    templateStaff: TemplateStaff[];
+    /** Alerts & access (P11 B2): who sees it and what they change. */
+    alertAccess: AlertAccess;
+    /** People who can be named on an alert. */
+    alertPeople: AlertPerson[];
+    /** Names of everyone already named on an alert, by id. */
+    alertNames: Record<string, string>;
+    /** Who each alert group would tell at each house (the safety net's warning). */
+    alertReach: AlertReach;
+    /** Open alerts nobody could be told about. */
+    alertNobodyOpen: number;
+    /** Message preview samples, rendered by the real notification (B2 C2). */
+    alertPreviews: Record<string, AlertPreview>;
+    /** Of the people who can get alerts, how many have push set up. */
+    alertDelivery: { push_ready: number; people: number };
+    /** On-call contacts (B2 C4), one per house this person sees. */
+    onCall: OnCallData;
+    /** Houses this person sees, for their quiet hours (B2 C5). */
+    alertHouses: { id: number; name: string }[];
+    /** People with a contact gap: Who can't be reached (B2 C5). */
+    alertReachGaps: ReachGap[];
+    emergencyPolicyAccess: boolean;
+    /** Settings › Connected services: whether each feature is set up (D4). */
+    connectedStatus?: ConnectedStatus;
+    alertLog: AlertLogPage | null;
+    alertLogSummary: { recent: number; open: number };
 };
 
-const GLOBAL_SITE = 'global';
+const VIEW_ICON: Record<ViewKey, LucideIcon> = {
+    connections: Layers,
+    rules: Pill,
+    rounds: Repeat,
+    staff: UserCheck,
+    alerts: Bell,
+    history: History,
+};
+/** Tabs whose settings are saved through the save bar. */
+const SAVED_SECTIONS = [
+    'safety',
+    'photos',
+    'reviews',
+    'timing',
+    'competency',
+    'exemptions',
+    'pins',
+    'alerts',
+    'delivery',
+    'emergency',
+    // Connected services › Switches and checks (D4).
+    'services',
+];
+const SHOW_OPTIONS = [
+    { value: 'all', label: 'All settings' },
+    { value: 'open', label: 'Not yet reviewed' },
+    { value: 'changed', label: 'Unsaved changes' },
+];
+const ALERT_SHOW_OPTIONS = [
+    { value: 'all', label: 'All alerts' },
+    { value: 'open', label: 'Not yet reviewed' },
+    { value: 'changed', label: 'Unsaved changes' },
+    { value: 'email', label: 'Email on' },
+    { value: 'push', label: 'Push on' },
+];
 
-type FormState = {
-    site_id: string;
-    match_type: string;
-    match_value: string;
-    requires_countersign: boolean;
-    required_observations: string[];
-    active: boolean;
+export type Filters = {
+    show: string;
+    logHouse: string;
+    logShow: string;
+    logRange: string;
+    rulesWhere: string;
+    rulesState: string;
+    pinState: string;
+    pinHouse: string;
+    tplHouse: string;
+    tplStatus: string;
+    history: HistoryFilters;
+};
+const F0: Filters = {
+    show: 'all',
+    logHouse: 'all',
+    logShow: 'all',
+    logRange: 'recent',
+    rulesWhere: 'all',
+    rulesState: 'all',
+    pinState: 'all',
+    pinHouse: 'all',
+    tplHouse: 'all',
+    tplStatus: 'current',
+    history: HISTORY_FILTERS,
 };
 
-function blankForm(
-    matchTypes: Option[],
-    sites: Props['sites'],
-    canManageGlobal: boolean,
-): FormState {
-    return {
-        site_id: canManageGlobal
-            ? GLOBAL_SITE
-            : (sites[0]?.id.toString() ?? ''),
-        match_type: matchTypes[0]?.value ?? 'medicine_name',
-        match_value: '',
-        requires_countersign: true,
-        required_observations: [],
-        active: true,
-    };
-}
+const DirtyDot = () => (
+    <span
+        role="img"
+        aria-label="Unsaved changes"
+        className="size-2 rounded-full bg-status-warning"
+    />
+);
 
-export default function EmarSettings({
-    rules,
-    sites,
-    observationOptions,
-    matchTypes,
-    can,
-}: Props) {
-    const [open, setOpen] = useState(false);
-    const [editing, setEditing] = useState<Rule | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState<FormState>(
-        blankForm(matchTypes, sites, can.manage_global),
+export default function EmarSettings(props: Props) {
+    const { witnessPin, settingsAccess, readOnlyAudit, alertAccess } = props;
+    // The settings, with the names alert values list and house names, so
+    // every change reads in words (P11 B2).
+    const s = useMemo(
+        () => ({
+            ...props.settings,
+            people_names: {
+                ...props.alertNames,
+                ...Object.fromEntries(
+                    props.alertPeople.map((p) => [p.id, p.name]),
+                ),
+            },
+            site_names: Object.fromEntries(
+                props.sites.map((x) => [x.id, x.name]),
+            ),
+            oncall_houses: (props.onCall?.houses ?? []).map((h) => ({
+                site_id: h.site_id,
+                name: h.name,
+                configured: !!h.rule,
+                contact: h.rule?.backup
+                    ? {
+                          id: h.rule.backup.id,
+                          name: h.rule.backup.name,
+                          detail:
+                              h.rule.mode === 'fixed'
+                                  ? 'Configured fixed contact'
+                                  : 'Configured backup contact',
+                      }
+                    : undefined,
+            })),
+            alert_reach: {
+                houses: props.alertReach.houses,
+                people: {
+                    ...props.alertReach.people,
+                    ...Object.fromEntries(
+                        props.alertPeople.map((p) => [
+                            p.id,
+                            {
+                                ok: true,
+                                site_ids: p.site_ids,
+                                controlled: p.controlled,
+                            },
+                        ]),
+                    ),
+                },
+            },
+        }),
+        [
+            props.settings,
+            props.alertNames,
+            props.alertPeople,
+            props.alertReach,
+            props.sites,
+            props.onCall?.houses,
+        ],
+    );
+    const connectedAccess = useConnectedAccess();
+    const hasConnections = Boolean(
+        connectedAccess.pharmacyConnectManage ||
+        connectedAccess.externalManage ||
+        connectedAccess.transfersManage ||
+        connectedAccess.catalogueManage ||
+        connectedAccess.backupsManage,
+    );
+    // P11 F1 + Q2: people who manage or read a house's round templates
+    // reach them here without other Settings access.
+    const templatesOnly = !settingsAccess && props.templateAccess.read;
+    const built: Built = useMemo(
+        () => ({
+            rules: settingsAccess
+                ? [
+                      'overview',
+                      'medicines',
+                      'safety',
+                      ...(s.groups.review_cadence ? ['reviews'] : []),
+                      ...(s.groups.packPhoto || s.groups.packPhotoReceipt
+                          ? ['photos']
+                          : []),
+                      'records',
+                      ...(props.controlledSettingsAccess.view
+                          ? ['controlled']
+                          : []),
+                  ]
+                : [],
+            // P11 F1: whoever manages a house's round templates reaches them
+            // here, and nothing else they couldn't already reach.
+            rounds: settingsAccess
+                ? ['overview', 'templates', 'timing']
+                : templatesOnly
+                  ? ['templates']
+                  : [],
+            staff: settingsAccess
+                ? ['overview', 'competency', 'exemptions', 'pins', 'status']
+                : witnessPin.can_reset
+                  ? ['pins', 'status']
+                  : [],
+            // P11 B2: settings readers, and house managers for their houses' extras.
+            alerts: alertAccess.view
+                ? [
+                      'overview',
+                      'alerts',
+                      'delivery',
+                      'triage',
+                      'oncall',
+                      'emergency',
+                      'log',
+                  ]
+                : [],
+            // D4: link cards for connected-service managers; the switches for settings managers.
+            connections: [
+                ...(hasConnections ? ['overview'] : []),
+                ...(settingsAccess ? ['services'] : []),
+            ],
+            history: settingsAccess ? ['decide', 'changes'] : [],
+        }),
+        [
+            settingsAccess,
+            hasConnections,
+            templatesOnly,
+            witnessPin.can_reset,
+            props.controlledSettingsAccess.view,
+            alertAccess.view,
+            s.groups.review_cadence,
+            s.groups.packPhoto,
+            s.groups.packPhotoReceipt,
+        ],
+    );
+    const [route, setRoute] = useState(() =>
+        parseHash(window.location.hash, built),
+    );
+    const { view, sec } = route;
+    const breadcrumbs = useEmarBreadcrumbs(
+        `/emar/settings${settingsHash(view, sec)}`,
+    ).map((crumb, index, trail) =>
+        index === trail.length - 1
+            ? {
+                  ...crumb,
+                  title:
+                      sec === 'overview'
+                          ? SET_VIEWS[view].label
+                          : sectionLabel(view, sec),
+                  href: `/emar/settings${settingsHash(view, sec)}`,
+              }
+            : crumb,
+    );
+    const [draft, setDraftState] = useState<Draft>({});
+    const [dialog, setDialog] = useState<Dialog | null>(null);
+    const [lensOpen, setLensOpen] = useState(false);
+    const status = useStatusMessage();
+    const setMessage = status.show;
+    const [query, setQuery] = useState(() =>
+        route.view === 'alerts' && route.sec === 'log'
+            ? (new URLSearchParams(window.location.search).get('log_q') ?? '')
+            : '',
+    );
+    const [f, setF] = useState<Filters>(() => {
+        const params = new URLSearchParams(window.location.search);
+        return {
+            ...F0,
+            logHouse: params.get('log_house') || 'all',
+            logShow: params.get('log_show') || 'all',
+            logRange: params.get('log_range') || 'recent',
+        };
+    });
+    const [page, setPage] = useState(1);
+    const [loadedAt, setLoadedAt] = useState(() => new Date());
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [freshAfter] = useState(() =>
+        Math.max(0, ...s.history.map((h) => h.id)),
+    );
+    const allowLeave = useRef(false);
+    const unsaved = changes(s, draft);
+    const pending = stillToDecide(s);
+
+    const go = useCallback(
+        (nextView: ViewKey, nextSec?: string) => {
+            const next = parseHash(settingsHash(nextView, nextSec), built);
+            setRoute(next);
+            setQuery('');
+            setPage(1);
+            setMessage(null);
+            window.history.replaceState(
+                window.history.state,
+                '',
+                settingsHash(next.view, next.sec),
+            );
+        },
+        [built, setMessage],
+    );
+    useEffect(() => {
+        const onHash = () => {
+            setRoute(parseHash(window.location.hash, built));
+            setMessage(null);
+        };
+        window.addEventListener('hashchange', onHash);
+        window.addEventListener('popstate', onHash);
+        return () => {
+            window.removeEventListener('hashchange', onHash);
+            window.removeEventListener('popstate', onHash);
+        };
+    }, [built, setMessage]);
+
+    // The server says what was saved; show it on the page (Fleet's status
+    // message). A save redirects back without the #view/tab, so put it back.
+    useEffect(
+        () =>
+            router.on('success', (event) => {
+                const saved = (
+                    event.detail.page.props.flash as
+                        | { medication_settings_saved?: string | null }
+                        | undefined
+                )?.medication_settings_saved;
+                if (saved) setMessage(saved);
+                if (!window.location.hash)
+                    window.history.replaceState(
+                        window.history.state,
+                        '',
+                        settingsHash(view, sec),
+                    );
+            }),
+        [view, sec, setMessage],
     );
 
-    const matchTypeLabel = (value: string) =>
-        matchTypes.find((t) => t.value === value)?.label ?? value;
-    const observationLabel = (value: string) =>
-        observationOptions.find((o) => o.value === value)?.label ?? value;
-
-    function openCreate() {
-        setEditing(null);
-        setForm(blankForm(matchTypes, sites, can.manage_global));
-        setOpen(true);
-    }
-
-    function openEdit(rule: Rule) {
-        setEditing(rule);
-        setForm({
-            site_id: rule.site_id ? rule.site_id.toString() : GLOBAL_SITE,
-            match_type: rule.match_type,
-            match_value: rule.match_value,
-            requires_countersign: rule.requires_countersign,
-            required_observations: rule.required_observations ?? [],
-            active: rule.active,
-        });
-        setOpen(true);
-    }
-
-    function toggleObservation(value: string) {
-        setForm((current) => ({
-            ...current,
-            required_observations: current.required_observations.includes(value)
-                ? current.required_observations.filter((o) => o !== value)
-                : [...current.required_observations, value],
-        }));
-    }
-
-    function submit() {
-        if (!form.match_value.trim()) {
-            toast.error(
-                'Enter a keyword to match (e.g. Warfarin, Intravenous).',
-            );
-            return;
-        }
-        if (
-            !form.requires_countersign &&
-            form.required_observations.length === 0
-        ) {
-            toast.error(
-                'A rule must require a countersignature and/or at least one observation.',
-            );
-            return;
-        }
-
-        const payload = {
-            site_id: form.site_id === GLOBAL_SITE ? null : Number(form.site_id),
-            match_type: form.match_type,
-            match_value: form.match_value.trim(),
-            requires_countersign: form.requires_countersign,
-            required_observations: form.required_observations,
-            active: form.active,
+    // Fleet's leave guard: leaving with an unsaved draft asks first.
+    const dirty = unsaved.length > 0;
+    useEffect(() => {
+        const beforeUnload = (event: BeforeUnloadEvent) => {
+            if (dirty && !allowLeave.current) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
         };
-
-        const options = {
-            preserveScroll: true,
-            onStart: () => setSaving(true),
-            onFinish: () => setSaving(false),
-            onSuccess: () => setOpen(false),
-        };
-
-        if (editing) {
-            router.put(`/emar/settings/rules/${editing.id}`, payload, options);
-        } else {
-            router.post('/emar/settings/rules', payload, options);
-        }
-    }
-
-    function remove(rule: Rule) {
-        if (!window.confirm(`Remove the rule for "${rule.match_value}"?`))
-            return;
-        router.delete(`/emar/settings/rules/${rule.id}`, {
-            preserveScroll: true,
+        window.addEventListener('beforeunload', beforeUnload);
+        const remove = router.on('before', (event) => {
+            if (
+                dirty &&
+                !allowLeave.current &&
+                event.detail.visit.method === 'get' &&
+                !event.detail.visit.only.length
+            ) {
+                event.preventDefault();
+                setDialog({
+                    kind: 'guard',
+                    url: event.detail.visit.url.toString(),
+                });
+            }
         });
-    }
+        return () => {
+            window.removeEventListener('beforeunload', beforeUnload);
+            remove();
+        };
+    }, [dirty]);
+
+    // A value "Review changes" can't save: its field takes focus (v5). A
+    // discarded or saved draft takes its message with it.
+    useEffect(() => {
+        document
+            .querySelector<HTMLElement>('main [aria-invalid="true"]')
+            ?.focus();
+    }, [errors]);
+    useEffect(() => {
+        setErrors((e) => {
+            const kept = Object.entries(e).filter(([id]) => {
+                const [group, key] = id.split('.');
+                return draft[group]?.[key] !== undefined;
+            });
+            return kept.length === Object.keys(e).length
+                ? e
+                : Object.fromEntries(kept);
+        });
+    }, [draft]);
+    const review = () => {
+        const found = validateView(s, draft, view);
+        setErrors(found);
+        const first = Object.keys(found)[0];
+        if (!first) {
+            setDialog({ kind: 'review', view });
+            return;
+        }
+        const [group, slot] = first.split('.');
+        // A house setting's error names its house: "hours@12".
+        const section = s.definitions[group]?.[slot.split('@')[0]]?.section;
+        if (section && section !== sec) go(view, section);
+    };
+
+    const templateData: TemplateData = {
+        templates: props.roundTemplates,
+        access: props.templateAccess,
+        staff: props.templateStaff,
+        readOnlyAudit,
+    };
+    const ruleData = settingsRuleData({ ...props, readOnlyAudit });
+    const onCallData: OnCallData = props.onCall ?? { houses: [], staff: {} };
+    const alertData: AlertData = {
+        access: alertAccess,
+        people: props.alertPeople,
+        sites: props.sites,
+        readOnlyAudit,
+        nobodyOpen: props.alertNobodyOpen,
+        previews: props.alertPreviews ?? {},
+        delivery: props.alertDelivery ?? { push_ready: 0, people: 0 },
+        onCall: onCallData,
+        houses: props.alertHouses ?? [],
+        reachGaps: props.alertReachGaps ?? [],
+        logSummary: props.alertLogSummary ?? { recent: 0, open: 0 },
+    };
+    // House extras and quiet hours: their own houses' managers (B2 Q3,
+    // Q12); everything else needs all-sites authority.
+    const canEdit = (group: string) =>
+        !!s.groups[group] &&
+        (group === 'ea'
+            ? !readOnlyAudit && props.emergencyPolicyAccess
+            : group === 'alertExtra' || group === 'quietHouse'
+              ? !readOnlyAudit && alertAccess.house_ids.length > 0
+              : s.can_manage_organisation);
+    const ctx: SettingsContext = {
+        s,
+        draft,
+        setDraft: (fn) => setDraftState(fn),
+        canEdit,
+        go,
+        open: (next) => {
+            // The walkthrough confirms in its own success pane; the page's
+            // message waits until it closes.
+            if (
+                next?.kind === 'reviewdefaults' ||
+                next?.kind === 'rule' ||
+                next?.kind === 'tpl'
+            )
+                status.hold();
+            setDialog(next);
+        },
+        close: () => {
+            setDialog(null);
+            status.release();
+        },
+        flash: setMessage,
+        freshAfter,
+        errors,
+        clearError: (id) =>
+            setErrors((e) => {
+                if (!e[id]) return e;
+                const next = { ...e };
+                delete next[id];
+                return next;
+            }),
+        leave: (url) => {
+            allowLeave.current = true;
+            setDialog(null);
+            setDraftState({});
+            router.visit(url);
+        },
+    };
+
+    const refresh = () =>
+        router.reload({
+            only: [
+                'settings',
+                'witnessPin',
+                'rules',
+                'roundTemplates',
+                'alertPeople',
+                'alertNames',
+                'alertReach',
+                'alertNobodyOpen',
+                'alertDelivery',
+                'onCall',
+                'alertHouses',
+                'alertReachGaps',
+            ],
+            onSuccess: () => setLoadedAt(new Date()),
+        });
+    const viewGroups = Object.values(s.groups).filter((g) => g.view === view);
+    const editable = viewGroups.some((g) => canEdit(g.key));
+    // Part of the one-line subline, so it stays short: houses are counted
+    // past one ("At a house" names them).
+    // Without Settings access the rail shows what they reach (alert extras,
+    // PIN resets, round templates); the subline only says where.
+    const accessText = readOnlyAudit
+        ? 'Read-only for audit'
+        : !settingsAccess
+          ? 'Your houses only'
+          : s.can_manage_organisation
+            ? 'All-sites authority'
+            : `${props.sites.length === 1 ? props.sites[0].name : `${props.sites.length || 'No'} houses`} · organisation rules read-only`;
+    const select = (
+        label: string,
+        value: string,
+        options: { value: string; label: string }[],
+        onChange: (v: string) => void,
+        icon?: LucideIcon,
+        allValue = 'all',
+    ) => (
+        <PageHeaderFilterSelect
+            key={label}
+            icon={icon}
+            label={label}
+            value={value}
+            allValue={allValue}
+            options={options}
+            onChange={(v) => {
+                onChange(v);
+                setPage(1);
+            }}
+        />
+    );
+    const historyWho = [
+        ...new Set(s.history.map((h) => h.who).filter(Boolean)),
+    ] as string[];
+    const historyWhere = [
+        ...new Set(s.history.map((h) => h.site_name ?? 'All houses')),
+    ];
+    const sectionFilters =
+        view === 'rules' && sec === 'medicines' ? (
+            <>
+                {select(
+                    'Where',
+                    f.rulesWhere,
+                    [
+                        { value: 'all', label: 'All rules' },
+                        { value: 'all-houses', label: 'All-houses rules' },
+                        ...props.sites.map((x) => ({
+                            value: String(x.id),
+                            label: `Applies at ${x.name}`,
+                        })),
+                    ],
+                    (v) => setF({ ...f, rulesWhere: v }),
+                    Home,
+                )}
+                {select(
+                    'Status',
+                    f.rulesState,
+                    [
+                        { value: 'all', label: 'Any status' },
+                        { value: 'active', label: 'Active' },
+                        { value: 'paused', label: 'Paused' },
+                    ],
+                    (v) => setF({ ...f, rulesState: v }),
+                )}
+            </>
+        ) : view === 'staff' && sec === 'status' ? (
+            <>
+                {select(
+                    'House',
+                    f.pinHouse,
+                    pinHouseOptions(witnessPin.staff),
+                    (v) => setF({ ...f, pinHouse: v }),
+                    Home,
+                )}
+                {select('PIN status', f.pinState, PIN_STATUS_OPTIONS, (v) =>
+                    setF({ ...f, pinState: v }),
+                )}
+            </>
+        ) : view === 'history' && sec === 'changes' ? (
+            <>
+                {select(
+                    'Area',
+                    f.history.area,
+                    [
+                        { value: 'all', label: 'All areas' },
+                        ...visibleViews(built)
+                            .filter((v) => v !== 'history')
+                            .map((v) => ({
+                                value: v,
+                                label: SET_VIEWS[v].label,
+                            })),
+                    ],
+                    (v) => setF({ ...f, history: { ...f.history, area: v } }),
+                    Layers,
+                )}
+                {select(
+                    'Changed by',
+                    f.history.who,
+                    [
+                        { value: 'all', label: 'Anyone' },
+                        ...historyWho.map((w) => ({ value: w, label: w })),
+                    ],
+                    (v) => setF({ ...f, history: { ...f.history, who: v } }),
+                )}
+                {select(
+                    'Where',
+                    f.history.where,
+                    [
+                        { value: 'all', label: 'Anywhere' },
+                        ...historyWhere.map((w) => ({ value: w, label: w })),
+                    ],
+                    (v) => setF({ ...f, history: { ...f.history, where: v } }),
+                    Home,
+                )}
+            </>
+        ) : view === 'rounds' && sec === 'templates' ? (
+            <>
+                {select(
+                    'House',
+                    f.tplHouse,
+                    [
+                        { value: 'all', label: 'All houses' },
+                        ...[
+                            ...new Map(
+                                props.roundTemplates.map((t) => [
+                                    String(t.site_id ?? 'all-houses'),
+                                    houseOf(t),
+                                ]),
+                            ),
+                        ].map(([value, label]) => ({ value, label })),
+                    ],
+                    (v) => setF({ ...f, tplHouse: v }),
+                    Home,
+                )}
+                {select(
+                    'Status',
+                    f.tplStatus,
+                    TEMPLATE_STATUS_OPTIONS,
+                    (v) => setF({ ...f, tplStatus: v }),
+                    undefined,
+                    'current',
+                )}
+            </>
+        ) : view === 'alerts' && sec === 'log' ? (
+            <>
+                {select(
+                    'House',
+                    f.logHouse,
+                    [
+                        { value: 'all', label: 'All houses' },
+                        ...props.sites.map((x) => ({
+                            value: String(x.id),
+                            label: x.name,
+                        })),
+                    ],
+                    (v) => setF({ ...f, logHouse: v }),
+                    Home,
+                )}
+                {select('Status', f.logShow, LOG_SHOW, (v) =>
+                    setF({ ...f, logShow: v }),
+                )}
+                {select(
+                    'History',
+                    f.logRange,
+                    LOG_RANGE,
+                    (v) => setF({ ...f, logRange: v }),
+                    History,
+                    'recent',
+                )}
+            </>
+        ) : view === 'alerts' && sec === 'alerts' ? (
+            select('All alerts', f.show, ALERT_SHOW_OPTIONS, (v) =>
+                setF({ ...f, show: v }),
+            )
+        ) : SAVED_SECTIONS.includes(sec) ? (
+            select('All settings', f.show, SHOW_OPTIONS, (v) =>
+                setF({ ...f, show: v }),
+            )
+        ) : null;
+
+    const meters = hasSettingsMeters(built) ? (
+        <SettingsMeters
+            built={built}
+            view={view}
+            sec={sec}
+            go={go}
+            pending={pending}
+            rules={props.rules}
+            templates={props.roundTemplates}
+            pins={witnessPin.staff}
+            oncall={s.oncall_houses ?? []}
+        />
+    ) : undefined;
+
+    const header = (
+        <PageHeader
+            className="overflow-clip!"
+            icon={SettingsIcon}
+            title="Settings"
+            titleChip={
+                <PageHeaderStatusChip variant="neutral">
+                    Organisation
+                </PageHeaderStatusChip>
+            }
+            subline={`Medication rules and house settings · ${accessText} · times in Pacific/Auckland`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={`Search ${(sec === 'overview' ? SET_VIEWS[view].label : sectionLabel(view, sec)).replace(/^[A-Z](?![A-Z])/, (c) => c.toLowerCase())}`}
+                    />
+                    {settingsAccess && props.sites.length ? (
+                        <PageHeaderGlassButton
+                            icon={Home}
+                            onClick={() => setLensOpen(true)}
+                        >
+                            At a house
+                        </PageHeaderGlassButton>
+                    ) : null}
+                    {settingsAccess ? (
+                        <PageHeaderGlassButton
+                            icon={History}
+                            onClick={() => go('history', 'changes')}
+                        >
+                            Changes
+                        </PageHeaderGlassButton>
+                    ) : null}
+                </>
+            }
+            meters={meters}
+            filters={
+                <>
+                    {sectionFilters}
+                    <PageHeaderFilterButton
+                        icon={RefreshCw}
+                        onClick={refresh}
+                        aria-label={`Updated ${formatTime(loadedAt)} Pacific/Auckland — refresh`}
+                    >
+                        Updated {formatTime(loadedAt)}
+                    </PageHeaderFilterButton>
+                    {unsaved.length ? (
+                        <PageHeaderFilterButton
+                            active
+                            icon={Pencil}
+                            onClick={() => setDialog({ kind: 'unsaved' })}
+                        >
+                            {unsaved.length} unsaved{' '}
+                            {unsaved.length === 1 ? 'change' : 'changes'}
+                        </PageHeaderFilterButton>
+                    ) : null}
+                </>
+            }
+            rail={
+                <PageHeaderRail
+                    items={visibleViews(built).map((key) => ({
+                        key,
+                        label: SET_VIEWS[key].label,
+                        icon: VIEW_ICON[key],
+                        ...(key === 'history' && pending.length
+                            ? { count: pending.length }
+                            : {}),
+                    }))}
+                    value={view}
+                    onSelect={(k) => go(k)}
+                    ariaLabel="Settings views"
+                    decorations={Object.fromEntries(
+                        visibleViews(built)
+                            .filter((v) => changes(s, draft, v).length)
+                            .map((v) => [v, <DirtyDot key={v} />]),
+                    )}
+                />
+            }
+        />
+    );
+
+    const secChanges = (k: string) =>
+        changes(s, draft, view).filter((c) => c.section === k).length;
+    const tabs = settingsSectionTabs(built, view).map((tab) => ({
+        ...tab,
+        ...(tab.key === 'decide' && pending.length
+            ? { count: pending.length }
+            : {}),
+        ...(secChanges(tab.key) ? { warningCount: secChanges(tab.key) } : {}),
+    }));
+    const clearQ = () => setQuery('');
+    const body =
+        view === 'connections' && sec === 'services' ? (
+            <ConnectedServicesSettings
+                q={query}
+                show={f.show}
+                status={props.connectedStatus ?? {}}
+            />
+        ) : view === 'connections' ? (
+            <ConnectedEntryPoints />
+        ) : view === 'rules' && sec === 'overview' ? (
+            <RulesOverview data={ruleData} q={query} />
+        ) : view === 'rules' && sec === 'medicines' ? (
+            <MedicineRules
+                data={ruleData}
+                q={query}
+                where={f.rulesWhere}
+                state={f.rulesState}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, rulesWhere: 'all', rulesState: 'all' });
+                }}
+            />
+        ) : view === 'rules' && sec === 'safety' ? (
+            <SafetyChecks
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'rules' && sec === 'controlled' ? (
+            <ControlledProductSettings
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+                houses={props.sites}
+                houseIds={props.controlledSettingsAccess.manageable_site_ids}
+                readOnlyAudit={readOnlyAudit}
+            />
+        ) : view === 'rules' && sec === 'photos' ? (
+            <MedicinePhotos
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'rules' && sec === 'records' ? (
+            <RecordsReporting q={query} show={f.show} />
+        ) : view === 'rules' && sec === 'reviews' ? (
+            <ReviewCadenceSettings
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'rounds' && sec === 'overview' ? (
+            <RoundsOverview q={query} templates={props.roundTemplates} />
+        ) : view === 'rounds' && sec === 'templates' ? (
+            <RoundTemplates
+                data={templateData}
+                q={query}
+                house={f.tplHouse}
+                status={f.tplStatus}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, tplHouse: 'all', tplStatus: 'current' });
+                }}
+            />
+        ) : view === 'rounds' && sec === 'timing' ? (
+            <DoseTiming
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'overview' ? (
+            <StaffOverview q={query} witnessPin={witnessPin} />
+        ) : view === 'staff' && sec === 'competency' ? (
+            <Competency
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'exemptions' ? (
+            <ExemptionLimit
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'pins' ? (
+            <WitnessPins
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'staff' && sec === 'status' ? (
+            <PinStatus
+                witnessPin={witnessPin}
+                q={query}
+                state={f.pinState}
+                house={f.pinHouse}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, pinState: 'all', pinHouse: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'overview' ? (
+            <AlertsOverview q={query} data={alertData} />
+        ) : view === 'alerts' && sec === 'alerts' ? (
+            <AlertsTable
+                q={query}
+                show={f.show}
+                data={alertData}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'emergency' ? (
+            <EmergencyAccess
+                q={query}
+                show={f.show}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'log' ? (
+            <AlertLog
+                page={props.alertLog ?? null}
+                q={query}
+                house={f.logHouse}
+                show={f.logShow}
+                range={f.logRange}
+                clear={() => {
+                    clearQ();
+                    setF({
+                        ...f,
+                        logHouse: 'all',
+                        logShow: 'all',
+                        logRange: 'recent',
+                    });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'delivery' ? (
+            <AlertsDelivery
+                q={query}
+                show={f.show}
+                data={alertData}
+                clear={() => {
+                    clearQ();
+                    setF({ ...f, show: 'all' });
+                }}
+            />
+        ) : view === 'alerts' && sec === 'triage' ? (
+            <ErrorTriageSettings q={query} show={f.show} clear={clearQ} />
+        ) : view === 'alerts' && sec === 'oncall' ? (
+            <OnCallContacts
+                q={query}
+                data={onCallData}
+                readOnlyAudit={readOnlyAudit}
+                clear={clearQ}
+            />
+        ) : view === 'history' && sec === 'decide' ? (
+            <StillToDecide q={query} />
+        ) : view === 'history' && sec === 'changes' ? (
+            <AllChanges
+                q={query}
+                clearQ={clearQ}
+                filters={f.history}
+                setFilters={(h) => setF({ ...f, history: h })}
+                page={page}
+                setPage={setPage}
+            />
+        ) : null;
 
     return (
-        <AppLayout>
-            <Head title="eMAR - Administration Rules" />
-            <PageHero
-                icon={Settings2}
-                title="Medication Administration Rules"
-                description="Require a countersignature or a clinical observation (BSL, pulse, blood pressure) when a medication name, route, or NZULM code matches a keyword. Rules apply automatically at the point of administration."
-                backHref="/emar"
-                backLabel="Back to eMAR"
-            />
-            <PageShell>
-                <div className="mb-4 flex items-center justify-between gap-4">
-                    <p className="text-sm text-muted-foreground">
-                        {rules.length} rule{rules.length === 1 ? '' : 's'}{' '}
-                        configured
-                    </p>
-                    {can.manage && (
-                        <Button onClick={openCreate} size="sm">
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Add Rule
-                        </Button>
-                    )}
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Medication settings" />
+            <SettingsCtx.Provider value={ctx}>
+                <div className="space-y-5">
+                    {header}
+                    <Sections
+                        tabs={tabs}
+                        value={sec}
+                        onChange={(k) => go(view, k)}
+                    />
+                    <StatusMessage message={status.message} />
+                    {body}
+                    {SAVED_SECTIONS.includes(sec) ? (
+                        <SaveBar
+                            count={changes(s, draft, view).length}
+                            onDiscard={() =>
+                                setDialog({ kind: 'discard', view })
+                            }
+                            onReview={review}
+                            readOnly={
+                                editable
+                                    ? undefined
+                                    : readOnlyAudit
+                                      ? 'Read-only — auditors can view settings and their history, not change them.'
+                                      : 'Only someone who manages medication settings for all houses can change these.'
+                            }
+                        />
+                    ) : null}
                 </div>
-
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Active &amp; inactive rules
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-xs font-medium text-muted-foreground">
-                                        <th className="pr-4 pb-2">Match</th>
-                                        <th className="pr-4 pb-2">Keyword</th>
-                                        <th className="pr-4 pb-2">Scope</th>
-                                        <th className="pr-4 pb-2">
-                                            Requirements
-                                        </th>
-                                        <th className="pr-4 pb-2">Status</th>
-                                        {can.manage && (
-                                            <th className="pb-2 text-right">
-                                                Actions
-                                            </th>
-                                        )}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rules.map((rule) => (
-                                        <tr
-                                            key={rule.id}
-                                            className="border-b last:border-0"
-                                        >
-                                            <td className="py-2.5 pr-4 font-medium">
-                                                {matchTypeLabel(
-                                                    rule.match_type,
-                                                )}
-                                            </td>
-                                            <td className="py-2.5 pr-4">
-                                                {rule.match_value}
-                                            </td>
-                                            <td className="py-2.5 pr-4 text-muted-foreground">
-                                                {rule.site_name ?? 'All sites'}
-                                            </td>
-                                            <td className="py-2.5 pr-4">
-                                                <div className="flex flex-wrap gap-1.5">
-                                                    {rule.requires_countersign && (
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="gap-1"
-                                                        >
-                                                            <ShieldCheck className="h-3 w-3" />{' '}
-                                                            Countersign
-                                                        </Badge>
-                                                    )}
-                                                    {rule.required_observations.map(
-                                                        (obs) => (
-                                                            <Badge
-                                                                key={obs}
-                                                                variant="outline"
-                                                                className="gap-1"
-                                                            >
-                                                                <Stethoscope className="h-3 w-3" />
-                                                                {observationLabel(
-                                                                    obs,
-                                                                )}
-                                                            </Badge>
-                                                        ),
-                                                    )}
-                                                    {!rule.requires_countersign &&
-                                                        rule
-                                                            .required_observations
-                                                            .length === 0 && (
-                                                            <span className="text-muted-foreground">
-                                                                —
-                                                            </span>
-                                                        )}
-                                                </div>
-                                            </td>
-                                            <td className="py-2.5 pr-4">
-                                                <Badge
-                                                    variant={
-                                                        rule.active
-                                                            ? 'default'
-                                                            : 'outline'
-                                                    }
-                                                >
-                                                    {rule.active
-                                                        ? 'Active'
-                                                        : 'Inactive'}
-                                                </Badge>
-                                            </td>
-                                            {can.manage && (
-                                                <td className="py-2.5 text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-8 w-8"
-                                                            aria-label="Edit rule"
-                                                            onClick={() =>
-                                                                openEdit(rule)
-                                                            }
-                                                        >
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-8 w-8 text-status-critical"
-                                                            aria-label="Remove rule"
-                                                            onClick={() =>
-                                                                remove(rule)
-                                                            }
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            )}
-                                        </tr>
-                                    ))}
-                                    {rules.length === 0 && (
-                                        <tr>
-                                            <td
-                                                colSpan={can.manage ? 6 : 5}
-                                                className="py-10 text-center text-muted-foreground"
-                                            >
-                                                No administration rules yet. Add
-                                                one to require countersigning or
-                                                observations for matching
-                                                medications.
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
-            </PageShell>
-
-            <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {editing ? 'Edit rule' : 'Add administration rule'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Matching is case-insensitive. A name/route rule
-                            matches when the medication contains the keyword; an
-                            NZULM rule matches the exact code.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="space-y-1.5">
-                            <Label>Match on</Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {matchTypes.map((type) => (
-                                    <Button
-                                        key={type.value}
-                                        type="button"
-                                        variant={
-                                            form.match_type === type.value
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                        size="sm"
-                                        onClick={() =>
-                                            setForm((c) => ({
-                                                ...c,
-                                                match_type: type.value,
-                                            }))
-                                        }
-                                    >
-                                        {type.label}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="match-value">Keyword</Label>
-                            <Input
-                                id="match-value"
-                                value={form.match_value}
-                                onChange={(e) =>
-                                    setForm((c) => ({
-                                        ...c,
-                                        match_value: e.target.value,
-                                    }))
-                                }
-                                placeholder={
-                                    form.match_type === 'route'
-                                        ? 'e.g. Intravenous'
-                                        : form.match_type === 'nzulm_code'
-                                          ? 'e.g. a12345'
-                                          : 'e.g. Warfarin'
-                                }
-                            />
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label>Applies to</Label>
-                            <Select
-                                value={form.site_id}
-                                onValueChange={(value) =>
-                                    setForm((c) => ({ ...c, site_id: value }))
-                                }
-                            >
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {can.manage_global && (
-                                        <SelectItem value={GLOBAL_SITE}>
-                                            All sites (global)
-                                        </SelectItem>
-                                    )}
-                                    {sites.map((site) => (
-                                        <SelectItem
-                                            key={site.id}
-                                            value={site.id.toString()}
-                                        >
-                                            {site.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-md border p-3">
-                            <div>
-                                <p className="text-sm font-medium">
-                                    Require countersignature
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    A second checker must authenticate at
-                                    administration.
-                                </p>
-                            </div>
-                            <Switch
-                                checked={form.requires_countersign}
-                                onCheckedChange={(checked) =>
-                                    setForm((c) => ({
-                                        ...c,
-                                        requires_countersign: checked,
-                                    }))
-                                }
-                            />
-                        </div>
-
-                        <div className="space-y-2 rounded-md border p-3">
-                            <p className="text-sm font-medium">
-                                Require observation at sign-off
-                            </p>
-                            {observationOptions.map((obs) => (
-                                <label
-                                    key={obs.value}
-                                    className="flex items-center gap-2 text-sm"
-                                >
-                                    <Checkbox
-                                        checked={form.required_observations.includes(
-                                            obs.value,
-                                        )}
-                                        onCheckedChange={() =>
-                                            toggleObservation(obs.value)
-                                        }
-                                    />
-                                    {obs.label}
-                                </label>
-                            ))}
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-md border p-3">
-                            <p className="text-sm font-medium">Active</p>
-                            <Switch
-                                checked={form.active}
-                                onCheckedChange={(checked) =>
-                                    setForm((c) => ({ ...c, active: checked }))
-                                }
-                            />
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                            disabled={saving}
-                        >
-                            Cancel
-                        </Button>
-                        <Button onClick={submit} disabled={saving}>
-                            {editing ? 'Save changes' : 'Add rule'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                {dialog?.kind === 'alertlog' && (
+                    <AlertLogView row={dialog.row} />
+                )}
+                <DialogHost dialog={dialog} />
+                {lensOpen ? (
+                    <HouseLens
+                        s={s}
+                        houses={props.sites}
+                        rules={props.rules}
+                        templates={props.roundTemplates}
+                        pins={witnessPin.staff}
+                        oncall={alertAccess.view ? onCallData : undefined}
+                        onOpen={(v) => {
+                            setLensOpen(false);
+                            go(v);
+                        }}
+                        onClose={() => setLensOpen(false)}
+                    />
+                ) : null}
+                <RuleDialogHost dialog={dialog} data={ruleData} />
+                <AlertDialogHost dialog={dialog} data={alertData} />
+                <OnCallDialogHost dialog={dialog} data={onCallData} />
+                <ReachDialogHost dialog={dialog} gaps={alertData.reachGaps} />
+                <TemplateDialogHost dialog={dialog} data={templateData} />
+            </SettingsCtx.Provider>
         </AppLayout>
     );
 }

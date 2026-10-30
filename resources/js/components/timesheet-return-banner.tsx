@@ -92,7 +92,8 @@ export function TimesheetReturnBanner({
                     <Button
                         asChild
                         size="sm"
-                        className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:hover:bg-status-warning"
+                        variant="outline"
+                        className="w-full sm:w-auto"
                     >
                         <Link href={href}>
                             Fix and resend

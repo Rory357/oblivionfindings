@@ -20,6 +20,7 @@ import {
     DialogDescription,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 
 /* ------------------------------------------------------------------ */
@@ -130,7 +131,7 @@ function StatTile({ label, value }: { label: string; value: number }) {
             className="rounded-xl border border-border bg-card p-3 text-center"
         >
             <div className="text-xl font-bold tabular-nums">{value}</div>
-            <div className="mt-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="mt-0.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {label}
             </div>
         </GuardrailCard>
@@ -161,8 +162,8 @@ export function SeriesDetailDialog({
             <DialogContent
                 className="max-h-[92vh] overflow-hidden p-0 [&>button]:hidden"
                 style={{
-                    maxWidth: 'min(94vw, 960px)',
-                    width: 'min(94vw, 960px)',
+                    maxWidth: 'min(92vw, 900px)',
+                    width: 'min(92vw, 900px)',
                 }}
             >
                 <DialogTitle className="sr-only">
@@ -257,7 +258,7 @@ function DetailBody({
                     <h2 className="truncate text-lg font-bold tracking-tight">
                         {series.client?.name ?? 'Recurring support series'}
                     </h2>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-muted-foreground">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
                         <span
                             className={cn(
                                 'rounded-full px-2 py-0.5 font-semibold capitalize',
@@ -348,7 +349,7 @@ function DetailBody({
                 </div>
                 {series.notes ? (
                     <div className="mt-2 rounded-xl border border-border p-3">
-                        <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                        <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                             Pattern notes
                         </div>
                         <p className="mt-1 text-sm whitespace-pre-wrap">
@@ -360,11 +361,11 @@ function DetailBody({
                 {/* Coverage drift */}
                 {coverageAlignment.linked_rule_issues.length > 0 ? (
                     <div className="mt-4 rounded-xl border border-status-critical/30 bg-status-critical-bg p-3">
-                        <div className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-status-critical uppercase">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold tracking-wide text-status-critical uppercase">
                             <AlertTriangle className="h-3.5 w-3.5" /> Coverage
                             drift
                         </div>
-                        <ul className="mt-1.5 space-y-1 text-[13px] text-status-critical">
+                        <ul className="mt-1.5 space-y-1 text-sm text-status-critical">
                             {coverageAlignment.linked_rule_issues
                                 .slice(0, 3)
                                 .map((issue, i) => (
@@ -377,7 +378,7 @@ function DetailBody({
                     </div>
                 ) : null}
                 {coverageAlignment.orphan_series ? (
-                    <div className="mt-2 rounded-xl border border-status-warning/30 bg-status-warning-bg p-3 text-[13px] text-status-warning">
+                    <div className="mt-2 rounded-xl border border-status-warning/30 bg-status-warning-bg p-3 text-sm text-status-warning">
                         No active coverage rule matches this series at{' '}
                         {coverageAlignment.orphan_series.site_name}.
                     </div>
@@ -446,7 +447,7 @@ function DetailBody({
                         <AlertDialogCancel>Keep series</AlertDialogCancel>
                         <AlertDialogAction
                             disabled={processing}
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            variant="destructive"
                             onClick={(e) => {
                                 e.preventDefault();
                                 cancelFuture();
@@ -464,7 +465,7 @@ function DetailBody({
 function SummaryCell({ label, value }: { label: string; value: string }) {
     return (
         <div className="rounded-xl border border-border p-3">
-            <div className="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+            <div className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                 {label}
             </div>
             <div className="mt-0.5 text-sm font-medium capitalize">{value}</div>
@@ -491,31 +492,29 @@ function OccurrenceRow({
                         <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
                         {formatTimeRange(occ.starts_at, occ.ends_at)}
                     </div>
-                    <div className="mt-0.5 text-[13px] text-muted-foreground">
+                    <div className="mt-0.5 text-sm text-muted-foreground">
                         {occ.staff?.name ?? 'Unassigned'}
                         {occ.location ? ` · ${occ.location}` : ''}
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground capitalize">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground capitalize">
                         {occ.status.replace(/_/g, ' ')}
                     </span>
                     {occ.incidents_count > 0 ? (
-                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">
+                        <StatusBadge variant="critical">
                             {occ.incidents_count} incident
-                        </span>
+                        </StatusBadge>
                     ) : null}
                     {occ.replacement ? (
-                        <span className="rounded-full bg-status-info-bg px-2 py-0.5 text-[11px] font-semibold text-status-info">
-                            Replacement
-                        </span>
+                        <StatusBadge variant="info">Replacement</StatusBadge>
                     ) : null}
                 </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
                 <a
                     href={`/operations/shifts/${occ.id}`}
-                    className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-foreground hover:bg-accent"
+                    className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-sm font-semibold text-foreground hover:bg-accent"
                 >
                     Open shift
                 </a>
@@ -524,7 +523,7 @@ function OccurrenceRow({
                         unstyled
                         type="button"
                         onClick={onCancel}
-                        className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-accent"
+                        className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-sm font-semibold text-muted-foreground hover:bg-accent"
                     >
                         Cancel occurrence
                     </Button>
@@ -534,7 +533,7 @@ function OccurrenceRow({
                         unstyled
                         type="button"
                         onClick={onReopen}
-                        className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-[12px] font-semibold text-muted-foreground hover:bg-accent"
+                        className="inline-flex h-7 items-center rounded-md border border-border px-2.5 text-sm font-semibold text-muted-foreground hover:bg-accent"
                     >
                         Reopen occurrence
                     </Button>

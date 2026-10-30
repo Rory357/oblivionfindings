@@ -7,10 +7,14 @@ use App\Domain\Monitoring\Models\ConfigurationSnapshot;
 use App\Domain\Monitoring\Models\MetricSeries;
 use App\Domain\Monitoring\Models\Monitor;
 use App\Domain\Monitoring\Models\MonitorDependency;
+use App\Domain\Monitoring\Models\MonitoringAlertRoute;
 use App\Domain\Monitoring\Models\MonitoringCoverageExpectation;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
+use App\Domain\Monitoring\Models\MonitoringThresholdRule;
+use App\Domain\SecurityDevices\Enums\DeviceDomain;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Models\Site;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -38,6 +42,9 @@ final class MonitoringPolicyAuthoringService
             'recovery_confirmations' => 2,
             'recovery_duration_seconds' => 0,
             'stale_after_seconds' => 300,
+            'threshold_direction' => 'above',
+            'warning_rising_threshold' => null,
+            'warning_falling_threshold' => null,
             'rising_threshold' => null,
             'falling_threshold' => null,
             'baseline_window_seconds' => 3600,
@@ -391,6 +398,8 @@ final class MonitoringPolicyAuthoringService
         return DB::transaction(function () use ($actor, $values): MonitoringMaintenanceWindow {
             $this->lockSite((int) $values['site_id']);
             $this->assertMaintenanceScope($values);
+            app(MaintenanceHistory::class)->storage();
+            app(MaintenanceOverlap::class)->assertAvailable($values);
             $window = MonitoringMaintenanceWindow::query()->create([
                 ...$values,
                 'status' => 'active',
@@ -398,7 +407,8 @@ final class MonitoringPolicyAuthoringService
                 'created_by_user_id' => $actor->id,
                 'updated_by_user_id' => $actor->id,
             ]);
-            $this->audit->write('monitoring.maintenance.created', $window, $actor, $this->auditContext($window));
+            $revision = app(MaintenanceHistory::class)->record($window, $actor, 'create', null, $values['reason']);
+            $this->audit->write('monitoring.maintenance.created', $window, $actor, [...$this->auditContext($window), 'revision_id' => $revision->id, 'effective_from' => $revision->effective_from->format('Y-m-d\TH:i:s.u\Z')]);
 
             return $window->fresh();
         }, 3);
@@ -423,12 +433,15 @@ final class MonitoringPolicyAuthoringService
             ]);
             $this->lockSite((int) $values['site_id']);
             $this->assertMaintenanceScope($values);
+            app(MaintenanceOverlap::class)->assertAvailable($values, (int) $locked->id);
+            $previous = app(MaintenanceHistory::class)->before($locked, $actor, $values['reason']);
             $locked->forceFill([
                 ...$values,
                 'version' => $locked->version + 1,
                 'updated_by_user_id' => $actor->id,
             ])->save();
-            $this->audit->write('monitoring.maintenance.updated', $locked, $actor, $this->auditContext($locked));
+            $revision = app(MaintenanceHistory::class)->record($locked, $actor, 'update', $previous, $values['reason']);
+            $this->audit->write('monitoring.maintenance.updated', $locked, $actor, [...$this->auditContext($locked), 'revision_id' => $revision->id, 'supersedes_id' => $previous->id, 'effective_from' => $revision->effective_from->format('Y-m-d\TH:i:s.u\Z')]);
 
             return $locked->fresh();
         }, 3);
@@ -448,6 +461,8 @@ final class MonitoringPolicyAuthoringService
             if ($locked->status !== 'active') {
                 $this->fail('status', 'Only an active maintenance window can be cancelled.');
             }
+            $this->lockSite((int) $locked->site_id);
+            $previous = app(MaintenanceHistory::class)->before($locked, $actor, $reason);
             $locked->forceFill([
                 'status' => 'cancelled',
                 'version' => $locked->version + 1,
@@ -456,9 +471,10 @@ final class MonitoringPolicyAuthoringService
                 'cancelled_by_user_id' => $actor->id,
                 'cancellation_reason' => $reason,
             ])->save();
+            $revision = app(MaintenanceHistory::class)->record($locked, $actor, 'cancel', $previous, $reason);
             $this->audit->write('monitoring.maintenance.cancelled', $locked, $actor, [
                 ...$this->auditContext($locked),
-                'reason_recorded' => true,
+                'reason_recorded' => true, 'revision_id' => $revision->id, 'supersedes_id' => $previous->id, 'effective_from' => $revision->effective_from->format('Y-m-d\TH:i:s.u\Z'),
             ]);
 
             return $locked->fresh();
@@ -737,6 +753,196 @@ final class MonitoringPolicyAuthoringService
         }, 3);
     }
 
+    /** @param array<string, mixed> $attributes */
+    public function createThresholdRule(User $actor, array $attributes): MonitoringThresholdRule
+    {
+        $values = $this->rules->thresholdRule($attributes);
+
+        return DB::transaction(function () use ($actor, $values): MonitoringThresholdRule {
+            $resolved = $this->resolveScopedRuleTargets($values, restrictToItDomain: false);
+            $rule = MonitoringThresholdRule::query()->create([
+                ...$resolved,
+                'is_active' => true,
+                'version' => 1,
+                'created_by_user_id' => $actor->id,
+                'updated_by_user_id' => $actor->id,
+            ]);
+            $this->audit->write('monitoring.threshold.created', $rule, $actor, $this->auditContext($rule));
+
+            return $rule->fresh();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function updateThresholdRule(
+        User $actor,
+        MonitoringThresholdRule $rule,
+        int $expectedVersion,
+        array $attributes,
+    ): MonitoringThresholdRule {
+        return DB::transaction(function () use ($actor, $rule, $expectedVersion, $attributes): MonitoringThresholdRule {
+            $locked = MonitoringThresholdRule::query()->lockForUpdate()->findOrFail($rule->id);
+            $this->assertVersion($locked, $expectedVersion);
+            $this->assertActive($locked);
+            $values = $this->rules->thresholdRule([
+                ...$this->thresholdRuleValues($locked),
+                ...$attributes,
+            ]);
+            $resolved = $this->resolveScopedRuleTargets($values, restrictToItDomain: false);
+            $locked->forceFill([
+                ...$resolved,
+                'version' => $locked->version + 1,
+                'updated_by_user_id' => $actor->id,
+            ])->save();
+            $this->audit->write('monitoring.threshold.updated', $locked, $actor, $this->auditContext($locked));
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    public function deactivateThresholdRule(
+        User $actor,
+        MonitoringThresholdRule $rule,
+        int $expectedVersion,
+        string $reason,
+    ): MonitoringThresholdRule {
+        return $this->deactivate(
+            actor: $actor,
+            model: $rule,
+            expectedVersion: $expectedVersion,
+            reason: $reason,
+            action: 'monitoring.threshold.deactivated',
+        );
+    }
+
+    public function reactivateThresholdRule(
+        User $actor,
+        MonitoringThresholdRule $rule,
+        int $expectedVersion,
+        string $reason,
+    ): MonitoringThresholdRule {
+        $reason = $this->rules->operationalReason($reason);
+
+        return DB::transaction(function () use ($actor, $rule, $expectedVersion, $reason): MonitoringThresholdRule {
+            $locked = MonitoringThresholdRule::query()->lockForUpdate()->findOrFail($rule->id);
+            $this->assertVersion($locked, $expectedVersion);
+            $this->assertInactive($locked);
+            $resolved = $this->resolveScopedRuleTargets($this->thresholdRuleValues($locked), restrictToItDomain: false);
+            $previousDeactivationReason = (string) $locked->deactivation_reason;
+            $locked->forceFill([
+                ...$resolved,
+                'is_active' => true,
+                'version' => $locked->version + 1,
+                'updated_by_user_id' => $actor->id,
+                'deactivated_at' => null,
+                'deactivated_by_user_id' => null,
+                'deactivation_reason' => null,
+            ])->save();
+            $this->audit->write('monitoring.threshold.reactivated', $locked, $actor, [
+                ...$this->auditContext($locked),
+                'previous_deactivation_reason' => $previousDeactivationReason,
+                'reactivation_reason' => $reason,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function createAlertRoute(User $actor, array $attributes): MonitoringAlertRoute
+    {
+        $values = $this->rules->alertRoute($attributes);
+
+        return DB::transaction(function () use ($actor, $values): MonitoringAlertRoute {
+            $resolved = $this->resolveScopedRuleTargets($values, restrictToItDomain: true);
+            $route = MonitoringAlertRoute::query()->create([
+                ...$resolved,
+                'is_active' => true,
+                'version' => 1,
+                'created_by_user_id' => $actor->id,
+                'updated_by_user_id' => $actor->id,
+            ]);
+            $this->audit->write('monitoring.alert_route.created', $route, $actor, $this->auditContext($route));
+
+            return $route->fresh();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    public function updateAlertRoute(
+        User $actor,
+        MonitoringAlertRoute $route,
+        int $expectedVersion,
+        array $attributes,
+    ): MonitoringAlertRoute {
+        return DB::transaction(function () use ($actor, $route, $expectedVersion, $attributes): MonitoringAlertRoute {
+            $locked = MonitoringAlertRoute::query()->lockForUpdate()->findOrFail($route->id);
+            $this->assertVersion($locked, $expectedVersion);
+            $this->assertActive($locked);
+            $values = $this->rules->alertRoute([
+                ...$this->alertRouteValues($locked),
+                ...$attributes,
+            ]);
+            $resolved = $this->resolveScopedRuleTargets($values, restrictToItDomain: true);
+            $locked->forceFill([
+                ...$resolved,
+                'version' => $locked->version + 1,
+                'updated_by_user_id' => $actor->id,
+            ])->save();
+            $this->audit->write('monitoring.alert_route.updated', $locked, $actor, $this->auditContext($locked));
+
+            return $locked->fresh();
+        }, 3);
+    }
+
+    public function deactivateAlertRoute(
+        User $actor,
+        MonitoringAlertRoute $route,
+        int $expectedVersion,
+        string $reason,
+    ): MonitoringAlertRoute {
+        return $this->deactivate(
+            actor: $actor,
+            model: $route,
+            expectedVersion: $expectedVersion,
+            reason: $reason,
+            action: 'monitoring.alert_route.deactivated',
+        );
+    }
+
+    public function reactivateAlertRoute(
+        User $actor,
+        MonitoringAlertRoute $route,
+        int $expectedVersion,
+        string $reason,
+    ): MonitoringAlertRoute {
+        $reason = $this->rules->operationalReason($reason);
+
+        return DB::transaction(function () use ($actor, $route, $expectedVersion, $reason): MonitoringAlertRoute {
+            $locked = MonitoringAlertRoute::query()->lockForUpdate()->findOrFail($route->id);
+            $this->assertVersion($locked, $expectedVersion);
+            $this->assertInactive($locked);
+            $resolved = $this->resolveScopedRuleTargets($this->alertRouteValues($locked), restrictToItDomain: true);
+            $previousDeactivationReason = (string) $locked->deactivation_reason;
+            $locked->forceFill([
+                ...$resolved,
+                'is_active' => true,
+                'version' => $locked->version + 1,
+                'updated_by_user_id' => $actor->id,
+                'deactivated_at' => null,
+                'deactivated_by_user_id' => null,
+                'deactivation_reason' => null,
+            ])->save();
+            $this->audit->write('monitoring.alert_route.reactivated', $locked, $actor, [
+                ...$this->auditContext($locked),
+                'previous_deactivation_reason' => $previousDeactivationReason,
+                'reactivation_reason' => $reason,
+            ]);
+
+            return $locked->fresh();
+        }, 3);
+    }
+
     /** @template TModel of Model
      * @param  TModel  $model
      * @return TModel
@@ -916,14 +1122,81 @@ final class MonitoringPolicyAuthoringService
         }
     }
 
+    /** @param array<string, mixed> $values
+     * @return array<string, mixed>
+     */
+    private function resolveScopedRuleTargets(array $values, bool $restrictToItDomain): array
+    {
+        $scope = (string) $values['scope_kind'];
+        if ($scope === 'application') {
+            $values['site_id'] = null;
+            $values['device_id'] = null;
+            $values['monitor_id'] = null;
+
+            return $values;
+        }
+        if ($scope === 'site') {
+            $siteId = (int) $values['site_id'];
+            $this->lockSite($siteId);
+            $values['site_id'] = $siteId;
+            $values['device_id'] = null;
+            $values['monitor_id'] = null;
+
+            return $values;
+        }
+        if ($scope === 'device') {
+            $device = Device::query()->findOrFail((int) $values['device_id']);
+            if ($restrictToItDomain && (string) $device->domain !== DeviceDomain::ItInfrastructure->value) {
+                $this->fail(
+                    'device_id',
+                    'Life-safety, security, and healthcare checks are locked to Control Room and cannot be rerouted or muted.',
+                );
+            }
+            $siteId = $this->siteResolver->resolve((int) $device->id);
+            if ($values['site_id'] !== null && (int) $values['site_id'] !== $siteId) {
+                $this->fail('device_id', 'The device does not belong to the selected Site.');
+            }
+            $this->lockSite($siteId);
+            $values['site_id'] = $siteId;
+            $values['device_id'] = (int) $device->id;
+            $values['monitor_id'] = null;
+
+            return $values;
+        }
+
+        $monitor = Monitor::query()->with('device')->findOrFail((int) $values['monitor_id']);
+        if ($restrictToItDomain && (string) ($monitor->device?->domain ?? '') !== DeviceDomain::ItInfrastructure->value) {
+            $this->fail(
+                'monitor_id',
+                'Life-safety, security, and healthcare checks are locked to Control Room and cannot be rerouted or muted.',
+            );
+        }
+        $deviceId = (int) $monitor->device_id;
+        $siteId = $this->siteResolver->resolve($deviceId);
+        if ($values['site_id'] !== null && (int) $values['site_id'] !== $siteId) {
+            $this->fail('monitor_id', 'The monitor does not belong to the selected Site.');
+        }
+        if ($values['device_id'] !== null && (int) $values['device_id'] !== $deviceId) {
+            $this->fail('monitor_id', 'The monitor does not belong to the selected device.');
+        }
+        $this->lockSite($siteId);
+        $values['site_id'] = $siteId;
+        $values['device_id'] = $deviceId;
+        $values['monitor_id'] = (int) $monitor->id;
+
+        return $values;
+    }
+
     /** @return array<string, mixed> */
     private function auditContext(Model $model): array
     {
         return array_filter([
             'policy_kind' => class_basename($model),
             'version' => (int) $model->getAttribute('version'),
+            'scope_kind' => $model->getAttribute('scope_kind'),
             'site_id' => $model->getAttribute('site_id'),
             'device_id' => $model->getAttribute('device_id'),
+            'monitor_id' => $model->getAttribute('monitor_id'),
             'state' => $model->getAttribute('status') ?? ((bool) $model->getAttribute('is_active') ? 'active' : 'inactive'),
         ], fn (mixed $value): bool => $value !== null);
     }
@@ -933,10 +1206,55 @@ final class MonitoringPolicyAuthoringService
     {
         return $profile->only([
             'name', 'description', 'interval_seconds', 'failure_confirmations', 'failure_duration_seconds',
-            'recovery_confirmations', 'recovery_duration_seconds', 'stale_after_seconds', 'rising_threshold',
+            'recovery_confirmations', 'recovery_duration_seconds', 'stale_after_seconds', 'threshold_direction',
+            'warning_rising_threshold', 'warning_falling_threshold', 'rising_threshold',
             'falling_threshold', 'baseline_window_seconds', 'baseline_minimum_samples',
             'baseline_deviation_multiplier', 'maintenance_policy', 'rollup_policy', 'retention_policy_id',
         ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function thresholdRuleValues(MonitoringThresholdRule $rule): array
+    {
+        return [
+            'name' => $rule->name,
+            'scope_kind' => $rule->scope_kind,
+            'site_id' => $rule->scope_kind === 'site' ? $rule->site_id : null,
+            'device_id' => $rule->scope_kind === 'device' ? $rule->device_id : null,
+            'monitor_id' => $rule->scope_kind === 'monitor' ? $rule->monitor_id : null,
+            'device_domain' => $rule->device_domain,
+            'device_category' => $rule->device_category,
+            'monitor_kind' => $rule->monitor_kind,
+            'metric_key' => $rule->metric_key,
+            'threshold_direction' => $rule->threshold_direction,
+            'warning_rising_threshold' => $rule->warning_rising_threshold,
+            'warning_falling_threshold' => $rule->warning_falling_threshold,
+            'critical_rising_threshold' => $rule->critical_rising_threshold,
+            'critical_falling_threshold' => $rule->critical_falling_threshold,
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function alertRouteValues(MonitoringAlertRoute $route): array
+    {
+        return [
+            'name' => $route->name,
+            'scope_kind' => $route->scope_kind,
+            'site_id' => $route->scope_kind === 'site' ? $route->site_id : null,
+            'device_id' => $route->scope_kind === 'device' ? $route->device_id : null,
+            'monitor_id' => $route->scope_kind === 'monitor' ? $route->monitor_id : null,
+            'device_domain' => $route->device_domain,
+            'device_category' => $route->device_category,
+            'monitor_kind' => $route->monitor_kind,
+            'warning_notify_in_app' => (bool) $route->warning_notify_in_app,
+            'warning_notify_email' => (bool) $route->warning_notify_email,
+            'warning_open_it_ticket' => (bool) $route->warning_open_it_ticket,
+            'critical_notify_in_app' => (bool) $route->critical_notify_in_app,
+            'critical_notify_email' => (bool) $route->critical_notify_email,
+            'critical_open_it_ticket' => (bool) $route->critical_open_it_ticket,
+            'critical_escalate_control_room' => (bool) $route->critical_escalate_control_room,
+            'recipient_role' => $route->recipient_role,
+        ];
     }
 
     /** @return array<string, mixed> */
@@ -961,7 +1279,7 @@ final class MonitoringPolicyAuthoringService
     {
         return $window->only([
             'site_id', 'monitor_id', 'device_id', 'name', 'starts_at', 'ends_at',
-            'recurrence', 'recurrence_until', 'timezone', 'reason',
+            'recurrence', 'recurrence_until', 'timezone', 'dst_overlap', 'dst_gap', 'reason',
         ]);
     }
 

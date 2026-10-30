@@ -55,6 +55,37 @@ class OpenAiVectorStoreClient
         return $resp->json('id');
     }
 
+    /**
+     * Remove every earlier snapshot from a client's vector store (detach and
+     * delete the file). A snapshot is built for one asker's access, so it
+     * must not stay retrievable for the next asker (EA-013).
+     */
+    public function removeVectorStoreFiles(string $vectorStoreId, ?string $keepFileId = null): void
+    {
+        if (! $this->isEnabled()) {
+            return;
+        }
+
+        $http = fn () => Http::baseUrl('https://api.openai.com')
+            ->withToken(config('llm.openai.api_key'))
+            ->acceptJson()
+            ->timeout(60);
+
+        $resp = $http()->get("/v1/vector_stores/{$vectorStoreId}/files", ['limit' => 100]);
+        if (! $resp->ok()) {
+            return;
+        }
+
+        foreach ((array) $resp->json('data', []) as $file) {
+            $fileId = is_array($file) ? ($file['id'] ?? null) : null;
+            if (! is_string($fileId) || $fileId === '' || $fileId === $keepFileId) {
+                continue;
+            }
+            $http()->delete("/v1/vector_stores/{$vectorStoreId}/files/{$fileId}");
+            $http()->delete("/v1/files/{$fileId}");
+        }
+    }
+
     public function attachFileToVectorStore(string $vectorStoreId, string $fileId): bool
     {
         if (!$this->isEnabled()) {

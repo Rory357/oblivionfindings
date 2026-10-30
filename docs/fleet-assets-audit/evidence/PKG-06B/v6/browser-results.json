@@ -1,0 +1,128 @@
+{
+  "checks": [
+    {
+      "name": "Upload: missing file/title errors and review cannot bypass validation",
+      "status": "passed"
+    },
+    {
+      "name": "Upload: review/back, retained failure and one local result",
+      "status": "failed",
+      "error": "Error: Error: Click did not change checked state to true\nlocator.setChecked(true) failed for selector internal:role=checkbox[name=\"Fail this save (demo)\"i]\nLocator diagnostics: {\"kind\":\"action_failed\",\"action\":\"setChecked\",\"locator\":\"internal:role=checkbox[name=\\\"Fail this save (demo)\\\"i]\",\"matchCount\":1,\"matches\":[{\"ariaLabel\":null,\"disabled\":false,\"role\":null,\"tag\":\"input\",\"text\":\"\",\"type\":\"checkbox\",\"visible\":true}],\"visibleCount\":1,\"truncated\":false}"
+    },
+    {
+      "name": "Upload recovery using keyboard controls",
+      "status": "passed"
+    },
+    {
+      "name": "Work: nested sources, completion and cancellation retain the draft",
+      "status": "failed",
+      "error": "Error: Work draft reset"
+    },
+    {
+      "name": "Work: actual textarea values survive nested sources and blocked decisions",
+      "status": "failed",
+      "error": "Error: TypeError: el.getAnimations is not a function\n    at __playwrightEvaluate (<anonymous>:2687:63)\n    at <anonymous>:2688:14\n    at runUserScript (<anonymous>:2689:10)\n    at <anonymous>:2693:10\n    at <anonymous>:2694:3"
+    },
+    {
+      "name": "Work: nested completion/cancellation and draft close recovery",
+      "status": "passed"
+    },
+    {
+      "name": "Edit: direct review validates identity and restores the offending step",
+      "status": "passed"
+    },
+    {
+      "name": "Problem report: summary and description checked before review",
+      "status": "passed"
+    },
+    {
+      "name": "Custody: assignment release preserves the parent draft",
+      "status": "passed"
+    },
+    {
+      "name": "Calendar: Escape closes only the picker and retains the loan date",
+      "status": "passed"
+    },
+    {
+      "name": "Receipt: discrepancy required before review and custody stays unresolved",
+      "status": "passed"
+    },
+    {
+      "name": "Exception: required reason, retained failure and retry result",
+      "status": "passed"
+    },
+    {
+      "name": "Document: version history and replacement return to the original record",
+      "status": "passed"
+    },
+    {
+      "name": "Archive: reason, failure recovery and preserved version",
+      "status": "passed"
+    },
+    {
+      "name": "Photo: non-image selection is rejected without closing the modal",
+      "status": "passed"
+    },
+    {
+      "name": "Retirement: review remains blocked by unresolved dependencies",
+      "status": "passed"
+    },
+    {
+      "name": "Photo rejection does not create an unsaved draft",
+      "status": "passed"
+    },
+    {
+      "name": "Find: selecting a file opens its record and closes cleanly",
+      "status": "passed"
+    },
+    {
+      "name": "Unavailable and quarantined files retain metadata history without file access",
+      "status": "passed"
+    },
+    {
+      "name": "Borrower departure: explicit outstanding-loan context and required reason",
+      "status": "failed",
+      "error": "Error: Timed out after 3000ms evaluating selector internal:role=combobox[name=\"Exception type\"s]: Playwright selector deadline exceeded"
+    },
+    {
+      "name": "Borrower departure: selected type and required reason verified in the rendered state",
+      "status": "passed"
+    },
+    {
+      "name": "Read-only: custody actions remain guarded and work fields stay disabled",
+      "status": "passed"
+    },
+    {
+      "name": "Custody selector: Escape retains selection and destination mismatch is caught early",
+      "status": "passed"
+    },
+    {
+      "name": "Problem mode: new/follow-up choices preserve entered observation",
+      "status": "failed",
+      "error": "Error: Timed out after 3000ms evaluating selector internal:role=textbox[name=\"What happened? Required\"s]: Playwright selector deadline exceeded"
+    },
+    {
+      "name": "Problem mode: rendered text is retained across follow-up and new issue",
+      "status": "passed"
+    },
+    {
+      "name": "Saving: Back, Cancel and duplicate submit are disabled while recording",
+      "status": "passed"
+    }
+  ],
+  "passed": 21,
+  "failedAttempts": 5,
+  "errors": [],
+  "inputMethod": "Keyboard-driven verification in the working in-app browser tab. Pointer automation failed to activate controls; keyboard input was used.",
+  "viewports": [
+    "2393×1188 initial browser viewport",
+    "1024×768",
+    "1600×1000"
+  ],
+  "notes": [
+    "Five failed harness attempts are retained with subsequent successful checks: checkbox pointer activation, textarea value attribute, unsupported animation helper, borrower selected-value evaluation timeout, report textarea evaluation timeout.",
+    "A late focus-restoration race and rejected-file dirty state were found and corrected during exploration.",
+    "Genuine browser zoom and pointer-driven interaction remain unverified in this pass.",
+    "Scoped preview only; no operational writes or production backend verification."
+  ]
+}

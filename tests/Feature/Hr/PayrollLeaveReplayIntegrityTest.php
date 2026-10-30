@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Services\ExternalSettlementService;
 use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
@@ -479,8 +481,9 @@ test('legacy paid-leave aggregates remain quarantined from release', function ()
     expect(fn () => app(PayrollJournalService::class)->postPayrollJournal($run->fresh()))
         ->toThrow(RuntimeException::class, 'unverified paid-leave provenance');
 
+    // Run and journal factories share the application ledger default, so the
+    // posted journal is reused only if it resolves to the run's own ledger.
     $postedJournal = FinJournal::factory()->create([
-        'organization_id' => $run->tenant_id,
         'type' => 'payroll',
         'source_type' => 'payroll_run',
         'source_id' => $run->id,
@@ -491,14 +494,16 @@ test('legacy paid-leave aggregates remain quarantined from release', function ()
         ->toBe($postedJournal->id)
         ->and($run->fresh()->journal_id)->toBe($postedJournal->id);
 
-    $paymentJournal = FinJournal::factory()->create(['organization_id' => 1]);
+    $paymentJournal = FinJournal::factory()->create();
     $run->forceFill([
         'payment_journal_id' => $paymentJournal->id,
     ])->saveQuietly();
     expect(app(PayrollJournalService::class)->postPayrollJournal($run->fresh())->id)
-        ->toBe($postedJournal->id)
-        ->and(app(PayrollJournalService::class)->postNetPayPayment($run->fresh())->id)
-        ->toBe($paymentJournal->id);
+        ->toBe($postedJournal->id);
+    expect(fn () => app(ExternalSettlementService::class)->preparePayrollNetPay($run->fresh(), $actor))
+        ->toThrow(InvalidArgumentException::class, 'Net pay for this run has already been settled.');
+    expect($run->fresh()->payment_journal_id)->toBe($paymentJournal->id)
+        ->and($run->fresh()->externalSettlement()->exists())->toBeFalse();
 });
 
 test('payroll replay migration removes self-reference before its supporting correction index', function (): void {
@@ -516,6 +521,7 @@ test('payroll replay migration removes self-reference before its supporting corr
 });
 
 test('two independent MySQL creators serialize to one period run', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     $actor = payrollReplayGlobalActor($this->siteA);

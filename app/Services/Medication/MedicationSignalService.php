@@ -265,17 +265,15 @@ class MedicationSignalService
             self::TYPE_ERROR,
             $error->client_id,
             $severityMap[$error->severity],
-            'Medication error: '.str_replace('_', ' ', $error->error_type)
-                .($medication ? " — {$medication->name}" : ''),
+            'Medication error '.$error->reference_number,
             [
                 'incident_id' => $error->client_incident_id,
                 'medication_error_id' => $error->id,
                 'client_medication_id' => $error->client_medication_id,
-                'medication_name' => $medication?->name,
                 'error_type' => $error->error_type,
                 'original_severity' => $error->severity,
-                'description' => $error->description,
-                'immediate_action' => $error->immediate_action,
+                'description' => MedicationErrorSummary::for($error),
+                'immediate_action' => 'See the medication error record.',
                 'reported_by' => $error->reported_by,
                 'reported_at' => $error->reported_at?->toIso8601String(),
                 'site_id' => $client?->site_id,
@@ -373,6 +371,9 @@ class MedicationSignalService
             'transport_log_id' => 'transport_log',
             'prn_attempt_id' => 'prn_attempt',
             'incident_id' => 'client_incident',
+            // An overdue dose (C6f): one signal per overdue spell of a dose,
+            // however often the overdue job finds it.
+            'dose_spell_key' => 'dose_spell',
         ] as $key => $type) {
             if (filled($context[$key] ?? null)) {
                 return [$type, $context[$key]];

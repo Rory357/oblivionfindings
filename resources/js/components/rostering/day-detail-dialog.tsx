@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
+import { StatusBadge } from '@/components/ui/status-badge';
 import { avatarHueStyle } from './avatar-hue';
 import {
     CAL_MONTHS,
@@ -257,13 +258,13 @@ function DayShiftRow({
             }}
         >
             <div className="flex flex-col gap-px">
-                <span className="text-[14.5px] font-bold tracking-tight tabular-nums">
+                <span className="text-base font-bold tracking-tight tabular-nums">
                     {s.start}
                 </span>
-                <span className="text-[11px] text-muted-foreground tabular-nums">
+                <span className="text-xs text-muted-foreground tabular-nums">
                     – {s.end}
                 </span>
-                <span className="text-[10.5px] font-semibold text-muted-foreground/80">
+                <span className="text-xs font-semibold text-muted-foreground/80">
                     {fmtHours(s.durationH)}
                 </span>
             </div>
@@ -278,7 +279,7 @@ function DayShiftRow({
                 <span className="flex min-w-0 flex-col gap-px">
                     <span
                         className={cn(
-                            'inline-flex min-w-0 items-center gap-1.5 truncate text-[13.5px] font-bold tracking-tight',
+                            'inline-flex min-w-0 items-center gap-1.5 truncate text-base font-bold tracking-tight',
                             m.muted && 'line-through',
                         )}
                     >
@@ -287,7 +288,7 @@ function DayShiftRow({
                             <Repeat className="h-[11px] w-[11px] shrink-0 text-muted-foreground" />
                         ) : null}
                     </span>
-                    <span className="truncate text-[11.5px] text-muted-foreground">
+                    <span className="truncate text-sm text-muted-foreground">
                         {subLine ? `${subLine} · ` : ''}
                         <span className="capitalize">{s.shiftType}</span>
                     </span>
@@ -298,12 +299,12 @@ function DayShiftRow({
                 {s.staff ? (
                     <>
                         <span
-                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold"
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-extrabold"
                             style={avatarHueStyle(calHashHue(s.staff))}
                         >
                             {calInitials(s.staff)}
                         </span>
-                        <span className="min-w-0 truncate text-[12.5px] font-semibold">
+                        <span className="min-w-0 truncate text-sm font-semibold">
                             {s.staff}
                         </span>
                     </>
@@ -322,14 +323,14 @@ function DayShiftRow({
                         <span className="flex min-w-0 flex-col">
                             <span
                                 className={cn(
-                                    'truncate text-[12.5px] font-semibold',
+                                    'truncate text-sm font-semibold',
                                     s.status !== 'draft' &&
                                         'text-status-critical',
                                 )}
                             >
                                 {unstaffedLabel}
                             </span>
-                            <span className="truncate text-[10.5px] text-muted-foreground">
+                            <span className="truncate text-xs text-muted-foreground">
                                 {unstaffedSub}
                             </span>
                         </span>
@@ -339,7 +340,7 @@ function DayShiftRow({
 
             <div className="hidden items-center justify-end gap-1.5 min-[880px]:flex">
                 <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-[3px] text-[10.5px] font-bold whitespace-nowrap"
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-[3px] text-xs font-bold whitespace-nowrap"
                     style={{ background: m.tint, color: m.accent }}
                 >
                     {m.live ? (
@@ -351,19 +352,20 @@ function DayShiftRow({
                     {m.label}
                 </span>
                 {s.conflict ? (
-                    <span className="rounded bg-status-critical-bg px-1 py-px text-[8.5px] font-extrabold tracking-wider text-status-critical">
-                        CLASH
-                    </span>
+                    <StatusBadge variant="critical" size="sm">
+                        Clash
+                    </StatusBadge>
                 ) : null}
                 {s.incidents > 0 ? (
-                    <span className="rounded bg-status-critical-bg px-1 py-px text-[8.5px] font-extrabold tracking-wider text-status-critical">
-                        {s.incidents} INC
-                    </span>
+                    <StatusBadge variant="critical" size="sm">
+                        {s.incidents}{' '}
+                        {s.incidents === 1 ? 'incident' : 'incidents'}
+                    </StatusBadge>
                 ) : null}
                 {s.replacement ? (
-                    <span className="rounded bg-status-warning-bg px-1 py-px text-[8.5px] font-extrabold tracking-wider text-status-warning">
-                        REPL
-                    </span>
+                    <StatusBadge variant="warning" size="sm">
+                        Replacing
+                    </StatusBadge>
                 ) : null}
             </div>
 
@@ -503,7 +505,11 @@ export function DayDetailDialog({
         <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
             <DialogContent
                 ref={contentRef}
-                className="flex h-[min(820px,92vh)] !w-full !max-w-[min(96vw,1080px)] flex-col gap-0 overflow-hidden !rounded-2xl !p-0 md:flex-row [&>button]:hidden"
+                className="flex h-[min(820px,92vh)] flex-col gap-0 overflow-hidden !rounded-2xl !p-0 md:flex-row [&>button]:hidden"
+                style={{
+                    maxWidth: 'min(92vw, 1100px)',
+                    width: 'min(92vw, 1100px)',
+                }}
                 onEscapeKeyDown={(e) => {
                     if (popoverOpen) e.preventDefault();
                 }}
@@ -521,14 +527,14 @@ export function DayDetailDialog({
                 </VisuallyHidden.Root>
 
                 {/* ── rail: date nav + status filters ── */}
-                <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 md:flex">
+                <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 md:flex">
                     <div className="mb-2 flex items-center gap-2.5">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
                             <CalendarClock className="h-4.5 w-4.5" />
                         </span>
                         <div className="min-w-0">
                             <h2 className="text-sm font-bold">Day roster</h2>
-                            <div className="truncate text-[11.5px] text-muted-foreground">
+                            <div className="truncate text-sm text-muted-foreground">
                                 {d.getDate()}{' '}
                                 {CAL_MONTHS[d.getMonth()].slice(0, 3)}{' '}
                                 {d.getFullYear()}
@@ -581,15 +587,15 @@ export function DayDetailDialog({
                                 className={cn(
                                     'flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors',
                                     isActive
-                                        ? 'bg-primary/10'
-                                        : 'hover:bg-sidebar-accent',
+                                        ? 'bg-primary-fill/10'
+                                        : 'hover:bg-muted',
                                 )}
                             >
                                 <span
                                     className={cn(
                                         'flex h-6 w-6 shrink-0 items-center justify-center rounded-full',
                                         isActive &&
-                                            'bg-primary text-primary-foreground',
+                                            'bg-primary-fill text-primary-fill-foreground',
                                     )}
                                     style={
                                         isActive
@@ -602,21 +608,21 @@ export function DayDetailDialog({
                                 <span className="min-w-0 flex-1">
                                     <span
                                         className={cn(
-                                            'block text-[13px] leading-tight font-semibold',
+                                            'block text-sm leading-tight font-semibold',
                                             isActive && 'font-bold',
                                         )}
                                     >
                                         {f.label}
                                     </span>
-                                    <span className="block truncate text-[11px] text-muted-foreground">
+                                    <span className="block truncate text-xs text-muted-foreground">
                                         {f.blurb}
                                     </span>
                                 </span>
                                 <span
                                     className={cn(
-                                        'shrink-0 self-center rounded-full px-1.5 py-px text-[10.5px] font-bold tabular-nums',
+                                        'shrink-0 self-center rounded-full px-1.5 py-px text-xs font-bold tabular-nums',
                                         isActive
-                                            ? 'bg-primary text-primary-foreground'
+                                            ? 'bg-primary-fill text-primary-fill-foreground'
                                             : 'bg-muted text-muted-foreground',
                                     )}
                                 >
@@ -628,7 +634,7 @@ export function DayDetailDialog({
 
                     {/* eslint-disable-next-line no-restricted-syntax -- wizard-rail coverage meter card matching CreateShiftDialog's readiness card. */}
                     <div className="mt-auto rounded-lg border border-border bg-card p-3">
-                        <div className="flex items-center justify-between text-[11.5px] font-semibold">
+                        <div className="flex items-center justify-between text-sm font-semibold">
                             <span>Coverage</span>
                             <b
                                 className="tabular-nums"
@@ -646,7 +652,7 @@ export function DayDetailDialog({
                                 }}
                             />
                         </div>
-                        <div className="mt-1.5 text-[10.5px] text-muted-foreground">
+                        <div className="mt-1.5 text-xs text-muted-foreground">
                             {openCount > 0
                                 ? `${openCount} open shift${openCount > 1 ? 's' : ''} need${openCount === 1 ? 's' : ''} cover`
                                 : active.length > 0
@@ -659,14 +665,14 @@ export function DayDetailDialog({
                 {/* ── main column ── */}
                 <div className="flex min-w-0 flex-1 flex-col">
                     <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
-                        <div className="min-w-0 truncate text-[12.5px] text-muted-foreground">
+                        <div className="min-w-0 truncate text-sm text-muted-foreground">
                             <b className="text-foreground">{dateLabel}</b> ·{' '}
                             {active.length} shift
                             {active.length === 1 ? '' : 's'} · {fmtHours(hours)}{' '}
                             planned
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                            <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
+                            <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-xs text-muted-foreground sm:inline-flex">
                                 <kbd className="font-sans font-semibold">←</kbd>
                                 <kbd className="font-sans font-semibold">→</kbd>
                                 <span>day</span>
@@ -696,7 +702,7 @@ export function DayDetailDialog({
                         {gaps.length > 0 ? (
                             // eslint-disable-next-line no-restricted-syntax -- inline coverage-gap callout panel, not a Card.
                             <div className="mb-4 rounded-xl border border-status-critical/25 bg-status-critical-bg/50 p-3">
-                                <div className="flex items-center gap-2 text-[12.5px] font-bold text-status-critical">
+                                <div className="flex items-center gap-2 text-sm font-bold text-status-critical">
                                     <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                                     Site coverage{' '}
                                     {gaps.length === 1 ? 'gap' : 'gaps'} on this
@@ -725,7 +731,7 @@ export function DayDetailDialog({
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
-                                                    className="h-7 px-2 text-[11px]"
+                                                    className="h-7 px-2 text-xs"
                                                     onClick={() => onFillGap(g)}
                                                 >
                                                     <Plus className="mr-1 h-3 w-3" />
@@ -744,7 +750,7 @@ export function DayDetailDialog({
                                 <strong className="text-sm text-foreground">
                                     {empty[0]}
                                 </strong>
-                                <span className="max-w-[360px] text-[12.5px]">
+                                <span className="max-w-[360px] text-sm">
                                     {empty[1]}
                                 </span>
                                 {filter === 'all' && canCreate ? (
@@ -779,7 +785,7 @@ export function DayDetailDialog({
                                                     · {g.sub}
                                                 </span>
                                             </div>
-                                            <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-[10.5px] font-bold text-muted-foreground tabular-nums">
+                                            <span className="shrink-0 rounded-full bg-muted px-1.5 py-px text-xs font-bold text-muted-foreground tabular-nums">
                                                 {g.items.length}
                                             </span>
                                         </div>

@@ -419,13 +419,13 @@ interface Props {
 
 const AVATAR_COLORS = [
     'bg-status-info text-primary-foreground',
-    'bg-primary text-primary-foreground',
+    'bg-primary-fill text-primary-fill-foreground',
     'bg-status-success text-primary-foreground',
     'bg-status-warning text-primary-foreground',
     'bg-status-critical text-primary-foreground',
     'bg-status-info text-primary-foreground',
     'bg-status-critical text-primary-foreground',
-    'bg-primary text-primary-foreground',
+    'bg-primary-fill text-primary-fill-foreground',
 ];
 
 function getInitials(name: string) {

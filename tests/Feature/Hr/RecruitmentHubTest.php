@@ -419,6 +419,8 @@ test('converting notifies the hiring manager and provisions the work email', fun
         'position_title' => 'Support Worker', 'target_site_id' => $this->site->id, 'status' => 'active',
     ]);
     $offer = makeOffer(['application' => $application], 'accepted', $this->hr->id, $this->site->id);
+    // Only a work email on the offer is provisioned; a personal email never is.
+    $offer->update(['work_email' => 'new.hire@care.example.test']);
 
     $this->actingAs($this->hr)->post(route('hr.offers.convert', $offer->id))->assertRedirect();
 
@@ -426,8 +428,9 @@ test('converting notifies the hiring manager and provisions the work email', fun
     // The new hire gets a branded welcome on their personal inbox.
     Notification::assertSentOnDemand(NewHireWelcomeNotification::class);
     expect($offer->fresh()->work_email_provisioned)->toBeTrue();
-    expect($offer->fresh()->work_email)->not->toBeNull();
-    expect(HrEmployeeProfile::query()->count())->toBeGreaterThan(0);
+    expect($offer->fresh()->work_email)->toBe('new.hire@care.example.test');
+    expect(HrEmployeeProfile::query()->where('candidate_id', $candidate->id)->value('work_email'))
+        ->toBe('new.hire@care.example.test');
 });
 
 /* ---- A8: gated rejection decline email (#18) ---- */

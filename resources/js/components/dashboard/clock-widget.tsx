@@ -1,3 +1,4 @@
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { router } from '@inertiajs/react';
 import { Loader2, LogIn, LogOut } from 'lucide-react';
@@ -136,11 +137,10 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                     Clock Out
                 </Button>
             ) : (
-                <Button
+                <PageHeaderPrimaryButton
                     onClick={handleClockIn}
                     disabled={processing}
-                    size="lg"
-                    className="gap-2 rounded-full bg-white px-8 font-semibold text-primary shadow-md hover:bg-white/90"
+                    className="h-10 gap-2 rounded-full px-8 disabled:opacity-50"
                 >
                     {processing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -148,7 +148,7 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                         <LogIn className="h-4 w-4" />
                     )}
                     Clock In
-                </Button>
+                </PageHeaderPrimaryButton>
             )}
         </div>
     );

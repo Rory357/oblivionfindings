@@ -25,8 +25,9 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { useSafetyForm } from '@/hooks/use-safety-workspace-drafts';
+import { formatDateOnly } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import { useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     CalendarClock,
@@ -61,6 +62,7 @@ import type { ProcedureFormData } from './procedure-detail-dialog';
 /* ------------------------------------------------------------------ */
 
 export type ProcedureWizardOptions = {
+    can_apply_organisation_wide?: boolean;
     sites: { id: number; name: string }[];
     roles: { id: number; name: string; label: string }[];
     trainingCourses: { id: number; name: string; code: string | null }[];
@@ -197,8 +199,16 @@ function validateStep(
     key: string,
     d: WizForm,
     isEdit: boolean,
+    allowOrganisationWide: boolean,
 ): Record<string, string> {
     const e: Record<string, string> = {};
+    if (
+        key === 'applies' &&
+        !allowOrganisationWide &&
+        !(d.applicable_sites ?? []).length
+    )
+        e.applicable_sites =
+            'Choose at least one approved site for this procedure.';
     if (key === 'basics') {
         if (!d.title.trim()) e.title = 'Give the procedure a title.';
         if (!d.reference_number.trim())
@@ -220,7 +230,8 @@ function completionPct(d: WizForm): number {
         !!d.scope.trim(),
         d.steps.some((s) => s.description.trim()),
         d.ppe_required.length > 0 || d.hazards_addressed.length > 0,
-        d.applicable_roles.length > 0 || d.applicable_sites.length > 0,
+        (d.applicable_roles ?? []).length > 0 ||
+            (d.applicable_sites ?? []).length > 0,
         !!d.review_date,
         !!d.owner_id,
     ];
@@ -246,13 +257,23 @@ export function ProcedureWizardDialog({
     onOpenProcedure: (id: number) => void;
 }) {
     const isEdit = !!initial?.id;
-    const form = useForm<WizForm>(
-        initial ? { ...EMPTY, ...initial, change_summary: '' } : { ...EMPTY },
+    const form = useSafetyForm<WizForm>(
+        initial
+            ? { ...EMPTY, ...initial, change_summary: '' }
+            : {
+                  ...EMPTY,
+                  applicable_sites: options.can_apply_organisation_wide
+                      ? []
+                      : options.sites.length === 1
+                        ? [options.sites[0].id]
+                        : null,
+              },
     );
     const [stepIndex, setStepIndex] = useState(0);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [done, setDone] = useState(false);
     const [createdId, setCreatedId] = useState<number | null>(null);
+    const [failure, setFailure] = useState<string | null>(null);
 
     const d = form.data;
     const cur = STEPS[stepIndex];
@@ -266,17 +287,22 @@ export function ProcedureWizardDialog({
         form.clearErrors();
         setErrors({});
         setStepIndex(0);
+        setFailure(null);
     };
 
     const close = () => {
-        if (!isEdit) reset();
-        setDone(false);
-        setCreatedId(null);
+        // The owning workspace asks whether to discard before this editor unmounts.
+        // Clearing here would destroy the draft even when the worker chooses Cancel.
         onClose();
     };
 
     const next = () => {
-        const e = validateStep(cur.key, d, isEdit);
+        const e = validateStep(
+            cur.key,
+            d,
+            isEdit,
+            !!options.can_apply_organisation_wide,
+        );
         setErrors(e);
         if (Object.keys(e).length === 0)
             setStepIndex((i) => Math.min(i + 1, STEPS.length - 1));
@@ -284,10 +310,20 @@ export function ProcedureWizardDialog({
     const back = () => setStepIndex((i) => Math.max(i - 1, 0));
 
     const submit = (addAnother: boolean) => {
+        if (form.processing) return;
+        setFailure(null);
         // Re-validate every step; jump to the first failure.
         const all: Record<string, string> = {};
         for (const s of STEPS)
-            Object.assign(all, validateStep(s.key, d, isEdit));
+            Object.assign(
+                all,
+                validateStep(
+                    s.key,
+                    d,
+                    isEdit,
+                    !!options.can_apply_organisation_wide,
+                ),
+            );
         if (Object.keys(all).length) {
             setErrors(all);
             setStepIndex(stepForError(Object.keys(all)[0]));
@@ -298,14 +334,27 @@ export function ProcedureWizardDialog({
             ? `/health-safety/procedures/${initial!.id}`
             : '/health-safety/procedures';
         form.transform((data) => ({
-            ...data,
+            ...Object.fromEntries(
+                Object.entries(data).filter(
+                    ([key, value]) =>
+                        !(
+                            [
+                                'applicable_roles',
+                                'applicable_sites',
+                                'related_training',
+                            ].includes(key) && value === null
+                        ),
+                ),
+            ),
             review_date: data.review_date || null,
             ...(isEdit ? { _method: 'put' as const } : {}),
         }));
+        let receivedResponse = false;
         form.post(url, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: (page) => {
+                receivedResponse = true;
                 const flash = (
                     page.props as {
                         flash?: {
@@ -314,19 +363,36 @@ export function ProcedureWizardDialog({
                         };
                     }
                 ).flash;
-                if (flash?.error) return;
+                if (flash?.error) {
+                    setFailure(flash.error);
+                    return;
+                }
                 if (addAnother) {
                     reset();
                     return;
                 }
+                form.setDefaults();
                 setCreatedId(
                     flash?.created_procedure_id ?? initial?.id ?? null,
                 );
                 setDone(true);
             },
             onError: (errs) => {
+                receivedResponse = true;
                 const first = Object.keys(errs)[0];
                 if (first) setStepIndex(stepForError(first));
+            },
+            onCancel: () => {
+                receivedResponse = true;
+                setFailure(
+                    'Saving was interrupted. Your entries are still here. Check the procedure before trying again.',
+                );
+            },
+            onFinish: () => {
+                if (!receivedResponse)
+                    setFailure(
+                        'The save could not be confirmed. Your entries are still here. Check the procedure before trying again.',
+                    );
             },
         });
     };
@@ -338,7 +404,7 @@ export function ProcedureWizardDialog({
                 unstyled
                 type="button"
                 onClick={close}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                className="frontline-tap frontline-focus rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
                 Cancel
             </GuardrailButton>
@@ -348,7 +414,7 @@ export function ProcedureWizardDialog({
                     type="button"
                     onClick={() => submit(true)}
                     disabled={form.processing}
-                    className="rounded-lg border border-primary/40 px-3.5 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
+                    className="frontline-tap frontline-focus rounded-lg border border-primary/40 px-3.5 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60"
                 >
                     Save &amp; add another
                 </GuardrailButton>
@@ -358,7 +424,7 @@ export function ProcedureWizardDialog({
                 type="button"
                 onClick={() => submit(false)}
                 disabled={form.processing}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+                className="frontline-tap frontline-focus inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90 disabled:opacity-60"
             >
                 <FilePlus2 className="h-4 w-4" />{' '}
                 {isEdit ? 'Save changes' : 'Create procedure'}
@@ -370,7 +436,7 @@ export function ProcedureWizardDialog({
                 unstyled
                 type="button"
                 onClick={close}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                className="frontline-tap frontline-focus rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
             >
                 Cancel
             </GuardrailButton>
@@ -378,7 +444,7 @@ export function ProcedureWizardDialog({
                 unstyled
                 type="button"
                 onClick={next}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                className="frontline-tap frontline-focus inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-sm font-semibold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
             >
                 Continue <ChevronRight className="h-4 w-4" />
             </GuardrailButton>
@@ -409,7 +475,7 @@ export function ProcedureWizardDialog({
                         unstyled
                         type="button"
                         onClick={back}
-                        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
+                        className="frontline-tap frontline-focus inline-flex items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground"
                     >
                         <ChevronLeft className="h-4 w-4" /> Back
                     </GuardrailButton>
@@ -424,7 +490,7 @@ export function ProcedureWizardDialog({
                         }
                         blurb={
                             isEdit
-                                ? `${d.reference_number} has been updated and a new version recorded.`
+                                ? `${d.reference_number} has a new working revision. Its last approved version remains available until a replacement is approved.`
                                 : `${d.reference_number} has been saved as a draft. Submit it for review when it's ready for approval.`
                         }
                         actions={
@@ -437,7 +503,7 @@ export function ProcedureWizardDialog({
                                             setDone(false);
                                             reset();
                                         }}
-                                        className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
+                                        className="frontline-tap frontline-focus rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
                                     >
                                         Add another
                                     </GuardrailButton>
@@ -451,7 +517,7 @@ export function ProcedureWizardDialog({
                                             close();
                                             onOpenProcedure(id);
                                         }}
-                                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                     >
                                         Open procedure
                                     </GuardrailButton>
@@ -460,7 +526,7 @@ export function ProcedureWizardDialog({
                                         unstyled
                                         type="button"
                                         onClick={close}
-                                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+                                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground hover:bg-primary-fill/90"
                                     >
                                         Done
                                     </GuardrailButton>
@@ -472,6 +538,31 @@ export function ProcedureWizardDialog({
             }
         >
             <WizardStepPane>
+                {failure && (
+                    <p
+                        role="alert"
+                        className="frontline-tap frontline-focus rounded-lg border border-status-critical bg-status-critical-bg p-3 text-sm text-status-critical-foreground"
+                    >
+                        {failure}
+                    </p>
+                )}
+                {Object.entries(form.errors)
+                    .filter(([key]) =>
+                        [
+                            'expected_version',
+                            'procedure',
+                            'authorization',
+                        ].includes(key),
+                    )
+                    .map(([key, message]) => (
+                        <p
+                            key={key}
+                            role="alert"
+                            className="text-sm text-status-critical"
+                        >
+                            {message}
+                        </p>
+                    ))}
                 {cur.key === 'basics' && (
                     <div className="flex flex-col gap-5">
                         <StepHead
@@ -511,6 +602,7 @@ export function ProcedureWizardDialog({
                             </Field>
                             <Field label="Review cadence">
                                 <SelectInput
+                                    frontline
                                     value={
                                         d.review_frequency_months
                                             ? String(d.review_frequency_months)
@@ -636,13 +728,34 @@ export function ProcedureWizardDialog({
                             title="Applies to"
                             blurb="Who must follow this procedure, where, and the training that backs it."
                         />
-                        <Field label="Roles" hint="leave empty for all roles">
+                        <Field
+                            label="Roles"
+                            hint="An empty selection applies to all eligible workforce roles."
+                            error={fieldError('applicable_roles')}
+                        >
+                            {d.applicable_roles === null && (
+                                <p className="text-subtle">
+                                    Role applicability was not recorded. Select
+                                    roles or explicitly choose all roles before
+                                    approval.
+                                </p>
+                            )}
+                            <GuardrailButton
+                                type="button"
+                                variant="outline"
+                                className="frontline-tap"
+                                onClick={() =>
+                                    form.setData('applicable_roles', [])
+                                }
+                            >
+                                All eligible roles
+                            </GuardrailButton>
                             <EntityChecklist
                                 options={options.roles.map((r) => ({
                                     value: r.name,
                                     label: r.label,
                                 }))}
-                                selected={d.applicable_roles}
+                                selected={d.applicable_roles ?? []}
                                 onChange={(v) =>
                                     form.setData(
                                         'applicable_roles',
@@ -655,13 +768,32 @@ export function ProcedureWizardDialog({
                         <Field
                             label="Sites"
                             hint="leave empty for all sites (organisation-wide)"
+                            error={fieldError('applicable_sites')}
                         >
+                            {d.applicable_sites === null && (
+                                <p className="text-subtle">
+                                    Site applicability was not recorded. Select
+                                    sites or explicitly choose organisation-wide
+                                    instructions before approval.
+                                </p>
+                            )}
+                            <GuardrailButton
+                                type="button"
+                                variant="outline"
+                                className="frontline-tap"
+                                onClick={() =>
+                                    form.setData('applicable_sites', [])
+                                }
+                                disabled={!options.can_apply_organisation_wide}
+                            >
+                                Organisation-wide instructions
+                            </GuardrailButton>
                             <EntityChecklist
                                 options={options.sites.map((s) => ({
                                     value: s.id,
                                     label: s.name,
                                 }))}
-                                selected={d.applicable_sites}
+                                selected={d.applicable_sites ?? []}
                                 onChange={(v) =>
                                     form.setData(
                                         'applicable_sites',
@@ -678,7 +810,7 @@ export function ProcedureWizardDialog({
                                     label: t.name,
                                     sub: t.code ?? undefined,
                                 }))}
-                                selected={d.related_training}
+                                selected={d.related_training ?? []}
                                 onChange={(v) =>
                                     form.setData(
                                         'related_training',
@@ -716,6 +848,7 @@ export function ProcedureWizardDialog({
                             </Field>
                             <Field label="Review cadence">
                                 <SelectInput
+                                    frontline
                                     value={
                                         d.review_frequency_months
                                             ? String(d.review_frequency_months)
@@ -737,6 +870,7 @@ export function ProcedureWizardDialog({
                             hint="responsible for keeping this current"
                         >
                             <SelectInput
+                                frontline
                                 value={d.owner_id ? String(d.owner_id) : ''}
                                 onChange={(v) =>
                                     form.setData(
@@ -752,10 +886,10 @@ export function ProcedureWizardDialog({
                             />
                         </Field>
                         <InfoCard icon={CheckCircle2} tone="info">
-                            New procedures save as a <strong>draft</strong>.
-                            Submit for review, then a manager approves it into
-                            force. The master document is attached from the
-                            procedure's Documents tab.
+                            Save a working draft, add its documents, then submit
+                            it for review. An authorised approver publishes the
+                            version staff will read. Editing keeps the last
+                            approved version available.
                         </InfoCard>
                     </div>
                 )}
@@ -834,24 +968,28 @@ export function ProcedureWizardDialog({
                                 <ReviewRow
                                     label="Roles"
                                     value={
-                                        d.applicable_roles.length
-                                            ? `${d.applicable_roles.length} role(s)`
-                                            : 'All roles'
+                                        (d.applicable_roles ?? []).length
+                                            ? `${(d.applicable_roles ?? []).length} role(s)`
+                                            : d.applicable_roles === null
+                                              ? 'Not recorded'
+                                              : 'All eligible roles'
                                     }
                                 />
                                 <ReviewRow
                                     label="Sites"
                                     value={
-                                        d.applicable_sites.length
-                                            ? `${d.applicable_sites.length} site(s)`
-                                            : 'All sites'
+                                        (d.applicable_sites ?? []).length
+                                            ? `${(d.applicable_sites ?? []).length} site(s)`
+                                            : d.applicable_sites === null
+                                              ? 'Not recorded'
+                                              : 'Organisation-wide'
                                     }
                                 />
                                 <ReviewRow
                                     label="Training"
                                     value={
-                                        d.related_training.length
-                                            ? `${d.related_training.length} course(s)`
+                                        (d.related_training ?? []).length
+                                            ? `${(d.related_training ?? []).length} course(s)`
                                             : '—'
                                     }
                                 />
@@ -863,7 +1001,10 @@ export function ProcedureWizardDialog({
                             >
                                 <ReviewRow
                                     label="Next review"
-                                    value={d.review_date || '—'}
+                                    value={formatDateOnly(
+                                        d.review_date,
+                                        'Not scheduled',
+                                    )}
                                 />
                                 <ReviewRow
                                     label="Cadence"
@@ -942,7 +1083,7 @@ function FreeChips({
                     {values.map((v) => (
                         <span
                             key={v}
-                            className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-[13px] font-medium text-primary"
+                            className="frontline-tap frontline-focus inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-[13px] font-medium text-primary"
                         >
                             {v}
                             <GuardrailButton
@@ -975,7 +1116,7 @@ function FreeChips({
                     unstyled
                     type="button"
                     onClick={() => add(text)}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted"
+                    className="frontline-tap frontline-focus inline-flex shrink-0 items-center gap-1 rounded-lg border border-border px-3 text-sm font-medium text-foreground hover:bg-muted"
                 >
                     <Plus className="h-4 w-4" /> Add
                 </GuardrailButton>
@@ -1028,7 +1169,7 @@ function EntityChecklist<T extends string | number>({
                         aria-pressed={active}
                         onClick={() => toggle(o.value)}
                         className={cn(
-                            'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
+                            'frontline-tap frontline-focus inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors',
                             active
                                 ? 'border-primary bg-primary/10 text-primary'
                                 : 'border-border bg-card text-foreground hover:border-primary/50',
@@ -1092,6 +1233,7 @@ function StepsEditor({
                         </span>
                         <div className="flex min-w-0 flex-1 flex-col gap-2">
                             <Textarea
+                                aria-label={`Step ${i + 1} instructions`}
                                 rows={2}
                                 value={s.description}
                                 onChange={(e) =>
@@ -1100,6 +1242,7 @@ function StepsEditor({
                                 placeholder={`Step ${i + 1} — what to do`}
                             />
                             <Input
+                                aria-label={`Step ${i + 1} safety note`}
                                 value={s.safety_notes}
                                 onChange={(e) =>
                                     update(i, { safety_notes: e.target.value })
@@ -1114,7 +1257,7 @@ function StepsEditor({
                                 type="button"
                                 onClick={() => remove(i)}
                                 aria-label={`Remove step ${i + 1}`}
-                                className="mt-1 shrink-0 text-muted-foreground hover:text-status-critical"
+                                className="frontline-tap frontline-focus mt-1 shrink-0 text-muted-foreground hover:text-status-critical"
                             >
                                 <Trash2 className="h-4 w-4" />
                             </GuardrailButton>
@@ -1126,7 +1269,7 @@ function StepsEditor({
                 unstyled
                 type="button"
                 onClick={add}
-                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+                className="frontline-tap frontline-focus inline-flex w-fit items-center gap-1.5 rounded-lg border border-dashed border-border px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
             >
                 <Plus className="h-4 w-4" /> Add step
             </GuardrailButton>

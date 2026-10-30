@@ -11,8 +11,10 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Carbon;
 
 beforeEach(function () {
+    Carbon::setTestNow(Carbon::parse('2026-10-04 23:30:00', 'UTC'));
     $this->seed(RbacSeeder::class);
 
     $this->allowedSite = Site::factory()->create(['name' => 'Allowed People Site']);
@@ -36,6 +38,10 @@ beforeEach(function () {
         'employment_type' => 'contractor',
         'start_date' => now()->subYear()->toDateString(),
     ]);
+});
+
+afterEach(function () {
+    Carbon::setTestNow();
 });
 
 function peopleReadProfile(User $user, ?Site $site, array $overrides = []): HrEmployeeProfile
@@ -189,10 +195,10 @@ test('people summary and triage conceal hidden Site names and counts', function 
 test('current manager pickers and org chart exclude non-current and hidden Site staff', function () {
     peopleReadUser('Allowed Current Manager', $this->allowedSite);
     peopleReadUser('Allowed Ended Manager', $this->allowedSite, [
-        'end_date' => now()->subDay()->toDateString(),
+        'end_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->subDay()->toDateString(),
     ]);
     peopleReadUser('Allowed Future Manager', $this->allowedSite, [
-        'start_date' => now()->addDay()->toDateString(),
+        'start_date' => now(config('app.worker_timezone', 'Pacific/Auckland'))->addDay()->toDateString(),
     ]);
     peopleReadUser('Allowed Inactive Manager', $this->allowedSite, [
         'is_active' => false,

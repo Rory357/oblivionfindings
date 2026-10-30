@@ -71,12 +71,12 @@ export function SiteFilter({
         ? cn(
               'inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20',
               !allSelected &&
-                  'border-primary-foreground bg-primary-foreground text-primary',
+                  'border-primary-foreground bg-primary-foreground text-primary-strong',
           )
         : cn(
               'inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-accent',
               !allSelected &&
-                  'border-primary bg-primary text-primary-foreground',
+                  'border-primary-fill bg-primary-fill text-primary-fill-foreground',
           );
 
     return (
@@ -144,7 +144,7 @@ export function SiteFilter({
                                     className={cn(
                                         'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
                                         allSelected
-                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                             : 'border-input bg-background',
                                     )}
                                     aria-hidden="true"
@@ -156,7 +156,7 @@ export function SiteFilter({
                                 <span className="flex-1 font-medium">
                                     All sites
                                 </span>
-                                <span className="text-[10px] text-muted-foreground tabular-nums">
+                                <span className="text-xs text-muted-foreground tabular-nums">
                                     {sites.length}
                                 </span>
                             </CommandItem>
@@ -184,7 +184,7 @@ export function SiteFilter({
                                                     className={cn(
                                                         'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
                                                         checked
-                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                             : 'border-input bg-background',
                                                     )}
                                                     aria-hidden="true"
@@ -194,11 +194,11 @@ export function SiteFilter({
                                                     ) : null}
                                                 </span>
                                                 <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-[13px] leading-tight">
+                                                    <span className="block truncate text-sm leading-tight">
                                                         {s.name}
                                                     </span>
                                                     {s.type ? (
-                                                        <span className="block truncate text-[10.5px] text-muted-foreground">
+                                                        <span className="block truncate text-xs text-muted-foreground">
                                                             {s.type}
                                                         </span>
                                                     ) : null}
@@ -211,7 +211,7 @@ export function SiteFilter({
                         ) : null}
                     </CommandList>
                     {selectedCount > 0 ? (
-                        <div className="flex items-center justify-between border-t border-border px-2.5 py-2 text-[11px]">
+                        <div className="flex items-center justify-between border-t border-border px-2.5 py-2 text-xs">
                             <span className="text-muted-foreground tabular-nums">
                                 {selectedCount} of {sites.length} selected
                             </span>

@@ -66,7 +66,7 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
         ]);
 
         $trackingConsentType = ConsentType::factory()->create([
-            'name' => 'Asset Location Tracking (Safety)',
+            'name' => 'Personal Tracker (Wandering Risk)',
             'purpose' => 'Client personal safety tracking',
             'active' => true,
         ]);
@@ -94,6 +94,7 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
                 'longitude' => 174.7633,
                 'speed' => 14,
                 'battery' => 82,
+                'accuracy_m' => 12,
             ],
         ]);
 
@@ -105,7 +106,8 @@ class CanonicalIntegrationEventHistoryTest extends TestCase
             ->assertJsonPath('locations.0.lat', -36.8485)
             ->assertJsonPath('locations.0.lng', 174.7633)
             ->assertJsonPath('locations.0.speed', 14)
-            ->assertJsonPath('locations.0.battery', 82);
+            ->assertJsonPath('locations.0.battery', 82)
+            ->assertJsonPath('locations.0.accuracy', 12);
     }
 
     public function test_resident_tracking_history_reads_canonical_integration_event_identity(): void

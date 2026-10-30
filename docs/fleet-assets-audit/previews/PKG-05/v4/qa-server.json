@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "name": "PDF POST rejects missing local origin",
+      "pass": true
+    },
+    {
+      "name": "PDF POST rejects invalid payload",
+      "pass": true
+    },
+    {
+      "name": "Static preview remains available",
+      "pass": true
+    }
+  ]
+}

@@ -662,7 +662,7 @@ export function PeoplePane({
 
             {/* Sticky bulk bar */}
             {canManage && selected.size > 0 ? (
-                <div className="sticky top-2 z-30 flex flex-wrap items-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-primary-foreground shadow-lg">
+                <div className="sticky top-2 z-30 flex flex-wrap items-center gap-2 rounded-xl bg-primary-fill px-3 py-2.5 text-primary-fill-foreground shadow-lg">
                     <span className="px-1 text-sm font-bold">
                         {selected.size} selected
                     </span>

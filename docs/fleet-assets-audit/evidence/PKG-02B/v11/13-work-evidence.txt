@@ -1,0 +1,145 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van › Maintenance
+  - button "Back to vehicle profile":
+  - button "Upload vehicle profile photo" [disabled]:
+  - heading "Routine service" [level=1]
+  - generic: Internal plan
+  - paragraph:
+    - text: WO-0268 · Kōwhai van · VH-014
+    - text: Maintenance · Original record context
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View vehicle":
+    - generic: Vehicle
+    - generic: VH-014
+    - generic: Kōwhai van
+  - button "View source":
+    - generic: Source
+    - generic: SCH-DEMO-07
+    - generic: Original service schedule
+  - button "View restriction":
+    - generic: Restriction
+    - generic: Active
+    - generic: Separate release decision
+  - button "View evidence":
+    - generic: Evidence
+    - generic: 0 linked files
+    - generic: Original records & notes
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance" [selected]:
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - strong: Routine service · WO-0268
+  - generic: "Next: record work outcome · Kōwhai House Coordinator"
+  - generic: Internal plan
+  - button "Record outcome"
+  - tablist "Work record sections":
+    - tab "Overview"
+    - tab "Appointment"
+    - tab "Evidence" [active] [selected]
+    - tab "Costs"
+  - heading "Work evidence 0" [level=3]
+  - button "Upload":
+    - text: Upload
+  - generic: PDFs, photos and supporting records
+  - strong: Completion evidence reference
+  - generic: Not recorded
+  - button "Open original source"
+  - generic "Activity · 1 entries"
+  - complementary:
+    - generic: VEHICLE CONTROL
+    - heading "Restriction active" [level=2]
+    - paragraph: Work completion keeps the restriction in place until an authorised release is recorded.
+    - button "Review vehicle release"
+    - button "Back to vehicle":
+      - text: Back to vehicle
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

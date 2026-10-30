@@ -10,6 +10,8 @@ use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Hr\Services\OnboardingService;
+use App\Domain\Hr\Services\PeopleMutationLockService;
+use App\Domain\Hr\Services\WorkforceAvailabilityCoverageService;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
 use App\Models\Permission;
@@ -249,7 +251,7 @@ test('evidence storage is cleaned up when task completion rolls back', function 
         'sort_order' => 1,
         'status' => 'pending',
     ]);
-    $service = new class(app(HrCurrentStaffService::class), app(UserSiteAccessService::class)) extends OnboardingService
+    $service = new class(app(HrCurrentStaffService::class), app(UserSiteAccessService::class), app(WorkforceAvailabilityCoverageService::class), app(PeopleMutationLockService::class)) extends OnboardingService
     {
         protected function checkChecklistCompletion(HrOnboardingChecklist $checklist): void
         {

@@ -2,6 +2,8 @@
 
 namespace App\Domain\Rostering\AutoSchedule;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Domain\Rostering\AutoSchedule\Strategies\EligibilityScoringStrategy;
 use App\Domain\Rostering\RosterPeriodService;
 use App\Jobs\GenerateRosterSuggestionsJob;
@@ -9,10 +11,11 @@ use App\Models\RosterSuggestion;
 use App\Models\RosterSuggestionRun;
 use App\Models\Shift;
 use App\Models\User;
-use App\Services\ShiftStaffEligibilityService;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -21,10 +24,9 @@ class RosterSuggestionService
     public function __construct(
         private readonly RosterPeriodService $periods,
         private readonly EligibilityScoringStrategy $strategy,
-        private readonly ShiftStaffEligibilityService $eligibility,
+        private readonly HrCurrentStaffService $currentStaff,
         private readonly UserSiteAccessService $siteAccess,
-    ) {
-    }
+    ) {}
 
     public function generate(User $actor, CarbonInterface|string|null $week, int $siteId, int $limitPerShift = 3): RosterSuggestionRun
     {
@@ -96,22 +98,7 @@ class RosterSuggestionService
             return 0;
         }
 
-        $candidateCount = User::staff()
-            ->whereNotNull('approved_at')
-            ->whereHas('hrEmployeeProfile', function (Builder $profileQuery) use ($siteId): void {
-                $profileQuery
-                    ->where('is_active', true)
-                    ->whereDate('start_date', '<=', today())
-                    ->where(function (Builder $employmentQuery): void {
-                        $employmentQuery->whereNull('end_date')
-                            ->orWhereDate('end_date', '>=', today());
-                    })
-                    ->where(function (Builder $siteQuery) use ($siteId): void {
-                        $siteQuery->where('primary_site_id', $siteId)
-                            ->orWhereJsonContains('secondary_site_ids', $siteId);
-                    });
-            })
-            ->count();
+        $candidateCount = $this->currentSiteCandidates($siteId)->count();
 
         return $openShiftCount * max(1, $candidateCount);
     }
@@ -157,19 +144,25 @@ class RosterSuggestionService
             'failure_message' => null,
         ])->save();
 
-        $weekStart = $run->week_start->copy()->startOfDay();
-        $weekEnd = $run->week_end->copy()->startOfDay();
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $weekStart = Carbon::parse($run->week_start->toDateString(), $timezone)->startOfDay();
+        $weekEnd = Carbon::parse($run->week_end->toDateString(), $timezone)->startOfDay();
         $limitPerShift = (int) ($run->parameters['limit_per_shift'] ?? 3);
 
         try {
             $shifts = $this->openShiftsQuery((int) $run->site_id, $weekStart, $weekEnd)
                 ->with(['client:id,first_name,last_name,site_id', 'site:id,name'])
                 ->orderBy('starts_at')
-                ->get();
+                ->get()
+                ->filter(fn (Shift $shift) => $shift->site && (int) $shift->site->id === (int) $run->site_id
+                    && ($shift->client_id === null || ($shift->client
+                        && (int) $shift->client->id === (int) $shift->client_id
+                        && (int) $shift->client->site_id === (int) $run->site_id)));
 
+            $currentCandidates = $this->currentSiteCandidates((int) $run->site_id);
             $context = new RosterSuggestionContext($run, $actor, $shifts);
             foreach ($shifts as $shift) {
-                $context->setCandidatePool($shift, $this->eligibility->candidatesFor($shift));
+                $context->setCandidatePool($shift, $this->candidatesForShift($shift, $currentCandidates));
             }
 
             $suggestions = $this->strategy->suggest(
@@ -219,12 +212,53 @@ class RosterSuggestionService
 
     private function openShiftsQuery(int $siteId, CarbonInterface $weekStart, CarbonInterface $weekEnd): Builder
     {
-        return Shift::query()
+        return $this->siteAccess->applyShiftIntegrityScope(Shift::query()
+            ->employeeDuties()
             ->where('site_id', $siteId)
             ->whereNull('user_id')
             ->where('status', '!=', 'cancelled')
-            ->where('starts_at', '<', $weekEnd)
-            ->where('ends_at', '>', $weekStart);
+            ->where('starts_at', '<', $weekEnd->copy()->utc())
+            ->where('ends_at', '>', $weekStart->copy()->utc()));
+    }
+
+    /** @return Collection<int, User> */
+    private function currentSiteCandidates(int $siteId): Collection
+    {
+        return $this->currentStaff->currentUsersQuery()
+            ->with('hrEmployeeProfile')
+            ->get()
+            ->filter(function (User $candidate) use ($siteId): bool {
+                $profile = $candidate->hrEmployeeProfile;
+
+                return $profile instanceof HrEmployeeProfile
+                    && ((int) $profile->primary_site_id === $siteId
+                        || collect($profile->secondary_site_ids ?? [])->contains(
+                            fn (mixed $assignedSiteId): bool => (int) $assignedSiteId === $siteId,
+                        ));
+            })
+            ->values();
+    }
+
+    /**
+     * Current assignment authority and employment throughout the shift are
+     * prerequisites. The strategy still evaluates the complete eligibility
+     * stack before any candidate becomes a persisted suggestion.
+     *
+     * @param  Collection<int, User>  $currentCandidates
+     * @return Collection<int, User>
+     */
+    private function candidatesForShift(Shift $shift, Collection $currentCandidates): Collection
+    {
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $startsOn = $shift->starts_at->copy()->timezone($timezone)->toDateString();
+        $endsOn = $shift->ends_at->copy()->timezone($timezone)->toDateString();
+
+        return $currentCandidates->filter(function (User $candidate) use ($startsOn, $endsOn): bool {
+            $profile = $candidate->hrEmployeeProfile;
+
+            return ($profile->start_date === null || $profile->start_date->toDateString() <= $startsOn)
+                && ($profile->end_date === null || $profile->end_date->toDateString() >= $endsOn);
+        })->values();
     }
 
     private function failRun(RosterSuggestionRun $run, string $message): RosterSuggestionRun
@@ -240,28 +274,18 @@ class RosterSuggestionService
 
     public function accept(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
-        $this->assertFresh($suggestion);
+        $result = app(RosterSuggestionCommand::class)->decide('accept', $suggestion, $actor);
+        if ($result->outcome === 'expired_marked_stale') {
+            // The legacy stale marker is already persisted before the rejection.
+            abort(422, 'This roster suggestion has expired. Generate a fresh run before applying it.');
+        }
 
-        $suggestion->forceFill([
-            'status' => RosterSuggestion::STATUS_ACCEPTED,
-            'accepted_by' => $actor->id,
-            'accepted_at' => now(),
-            'dismissed_by' => null,
-            'dismissed_at' => null,
-        ])->save();
-
-        return $suggestion->fresh() ?? $suggestion;
+        return $result->model;
     }
 
     public function dismiss(RosterSuggestion $suggestion, User $actor): RosterSuggestion
     {
-        $suggestion->forceFill([
-            'status' => RosterSuggestion::STATUS_DISMISSED,
-            'dismissed_by' => $actor->id,
-            'dismissed_at' => now(),
-        ])->save();
-
-        return $suggestion->fresh() ?? $suggestion;
+        return app(RosterSuggestionCommand::class)->decide('dismiss', $suggestion, $actor)->model;
     }
 
     public function expireStaleRuns(): int

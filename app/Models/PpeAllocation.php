@@ -32,6 +32,8 @@ class PpeAllocation extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
         'allocated_at' => 'datetime',
         'returned_at' => 'datetime',
         'fit_test_completed' => 'boolean',
@@ -91,5 +93,11 @@ class PpeAllocation extends Model
     public function isActive(): bool
     {
         return $this->returned_at === null;
+    }
+
+    /** Governed facts remain distinct from legacy rows and current authority. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PpeSourceVersion::class, 'source_id')->where('source_type', 'allocation');
     }
 }

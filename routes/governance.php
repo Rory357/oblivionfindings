@@ -370,6 +370,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
         Route::middleware('permission:governance.clinical.manage')->group(function () {
             Route::post('/clinical/indicators', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'storeIndicator'])->name('clinical.indicators.store');
+            Route::post('/clinical/medication-target', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'medicationTarget'])->name('clinical.medication_target');
             Route::post('/clinical/snapshots', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'recordSnapshot'])->name('clinical.snapshots.store');
         });
     });

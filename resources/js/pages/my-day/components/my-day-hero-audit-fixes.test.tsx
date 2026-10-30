@@ -51,6 +51,9 @@ describe('MyDayHero audit fixes', () => {
 
         expect(screen.getByText('Today')).toBeVisible();
         expect(screen.queryByText(/–\s*·\s*8h/)).not.toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: /Report incident/i }),
+        ).toHaveAttribute('href', '/incidents/create?return_to=%2Fmy-day');
     });
 
     it('links workers to their own availability editor when provided', () => {
@@ -115,16 +118,24 @@ describe('MyDayHero audit fixes', () => {
             />,
         );
 
+        // PageHero stats take the band-safe tones (app.css page-hero-tone-*):
+        // the plain status tokens are tuned for cards, not the dark band.
         expect(screen.getByText('Clocked in')).toHaveClass(
-            'text-status-success',
+            'page-hero-tone-success',
         );
-        expect(screen.getByText('1/3')).toHaveClass('text-status-critical');
+        expect(screen.getByText('1/3')).toHaveClass('page-hero-tone-critical');
         expect(
             screen
                 .getAllByText('2')
                 .some((element) =>
-                    element.classList.contains('text-status-warning'),
+                    element.classList.contains('page-hero-tone-warning'),
                 ),
         ).toBe(true);
+        expect(
+            screen.getByRole('link', { name: /Report incident/i }),
+        ).toHaveAttribute(
+            'href',
+            '/incidents/create?shift_id=12&return_to=%2Fmy-day',
+        );
     });
 });

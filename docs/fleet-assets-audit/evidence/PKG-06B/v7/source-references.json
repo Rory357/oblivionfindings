@@ -1,0 +1,42 @@
+[
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.tsx",
+    "sha256": "e86598e9310ed23e44b7ad4edfd27bb364626473473221f6105e8ed816a385d9",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-types.ts",
+    "sha256": "305b315d2a534ac3cd3e8759469b5d9e88651a23426abd9f50e9b05a6d11b070",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/record-collection.tsx",
+    "sha256": "f6972e228aed9b0af25b7a2c95782978f8ac4a666d668fd2405ab87720e312df",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/assets/asset-finance-technology-projection.tsx",
+    "sha256": "5cbb9fbe4985ab7d5ac2df2bc4ce132893103927865dc9b783453a55c4109c2b",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "app/Domain/Finance/Presenters/AssetFinanceTechnologyProjectionPresenter.php",
+    "sha256": "4e43a66f8546f6016d6e1c59162fc0b17376693f2d8744be72e13fc016c591a2",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinFixedAsset.php",
+    "sha256": "e30457c1214b6bc93316e765fabcb543c578a91eafcbe78f835bfca6336d6b89",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/ui/dialog.tsx",
+    "sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/ui/status-badge.tsx",
+    "sha256": "d1d83d69c9f091a1dea57b7f7312f794097f2a8278dd70d7ba14a288d459c130",
+    "access": "Read-only source reference"
+  }
+]

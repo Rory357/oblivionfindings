@@ -9,8 +9,22 @@ const alertVariants = cva(
     variants: {
       variant: {
         default: "bg-background text-foreground",
+        // The verified critical status pair, not --destructive-foreground:
+        // that token is text for a solid bg-destructive fill (white in light
+        // mode), so on a card it rendered white on white (DESIGN.md
+        // "Fill foregrounds off their fill").
         destructive:
-          "text-destructive-foreground [&>svg]:text-current *:data-[slot=alert-description]:text-destructive-foreground/80",
+          "border-status-critical/40 bg-status-critical-bg text-status-critical-foreground [&>svg]:text-status-critical *:data-[slot=alert-description]:text-status-critical-foreground",
+        // Borderless toned notices on the same verified status pairs
+        // (sign-in screens): -foreground text, status-colour icon.
+        critical:
+          "border-transparent bg-status-critical-bg text-status-critical-foreground [&>svg]:text-status-critical *:data-[slot=alert-description]:text-status-critical-foreground",
+        warning:
+          "border-transparent bg-status-warning-bg text-status-warning-foreground [&>svg]:text-status-warning *:data-[slot=alert-description]:text-status-warning-foreground",
+        info:
+          "border-transparent bg-status-info-bg text-status-info-foreground [&>svg]:text-status-info *:data-[slot=alert-description]:text-status-info-foreground",
+        success:
+          "border-transparent bg-status-success-bg text-status-success-foreground [&>svg]:text-status-success *:data-[slot=alert-description]:text-status-success-foreground",
       },
     },
     defaultVariants: {

@@ -2,6 +2,14 @@ import { HorizontalBarChart } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,14 +33,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { toDateInput } from '@/lib/datetime';
 import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
@@ -234,85 +235,106 @@ export default function MileageIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Mileage Claims', href: '#' },
             ]}
         >
             <Head title="Mileage Claims" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Receipt} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Mileage claims · IRD ${irdRate.toFixed(2)}/km
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Staff Mileage Claims
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Personal vehicle mileage reimbursement claims.
-                                NZ IRD rate: ${irdRate.toFixed(2)}/km.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href="/fleet-assets/mileage?status=pending"
+                <PageHeader
+                    wrapTitle
+                    title="Staff Mileage Claims"
+                    icon={Receipt}
+                    subline={
+                        <>
+                            Personal vehicle reimbursement · NZ IRD rate: $
+                            {irdRate.toFixed(2)}/km
+                        </>
+                    }
+                    actions={
+                        <>
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => setWizardOpen(true)}
+                            >
+                                New claim
+                            </PageHeaderPrimaryButton>
+                            <PageHeaderGlassButton
+                                icon={Download}
+                                onClick={() =>
+                                    window.location.assign(
+                                        `/fleet-assets/mileage/export?${new URLSearchParams(localFilters as Record<string, string>).toString()}`,
+                                    )
+                                }
+                            >
+                                Export CSV
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Pending approval"
-                                value={fmt(safeStats.pending_approval)}
-                                caption="awaiting review"
+                                href={'/fleet-assets/mileage?status=pending'}
                                 tone={
                                     safeStats.pending_approval > 0
                                         ? 'warning'
                                         : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/mileage?status=approved"
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(safeStats.pending_approval)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    awaiting review
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Approved unpaid"
-                                value={fmt(safeStats.approved_unpaid ?? 0)}
-                                caption="ready for payroll"
+                                href={'/fleet-assets/mileage?status=approved'}
                                 tone={
                                     (safeStats.approved_unpaid ?? 0) > 0
                                         ? 'warning'
-                                        : 'neutral'
+                                        : 'brand'
                                 }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/mileage?status=paid"
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(safeStats.approved_unpaid ?? 0)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    ready for payroll
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Paid this month"
-                                value={formatCurrency(
-                                    safeStats.paid_this_month ?? 0,
-                                )}
-                                caption="reimbursed"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={last30Href}
+                                href={'/fleet-assets/mileage?status=paid'}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {formatCurrency(
+                                        safeStats.paid_this_month ?? 0,
+                                    )}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    reimbursed
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Claims 30d"
-                                value={fmt(safeStats.claims_30d ?? 0)}
-                                caption="trips claimed"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            icon={Plus}
-                            emphasis
-                            onClick={() => setWizardOpen(true)}
-                        >
-                            New claim
-                        </FleetHeroAction>
-                        <FleetHeroAction
-                            href={`/fleet-assets/mileage/export?${new URLSearchParams(localFilters as Record<string, string>).toString()}`}
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                                href={last30Href}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(safeStats.claims_30d ?? 0)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    trips claimed
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {/* KPI Cards */}
                 <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

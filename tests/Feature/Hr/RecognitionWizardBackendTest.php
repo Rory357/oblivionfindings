@@ -72,7 +72,7 @@ test('a single-recipient kudos stays back-compatible and defaults the impact', f
         ])
         ->assertRedirect();
 
-    expect(HrKudos::where('to_user_id', $this->r1->id)->value('impact'))->toBe('good_job');
+    expect(HrKudos::where('to_user_id', $this->r1->id)->value('impact'))->toBe('thank_you');
 });
 
 test('an invalid impact is rejected', function () {
@@ -92,7 +92,7 @@ test('reacting to a kudos toggles the reaction on and off', function () {
     $this->actingAs($this->hr)->post('/hr/feed/kudos', [
         'to_user_id' => $this->r1->id,
         'category' => 'teamwork',
-        'message' => 'Nice work.',
+        'message' => 'Thoughtful work.',
     ]);
     $kudos = HrKudos::firstOrFail();
 
@@ -120,7 +120,7 @@ test('an unknown reaction emoji is rejected', function () {
     $this->actingAs($this->hr)->post('/hr/feed/kudos', [
         'to_user_id' => $this->r1->id,
         'category' => 'teamwork',
-        'message' => 'Nice work.',
+        'message' => 'Thoughtful work.',
     ]);
     $kudos = HrKudos::firstOrFail();
 
@@ -129,11 +129,11 @@ test('an unknown reaction emoji is rejected', function () {
         ->assertSessionHasErrors('emoji');
 });
 
-test('only the giver or receiver can reply to a kudos thread', function () {
+test('authorised audience readers with give permission can join a public kudos thread', function () {
     $this->actingAs($this->hr)->post('/hr/feed/kudos', [
         'to_user_id' => $this->r1->id,
         'category' => 'teamwork',
-        'message' => 'Nice work.',
+        'message' => 'Thoughtful work.',
     ]);
     $kudos = HrKudos::firstOrFail();
 
@@ -146,10 +146,11 @@ test('only the giver or receiver can reply to a kudos thread', function () {
         'user_id' => $this->hr->id,
     ]);
 
-    // A non-participant who still holds the give permission is forbidden.
+    // Public recognition supports participation from its authorised audience.
     $this->actingAs($this->hr2)
         ->post("/hr/feed/kudos/{$kudos->id}/reply", ['body' => 'Me too'])
-        ->assertForbidden();
+        ->assertRedirect();
+    $this->assertDatabaseHas('hr_kudos_replies', ['kudos_id' => $kudos->id, 'user_id' => $this->hr2->id, 'body' => 'Me too']);
 });
 
 test('the employee picker includes current approved staff and excludes archived profiles', function () {

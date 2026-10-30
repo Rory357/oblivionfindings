@@ -4,9 +4,11 @@ namespace App\Domain\SecurityDevices\Http\Controllers;
 
 use App\Domain\Monitoring\Exceptions\MonitoringPolicyVersionConflict;
 use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringAlertRoute;
 use App\Domain\Monitoring\Models\MonitoringCoverageExpectation;
 use App\Domain\Monitoring\Models\MonitoringMaintenanceWindow;
 use App\Domain\Monitoring\Models\MonitoringRetentionPolicy;
+use App\Domain\Monitoring\Models\MonitoringThresholdRule;
 use App\Domain\Monitoring\Services\MonitoringPolicyAuthoringService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -99,6 +101,53 @@ abstract class MonitoringPolicySettingsController extends Controller
         }
         if ($scope === 'device') {
             $this->accessibleDevice($actor, (int) $attributes['device_id']);
+
+            return;
+        }
+
+        $this->assertApplicationAccess($actor);
+    }
+
+    protected function assertScopedRuleScope(
+        User $actor,
+        MonitoringThresholdRule|MonitoringAlertRoute $rule,
+    ): void {
+        $this->assertScopedRuleAttributes($actor, $rule->only([
+            'scope_kind', 'site_id', 'device_id', 'monitor_id',
+        ]));
+    }
+
+    /** @param array<string, mixed> $attributes */
+    protected function assertScopedRuleAttributes(User $actor, array $attributes): void
+    {
+        $scope = (string) ($attributes['scope_kind'] ?? 'application');
+        if ($scope === 'site') {
+            if (($attributes['site_id'] ?? null) !== null) {
+                $this->access->assertCanViewSite($actor, (int) $attributes['site_id']);
+            }
+
+            return;
+        }
+        if ($scope === 'device') {
+            if (($attributes['device_id'] ?? null) !== null) {
+                $this->accessibleDevice($actor, (int) $attributes['device_id']);
+            }
+            if (($attributes['site_id'] ?? null) !== null) {
+                $this->access->assertCanViewSite($actor, (int) $attributes['site_id']);
+            }
+
+            return;
+        }
+        if ($scope === 'monitor') {
+            if (($attributes['monitor_id'] ?? null) !== null) {
+                $this->accessibleMonitor($actor, (int) $attributes['monitor_id']);
+            }
+            if (($attributes['device_id'] ?? null) !== null) {
+                $this->accessibleDevice($actor, (int) $attributes['device_id']);
+            }
+            if (($attributes['site_id'] ?? null) !== null) {
+                $this->access->assertCanViewSite($actor, (int) $attributes['site_id']);
+            }
 
             return;
         }

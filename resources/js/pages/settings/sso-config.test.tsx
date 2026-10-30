@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Test doubles use raw buttons as simple controls. */
 import type {
     ProviderConfiguration,
     ProvisioningConfiguration,

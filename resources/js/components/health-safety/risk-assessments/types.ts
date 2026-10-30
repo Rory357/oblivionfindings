@@ -26,7 +26,7 @@ export interface AttachedTo {
 }
 
 export interface ReviewState {
-    kind: 'overdue' | 'soon' | 'ok' | 'none';
+    kind: 'overdue' | 'today' | 'soon' | 'ok' | 'none';
     days: number | null;
 }
 
@@ -76,10 +76,10 @@ export interface RaFormPrefill {
     consequence: number;
     existing_controls: string | null;
     additional_controls: string | null;
-    residual_likelihood: number;
-    residual_consequence: number;
-    risk_acceptable: boolean;
-    review_frequency_days: number;
+    residual_likelihood: number | null;
+    residual_consequence: number | null;
+    risk_acceptable: boolean | null;
+    review_frequency_days: number | null;
     review_due_at: string | null;
 }
 
@@ -102,8 +102,69 @@ export interface RaDetail extends RaRow {
     } | null;
     hs_event: { id: number; reference_number: string } | null;
     attachments: RaAttachment[];
-    can: { manage: boolean };
+    can: {
+        manage: boolean;
+        edit?: boolean;
+        activate?: boolean;
+        mark_for_review?: boolean;
+        record_residual?: boolean;
+        complete_review?: boolean;
+        supersede?: boolean;
+        archive?: boolean;
+        add_evidence?: boolean;
+        remove_evidence?: boolean;
+    };
+    review_completion_gate?: { eligible: boolean; reasons: string[] };
+    history?: RaHistoryEntry[];
+    connections?: RaConnections;
     form: RaFormPrefill;
+}
+
+export interface RaHistoryEntry {
+    id: string;
+    action: string;
+    title: string;
+    actor: { id: number; name: string } | null;
+    occurred_at: string | null;
+    note: string | null;
+    snapshot: Record<string, string | number | boolean | null | string[]>;
+    legacy: boolean;
+}
+
+export interface RaConnectedWork {
+    id: number | string;
+    reference_number: string | null;
+    title: string;
+    status: string;
+    display_state: string | null;
+    assigned_to: { id: number; name: string } | null;
+    due_date: string | null;
+    href: string;
+}
+export interface RaVersion {
+    id: number;
+    reference_number: string;
+    status: RaStatus;
+    href: string;
+}
+export interface RaConnections {
+    source: {
+        type: 'site' | 'client';
+        id: number;
+        title: string;
+        href: string;
+    } | null;
+    safety_review: {
+        id: number;
+        reference_number: string;
+        status: string;
+        owner: { id: number; name: string } | null;
+        href: string;
+    } | null;
+    corrective_actions: RaConnectedWork[];
+    tasks: (RaConnectedWork & { id: string; source: string })[];
+    tasks_href: string | null;
+    versions: { previous: RaVersion[]; next: RaVersion | null };
 }
 
 export interface RaPickerItem {

@@ -1,0 +1,313 @@
+- banner:
+  - button:
+    - text: blivion
+    - emphasis: Care
+  - strong: Saturday
+  - text: 26 Sep 2026
+  - button:
+    - text: Search or jump to…
+    - generic: Ctrl K
+  - button: Report incident
+  - button:
+  - button:
+  - button:
+  - generic: NP
+- complementary:
+  - button:
+    - generic: My Day
+  - button:
+    - generic: Overview
+  - button:
+    - generic: Today
+  - button:
+    - generic: My Calendar
+  - button:
+    - generic: All Tasks
+  - button:
+    - generic: Sites & Locations
+  - button:
+    - generic: Operations
+  - button:
+    - generic: People & HR
+  - button:
+    - generic: Compliance
+  - button:
+    - generic: Incidents
+  - button:
+    - generic: Governance
+  - button:
+    - generic: Fleet & Assets
+  - navigation:
+    - button:
+      - generic: Overview
+    - button:
+      - generic: Fleet
+    - button:
+      - generic: Assets
+    - button:
+      - generic: Maintenance
+    - button:
+      - generic: Maps & boundaries
+    - button:
+      - generic: Reports
+    - button:
+      - generic: Settings
+  - button:
+    - generic: Finance
+  - button:
+    - generic: Security & Devices
+  - button:
+    - generic: Settings
+  - button:
+  - generic: One organisation · Approved sites
+- main:
+  - button: Home
+  - button: Fleet & Assets
+  - button: Assets
+  - generic: Transfer hoist
+  - generic: AS-104
+  - button:
+  - button:
+  - heading [level=1]: Transfer hoist
+  - text: On hold
+  - paragraph: AS-104 · Kōwhai House / Equipment room · Shared equipment
+  - button:
+    - generic: Find in this asset…
+    - generic: /
+  - button:
+    - text: Manage custody
+  - button:
+    - text: Report a problem
+  - button:
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: MW-271 · Awaiting vendor
+  - button:
+    - generic: Custody
+    - generic: Receipt pending
+    - generic: Mara Ellis · 0/3 items
+  - button:
+    - generic: Last check
+    - generic: Needs assessment
+    - generic: CHK-882 · 24 Sep 2026
+  - button:
+    - generic: Documents
+    - generic: 5 current
+    - generic: Manuals, warranty & source evidence
+  - text: Illustrative record · As at 26 Sep 2026, 10:42 am NZST
+  - tablist:
+    - tab [selected]:
+      - generic: Overview
+    - tab:
+      - generic: Custody
+    - tab:
+      - generic: Checks & service
+    - tab:
+      - generic: Maintenance
+    - tab:
+      - generic: Location
+    - tab:
+      - generic: Components & kit
+    - tab:
+      - generic: History
+    - button:
+      - generic: Find
+      - generic: /
+  - tablist:
+    - tab:
+      - text: Summary
+    - tab:
+      - text: Asset details
+    - tab [selected]:
+      - text: Documents
+    - tab:
+      - text: Finance
+  - strong: Use on hold · Brake assessment pending
+  - paragraph: Mara Ellis owns the next action. Moving or receiving this asset does not release the hold.
+  - button:
+    - text: Open MW-271
+  - tabpanel:
+    - generic: ASSET RECORD · AS-104
+    - heading [level=2]: Documents & evidence
+    - paragraph: Find the original, replace a version, or follow its source.
+    - button [pressed]:
+      - text: List
+    - button:
+      - text: Cards
+    - button:
+      - text: Upload document
+    - strong: 2 asset documents
+    - generic: Manuals, warranty and asset-owned files
+    - button: View
+    - strong: 3 linked evidence records
+    - generic: Original checks and Maintenance
+    - button: Review unavailable
+    - textbox:
+      - /placeholder: Search file, type, reference or source…
+    - generic: Document versions
+    - combobox
+    - generic: Document source
+    - combobox
+    - generic: File availability
+    - combobox
+    - generic: Document library
+    - generic: 5 of 6 records shown
+    - table:
+      - row:
+        - columnheader: Record
+        - columnheader: Version / added
+        - columnheader: Original source
+        - columnheader: Availability / action
+      - row:
+        - cell:
+          - generic: Operating manual
+          - generic: transfer-hoist-manual.pdf
+        - cell:
+          - generic: Current · v3
+          - generic: 12 Sep 2026 · Mara Ellis
+        - cell:
+          - button:
+            - text: Asset document set · DS-104-1
+          - generic: Managed with this asset
+        - cell:
+          - generic: Available
+          - button:
+            - text: View document
+          - link:
+            - /url: /files/transfer-hoist-manual.pdf?download=1
+            - text: Download
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: Purchase & warranty
+          - generic: warranty-104.pdf
+        - cell:
+          - generic: Current · v1
+          - generic: 18 Mar 2025 · Nia Patel
+        - cell:
+          - button:
+            - text: Asset document set · DS-104-2
+          - generic: Managed with this asset
+        - cell:
+          - generic: Available
+          - button:
+            - text: View document
+          - link:
+            - /url: /files/warranty-104.pdf?download=1
+            - text: Download
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: Brake assessment photos
+          - generic: brake-assessment.jpg
+        - cell:
+          - generic: Current · v1
+          - generic: 24 Sep 2026 · Mara Ellis
+        - cell:
+          - button:
+            - text: Original check · CHK-882
+          - generic: Kept with the original record
+        - cell:
+          - generic: Available
+          - button:
+            - text: View document
+          - link:
+            - /url: /files/brake-assessment.jpg?download=1
+            - text: Download
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: Service report
+          - generic: service-report-271.pdf
+        - cell:
+          - generic: Current · v1
+          - generic: 25 Sep 2026 · Harbour Equipment
+        - cell:
+          - button:
+            - text: Maintenance · MW-271
+          - generic: Kept with the original record
+        - cell:
+          - generic: Unavailable
+          - button:
+            - text: Review file status
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: Calibration certificate
+          - generic: calibration-certificate.pdf
+        - cell:
+          - generic: Current · v1
+          - generic: 26 Sep 2026 · Nia Patel
+        - cell:
+          - button:
+            - text: Maintenance evidence · MW-271
+          - generic: Kept with the original record
+        - cell:
+          - generic: Quarantined
+          - button:
+            - text: Review file status
+        - cell:
+          - button:
+    - text: Private to permitted roles, approved sites and the original record.
+    - text: Replacements retain earlier versions and submitted evidence.
+  - button:
+    - text: Return to Assets register
+  - button:
+    - text: Kōwhai House assets
+  - generic: All names, references and records are synthetic.
+- text: DESIGN PREVIEW
+- strong: PKG-06B · v9
+- generic: Local simulation only
+- button: Dark theme
+- text: Scenario
+- combobox
+- text: Actor
+- combobox
+- button:
+  - text: Reset preview
+- dialog "Operating manual":
+  - banner:
+    - heading "Operating manual" [level=2]
+    - paragraph: AS-104 · Transfer hoist · Private record
+    - button "Close dialog":
+  - region "File viewer for Operating manual":
+    - strong: transfer-hoist-manual.pdf
+    - generic: PDF document · 43 KB · 2 pages
+    - generic: Sample file
+    - generic "File viewer controls":
+      - button "Previous document page" [disabled]:
+      - status: Page 1 of 2
+      - button "Next document page":
+      - button "Zoom out":
+      - generic: 100%
+      - button "Zoom in":
+      - button "Fit width"
+      - link "Download original PDF" [active]:
+        - /url: /files/transfer-hoist-manual.pdf?download=1
+        - text: Download PDF
+    - generic "Document page, scroll to read":
+      - img "Operating manual, version 3, page 1"
+    - generic "Read page text"
+    - paragraph: Preview rendered from the downloadable PDF. All content is labelled as a design sample.
+  - term: Original source
+  - definition: Asset document set · DS-104-1
+  - term: Added
+  - definition: Mara Ellis · 12 Sep 2026
+  - term: File identity
+  - definition: DOC-104-1 · Version 3
+  - paragraph: Manufacturer manual · Original file retained with each version. This sample contains no operating instructions.
+  - button "Replace version"
+  - button "Archive version"
+  - paragraph: This is a downloadable design sample. Real documents remain subject to the original source’s access and file checks.
+  - contentinfo:
+    - button "Close"
+    - button "Version history"
+    - link "Download Operating manual version 3":
+      - /url: /files/transfer-hoist-manual.pdf?download=1
+      - text: Download
+      - generic: transfer-hoist-manual.pdf
+  - text: Synthetic preview · Changes stay in this tab

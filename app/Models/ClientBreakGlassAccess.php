@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -31,6 +32,13 @@ class ClientBreakGlassAccess extends Model
         'acknowledged_min_necessary',
         'acknowledged_incident_report',
         'expires_at',
+        'policy_snapshot',
+        'confirmed_at',
+        'ended_at',
+        'ended_how',
+        'ended_by',
+        'end_reason',
+        'review_due_at',
         'reviewed_at',
         'reviewed_by',
         'review_outcome',
@@ -41,11 +49,49 @@ class ClientBreakGlassAccess extends Model
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'policy_snapshot' => 'array',
+        'confirmed_at' => 'datetime',
+        'ended_at' => 'datetime',
+        'review_due_at' => 'datetime',
         'reviewed_at' => 'datetime',
         'acknowledged_min_necessary' => 'boolean',
         'acknowledged_incident_report' => 'boolean',
         'incident_report_linked' => 'boolean',
     ];
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(MedicationEmergencyAccessReview::class, 'access_id');
+    }
+
+    public function extensions(): HasMany
+    {
+        return $this->hasMany(MedicationEmergencyAccessExtension::class, 'access_id');
+    }
+
+    public function effectivePolicy(): array
+    {
+        // The policy for a legacy grant is unknown. Preserve the historical defaults,
+        // never reinterpret it using a policy subsequently edited by someone else.
+        return $this->policy_snapshot ?? BreakGlassPolicy::defaults();
+    }
+
+    public function isRunning(): bool
+    {
+        return ! $this->trashed() && $this->ended_at === null
+            && $this->expires_at !== null && $this->expires_at->gt(now());
+    }
+
+    public function endedTime(): ?CarbonInterface
+    {
+        return $this->ended_at ?? $this->deleted_at
+            ?? ($this->expires_at?->lte(now()) ? $this->expires_at : null);
+    }
+
+    public function reviewDueTime(): ?CarbonInterface
+    {
+        return $this->review_due_at ?? $this->endedTime()?->copy()->addDays($this->effectivePolicy()['review_days']);
+    }
 
     public function client(): BelongsTo
     {
@@ -82,14 +128,14 @@ class ClientBreakGlassAccess extends Model
         return $this->hasMany(BreakGlassAccessEvent::class, 'break_glass_access_id');
     }
 
-    /** Short attribution label for the grant card / audit ("Self-authorised", "Co-signed by …"). */
+    /** Short attribution label for the grant card / audit ("No second person asked", "Co-signed by …"). */
     public function authorizationLabel(): ?string
     {
         if ($this->authorization_mode === 'co_sign') {
             return 'Co-signed by '.($this->coSignedBy?->name ?? 'second approver');
         }
         if ($this->authorization_mode === 'self') {
-            return 'Self-authorised';
+            return 'No second person asked';
         }
 
         return null; // legacy grants have no recorded mode

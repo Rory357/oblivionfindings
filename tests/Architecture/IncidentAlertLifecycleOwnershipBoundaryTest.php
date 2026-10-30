@@ -3,13 +3,18 @@
 test('incident routes emit lifecycle signals while Control Room owns alert transitions', function () {
     $repositoryRoot = dirname(__DIR__, 2);
     $incidentController = file_get_contents($repositoryRoot.'/app/Http/Controllers/IncidentController.php');
+    $incidentClosure = file_get_contents($repositoryRoot.'/app/Services/Incidents/IncidentClosureService.php');
     $controlRoomLifecycle = file_get_contents($repositoryRoot.'/app/Services/ControlRoom/ControlRoomAlertLifecycleService.php');
     $signalService = file_get_contents($repositoryRoot.'/app/Services/Incidents/IncidentAlertLifecycleSignalService.php');
 
     expect($incidentController)
         ->toContain('IncidentAlertLifecycleSignalService')
-        ->toContain('recordClose(')
+        ->toContain('app(IncidentClosureService::class)->close(')
         ->toContain('recordReopen(')
+        ->not->toContain('ControlRoomAlert::query()')
+        ->and($incidentClosure)
+        ->toContain('IncidentAlertLifecycleSignalService')
+        ->toContain('recordClose(')
         ->not->toContain('ControlRoomAlert::query()')
         ->and($controlRoomLifecycle)
         ->toContain('applyIncidentLifecycleSignal(')

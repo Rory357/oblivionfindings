@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PKGConsolidationMainMapReviewTest" file="C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKGConsolidationMainMapReviewTest.php" tests="2" assertions="8" errors="0" failures="0" skipped="0" time="421.977158">
+    <testsuite name="PKGConsolidationMainMapReviewTest::test_assets_only_actor_cannot_receive_restricted_fleet_positions" tests="2" assertions="8" errors="0" failures="0" skipped="0" time="421.977158">
+      <testcase name="test_assets_only_actor_cannot_receive_restricted_fleet_positions with data set &quot;assets view any&quot;" file="C:\Users\steph\.codex\visualizations\2026\09\27\01a0e1a8-7e5a-7b81-921c-feaf73216636\consolidation-qa\LegacyMapProjectionProbeTest.php" line="28" class="PKGConsolidationMainMapReviewTest" classname="PKGConsolidationMainMapReviewTest" assertions="4" time="421.830283"/>
+      <testcase name="test_assets_only_actor_cannot_receive_restricted_fleet_positions with data set &quot;assets view assigned&quot;" file="C:\Users\steph\.codex\visualizations\2026\09\27\01a0e1a8-7e5a-7b81-921c-feaf73216636\consolidation-qa\LegacyMapProjectionProbeTest.php" line="28" class="PKGConsolidationMainMapReviewTest" classname="PKGConsolidationMainMapReviewTest" assertions="4" time="0.146875"/>
+    </testsuite>
+  </testsuite>
+</testsuites>

@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\AssetGeofence;
+use App\Models\BoundaryVersion;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
 
@@ -37,6 +38,12 @@ class FixSiteGeofenceScopes extends Command
         $orphaned = 0;
 
         foreach ($geofences as $gf) {
+            // This legacy repair must not rewrite reviewed canonical boundaries.
+            if (Schema::hasTable('boundary_versions') && BoundaryVersion::query()->where('boundary_id', $gf->id)->exists()) {
+                $skipped++;
+
+                continue;
+            }
             if (! $gf->site) {
                 $orphaned++;
                 $this->warn("  geofence id={$gf->id} site_id={$gf->site_id} → site missing");

@@ -1,0 +1,13 @@
+{
+  "thread": "01a0dd46-af7e-77d0-8943-21f8df2bae5b",
+  "model": "gpt-6-astra",
+  "effort": "xhigh",
+  "verifiedFrom": "Own rollout turn_context",
+  "pinned": true,
+  "pinEvidence": "list_threads pinnedIndex 16",
+  "cwd": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings",
+  "baseline": "4ea64c547ed85a5b7504e59599db351f6eba7deb",
+  "initialStatus": "Clean detached checkout",
+  "scope": "Design only; PKG-06B preview/page/evidence artifacts",
+  "time": "2026-09-26T22:37:08.9011165+12:00"
+}

@@ -1,0 +1,10 @@
+{
+  "owned": [],
+  "imported": [
+    {
+      "file": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/page/page-header.tsx",
+      "code": 2322,
+      "message": "Type '{ children: string; dusk: string; className: string; }' is not assignable to type 'DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>'.   Property 'dusk' does not exist on type 'DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>'."
+    }
+  ]
+}

@@ -100,18 +100,61 @@ final readonly class ProbeRunner
     private function icmp(array $check): array
     {
         $timeout = $this->timeout($check);
+        $ipv6 = str_contains((string) $check['target'], ':');
         $arguments = PHP_OS_FAMILY === 'Windows'
-            ? ['ping', '-n', '1', '-w', (string) ($timeout * 1000), $check['target']]
-            : ['ping', '-c', '1', '-W', (string) $timeout, $check['target']];
+            ? ['ping', ...($ipv6 ? ['-6'] : ['-4']), '-n', '1', '-w', (string) ($timeout * 1000), $check['target']]
+            : ['ping', ...($ipv6 ? ['-6'] : []), '-n', '-c', '1', '-W', (string) $timeout, $check['target']];
         $process = new Process($arguments);
         $process->setTimeout($timeout + 1);
         $process->run();
 
+        $replied = $process->isSuccessful()
+            && self::hasGenuineEchoReply((string) $check['target'], $process->getOutput());
+
         return [
-            'state' => $process->isSuccessful() ? 'healthy' : 'failed',
-            'reason_code' => $process->isSuccessful() ? 'icmp_reply' : 'icmp_unreachable',
+            'state' => $replied ? 'healthy' : 'failed',
+            'reason_code' => $replied ? 'icmp_reply' : 'icmp_unreachable',
             'metrics' => ['exit_code' => $process->getExitCode()],
         ];
+    }
+
+    public static function hasGenuineEchoReply(string $targetAddress, string $stdout): bool
+    {
+        $targetBinary = self::normalizeIpBinary($targetAddress);
+        if ($targetBinary === null) {
+            return false;
+        }
+
+        foreach (preg_split('/\R/', $stdout) ?: [] as $line) {
+            $responder = null;
+            if (preg_match('/^\s*Reply from\s+(.+?):\s*(?:bytes=\d+\s+)?time[=<]\s*[0-9]+(?:\.[0-9]+)?\s*ms\b/i', $line, $winMatch) === 1) {
+                $responder = $winMatch[1];
+            } elseif (preg_match('/^\s*\d+\s+bytes from\s+(.+?):\s+icmp_[sr]eq=\d+\b.*?\btime[=<]\s*[0-9]+(?:\.[0-9]+)?\s*ms\b/i', $line, $unixMatch) === 1) {
+                $responder = $unixMatch[1];
+            }
+
+            if ($responder !== null && self::normalizeIpBinary($responder) === $targetBinary) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function normalizeIpBinary(string $rawAddress): ?string
+    {
+        $candidate = trim($rawAddress);
+        if (preg_match('/\(([^()]+)\)\s*$/', $candidate, $parenMatch) === 1) {
+            $candidate = trim($parenMatch[1]);
+        }
+        $candidate = trim($candidate, '[]');
+        $zonePos = strpos($candidate, '%');
+        if ($zonePos !== false) {
+            $candidate = substr($candidate, 0, $zonePos);
+        }
+        $binary = @inet_pton($candidate);
+
+        return $binary === false ? null : $binary;
     }
 
     /** @param array<string, mixed> $check @return array{state: string, reason_code: string, metrics: array<string, mixed>} */

@@ -1,3 +1,7 @@
+import {
+    secondPersonDisplay,
+    type SecondPersonEvidence,
+} from '@/lib/medication-second-person';
 /* eslint-disable no-restricted-syntax -- the audit trail is a custom timeline
    (border-l rail + absolute status dots) reusing the timesheets/view-timesheet
    idiom; all colours are semantic tokens. */
@@ -16,12 +20,13 @@ import {
 import type { ComponentType } from 'react';
 import {
     doseStatusMeta,
+    isRecordedStatus,
     type RoundCell,
     type RoundItem,
     type RoundSummary,
 } from './types';
 
-export interface AuditAdminEntry {
+export interface AuditAdminEntry extends SecondPersonEvidence {
     status: string;
     medication_name: string;
     dose: string | null;
@@ -64,14 +69,19 @@ function fmtTime(iso: string | null): string {
     const d = new Date(iso);
     return Number.isNaN(d.getTime())
         ? ''
-        : d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+        : d.toLocaleTimeString('en-NZ', {
+              timeZone: 'Pacific/Auckland',
+              hour: '2-digit',
+              minute: '2-digit',
+          });
 }
 
 /** Flatten round cells → actioned audit entries (skips still-due doses). */
 export function cellsToAuditEntries(cells: RoundCell[]): AuditAdminEntry[] {
     return cells
-        .filter((c) => c.status !== 'due')
+        .filter((c) => isRecordedStatus(c.status))
         .map((c) => ({
+            ...c,
             status: c.status,
             medication_name: c.medication_name,
             dose: c.dose,
@@ -91,6 +101,7 @@ export function itemsToAuditEntries(items: RoundItem[]): AuditAdminEntry[] {
     return items
         .filter((it) => it.administration)
         .map((it) => ({
+            ...it.administration!,
             status: it.administration!.status,
             medication_name: it.medication_name,
             dose: it.dose,
@@ -190,8 +201,14 @@ export default function RoundAuditTimeline({
             {entries.map((e, i) => {
                 const dm = doseStatusMeta(e.status);
                 const Icon = STATUS_ICON[e.status] ?? Activity;
+                const confirmation = secondPersonDisplay({
+                    ...e,
+                    witness: e.witnessed_by,
+                });
                 const detail = [
-                    e.witnessed_by ? `Witness: ${e.witnessed_by}` : null,
+                    confirmation
+                        ? confirmation.label + ' · ' + confirmation.detail
+                        : null,
                     e.blood_glucose_level != null
                         ? `BG ${e.blood_glucose_level} mmol/L`
                         : null,
@@ -201,7 +218,12 @@ export default function RoundAuditTimeline({
                 return (
                     <TimelineRow
                         key={`${e.medication_name}-${e.at}-${i}`}
-                        tone={dm.tone}
+                        tone={
+                            confirmation?.tone === 'critical' ||
+                            confirmation?.tone === 'warning'
+                                ? confirmation.tone
+                                : dm.tone
+                        }
                         icon={Icon}
                         title={`${dm.label} — ${e.medication_name}${e.dose ? ` ${e.dose}` : ''}`}
                         meta={[e.resident_name, e.staff, fmtTime(e.at)]

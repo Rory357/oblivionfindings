@@ -24,7 +24,9 @@ test('old calendar sync bookmarks require the settings permission', function () 
 
 test('retired calendar sync write endpoints cannot create delete or queue a connection', function () {
     Queue::fake();
-    $this->actingAs(User::factory()->create(['approved_at' => now()]));
+    $actor = User::factory()->create(['approved_at' => now()]);
+    Queue::fake(); // Observe retired write routes after the account fixture.
+    $this->actingAs($actor);
     $this->post('/operations/calendar-sync', ['provider' => 'google'])->assertStatus(405);
     $this->delete('/operations/calendar-sync/1')->assertNotFound();
     $this->post('/operations/calendar-sync/1/trigger')->assertNotFound();

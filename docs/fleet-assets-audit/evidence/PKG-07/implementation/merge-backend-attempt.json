@@ -1,0 +1,11 @@
+{
+  "phase": "First current-base backend rerun",
+  "tests": 14,
+  "assertions": 155,
+  "errors": 1,
+  "failure": "Synthetic User factory email collided with an existing record in the isolated preview database.",
+  "location": "tests/Feature/FleetAssets/Pkg07BoundariesTest.php::user",
+  "correction": "PKG-07 User helpers now supply unique UUID-based example.test email addresses.",
+  "rerun": "current-main-backend.log: 14 passing tests, 193 assertions",
+  "raw_log": "merge-backend-tests.log is retained locally and excluded from Git because database exception diagnostics can contain synthetic authentication fields."
+}

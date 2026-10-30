@@ -18,6 +18,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
+require_once __DIR__.'/../../Support/RespiteCommencementFixtures.php';
+
 class RespiteReadinessTest extends TestCase
 {
     use RefreshDatabase;
@@ -217,9 +219,10 @@ class RespiteReadinessTest extends TestCase
             'client_id' => $this->client->id,
             'location_id' => $this->site->id,
             'status' => 'confirmed',
-            'start_at' => Carbon::parse('2026-05-02 09:00:00'),
+            'start_at' => Carbon::parse('2026-05-03 09:00:00'),
             'end_at' => Carbon::parse('2026-05-04 17:00:00'),
         ]);
+        prepareRespiteCommencement($booking);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,

@@ -1,0 +1,22 @@
+[
+  {
+    "path": "app.tsx",
+    "sha256": "8360df9d51961c23a5ccc5592791c0a75615ae1f11df69ecdbe675665330c090"
+  },
+  {
+    "path": "forms.tsx",
+    "sha256": "9ba25272246094a6b8aca1a01ceef33290d2551c4e3b1a2c335e201393b4142f"
+  },
+  {
+    "path": "domain.ts",
+    "sha256": "8798b49f3a3f7ad4f4e77eb3be86a21282b609922225ab4fe2693b1024039c55"
+  },
+  {
+    "path": "preview.css",
+    "sha256": "bb4d6b0328c55bdb92d396df6856913a8b1af12f997cdb7c46a679aa5f59389c"
+  },
+  {
+    "path": "dist/app.js",
+    "sha256": "f426ef7b637ffd539e8e7bfd5b2b2c26e9db8ff6ce5b6ac2a6ecc3b306225400"
+  }
+]

@@ -1,9 +1,18 @@
 <?php
 
+use App\Services\Chat\ChatNotificationPreferences;
+
 return [
     // Used for preferences UI + routing defaults.
     // Keys should remain stable (audit/readability).
     'groups' => [
+        'Chat' => ChatNotificationPreferences::EVENTS,
+        'Fleet & Assets' => [
+            'fleet.booking_decisions',
+            'fleet.maintenance_reminders',
+            'fleet.handover_updates',
+            'fleet.import_results',
+        ],
         'Timesheets' => [
             'timesheets.created',
             'timesheets.updated',
@@ -27,12 +36,19 @@ return [
         'Rostering' => [
             'shift_task_due',
         ],
+        // eMAR P11: always in the app; push when the person turns it on.
+        'Medication' => [
+            'medications.witness_pin_reminder',
+        ],
         'Audit & Safety' => [
             'breakglass.daily_report',
             'incidents.high_unreviewed_reminder',
         ],
 
         // --- HR Module ---
+        'Company events' => [
+            'hr.calendar.reminder',
+        ],
         'Leave' => [
             'hr.leave.requested',
             'hr.leave.approved',
@@ -101,6 +117,11 @@ return [
         // --- Control Room ---
         'Control Room' => [
             'controlroom.alert',
+        ],
+
+        // --- Service agreements ---
+        'Service agreements' => [
+            'service_agreements.referral_draft_created',
         ],
 
         // --- Cross-Domain ---

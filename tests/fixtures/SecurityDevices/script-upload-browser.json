@@ -1,0 +1,208 @@
+[
+  {
+    "request": {
+      "expected_actor_id": 43,
+      "request_key": "aeabd7a7-8bfa-4ec0-bd93-7a53d1efa2d5",
+      "reason": "Synthetic independent catalogue verification.",
+      "metadata": {
+        "name": "Synthetic inspection",
+        "publisher_label": "Synthetic publisher",
+        "interpreter": "powershell7",
+        "interpreter_version": "7.6.0",
+        "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "architecture": "amd64",
+        "parameter_schema": [],
+        "execution_policy": {
+          "expected_observation_schema": null,
+          "network_mode": "reviewed_network",
+          "output_bytes": 4096,
+          "output_retention_hours": 24,
+          "runtime_seconds": 60,
+          "success_exit_codes": [
+            0
+          ],
+          "timeout_mode": "report_only"
+        }
+      },
+      "review": {
+        "child_processes": [],
+        "compensation": "No mutation approved.",
+        "effect": "read_only",
+        "network_destinations": [],
+        "no_detached_work": true,
+        "no_dynamic_code": true,
+        "output_sensitivity": "operational",
+        "restart_behavior": "none"
+      },
+      "artifact_base64": "IyBTeW50aGV0aWMgY2F0YWxvZ3VlIGZpeHR1cmUuIE5ldmVyIGV4ZWN1dGUuCg==",
+      "runtime_manifest_base64": "eyJ2ZXJzaW9uIjoxLCJpbnRlcnByZXRlciI6InBvd2Vyc2hlbGw3IiwiaW50ZXJwcmV0ZXJfdmVyc2lvbiI6IjcuNi4wIiwiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJlbnRyeXBvaW50IjoicHdzaC5leGUiLCJmaWxlcyI6W3sicGF0aCI6Im9ibGktc2NyaXB0LXdyYXBwZXIucHMxIiwic2l6ZV9ieXRlcyI6MTAsInNoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIifSx7InBhdGgiOiJwd3NoLmV4ZSIsInNpemVfYnl0ZXMiOjIwLCJzaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn1dfQ=="
+    },
+    "request_json": "{\"expected_actor_id\":43,\"request_key\":\"aeabd7a7-8bfa-4ec0-bd93-7a53d1efa2d5\",\"reason\":\"Synthetic independent catalogue verification.\",\"metadata\":{\"name\":\"Synthetic inspection\",\"publisher_label\":\"Synthetic publisher\",\"interpreter\":\"powershell7\",\"interpreter_version\":\"7.6.0\",\"wrapper_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"architecture\":\"amd64\",\"parameter_schema\":[],\"execution_policy\":{\"expected_observation_schema\":null,\"network_mode\":\"reviewed_network\",\"output_bytes\":4096,\"output_retention_hours\":24,\"runtime_seconds\":60,\"success_exit_codes\":[0],\"timeout_mode\":\"report_only\"}},\"review\":{\"child_processes\":[],\"compensation\":\"No mutation approved.\",\"effect\":\"read_only\",\"network_destinations\":[],\"no_detached_work\":true,\"no_dynamic_code\":true,\"output_sensitivity\":\"operational\",\"restart_behavior\":\"none\"},\"artifact_base64\":\"IyBTeW50aGV0aWMgY2F0YWxvZ3VlIGZpeHR1cmUuIE5ldmVyIGV4ZWN1dGUuCg==\",\"runtime_manifest_base64\":\"eyJ2ZXJzaW9uIjoxLCJpbnRlcnByZXRlciI6InBvd2Vyc2hlbGw3IiwiaW50ZXJwcmV0ZXJfdmVyc2lvbiI6IjcuNi4wIiwiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJlbnRyeXBvaW50IjoicHdzaC5leGUiLCJmaWxlcyI6W3sicGF0aCI6Im9ibGktc2NyaXB0LXdyYXBwZXIucHMxIiwic2l6ZV9ieXRlcyI6MTAsInNoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIifSx7InBhdGgiOiJwd3NoLmV4ZSIsInNpemVfYnl0ZXMiOjIwLCJzaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn1dfQ==\"}",
+    "expected_manifest": {
+      "name": "Synthetic inspection",
+      "publisher_label": "Synthetic publisher",
+      "interpreter": "powershell7",
+      "interpreter_version": "7.6.0",
+      "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "architecture": "amd64",
+      "parameter_schema": [],
+      "execution_policy": {
+        "expected_observation_schema": null,
+        "network_mode": "reviewed_network",
+        "output_bytes": 4096,
+        "output_retention_hours": 24,
+        "runtime_seconds": 60,
+        "success_exit_codes": [
+          0
+        ],
+        "timeout_mode": "report_only"
+      },
+      "script_uuid": "aeabd7a7-8bfa-4ec0-bd93-7a53d1efa2d5",
+      "script_version": 1,
+      "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+      "size_bytes": 46,
+      "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8"
+    },
+    "artifact": "# Synthetic catalogue fixture. Never execute.\n"
+  },
+  {
+    "request": {
+      "expected_actor_id": 43,
+      "request_key": "22222222-2222-4222-8222-222222222222",
+      "reason": "Synthetic UTF-8 upload verification.",
+      "metadata": {
+        "name": "Synthetic inspection",
+        "publisher_label": "Synthetic publisher",
+        "interpreter": "powershell7",
+        "interpreter_version": "7.6.0",
+        "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "architecture": "amd64",
+        "parameter_schema": [
+          {
+            "name": "Enabled",
+            "type": "boolean",
+            "required": true,
+            "constraints": {}
+          },
+          {
+            "name": "Count",
+            "type": "integer",
+            "required": false,
+            "constraints": {
+              "minimum": -3,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "Message",
+            "type": "string",
+            "required": true,
+            "constraints": {
+              "min_length": 1,
+              "max_length": 120
+            }
+          },
+          {
+            "name": "Mode",
+            "type": "enum",
+            "required": true,
+            "constraints": {
+              "values": [
+                "inspect",
+                "report 😀"
+              ]
+            }
+          }
+        ],
+        "execution_policy": {
+          "expected_observation_schema": null,
+          "network_mode": "reviewed_network",
+          "output_bytes": 0,
+          "output_retention_hours": 24,
+          "runtime_seconds": 60,
+          "success_exit_codes": [
+            0,
+            42
+          ],
+          "timeout_mode": "terminate_owned_job"
+        }
+      },
+      "review": {
+        "child_processes": [],
+        "compensation": "No mutation approved.",
+        "effect": "read_only",
+        "network_destinations": [],
+        "no_detached_work": true,
+        "no_dynamic_code": true,
+        "output_sensitivity": "operational",
+        "restart_behavior": "none"
+      },
+      "artifact_base64": "IyBTeW50aGV0aWMgVVRGLTggZml4dHVyZSDwn5iADQojIE5ldmVyIGV4ZWN1dGUuDQo=",
+      "runtime_manifest_base64": "eyJ2ZXJzaW9uIjoxLCJpbnRlcnByZXRlciI6InBvd2Vyc2hlbGw3IiwiaW50ZXJwcmV0ZXJfdmVyc2lvbiI6IjcuNi4wIiwiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJlbnRyeXBvaW50IjoicHdzaC5leGUiLCJmaWxlcyI6W3sicGF0aCI6Im9ibGktc2NyaXB0LXdyYXBwZXIucHMxIiwic2l6ZV9ieXRlcyI6MTAsInNoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIifSx7InBhdGgiOiJwd3NoLmV4ZSIsInNpemVfYnl0ZXMiOjIwLCJzaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn1dfQ=="
+    },
+    "request_json": "{\"expected_actor_id\":43,\"request_key\":\"22222222-2222-4222-8222-222222222222\",\"reason\":\"Synthetic UTF-8 upload verification.\",\"metadata\":{\"name\":\"Synthetic inspection\",\"publisher_label\":\"Synthetic publisher\",\"interpreter\":\"powershell7\",\"interpreter_version\":\"7.6.0\",\"wrapper_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"architecture\":\"amd64\",\"parameter_schema\":[{\"name\":\"Enabled\",\"type\":\"boolean\",\"required\":true,\"constraints\":{}},{\"name\":\"Count\",\"type\":\"integer\",\"required\":false,\"constraints\":{\"minimum\":-3,\"maximum\":100}},{\"name\":\"Message\",\"type\":\"string\",\"required\":true,\"constraints\":{\"min_length\":1,\"max_length\":120}},{\"name\":\"Mode\",\"type\":\"enum\",\"required\":true,\"constraints\":{\"values\":[\"inspect\",\"report 😀\"]}}],\"execution_policy\":{\"expected_observation_schema\":null,\"network_mode\":\"reviewed_network\",\"output_bytes\":0,\"output_retention_hours\":24,\"runtime_seconds\":60,\"success_exit_codes\":[0,42],\"timeout_mode\":\"terminate_owned_job\"}},\"review\":{\"child_processes\":[],\"compensation\":\"No mutation approved.\",\"effect\":\"read_only\",\"network_destinations\":[],\"no_detached_work\":true,\"no_dynamic_code\":true,\"output_sensitivity\":\"operational\",\"restart_behavior\":\"none\"},\"artifact_base64\":\"IyBTeW50aGV0aWMgVVRGLTggZml4dHVyZSDwn5iADQojIE5ldmVyIGV4ZWN1dGUuDQo=\",\"runtime_manifest_base64\":\"eyJ2ZXJzaW9uIjoxLCJpbnRlcnByZXRlciI6InBvd2Vyc2hlbGw3IiwiaW50ZXJwcmV0ZXJfdmVyc2lvbiI6IjcuNi4wIiwiYXJjaGl0ZWN0dXJlIjoiYW1kNjQiLCJlbnRyeXBvaW50IjoicHdzaC5leGUiLCJmaWxlcyI6W3sicGF0aCI6Im9ibGktc2NyaXB0LXdyYXBwZXIucHMxIiwic2l6ZV9ieXRlcyI6MTAsInNoYTI1NiI6ImJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIifSx7InBhdGgiOiJwd3NoLmV4ZSIsInNpemVfYnl0ZXMiOjIwLCJzaGEyNTYiOiJjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjY2NjIn1dfQ==\"}",
+    "expected_manifest": {
+      "name": "Synthetic inspection",
+      "publisher_label": "Synthetic publisher",
+      "interpreter": "powershell7",
+      "interpreter_version": "7.6.0",
+      "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "architecture": "amd64",
+      "parameter_schema": [
+        {
+          "name": "Enabled",
+          "type": "boolean",
+          "required": true,
+          "constraints": {}
+        },
+        {
+          "name": "Count",
+          "type": "integer",
+          "required": false,
+          "constraints": {
+            "minimum": -3,
+            "maximum": 100
+          }
+        },
+        {
+          "name": "Message",
+          "type": "string",
+          "required": true,
+          "constraints": {
+            "min_length": 1,
+            "max_length": 120
+          }
+        },
+        {
+          "name": "Mode",
+          "type": "enum",
+          "required": true,
+          "constraints": {
+            "values": [
+              "inspect",
+              "report 😀"
+            ]
+          }
+        }
+      ],
+      "execution_policy": {
+        "expected_observation_schema": null,
+        "network_mode": "reviewed_network",
+        "output_bytes": 0,
+        "output_retention_hours": 24,
+        "runtime_seconds": 60,
+        "success_exit_codes": [
+          0,
+          42
+        ],
+        "timeout_mode": "terminate_owned_job"
+      },
+      "script_uuid": "22222222-2222-4222-8222-222222222222",
+      "script_version": 1,
+      "sha256": "75f4ec47a38e6fbb1198e0dbf6f6961bf3f3200ffee65f801691542d6770e0ff",
+      "size_bytes": 50,
+      "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8"
+    },
+    "artifact": "# Synthetic UTF-8 fixture 😀\r\n# Never execute.\r\n"
+  }
+]

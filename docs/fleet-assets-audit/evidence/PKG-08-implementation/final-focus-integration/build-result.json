@@ -1,0 +1,18 @@
+{
+  "job": "build",
+  "attempt": "",
+  "command": {
+    "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+    "args": [
+      "C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-1548-7873-a062-e0db43eed7e1/final-focus-vite-worker.mjs",
+      "build"
+    ],
+    "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+  },
+  "configLoader": "runner with repository-root __dirname shim",
+  "cacheDirectory": "storage/framework/pkg08-map-regression/final-focus-qa-cache",
+  "startedAt": "2026-09-28T05:00:03.389Z",
+  "finishedAt": "2026-09-28T05:05:29.177Z",
+  "exitCode": 0,
+  "signal": null
+}

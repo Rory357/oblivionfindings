@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\CoverageGapController;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\CoverageGapAcknowledgement;
@@ -26,13 +27,24 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\Eligibility\AssignmentEligibilityDecision;
 use App\Services\Eligibility\EligibilityResult;
+use App\Services\ShiftCoverageService;
 use App\Services\ShiftSignalService;
 use App\Services\ShiftStaffEligibilityService;
+use App\Services\UserSiteAccessService;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 use Mockery\MockInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Support\CommittedFixtureCleanup;
+use Tests\Support\OwnedTestDatabase;
 use Tests\TestCase;
 
 class ShiftControllerTest extends TestCase
@@ -280,8 +292,8 @@ class ShiftControllerTest extends TestCase
 
     public function test_coverage_reservation_post_is_idempotent_and_shift_create_get_only_validates_token(): void
     {
-        $startsAt = now()->addDay()->setTime(9, 0);
-        $endsAt = now()->addDay()->setTime(10, 0);
+        $startsAt = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->addDay()->setTime(9, 0);
+        $endsAt = $startsAt->copy()->setTime(10, 0);
         $rule = SiteCoverageRequirement::create([
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -480,6 +492,425 @@ class ShiftControllerTest extends TestCase
         ])->count());
     }
 
+    public function test_coverage_review_root_results_bind_the_recorded_window_without_resolving_staffing(): void
+    {
+        Queue::fake();
+        [$key, $payload, $rule] = $this->coverageReviewWindow();
+        $coverage = app(ShiftCoverageService::class);
+        $beforeWindows = $coverage->buildRangeCoverage(Carbon::parse($payload['window_starts_at']), Carbon::parse($payload['window_ends_at']), $this->site->id);
+        $this->assertCount(1, $beforeWindows);
+        $this->assertSame(1, $beforeWindows[0]['missing_staff']);
+        $this->withCommittedCoverageReview(function () use ($key, $payload, $rule, $coverage, $beforeWindows): void {
+            $queue = Queue::getFacadeRoot()->pushedJobs();
+            $ruleBefore = $rule->fresh()->getRawOriginal();
+            $prior = $this->coverageReviewState();
+            $previous = null;
+            foreach (['ack', 'dismiss', 'clear', 'clear'] as $index => $action) {
+                $requestId = (string) Str::uuid();
+                $body = $payload + ['request_id' => $requestId, 'reason' => 'Review recorded; staffing still needs attention.'];
+                $response = $action === 'clear'
+                    ? $this->actingAs($this->admin)->deleteJson(route('operations.rostering.coverage.clear', $key), $body)
+                    : $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.'.$action, $key), $body);
+                $response->assertOk();
+                $result = $response->json('result');
+                $this->assertIsArray($result);
+                $this->assertSame(1, $result['version']);
+                $this->assertSame('coverage_gap', $result['scope']);
+                $this->assertSame($this->admin->id, $result['actor_id']);
+                $this->assertSame($action, $result['action']);
+                $this->assertSame($requestId, $result['request_id']);
+                $this->assertSame(['site_id' => $this->site->id, 'coverage_requirement_id' => $rule->id, 'coverage_window_key' => $key,
+                    'window_starts_at' => Carbon::parse($payload['window_starts_at'])->utc()->toISOString(),
+                    'window_ends_at' => Carbon::parse($payload['window_ends_at'])->utc()->toISOString()], $result['window']);
+                $this->assertSame(['window_starts_at' => Carbon::parse($payload['window_starts_at'])->toDateTimeString(),
+                    'window_ends_at' => Carbon::parse($payload['window_ends_at'])->toDateTimeString()], $result['stored_window']);
+                $this->assertSame($index < 2 ? 'recorded' : ($index === 2 ? 'cleared' : 'unchanged'), $result['outcome']);
+                $this->assertSame($index < 3, $result['changed']);
+                $this->assertFalse($result['staffing_resolved']);
+                $this->assertSame($previous ? [$previous->id] : [], $result['cleared_ids']);
+                if ($previous) {
+                    $this->assertNotNull($previous->fresh()->cleared_at);
+                }
+                $row = $index < 2 ? CoverageGapAcknowledgement::findOrFail($result['acknowledgement_id']) : null;
+                $this->assertSame($row?->id, $result['acknowledgement_id']);
+                $this->assertSame($row?->state, $result['state']);
+                $this->assertSame($row?->reason, $result['reason']);
+                $this->assertSame($index < 2 ? 1 : 0, CoverageGapAcknowledgement::where('coverage_window_key', $key)->whereNull('cleared_at')->count());
+                if ($row) {
+                    $this->assertSame($result['stored_window']['window_starts_at'], $row->getRawOriginal('window_starts_at'));
+                    $this->assertSame($result['stored_window']['window_ends_at'], $row->getRawOriginal('window_ends_at'));
+                }
+                $audit = AuditLog::findOrFail($result['audit_id']);
+                $this->assertSame($this->admin->id, $audit->user_id);
+                $this->assertSame('rostering.coverage.'.$action, $audit->action);
+                $this->assertSame($key, $audit->meta['coverage_window_key']);
+                $this->assertSame(count($prior['audits']) + $index + 1, AuditLog::where('action', 'like', 'rostering.coverage.%')->count());
+                foreach ($prior['reviews'] as $original) {
+                    $this->assertSame($original, CoverageGapAcknowledgement::findOrFail($original['id'])->getRawOriginal());
+                }
+                foreach ($prior['audits'] as $original) {
+                    $this->assertSame($original, AuditLog::findOrFail($original['id'])->getRawOriginal());
+                }
+                $this->assertSame($result, session('coverage_gap_result'));
+                $windows = $coverage->buildRangeCoverage(Carbon::parse($payload['window_starts_at']), Carbon::parse($payload['window_ends_at']), $this->site->id);
+                $this->assertCount(1, $windows);
+                $this->assertSame($beforeWindows[0]['missing_staff'], $windows[0]['missing_staff']);
+                $this->assertSame($beforeWindows[0]['has_actionable_gap'], $windows[0]['has_actionable_gap']);
+                $this->assertSame($row?->state, $windows[0]['acknowledgement']['state'] ?? null);
+                $this->assertSame($ruleBefore, $rule->fresh()->getRawOriginal());
+                $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+                $previous = $row;
+            }
+        });
+    }
+
+    public static function coverageReviewVetoes(): array
+    {
+        return ['ack creation refused' => ['ack', 'create_false'], 'ack values altered' => ['ack', 'create_altered'],
+            'dismiss clears then creation refused' => ['dismiss', 'create_false'], 'dismiss prior clear refused' => ['dismiss', 'clear_false'],
+            'clear refused' => ['clear', 'clear_false'], 'audit creation refused' => ['ack', 'audit_false'],
+            'audit metadata altered' => ['dismiss', 'audit_altered'], 'late audit changes prior row' => ['clear', 'late_row_altered']];
+    }
+
+    #[DataProvider('coverageReviewVetoes')]
+    public function test_coverage_review_veto_or_changed_readback_rolls_back_the_complete_action(string $action, string $fault): void
+    {
+        Queue::fake();
+        [$key, $payload] = $this->coverageReviewWindow();
+        $old = CoverageGapAcknowledgement::create($payload + ['coverage_window_key' => $key, 'state' => 'acked',
+            'reason' => 'Prior review', 'actor_user_id' => $this->admin->id, 'created_at' => now()->subMinute()]);
+        $before = $this->coverageReviewState();
+        $queue = Queue::getFacadeRoot()->pushedJobs();
+        $events = Model::getEventDispatcher();
+        Model::setEventDispatcher(clone $events);
+        try {
+            CoverageGapAcknowledgement::saving(function ($row) use ($fault, $key) {
+                if ($row->coverage_window_key !== $key) {
+                    return;
+                }
+                if ($fault === 'clear_false' && $row->exists && $row->isDirty('cleared_at')) {
+                    return false;
+                }
+                if (! $row->exists && $fault === 'create_false') {
+                    return false;
+                }
+                if (! $row->exists && $fault === 'create_altered') {
+                    $row->reason = 'Unexpected alteration';
+                }
+            });
+            AuditLog::saving(function ($audit) use ($fault, $key, $old) {
+                if (($audit->meta['coverage_window_key'] ?? null) !== $key) {
+                    return;
+                }
+                if ($fault === 'audit_false') {
+                    return false;
+                }
+                if ($fault === 'audit_altered') {
+                    $audit->meta = [...$audit->meta, 'site_id' => 999999];
+                }
+                if ($fault === 'late_row_altered') {
+                    DB::table('coverage_gap_acknowledgements')->where('id', $old->id)->update(['reason' => 'Changed after clear']);
+                }
+            });
+            $this->withSession(['coverage_gap_result' => ['actor_id' => $this->admin->id, 'request_id' => 'stale']]);
+            $body = $payload + ['reason' => 'Current review', 'request_id' => (string) Str::uuid()];
+            ($action === 'clear' ? $this->actingAs($this->admin)->deleteJson(route('operations.rostering.coverage.clear', $key), $body)
+                : $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.'.$action, $key), $body))
+                ->assertUnprocessable()->assertJsonValidationErrors('coverage_window_key');
+            $this->assertSame($before, $this->coverageReviewState());
+            $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+            $this->assertNull(session('coverage_gap_result'));
+        } finally {
+            Model::setEventDispatcher($events);
+        }
+    }
+
+    public static function coverageReviewCurrentChanges(): array
+    {
+        return ['grant revoked' => ['grant'], 'account no longer approved' => ['approval'], 'site archived' => ['site'],
+            'rule moved to another site' => ['rule'], 'site profile moved with no reports bypass' => ['profile']];
+    }
+
+    #[DataProvider('coverageReviewCurrentChanges')]
+    public function test_coverage_review_uses_current_authority_and_source_over_a_primed_snapshot(string $change): void
+    {
+        Queue::fake();
+        [$key, $payload, $rule] = $this->coverageReviewWindow();
+        $foreign = Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $actor = $this->admin;
+        $grant = Permission::where('key', 'rostering.viewAny')->firstOrFail();
+        $actor->permissionOverrides()->syncWithoutDetaching([$grant->id => ['allowed' => true]]);
+        if ($change === 'profile') {
+            $this->giveAdminCurrentHrProfile();
+            $actor->permissionOverrides()->syncWithoutDetaching([Permission::where('key', 'reports.viewAny')->firstOrFail()->id => ['allowed' => false]]);
+        }
+        $this->withCommittedCoverageReview(function () use ($change, $key, $payload, $rule, $foreign, $actor, $grant): void {
+            $primary = DB::connection();
+            config(['database.connections.coverage_review_writer' => [...$primary->getConfig(), 'name' => 'coverage_review_writer']]);
+            $writer = DB::connection('coverage_review_writer');
+            $this->assertNotSame($primary->getPdo(), $writer->getPdo());
+            $this->assertSame($primary->selectOne('SELECT DATABASE() AS db')->db, $writer->selectOne('SELECT DATABASE() AS db')->db);
+            $primary->beginTransaction();
+            try {
+                $stale = User::findOrFail($actor->id)->load(['permissionOverrides', 'roles.permissions', 'hrEmployeeProfile']);
+                $this->assertTrue($stale->isApproved());
+                $this->assertTrue($stale->canDo('rostering.viewAny'));
+                $this->assertContains($this->site->id, app(UserSiteAccessService::class)->accessibleSiteIds($stale, ['reports.viewAny']));
+                $this->assertSame($this->site->id, SiteCoverageRequirement::findOrFail($rule->id)->site_id);
+                $writer->transaction(function () use ($writer, $change, $actor, $grant, $rule, $foreign): void {
+                    $affected = match ($change) {
+                        'grant' => $writer->table('permission_user')->where('user_id', $actor->id)->where('permission_id', $grant->id)->update(['allowed' => false]),
+                        'approval' => $writer->table('users')->where('id', $actor->id)->update(['approved_at' => null]),
+                        'site' => $writer->table('sites')->where('id', $this->site->id)->update(['archived' => true, 'archived_at' => now()->toDateTimeString()]),
+                        'rule' => $writer->table('site_coverage_requirements')->where('id', $rule->id)->update(['site_id' => $foreign->id]),
+                        'profile' => $writer->table('hr_employee_profiles')->where('user_id', $actor->id)->update(['primary_site_id' => $foreign->id]),
+                    };
+                    $this->assertSame(1, $affected);
+                });
+                $this->assertSame(0, $writer->transactionLevel());
+                $this->assertFalse($writer->getPdo()->inTransaction());
+                $currentValue = match ($change) {
+                    'grant' => (bool) $writer->table('permission_user')->where('user_id', $actor->id)->where('permission_id', $grant->id)->value('allowed'),
+                    'approval' => $writer->table('users')->where('id', $actor->id)->value('approved_at'),
+                    'site' => (bool) $writer->table('sites')->where('id', $this->site->id)->value('archived'),
+                    'rule' => (int) $writer->table('site_coverage_requirements')->where('id', $rule->id)->value('site_id'),
+                    'profile' => (int) $writer->table('hr_employee_profiles')->where('user_id', $actor->id)->value('primary_site_id'),
+                };
+                $this->assertSame(match ($change) {
+                    'grant' => false, 'approval' => null, 'site' => true, default => $foreign->id
+                }, $currentValue);
+                $this->assertTrue(User::findOrFail($actor->id)->canDo('rostering.viewAny'));
+                $this->assertTrue(User::findOrFail($actor->id)->isApproved());
+                $this->assertFalse(Site::findOrFail($this->site->id)->archived);
+                $this->assertSame($this->site->id, SiteCoverageRequirement::findOrFail($rule->id)->site_id);
+                if ($change === 'profile') {
+                    $this->assertSame($this->site->id, HrEmployeeProfile::where('user_id', $actor->id)->firstOrFail()->primary_site_id);
+                }
+                $before = $this->coverageReviewState();
+                $queue = Queue::getFacadeRoot()->pushedJobs();
+                $this->actingAs($stale)->postJson(route('operations.rostering.coverage.ack', $key), $payload)->assertForbidden();
+                $this->assertSame($before, $this->coverageReviewState());
+                $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+                $this->assertNull(session('coverage_gap_result'));
+                if ($change === 'grant' || $change === 'approval') {
+                    $unknown = [...$payload, 'site_id' => 999999];
+                    $unknownKey = app(ShiftSignalService::class)->buildCoverageWindowKey(['site_id' => 999999, 'rule_id' => $rule->id,
+                        'starts_at' => $payload['window_starts_at'], 'ends_at' => $payload['window_ends_at']]);
+                    $this->actingAs($stale)->postJson(route('operations.rostering.coverage.ack', $unknownKey), $unknown)->assertForbidden();
+                    $this->assertSame($before, $this->coverageReviewState());
+                    $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+                }
+            } finally {
+                $primary->rollBack();
+                DB::purge('coverage_review_writer');
+            }
+        });
+    }
+
+    public function test_nested_coverage_review_has_no_committed_result_and_outer_rollback_preserves_rows(): void
+    {
+        Queue::fake();
+        [$key, $payload] = $this->coverageReviewWindow();
+        $before = $this->coverageReviewState();
+        $queue = Queue::getFacadeRoot()->pushedJobs();
+        DB::beginTransaction();
+        try {
+            $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.ack', $key), $payload)
+                ->assertOk()->assertJsonPath('status', 'acked')->assertJsonPath('result', null);
+            $this->assertNull(session('coverage_gap_result'));
+            $this->assertSame(count($before['reviews']) + 1, CoverageGapAcknowledgement::count());
+        } finally {
+            DB::rollBack();
+        }
+        $this->assertSame($before, $this->coverageReviewState());
+        $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+    }
+
+    public function test_coverage_review_raw_pdo_boundary_refuses_without_a_false_result(): void
+    {
+        Queue::fake();
+        [$key, $payload] = $this->coverageReviewWindow();
+        $this->withCommittedCoverageReview(function () use ($key, $payload): void {
+            $before = $this->coverageReviewState();
+            $queue = Queue::getFacadeRoot()->pushedJobs();
+            $pdo = DB::connection()->getPdo();
+            $pdo->beginTransaction();
+            try {
+                $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.ack', $key), $payload)->assertConflict();
+                $this->assertTrue($pdo->inTransaction());
+                $this->assertSame(0, DB::transactionLevel());
+                $this->assertSame($before, $this->coverageReviewState());
+                $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+                $this->assertNull(session('coverage_gap_result'));
+            } finally {
+                $pdo->rollBack();
+            }
+        });
+    }
+
+    public function test_coverage_review_invalid_input_clears_stale_result_and_window_tuple_must_match(): void
+    {
+        Queue::fake();
+        [$key, $payload] = $this->coverageReviewWindow();
+        $before = $this->coverageReviewState();
+        $queue = Queue::getFacadeRoot()->pushedJobs();
+        foreach ([['request_id' => 'not-a-uuid'], ['window_ends_at' => Carbon::parse($payload['window_ends_at'])->addMinute()->toIso8601String()]] as $change) {
+            $this->withSession(['coverage_gap_result' => ['actor_id' => $this->admin->id, 'request_id' => 'stale']]);
+            $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.ack', $key), [...$payload, ...$change])->assertUnprocessable();
+            $this->assertNull(session('coverage_gap_result'));
+            $this->assertSame($before, $this->coverageReviewState());
+            $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+        }
+        $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.dismiss', $key), $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('reason');
+        $this->assertSame($before, $this->coverageReviewState());
+        $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+    }
+
+    public function test_coverage_review_result_projection_failure_keeps_saved_rows_without_claiming_success(): void
+    {
+        Queue::fake();
+        [$key, $payload] = $this->coverageReviewWindow();
+        $this->app->instance(CoverageGapController::class, new class extends CoverageGapController
+        {
+            protected function flashCommittedResult(Request $request, array $result): void
+            {
+                throw new \RuntimeException('DEVELOPMENT ONLY result projection unavailable');
+            }
+        });
+        $this->withCommittedCoverageReview(function () use ($key, $payload): void {
+            $queue = Queue::getFacadeRoot()->pushedJobs();
+            $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.ack', $key), $payload)
+                ->assertOk()->assertJsonPath('status', 'acked')->assertJsonPath('result', null);
+            $this->assertSame(1, CoverageGapAcknowledgement::where('coverage_window_key', $key)->whereNull('cleared_at')->count());
+            $this->assertSame(1, AuditLog::where('action', 'rostering.coverage.ack')->count());
+            $this->assertNull(session('coverage_gap_result'));
+            $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+        });
+    }
+
+    public function test_coverage_review_flash_is_same_actor_only_and_malformed_results_are_withheld(): void
+    {
+        $receipt = ['version' => 1, 'scope' => 'coverage_gap', 'actor_id' => $this->admin->id, 'action' => 'ack',
+            'request_id' => (string) Str::uuid(), 'staffing_resolved' => false];
+        $this->actingAs($this->admin)->withSession(['coverage_gap_result' => $receipt])->get('/operations/shifts')
+            ->assertOk()->assertInertia(fn ($page) => $page->where('flash.coverage_gap_result', $receipt));
+        $other = User::factory()->create(['approved_at' => now(), 'role' => 'admin']);
+        $other->roles()->attach(Role::where('name', 'admin')->firstOrFail());
+        $this->actingAs($other)->withSession(['coverage_gap_result' => $receipt])->get('/operations/shifts')
+            ->assertOk()->assertInertia(fn ($page) => $page->where('flash.coverage_gap_result', null));
+        foreach (['bad-value', [...$receipt, 'version' => 2], [...$receipt, 'scope' => 'another_scope']] as $malformed) {
+            $this->actingAs($this->admin)->withSession(['coverage_gap_result' => $malformed])->get('/operations/shifts')
+                ->assertOk()->assertInertia(fn ($page) => $page->where('flash.coverage_gap_result', null));
+        }
+    }
+
+    public static function coverageReviewAuditErrors(): array
+    {
+        return ['lock timeout is not a duplicate' => ['HY000', 1205], 'integrity error is not swallowed' => ['23000', 1452]];
+    }
+
+    #[DataProvider('coverageReviewAuditErrors')]
+    public function test_coverage_review_propagates_genuine_audit_query_errors_and_rolls_back(string $state, int $code): void
+    {
+        Queue::fake();
+        [$key, $payload] = $this->coverageReviewWindow();
+        $before = $this->coverageReviewState();
+        $queue = Queue::getFacadeRoot()->pushedJobs();
+        $cause = new \PDOException('DEVELOPMENT ONLY coverage audit failure');
+        $cause->errorInfo = [$state, $code, $cause->getMessage()];
+        $failure = new QueryException(DB::getDefaultConnection(), 'insert coverage audit probe', [], $cause);
+        $events = Model::getEventDispatcher();
+        Model::setEventDispatcher(clone $events);
+        $this->withoutExceptionHandling();
+        try {
+            AuditLog::saving(function ($audit) use ($key, $failure): void {
+                if (($audit->meta['coverage_window_key'] ?? null) === $key) {
+                    throw $failure;
+                }
+            });
+            try {
+                $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.ack', $key), $payload);
+                $this->fail('The genuine audit error must propagate.');
+            } catch (QueryException $actual) {
+                $this->assertSame($failure, $actual);
+            }
+            $this->assertSame($before, $this->coverageReviewState());
+            $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+            $this->assertNull(session('coverage_gap_result'));
+        } finally {
+            Model::setEventDispatcher($events);
+        }
+    }
+
+    public static function coverageReviewLegacyRules(): array
+    {
+        return ['nullable rule' => [true], 'inactive rule retains review support' => [false]];
+    }
+
+    #[DataProvider('coverageReviewLegacyRules')]
+    public function test_coverage_review_does_not_add_a_new_active_rule_or_schedule_policy(bool $nullable): void
+    {
+        Queue::fake();
+        [$key, $payload, $rule] = $this->coverageReviewWindow();
+        $rule->update(['is_active' => false]);
+        if ($nullable) {
+            $payload['coverage_requirement_id'] = null;
+            $key = app(ShiftSignalService::class)->buildCoverageWindowKey(['site_id' => $this->site->id, 'rule_id' => null,
+                'starts_at' => $payload['window_starts_at'], 'ends_at' => $payload['window_ends_at']]);
+        }
+        $this->withCommittedCoverageReview(function () use ($key, $payload, $rule): void {
+            $ruleBefore = $rule->fresh()->getRawOriginal();
+            $queue = Queue::getFacadeRoot()->pushedJobs();
+            $this->actingAs($this->admin)->postJson(route('operations.rostering.coverage.ack', $key), $payload)
+                ->assertOk()->assertJsonPath('result.outcome', 'recorded')
+                ->assertJsonPath('result.window.coverage_requirement_id', $payload['coverage_requirement_id']);
+            $this->assertSame($ruleBefore, $rule->fresh()->getRawOriginal());
+            $this->assertSame($queue, Queue::getFacadeRoot()->pushedJobs());
+        });
+    }
+
+    private function coverageReviewWindow(): array
+    {
+        $starts = now((string) (config('app.worker_timezone') ?: config('app.timezone', 'UTC')))->addDay()->setTime(9, 0, 0)->startOfSecond();
+        $ends = $starts->copy()->addHour();
+        $rule = SiteCoverageRequirement::create(['site_id' => $this->site->id, 'service_context_id' => $this->serviceContext->id,
+            'name' => 'DEVELOPMENT ONLY coverage review', 'coverage_type' => 'custom', 'day_of_week' => strtolower($starts->format('D')),
+            'starts_time' => $starts->format('H:i'), 'ends_time' => $ends->format('H:i'), 'minimum_staff' => 1,
+            'role_requirements' => [], 'allow_overstaffing' => true, 'is_active' => true]);
+        $key = app(ShiftSignalService::class)->buildCoverageWindowKey(['site_id' => $this->site->id, 'rule_id' => $rule->id,
+            'starts_at' => $starts->toIso8601String(), 'ends_at' => $ends->toIso8601String()]);
+
+        return [$key, ['site_id' => $this->site->id, 'coverage_requirement_id' => $rule->id,
+            'window_starts_at' => $starts->toIso8601String(), 'window_ends_at' => $ends->toIso8601String()], $rule];
+    }
+
+    private function coverageReviewState(): array
+    {
+        return ['reviews' => CoverageGapAcknowledgement::orderBy('id')->get()->map(fn ($row) => $row->getRawOriginal())->all(),
+            'audits' => AuditLog::where('action', 'like', 'rostering.coverage.%')->orderBy('id')->get()->map(fn ($row) => $row->getRawOriginal())->all()];
+    }
+
+    private function withCommittedCoverageReview(callable $proof): void
+    {
+        $connection = DB::connection();
+        $this->assertSame(1, $connection->transactionLevel());
+        $this->assertTrue(OwnedTestDatabase::isOwnedBy((string) $connection->getDatabaseName(), getmypid()));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        $connection->commit();
+        $this->assertSame(0, $connection->transactionLevel());
+        $this->assertFalse($connection->getPdo()->inTransaction());
+        try {
+            $proof();
+        } finally {
+            while ($connection->transactionLevel() > 0) {
+                $connection->rollBack();
+            }
+            $this->assertFalse($connection->getPdo()->inTransaction());
+            $connection->beginTransaction();
+        }
+    }
+
     public function test_store_creates_shift_with_valid_data(): void
     {
         $shiftData = [
@@ -615,6 +1046,7 @@ class ShiftControllerTest extends TestCase
     public function test_direct_assignment_returns_safe_503_without_side_effects_and_succeeds_on_retry(): void
     {
         Notification::fake();
+        $this->giveAdminCurrentHrProfile();
         $shift = $this->assignmentBoundaryShift();
         $baseline = [
             'audit' => AuditLog::query()->count(),
@@ -624,8 +1056,9 @@ class ShiftControllerTest extends TestCase
             'outbox' => ShiftSignalOutbox::query()->count(),
         ];
         $attempt = 0;
+        // Failed preview, then the retry's preview, locked re-decision, and committed Workforce observation.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use (&$attempt): void {
-            $mock->shouldReceive('evaluate')->twice()->andReturnUsing(function () use (&$attempt) {
+            $mock->shouldReceive('evaluate')->times(4)->andReturnUsing(function () use (&$attempt) {
                 if (++$attempt === 1) {
                     throw new \RuntimeException('private eligibility infrastructure detail');
                 }
@@ -687,10 +1120,13 @@ class ShiftControllerTest extends TestCase
 
     public function test_direct_warning_requires_the_governed_override_and_persists_immutable_evidence(): void
     {
+        $this->giveAdminCurrentHrProfile();
         $shift = $this->assignmentBoundaryShift();
         $warning = 'Would exceed the weekly fatigue warning threshold.';
+        // Warning preview, then preview plus locked re-decision for both overrides,
+        // followed by the committed Workforce observation after the admin succeeds.
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
-            $mock->shouldReceive('evaluate')->times(3)->andReturn(
+            $mock->shouldReceive('evaluate')->times(6)->andReturn(
                 $this->assignmentEligibilityResult(warnings: [$warning]),
             );
         });
@@ -1118,6 +1554,144 @@ class ShiftControllerTest extends TestCase
         $this->assertSame($baselineReservations, CoverageReservation::query()->count());
     }
 
+    public function test_update_warning_returns_actionable_inertia_errors_without_saving_the_draft(): void
+    {
+        $start = now()->addWeek()->setTime(9, 0);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addHours(4),
+            'location' => 'Original location',
+            'status' => 'scheduled',
+        ]);
+        $task = $shift->tasks()->create(['label' => 'Original task', 'sort_order' => 0]);
+        $payload = [
+            'client_id' => $this->client->id,
+            'starts_at' => $start->copy()->addHour()->toIso8601String(),
+            'ends_at' => $start->copy()->addHours(5)->toIso8601String(),
+            'location' => 'Unsaved draft location',
+            'status' => 'scheduled',
+            'tasks' => [['id' => $task->id, 'label' => 'Unsaved task', 'scheduled_time' => '11:00']],
+        ];
+        $reservation = CoverageReservation::create([
+            'site_id' => $this->site->id,
+            'shift_id' => $shift->id,
+            'reserved_by_user_id' => $this->admin->id,
+            'reservation_token' => 'update-warning-'.$shift->id,
+            'status' => 'active',
+            'reason' => 'shift_update',
+            'window_starts_at' => $payload['starts_at'],
+            'window_ends_at' => $payload['ends_at'],
+            'expires_at' => now()->addMinutes(5),
+        ]);
+        $payload['coverage_reservation_token'] = $reservation->reservation_token;
+        $shiftBefore = $shift->fresh()->getRawOriginal();
+        $taskBefore = $task->fresh()->getRawOriginal();
+        $timelineBefore = TimelineEvent::query()->count();
+        $outboxBefore = ShiftSignalOutbox::query()->count();
+        $overridesBefore = ShiftEligibilityOverride::query()->count();
+        $warnings = ['Would exceed the weekly fatigue warning threshold.', 'Minimum rest between shifts is below the preferred interval.'];
+        $eligibility = $this->assignmentEligibilityResult(warnings: $warnings);
+        $message = 'Review and acknowledge the eligibility warnings before saving this shift. '.implode(' ', $warnings);
+        Notification::fake();
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($eligibility): void {
+            $mock->shouldReceive('evaluate')->once()->andReturn($eligibility);
+        });
+
+        $this->actingAs($this->admin)
+            ->from('/operations/shifts')
+            ->withHeader('X-Inertia', 'true')
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertStatus(303)
+            ->assertRedirect('/operations/shifts')
+            ->assertSessionHasErrors(['user_id' => $message])
+            ->assertSessionHas('eligibility_result', $eligibility->toArray())
+            ->assertSessionHas('assignment_warnings', $warnings)
+            ->assertSessionHasInput('location', 'Unsaved draft location')
+            ->assertSessionHasInput('tasks.0.label', 'Unsaved task')
+            ->assertSessionMissing('success');
+
+        $this->assertSame($shiftBefore, $shift->fresh()->getRawOriginal());
+        $this->assertSame($taskBefore, $task->fresh()->getRawOriginal());
+        $this->assertSame($timelineBefore, TimelineEvent::query()->count());
+        $this->assertSame($outboxBefore, ShiftSignalOutbox::query()->count());
+        $this->assertSame($overridesBefore, ShiftEligibilityOverride::query()->count());
+        $this->assertSame('released', $reservation->fresh()->status);
+        Notification::assertNothingSent();
+
+        $this->withoutHeader('X-Inertia')->get('/operations/shifts')->assertInertia(fn ($page) => $page
+            ->where('errors.user_id', $message)
+        );
+    }
+
+    public function test_update_warning_acknowledgement_still_requires_authority_and_a_reason(): void
+    {
+        $start = now()->addWeek()->setTime(9, 0);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => $start,
+            'ends_at' => $start->copy()->addHours(4),
+            'location' => 'Original location',
+            'status' => 'scheduled',
+        ]);
+        $this->staff->permissionOverrides()->syncWithoutDetaching([
+            Permission::where('key', 'shifts.manageAny')->firstOrFail()->id => ['allowed' => true],
+            Permission::where('key', 'shifts.overrideEligibility')->firstOrFail()->id => ['allowed' => false],
+        ]);
+        $payload = [
+            'client_id' => $this->client->id,
+            'starts_at' => $start->copy()->addHour()->toIso8601String(),
+            'ends_at' => $start->copy()->addHours(5)->toIso8601String(),
+            'location' => 'Reviewed location',
+            'status' => 'scheduled',
+            'override_acknowledged' => true,
+        ];
+        $shiftBefore = $shift->fresh()->getRawOriginal();
+        $overridesBefore = ShiftEligibilityOverride::query()->count();
+        Notification::fake();
+        $warning = 'Would exceed the weekly fatigue warning threshold.';
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($warning): void {
+            // Three update decisions, then the committed observation of the successful update.
+            $mock->shouldReceive('evaluate')->times(4)->andReturn($this->assignmentEligibilityResult(warnings: [$warning]));
+        });
+
+        $this->actingAs($this->admin)
+            ->from('/operations/shifts')
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertRedirect('/operations/shifts')
+            ->assertSessionHasErrors(['override_reason' => 'A reason is required when overriding eligibility warnings.']);
+        $this->assertSame($shiftBefore, $shift->fresh()->getRawOriginal());
+        $this->assertSame($overridesBefore, ShiftEligibilityOverride::query()->count());
+        Notification::assertNothingSent();
+
+        $reason = 'Duty manager reviewed fatigue and confirmed safe cover arrangements.';
+        $payload['override_reason'] = $reason;
+        $this->actingAs($this->staff->fresh())
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertForbidden();
+        $this->assertSame($shiftBefore, $shift->fresh()->getRawOriginal());
+        $this->assertSame($overridesBefore, ShiftEligibilityOverride::query()->count());
+        Notification::assertNothingSent();
+
+        $this->actingAs($this->admin)
+            ->put(route('operations.shifts.update', $shift), $payload)
+            ->assertSessionHas('success');
+        $this->assertSame('Reviewed location', $shift->fresh()->location);
+        $this->assertTrue($shift->fresh()->starts_at->equalTo($start->copy()->addHour()));
+        $this->assertSame($overridesBefore + 1, ShiftEligibilityOverride::query()->count());
+        $override = ShiftEligibilityOverride::query()->where('shift_id', $shift->id)->sole();
+        $this->assertSame($this->admin->id, $override->overridden_by);
+        $this->assertSame($this->staff->id, $override->user_id);
+        $this->assertSame($reason, $override->override_reason);
+        $this->assertSame(['fatigue_weekly'], $override->rules_overridden);
+    }
+
     public function test_update_prevents_modifying_completed_shift(): void
     {
         $shift = Shift::factory()->completed()->create([
@@ -1280,6 +1854,7 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
             'status' => 'scheduled',
             'starts_at' => now()->subMinutes(10),
@@ -1300,6 +1875,7 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
             'status' => 'in_progress',
             'actual_starts_at' => now()->subHours(2),
@@ -1318,6 +1894,7 @@ class ShiftControllerTest extends TestCase
     {
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
             'user_id' => $this->staff->id,
             'status' => 'in_progress',
             'actual_starts_at' => now()->subHours(2),
@@ -1409,6 +1986,7 @@ class ShiftControllerTest extends TestCase
     public function test_assignment_route_segments_sunday_overnight_hours_across_local_iso_weeks(): void
     {
         Notification::fake();
+        $this->giveAdminCurrentHrProfile();
         config([
             'app.worker_timezone' => 'Pacific/Auckland',
             'hr.fatigue.max_hours_per_day' => 24,
@@ -1440,8 +2018,9 @@ class ShiftControllerTest extends TestCase
         StaffAvailability::query()->create([
             'user_id' => $this->staff->id,
             'day_of_week' => Carbon::SUNDAY,
-            'starts_at' => '00:00:00',
-            'ends_at' => '23:59:59',
+            'starts_at' => '23:00:00',
+            'ends_at' => '03:00:00',
+            'ends_next_day' => true,
         ]);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
@@ -1525,6 +2104,27 @@ class ShiftControllerTest extends TestCase
         $this->assertSame($timelineCount, TimelineEvent::query()->count());
         $this->assertSame($reservationCount, CoverageReservation::query()->count());
         Notification::assertNothingSent();
+    }
+
+    /**
+     * Shift lifecycle writes lock the actor's current HR profile as employment
+     * evidence, so the admin needs one before an assignment can land.
+     */
+    private function giveAdminCurrentHrProfile(): void
+    {
+        HrEmployeeProfile::query()->create([
+            'tenant_id' => 1,
+            'user_id' => $this->admin->id,
+            'employee_number' => 'EMP-ADMIN-'.$this->admin->id,
+            'work_email' => $this->admin->email,
+            'position_title' => 'Operations Manager',
+            'position_role' => 'admin',
+            'employment_type' => 'full_time',
+            'start_date' => now()->subMonth()->toDateString(),
+            'is_active' => true,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+        ]);
     }
 
     private function assignmentBoundaryShift(): Shift

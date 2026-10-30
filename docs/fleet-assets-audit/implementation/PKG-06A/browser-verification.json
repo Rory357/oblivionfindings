@@ -1,0 +1,17 @@
+{
+  "Theme": "dark",
+  "SourceWorktree": "6421",
+  "SyntheticData": true,
+  "Screenshots": [
+    "inventory.png",
+    "stocktake-hub.png",
+    "completed-stocktake.png"
+  ],
+  "BrowserWarningsAndErrors": [],
+  "BuildManifestSHA256": "017b989607552083a2ff64bd3db0868f31d3d9716d839bb5c82650023d402196",
+  "AssetsEntryObserved": "/build/assets/index-BEJFccP9.js",
+  "CapturedAt": "2026-09-27T04:01:33.6270676Z",
+  "Host": "http://127.0.0.1:8774",
+  "PublicHotPresent": false,
+  "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0"
+}

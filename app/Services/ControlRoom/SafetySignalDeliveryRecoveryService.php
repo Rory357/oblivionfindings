@@ -30,6 +30,7 @@ use App\Services\Incidents\IncidentAlertLifecycleSignalService;
 use DomainException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Throwable;
@@ -50,6 +51,9 @@ class SafetySignalDeliveryRecoveryService
      *   failure_rows: list<array{source: string, id: int, status: string, attempts: int, last_attempt_at: ?string, last_error: ?string}>
      * }
      */
+    /** How long a transition that failed to reconcile waits before the next try. */
+    public const INCIDENT_RETRY_HOURS = 6;
+
     public function recover(int $limit = 100, bool $reportOnly = false): array
     {
         $limit = max(1, min($limit, 1000));
@@ -284,15 +288,25 @@ class SafetySignalDeliveryRecoveryService
             })
             ->orderBy('id')
             ->limit($limit)
-            ->get(['id'])
+            ->get(['id', 'status', 'closed_at', 'reopened_at'])
             ->each(function (ClientIncident $incident) use (&$count): void {
+                // A transition that can't be reconciled (the incident's own data is incomplete) is logged once and
+                // tried again only after INCIDENT_RETRY_HOURS or a new transition, not failed and logged every minute.
+                $key = 'safety-signals:incident-reconcile-failed:'.$incident->id.':'.sha1(implode('|', [
+                    $incident->status, $incident->getRawOriginal('closed_at'), $incident->getRawOriginal('reopened_at'),
+                ]));
+                if (Cache::has($key)) {
+                    return;
+                }
                 try {
                     $outbox = $this->incidentLifecycleSignals->reconcileLatestTransition($incident);
                     $count += $outbox?->wasRecentlyCreated ? 1 : 0;
                 } catch (Throwable $exception) {
+                    Cache::put($key, true, now()->addHours(self::INCIDENT_RETRY_HOURS));
                     Log::error('Incident lifecycle signal reconciliation failed', [
                         'incident_id' => $incident->id,
                         'error' => $exception->getMessage(),
+                        'next_try' => 'in '.self::INCIDENT_RETRY_HOURS.' hours, or straight away after a new close or reopen',
                     ]);
                 }
             });

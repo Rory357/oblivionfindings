@@ -5,6 +5,7 @@ import LeafletMap, {
 import { OperationalStateBadge } from '@/components/security-devices/estate-operations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { ReviewRow } from '@/components/wizard/shell';
 import { formatDateTime, formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -84,6 +85,7 @@ type TrackingDevice = {
     } | null;
     canonicalHref: string | null;
     historyHref: string | null;
+    queclinkHref?: string | null;
 };
 
 type TrackingGeofence = {
@@ -255,12 +257,11 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                             <p className="mt-2 text-xs font-medium text-status-warning">
                                 Counts below describe the first 100 visible
                                 candidates and may be incomplete. Open a purpose
-                                view or the canonical inventory to narrow the
-                                estate.
+                                view or the device list to narrow the estate.
                             </p>
                         ) : null}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-0">
                         <Summary
                             label="tracking devices"
                             value={inventory.total}
@@ -297,8 +298,8 @@ function Overview({ data }: { data: TrackingWorkspaceData }) {
                         Open by purpose
                     </h2>
                     <p className="text-sm text-muted-foreground">
-                        Each view keeps its canonical Client, H&S, Fleet, or
-                        Asset workflow one click away.
+                        Each view keeps its Client, H&S, Fleet, or Asset
+                        workflow one click away.
                     </p>
                 </div>
                 <div className="grid gap-3 lg:grid-cols-3">
@@ -386,13 +387,14 @@ function Summary({
     value: number;
     bounded: boolean;
 }) {
+    const factLabel = label.replace(/^./, (character) =>
+        character.toUpperCase(),
+    );
     return (
-        <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
-            <p className="text-lg font-bold">
-                {value} {label}
-                {bounded ? ' shown' : ''}
-            </p>
-        </div>
+        <ReviewRow
+            label={factLabel + (bounded ? ' shown' : '')}
+            value={value}
+        />
     );
 }
 
@@ -472,7 +474,7 @@ function DeviceCard({ device }: { device: TrackingDevice }) {
                 ) : null}
                 {!device.person && !device.asset ? (
                     <p className="text-status-warning">
-                        Not assigned to a canonical subject
+                        Not assigned to a person, vehicle, or asset
                     </p>
                 ) : null}
             </div>
@@ -532,14 +534,27 @@ function DeviceCard({ device }: { device: TrackingDevice }) {
                 ) : null}
             </div>
 
-            {device.canonicalHref ? (
-                <Link
-                    href={device.canonicalHref}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm font-medium text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                >
-                    <ExternalLink className="h-4 w-4" />
-                    {canonicalActionLabel(device)}
-                </Link>
+            {device.canonicalHref || device.queclinkHref ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    {device.canonicalHref ? (
+                        <Link
+                            href={device.canonicalHref}
+                            className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 text-sm font-medium text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <ExternalLink className="h-4 w-4" />
+                            {canonicalActionLabel(device)}
+                        </Link>
+                    ) : null}
+                    {device.queclinkHref ? (
+                        <Link
+                            href={device.queclinkHref}
+                            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-border px-3 text-xs font-medium text-primary hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <RadioTower className="h-3.5 w-3.5" />
+                            Open in Queclink hub
+                        </Link>
+                    ) : null}
+                </div>
             ) : null}
         </article>
     );
@@ -581,9 +596,8 @@ function DeviceGrid({ devices }: { devices: TrackingDevice[] }) {
                             No authorised trackers in this view
                         </p>
                         <p className="text-sm text-muted-foreground">
-                            A tracker appears only when its canonical
-                            destination record and purpose boundary are visible
-                            to you.
+                            A tracker appears only when its linked destination
+                            record and purpose boundary are visible to you.
                         </p>
                     </div>
                 </CardContent>

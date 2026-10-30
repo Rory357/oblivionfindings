@@ -5,17 +5,28 @@ use App\Http\Controllers\AllTasksController;
 use App\Http\Controllers\MyTasksController;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Notifications\AppEventNotification;
+use App\Services\HealthSafety\ChemicalExposureFollowupDestinationService;
+use App\Services\HealthSafety\InjurySourceProjectionService;
+use App\Services\Medication\Downtime\DowntimeService;
+use App\Services\Medication\Reviews\MedicationReviewReader;
 use App\Services\NotificationService;
 use App\Services\Tasks\Contracts\ExplicitlyGlobalTaskProvider;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\Providers\ActionItemProvider;
 use App\Services\Tasks\Providers\CdLossReportProvider;
+use App\Services\HealthSafety\ChemicalExposureDeliveryProblems;
+use App\Services\Tasks\Providers\ChemicalExposureDeliveryProvider;
+use App\Services\Tasks\Providers\ChemicalExposureFollowupProvider;
+use App\Services\Tasks\Providers\HsEventReviewFlagProvider;
 use App\Services\Tasks\Providers\ClientIncidentProvider;
 use App\Services\Tasks\Providers\ControlRoomAlertProvider;
 use App\Services\Tasks\Providers\DataBreachProvider;
 use App\Services\Tasks\Providers\DataSubjectRequestProvider;
+use App\Services\Tasks\Providers\EmergencyDrillFindingProvider;
+use App\Services\Tasks\Providers\EmergencyDrillProvider;
 use App\Services\Tasks\Providers\FirstAidFollowupProvider;
+use App\Services\Tasks\Providers\FleetFinanceReviewProvider;
 use App\Services\Tasks\Providers\FleetIncidentProvider;
 use App\Services\Tasks\Providers\FleetMaintenanceProvider;
 use App\Services\Tasks\Providers\HrCaseProvider;
@@ -23,8 +34,25 @@ use App\Services\Tasks\Providers\HsCorrectiveActionProvider;
 use App\Services\Tasks\Providers\HsEventProvider;
 use App\Services\Tasks\Providers\HsInvestigationProvider;
 use App\Services\Tasks\Providers\IncidentFollowupProvider;
+use App\Services\Tasks\Providers\ItApprovalTaskProvider;
+use App\Services\Tasks\Providers\ItAutomationReviewTaskProvider;
+use App\Services\Tasks\Providers\ItKnowledgeReviewTaskProvider;
+use App\Services\Tasks\Providers\ItProvisioningTaskProvider;
+use App\Services\Tasks\Providers\ItRecurrenceFailureTaskProvider;
 use App\Services\Tasks\Providers\ItWorkTaskProvider;
+use App\Services\Tasks\Providers\LegacyMedicationEffectProvider;
+use App\Services\Tasks\Providers\MedicationEmergencyAccessReviewProvider;
+use App\Services\Tasks\Providers\MedicationErrorActionProvider;
 use App\Services\Tasks\Providers\MedicationErrorProvider;
+use App\Services\Tasks\Providers\MedicationFollowupProvider;
+use App\Services\Tasks\Providers\MedicationPaperGiverConfirmationProvider;
+use App\Services\Tasks\Providers\MedicationPaperWitnessConfirmationProvider;
+use App\Services\Tasks\Providers\MedicationPrescriberRequestProvider;
+use App\Services\Tasks\Providers\MedicationReviewChangeProvider;
+use App\Services\Tasks\Providers\MedicationReviewProvider;
+use App\Services\Tasks\Providers\MedicationRoundProvider;
+use App\Services\Tasks\Providers\ProcedureReviewRequestProvider;
+use App\Services\Tasks\Providers\ReferralTaskProvider;
 use App\Services\Tasks\Providers\RespiteTaskProvider;
 use App\Services\Tasks\Providers\RestraintReviewProvider;
 use App\Services\Tasks\Providers\SafeguardingActionPlanProvider;
@@ -32,6 +60,7 @@ use App\Services\Tasks\Providers\SafeguardingConcernProvider;
 use App\Services\Tasks\Providers\ShiftTaskProvider;
 use App\Services\Tasks\Providers\SiteChecklistRunProvider;
 use App\Services\Tasks\Providers\SiteHazardProvider;
+use App\Services\Tasks\Providers\VendorRenewalTaskProvider;
 use App\Services\Tasks\Providers\WorkplaceInjuryProvider;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskAssignmentNotifier;
@@ -41,7 +70,7 @@ use Illuminate\Support\Facades\Route;
 it('registers every task source behind exactly one authorization boundary', function () {
     $providers = TaskAggregator::defaultProviders();
 
-    expect($providers)->toHaveCount(24);
+    expect($providers)->toHaveCount(48);
     expect(collect($providers)->mapWithKeys(fn (TaskProvider $provider): array => [
         $provider::class => $provider->sourceKey(),
     ])->all())->toBe([
@@ -51,14 +80,34 @@ it('registers every task source behind exactly one authorization boundary', func
         HsInvestigationProvider::class => 'hs_investigation',
         HsCorrectiveActionProvider::class => 'corrective_action',
         SiteHazardProvider::class => 'hazard',
+        ProcedureReviewRequestProvider::class => 'procedure_review_request',
+        EmergencyDrillProvider::class => 'emergency_drill',
+        EmergencyDrillFindingProvider::class => 'emergency_drill_finding',
         WorkplaceInjuryProvider::class => 'injury',
         SafeguardingConcernProvider::class => 'safeguarding',
         SafeguardingActionPlanProvider::class => 'safeguarding_action',
         ControlRoomAlertProvider::class => 'alert',
         ItWorkTaskProvider::class => 'it_work_task',
+        ItApprovalTaskProvider::class => 'it_approval',
+        ItKnowledgeReviewTaskProvider::class => 'it_knowledge_review',
+        ItAutomationReviewTaskProvider::class => 'it_automation_review',
+        ItRecurrenceFailureTaskProvider::class => 'it_recurrence_failure',
+        VendorRenewalTaskProvider::class => 'vendor_renewal',
+        ItProvisioningTaskProvider::class => 'it_provisioning',
         FleetIncidentProvider::class => 'fleet_incident',
         FleetMaintenanceProvider::class => 'fleet_maintenance',
+        FleetFinanceReviewProvider::class => 'fleet_finance_review',
         MedicationErrorProvider::class => 'med_error',
+        MedicationFollowupProvider::class => 'medication-followup',
+        LegacyMedicationEffectProvider::class => 'medication-effect-source',
+        MedicationErrorActionProvider::class => 'med_error_action',
+        MedicationReviewProvider::class => 'medication_review',
+        MedicationReviewChangeProvider::class => 'medication_review_change',
+        MedicationEmergencyAccessReviewProvider::class => 'med_emergency_review',
+        MedicationPaperGiverConfirmationProvider::class => 'med_paper_giver',
+        MedicationPaperWitnessConfirmationProvider::class => 'med_paper_witness',
+        MedicationPrescriberRequestProvider::class => 'med_prescriber_request',
+        MedicationRoundProvider::class => 'medication-round',
         CdLossReportProvider::class => 'cd_loss',
         DataBreachProvider::class => 'breach',
         DataSubjectRequestProvider::class => 'dsr',
@@ -67,9 +116,40 @@ it('registers every task source behind exactly one authorization boundary', func
         SiteChecklistRunProvider::class => 'checklist_run',
         ShiftTaskProvider::class => 'shift_task',
         RespiteTaskProvider::class => 'respite_task',
+        ReferralTaskProvider::class => 'referrals',
         FirstAidFollowupProvider::class => 'first_aid_followup',
         RestraintReviewProvider::class => 'restraint_review',
+        ChemicalExposureFollowupProvider::class => 'chemical_exposure_followup',
+        ChemicalExposureDeliveryProvider::class => 'chemical_exposure_delivery',
+        HsEventReviewFlagProvider::class => 'hs_event_review',
     ]);
+
+    // Owning-domain adapters retain the same Site/person boundary; their
+    // canonical readers load rows before these providers project task items.
+    $domainAdapters = [
+        MedicationReviewProvider::class => [MedicationReviewReader::class, '->query($user)'],
+        MedicationReviewChangeProvider::class => [MedicationReviewReader::class, '->clientIds($user)', "whereColumn('medication_reviews.client_id', 'medication_review_items.client_id')"],
+        MedicationPaperGiverConfirmationProvider::class => [DowntimeService::class, '->pendingConfirmations($user)'],
+        MedicationPaperWitnessConfirmationProvider::class => [DowntimeService::class, '->pendingConfirmations($user)'],
+    ];
+
+    // These approved source-owned adapters retain fresh actor/Site/source reads;
+    // the original providers continue to satisfy their existing shared boundary.
+    $currentSourceAdapters = [
+        ProcedureReviewRequestProvider::class => [
+            'SafeWorkProcedureAccessService::class', '$access->assertSource($row, $current, $reads, $sites, false, $context)',
+            '$access->isApprovedVersion($version)', '$access->audienceAllows($version->content_snapshot ?? [], $current, $sites)',
+            '$access->workingAllowed($record, $current, $sites)', '$access->allSitesAllowed($record->applicable_sites ?? [], $sites, $current)',
+        ],
+        EmergencyDrillProvider::class => [
+            'EmergencyDrillAccessService::class', '$access->scopeForSites(EmergencyDrill::query(), $sites)',
+            '->where(\'conducted_by\', $current->id)',
+        ],
+        EmergencyDrillFindingProvider::class => [
+            'EmergencyDrillAccessService::class', '->whereHas(\'emergencyDrill\', fn ($q) => $access->scopeForSites($q, $sites))',
+            '->where(\'assigned_to\', $current->id)',
+        ],
+    ];
 
     foreach ($providers as $provider) {
         $siteScoped = $provider instanceof SiteScopedTaskProvider;
@@ -80,9 +160,81 @@ it('registers every task source behind exactly one authorization boundary', func
             ->and((int) $siteScoped + (int) $explicitlyGlobal)
             ->toBe(1, $provider::class.' must declare exactly one row-authorization mode.');
 
-        $reflection = new ReflectionClass($provider);
+        $reflection = new ReflectionMethod($provider, 'authorizedTasks');
         $path = $reflection->getFileName();
         $source = $path === false ? '' : file_get_contents($path);
+
+        expect($source)->not->toContain('public function tasks(');
+        if ($provider instanceof WorkplaceInjuryProvider) {
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain(InjurySourceProjectionService::class)
+                ->toContain('->taskRows($user, $filters, $context)')
+                ->toContain('restricted: true')
+                ->not->toContain('WorkplaceInjury::query(')
+                ->not->toContain('->siteScoped(')
+                ->not->toContain(TaskProviderAuthorization::class)
+                ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
+            // TaskItems are created after the scalar-only source callback has returned.
+            expect(strpos($source, '->taskRows($user, $filters, $context)'))->toBeLessThan(strpos($source, 'new TaskItem('));
+
+            continue;
+        }
+
+        if ($provider instanceof ChemicalExposureFollowupProvider) {
+            // Source-owned private follow-ups: the H&S destination service reads assigned rows under
+            // its own fresh actor/Site/source authority and returns scalars only.
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain(ChemicalExposureFollowupDestinationService::class)
+                ->toContain('->taskRows($viewer, $filters, $context, $navigation)')
+                ->toContain('restricted: true')
+                ->not->toContain('ChemicalExposureFollowup::query(')
+                ->not->toContain('->siteScoped(')
+                ->not->toContain(TaskProviderAuthorization::class)
+                ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
+
+            continue;
+        }
+
+        if ($provider instanceof ChemicalExposureDeliveryProvider) {
+            // Exposures not on the H&S register (job 3): the problems reader admits exposure managers and readable
+            // exposures under fresh actor/Site authority and returns scalars only.
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain(ChemicalExposureDeliveryProblems::class)
+                ->toContain('->rows($viewer, $context, $only)')
+                ->toContain('restricted: true')
+                ->not->toContain('ChemicalExposureSourceDelivery::query(')
+                ->not->toContain('->siteScoped(')
+                ->not->toContain(TaskProviderAuthorization::class)
+                ->not->toMatch('/->(?:get|paginate|cursor|lazy|chunk)\s*\(/');
+
+            continue;
+        }
+
+        if (isset($currentSourceAdapters[$provider::class])) {
+            expect($siteScoped)->toBeTrue();
+            expect($source)
+                ->toContain('->withCurrentViewer(')
+                ->toContain('CurrentAuthorizationReads $reads')
+                ->toContain('if (! $this->canView($current))')
+                ->toContain('$reads->query(');
+            foreach ($currentSourceAdapters[$provider::class] as $requiredScope) {
+                expect($source)->toContain($requiredScope);
+            }
+
+            continue;
+        }
+
+        if (isset($domainAdapters[$provider::class])) {
+            expect($source)->toContain('if (! $this->canView($user))');
+            foreach ($domainAdapters[$provider::class] as $requiredScope) {
+                expect($source)->toContain($requiredScope);
+            }
+
+            continue;
+        }
 
         expect($source)
             ->toContain(TaskProviderAuthorization::class)
@@ -107,6 +259,8 @@ it('keeps the intentionally global providers tied to their explicit product perm
         ->all();
 
     expect($globalProviders)->toBe([
+        'it_automation_review' => ['it.manage'],
+        'it_recurrence_failure' => ['it.manage'],
         'breach' => ['privacy.reportBreaches'],
         'dsr' => ['privacy.viewRequests'],
         'action_item' => ['governance.actions.view'],

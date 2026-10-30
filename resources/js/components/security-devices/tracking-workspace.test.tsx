@@ -139,9 +139,9 @@ describe('TrackingWorkspacePanels', () => {
         expect(
             screen.getByRole('heading', { name: 'Tracking at a glance' }),
         ).toBeInTheDocument();
-        expect(screen.getByText('2 personal safety')).toBeInTheDocument();
-        expect(screen.getByText('1 Fleet')).toBeInTheDocument();
-        expect(screen.getByText('2 asset tracking')).toBeInTheDocument();
+        expectFact('Personal safety', '2');
+        expectFact('Fleet', '1');
+        expectFact('Asset tracking', '2');
         expect(
             screen.getByRole('heading', {
                 name: 'Location access follows purpose',
@@ -178,7 +178,7 @@ describe('TrackingWorkspacePanels', () => {
         expect(
             screen.getByText(/Counts below describe the first 100/),
         ).toBeInTheDocument();
-        expect(screen.getByText('2 personal safety shown')).toBeInTheDocument();
+        expectFact('Personal safety shown', '2');
         expect(
             screen.getByText(/1 matching authorised trackers shown/),
         ).toBeInTheDocument();
@@ -378,4 +378,41 @@ describe('TrackingWorkspacePanels', () => {
         ).toBeInTheDocument();
         expect(screen.queryByTestId('tracking-map')).not.toBeInTheDocument();
     });
+
+    it('renders masked Queclink hub link on paired tracker cards when permitted', () => {
+        render(
+            <TrackingWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'personal-safety',
+                        label: 'Personal safety',
+                        inventoryShown: 1,
+                        devices: [
+                            {
+                                ...clientDevice,
+                                queclinkHref:
+                                    '/security-devices/integrations/queclink?device_search=6789',
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        expect(
+            screen.getByRole('link', { name: 'Open in Queclink hub' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/integrations/queclink?device_search=6789',
+        );
+    });
 });
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

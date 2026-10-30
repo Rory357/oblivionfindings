@@ -3,7 +3,9 @@
 namespace Tests\Feature\Emar;
 
 use App\Models\Client;
+use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -24,6 +26,13 @@ class MarChartBoardPayloadTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        // Keep the explicit fallback contract; public defaults are covered separately.
+        config(['medications.person_record' => 'legacy']);
+    }
+
     protected function tearDown(): void
     {
         Carbon::setTestNow();
@@ -33,7 +42,7 @@ class MarChartBoardPayloadTest extends TestCase
 
     public function test_mar_chart_exposes_shared_board_payload_and_site_brand_colour(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
@@ -41,6 +50,18 @@ class MarChartBoardPayloadTest extends TestCase
             'medications.view',
             'medications.administer.record',
             'medications.controlled.witness',
+        ]);
+        // "Med-competent" is the competency policy's decision, not the permission.
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $user->id,
+            'assessor_id' => User::factory()->create(['approved_at' => now()])->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->subMonth()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
         ]);
 
         $site = Site::factory()->create([
@@ -56,7 +77,7 @@ class MarChartBoardPayloadTest extends TestCase
             'status' => 'active',
         ]);
 
-        ClientMedication::query()->create([
+        $this->entered([
             'client_id' => $client->id,
             'name' => 'Morning tablets',
             'dosage' => '1 tablet',
@@ -102,7 +123,7 @@ class MarChartBoardPayloadTest extends TestCase
 
     public function test_mar_chart_defaults_to_first_resident_when_no_client_id(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
@@ -121,7 +142,7 @@ class MarChartBoardPayloadTest extends TestCase
             'status' => 'active',
         ]);
 
-        ClientMedication::query()->create([
+        $this->entered([
             'client_id' => $client->id,
             'name' => 'Morning tablets',
             'dosage' => '1 tablet',
@@ -147,7 +168,7 @@ class MarChartBoardPayloadTest extends TestCase
 
     public function test_mar_chart_defaults_to_last_viewed_resident(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $user = $this->makeRoleUser('admin');
@@ -165,7 +186,7 @@ class MarChartBoardPayloadTest extends TestCase
         $recent = Client::factory()->create(['first_name' => 'Zeta', 'last_name' => 'Zzz', 'site_id' => $site->id, 'status' => 'active']);
 
         foreach ([$first, $recent] as $client) {
-            ClientMedication::query()->create([
+            $this->entered([
                 'client_id' => $client->id,
                 'name' => 'Tablets',
                 'dosage' => '1 tablet',
@@ -206,6 +227,86 @@ class MarChartBoardPayloadTest extends TestCase
         $this->actingAs($user)
             ->get('/emar/clients/'.$client->id.'/inr')
             ->assertRedirect('/emar/mar?client_id='.$client->id);
+    }
+
+    public function test_mar_inr_list_shows_unlinked_readings_but_conceals_controlled_and_cross_client_links(): void
+    {
+        $this->seed(RbacSeeder::class);
+
+        $user = $this->makeRoleUser('admin');
+        $this->grantPermissions($user, ['medications.view']);
+        $user->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'medications.controlled.view')->value('id') => ['allowed' => false],
+        ]);
+
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $neighbour = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $warfarin = $this->prnMedication($client, 'Warfarin');
+        $morphine = $this->prnMedication($client, 'Morphine sulfate', true);
+        $neighbourWarfarin = $this->prnMedication($neighbour, 'Warfarin');
+
+        foreach ([
+            [null, 4.8],
+            [$warfarin->id, 2.5],
+            // Controlled — concealed from a reader without controlled view.
+            [$morphine->id, 5.5],
+            // Another resident's order — never a canonical link.
+            [$neighbourWarfarin->id, 6.1],
+        ] as [$medicationId, $value]) {
+            ClientInrRecord::query()->create([
+                'client_id' => $client->id,
+                'client_medication_id' => $medicationId,
+                'inr_value' => $value,
+                'target_range_low' => 2.0,
+                'target_range_high' => 3.0,
+                'tested_on' => today()->toDateString(),
+                'recorded_by' => $user->id,
+            ]);
+        }
+
+        // The MAR rail labels the reading whose client_medication_id is null.
+        $this->actingAs($user)
+            ->get('/emar/mar?client_id='.$client->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('emar/MarCharts')
+                ->has('marData.inr_records', 2)
+                ->where('marData.inr_records', fn ($records) => collect($records)
+                    ->mapWithKeys(fn (array $r) => [(string) $r['inr_value'] => $r['client_medication_id']])
+                    ->sortKeys()
+                    ->all() === ['2.5' => $warfarin->id, '4.8' => null])
+            );
+    }
+
+    /**
+     * A scheduled order entered at the start of the day: a dose due before
+     * an order's entry is not owed.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function entered(array $attributes): ClientMedication
+    {
+        $now = Carbon::getTestNow();
+        Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
+        $order = ClientMedication::query()->create($attributes);
+        Carbon::setTestNow($now);
+
+        return $order;
+    }
+
+    private function prnMedication(Client $client, string $name, bool $controlled = false): ClientMedication
+    {
+        return ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => $name,
+            'dosage' => '1 tablet',
+            'frequency' => 'As required',
+            'is_prn' => true,
+            'controlled_drug' => $controlled,
+            'active' => true,
+            'state' => 'active',
+        ]);
     }
 
     protected function makeRoleUser(string $roleName): User

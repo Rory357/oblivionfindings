@@ -1,0 +1,89 @@
+{
+  "auditedAt": "2026-09-26T11:37:07.5849452Z",
+  "files": [
+    {
+      "path": "audit-behaviour.js",
+      "unchanged": true
+    },
+    {
+      "path": "audit-journey.js",
+      "unchanged": true
+    },
+    {
+      "path": "audit-privacy.js",
+      "unchanged": true
+    },
+    {
+      "path": "AUDIT.md",
+      "unchanged": true
+    },
+    {
+      "path": "behaviour-results.log",
+      "unchanged": true
+    },
+    {
+      "path": "journey-results.log",
+      "unchanged": true
+    },
+    {
+      "path": "privacy-results.log",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A01-checkout-without-allocation.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A02-dispute-became-pending.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A03-discarded-allocation-retained.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A04-stale-context-after-new-request.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A05-cancelled-before-travel-progress.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A06-cancelled-request-listed-allocated.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/A07-acknowledgement-with-no-handover.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/J01-journey-full.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/J02-returned-journey-full.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/J03-return-before-departure-accepted.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/J04-original-receipt-mutated.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/J05-new-request-inherits-old-note.png",
+      "unchanged": true
+    },
+    {
+      "path": "screenshots/P01-denied-linked-maintenance.png",
+      "unchanged": true
+    },
+    {
+      "path": "start.yml",
+      "unchanged": true
+    }
+  ]
+}

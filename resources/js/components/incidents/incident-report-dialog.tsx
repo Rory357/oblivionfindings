@@ -1,4 +1,5 @@
 import DraftResumePrompt from '@/components/draft-resume-prompt';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import {
     AlertDialog,
     AlertDialogCancel,
@@ -11,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { WizardPageShell } from '@/components/wizard/page-shell';
 import {
     Field,
     FieldErr,
@@ -28,7 +30,7 @@ import {
     WizardSuccessPane,
 } from '@/components/wizard/shell';
 import { useIncidentReportDraft } from '@/hooks/use-incident-report-draft';
-import { formatTime } from '@/lib/datetime';
+import { formatDateOnly, formatTime, toDatetimeLocal } from '@/lib/datetime';
 import { useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -52,7 +54,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 export type IncidentReportEntryContext =
     | 'incidents'
@@ -160,7 +162,13 @@ function splitOccurredAt(value?: string | null): {
     occurred_date: string;
     occurred_time: string;
 } {
-    const match = value?.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
+    // Persisted records carry an offset; unfinished form drafts already carry
+    // NZ wall time. Convert instants once, without shifting a recovered draft.
+    const local =
+        value && /(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+            ? toDatetimeLocal(value)
+            : value;
+    const match = local?.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/);
 
     return {
         occurred_date: match?.[1] ?? '',
@@ -239,6 +247,8 @@ export function IncidentReportDialog({
     defaults,
     canManageFollowups = false,
     onOpenIncident,
+    doneLabel = 'Done',
+    presentation = 'dialog',
 }: {
     open: boolean;
     onClose: () => void;
@@ -250,8 +260,12 @@ export function IncidentReportDialog({
     defaults?: IncidentReportDefaults;
     canManageFollowups?: boolean;
     onOpenIncident?: (url: string) => void;
+    doneLabel?: string;
+    /** 'page' lays the same wizard out as a full page, for reporters without register access. */
+    presentation?: 'dialog' | 'page';
 }) {
     const isNearMiss = mode === 'near_miss';
+    const Shell = presentation === 'page' ? WizardPageShell : WizardShell;
     const page = usePage();
     const userId = Number(
         (page.props as { auth?: { user?: { id?: number } } }).auth?.user?.id ??
@@ -762,7 +776,7 @@ export function IncidentReportDialog({
                         Report another
                     </Button>
                     <Button variant="ghost" onClick={requestClose}>
-                        Done
+                        {doneLabel}
                     </Button>
                 </>
             }
@@ -771,7 +785,7 @@ export function IncidentReportDialog({
 
     return (
         <>
-            <WizardShell
+            <Shell
                 open={open}
                 onClose={requestClose}
                 title={isNearMiss ? 'Report a near miss' : 'Report an incident'}
@@ -971,7 +985,7 @@ export function IncidentReportDialog({
                         </>
                     ) : null}
                 </WizardStepPane>
-            </WizardShell>
+            </Shell>
 
             <AlertDialog
                 open={closePrompt}
@@ -1550,6 +1564,7 @@ function FollowupsStep({
     onUpdate: (i: number, patch: Partial<FollowupDraft>) => void;
     onRemove: (i: number) => void;
 }) {
+    const fieldId = useId();
     const staffOptions = staff.map((s) => ({
         value: String(s.id),
         label: s.name,
@@ -1567,6 +1582,11 @@ function FollowupsStep({
                 const assigneeError =
                     errors[`followups.${i}.assigned_to_user_id`];
                 const dueAtError = errors[`followups.${i}.due_at`];
+                const unavailableAssignee =
+                    f.assigned_to_user_id !== '' &&
+                    !staffOptions.some(
+                        (person) => person.value === f.assigned_to_user_id,
+                    );
 
                 return (
                     <div
@@ -1600,18 +1620,57 @@ function FollowupsStep({
                                             })
                                         }
                                         placeholder="Unassigned"
-                                        options={staffOptions}
+                                        options={
+                                            unavailableAssignee
+                                                ? [
+                                                      {
+                                                          value: f.assigned_to_user_id,
+                                                          label: 'Staff selection unavailable',
+                                                          disabled: true,
+                                                      },
+                                                      ...staffOptions,
+                                                  ]
+                                                : staffOptions
+                                        }
+                                        frontline
                                     />
+                                    {f.assigned_to_user_id !== '' ? (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="frontline-tap mt-1 text-muted-foreground"
+                                            onClick={() =>
+                                                onUpdate(i, {
+                                                    assigned_to_user_id: '',
+                                                })
+                                            }
+                                        >
+                                            Clear assignment
+                                        </Button>
+                                    ) : null}
                                 </Field>
                             ) : (
                                 <FieldErr>{assigneeError}</FieldErr>
                             )}
-                            <Field label="Due" error={dueAtError}>
-                                <Input
-                                    type="date"
+                            <Field
+                                label="Due"
+                                error={dueAtError}
+                                errorId={`${fieldId}-due-error-${i}`}
+                            >
+                                <DatePicker
+                                    compact
+                                    id={`${fieldId}-due-${i}`}
+                                    label={`Task ${i + 1} due`}
                                     value={f.due_at}
-                                    onChange={(e) =>
-                                        onUpdate(i, { due_at: e.target.value })
+                                    allowClear
+                                    invalid={Boolean(dueAtError)}
+                                    describedBy={
+                                        dueAtError
+                                            ? `${fieldId}-due-error-${i}`
+                                            : undefined
+                                    }
+                                    onChange={(value) =>
+                                        onUpdate(i, { due_at: value })
                                     }
                                 />
                             </Field>
@@ -1659,7 +1718,10 @@ function ReviewStep({
         ? `${client.first_name} ${client.last_name}`
         : '—';
     const staffName = (id: string) =>
-        staff.find((s) => String(s.id) === id)?.name ?? 'Unassigned';
+        id
+            ? (staff.find((s) => String(s.id) === id)?.name ??
+              'Staff selection unavailable')
+            : 'Unassigned';
     return (
         <div className="flex flex-col gap-4">
             <StepHead
@@ -1773,15 +1835,26 @@ function ReviewStep({
                         {d.followups
                             .filter((f) => f.notes.trim())
                             .map((f, i) => (
-                                <ReviewRow
-                                    key={i}
-                                    label={
-                                        canManageFollowups
-                                            ? staffName(f.assigned_to_user_id)
-                                            : 'Unassigned'
-                                    }
-                                    value={f.notes}
-                                />
+                                <div key={i}>
+                                    <ReviewRow
+                                        label={
+                                            canManageFollowups
+                                                ? staffName(
+                                                      f.assigned_to_user_id,
+                                                  )
+                                                : 'Unassigned'
+                                        }
+                                        value={f.notes}
+                                    />
+                                    <ReviewRow
+                                        label={`Task ${i + 1} due`}
+                                        value={
+                                            f.due_at
+                                                ? formatDateOnly(f.due_at)
+                                                : 'No due date'
+                                        }
+                                    />
+                                </div>
                             ))}
                     </ReviewCard>
                 ) : null}

@@ -59,6 +59,12 @@ class ShiftHandoverService
         MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
         MedicationGovernanceScopeService::CONTROLLED_CAPABILITY,
         'medications.controlled.witness',
+        'medications.view',
+        'medications.administer.record',
+        'medications.stock.update',
+        'medications.audit.view',
+        'medications.reports.export',
+        'medications.breakglass',
         ...MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
     ];
 
@@ -378,7 +384,7 @@ class ShiftHandoverService
             $attributes['version'] = $existing ? (int) $existing->version + 1 : 1;
             $handover->fill($attributes);
 
-            $handover->save();
+            $this->persistHandover($handover);
 
             $freshHandover = $handover->fresh([
                 'outgoingShift.client:id,first_name,last_name,site_id',
@@ -396,7 +402,7 @@ class ShiftHandoverService
                 $this->refreshHandoverTimelineSnapshot($freshHandover);
             }
             if ($cdResolution['audit_action'] !== null) {
-                AuditLogger::logOrFail(
+                $this->recordHandoverAudit(
                     'shift.handover.cdVerification.'.$cdResolution['audit_action'],
                     $freshHandover,
                     [
@@ -410,8 +416,10 @@ class ShiftHandoverService
                         'replacement_verification' => $cdResolution['verification'],
                     ],
                 );
+                // eMAR C5 (EA-034): a count that didn't match reaches the register's lead.
+                app(\App\Services\Emar\HandoverControlledCountFollowup::class)->afterCount($freshHandover, $client, $cdResolution['verification']);
             }
-            AuditLogger::logOrFail($isFirstSave ? 'shift.handover.created' : 'shift.handover.updated', $freshHandover, [
+            $this->recordHandoverAudit($isFirstSave ? 'shift.handover.created' : 'shift.handover.updated', $freshHandover, [
                 'shift_id' => $outgoingShift->id,
                 'incoming_shift_id' => $freshHandover->incoming_shift_id,
                 'status' => $freshHandover->status,
@@ -431,6 +439,16 @@ class ShiftHandoverService
                 'action' => 'submitted',
             ];
         });
+    }
+
+    protected function persistHandover(ShiftHandover $handover): void
+    {
+        $handover->save();
+    }
+
+    protected function recordHandoverAudit(string $action, ShiftHandover $handover, array $meta): void
+    {
+        AuditLogger::logOrFail($action, $handover, $meta);
     }
 
     public function submit(ShiftHandover $handover, User $actor): ShiftHandover
@@ -522,12 +540,13 @@ class ShiftHandoverService
                 'status' => self::STATUS_SUBMITTED,
                 'submitted_at' => $handover->submitted_at ?? now(),
                 'submitted_by' => $actor->id,
-            ])->save();
+            ]);
+            $this->persistHandover($handover);
 
             $fresh = $this->freshHandover($handover);
 
             $this->timelineService->recordHandoverSubmitted($fresh, $fresh->outgoingShift, $actor);
-            AuditLogger::logOrFail('shift.handover.submitted', $fresh, [
+            $this->recordHandoverAudit('shift.handover.submitted', $fresh, [
                 'shift_id' => $fresh->outgoing_shift_id,
                 'incoming_shift_id' => $fresh->incoming_shift_id,
             ]);
@@ -724,6 +743,7 @@ class ShiftHandoverService
 
             $fresh = $this->freshHandover($handover, includeAcknowledger: true);
 
+            app(\App\Services\Medication\Followups\MedicationFollowupService::class)->acknowledged($fresh, $incomingShift, $actor);
             $this->timelineService->recordHandoverAcknowledged($fresh, $fresh->outgoingShift, $actor);
             AuditLogger::logOrFail('shift.handover.acknowledged', $fresh, [
                 'shift_id' => $fresh->outgoing_shift_id,
@@ -1399,7 +1419,8 @@ class ShiftHandoverService
                 ];
                 $attributes['worker_notes'] = $notes;
             }
-            $handover->fill($attributes)->save();
+            $handover->fill($attributes);
+            $this->persistHandover($handover);
 
             $fresh = $handover->fresh([
                 'outgoingShift.client:id,first_name,last_name,site_id',
@@ -1410,7 +1431,7 @@ class ShiftHandoverService
             ]) ?? $handover;
 
             if ($cdResolution['audit_action'] !== null) {
-                AuditLogger::logOrFail(
+                $this->recordHandoverAudit(
                     'shift.handover.cdVerification.'.$cdResolution['audit_action'],
                     $fresh,
                     [
@@ -1424,8 +1445,10 @@ class ShiftHandoverService
                         'replacement_verification' => $cdResolution['verification'],
                     ],
                 );
+                // eMAR C5 (EA-034): a count that didn't match reaches the register's lead.
+                app(\App\Services\Emar\HandoverControlledCountFollowup::class)->afterCount($fresh, $client, $cdResolution['verification']);
             }
-            AuditLogger::logOrFail('shift.handover.updated', $fresh, [
+            $this->recordHandoverAudit('shift.handover.updated', $fresh, [
                 'shift_id' => $fresh->outgoing_shift_id,
                 'status' => $fresh->status,
             ]);
@@ -2174,6 +2197,9 @@ class ShiftHandoverService
             }
 
             RateLimiter::hit($rateLimitKey, self::CD_WITNESS_DECAY_SECONDS);
+            // PIN-1: keep the witness PIN's own message ("Incorrect PIN",
+            // "locked — unlocks at…", "hasn't set a PIN") so staff know
+            // what to do; only this surface's throttle stays generic.
             $this->rejectCdWitnessCredential(
                 $actor,
                 $client,
@@ -2181,6 +2207,7 @@ class ShiftHandoverService
                 $ipAddress,
                 'rejected',
                 RateLimiter::attempts($rateLimitKey),
+                $exception->errors()['cd_witness_credential'][0] ?? null,
             );
         }
 
@@ -2253,6 +2280,7 @@ class ShiftHandoverService
         string $ipAddress,
         string $outcome,
         int $attempts,
+        ?string $message = null,
     ): never {
         Log::warning('Shift handover controlled-drug witness credential rejected.', [
             'security_event' => 'shift_handover_cd_witness_credential_rejected',
@@ -2267,7 +2295,7 @@ class ShiftHandoverService
         ]);
 
         throw ValidationException::withMessages([
-            'cd_witness_credential' => self::CD_WITNESS_FAILURE,
+            'cd_witness_credential' => $message ?? self::CD_WITNESS_FAILURE,
         ]);
     }
 

@@ -1,0 +1,1169 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\storage\pkg02b-audit\phpunit.xml
+
+.........[41;37mF[0m.[41;37mF[0m.......
+  [39;41;1m FAIL [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[39m
+  [33;1m![39;22m[90m [39m[90mappointment commands refuse stale edits and changed retries and undo only the exact plan[39m[90m [39m[33m→ file_get_conte[39m[90m…[39m [90m241.43s[39m  
+  [33;1m![39;22m[90m [39m[90msnooze undo restores an overdue time without overwriting a later change[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe feed shows permitted bookings and only busy time for others[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.75s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90munavailable periods are idempotent versioned and block bookings[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.75s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma booking change rechecks conflicts and versions[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b[39m[90m…[39m[90m [39m[90m0.76s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mservice appointments plan reschedule overrun and cancel with one vehicle hold[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m0.92s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90msnoozing a reminder only moves it later[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-au[39m[90m…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mevidence can be kept with a booking or unavailable period of this vehicle only[39m[90m [39m[33m→ file_get_contents(C:\Users[39m[90m…[39m[90m [39m[90m0.75s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe summary describes the restriction its linked work and release authority[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m  [39m[31;1m⨯[39;22m[90m [39m[90mactive restrictions span the window and estimates carry their appointment[39m[90m                                   [39m[90m [39m[90m0.66s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma booking or period outside the summary lists opens as its record[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex[39m[90m…[39m[90m [39m[90m0.93s[39m[90m  [39m
+[90m  [39m[31;1m⨯[39;22m[90m [39m[90ma linked appointment reuses open work from the same due item[39m[90m                                                [39m[90m [39m[90m0.88s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma period an appointment holds is managed through the appointment[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.77s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma cancelled period can be restored while its time is still free[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.86s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreversible changes can be put back through their own endpoints[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma return with a concern opens linked maintenance work once[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m0.79s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma return concern without maintenance routing still returns the vehicle[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m0.88s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mperiods are busy time outside the viewers sites and appointment details follow maintenance access[39m[90m [39m[33m→ file_ge[39m[90m…[39m[90m [39m[90m0.83s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma stale booking change is refused instead of being lost[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m[90m [39m[90m0.73s[39m[90m  [39m
+...........[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe finance view is concealed without finance access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pk[39m[90m…[39m[90m [39m[90m0.67s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked records combine finance and vehicle links without double counting[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m0.62s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinking needs fleet management finance access a reason and the vehicles scope[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m0.87s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90munlinking keeps the finance record and needs a reason[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\p[39m[90m…[39m[90m [39m[90m0.71s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinkable search is scoped to the vehicle and finance access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreview requests are idempotent scoped and refuse open duplicates[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.80s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreview request files are private and open only for finance viewers[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m1.11s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90monly finance decides a review request[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audi[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe person who asked for a review cannot decide it[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg0[39m[90m…[39m[90m [39m[90m0.71s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfinance decides review requests in finance without fleet access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m1.12s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mopen review requests reach finance in all tasks[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-[39m[90m…[39m[90m [39m[90m0.76s[39m[90m  [39m
+.......[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register download refuses vehicle files that have not passed their virus check[39m[90m [39m[33m→ file_get_contents(C:\U[39m[90m…[39m[90m [39m[90m9.41s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mclean vehicle files open from the register through the vehicle profile download[39m[90m [39m[33m→ file_get_contents(C:\User[39m[90m…[39m[90m [39m[90m0.86s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfinance review evidence opens from the register only for finance viewers[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m2.26s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register cannot delete files the vehicle profile keeps[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m9.28s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register refuses new vehicle uploads[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-a[39m[90m…[39m[90m [39m[90m0.64s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mother assets keep register upload download and delete[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\p[39m[90m…[39m[90m [39m[90m0.71s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register lists vehicle documents without source owned evidence[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m0.99s[39m[90m  [39m
+................[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg01CheckAssessmentTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90man independent manager releases a check that no approved rule covers[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.co[39m[90m…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe recorder may release their own check only when it recorded no issue and no rule applied[39m[90m [39m[33m→ file_get_cont[39m[90m…[39m[90m [39m[90m0.87s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma reason and confirmation are required and nothing is kept without them[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.66s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90monly maintenance managers at the vehicles site can assess[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktre[39m[90m…[39m[90m [39m[90m0.90s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma retry returns the same decision and a changed retry or second decision conflicts[39m[90m [39m[33m→ file_get_contents(C:\U[39m[90m…[39m[90m [39m[90m0.73s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma check failed by an approved rule keeps the repair retest and release path[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma check maintenance placed a hold for is released only by independent release[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mretests passed advisory and already released checks have nothing to assess[39m[90m [39m[33m→ file_get_contents(C:\Users\ste[39m[90m…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe release readiness gate applies before a check is released[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wor[39m[90m…[39m[90m [39m[90m0.67s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mother maintenance holds keep the vehicle unavailable[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pk[39m[90m…[39m[90m [39m[90m0.67s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma booking the check stopped can be approved once it is released[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.83s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90man assessed check recorded after a retest no longer prevents release[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.co[39m[90m…[39m[90m [39m[90m0.68s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma legacy daily check without a submission time never blocks release[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.64s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe decision is visible on the check the vehicle and its linked work[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.co[39m[90m…[39m[90m [39m[90m0.82s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcheck assessments roll back only while empty[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-fin[39m[90m…[39m[90m [39m[90m0.63s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe vehicle lock orders a release against a new hold and a waiting booking decision[39m[90m [39m[33m→ file_get_contents(C:</>…[39m[90m [39m[90m9.95s[39m[90m  [39m
+..[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\FleetControlRoomAlertHeroScopeTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet hero alert counts are actionable site scoped and globally available to managers[39m[90m [39m[33m→ file_get_contents(C[39m[90m…[39m[90m [39m[90m0.91s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcanonical vehicle signals appear in fleet alerts without widening site access[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m0.58s[39m[90m  [39m
+.          56 / 56 (100%)[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mPKG-02B migrations roll back only while empty and never discard vehicle records[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m24.13s[39m[90m  [39m
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m appointment commands refuse stale edits and chang…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m snooze undo restores an overdue time without over…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m the feed shows permitted bookings and only busy t…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m unavailable periods are idempotent versioned and…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a booking change rechecks conflicts and versions     [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m service appointments plan reschedule overrun and…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m snoozing a reminder only moves it later              [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m evidence can be kept with a booking or unavailabl…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m the summary describes the restriction its linked…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[41;1m FAILED [49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m active restrictions span the window and estimates c…   [39m
+[39;1m  Expected response status code [200] but received 422.
+Failed asserting that 422 is identical to 200.
+
+The following errors occurred during the last request:
+
+{
+    "message": "The expected version field is required.",
+    "errors": {
+        "expected_version": [
+            "The expected version field is required."
+        ]
+    }
+}[39;22m
+
+[90m  at [39m[32mtests\Feature\FleetAssets\Pkg02bVehicleCalendarTest.php[39m[90m:[39m[32m455[39m
+[90m    451▕         // A cancelled appointment is no longer carried by its estimate.
+    452▕         $this->actingAs($manager)->postJson("/fleet-assets/vehicles/{$vehicle->id}/appointments", [
+    453▕             'operation' => 'cancel', 'work_order_id' => $planned->id, 'change_reason' => 'Provider closed.',
+    454▕             'request_key' => 'appointment-estimate-cancel',
+  ➜ 455▕         ])->assertOk();
+    456▕         $this->assertNull(collect($this->feed($manager, $vehicle))->firstWhere('id', 'estimate:'.$plannedEstimate)['meta']);
+    457▕     }
+    458▕ 
+    459▕     public function test_a_booking_or_period_outside_the_summary_lists_opens_as_its_record(): void[39m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a booking or period outside the summary lists ope…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[41;1m FAILED [49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a linked appointment reuses open work from the same…   [39m
+[39;1m  Failed to find a validation error in the response for key: 'work_order_id'
+
+Response has the following JSON validation errors:
+
+{
+    "expected_version": [
+        "The expected version field is required."
+    ]
+}
+
+Failed asserting that an array has the key 'work_order_id'.
+
+The following errors occurred during the last request:
+
+{
+    "message": "The expected version field is required.",
+    "errors": {
+        "expected_version": [
+            "The expected version field is required."
+        ]
+    }
+}[39;22m
+
+[90m  at [39m[32mtests\Feature\FleetAssets\Pkg02bVehicleCalendarTest.php[39m[90m:[39m[32m563[39m
+[90m    559▕ 
+    560▕         // A chosen record must be the due item's linked work.
+    561▕         $manual = $this->workOrder($vehicle, $manager, 'Brake noise');
+    562▕         $this->actingAs($manager)->postJson($url, ['work_order_id' => $manual->id, 'request_key' => 'linked-3'] + $plan)
+  ➜ 563▕             ->assertUnprocessable()->assertJsonValidationErrors('work_order_id');
+    564▕         $this->actingAs($manager)->postJson($url, ['work_order_id' => $work->id, 'starts_local' => '2026-09-26T09:00',
+    565▕             'ends_local' => '2026-09-26T11:00', 'request_key' => 'linked-4'] + $plan)->assertOk()
+    566▕             ->assertJsonPath('work_order_id', $work->id);
+    567▕[39m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a period an appointment holds is managed through…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a cancelled period can be restored while its time…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m reversible changes can be put back through their…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a return with a concern opens linked maintenance…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a return concern without maintenance routing stil…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m periods are busy time outside the viewers sites a…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleCalendarTest[22m[90m [39m[90m>[39m[90m a stale booking change is refused instead of bein…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m the finance view is concealed without finance acce…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m linked records combine finance and vehicle links w…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m linking needs fleet management finance access a re…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m unlinking keeps the finance record and needs a rea…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m linkable search is scoped to the vehicle and finan…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m review requests are idempotent scoped and refuse o…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m review request files are private and open only for…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m only finance decides a review request                 [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m the person who asked for a review cannot decide it    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m finance decides review requests in finance without…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[22m[90m [39m[90m>[39m[90m open review requests reach finance in all tasks       [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m the register download refuses vehicle f…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m clean vehicle files open from the regis…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m finance review evidence opens from the…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m the register cannot delete files the ve…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m the register refuses new vehicle upload…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m other assets keep register upload downl…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[22m[90m [39m[90m>[39m[90m the register lists vehicle documents wi…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m an independent manager releases a check that no ap…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m the recorder may release their own check only when…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m a reason and confirmation are required and nothing…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m only maintenance managers at the vehicles site can…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m a retry returns the same decision and a changed re…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m a check failed by an approved rule keeps the repai…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m a check maintenance placed a hold for is released…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m retests passed advisory and already released check…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m the release readiness gate applies before a check…    [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m other maintenance holds keep the vehicle unavailab…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m a booking the check stopped can be approved once i…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m an assessed check recorded after a retest no longe…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m a legacy daily check without a submission time nev…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m the decision is visible on the check the vehicle a…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m check assessments roll back only while empty          [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg01CheckAssessmentTest[22m[90m [39m[90m>[39m[90m the vehicle lock orders a release against a new ho…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\FleetControlRoomAlertHeroScopeTest[22m[90m [39m[90m>[39m[90m fleet hero alert counts are actionable s…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\FleetControlRoomAlertHeroScopeTest[22m[90m [39m[90m>[39m[90m canonical vehicle signals appear in flee…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+[90m  [39m[31m────────────────────────────────────────────────────────────────────────────────────────────────────────────────────[39m[90m  [39m
+[90m  [39m[30;43;1m WARNINGS [39;49;22m[90m [39m[1mTests\Feature\FleetAssets\Pkg02bWorkspaceRollbackTest[22m[90m [39m[90m>[39m[90m PKG-02B migrations roll back only while empty a…   [39m
+[39;1m  file_get_contents(C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\.env): Failed to open stream: No such file or directory[39;22m
+
+[90m  at [39m[32mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39m[90m:[39m[32m73[39m
+[90m     69▕      */
+     70▕     private static function readFromFile(string $path, ?string $encoding = null)
+     71▕     {
+     72▕         /** @var Option[39m[90m<string>[39m[90m */
+  ➜  73▕         $content = Option::fromValue(@\file_get_contents($path), false);
+     74▕ 
+     75▕         return $content->flatMap(static function (string $content) use ($encoding) {
+     76▕             return Str::utf8($content, $encoding)->mapError(static function (string $error) {
+     77▕                 throw new InvalidEncodingException($error);[39m
+
+[90m  [39m[33m1   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\File\Reader.php[39;22m[90m:[39m[39;1m48[39;22m
+[90m  [39m[33m2   [39m[39;1mvendor\vlucas\phpdotenv\src\Store\FileStore.php[39;22m[90m:[39m[39;1m62[39;22m
+
+
+[90m  [39m[90mTests:[39m[90m    [39m[31;1m2 failed[39;22m[90m,[39m[39m [39m[33;1m54 warnings[39;22m[90m (1210 assertions)[39m
+[90m  [39m[90mDuration:[39m[90m [39m[39m335.22s[39m
+
+
+
+Time: 05:35.078, Memory: 176.00 MB
+
+There were 2 failures:
+
+1) Tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest::test_active_restrictions_span_the_window_and_estimates_carry_their_appointment
+Expected response status code [200] but received 422.
+Failed asserting that 422 is identical to 200.
+
+The following errors occurred during the last request:
+
+{
+    "message": "The expected version field is required.",
+    "errors": {
+        "expected_version": [
+            "The expected version field is required."
+        ]
+    }
+}
+
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest.php:455
+
+2) Tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest::test_a_linked_appointment_reuses_open_work_from_the_same_due_item
+Failed to find a validation error in the response for key: 'work_order_id'
+
+Response has the following JSON validation errors:
+
+{
+    "expected_version": [
+        "The expected version field is required."
+    ]
+}
+
+Failed asserting that an array has the key 'work_order_id'.
+
+The following errors occurred during the last request:
+
+{
+    "message": "The expected version field is required.",
+    "errors": {
+        "expected_version": [
+            "The expected version field is required."
+        ]
+    }
+}
+
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:1150
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:1078
+C:\Users\steph\.codex\worktrees\pkg02b-final-audit\oblivionfindings\tests\Feature\FleetAssets\Pkg02bVehicleCalendarTest.php:563
+
+[37;41mFAILURES![0m
+[37;41mTests: 56[0m[37;41m, Assertions: 1210[0m[37;41m, Failures: 2[0m[37;41m.[0m

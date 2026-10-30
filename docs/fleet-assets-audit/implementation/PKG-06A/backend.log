@@ -1,0 +1,83 @@
+
+   PASS  Tests\Feature\FleetAssets\AssetRegisterWorkflowTest
+  ✓ location directory and checklist use only permitted assets                                                  87.58s
+  ✓ coverage excludes selected item counts and followups recheck access                                          0.43s
+  ✓ count is durable versioned immutable and does not change assignment                                          0.41s
+  ✓ scan resolves existing identity rejects foreign urls and requires extra confirmation                         0.35s
+  ✓ duplicate command is idempotent and undo keeps evidence                                                      0.32s
+  ✓ missing and changed items require review and owner                                                           0.37s
+  ✓ hidden site and asset records are denied and permission revocation blocks writes                             0.30s
+  ✓ completed report is real pdf and typed xlsx                                                                  2.10s
+  ✓ csv validation partial import and retry do not duplicate assets                                              0.48s
+  ✓ newly conflicting import row can be retried without repeating successes                                      0.28s
+  ✓ empty count requires attestation and records it                                                              0.24s
+  ✓ read access does not grant counting or import permission                                                     0.30s
+  ✓ canonical room filter and registration cannot cross sites                                                    0.24s
+  ✓ label exports preserve tokens and revalidate download scope                                                  1.25s
+  ✓ label replay requires the original selection and layout                                                      0.23s
+  ✓ print permission does not grant permission to create a missing qr identity                                   0.30s
+
+   PASS  Tests\Feature\AssetControllerTest
+  ✓ asset index requires authentication                                                                          1.04s
+  ✓ asset index redirects to fleet assets                                                                        1.02s
+  ✓ asset alerts redirects to fleet assets alerts                                                                0.88s
+  ✓ asset create requires authentication                                                                         0.68s
+  ✓ asset create redirects to index wizard shim                                                                  0.94s
+  ✓ asset index ships wizard option lists                                                                        1.01s
+  ✓ asset create blocked for user without permission                                                             0.72s
+  ✓ asset store creates asset                                                                                    1.13s
+  ✓ asset store validates required name                                                                          1.02s
+  ✓ asset store validates status                                                                                 1.03s
+  ✓ asset store validates risk level                                                                             1.30s
+  ✓ asset store requires site or client                                                                          1.33s
+  ✓ asset store infers site from client                                                                          1.19s
+  ✓ asset store blocked for user without permission                                                              0.71s
+  ✓ asset show requires authentication                                                                           0.69s
+  ✓ asset show redirects to fleet assets                                                                         0.99s
+  ✓ asset edit redirects to show wizard shim                                                                     1.05s
+  ✓ asset show ships edit wizard option lists                                                                    1.17s
+  ✓ asset store from modal redirects back to index with created id                                               1.17s
+  ✓ asset update successful                                                                                      1.16s
+  ✓ asset update validates required fields                                                                       1.23s
+  ✓ asset delete retires and retains the record                                                                  1.16s
+  ✓ asset delete blocked for coordinator                                                                         1.04s
+
+   PASS  Tests\Feature\FleetAssets\AssetMutationBoundaryTest
+  ✓ asset register create update and picker data are canonical site scoped                                       1.06s
+  ✓ assigned only asset register rows exports and counts follow the asset policy                                 1.19s
+  ✓ asset access uses direct then home then client site provenance and denies conflicts                          0.76s
+  ✓ every asset object ability reuses the canonical visibility boundary                                          0.82s
+  ✓ fleet write routes conceal hidden vehicles and bulk work is atomic                                           0.78s
+  ✓ ordinary edits cannot retire assets or move live assignment and device provenance                            0.81s
+  ✓ bulk offline state and mutation audits are durable per vehicle                                               0.72s
+  ✓ asset assignment requires one site valid active holder and explicit release                                  0.86s
+  ✓ competing custody transfers are serialized and preserve assignment history                                  11.28s
+  ✓ asset ownership transition validates target and retains history                                              1.00s
+  ✓ asset delete route retires and preserves lifecycle history                                                   0.88s
+
+   PASS  Tests\Feature\FleetAssets\Pkg02bVehicleTripHistoryTest
+  ✓ trip history is concealed outside the viewers sites and needs fleet view                                     0.93s
+  ✓ driver names from other sites are not shown                                                                  0.82s
+  ✓ list filters by auckland day search driver and event type                                                    1.36s
+  ✓ the list reads the latest days and at most a year and says so                                                0.95s
+  ✓ the list reads at most the latest trips while exports keep their own limits                                  2.25s
+  ✓ trip detail reads behaviour from the recorded telemetry                                                      0.87s
+  ✓ personal and restricted trips are listed without their places or route                                       0.92s
+  ✓ confirming a driver needs authority a site candidate and is audited                                          1.23s
+  ✓ deleting a trip never erases its driver confirmation or event reviews                                        1.07s
+  ✓ exports are scoped branded sanitised and audited                                                             1.64s
+  ✓ excel duration totals recalculate from recorded seconds without per trip rounding                            0.88s
+  ✓ local street maps are embedded in both formats with dataset audit and privacy                                1.45s
+  ✓ driving metrics count queclink harsh reports and speed episodes                                              0.81s
+  ✓ trip builder records maximum speed for the trips list                                                        0.93s
+
+   PASS  Tests\Unit\TestDatabaseBootstrapFailClosedTest
+  ✓ it fails closed when pending migrations return a non-zero exit code                                          0.09s
+  ✓ it fails closed when the pending migrator throws
+  ✓ it marks successful pending migrations once and reuses that prepared state
+
+   PASS  Tests\Unit\Support\SchemaCacheScopeTest
+  ✓ it only lists the current database when discovering application tables                                       0.16s
+
+  Tests:    68 passed (855 assertions)
+  Duration: 156.97s

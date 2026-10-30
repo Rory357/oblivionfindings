@@ -14,6 +14,8 @@ use App\Models\SafeguardingInvestigation;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
+use App\Services\HealthSafety\NotifiableEventClassifier;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -113,14 +115,20 @@ class SafeguardingLifecycleTest extends TestCase
             'owner_user_id' => $actor->id,
             'handover_status' => HsEvent::HANDOVER_NOT_REQUIRED,
             'investigation_required' => false,
-            'worksafe_notifiable' => false,
-            'worksafe_decided_at' => now(),
-            'worksafe_decided_by_user_id' => $actor->id,
-            'worksafe_decision_reason' => 'Assessed as not meeting the WorkSafe notification threshold.',
-            'worksafe_decision_source' => 'manual',
-            'worksafe_status' => null,
         ])->save();
         $this->actingAs($actor);
+        $this->assertTrue($actor->canDo('hazards.manage'));
+        $event = app(HsEventService::class)->recordWorksafeDecision(
+            $event->fresh(),
+            false,
+            'Assessed as not meeting the WorkSafe notification threshold.',
+            $actor,
+        );
+        $this->assertTrue($event->hasSignedWorksafeDecision());
+        $this->assertFalse($event->worksafe_notifiable);
+        $this->assertSame($actor->id, $event->worksafe_decided_by_user_id);
+        $this->assertSame(NotifiableEventClassifier::DECISION_TREE_VERSION, $event->worksafe_decision_tree_version);
+        $this->assertSame(NotifiableEventClassifier::SOURCE_EFFECTIVE_DATE, $event->worksafe_source_effective_date->toDateString());
         app(HsEventClosureService::class)->closeEvent(
             $event->fresh(),
             'H&S safeguarding governance completed.',

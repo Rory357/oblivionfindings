@@ -1,4 +1,6 @@
 import HeadingSmall from '@/components/heading-small';
+import InputError from '@/components/input-error';
+import { BrandContrastNotice } from '@/components/settings/brand-contrast-notice';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,6 +11,7 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -60,7 +63,11 @@ type Props = {
         tagline: string | null;
         report_subtitle: string | null;
         logoUrl: string | null;
+        logoDarkUrl: string | null;
         faviconUrl: string | null;
+        /** The website and sign-in photo, and its screen-reader description. */
+        heroUrl?: string | null;
+        hero_alt?: string | null;
         email_header_colour: string | null;
         email_footer_text: string | null;
         report_logo_position: string | null;
@@ -410,6 +417,140 @@ function ColorSwatch({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Website and sign-in photo                                          */
+/* ------------------------------------------------------------------ */
+
+const HERO_MAX_BYTES = 8 * 1024 * 1024;
+
+/**
+ * One optional photo for the public home page and both sign-in pages
+ * (client demo website, 23 Oct 2026). Without it those show a plain panel
+ * in the brand colour. The server re-encodes it, which strips location and
+ * camera details, before it is published.
+ */
+function HeroPhotoField({
+    currentUrl,
+    file,
+    remove,
+    alt,
+    error,
+    altError,
+    onFile,
+    onRemove,
+    onAlt,
+}: {
+    currentUrl: string | null;
+    file: File | null;
+    remove: boolean;
+    alt: string;
+    error?: string;
+    altError?: string;
+    onFile: (file: File | null) => void;
+    onRemove: (remove: boolean) => void;
+    onAlt: (alt: string) => void;
+}) {
+    const [tooLarge, setTooLarge] = useState(false);
+    const message = tooLarge ? 'Choose a photo up to 8 MB.' : error;
+
+    return (
+        <div className="space-y-3">
+            <div className="space-y-1">
+                <Label id="hero_photo_label">Website and sign-in photo</Label>
+                <p
+                    id="hero_photo_hint"
+                    className="text-sm text-muted-foreground"
+                >
+                    Shown on your website’s home page and on the staff and
+                    family sign-in pages, under a dark shade so the text stays
+                    readable. Without a photo they show a plain panel in your
+                    brand colour. JPG, PNG or WebP, at least 1200 × 800 pixels,
+                    up to 8 MB. Location and camera details are removed before
+                    it’s published.
+                </p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-3">
+                    {currentUrl && !remove && !file && (
+                        <img
+                            src={currentUrl}
+                            alt={alt || 'Current website and sign-in photo'}
+                            className="aspect-[16/10] w-full rounded-lg border border-border object-cover"
+                        />
+                    )}
+                    {file && (
+                        <StagedFileCard
+                            file={file}
+                            onRemove={() => onFile(null)}
+                        />
+                    )}
+                    <FileDropzone
+                        id="hero_photo"
+                        aria-labelledby="hero_photo_label"
+                        aria-describedby="hero_photo_hint"
+                        aria-invalid={message ? true : undefined}
+                        multiple={false}
+                        accept=".jpg,.jpeg,.png,.webp"
+                        title={
+                            file || currentUrl
+                                ? 'Drag a new photo here to replace it'
+                                : 'Drag your photo here'
+                        }
+                        hint="JPG, PNG or WebP · at least 1200 × 800 · up to 8 MB"
+                        onFiles={(list) => {
+                            const next = list[0] ?? null;
+                            setTooLarge(!!next && next.size > HERO_MAX_BYTES);
+                            if (next && next.size <= HERO_MAX_BYTES)
+                                onFile(next);
+                        }}
+                    />
+                    <InputError message={message} />
+                    {currentUrl && !file && (
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id="remove_hero_photo"
+                                checked={remove}
+                                onCheckedChange={(value) =>
+                                    onRemove(Boolean(value))
+                                }
+                            />
+                            <Label
+                                htmlFor="remove_hero_photo"
+                                className="text-sm text-muted-foreground"
+                            >
+                                Remove the current photo
+                            </Label>
+                        </div>
+                    )}
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="branding_hero_alt">
+                        Photo description (for screen readers)
+                    </Label>
+                    <Input
+                        id="branding_hero_alt"
+                        value={alt}
+                        maxLength={200}
+                        onChange={(event) => onAlt(event.target.value)}
+                        aria-describedby="branding_hero_alt_hint"
+                        aria-invalid={altError ? true : undefined}
+                        placeholder="e.g. Two people laughing as they cook together"
+                    />
+                    <p
+                        id="branding_hero_alt_hint"
+                        className="text-xs text-muted-foreground"
+                    >
+                        Describe what’s in the photo for people who can’t see
+                        it. Used on your home page; leave it blank if the photo
+                        is only decoration.
+                    </p>
+                    <InputError message={altError} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main page                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -422,8 +563,10 @@ export default function BrandingPage(props: Props) {
         document.documentElement.classList.contains('dark'),
     );
     const [dragOver, setDragOver] = useState(false);
+    const [darkDragOver, setDarkDragOver] = useState(false);
     const [faviconDragOver, setFaviconDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const darkFileInputRef = useRef<HTMLInputElement>(null);
     const faviconInputRef = useRef<HTMLInputElement>(null);
 
     const initialTheme = useMemo(
@@ -445,12 +588,17 @@ export default function BrandingPage(props: Props) {
             report_logo_position: string;
             report_font: string;
             report_include_company_details: boolean;
+            hero_alt: string;
         };
         theme: { light: Record<string, string>; dark: Record<string, string> };
         logo: File | null;
         remove_logo: boolean;
+        logo_dark: File | null;
+        remove_logo_dark: boolean;
         favicon: File | null;
         remove_favicon: boolean;
+        hero_photo: File | null;
+        remove_hero_photo: boolean;
     }>({
         branding: {
             name: (props.branding?.name ?? '').toString(),
@@ -468,6 +616,7 @@ export default function BrandingPage(props: Props) {
             report_font: (props.branding?.report_font ?? 'default').toString(),
             report_include_company_details:
                 props.branding?.report_include_company_details ?? true,
+            hero_alt: (props.branding?.hero_alt ?? '').toString(),
         },
         theme: {
             light: { ...initialTheme.light },
@@ -475,8 +624,12 @@ export default function BrandingPage(props: Props) {
         },
         logo: null,
         remove_logo: false,
+        logo_dark: null,
+        remove_logo_dark: false,
         favicon: null,
         remove_favicon: false,
+        hero_photo: null,
+        remove_hero_photo: false,
     });
 
     /* --- Terminology form (PUT to /settings/terminology) --- */
@@ -501,6 +654,14 @@ export default function BrandingPage(props: Props) {
         (file: File | null) => {
             if (file && file.size > 2 * 1024 * 1024) return;
             form.setData('logo', file);
+        },
+        [form],
+    );
+
+    const handleDarkFile = useCallback(
+        (file: File | null) => {
+            if (file && file.size > 2 * 1024 * 1024) return;
+            form.setData('logo_dark', file);
         },
         [form],
     );
@@ -849,6 +1010,108 @@ export default function BrandingPage(props: Props) {
                                                     </Label>
                                                 </div>
                                             )}
+
+                                            {/* Second logo: shown on dark backgrounds (sign-in brand half, dark mode). */}
+                                            <Label>
+                                                Logo for dark backgrounds
+                                            </Label>
+                                            <div
+                                                className={`relative flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed bg-journey-ink px-6 py-8 text-journey-paper transition-colors ${
+                                                    darkDragOver
+                                                        ? 'border-journey-lavender'
+                                                        : 'border-journey-ink-muted/40 hover:border-journey-lavender'
+                                                }`}
+                                                onClick={() =>
+                                                    darkFileInputRef.current?.click()
+                                                }
+                                                onDragOver={(e) => {
+                                                    e.preventDefault();
+                                                    setDarkDragOver(true);
+                                                }}
+                                                onDragLeave={() =>
+                                                    setDarkDragOver(false)
+                                                }
+                                                onDrop={(e) => {
+                                                    e.preventDefault();
+                                                    setDarkDragOver(false);
+                                                    handleDarkFile(
+                                                        e.dataTransfer
+                                                            .files?.[0] ?? null,
+                                                    );
+                                                }}
+                                            >
+                                                {props.branding?.logoDarkUrl &&
+                                                !form.data.remove_logo_dark ? (
+                                                    <img
+                                                        src={
+                                                            props.branding
+                                                                .logoDarkUrl
+                                                        }
+                                                        alt="Current logo for dark backgrounds"
+                                                        className="mb-3 h-14 w-auto object-contain"
+                                                    />
+                                                ) : (
+                                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-journey-paper/10">
+                                                        <Upload className="h-6 w-6 text-journey-ink-muted" />
+                                                    </div>
+                                                )}
+                                                <p className="text-sm font-medium">
+                                                    Click to upload or drag and
+                                                    drop
+                                                </p>
+                                                <p className="mt-1 text-xs text-journey-ink-muted">
+                                                    A light version of your logo
+                                                    for the dark half of the
+                                                    sign-in page and dark mode.
+                                                    PNG, JPG up to 2MB.
+                                                </p>
+                                                {form.data.logo_dark && (
+                                                    <p className="mt-2 text-xs font-medium text-journey-lavender">
+                                                        Selected:{' '}
+                                                        {
+                                                            form.data.logo_dark
+                                                                .name
+                                                        }
+                                                    </p>
+                                                )}
+                                                <input
+                                                    ref={darkFileInputRef}
+                                                    type="file"
+                                                    accept="image/png,image/jpeg,image/jpg"
+                                                    className="hidden"
+                                                    onChange={(e) =>
+                                                        handleDarkFile(
+                                                            e.target
+                                                                .files?.[0] ??
+                                                                null,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            {props.branding?.logoDarkUrl && (
+                                                <div className="flex items-center gap-2">
+                                                    <Checkbox
+                                                        id="remove_logo_dark"
+                                                        checked={
+                                                            form.data
+                                                                .remove_logo_dark
+                                                        }
+                                                        onCheckedChange={(v) =>
+                                                            form.setData(
+                                                                'remove_logo_dark',
+                                                                Boolean(v),
+                                                            )
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor="remove_logo_dark"
+                                                        className="text-sm text-muted-foreground"
+                                                    >
+                                                        Remove logo for dark
+                                                        backgrounds
+                                                    </Label>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -938,6 +1201,53 @@ export default function BrandingPage(props: Props) {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* The website and sign-in photo (client demo site, 23 Oct 2026). */}
+                                    <Separator />
+                                    <HeroPhotoField
+                                        currentUrl={
+                                            props.branding?.heroUrl ?? null
+                                        }
+                                        file={form.data.hero_photo}
+                                        remove={form.data.remove_hero_photo}
+                                        alt={form.data.branding.hero_alt}
+                                        error={
+                                            (
+                                                form.errors as Record<
+                                                    string,
+                                                    string | undefined
+                                                >
+                                            ).hero_photo
+                                        }
+                                        altError={
+                                            (
+                                                form.errors as Record<
+                                                    string,
+                                                    string | undefined
+                                                >
+                                            )['branding.hero_alt']
+                                        }
+                                        onFile={(file) => {
+                                            form.setData('hero_photo', file);
+                                            if (file)
+                                                form.setData(
+                                                    'remove_hero_photo',
+                                                    false,
+                                                );
+                                        }}
+                                        onRemove={(value) =>
+                                            form.setData(
+                                                'remove_hero_photo',
+                                                value,
+                                            )
+                                        }
+                                        onAlt={(value) =>
+                                            form.setData('branding', {
+                                                ...form.data.branding,
+                                                hero_alt: value,
+                                            })
+                                        }
+                                    />
                                 </CardContent>
                             </Card>
 
@@ -1059,6 +1369,10 @@ export default function BrandingPage(props: Props) {
                                                 and chart colours are derived
                                                 from this hue.
                                             </p>
+                                            <BrandContrastNotice
+                                                hex={brandHex}
+                                                onUseShade={handleBrandChange}
+                                            />
                                         </div>
 
                                         <div className="space-y-3">
@@ -1814,9 +2128,14 @@ export default function BrandingPage(props: Props) {
                                         report_logo_position: 'left',
                                         report_font: 'default',
                                         report_include_company_details: true,
+                                        hero_alt: '',
                                     });
+                                    form.setData('hero_photo', null);
+                                    form.setData('remove_hero_photo', false);
                                     form.setData('logo', null);
                                     form.setData('remove_logo', false);
+                                    form.setData('logo_dark', null);
+                                    form.setData('remove_logo_dark', false);
                                     form.setData('favicon', null);
                                     form.setData('remove_favicon', false);
                                     props.allowedVars.forEach((v) =>

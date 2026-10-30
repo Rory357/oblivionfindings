@@ -1,0 +1,55 @@
+{
+  "captured": "2026-09-27T17:48:28.5993935+13:00",
+  "main": "C:/Users/steph/Herd/oblivionfindings",
+  "mainHead": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
+  "remoteMain": "a6b9fae6a73516548b02e64c41cf1fc94ce43f01",
+  "tree": "41fc7644a1d32f59b169a8284a0aadaeaf4c14a1",
+  "eslintBlob": "5b3cd4e6e760f9bfdcf84c55c479d5cabbfe4122",
+  "protectedFiles": 67,
+  "immediatePostFastForwardPreserved": true,
+  "laterChanges": [],
+  "userIniHash": "5b89b33882c30a9b7882c456bda8503f7bd0341187cf7ac0873c5ec512f5c82a",
+  "sourceWorkingTreeMatchesHead": true,
+  "integratedScope": {
+    "validationRoot": "C:/Users/steph/Herd/oblivionfindings",
+    "approvedBase": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+    "frozenFiles": 576,
+    "frozenBytesChanged": [],
+    "ignoredCodeFiles": 166,
+    "unexpectedlyIncludedFrozenFiles": [],
+    "production": [
+      {
+        "file": "resources/js/components/fleet-assets/transport/calendar.tsx",
+        "included": true,
+        "rulesUnchanged": true
+      },
+      {
+        "file": "resources/js/components/fleet-assets/transport/calendar-actions.ts",
+        "included": true,
+        "rulesUnchanged": true
+      },
+      {
+        "file": "resources/js/components/fleet-assets/transport/dialogs.tsx",
+        "included": true,
+        "rulesUnchanged": true
+      },
+      {
+        "file": "resources/js/pages/fleet-assets/transports/workspace.tsx",
+        "included": true,
+        "rulesUnchanged": true
+      },
+      {
+        "file": "resources/js/pages/fleet-assets/bookings/show.tsx",
+        "included": true,
+        "rulesUnchanged": true
+      },
+      {
+        "file": "resources/js/pages/sites/calendar/_parts.tsx",
+        "included": true,
+        "rulesUnchanged": true
+      }
+    ],
+    "unrelatedPreviewScopeUnchanged": true
+  },
+  "integratedLintLogBytes": 0
+}

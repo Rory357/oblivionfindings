@@ -237,6 +237,7 @@ it('blocks a queued command when its observation becomes stale and never invokes
     $adapter = new ContractDoorExecutionAdapter;
     bindDoorAdapter($adapter);
     $command->device()->update(['last_seen_at' => now()->subHour()]);
+    Queue::fake(); // Observe dispatch denial after the command's staff and Site fixtures.
 
     expect(fn () => app(DeviceCommandQueueService::class)->queue($command->fresh(), $requester))
         ->toThrow(ValidationException::class, 'observation became stale')
@@ -498,6 +499,7 @@ it('conceals the execution route from an operator outside the command Site', fun
     ]);
     $control = Permission::query()->where('key', 'securityDevices.commands.control')->firstOrFail();
     $outsideOperator->permissionOverrides()->attach($control->id, ['allowed' => true]);
+    Queue::fake(); // Observe execution-route denial after every staff and Site fixture.
 
     $this->actingAs($outsideOperator)
         ->post("/security-devices/commands/{$command->id}/dispatch")

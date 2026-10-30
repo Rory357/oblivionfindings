@@ -1,0 +1,205 @@
+<Window x:Class="Oblivion.Obli.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Oblivion.Obli"
+ Title="Obli" Width="470" Height="680" MinWidth="380" MinHeight="530" Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource ForegroundBrush}" FontFamily="Segoe UI" WindowStartupLocation="Manual" ShowInTaskbar="False">
+ <Grid x:Name="Shell">
+  <Grid.RowDefinitions><RowDefinition Height="68"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="52"/></Grid.RowDefinitions>
+  <Grid Margin="16,10"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+   <StackPanel Orientation="Horizontal" VerticalAlignment="Center"><local:ObliOrb x:Name="HeaderOrb" Width="36" Height="36"/><TextBlock Text="Obli" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" Margin="2,0,0,0"/>
+    <Border Width="1" Height="18" Margin="14,0" Background="{DynamicResource BorderBrush}"/><TextBlock Text="Support" Style="{StaticResource SecondaryText}" VerticalAlignment="Center"/>
+   </StackPanel>
+   <Button x:Name="SignInButton" Grid.Column="2" Content="Sign in" Style="{StaticResource NavButton}" Click="SignInClick" IsEnabled="False"/>
+  </Grid>
+  <Border x:Name="RemotePanel" Grid.Row="1" Visibility="Collapsed" Margin="22,0,22,8" Padding="14" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource MutedBrush}">
+   <StackPanel>
+    <TextBlock x:Name="RemoteTitle" FontWeight="SemiBold" Text="Allow remote connection?" Margin="0,0,0,8"/>
+    <TextBlock x:Name="RemotePerson" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,6"/>
+    <TextBox x:Name="RemotePurpose" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="80" VerticalScrollBarVisibility="Auto" Margin="0,0,0,8" AutomationProperties.Name="Reason for the remote request"/>
+    <TextBlock x:Name="RemoteNotice" TextWrapping="Wrap" AutomationProperties.LiveSetting="Assertive" Margin="0,0,0,10"/>
+    <WrapPanel><Button x:Name="AllowRemoteButton" Content="Allow connection" Click="AllowRemoteClick" Margin="0,0,8,4"/><Button x:Name="DeclineRemoteButton" Content="Decline" Click="DeclineRemoteClick" Margin="0,0,8,4"/><Button x:Name="StopRemoteButton" Content="Stop" Click="StopRemoteClick" Margin="0,0,0,4" Visibility="Collapsed"/></WrapPanel>
+   </StackPanel>
+  </Border>
+  <ScrollViewer x:Name="PageScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="22,14,22,20">
+   <Grid>
+    <StackPanel x:Name="HelpPane">
+     <TextBlock Text="What do you need help with?" Style="{StaticResource SectionTitle}"/>
+     <TextBlock x:Name="ChatNotice" Text="Sign in to use private AI chat. The quick guides below work without signing in." Style="{StaticResource SecondaryText}" Margin="0,0,0,14" AutomationProperties.LiveSetting="Polite"/>
+     <Button x:Name="LoadChatButton" Content="Load chat and guides" Click="LoadChatClick" HorizontalAlignment="Left" Visibility="Collapsed" Margin="0,0,0,12"/>
+     <Button x:Name="BrowseKnowledgeButton" Content="Organisation guides" Click="BrowseKnowledgeClick" HorizontalAlignment="Left" Visibility="Collapsed" Margin="0,0,0,12"/>
+     <StackPanel x:Name="ChatTools" Visibility="Collapsed">
+      <TextBlock x:Name="ChatDisclosure" Style="{StaticResource SecondaryText}" Margin="0,0,0,12"/>
+      <CheckBox x:Name="ChatConsent" MinHeight="44" VerticalContentAlignment="Center" Foreground="{DynamicResource ForegroundBrush}" Checked="ChatConsentChanged" Unchecked="ChatConsentChanged" Margin="0,0,0,12"><TextBlock Text="Send this conversation to the provider shown above" TextWrapping="Wrap"/></CheckBox>
+      <Button x:Name="ReviewDiagnosticsButton" Content="Review computer checks" Click="ReviewDiagnosticsClick" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,10"/>
+      <Border x:Name="DiagnosticPanel" Visibility="Collapsed" Background="{DynamicResource MutedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="12" Margin="0,0,0,12">
+       <StackPanel>
+        <TextBlock Text="Choose what to share" FontWeight="SemiBold" Margin="0,0,0,6"/>
+        <TextBlock Text="These checks come from the last accepted computer report. They exclude names, files, addresses and raw logs." Style="{StaticResource SecondaryText}" Margin="0,0,0,8"/>
+        <CheckBox x:Name="DiagnosticSystem" MinHeight="44" VerticalContentAlignment="Center" Checked="DiagnosticSelectionChanged" Unchecked="DiagnosticSelectionChanged"><TextBlock Text="System health"/></CheckBox>
+        <CheckBox x:Name="DiagnosticSoftware" MinHeight="44" VerticalContentAlignment="Center" Checked="DiagnosticSelectionChanged" Unchecked="DiagnosticSelectionChanged"><TextBlock Text="Approved software versions"/></CheckBox>
+        <CheckBox x:Name="DiagnosticServices" MinHeight="44" VerticalContentAlignment="Center" Checked="DiagnosticSelectionChanged" Unchecked="DiagnosticSelectionChanged"><TextBlock Text="Windows service states"/></CheckBox>
+        <TextBox x:Name="DiagnosticPreview" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="90" MaxHeight="220" Margin="0,8,0,10" AutomationProperties.Name="Preview of selected computer checks"/>
+        <WrapPanel><Button x:Name="UseDiagnosticsButton" Content="Use these checks" Click="UseDiagnosticsClick" Margin="0,0,8,8"/><Button Content="Cancel" Click="CancelDiagnosticsClick" Margin="0,0,0,8"/></WrapPanel>
+       </StackPanel>
+      </Border>
+      <Border x:Name="SelectedDiagnosticPanel" Visibility="Collapsed" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,12">
+       <StackPanel><TextBlock Text="Computer checks attached to this draft" FontWeight="SemiBold"/><TextBox x:Name="SelectedDiagnosticText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxHeight="160" Margin="0,8,0,8" AutomationProperties.Name="Computer checks attached to draft"/><Button x:Name="RemoveDiagnosticsButton" Content="Remove checks" Click="RemoveDiagnosticsClick" HorizontalAlignment="Left"/></StackPanel>
+      </Border>
+      <Border x:Name="SelectedKnowledgePanel" Visibility="Collapsed" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="10" Margin="0,0,0,12">
+       <StackPanel><TextBlock Text="Guide attached to this draft" FontWeight="SemiBold"/><TextBlock x:Name="SelectedKnowledgeTitle" Margin="0,6,0,6"/><TextBox x:Name="SelectedKnowledgeText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxHeight="150" AutomationProperties.Name="Guide excerpt attached to draft"/><Button x:Name="RemoveKnowledgeButton" Content="Remove guide" Click="RemoveKnowledgeClick" HorizontalAlignment="Left" Margin="0,8,0,0"/></StackPanel>
+      </Border>
+      <ItemsControl x:Name="ChatRows"/>
+      <Label Content="_Message to Obli" Target="{Binding ElementName=ChatInput}"/>
+      <TextBox x:Name="ChatInput" MaxLength="6000" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="76" MaxHeight="180" Margin="0,0,0,10"/>
+      <WrapPanel Margin="0,0,0,12">
+       <Button x:Name="SendChatButton" Content="Send to Obli" Click="SendChatClick" IsEnabled="False" Margin="0,0,8,8"/>
+       <Button x:Name="CheckChatButton" Content="Check for reply" Click="CheckChatClick" Visibility="Collapsed" Margin="0,0,8,8"/>
+       <Button x:Name="StopChatButton" Content="Stop waiting" Click="StopChatClick" Visibility="Collapsed" Margin="0,0,8,8"/>
+       <Button x:Name="NewChatButton" Content="New chat" Click="NewChatClick" Margin="0,0,0,8"/>
+      </WrapPanel>
+     </StackPanel>
+     <TextBlock Text="Quick guides" FontWeight="SemiBold" Margin="0,14,0,10"/>
+     <WrapPanel><Button Content="Printer" Click="PrinterHelp" Margin="0,0,8,8"/><Button Content="Internet" Click="InternetHelp" Margin="0,0,8,8"/><Button Content="Slow computer" Click="SlowHelp" Margin="0,0,0,8"/></WrapPanel>
+     <Border x:Name="GuidePanel" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1,0,0,0" Padding="14,0,0,0" Margin="0,18,0,0" Visibility="Collapsed">
+      <StackPanel><TextBlock x:Name="GuideTitle" FontWeight="SemiBold" Margin="0,0,0,10"/><TextBlock x:Name="GuideText" LineHeight="23"/><TextBlock Text="If this does not help, contact your IT team. Do not share your password." Style="{StaticResource SecondaryText}" Margin="0,18,0,0"/></StackPanel>
+     </Border>
+     <Button Content="What can Obli access?" Click="ShowPrivacy" HorizontalAlignment="Left" Style="{StaticResource NavButton}" Foreground="{DynamicResource AccentBrush}" Margin="0,24,0,0"/>
+    </StackPanel>
+    <StackPanel x:Name="KnowledgePane" Visibility="Collapsed">
+     <Button Content="Back to Obli" Click="BackFromKnowledgeClick" Style="{StaticResource NavButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+     <TextBlock Text="Organisation guides" Style="{StaticResource SectionTitle}"/>
+     <TextBlock Text="Reviewed IT guidance you have access to. Reading a guide does not send it to the AI provider." Style="{StaticResource SecondaryText}" Margin="0,0,0,14"/>
+     <TextBlock x:Name="KnowledgeNotice" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,12"/>
+     <StackPanel x:Name="KnowledgeListPanel">
+      <Label Content="_Search guides" Target="{Binding ElementName=KnowledgeQuery}"/><TextBox x:Name="KnowledgeQuery" MaxLength="100" MinHeight="38" Margin="0,0,0,10"/>
+      <Button x:Name="SearchKnowledgeButton" Content="Search guides" Click="SearchKnowledgeClick" HorizontalAlignment="Left" Margin="0,0,0,14"/>
+      <ItemsControl x:Name="KnowledgeRows"/>
+      <WrapPanel><Button x:Name="PreviousKnowledgeButton" Content="Previous guides" Click="PreviousKnowledgeClick" Visibility="Collapsed" Margin="0,8,8,8"/><Button x:Name="MoreKnowledgeButton" Content="More guides" Click="MoreKnowledgeClick" Visibility="Collapsed" Margin="0,8,0,8"/></WrapPanel>
+     </StackPanel>
+     <StackPanel x:Name="KnowledgeDetailPanel" Visibility="Collapsed">
+      <Button x:Name="BackToGuidesButton" Content="Back to results" Click="BackToGuidesClick" Style="{StaticResource NavButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+      <TextBlock x:Name="KnowledgeTitle" FontSize="19" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
+      <TextBlock x:Name="KnowledgeDate" Style="{StaticResource SecondaryText}" Margin="0,0,0,12"/>
+      <TextBox x:Name="KnowledgeExcerpt" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="100" MaxHeight="260" AutomationProperties.Name="Approved guide excerpt"/>
+      <TextBlock x:Name="KnowledgeShortened" Text="Shortened excerpt. Open the full guide in Oblivion before following a procedure." Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,10,0,0"/>
+      <TextBlock x:Name="KnowledgeSharingNotice" Style="{StaticResource SecondaryText}" Margin="0,14,0,12"/>
+      <WrapPanel><Button x:Name="UseKnowledgeButton" Content="Attach to my question" Click="UseKnowledgeClick" Margin="0,0,8,8"/><Button x:Name="OpenKnowledgeButton" Content="Open in Oblivion" Click="OpenKnowledgeClick" Margin="0,0,0,8"/></WrapPanel>
+     </StackPanel>
+    </StackPanel>
+    <StackPanel x:Name="TicketsPane" Visibility="Collapsed">
+     <TextBlock Text="My tickets" Style="{StaticResource SectionTitle}"/>
+     <TextBlock x:Name="StaffNotice" Text="Sign in to see your support requests." Margin="0,0,0,12" AutomationProperties.LiveSetting="Polite"/>
+     <Button x:Name="CancelSignIn" Content="Cancel sign-in" Click="CancelSignInClick" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+     <StackPanel x:Name="StaffTools" Visibility="Collapsed">
+      <StackPanel x:Name="TicketOverview">
+      <Button x:Name="NewRequestButton" Content="New request" Click="NewRequestClick" HorizontalAlignment="Left" Margin="0,4,0,12"/>
+      <StackPanel x:Name="NewRequestPanel" Visibility="Collapsed">
+      <TextBlock Text="New support request" FontWeight="SemiBold" Margin="0,12,0,12"/>
+      <StackPanel x:Name="TicketEditor">
+       <Label Content="_Site" Target="{Binding ElementName=SiteChoice}"/><ComboBox x:Name="SiteChoice" MinHeight="36" Margin="0,0,0,8"><ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Name}"/></DataTemplate></ComboBox.ItemTemplate></ComboBox>
+       <Label Content="_Category" Target="{Binding ElementName=CategoryChoice}"/><ComboBox x:Name="CategoryChoice" SelectedIndex="0" MinHeight="36" Margin="0,0,0,8"><ComboBoxItem Content="Computer or equipment" Tag="hardware"/><ComboBoxItem Content="Account or sign-in" Tag="account"/><ComboBoxItem Content="Network or internet" Tag="network"/><ComboBoxItem Content="Something else" Tag="other"/></ComboBox>
+       <Label Content="_Summary" Target="{Binding ElementName=TicketTitle}"/><TextBox x:Name="TicketTitle" MaxLength="200" MinHeight="38" Margin="0,0,0,8"/>
+       <Label Content="_What happened?" Target="{Binding ElementName=TicketDescription}"/><TextBox x:Name="TicketDescription" MaxLength="12000" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="110" MaxHeight="220" Margin="0,0,0,12"/>
+       <StackPanel x:Name="ComputerChoice" Visibility="Collapsed" Margin="0,0,0,12">
+        <CheckBox x:Name="IncludeComputer" MinHeight="44" VerticalContentAlignment="Center" Foreground="{DynamicResource ForegroundBrush}"><TextBlock Text="Include this computer"/></CheckBox>
+        <TextBlock Text="Links the request to this enrolled computer so IT can find it. This does not start remote access." Style="{StaticResource SecondaryText}"/>
+       </StackPanel>
+      </StackPanel>
+      <TextBlock x:Name="TicketDraftNotice" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,12"/>
+      <Button x:Name="CancelTicketCheckButton" Content="Cancel computer check" Click="CancelTicketCheckClick" Visibility="Collapsed" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+      <Button x:Name="ReviewTicketButton" Content="Review before sending" Click="ReviewTicketClick" HorizontalAlignment="Left"/>
+      <Border x:Name="ReviewPanel" Visibility="Collapsed" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource MutedBrush}" Padding="14" Margin="0,14,0,0">
+       <StackPanel><TextBlock Text="Share with IT" FontWeight="SemiBold" Margin="0,0,0,10"/><TextBlock x:Name="ReviewSummary" Margin="0,0,0,12"/><TextBlock x:Name="ReviewComputer" Visibility="Collapsed" Margin="0,0,0,16"/><WrapPanel><Button x:Name="SubmitTicketButton" Content="Send to IT" Click="SubmitTicketClick" Margin="0,0,8,8"/><Button x:Name="CheckTicketDeliveryButton" Content="Check delivery" Click="CheckTicketDeliveryClick" Visibility="Collapsed" Margin="0,0,8,8"/><Button x:Name="EditTicketButton" Content="Edit" Click="EditTicketClick"/></WrapPanel></StackPanel>
+      </Border>
+      </StackPanel>
+      <TextBlock Text="Your requests" FontWeight="SemiBold" Margin="0,26,0,10"/>
+      <TextBlock x:Name="TicketListNotice" Style="{StaticResource SecondaryText}" Margin="0,0,0,12"/>
+      <Button x:Name="RefreshTicketsButton" Content="Refresh tickets" Click="RefreshTicketsClick" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+      <ItemsControl x:Name="TicketRows"/>
+      <WrapPanel Margin="0,8,0,0"><Button x:Name="NewerTicketsButton" Content="Newer requests" Click="NewerTicketsClick" Margin="0,0,8,8" Visibility="Collapsed"/><Button x:Name="OlderTicketsButton" Content="Older requests" Click="OlderTicketsClick" Margin="0,0,0,8" Visibility="Collapsed"/></WrapPanel>
+      </StackPanel>
+      <StackPanel x:Name="TicketConversationPanel" Visibility="Collapsed">
+       <Button x:Name="BackToTicketsButton" Content="Back to my tickets" Click="BackToTicketsClick" Style="{StaticResource NavButton}" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+       <TextBlock x:Name="ConversationReference" Style="{StaticResource SecondaryText}" Margin="0,0,0,6"/>
+       <TextBlock x:Name="ConversationTitle" Style="{StaticResource SectionTitle}"/>
+       <TextBlock x:Name="ConversationStatus" Margin="0,0,0,12"/>
+       <TextBlock x:Name="ConversationNotice" Style="{StaticResource SecondaryText}" Margin="0,0,0,12" AutomationProperties.LiveSetting="Polite"/>
+       <WrapPanel><Button x:Name="RefreshConversationButton" Content="Latest updates" Click="RefreshConversationClick" Margin="0,0,8,12"/><Button x:Name="OpenTicketBrowserButton" Content="Open in Oblivion" Click="OpenTicketBrowserClick" Margin="0,0,0,12"/></WrapPanel>
+       <TextBlock Text="Your request" FontWeight="SemiBold" Margin="0,8,0,8"/>
+       <TextBox x:Name="ConversationDescription" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxHeight="150" Margin="0,0,0,6" AutomationProperties.Name="Original support request"/>
+       <TextBlock x:Name="DescriptionShortened" Text="This is a shortened preview. Open in Oblivion to read the full request." Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,0,0,8"/>
+       <TextBlock Text="Conversation with IT" FontWeight="SemiBold" Margin="0,18,0,12"/>
+       <ItemsControl x:Name="ConversationRows"/>
+       <TextBlock x:Name="ConversationEmpty" Text="No replies yet. Your IT team will reply here." Style="{StaticResource SecondaryText}" Margin="0,0,0,12"/>
+       <WrapPanel><Button x:Name="OlderRepliesButton" Content="Earlier replies" Click="OlderRepliesClick" Margin="0,0,8,12" Visibility="Collapsed"/><Button x:Name="NewerRepliesButton" Content="Newer replies" Click="NewerRepliesClick" Margin="0,0,0,12" Visibility="Collapsed"/></WrapPanel>
+       <StackPanel x:Name="ReplyComposer">
+        <Label Content="_Reply to IT" Target="{Binding ElementName=ReplyBody}"/>
+        <TextBox x:Name="ReplyBody" TextChanged="ReplyBodyChanged" MaxLength="5000" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MinHeight="90" MaxHeight="180" Margin="0,0,0,8"/>
+        <TextBlock Text="Your reply is shared with IT. Private Obli chats are not added." Style="{StaticResource SecondaryText}" Margin="0,0,0,12"/>
+        <WrapPanel><Button x:Name="ReviewReplyButton" Content="Review reply" Click="ReviewReplyClick" Margin="0,0,8,8"/><Button x:Name="DiscardReplyButton" Content="Discard draft" Click="DiscardReplyClick" Margin="0,0,0,8"/></WrapPanel>
+       </StackPanel>
+       <TextBlock x:Name="ReplyUnavailable" Text="This ticket is not accepting replies. Open it in Oblivion for the available next steps." Style="{StaticResource SecondaryText}" Visibility="Collapsed" Margin="0,8,0,8"/>
+       <Border x:Name="ReplyReviewPanel" Visibility="Collapsed" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource MutedBrush}" Padding="14" Margin="0,14,0,0">
+        <StackPanel><TextBlock x:Name="ReplyReviewHeading" Text="Review your reply" FontWeight="SemiBold" Margin="0,0,0,10"/>
+         <TextBox x:Name="ReplyReviewText" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" MaxHeight="180" Margin="0,0,0,12" AutomationProperties.Name="Reply to be shared with IT"/>
+         <TextBlock Text="{Binding Text, ElementName=ConversationNotice}" Style="{StaticResource SecondaryText}" Margin="0,0,0,12"/>
+         <WrapPanel><Button x:Name="SendReplyButton" Content="Send reply" Click="SendReplyClick" Margin="0,0,8,8"/><Button x:Name="EditReplyButton" Content="Edit" Click="EditReplyClick" Margin="0,0,8,8"/><Button x:Name="CheckReplyButton" Content="Check delivery" Click="CheckReplyClick" Margin="0,0,0,8" Visibility="Collapsed"/></WrapPanel>
+        </StackPanel>
+       </Border>
+      </StackPanel>
+     </StackPanel>
+    </StackPanel>
+    <StackPanel x:Name="DevicePane" Visibility="Collapsed">
+     <Border x:Name="RestartPanel" Visibility="Collapsed" Padding="14" Margin="0,0,0,22" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource MutedBrush}">
+      <StackPanel>
+       <TextBlock x:Name="RestartTitle" Text="Computer restart" FontWeight="SemiBold" Margin="0,0,0,12"/>
+       <TextBlock x:Name="RestartTime" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+       <TextBlock x:Name="RestartCountdown" Margin="0,0,0,8" AutomationProperties.LiveSetting="Off"/>
+       <TextBlock x:Name="RestartPerson" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"/>
+       <TextBox x:Name="RestartPurpose" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="95" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10" AutomationProperties.Name="Reason for restarting this computer"/>
+       <TextBlock x:Name="RestartNotice" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,12"/>
+       <WrapPanel><Button x:Name="AllowRestartButton" Content="Allow scheduled restart" Click="AllowRestartClick" Margin="0,0,8,8"/><Button x:Name="DeclineRestartButton" Content="Decline" Click="DeclineRestartClick" Margin="0,0,8,8"/><Button x:Name="CancelRestartButton" Content="Cancel restart" Click="CancelRestartClick" Margin="0,0,8,8"/><Button x:Name="CheckRestartButton" Content="Check result" Click="CheckRestartClick" Margin="0,0,0,8"/></WrapPanel>
+      </StackPanel>
+     </Border>
+     <Border x:Name="SoftwarePanel" Visibility="Collapsed" Padding="14" Margin="0,0,0,22" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource MutedBrush}">
+      <StackPanel>
+       <TextBlock x:Name="SoftwareTitle" Text="Software installation" FontWeight="SemiBold" Margin="0,0,0,12"/>
+       <TextBlock x:Name="SoftwareTarget" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,4"/>
+       <TextBlock x:Name="SoftwarePublisher" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"/>
+       <TextBlock x:Name="SoftwarePerson" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"/>
+       <TextBox x:Name="SoftwarePurpose" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="95" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10" AutomationProperties.Name="Reason for installing this software"/>
+       <TextBlock x:Name="SoftwareNotice" AutomationProperties.LiveSetting="Polite" Margin="0,0,0,12"/>
+       <WrapPanel><Button x:Name="AllowSoftwareButton" Content="Allow installation" Click="AllowSoftwareClick" Margin="0,0,8,8"/><Button x:Name="DeclineSoftwareButton" Content="Decline" Click="DeclineSoftwareClick" Margin="0,0,8,8"/><Button x:Name="CheckSoftwareButton" Content="Check result" Click="CheckSoftwareClick" Margin="0,0,0,8"/></WrapPanel>
+      </StackPanel>
+     </Border>
+     <Border x:Name="ServiceActionPanel" Visibility="Collapsed" Padding="14" Margin="0,0,0,22" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Background="{DynamicResource MutedBrush}">
+      <StackPanel>
+       <TextBlock x:Name="ServiceActionTitle" Text="Allow this computer action?" FontWeight="SemiBold" Margin="0,0,0,12"/>
+       <TextBlock x:Name="ServiceActionTarget" FontSize="16" FontWeight="SemiBold" Margin="0,0,0,8"/>
+       <TextBlock x:Name="ServiceActionPerson" Style="{StaticResource SecondaryText}" Margin="0,0,0,10"/>
+       <TextBox x:Name="ServiceActionPurpose" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="95" VerticalScrollBarVisibility="Auto" Margin="0,0,0,10" AutomationProperties.Name="Reason for the computer action"/>
+       <TextBlock x:Name="ServiceActionNotice" AutomationProperties.LiveSetting="Assertive" Margin="0,0,0,12"/>
+       <WrapPanel><Button x:Name="AllowServiceActionButton" Content="Allow action" Click="AllowServiceActionClick" Margin="0,0,8,8"/><Button x:Name="DeclineServiceActionButton" Content="Decline" Click="DeclineServiceActionClick" Margin="0,0,8,8"/><Button x:Name="CheckServiceActionButton" Content="Check result" Click="CheckServiceActionClick" Margin="0,0,0,8"/></WrapPanel>
+      </StackPanel>
+     </Border>
+     <Grid Margin="0,0,0,24"><Grid.ColumnDefinitions><ColumnDefinition Width="50"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Border Background="{DynamicResource MutedBrush}" Width="40" Height="40" CornerRadius="4" VerticalAlignment="Top"><Path Data="M3 4h18v12H3V4 M12 16v4 M7 20h10" Stroke="{DynamicResource ForegroundBrush}" StrokeThickness="1.6" Width="25" Height="25" Stretch="Uniform"/></Border>
+      <StackPanel Grid.Column="1"><TextBlock x:Name="ComputerName" FontSize="21" FontWeight="SemiBold"/><TextBlock Text="This Windows computer" Style="{StaticResource SecondaryText}" Margin="0,3,0,0"/></StackPanel>
+     </Grid>
+     <TextBlock x:Name="ConnectionText" Text="Checking computer support…" Margin="0,0,0,18" AutomationProperties.LiveSetting="Polite"/>
+     <Grid Margin="0,0,0,20"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+      <TextBlock Text="Agent version" Style="{StaticResource SecondaryText}" Margin="0,0,16,10"/><TextBlock x:Name="AgentVersionText" Grid.Column="1" Text="Unavailable" TextAlignment="Right"/>
+      <TextBlock Text="Oblivion server" Style="{StaticResource SecondaryText}" Grid.Row="1" Margin="0,0,16,10"/><TextBlock x:Name="ServerText" Grid.Column="1" Grid.Row="1" Text="Unavailable" TextAlignment="Right"/>
+      <TextBlock Text="Last check-in" Style="{StaticResource SecondaryText}" Grid.Row="2" Margin="0,0,16,0"/><TextBlock x:Name="LastContactText" Grid.Column="1" Grid.Row="2" Text="No confirmed check-in" TextAlignment="Right"/>
+     </Grid>
+     <Button Content="Refresh connection" Click="RefreshClick" HorizontalAlignment="Left" Margin="0,0,0,24"/>
+     <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,20,0,0">
+      <StackPanel><TextBlock Text="Remote support" FontWeight="SemiBold" Margin="0,0,0,8"/><TextBlock Text="Oblivion remote support is not available yet." Style="{StaticResource SecondaryText}"/><TextBlock Text="When enabled, connection requests and an active-session stop control will appear here." Style="{StaticResource SecondaryText}" Margin="0,8,0,0"/></StackPanel>
+     </Border>
+     <Button Content="What can Obli access?" Click="ShowPrivacy" HorizontalAlignment="Left" Style="{StaticResource NavButton}" Foreground="{DynamicResource AccentBrush}" Margin="0,22,0,0"/>
+    </StackPanel>
+   </Grid>
+  </ScrollViewer>
+  <Border Grid.Row="3" Padding="22,9" Background="{DynamicResource MutedBrush}"><TextBlock Text="Development build · computer support is still being connected" FontSize="10" Foreground="{DynamicResource MutedForegroundBrush}"/></Border>
+  <Border Grid.Row="4" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+   <UniformGrid Columns="3"><Button x:Name="HelpNav" Content="Ask Obli" Style="{StaticResource NavButton}" Click="HelpClick"/><Button x:Name="TicketsNav" Content="My tickets" Style="{StaticResource NavButton}" Click="TicketsClick"/><Button x:Name="DeviceNav" Content="This computer" Style="{StaticResource NavButton}" Click="DeviceClick"/></UniformGrid>
+  </Border>
+ </Grid>
+</Window>

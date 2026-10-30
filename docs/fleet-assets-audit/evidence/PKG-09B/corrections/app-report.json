@@ -1,0 +1,415 @@
+{
+    "definition": {
+        "name": "Fleet planning \u2014 synthetic QA",
+        "sort": "group",
+        "limit": 20,
+        "match": "all",
+        "groups": [
+            "resource",
+            "date"
+        ],
+        "layout": "pivot",
+        "source": "journeys",
+        "columns": [
+            "reference",
+            "date",
+            "resource",
+            "site",
+            "status",
+            "distance",
+            "duration"
+        ],
+        "date_to": "2026-09-28",
+        "filters": [],
+        "version": 1,
+        "measures": [
+            {
+                "id": "m2",
+                "unit": "km",
+                "field": "distance",
+                "label": "Total recorded distance",
+                "formula": null,
+                "decimals": 2,
+                "operation": "sum"
+            },
+            {
+                "id": "m1",
+                "unit": "count",
+                "field": null,
+                "label": "Source rows",
+                "formula": null,
+                "decimals": 0,
+                "operation": "count"
+            }
+        ],
+        "site_ids": [],
+        "date_from": "2026-09-22",
+        "direction": "asc",
+        "precision": "redacted",
+        "comparison": false,
+        "subject_id": null,
+        "date_bucket": "week",
+        "resource_ids": []
+    },
+    "provenance": {
+        "watermark": {
+            "captured_at": "2026-09-27T22:35:30.134965Z",
+            "snapshot_id": "be497176b391240455a10b7fb9d8c8293261753db467be06f813305bc3adf7be"
+        },
+        "retention_expires_at": null,
+        "window": {
+            "from": "2026-09-21T12:00:00.000000Z",
+            "to": "2026-09-27T22:35:30.134956Z",
+            "timezone": "Pacific\/Auckland"
+        },
+        "coverage": "Complete rows that passed source identity and current authority checks. Unverifiable records are excluded; observation continuity is not guaranteed."
+    },
+    "result": {
+        "pivot_totals": {
+            "rows": [
+                {
+                    "dimensions": [
+                        "Harbour van (Synthetic)"
+                    ],
+                    "values": {
+                        "m2": 90,
+                        "m1": 5
+                    },
+                    "row_count": 5
+                },
+                {
+                    "dimensions": [
+                        "Community car (Synthetic)"
+                    ],
+                    "values": {
+                        "m2": 125,
+                        "m1": 5
+                    },
+                    "row_count": 5
+                },
+                {
+                    "dimensions": [
+                        "Accessible shuttle (Synthetic)"
+                    ],
+                    "values": {
+                        "m2": 160,
+                        "m1": 5
+                    },
+                    "row_count": 5
+                },
+                {
+                    "dimensions": [
+                        "Service vehicle (Synthetic)"
+                    ],
+                    "values": {
+                        "m2": 195,
+                        "m1": 5
+                    },
+                    "row_count": 5
+                }
+            ],
+            "columns": [
+                {
+                    "dimensions": [
+                        "2026-09-21"
+                    ],
+                    "values": {
+                        "m2": 570,
+                        "m1": 20
+                    },
+                    "row_count": 20
+                }
+            ]
+        },
+        "row_count": 20,
+        "group_count": 4,
+        "missing": {
+            "reference": 0,
+            "date": 0,
+            "resource": 0,
+            "site": 0,
+            "status": 0,
+            "distance": 0,
+            "duration": 0
+        },
+        "totals": {
+            "m2": 570,
+            "m1": 20
+        },
+        "groups": [
+            {
+                "dimensions": [
+                    "Accessible shuttle (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 160,
+                    "m1": 5
+                },
+                "row_count": 5
+            },
+            {
+                "dimensions": [
+                    "Community car (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 125,
+                    "m1": 5
+                },
+                "row_count": 5
+            },
+            {
+                "dimensions": [
+                    "Harbour van (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 90,
+                    "m1": 5
+                },
+                "row_count": 5
+            },
+            {
+                "dimensions": [
+                    "Service vehicle (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 195,
+                    "m1": 5
+                },
+                "row_count": 5
+            }
+        ],
+        "chart": [
+            {
+                "dimensions": [
+                    "Accessible shuttle (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 160,
+                    "m1": 5
+                },
+                "row_count": 5
+            },
+            {
+                "dimensions": [
+                    "Community car (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 125,
+                    "m1": 5
+                },
+                "row_count": 5
+            },
+            {
+                "dimensions": [
+                    "Harbour van (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 90,
+                    "m1": 5
+                },
+                "row_count": 5
+            },
+            {
+                "dimensions": [
+                    "Service vehicle (Synthetic)",
+                    "2026-09-21"
+                ],
+                "values": {
+                    "m2": 195,
+                    "m1": 5
+                },
+                "row_count": 5
+            }
+        ],
+        "rows": [
+            {
+                "reference": "1",
+                "date": "2026-09-26",
+                "resource": "Harbour van (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 12,
+                "duration": 1
+            },
+            {
+                "reference": "2",
+                "date": "2026-09-25",
+                "resource": "Harbour van (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 15,
+                "duration": 1
+            },
+            {
+                "reference": "3",
+                "date": "2026-09-24",
+                "resource": "Harbour van (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 18,
+                "duration": 1
+            },
+            {
+                "reference": "4",
+                "date": "2026-09-23",
+                "resource": "Harbour van (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 21,
+                "duration": 1
+            },
+            {
+                "reference": "5",
+                "date": "2026-09-22",
+                "resource": "Harbour van (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 24,
+                "duration": 1
+            },
+            {
+                "reference": "7",
+                "date": "2026-09-26",
+                "resource": "Community car (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 19,
+                "duration": 1
+            },
+            {
+                "reference": "8",
+                "date": "2026-09-25",
+                "resource": "Community car (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 22,
+                "duration": 1
+            },
+            {
+                "reference": "9",
+                "date": "2026-09-24",
+                "resource": "Community car (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 25,
+                "duration": 1
+            },
+            {
+                "reference": "10",
+                "date": "2026-09-23",
+                "resource": "Community car (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 28,
+                "duration": 1
+            },
+            {
+                "reference": "11",
+                "date": "2026-09-22",
+                "resource": "Community car (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 31,
+                "duration": 1
+            },
+            {
+                "reference": "13",
+                "date": "2026-09-26",
+                "resource": "Accessible shuttle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 26,
+                "duration": 1
+            },
+            {
+                "reference": "14",
+                "date": "2026-09-25",
+                "resource": "Accessible shuttle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 29,
+                "duration": 1
+            },
+            {
+                "reference": "15",
+                "date": "2026-09-24",
+                "resource": "Accessible shuttle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 32,
+                "duration": 1
+            },
+            {
+                "reference": "16",
+                "date": "2026-09-23",
+                "resource": "Accessible shuttle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 35,
+                "duration": 1
+            },
+            {
+                "reference": "17",
+                "date": "2026-09-22",
+                "resource": "Accessible shuttle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 38,
+                "duration": 1
+            },
+            {
+                "reference": "19",
+                "date": "2026-09-26",
+                "resource": "Service vehicle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 33,
+                "duration": 1
+            },
+            {
+                "reference": "20",
+                "date": "2026-09-25",
+                "resource": "Service vehicle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 36,
+                "duration": 1
+            },
+            {
+                "reference": "21",
+                "date": "2026-09-24",
+                "resource": "Service vehicle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 39,
+                "duration": 1
+            },
+            {
+                "reference": "22",
+                "date": "2026-09-23",
+                "resource": "Service vehicle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 42,
+                "duration": 1
+            },
+            {
+                "reference": "23",
+                "date": "2026-09-22",
+                "resource": "Service vehicle (Synthetic)",
+                "site": "Harbour House (Synthetic)",
+                "status": "closed",
+                "distance": 45,
+                "duration": 1
+            }
+        ]
+    },
+    "comparison": null
+}

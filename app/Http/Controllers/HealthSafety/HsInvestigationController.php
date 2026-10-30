@@ -8,9 +8,11 @@ use App\Models\HsEvent;
 use App\Models\HsInvestigation;
 use App\Models\HsRecommendationDisposition;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventAccessService;
 use App\Services\HealthSafety\HsInvestigationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -30,6 +32,11 @@ class HsInvestigationController extends Controller
 
     /** Start an investigation: create (methodology, lead, team) then move to in_progress. */
     public function store(Request $request, HsEvent $event)
+    {
+        return DB::transaction(fn () => $this->storeWithinSourceAuthority($request, $event));
+    }
+
+    private function storeWithinSourceAuthority(Request $request, HsEvent $event)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
 
@@ -71,6 +78,11 @@ class HsInvestigationController extends Controller
     /** Record findings: causes, contributing factors, recommendations (→ findings_recorded). */
     public function recordFindings(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        return DB::transaction(fn () => $this->recordFindingsWithinSourceAuthority($request, $event, $investigation));
+    }
+
+    private function recordFindingsWithinSourceAuthority(Request $request, HsEvent $event, HsInvestigation $investigation)
+    {
         $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
 
@@ -95,6 +107,11 @@ class HsInvestigationController extends Controller
     /** Submit for review (findings_recorded → under_review). */
     public function submit(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
+        return DB::transaction(fn () => $this->submitWithinSourceAuthority($request, $event, $investigation));
+    }
+
+    private function submitWithinSourceAuthority(Request $request, HsEvent $event, HsInvestigation $investigation)
+    {
         $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
 
@@ -109,6 +126,11 @@ class HsInvestigationController extends Controller
 
     /** Return for rework (under_review → in_progress) with reviewer notes. */
     public function returnForRework(Request $request, HsEvent $event, HsInvestigation $investigation)
+    {
+        return DB::transaction(fn () => $this->returnForReworkWithinSourceAuthority($request, $event, $investigation));
+    }
+
+    private function returnForReworkWithinSourceAuthority(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
@@ -126,6 +148,11 @@ class HsInvestigationController extends Controller
 
     /** Record review, then approve and complete, as two authenticated actors. */
     public function complete(Request $request, HsEvent $event, HsInvestigation $investigation)
+    {
+        return DB::transaction(fn () => $this->completeWithinSourceAuthority($request, $event, $investigation));
+    }
+
+    private function completeWithinSourceAuthority(Request $request, HsEvent $event, HsInvestigation $investigation)
     {
         $event = $this->resolveAccessibleEvent($request, $event);
         $this->ensureBelongs($event, $investigation);
@@ -151,6 +178,15 @@ class HsInvestigationController extends Controller
 
     /** Record or revise the explicit outcome of one completed recommendation. */
     public function disposition(
+        Request $request,
+        HsEvent $event,
+        HsInvestigation $investigation,
+        int $recommendationIndex,
+    ) {
+        return DB::transaction(fn () => $this->dispositionWithinSourceAuthority($request, $event, $investigation, $recommendationIndex));
+    }
+
+    private function dispositionWithinSourceAuthority(
         Request $request,
         HsEvent $event,
         HsInvestigation $investigation,
@@ -237,16 +273,11 @@ class HsInvestigationController extends Controller
         abort_unless($investigation->hs_event_id === $event->id, 404);
     }
 
+    /** Read through the event page's H&S source read (incident-linked events need incident read); it stays locked until commit. */
     private function resolveAccessibleEvent(Request $request, HsEvent $event): HsEvent
     {
-        $query = HsEvent::query();
-        $this->siteAccess->applyHsEventScope(
-            $query,
-            $request->user(),
-            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS,
-        );
-
-        return $query->findOrFail($event->id);
+        return app(HsEventAccessService::class)->readableEventForCommand($request->user(), (int) $event->id,
+            UserSiteAccessService::HEALTH_SAFETY_SITE_BYPASS_PERMISSIONS);
     }
 
     /** @param list<int> $staffIds */

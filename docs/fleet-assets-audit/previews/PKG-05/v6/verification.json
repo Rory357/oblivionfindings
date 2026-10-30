@@ -1,0 +1,1181 @@
+{
+  "candidate": "PKG-05 v6",
+  "checkedAt": "2026-09-26T23:51:21.801Z",
+  "url": "http://127.0.0.1:4400/#/fleet-assets/transports/overview",
+  "baseline": "4ea64c547ed85a5b7504e59599db351f6eba7deb",
+  "runtimeSha256": "21c6f2a28a60bfdffd933917db20a0705d89b48ce9c263ef2dda45aee2c606bb",
+  "servedSha256": "21c6f2a28a60bfdffd933917db20a0705d89b48ce9c263ef2dda45aee2c606bb",
+  "versionHeader": "v6",
+  "browserAssertions": 168,
+  "domainAssertions": 93,
+  "serverAssertions": 3,
+  "typeErrors": 0,
+  "suites": [
+    {
+      "script": "verify-builder.js",
+      "log": "verify-builder.log",
+      "results": [
+        {
+          "name": "Initial ready request is selected",
+          "pass": true
+        },
+        {
+          "name": "Hero has four meaningful meters",
+          "pass": true
+        },
+        {
+          "name": "Step change restores focus",
+          "pass": true
+        },
+        {
+          "name": "Missing resources explain blocked next step",
+          "pass": true
+        },
+        {
+          "name": "Vehicle cards are searchable",
+          "pass": true
+        },
+        {
+          "name": "Live summary updates",
+          "pass": true
+        },
+        {
+          "name": "Changing request protects unsaved draft",
+          "pass": true
+        },
+        {
+          "name": "Keep editing preserves selected resources",
+          "pass": true
+        },
+        {
+          "name": "Kept draft permits calendar inspection",
+          "pass": true
+        },
+        {
+          "name": "Draft recovers exact vehicle and driver",
+          "pass": true
+        },
+        {
+          "name": "Save blocked until availability checked",
+          "pass": true
+        },
+        {
+          "name": "Exact plan check unlocks save",
+          "pass": true
+        },
+        {
+          "name": "Plan saves as a proposed linked booking",
+          "pass": true
+        },
+        {
+          "name": "Saved plan appears in the same Fleet calendar identity",
+          "pass": true
+        },
+        {
+          "name": "Overdue return blocks vehicle and crew reuse",
+          "pass": true
+        },
+        {
+          "name": "Rescheduling preserves one booking identity",
+          "pass": true
+        },
+        {
+          "name": "No browser runtime errors",
+          "pass": true
+        }
+      ],
+      "errors": [],
+      "booking": "BK-1101"
+    },
+    {
+      "script": "verify-builder-edges.js",
+      "log": "verify-builder-edges.log",
+      "results": [
+        {
+          "name": "Expired result invalidates save",
+          "pass": true
+        },
+        {
+          "name": "Expired result explains recovery",
+          "pass": true
+        },
+        {
+          "name": "Refresh alone cannot attest the plan",
+          "pass": true
+        },
+        {
+          "name": "Missing configuration cannot be bypassed by refresh",
+          "pass": true
+        },
+        {
+          "name": "Stale source retains resources without enabling save",
+          "pass": true
+        },
+        {
+          "name": "Load error conceals data without false zero",
+          "pass": true
+        },
+        {
+          "name": "Draft survives temporary source failure",
+          "pass": true
+        },
+        {
+          "name": "Recovered draft requires fresh availability",
+          "pass": true
+        },
+        {
+          "name": "Shared time picker updates the live plan",
+          "pass": true
+        },
+        {
+          "name": "Changed time invalidates previous availability",
+          "pass": true
+        },
+        {
+          "name": "Kept draft can open the full source record",
+          "pass": true
+        },
+        {
+          "name": "Back restores the changed time",
+          "pass": true
+        },
+        {
+          "name": "Reset recovers the original request window",
+          "pass": true
+        },
+        {
+          "name": "Assessment prerequisite is clear",
+          "pass": true
+        },
+        {
+          "name": "Wheelchair request limits suitable vehicle choices",
+          "pass": true
+        },
+        {
+          "name": "Escort and required equipment remain visible",
+          "pass": true
+        },
+        {
+          "name": "Unsuitable choices state the reason and are disabled",
+          "pass": true
+        },
+        {
+          "name": "No horizontal page overflow 1024",
+          "pass": true
+        },
+        {
+          "name": "Planner action remains in viewport 1024",
+          "pass": true
+        },
+        {
+          "name": "No horizontal page overflow 1280",
+          "pass": true
+        },
+        {
+          "name": "Planner action remains in viewport 1280",
+          "pass": true
+        },
+        {
+          "name": "No horizontal page overflow 1440",
+          "pass": true
+        },
+        {
+          "name": "Planner action remains in viewport 1440",
+          "pass": true
+        },
+        {
+          "name": "No horizontal page overflow 1920",
+          "pass": true
+        },
+        {
+          "name": "Planner action remains in viewport 1920",
+          "pass": true
+        },
+        {
+          "name": "Requester has no out-of-site request or vehicle",
+          "pass": true
+        },
+        {
+          "name": "Requester cannot continue allocation",
+          "pass": true
+        },
+        {
+          "name": "Denied state leaks no passenger details",
+          "pass": true
+        },
+        {
+          "name": "Saving from Ready filter keeps confirmation",
+          "pass": true
+        },
+        {
+          "name": "No browser runtime errors",
+          "pass": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "script": "verify-search.js",
+      "log": "verify-search.log",
+      "results": [
+        {
+          "name": "Q search RC-310",
+          "pass": true
+        },
+        {
+          "name": "Q search OFV-014",
+          "pass": true
+        },
+        {
+          "name": "Q search KEY-014",
+          "pass": true
+        },
+        {
+          "name": "Q search Ben Carter",
+          "pass": true
+        },
+        {
+          "name": "Q search office",
+          "pass": true
+        },
+        {
+          "name": "Q search not-found",
+          "pass": true
+        },
+        {
+          "name": "Q filtered export scope",
+          "pass": true
+        },
+        {
+          "name": "Q real PDF download",
+          "pass": true
+        },
+        {
+          "name": "Q quick view keeps queue route",
+          "pass": true
+        },
+        {
+          "name": "Q historical receipt shows newer global holder",
+          "pass": true
+        },
+        {
+          "name": "Q history filter matches event",
+          "pass": true
+        },
+        {
+          "name": "Q full record retains return context",
+          "pass": true
+        },
+        {
+          "name": "Q banner history search opens filtered history",
+          "pass": true
+        },
+        {
+          "name": "Q journey explicitly links two vehicle legs",
+          "pass": true
+        },
+        {
+          "name": "Q vehicle source is searchable",
+          "pass": true
+        },
+        {
+          "name": "Q passenger access does not grant vehicle source",
+          "pass": true
+        },
+        {
+          "name": "Q calendar shares five Fleet booking entries",
+          "pass": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "script": "verify-final.js",
+      "log": "verify-final.log",
+      "results": [
+        {
+          "name": "Planner search has a clear empty state",
+          "pass": true
+        },
+        {
+          "name": "Planner search finds the request",
+          "pass": true
+        },
+        {
+          "name": "Shared calendar changes the full booking date",
+          "pass": true
+        },
+        {
+          "name": "Date change updates list scope without losing saved confirmation",
+          "pass": true
+        },
+        {
+          "name": "Rescheduled date shares same calendar",
+          "pass": true
+        },
+        {
+          "name": "Discard removes the unsaved resource selection",
+          "pass": true
+        },
+        {
+          "name": "Wide desktop uses parallel vehicle cards",
+          "pass": true
+        },
+        {
+          "name": "Request action opens the new visual builder",
+          "pass": true
+        },
+        {
+          "name": "No final browser runtime errors",
+          "pass": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "script": "verify-navigation.js",
+      "log": "verify-navigation.log",
+      "results": [
+        {
+          "name": "Heading directly below hero: overview",
+          "pass": true
+        },
+        {
+          "name": "Shared heading typography: overview",
+          "pass": true
+        },
+        {
+          "name": "Home-rooted breadcrumb: overview",
+          "pass": true
+        },
+        {
+          "name": "Heading directly below hero: requests",
+          "pass": true
+        },
+        {
+          "name": "Shared heading typography: requests",
+          "pass": true
+        },
+        {
+          "name": "Home-rooted breadcrumb: requests",
+          "pass": true
+        },
+        {
+          "name": "Heading directly below hero: planner",
+          "pass": true
+        },
+        {
+          "name": "Shared heading typography: planner",
+          "pass": true
+        },
+        {
+          "name": "Home-rooted breadcrumb: planner",
+          "pass": true
+        },
+        {
+          "name": "Heading directly below hero: journeys",
+          "pass": true
+        },
+        {
+          "name": "Shared heading typography: journeys",
+          "pass": true
+        },
+        {
+          "name": "Home-rooted breadcrumb: journeys",
+          "pass": true
+        },
+        {
+          "name": "Heading directly below hero: returns",
+          "pass": true
+        },
+        {
+          "name": "Shared heading typography: returns",
+          "pass": true
+        },
+        {
+          "name": "Home-rooted breadcrumb: returns",
+          "pass": true
+        },
+        {
+          "name": "Heading directly below hero: calendar",
+          "pass": true
+        },
+        {
+          "name": "Shared heading typography: calendar",
+          "pass": true
+        },
+        {
+          "name": "Home-rooted breadcrumb: calendar",
+          "pass": true
+        },
+        {
+          "name": "Repeated result toolbar removed",
+          "pass": true
+        },
+        {
+          "name": "Return explanation follows the heading and starts collapsed",
+          "pass": true
+        },
+        {
+          "name": "Return help remains available",
+          "pass": true
+        },
+        {
+          "name": "Shared secondary tab changes the return queue",
+          "pass": true
+        },
+        {
+          "name": "Dedicated calendar tab has a direct route",
+          "pass": true
+        },
+        {
+          "name": "Calendar keeps the six main tabs and five secondary views",
+          "pass": true
+        },
+        {
+          "name": "Calendar first meter anchors full date",
+          "pass": true
+        },
+        {
+          "name": "Shared Month view retains the same booking",
+          "pass": true
+        },
+        {
+          "name": "Shared Week view retains the same booking",
+          "pass": true
+        },
+        {
+          "name": "Shared Day view retains the same booking",
+          "pass": true
+        },
+        {
+          "name": "Shared Agenda view retains the same booking",
+          "pass": true
+        },
+        {
+          "name": "Shared Timeline view retains the same booking",
+          "pass": true
+        },
+        {
+          "name": "Next updates the date anchor",
+          "pass": true
+        },
+        {
+          "name": "Today restores the example date",
+          "pass": true
+        },
+        {
+          "name": "Shared jump-to-date control opens a calendar",
+          "pass": true
+        },
+        {
+          "name": "Shared source pills include source restrictions",
+          "pass": true
+        },
+        {
+          "name": "Source toggle removes bookings across views",
+          "pass": true
+        },
+        {
+          "name": "Calendar search filters the source feed",
+          "pass": true
+        },
+        {
+          "name": "Entry context uses shared menu and preserves actions",
+          "pass": true
+        },
+        {
+          "name": "Entry keyboard context opens the same actions",
+          "pass": true
+        },
+        {
+          "name": "Blank-time action seeds the transport request",
+          "pass": true
+        },
+        {
+          "name": "Cancelling calendar creation keeps calendar context",
+          "pass": true
+        },
+        {
+          "name": "Calendar has no page overflow 1024",
+          "pass": true
+        },
+        {
+          "name": "Calendar has no page overflow 1280",
+          "pass": true
+        },
+        {
+          "name": "Calendar has no page overflow 1920",
+          "pass": true
+        },
+        {
+          "name": "Read-only calendar offers no blank-time creation",
+          "pass": true
+        },
+        {
+          "name": "Denied calendar hides entries and counts",
+          "pass": true
+        },
+        {
+          "name": "No runtime errors after navigation correction",
+          "pass": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "script": "verify-overview.js",
+      "log": "verify-overview.log",
+      "results": [
+        {
+          "name": "Two real charts render",
+          "pass": true
+        },
+        {
+          "name": "Nine scoped requests are partitioned by stage",
+          "pass": true
+        },
+        {
+          "name": "Overdue return is the first action",
+          "pass": true
+        },
+        {
+          "name": "Graph stage opens matching journey queue",
+          "pass": true
+        },
+        {
+          "name": "Time data opens matching transport records",
+          "pass": true
+        },
+        {
+          "name": "Urgent action opens record quick view",
+          "pass": true
+        },
+        {
+          "name": "Attention tab shows all seven actions",
+          "pass": true
+        },
+        {
+          "name": "Departure board labels confirmed and proposed plans",
+          "pass": true
+        },
+        {
+          "name": "Search updates graphs and matching count",
+          "pass": true
+        },
+        {
+          "name": "Overview export uses the searched scope",
+          "pass": true
+        },
+        {
+          "name": "Overview summary downloads as an actual PDF",
+          "pass": true
+        },
+        {
+          "name": "Drilldown preserves the graph search",
+          "pass": true
+        },
+        {
+          "name": "Empty search shows no misleading charts",
+          "pass": true
+        },
+        {
+          "name": "Site filter narrows graphs to the permitted site",
+          "pass": true
+        },
+        {
+          "name": "Empty date is an honest empty result",
+          "pass": true
+        },
+        {
+          "name": "Role change clears inaccessible site scope",
+          "pass": true
+        },
+        {
+          "name": "Stale overview is labelled and cannot export",
+          "pass": true
+        },
+        {
+          "name": "Failed source hides graphs and has unavailable meters",
+          "pass": true
+        },
+        {
+          "name": "Denied source hides graph labels, people and counts",
+          "pass": true
+        },
+        {
+          "name": "Two consistent navigation tiers: overview",
+          "pass": true
+        },
+        {
+          "name": "Second row is bare and wrapping: overview",
+          "pass": true
+        },
+        {
+          "name": "Shared icon chip and active underline: overview",
+          "pass": true
+        },
+        {
+          "name": "Keyboard selection and focus agree: overview",
+          "pass": true
+        },
+        {
+          "name": "Two consistent navigation tiers: requests",
+          "pass": true
+        },
+        {
+          "name": "Second row is bare and wrapping: requests",
+          "pass": true
+        },
+        {
+          "name": "Shared icon chip and active underline: requests",
+          "pass": true
+        },
+        {
+          "name": "Keyboard selection and focus agree: requests",
+          "pass": true
+        },
+        {
+          "name": "Two consistent navigation tiers: planner",
+          "pass": true
+        },
+        {
+          "name": "Second row is bare and wrapping: planner",
+          "pass": true
+        },
+        {
+          "name": "Shared icon chip and active underline: planner",
+          "pass": true
+        },
+        {
+          "name": "Keyboard selection and focus agree: planner",
+          "pass": true
+        },
+        {
+          "name": "Two consistent navigation tiers: calendar",
+          "pass": true
+        },
+        {
+          "name": "Second row is bare and wrapping: calendar",
+          "pass": true
+        },
+        {
+          "name": "Shared icon chip and active underline: calendar",
+          "pass": true
+        },
+        {
+          "name": "Keyboard selection and focus agree: calendar",
+          "pass": true
+        },
+        {
+          "name": "Two consistent navigation tiers: journeys",
+          "pass": true
+        },
+        {
+          "name": "Second row is bare and wrapping: journeys",
+          "pass": true
+        },
+        {
+          "name": "Shared icon chip and active underline: journeys",
+          "pass": true
+        },
+        {
+          "name": "Keyboard selection and focus agree: journeys",
+          "pass": true
+        },
+        {
+          "name": "Two consistent navigation tiers: returns",
+          "pass": true
+        },
+        {
+          "name": "Second row is bare and wrapping: returns",
+          "pass": true
+        },
+        {
+          "name": "Shared icon chip and active underline: returns",
+          "pass": true
+        },
+        {
+          "name": "Keyboard selection and focus agree: returns",
+          "pass": true
+        },
+        {
+          "name": "Overview graphs fit desktop 1024",
+          "pass": true
+        },
+        {
+          "name": "Overview graphs fit desktop 1280",
+          "pass": true
+        },
+        {
+          "name": "Overview graphs fit desktop 1440",
+          "pass": true
+        },
+        {
+          "name": "Overview graphs fit desktop 1920",
+          "pass": true
+        },
+        {
+          "name": "No browser errors",
+          "pass": true
+        },
+        {
+          "name": "Charts have no sizing warnings",
+          "pass": true
+        }
+      ],
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "domain": {
+    "scope": "Synthetic preview transition invariants only; no backend, real permission, persistence, delivery or integration validation.",
+    "results": [
+      {
+        "name": "M01 Unassessed allocation rejected atomically",
+        "pass": true
+      },
+      {
+        "name": "M02 Unallocated checkout cannot fabricate booking or journey",
+        "pass": true
+      },
+      {
+        "name": "M03 Failed checkout leaves no fabricated records",
+        "pass": true
+      },
+      {
+        "name": "M04 Out-of-site object denied",
+        "pass": true
+      },
+      {
+        "name": "M05 Denied linked command denied",
+        "pass": true
+      },
+      {
+        "name": "M06 Stale source blocks all mutations",
+        "pass": true
+      },
+      {
+        "name": "M07 Concurrent version change rejected",
+        "pass": true
+      },
+      {
+        "name": "M08 Unknown readiness fails closed",
+        "pass": true
+      },
+      {
+        "name": "M09 Expired availability fails closed",
+        "pass": true
+      },
+      {
+        "name": "M10 Resource conflict fails without partial reservation",
+        "pass": true
+      },
+      {
+        "name": "M11 Unknown/conflict results create no booking",
+        "pass": true
+      },
+      {
+        "name": "M12 Independent self-approval denied",
+        "pass": true
+      },
+      {
+        "name": "M13 Not-required source authority is distinct from independent approval",
+        "pass": true
+      },
+      {
+        "name": "M14 Impossible dates rejected",
+        "pass": true
+      },
+      {
+        "name": "M15 Return before actual departure rejected",
+        "pass": true
+      },
+      {
+        "name": "M16 Odometer below checkout rejected",
+        "pass": true
+      },
+      {
+        "name": "M17 Unconfigured frontline return authority rejected",
+        "pass": true
+      },
+      {
+        "name": "M18 Same operation replays one immutable receipt",
+        "pass": true
+      },
+      {
+        "name": "M19 Changed retry fingerprint rejected",
+        "pass": true
+      },
+      {
+        "name": "M20 Original receipt remains original",
+        "pass": true
+      },
+      {
+        "name": "M21 Missing passenger confirmation blocks completion",
+        "pass": true
+      },
+      {
+        "name": "M22 Outstanding medication prevents completion",
+        "pass": true
+      },
+      {
+        "name": "M23 Driver cannot resolve medication source",
+        "pass": true
+      },
+      {
+        "name": "M24 Passenger completion retains independent restriction",
+        "pass": true
+      },
+      {
+        "name": "M25 Exception does not mutate dispute",
+        "pass": true
+      },
+      {
+        "name": "M26 Already-disputed handover cannot be acknowledged again",
+        "pass": true
+      },
+      {
+        "name": "M27 No handover can be acknowledged if none exists",
+        "pass": true
+      },
+      {
+        "name": "M28 Cancellation does not erase started trip",
+        "pass": true
+      },
+      {
+        "name": "M29 Later receipt preserves original partial return and dispute",
+        "pass": true
+      },
+      {
+        "name": "M30 Reconciled historical dispute is no longer outstanding work",
+        "pass": true
+      },
+      {
+        "name": "M31 String equipment value cannot stand in for physical confirmation",
+        "pass": true
+      },
+      {
+        "name": "M32 Vehicle from another site cannot be allocated",
+        "pass": true
+      },
+      {
+        "name": "M33 Escort role alone cannot resolve another assigned worker’s handoff",
+        "pass": true
+      },
+      {
+        "name": "M34 Escort role alone cannot attest another assigned worker’s passenger return",
+        "pass": true
+      }
+    ]
+  },
+  "custody": {
+    "scope": "Synthetic custody model only",
+    "results": [
+      {
+        "name": "K01 Historical return keeps newer vehicle key holder",
+        "pass": true
+      },
+      {
+        "name": "K02 Older journey cannot overwrite newer key event",
+        "pass": true
+      },
+      {
+        "name": "K03 Wrong role cannot plan custody",
+        "pass": true
+      },
+      {
+        "name": "K04 Stale plan cannot save",
+        "pass": true
+      },
+      {
+        "name": "K05 Unapproved site point rejected",
+        "pass": true
+      },
+      {
+        "name": "K06 Reception is not secure return storage",
+        "pass": true
+      },
+      {
+        "name": "K07 Delivery requires named worker",
+        "pass": true
+      },
+      {
+        "name": "K08 Delivery requires arrangement",
+        "pass": true
+      },
+      {
+        "name": "K09 Plan does not move keys",
+        "pass": true
+      },
+      {
+        "name": "K10 Identical plan retry replays",
+        "pass": true
+      },
+      {
+        "name": "K11 Changed plan retry rejected",
+        "pass": true
+      },
+      {
+        "name": "K12 Actual giver must be current holder",
+        "pass": true
+      },
+      {
+        "name": "K13 Checkout records actual driver custody",
+        "pass": true
+      },
+      {
+        "name": "K14 Collected key plan cannot be rewritten",
+        "pass": true
+      },
+      {
+        "name": "K15 Receipt is with worker and not safe",
+        "pass": true
+      },
+      {
+        "name": "K16 Retrying return cannot duplicate key events",
+        "pass": true
+      },
+      {
+        "name": "K17 Unconfigured staff cannot record storage",
+        "pass": true
+      },
+      {
+        "name": "K18 Driver cannot attest receiving-worker storage",
+        "pass": true
+      },
+      {
+        "name": "K19 Changed vehicle custody invalidates storage form",
+        "pass": true
+      },
+      {
+        "name": "K20 Physical placement must be explicit",
+        "pass": true
+      },
+      {
+        "name": "K21 Storage cannot predate receipt",
+        "pass": true
+      },
+      {
+        "name": "K22 Handover point cannot masquerade as secure storage",
+        "pass": true
+      },
+      {
+        "name": "K23 Separate storage observation preserves receipt",
+        "pass": true
+      },
+      {
+        "name": "K24 Unconfigured physical later receipt denied",
+        "pass": true
+      },
+      {
+        "name": "K25 Denied direct object cannot change plan",
+        "pass": true
+      }
+    ]
+  },
+  "planning": {
+    "results": [
+      {
+        "name": "P01 Suitable free resources pass",
+        "pass": true
+      },
+      {
+        "name": "P02 Overdue vehicle is not released by its scheduled end",
+        "pass": true
+      },
+      {
+        "name": "P03 Overdue crew requires a recorded return",
+        "pass": true
+      },
+      {
+        "name": "P04 Scheduled return boundary does not attest release",
+        "pass": true
+      },
+      {
+        "name": "P05 Overlapping confirmed reservation blocks chosen vehicle",
+        "pass": true
+      },
+      {
+        "name": "P06 Adjacent confirmed windows do not overlap",
+        "pass": true
+      },
+      {
+        "name": "P07 Same booking is excluded during rescheduling",
+        "pass": true
+      },
+      {
+        "name": "P08 Out-of-site vehicle is unsuitable",
+        "pass": true
+      },
+      {
+        "name": "P09 Wheelchair needs cannot use standard seating",
+        "pass": true
+      },
+      {
+        "name": "P10 Occupancy includes everyone",
+        "pass": true
+      },
+      {
+        "name": "P11 Required escort is enforced",
+        "pass": true
+      },
+      {
+        "name": "P12 Required equipment is enforced",
+        "pass": true
+      },
+      {
+        "name": "P13 Invalid date is rejected",
+        "pass": true
+      },
+      {
+        "name": "P14 Reversed time is rejected",
+        "pass": true
+      },
+      {
+        "name": "P15 Source expired blocks saving",
+        "pass": true
+      },
+      {
+        "name": "P15 Source unknown blocks saving",
+        "pass": true
+      },
+      {
+        "name": "P15 Source conflict blocks saving",
+        "pass": true
+      },
+      {
+        "name": "P16 Driver eligibility is scoped to the request site",
+        "pass": true
+      },
+      {
+        "name": "P17 Editing resources invalidates availability",
+        "pass": true
+      },
+      {
+        "name": "P18 Concurrent Fleet change invalidates availability",
+        "pass": true
+      },
+      {
+        "name": "P19 Source-state change invalidates availability",
+        "pass": true
+      },
+      {
+        "name": "P20 Request version change invalidates availability",
+        "pass": true
+      }
+    ]
+  },
+  "overview": {
+    "results": [
+      {
+        "name": "Every permitted request has exactly one stage",
+        "pass": true
+      },
+      {
+        "name": "Completed journey with custody exception stays completed in the chart",
+        "pass": true
+      },
+      {
+        "name": "Outstanding receipt survives journey completion in attention list",
+        "pass": true
+      },
+      {
+        "name": "Actual return does not imply journey completion",
+        "pass": true
+      },
+      {
+        "name": "Overdue actual journey is prioritised",
+        "pass": true
+      },
+      {
+        "name": "Cancelled demand is excluded from scheduled departure totals",
+        "pass": true
+      },
+      {
+        "name": "Every expected return is counted once",
+        "pass": true
+      },
+      {
+        "name": "Departure board excludes trips already underway or cancelled",
+        "pass": true
+      },
+      {
+        "name": "Scoped graphs exclude out-of-site request",
+        "pass": true
+      },
+      {
+        "name": "Empty sources give no invented activity",
+        "pass": true
+      },
+      {
+        "name": "Export reflects permitted scope without hidden names",
+        "pass": true
+      },
+      {
+        "name": "Export distinguishes scheduled from actual movement",
+        "pass": true
+      }
+    ]
+  },
+  "server": {
+    "results": [
+      {
+        "name": "PDF POST rejects missing local origin",
+        "pass": true
+      },
+      {
+        "name": "PDF POST rejects invalid payload",
+        "pass": true
+      },
+      {
+        "name": "Static preview remains available",
+        "pass": true
+      }
+    ]
+  },
+  "types": {
+    "scopedErrors": [],
+    "importedSourceErrors": []
+  },
+  "preservation": [
+    {
+      "version": "v1",
+      "filesChecked": 62,
+      "mismatches": []
+    },
+    {
+      "version": "v2",
+      "filesChecked": 92,
+      "mismatches": []
+    },
+    {
+      "version": "v3",
+      "filesChecked": 57,
+      "mismatches": []
+    },
+    {
+      "version": "v4",
+      "filesChecked": 95,
+      "mismatches": []
+    },
+    {
+      "version": "v5",
+      "filesChecked": 93,
+      "mismatches": []
+    },
+    {
+      "version": "audit-v1",
+      "filesChecked": 21,
+      "mismatches": []
+    }
+  ],
+  "limitations": [
+    "Synthetic browser state only. No production API, database, upload, notification or clinical record was changed. Local POST only generates a synthetic PDF in memory.",
+    "Scoped staff custody authority, key storage-point mapping and passenger-journey to vehicle-trip links still need approved production contracts.",
+    "Resource availability is a controlled source simulation over shared synthetic bookings, not a live reservation engine. Site eligibility, equipment identity, buffers and hold policy require approved source contracts.",
+    "Drafts are held in browser memory only and reset on reload or role/access change. Three PDF downloads were smoke-tested; this version does not claim a new PDF layout audit.",
+    "Actual browser zoom remains unverified; desktop resizing checked at 1024, 1280, 1440 and 1920 pixels.",
+    "Whole-application/backend security and repository CI were not exercised by these preview tests."
+  ]
+}

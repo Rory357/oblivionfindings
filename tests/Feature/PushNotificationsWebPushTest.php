@@ -20,6 +20,7 @@ it('stores browser web-push subscriptions with endpoint and keys', function () {
     $this->actingAs($user)
         ->postJson(route('settings.notifications.push-subscriptions.store'), [
             'provider' => 'webpush',
+            'actor_id' => $user->id,
             'token' => 'https://push.example.test/subscription/abc123',
             'keys' => [
                 'p256dh' => 'p256dh-key',

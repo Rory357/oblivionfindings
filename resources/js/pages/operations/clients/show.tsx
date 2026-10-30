@@ -3,18 +3,34 @@ import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
 import RecentClientsStrip from '@/components/client-profile/recent-clients-strip';
-import { type ClientSafety } from '@/components/client-safety-ribbon';
+import {
+    allergyReviewCaption,
+    type ClientSafety,
+} from '@/components/client-safety-ribbon';
+import type { ContactProfile } from '@/components/clients/contact-review-fields';
 import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
+import { ProfileContactPreferencesCard } from '@/components/clients/profile/contact-preferences-card';
+import { ProfileCultureCard } from '@/components/clients/profile/culture-card';
 import {
     ProfileDialogs,
     type ProfileDialogState,
 } from '@/components/clients/profile/dialog-host';
 import {
+    MedicalDialogs,
+    type MedicalSection,
+} from '@/components/clients/profile/medical-dialogs';
+import {
     buildAboutTiles,
     OverviewDesignGrid,
 } from '@/components/clients/profile/overview-grid';
+import {
+    ProfileSupportContactsCard,
+    type SupportContact,
+} from '@/components/clients/profile/support-contacts-card';
 import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
+import { AllergyRecord } from '@/components/emar/record/allergy-record';
+import { FamilyNoteOwner } from '@/components/family-notes/family-note-owner';
 import { RaRegisterSection } from '@/components/health-safety/risk-assessments/ra-register-section';
 import type {
     RaPickers,
@@ -43,6 +59,7 @@ import {
     type GroupedProfileNavGroup,
 } from '@/components/page/grouped-profile-nav';
 import { ClientPrivacyPanel } from '@/components/privacy/client-privacy-panel';
+import { InternalSupportPreparation } from '@/components/referrals/internal-support-preparation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,8 +84,13 @@ import { Separator } from '@/components/ui/separator';
 import { Ring } from '@/components/wizard/primitives';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTimeLong } from '@/lib/datetime';
+import { ageOnWorkerDay, formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
+import {
+    medicationReturnTo,
+    withMedicationReturn,
+} from '@/lib/medication-navigation';
+import type { WitnessPickerOption } from '@/lib/witness-pin';
 import { ClientClinicalRecordLaunchers } from '@/pages/health-clinical/components/client-clinical-launchers';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { QuickNoteDialog } from '@/pages/operations/clients/dialogs/quick-note-dialog';
@@ -371,6 +393,8 @@ type Props = {
         status: string;
         phone?: string | null;
         email?: string | null;
+        contact_profile?: ContactProfile;
+        support_contacts?: SupportContact[];
         address_line_1?: string | null;
         address_line_2?: string | null;
         suburb?: string | null;
@@ -380,6 +404,10 @@ type Props = {
         funding_notes?: string | null;
         // Identity & Culture
         ethnicity?: string | null;
+        iwi?: string | null;
+        hapu?: string | null;
+        marae?: string | null;
+        cultural_dietary_needs?: string | null;
         preferred_pronouns?: string | null;
         religion?: string | null;
         languages?: string[] | null;
@@ -415,6 +443,8 @@ type Props = {
             name: string;
             email?: string | null;
         }>;
+        /** PIN-1: eligible second signatures at the client's Site. */
+        medication_witnesses?: WitnessPickerOption[];
     };
     medical?: {
         profile: any | null;
@@ -544,6 +574,7 @@ type Props = {
         create_communication_note?: boolean;
         pin_handover?: boolean;
         manage_onboarding?: boolean;
+        prepare_support?: boolean;
         manage_onboarding_checklist?: boolean;
         create_onboarding_workflow?: boolean;
         manage_onboarding_workflow?: boolean;
@@ -858,6 +889,25 @@ export default function ClientShow({
     transport,
 }: Props) {
     const pageProps = usePage().props as any;
+    const profileUrl = usePage().url;
+    const medicalSection = new URLSearchParams(
+        profileUrl.split('?')[1]?.split('#')[0],
+    ).get('medical_section');
+    const [medicalDialog, setMedicalDialog] = useState<MedicalSection | null>(
+        null,
+    );
+    const closeMedicalDialog = () => {
+        setMedicalDialog(null);
+        if (medicalSection) {
+            const url = new URL(profileUrl, window.location.origin);
+            url.searchParams.delete('medical_section');
+            router.replace({
+                url: url.pathname + url.search + url.hash,
+                preserveState: true,
+                preserveScroll: true,
+            });
+        }
+    };
     const { auth, labels } = pageProps;
     const profileSectionAccess =
         profileSectionAccessProp ??
@@ -873,6 +923,19 @@ export default function ClientShow({
             ),
         [pageProps, profileSectionAccess],
     );
+    const canEditLoadedMedical = Boolean(
+        can.update_client && canShowProfileTab('medical') && pageProps.medical,
+    );
+    useEffect(() => {
+        if (
+            canEditLoadedMedical &&
+            ['profile', 'conditions', 'emergency_contacts'].includes(
+                medicalSection ?? '',
+            )
+        )
+            setMedicalDialog(medicalSection as MedicalSection);
+        if (!canEditLoadedMedical) setMedicalDialog(null);
+    }, [medicalSection, canEditLoadedMedical]);
     const safety = pageProps.safety as ClientSafety | null | undefined;
     const createShiftLauncher = useCreateShiftLauncher();
     const nextShiftSummary = shifts_summary?.next ?? null;
@@ -990,6 +1053,50 @@ export default function ClientShow({
         [pageProps.client_agreements],
     );
     const familyNotes = pageProps.family_notes ?? [];
+    useEffect(() => {
+        const refreshPublishedMedia = (event: Event) => {
+            const detail = (
+                event as CustomEvent<{ clientId: number; destination: string }>
+            ).detail;
+            if (
+                detail?.clientId !== client.id ||
+                !['documents', 'photos'].includes(detail.destination)
+            )
+                return;
+            router.reload({ only: [detail.destination], preserveScroll: true });
+        };
+        window.addEventListener(
+            'oblivion:chat-attachment-published',
+            refreshPublishedMedia,
+        );
+        return () =>
+            window.removeEventListener(
+                'oblivion:chat-attachment-published',
+                refreshPublishedMedia,
+            );
+    }, [client.id]);
+    useEffect(() => {
+        const refreshFamilyNotes = (event: Event) => {
+            if (
+                (event as CustomEvent<{ clientId?: number }>).detail
+                    ?.clientId !== client.id
+            )
+                return;
+            router.reload({
+                only: ['family_notes', 'family_notes_open_count'],
+                preserveScroll: true,
+            });
+        };
+        window.addEventListener(
+            'oblivion:family-followup-created',
+            refreshFamilyNotes,
+        );
+        return () =>
+            window.removeEventListener(
+                'oblivion:family-followup-created',
+                refreshFamilyNotes,
+            );
+    }, [client.id]);
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
@@ -1684,12 +1791,7 @@ export default function ClientShow({
         ? client.status.charAt(0).toUpperCase() + client.status.slice(1)
         : 'Unknown';
 
-    const clientAge = client.date_of_birth
-        ? Math.floor(
-              (Date.now() - new Date(client.date_of_birth).getTime()) /
-                  31557600000,
-          )
-        : null;
+    const clientAge = ageOnWorkerDay(client.date_of_birth);
     const identityLine = [
         client.preferred_name && client.preferred_name !== name
             ? `“${client.preferred_name}”`
@@ -1765,8 +1867,13 @@ export default function ClientShow({
         client.risk_level === 'high' ||
         client.risk_level === 'critical'
             ? 'critical'
-            : 'success';
+            : safety?.allergy_record &&
+                (!safety.allergy_record.reviewed ||
+                    safety.allergy_record.status === 'none')
+              ? 'warning'
+              : 'success';
     const safetyCaption = [
+        allergyReviewCaption(safety?.allergy_record),
         client.risk_level ? `${client.risk_level} risk` : null,
         ...(client.safeguarding_flag ? ['Safeguarding'] : []),
         ...(safety?.allergies ?? []).map((a) => `Allergy: ${a.label}`),
@@ -1911,11 +2018,16 @@ export default function ClientShow({
     if (client.phone)
         moreItems.push({
             key: 'call',
-            label: 'Call',
+            label: 'Contact instructions',
             icon: Phone,
             detail: client.phone,
             onSelect: () => {
-                window.location.href = `tel:${client.phone}`;
+                handleTabChange('profile');
+                requestAnimationFrame(() =>
+                    document
+                        .getElementById('person-contact-details')
+                        ?.scrollIntoView({ block: 'center' }),
+                );
             },
         });
     if (can.navigate_family_portal)
@@ -2074,7 +2186,13 @@ export default function ClientShow({
                 hero={
                     <PageHeader
                         variant="profile"
-                        backHref="/operations/clients"
+                        backHref={
+                            medicationReturnTo(
+                                new URLSearchParams(
+                                    profileUrl.split('?')[1],
+                                ).get('return_to'),
+                            ) ?? '/operations/clients'
+                        }
                         mark={
                             <span className="eh-mark-ring text-[17px] font-bold tracking-tight">
                                 {client.avatar || client.profile_photo_url ? (
@@ -2405,7 +2523,7 @@ export default function ClientShow({
                                             </PageHeaderMeterBig>
                                             <PageHeaderMeterCaption>
                                                 {safetyCaption ||
-                                                    'no allergies or active alerts recorded'}
+                                                    'No safety alerts shown'}
                                             </PageHeaderMeterCaption>
                                         </PageHeaderMeterBlock>
                                     ) : null}
@@ -2734,6 +2852,27 @@ export default function ClientShow({
                                         {/* Overview board — design composition (tabs-core OverviewTab).
                                     Legacy depth widgets (house coverage, health summary, …)
                                     continue below so nothing is lost. */}
+                                        <ProfileContactPreferencesCard
+                                            id={client.id}
+                                            profile={client.contact_profile}
+                                            canEdit={!!can.update_client}
+                                        />
+                                        <ProfileCultureCard
+                                            client={client}
+                                            onEdit={
+                                                can.update_client
+                                                    ? () =>
+                                                          openProfileDialog(
+                                                              'edit_profile',
+                                                          )
+                                                    : undefined
+                                            }
+                                        />
+                                        <ProfileSupportContactsCard
+                                            contacts={
+                                                client.support_contacts ?? []
+                                            }
+                                        />
                                         <OverviewDesignGrid
                                             preferredName={preferredName}
                                             aboutTiles={buildAboutTiles(
@@ -2871,6 +3010,11 @@ export default function ClientShow({
 
                         {tab === 'onboarding' && (
                             <div className="space-y-4">
+                                {can.prepare_support && (
+                                    <InternalSupportPreparation
+                                        personId={client.id}
+                                    />
+                                )}
                                 {/* Workflow Progress Header */}
                                 {onboarding?.workflow ? (
                                     <Card>
@@ -3047,7 +3191,14 @@ export default function ClientShow({
                                                 labels?.['client.singular'] ??
                                                 'client'
                                             ).toLowerCase()}{' '}
-                                            profile data
+                                            profile data. This shows saved
+                                            records; it does not approve a care
+                                            plan or authorise services to start.
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Referral funding evidence stays in
+                                            Referrals. Only documents saved to
+                                            this profile count here.
                                         </p>
                                     </CardHeader>
                                     <CardContent className="space-y-2">
@@ -3058,7 +3209,7 @@ export default function ClientShow({
                                         ).map((item: any) => (
                                             <div
                                                 key={item.key}
-                                                className="flex items-center justify-between rounded-md border p-2"
+                                                className="flex flex-col gap-2 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
                                             >
                                                 <div className="flex items-center gap-2">
                                                     <div
@@ -3079,8 +3230,9 @@ export default function ClientShow({
                                                 </div>
                                                 {!item.has_data &&
                                                     can.manage_onboarding_checklist && (
-                                                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                                                        <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-xs text-muted-foreground sm:min-h-9">
                                                             <Checkbox
+                                                                aria-label={`Mark ${item.label.toLowerCase()} as not applicable`}
                                                                 checked={
                                                                     item.override
                                                                 }
@@ -3274,6 +3426,7 @@ export default function ClientShow({
                                                                                         },
                                                                                     );
                                                                                 }}
+                                                                                aria-label={`Complete ${step.step_name}`}
                                                                             >
                                                                                 Complete
                                                                             </Button>
@@ -3292,6 +3445,7 @@ export default function ClientShow({
                                                                                         },
                                                                                     );
                                                                                 }}
+                                                                                aria-label={`Skip ${step.step_name}`}
                                                                             >
                                                                                 Skip
                                                                             </Button>
@@ -3335,10 +3489,17 @@ export default function ClientShow({
                                                                 );
                                                             }}
                                                         >
-                                                            Complete Onboarding
-                                                            — Set Status to
-                                                            Active
+                                                            Complete onboarding
                                                         </Button>
+                                                        <p className="text-subtle mt-2 text-muted-foreground">
+                                                            This completes
+                                                            preparation. Review
+                                                            start approval and
+                                                            record actual
+                                                            commencement
+                                                            separately through
+                                                            Prepare support.
+                                                        </p>
                                                     </div>
                                                 ) : null;
                                             })()}
@@ -3527,21 +3688,11 @@ export default function ClientShow({
 
                         {tab === 'medical' && (
                             <div className="space-y-4">
-                                {/* Allergy Alert */}
-                                {medical.profile?.allergies &&
-                                    medical.profile.allergies !== '-' && (
-                                        <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                            <ShieldAlert className="h-6 w-6 shrink-0 text-status-critical" />
-                                            <div>
-                                                <p className="text-sm font-bold text-status-critical">
-                                                    Allergies
-                                                </p>
-                                                <p className="text-sm text-status-critical">
-                                                    {medical.profile.allergies}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
+                                <AllergyRecord
+                                    key={client.id}
+                                    clientId={client.id}
+                                    editable
+                                />
 
                                 {/* Quick Stats */}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -3577,7 +3728,12 @@ export default function ClientShow({
                                             className="gap-1.5 text-xs"
                                             asChild
                                         >
-                                            <Link href="/emar">
+                                            <Link
+                                                href={withMedicationReturn(
+                                                    `/emar/mar?client_id=${client.id}`,
+                                                    profileUrl,
+                                                )}
+                                            >
                                                 <Pill className="h-3.5 w-3.5" />{' '}
                                                 Open eMAR
                                             </Link>
@@ -3663,17 +3819,18 @@ export default function ClientShow({
                                                         </div>
                                                         Medical Profile
                                                     </div>
-                                                    {can.edit && (
+                                                    {can.update_client && (
                                                         <Button
                                                             variant="outline"
                                                             size="sm"
-                                                            asChild
+                                                            onClick={() =>
+                                                                setMedicalDialog(
+                                                                    'profile',
+                                                                )
+                                                            }
                                                         >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical`}
-                                                            >
-                                                                Edit
-                                                            </Link>
+                                                            {' '}
+                                                            Edit{' '}
                                                         </Button>
                                                     )}
                                                 </CardTitle>
@@ -3864,18 +4021,18 @@ export default function ClientShow({
                                                         </div>
                                                         Conditions
                                                     </div>
-                                                    {can.edit && (
+                                                    {can.update_client && (
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="outline"
                                                             size="sm"
-                                                            className="h-6 text-xs"
-                                                            asChild
+                                                            onClick={() =>
+                                                                setMedicalDialog(
+                                                                    'conditions',
+                                                                )
+                                                            }
                                                         >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=conditions`}
-                                                            >
-                                                                Manage
-                                                            </Link>
+                                                            {' '}
+                                                            Manage{' '}
                                                         </Button>
                                                     )}
                                                 </CardTitle>
@@ -3943,18 +4100,18 @@ export default function ClientShow({
                                                         </div>
                                                         Emergency Contacts
                                                     </div>
-                                                    {can.edit && (
+                                                    {can.update_client && (
                                                         <Button
-                                                            variant="ghost"
+                                                            variant="outline"
                                                             size="sm"
-                                                            className="h-6 text-xs"
-                                                            asChild
+                                                            onClick={() =>
+                                                                setMedicalDialog(
+                                                                    'emergency_contacts',
+                                                                )
+                                                            }
                                                         >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}
-                                                            >
-                                                                Manage
-                                                            </Link>
+                                                            {' '}
+                                                            Manage{' '}
                                                         </Button>
                                                     )}
                                                 </CardTitle>
@@ -4032,35 +4189,10 @@ export default function ClientShow({
                         {tab === 'mar' && (
                             <MarTab
                                 clientId={client.id}
-                                clientFirstName={client.first_name}
-                                siteName={client.site?.name ?? null}
-                                medications={
-                                    (medical?.medications ?? []) as any[]
-                                }
-                                allergies={
-                                    Array.isArray(medical?.profile?.allergies)
-                                        ? (medical.profile
-                                              .allergies as string[])
-                                        : []
-                                }
-                                emarSummary={emarSummary}
-                                canRecord={Boolean(
-                                    can.record_medication_administration,
-                                )}
-                                canRecordControlled={Boolean(
-                                    can.record_controlled_medication,
-                                )}
+                                personName={preferredName}
                                 canViewControlled={Boolean(
                                     auth?.can?.medications?.controlledView,
                                 )}
-                                onRecordDose={(medicationId) =>
-                                    openProfileDialog(
-                                        'emar',
-                                        medicationId
-                                            ? { medicationId }
-                                            : undefined,
-                                    )
-                                }
                             />
                         )}
 
@@ -4241,6 +4373,9 @@ export default function ClientShow({
                                 />
                                 <HealthMonitoringTab
                                     clientId={client.id}
+                                    canViewDoseReadings={canShowProfileTab(
+                                        'medical',
+                                    )}
                                     data={healthMonitoring}
                                     isLoading={!hasHealthMonitoringProp}
                                 />
@@ -5287,6 +5422,11 @@ export default function ClientShow({
                                                                                         : ''}
                                                                                 </p>
                                                                             )}
+                                                                            <FamilyNoteOwner
+                                                                                name={
+                                                                                    note.assigned_user_name
+                                                                                }
+                                                                            />
                                                                             {note.description && (
                                                                                 <p className="mt-1.5 text-sm text-muted-foreground">
                                                                                     {note
@@ -6282,7 +6422,24 @@ export default function ClientShow({
                                                                             ) : null}
                                                                         </div>
                                                                     </div>
-                                                                    {can.edit ? (
+                                                                    {b.workspace_url ? (
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            asChild
+                                                                        >
+                                                                            <Link
+                                                                                href={
+                                                                                    b.workspace_url
+                                                                                }
+                                                                            >
+                                                                                Open
+                                                                                transport
+                                                                            </Link>
+                                                                        </Button>
+                                                                    ) : null}
+                                                                    {can.edit &&
+                                                                    b.can_remove ? (
                                                                         <Button
                                                                             size="sm"
                                                                             variant="ghost"
@@ -6878,6 +7035,7 @@ export default function ClientShow({
                 medications={(medical?.medications ?? []) as any[]}
                 canRecord={Boolean(can.record_medication_administration)}
                 canRecordControlled={Boolean(can.record_controlled_medication)}
+                witnessOptions={client.medication_witnesses ?? []}
             />
 
             <ClientEditDialog
@@ -6890,6 +7048,15 @@ export default function ClientShow({
                 }}
             />
 
+            {canEditLoadedMedical && medicalDialog && (
+                <MedicalDialogs
+                    key={`${client.id}:${medicalDialog}`}
+                    clientId={client.id}
+                    section={medicalDialog}
+                    medical={medical}
+                    onClose={closeMedicalDialog}
+                />
+            )}
             {createShiftLauncher.dialog}
         </AppLayout>
     );

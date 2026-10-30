@@ -10,7 +10,7 @@ class ClientGeofenceRuleVersion extends Model
 
     protected $guarded = ['id'];
 
-    protected $casts = ['geometry_proposal' => 'array', 'schedule_proposal' => 'array', 'revision' => 'integer', 'created_at' => 'datetime'];
+    protected $casts = ['canonical_boundary_snapshot' => 'array', 'geometry_proposal' => 'array', 'schedule_proposal' => 'array', 'revision' => 'integer', 'created_at' => 'datetime'];
 
     protected static function booted(): void
     {

@@ -1,0 +1,128 @@
+diff --git a/app/Http/Controllers/Emar/EmarController.php b/app/Http/Controllers/Emar/EmarController.php
+index a3a58104d..8c7c8bdaf 100644
+--- a/app/Http/Controllers/Emar/EmarController.php
++++ b/app/Http/Controllers/Emar/EmarController.php
+@@ -1239,6 +1239,12 @@ public function dashboard(Request $request, MedicationOverviewService $overview)
+     // ─── MAR Charts ────────────────────────────────────────
+     public function mar(Request $request)
+     {
++        // The rebuilt person record (P02) serves a named person once the
++        // switch is on; until the Chart lands (P02-4) today's page stays.
++        if (config('medications.person_record') === 'p02' && $request->filled('client_id')) {
++            return app(PersonMedicationRecordController::class)->show($request, $request->integer('client_id'));
++        }
++
+         $actor = $request->user();
+         abort_unless($actor, 403);
+         $requestedClientId = $request->integer('client_id') ?: null;
+diff --git a/config/medications.php b/config/medications.php
+index 1a5ccc300..b5b77a28a 100644
+--- a/config/medications.php
++++ b/config/medications.php
+@@ -1,6 +1,12 @@
+ <?php
+ 
+ return [
++    // The person medication record at /emar/mar?client_id=… (eMAR P02):
++    // "legacy" keeps today's MAR chart page; "p02" serves the rebuilt record.
++    // It switches to p02 when the record reaches today's page (the Chart,
++    // P02-4) and the switch is then removed.
++    'person_record' => env('EMAR_PERSON_RECORD', 'legacy'),
++
+     // Dose timing defaults. Medication › Settings › Rounds & timing saves the
+     // organisation's own values; DoseTimingSettings reads them, falling back
+     // to these until someone saves one.
+diff --git a/resources/js/hooks/use-emar-breadcrumbs.ts b/resources/js/hooks/use-emar-breadcrumbs.ts
+index 8f7cac7d5..a46b1b3f6 100644
+--- a/resources/js/hooks/use-emar-breadcrumbs.ts
++++ b/resources/js/hooks/use-emar-breadcrumbs.ts
+@@ -2,6 +2,8 @@ import { usePage } from '@inertiajs/react';
+ 
+ import {
+     emarBreadcrumbs,
++    emarRecordBreadcrumbs,
++    type EmarBreadcrumb,
+     type EmarNavigationPermissions,
+ } from '@/lib/emar-navigation';
+ import type { BreadcrumbItem } from '@/types';
+@@ -15,3 +17,11 @@ export function useEmarBreadcrumbs(): BreadcrumbItem[] {
+     const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
+     return emarBreadcrumbs(page.url, page.props.auth?.can);
+ }
++
++/** The trail for a person's medication record (`emarRecordBreadcrumbs`). */
++export function useEmarRecordBreadcrumbs(
++    person: EmarBreadcrumb,
++): BreadcrumbItem[] {
++    const page = usePage<{ auth?: { can?: EmarNavigationPermissions } }>();
++    return emarRecordBreadcrumbs(page.props.auth?.can, person);
++}
+diff --git a/resources/js/lib/emar-navigation.ts b/resources/js/lib/emar-navigation.ts
+index 87fcb302c..251856357 100644
+--- a/resources/js/lib/emar-navigation.ts
++++ b/resources/js/lib/emar-navigation.ts
+@@ -473,6 +473,30 @@ export function emarBreadcrumbs(url: string, can: Can): EmarBreadcrumb[] {
+     ];
+ }
+ 
++/**
++ * A person's medication record (P02): frontline staff reach it from Meds
++ * today (Home › Meds today › person); everyone else from the MAR hub
++ * (Home › Medication › MAR & medicines › person).
++ */
++export function emarRecordBreadcrumbs(
++    can: Can,
++    person: EmarBreadcrumb,
++): EmarBreadcrumb[] {
++    const home = { title: 'Home', href: '/dashboard' };
++    const sidebar = emarSidebar(can);
++    if (sidebar.mode === 'frontline') {
++        return [home, { title: 'Meds today', href: sidebar.href }, person];
++    }
++    const mar = EMAR_HUBS.find((hub) => hub.key === 'mar');
++    const marLanding = mar ? emarHubLanding(mar, can) : null;
++    return [
++        home,
++        { title: EMAR_MODULE_LABEL, href: emarModuleLanding(can) ?? person.href },
++        ...(mar && marLanding ? [{ title: mar.label, href: marLanding }] : []),
++        person,
++    ];
++}
++
+ /**
+  * Sidebar active state for a hub link: lit on every page of its hub.
+  * Undefined leaves the generic matcher alone for every other link.
+diff --git a/routes/emar.php b/routes/emar.php
+index 808d3b187..485eb24d8 100644
+--- a/routes/emar.php
++++ b/routes/emar.php
+@@ -7,6 +7,7 @@
+ use App\Http\Controllers\Emar\DoseRequirementsController;
+ use App\Http\Controllers\Emar\EmarController;
+ use App\Http\Controllers\Emar\EmarPdfController;
++use App\Http\Controllers\Emar\PersonMedicationRecordController;
+ use App\Http\Controllers\Emar\EmarReportController;
+ use App\Http\Controllers\Emar\GuidedRoundController;
+ use App\Http\Controllers\Emar\MedicationAuditEventController;
+@@ -157,6 +158,21 @@
+             ->name('meds.round.complete');
+     });
+ 
++    // The person medication record's own views (P02); each one passes the
++    // per-person gate in the controller (MedicationRecordAccess).
++    Route::prefix('/clients/{client}/record')
++        ->whereNumber('client')
++        ->middleware('permission:medications.view')
++        ->group(function () {
++            Route::get('/medicines', [PersonMedicationRecordController::class, 'medicines'])
++                ->name('emar.record.medicines');
++            Route::get('/medicines/{medication}', [PersonMedicationRecordController::class, 'medicine'])
++                ->whereNumber('medication')
++                ->name('emar.record.medicine');
++            Route::get('/support', [PersonMedicationRecordController::class, 'support'])
++                ->name('emar.record.support');
++        });
++
+     // Self-Administration Assessments
+     Route::get('/self-admin', [EmarController::class, 'selfAdmin'])
+         ->middleware('permission:medications.view')

@@ -4,6 +4,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import type { Page } from '@inertiajs/core';
 import { router } from '@inertiajs/react';
 import { FileText, Trash2, Upload, UploadCloud } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type AriaAttributes, type ReactNode } from 'react';
@@ -96,7 +97,7 @@ export function FileDropzone({
                 <span
                     className={cn(
                         'grid h-14 w-14 place-items-center rounded-2xl transition-colors',
-                        dragging ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary',
+                        dragging ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-primary/10 text-primary',
                     )}
                 >
                     <UploadCloud className="h-7 w-7" />
@@ -180,6 +181,10 @@ export function AttachmentUploader({
     categoryField = null,
     accept,
     hint,
+    onStateChange,
+    requestData,
+    nextRequestData,
+    frontline = false,
 }: {
     endpoint: string;
     /** Form field for an optional per-file note (omit to hide the note input). */
@@ -190,10 +195,21 @@ export function AttachmentUploader({
     categoryField?: { field: string; label: string; options: { value: string; label: string }[] } | null;
     accept?: string;
     hint?: string;
+    /** Optional host leave protection; file contents stay in this component. */
+    onStateChange?: (state: { dirty: boolean; busy: boolean }) => void;
+    /** Optional source-version guards. Sequential uploads advance only from the server receipt. */
+    requestData?: Record<string, string | number>;
+    nextRequestData?: (page: Page) => Record<string, string | number> | null;
+    frontline?: boolean;
 }) {
     const [items, setItems] = useState<StagedItem[]>([]);
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        onStateChange?.({ dirty: items.length > 0, busy: uploading });
+    }, [items.length, uploading, onStateChange]);
+    useEffect(() => () => onStateChange?.({ dirty: false, busy: false }), [onStateChange]);
 
     const add = (files: File[]) => {
         setError(null);
@@ -209,6 +225,7 @@ export function AttachmentUploader({
         setUploading(true);
         setError(null);
         const queue = [...items];
+        let guards = requestData;
         const next = (i: number) => {
             if (i >= queue.length) {
                 setUploading(false);
@@ -220,16 +237,46 @@ export function AttachmentUploader({
             if (noteField) fd.append(noteField, it.note);
             if (sensitive) fd.append(sensitive.field, it.sensitive ? '1' : '0');
             if (categoryField && it.category) fd.append(categoryField.field, it.category);
+            Object.entries(guards ?? {}).forEach(([key, value]) => fd.append(key, String(value)));
+            let receivedResponse = false;
             router.post(endpoint, fd, {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
+                onSuccess: (page) => {
+                    receivedResponse = true;
+                    const flash = page.props.flash as { error?: string } | undefined;
+                    if (flash?.error) {
+                        setError(flash.error);
+                        setUploading(false);
+                        return;
+                    }
                     remove(it.id);
+                    if (nextRequestData) {
+                        const nextGuards = nextRequestData(page);
+                        if (nextGuards === null && i + 1 < queue.length) {
+                            setError('The file was saved, but the updated version could not be confirmed. Check the record before uploading the remaining files.');
+                            setUploading(false);
+                            return;
+                        }
+                        guards = nextGuards ?? undefined;
+                    }
                     next(i + 1);
                 },
-                onError: () => {
-                    setError('Upload failed — check the file size and type, then try again.');
+                onError: (errors) => {
+                    receivedResponse = true;
+                    setError(Object.values(errors).join(' ') || 'Upload failed. Your remaining files are still here.');
                     setUploading(false);
+                },
+                onCancel: () => {
+                    receivedResponse = true;
+                    setError('Upload interrupted. Check the record before retrying. Your remaining files are still here.');
+                    setUploading(false);
+                },
+                onFinish: () => {
+                    if (!receivedResponse) {
+                        setError('The upload could not be confirmed. Check the record before retrying. Your remaining files are still here.');
+                        setUploading(false);
+                    }
                 },
             });
         };
@@ -251,7 +298,7 @@ export function AttachmentUploader({
                                             value={it.category}
                                             onChange={(e) => patch(it.id, { category: e.target.value })}
                                             aria-label={categoryField.label}
-                                            className="h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none"
+                                            className={cn('h-8 rounded-md border border-border bg-background px-2 text-xs text-foreground focus-visible:ring-2 focus-visible:ring-primary focus-visible:outline-none', frontline && 'frontline-tap')}
                                         >
                                             <option value="">{categoryField.label}…</option>
                                             {categoryField.options.map((o) => (
@@ -262,7 +309,7 @@ export function AttachmentUploader({
                                         </select>
                                     ) : null}
                                     {noteField ? (
-                                        <Input value={it.note} onChange={(e) => patch(it.id, { note: e.target.value })} placeholder="Note (optional)" className="h-8" />
+                                        <Input aria-label={`Note for ${it.file.name}`} value={it.note} onChange={(e) => patch(it.id, { note: e.target.value })} placeholder="Note (optional)" className={cn('h-8', frontline && 'frontline-tap')} />
                                     ) : null}
                                     {sensitive ? (
                                         <label className="flex items-center gap-2 text-xs text-foreground">
@@ -281,8 +328,8 @@ export function AttachmentUploader({
                     ))}
 
                     <div className="flex items-center justify-between gap-2">
-                        {error ? <span className="text-xs text-status-critical">{error}</span> : <span />}
-                        <Button type="button" size="sm" onClick={upload} disabled={uploading}>
+                        {error ? <span role="alert" className="text-sm text-status-critical">{error}</span> : <span />}
+                        <Button className={cn(frontline && 'frontline-tap shrink-0')} type="button" size="sm" onClick={upload} disabled={uploading}>
                             <Upload className="mr-1.5 h-3.5 w-3.5" /> {uploading ? 'Uploading…' : `Upload ${items.length} file${items.length === 1 ? '' : 's'}`}
                         </Button>
                     </div>

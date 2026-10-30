@@ -1,0 +1,290 @@
+[
+  {
+    "path": "app/Domain/Finance/Exceptions/StaleBillApprovalException.php",
+    "sha256": "0BEADDD89796A078247C4DB958CB6592896603F5D266C28EB4D98E454B0C9211"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/BillController.php",
+    "sha256": "4EA4B1E828C9E38485535BF0EC80D7B008DA7FC4ADD1478315826CBDB21E369E"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/BillDocumentController.php",
+    "sha256": "711CBC2D0F0A55D1856A0F6DD04019D1F1F6749F95FCCAC14D81C3C429A4BFF3"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/JournalController.php",
+    "sha256": "49A2322C2EF350F0028334D3E6F06501E8937366B1715A5EFB5DCA96FFE4A2B7"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Controllers/VehicleReviewRequestController.php",
+    "sha256": "9B4B3CA3D2F013FABC035982E272D3A0FAA10FA9A1F70C5A99DD32CD08CD0CE6"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Requests/StoreBillRequest.php",
+    "sha256": "42C80E7F10198CEC6C173BF06043A3BE993132D97E705923A0D3B9DA342503E0"
+  },
+  {
+    "path": "app/Domain/Finance/Http/Requests/UpdateBillRequest.php",
+    "sha256": "08291CD9F01D02E541A1D973F3C56227DAB5314DC5D1CB7CB2F78943B4AC71D4"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinBill.php",
+    "sha256": "2643E11BBFAC9EB2D7499E0B604BF2AB8F181294376D6A13137013D8DB6FA477"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinBillApprovalReceipt.php",
+    "sha256": "A3D48FAB60D79DAD845B8F3321B07B57CAA20E6F4D910AF80BACD4C22FF56ED4"
+  },
+  {
+    "path": "app/Domain/Finance/Models/FinBillDocument.php",
+    "sha256": "0181ABC820E928FF8ED1EF118B13199DD9895BE62FE4A101A1B6C12464AA95F9"
+  },
+  {
+    "path": "app/Domain/Finance/Policies/FinBillPolicy.php",
+    "sha256": "5F8A2FC9E1A1F30B16FDA6FEAD308DB2470FD4BC114F3FF8A0B8FE2129CADF11"
+  },
+  {
+    "path": "app/Domain/Finance/Services/AccountsPayableService.php",
+    "sha256": "D2A6610FB441490A95E1D7744D1DE8D434AFF99DE6CA37DB97378C1445949BDF"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillApprovalSnapshot.php",
+    "sha256": "0D274785B758FD7A935CB0EC2AC9D1EE68F816F2A97EBABE6C2A6B25DAD98298"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillDocumentService.php",
+    "sha256": "49A5A3D15AFCB72014FB47CE912AB33AB2665111A8F5D1385DD0DC29F2490937"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillSiteScope.php",
+    "sha256": "863780C253B444825B910182BD4CA3FD485C5802E28F834AFC4D307021537AD3"
+  },
+  {
+    "path": "app/Domain/Finance/Services/BillWorkContext.php",
+    "sha256": "BA696956226451A7F066F6604E14D0C559178AA028C2446B074493854A518A07"
+  },
+  {
+    "path": "app/Http/Controllers/FleetAssets/VehicleFinanceController.php",
+    "sha256": "536C4A69B283EB775CC5FC91D32BFB521D71458BD94340747196FCD2E26D5B00"
+  },
+  {
+    "path": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+    "sha256": "0FD3B97EFDE8FC2642C0BC22D50612F9A51B536E839DBE08440E277536B4B381"
+  },
+  {
+    "path": "app/Jobs/DeliverFinanceReviewNotice.php",
+    "sha256": "8731832FFD07BA01EADD340B05230EBC51BA3C93D1ECB4B1B733CE8836B682E0"
+  },
+  {
+    "path": "app/Models/FleetFinanceReviewRequest.php",
+    "sha256": "7C04719C251BFD6C3B9CFC63D5EC1E7A9B3E1C65440147C6990187424EED2BFF"
+  },
+  {
+    "path": "app/Models/FleetFinanceReviewRequestEvent.php",
+    "sha256": "1BB32D4D14B5A8999FAD641A58FC0FBE6F08F423B1D5B4D371A6699186EFFDCF"
+  },
+  {
+    "path": "app/Services/Fleet/FinanceReviewEvidence.php",
+    "sha256": "E4A434FBE7670EF702B6851F672A7F664CFAB96D9275A4B67AF71DCAF8890D41"
+  },
+  {
+    "path": "app/Services/Fleet/FinanceReviewNotices.php",
+    "sha256": "426D0386D9FF7A1287EEB3CC88A85D02AFE7BEBB53BC85E1B39E4698CA6EF41B"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceCostPresenter.php",
+    "sha256": "E0E562D2F4483351B4B245A7D0644527444069E682EA29F09555927CE4128311"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceCostSummary.php",
+    "sha256": "C98144E33F76EA12D91F16499AAB7F89B1B0505BA40CB526670A4FF4CFA7312A"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceFinanceService.php",
+    "sha256": "581742324B71593F6AF6DDCBFC80052436D1A0E8875939FD1B3636BCAD5663E5"
+  },
+  {
+    "path": "app/Services/Fleet/MaintenanceTransitionService.php",
+    "sha256": "CE3A99CCB5ECF2C5797B582F44ECDD8E53851C1F1B733FCB96D6A857E8D63B1D"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleDocumentService.php",
+    "sha256": "8AE625BEFC2135D08C001BC581BAC8255FD65D3A491263ED9383263BF8CDA406"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleFinancePresenter.php",
+    "sha256": "5DB136A5932244A0804CB05648F26D0F668AD79DC3E5D8225B4DB46408A39242"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleFinanceReviewQueue.php",
+    "sha256": "18239F6CC7C32F96754C155794959EED552FABFDD16F22B65CB85C809DB6F0AE"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleFinanceService.php",
+    "sha256": "E022934A8A41B3D49377F2F021FF2D7575EE22A1F0A1B26D25BEE7D9F69A5207"
+  },
+  {
+    "path": "app/Services/Tasks/Providers/FleetFinanceReviewProvider.php",
+    "sha256": "530B5A5D3952ECB54AC6F8D268BC26B9763AD6EB7C9F527659D01D5A9A583DFE"
+  },
+  {
+    "path": "build/pdfjs-assets.ts",
+    "sha256": "8ACA8943D90E12C711DC51FBAE595B2E5572CFDA3B1633DCFE2A6DEFC23AD6E0"
+  },
+  {
+    "path": "database/migrations/2026_09_27_000100_complete_finance_review_workflow.php",
+    "sha256": "A5C1543609EE986E6335B0798C15FCD1FE83DAC4F03CDCE746BF78677F2F95D6"
+  },
+  {
+    "path": "package-lock.json",
+    "sha256": "E0ABFE3BE6DF3C1B12AD9DABF4BE4E08F38E7FE4D492295D6E0B3452D876561F"
+  },
+  {
+    "path": "package.json",
+    "sha256": "BB99EC165B561A81C53AAF006B191ED628655929742C3A4E12067AA36E59B769"
+  },
+  {
+    "path": "resources/css/maintenance-work-record.css",
+    "sha256": "2C92DE5849FED7AA3B3AB93BDDD53014877E216950A490B0FD9C02F420075C3A"
+  },
+  {
+    "path": "resources/js/components/finance/bill-review.tsx",
+    "sha256": "92D33CE61EF7D6406146F92C0C514FBD41EF1F8ACC31259508E798C96B2B6108"
+  },
+  {
+    "path": "resources/js/components/finance/bill-workspace.tsx",
+    "sha256": "570699D710B1B294C0155D311351D10DE3B83315434F0D81BF3A3D740C646075"
+  },
+  {
+    "path": "resources/js/components/finance/document-preview.test.tsx",
+    "sha256": "23ECE5D8741208F205EFC556D2601A2C27DDFA4DBCC6E9A8BDA32E62C58830BE"
+  },
+  {
+    "path": "resources/js/components/finance/document-preview.tsx",
+    "sha256": "E5849519BA0E71523A9F5B0B658C295E4B257349241BDF286EC22C3B801B70D6"
+  },
+  {
+    "path": "resources/js/components/finance/new-bill-dialog.tsx",
+    "sha256": "FD9E4F1A027D1065D040D42978A2D03AFC2676F496811B63F54AA4E3ABB15FF0"
+  },
+  {
+    "path": "resources/js/components/finance/record-batch-wizard.test.tsx",
+    "sha256": "33ABAC481339AEB6B928F1C77791D0B8B0F68386B35B6079630367945DE5CA80"
+  },
+  {
+    "path": "resources/js/components/finance/record-batch-wizard.tsx",
+    "sha256": "17BF881B12CBB0BCA0754579ABD09132AA82DEB57C9530ACDFDCE421E74ED52F"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx",
+    "sha256": "3FC3E8D118EF9E854E327BC30FD1B878AF20150A1C6B36DD746D8A0686E870C7"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/maintenance/cost-workspace.tsx",
+    "sha256": "BEE2BB8B1A4C3D2319AB9A1E5867365EBD0FE5F0AB5B1A38D4F8B5435FAA5F97"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-command-results.ts",
+    "sha256": "22924283258E9F2FE6C6BFF413793652EC02C62C2FA228ED4F2F54154F317C54"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-shared.tsx",
+    "sha256": "409C31544B76FC0FFC70B0904B824E03CB82766DAA3AFAE61EFF595AD389528E"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx",
+    "sha256": "523923FDE9E6683E103BEB6597FC525C71106F2F75B6102E9DA384F3665809F0"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.tsx",
+    "sha256": "CFA493959E0D2A871C0F7B471717D5C3C088A51CF7184F2A1B30C7E33BC196AF"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-types.ts",
+    "sha256": "BFA2BA3E1157DE69DF91D329B1A3B0A63F692BF6476A36FC758AF23696CB89D0"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-wizards.tsx",
+    "sha256": "E606E16A94A0E2FCE482D05969202FA6DCE0B4F11A334AF2166293415618C526"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx",
+    "sha256": "50D8652D218BE064AE49E18F19D828FCA099F77B32F1DB8035D0B3151C322CF5"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.ts",
+    "sha256": "91140D6BA6DEDA14E33B79D0ED3F70AD2C9118952110E94DF314709E929535EC"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/wizard-kit.tsx",
+    "sha256": "9B5E7849C14D33DC80786BCAA458B54FDB8D1A42B56B2604789CF2D517757226"
+  },
+  {
+    "path": "resources/js/pages/finance/bills/Index.tsx",
+    "sha256": "79D02AC865FCCC5A364FD41BA7F8C629F03636F4231986B0A5C9A0569B06ED96"
+  },
+  {
+    "path": "resources/js/pages/finance/bills/Show.test.tsx",
+    "sha256": "39F9DD88AA60FAC542D80D159C13F1B82AAC4B344928798BB2B125002D131A6B"
+  },
+  {
+    "path": "resources/js/pages/finance/bills/Show.tsx",
+    "sha256": "33ECF3F525227F3E0EAFB8F349EA336B59CC4251A52A1D3A7E731481818EDB60"
+  },
+  {
+    "path": "resources/js/pages/finance/journals/Show.tsx",
+    "sha256": "60961AC86899B1454EFAEB3C79490C655B5A0E5D0142D87B3160748A25685CF8"
+  },
+  {
+    "path": "resources/js/pages/finance/vehicle-reviews/_dialogs.tsx",
+    "sha256": "B84D39B90185D21346EF17772BEB3EB0EEEC44B5C8F3ACBB1E8CB01AD31046DD"
+  },
+  {
+    "path": "resources/js/pages/finance/vehicle-reviews/history.test.tsx",
+    "sha256": "44B6B7E61AFF144D306274E9F926036B1260A9E028473625104DD8EAFCA1D0A5"
+  },
+  {
+    "path": "resources/js/pages/finance/vehicle-reviews/index.tsx",
+    "sha256": "1B8CBE7714C911CA5449B06F2792F2EF48CF28A050F37B4F6B38D48DB785DE70"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+    "sha256": "A46017F8C5FBCFBCE6905745D8CC597505D3C9CB5FF2F7EC74CD028833329D23"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+    "sha256": "8965AB04CEDAAE2D95E0E754F6BDAAD972352B580C53A313AA3C9AE020B318F9"
+  },
+  {
+    "path": "routes/console.php",
+    "sha256": "17A8D37404E0274156B986D33853F6E7B9ED7168884E1474694C53D73FCE0BF5"
+  },
+  {
+    "path": "routes/finance.php",
+    "sha256": "77FAC1BFB676C8FE92C7050E2FF798F9C08E3B2B8F74D09AD69411F417A175BD"
+  },
+  {
+    "path": "routes/fleet-assets.php",
+    "sha256": "7B3D4FD12D04BFE6CB1E5A64416CF0301382D31A3DC54F000F9FA2B98780844C"
+  },
+  {
+    "path": "tests/Feature/Finance/BillApprovalSnapshotTest.php",
+    "sha256": "CC3482BB30F4A8FBBBF8B866B25E8FA6DF7E5D74CD38ADFB8B1612E0A5109F67"
+  },
+  {
+    "path": "tests/Feature/Finance/BillSpendApprovalGateTest.php",
+    "sha256": "670F3726EE5BA62DBF43CEF9DE7D36FC1D2975DFBEECEA273CFA5D805F510A70"
+  },
+  {
+    "path": "tests/Feature/FleetAssets/Pkg02bVehicleFinanceTest.php",
+    "sha256": "5C32E0F5D7A9FD68BD0660DA4AEC92F982940740090E7FA22EA22D9129C62680"
+  },
+  {
+    "path": "tests/Unit/FleetAssets/MaintenanceCostSummaryTest.php",
+    "sha256": "2EA32AD934EE0E3E53CDF383D10D57398E63FA15FEE3E7BB8796ED2630D79C3C"
+  },
+  {
+    "path": "vite.config.ts",
+    "sha256": "437271C5905D3C19CA6A263F5426E8DB7CE6BC0D2420F9E3EC3F096F0DE29808"
+  }
+]

@@ -20,12 +20,6 @@ use Illuminate\Support\Collection;
  */
 final class HrCalendarAccessService
 {
-    /** @var array<int, bool> */
-    private array $currentStaffCache = [];
-
-    /** @var array<int, HrEmployeeProfile|null> */
-    private array $profileCache = [];
-
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly HrCurrentStaffService $currentStaff,
@@ -34,27 +28,29 @@ final class HrCalendarAccessService
     /** @return array<int, int> */
     public function accessibleSiteIds(User $viewer): array
     {
-        return $this->siteAccess->accessibleSiteIds($viewer);
+        $current = $viewer->fresh();
+
+        return $current ? (new UserSiteAccessService)->accessibleSiteIds($current) : [];
     }
 
     /** @return Builder<Site> */
     public function visibleSitesQuery(User $viewer): Builder
     {
-        return $this->siteAccess->applySiteScope(Site::query(), $viewer);
+        return (new UserSiteAccessService)->applySiteScope(Site::query(), $viewer->fresh());
     }
 
     /** @return Builder<User> */
     public function visibleCurrentStaffQuery(User $viewer): Builder
     {
-        return $this->siteAccess->applyStaffScope(User::query(), $viewer);
+        return (new UserSiteAccessService)->applyStaffScope(User::query(), $viewer->fresh());
     }
 
     /** @return Builder<HrEmployeeProfile> */
     public function visibleCurrentProfilesQuery(User $viewer): Builder
     {
-        return $this->siteAccess->applyCurrentStaffProfileScope(
+        return (new UserSiteAccessService)->applyCurrentStaffProfileScope(
             HrEmployeeProfile::query(),
-            $viewer,
+            $viewer->fresh(),
         );
     }
 
@@ -99,11 +95,15 @@ final class HrCalendarAccessService
 
     public function applyShiftScope(Builder $query, User $viewer): Builder
     {
-        return $this->siteAccess->applyShiftScope($query, $viewer);
+        return (new UserSiteAccessService)->applyShiftScope($query, $viewer->fresh());
     }
 
     public function canViewEvent(User $viewer, HrCalendarEvent $event): bool
     {
+        $viewer = $viewer->fresh();
+        if (! $viewer) {
+            return false;
+        }
         if ($event->recurrence_parent_id !== null) {
             $event->loadMissing('recurrenceParent.attendees');
             $parent = $event->recurrenceParent;
@@ -170,6 +170,10 @@ final class HrCalendarAccessService
 
     public function canManageEvent(User $viewer, HrCalendarEvent $event): bool
     {
+        $viewer = $viewer->fresh();
+        if (! $viewer) {
+            return false;
+        }
         if (! $this->canViewEvent($viewer, $event)) {
             return false;
         }
@@ -279,17 +283,12 @@ final class HrCalendarAccessService
 
     private function isCurrent(User $viewer): bool
     {
-        return $this->currentStaffCache[$viewer->id]
-            ??= $this->currentStaff->isCurrent($viewer);
+        return $this->currentStaff->isCurrent($viewer);
     }
 
     private function profileFor(User $viewer): ?HrEmployeeProfile
     {
-        if (! array_key_exists($viewer->id, $this->profileCache)) {
-            $this->profileCache[$viewer->id] = $viewer->hrEmployeeProfile()->first();
-        }
-
-        return $this->profileCache[$viewer->id];
+        return $viewer->hrEmployeeProfile()->first();
     }
 
     private function audienceGraphIsCoherent(

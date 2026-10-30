@@ -89,7 +89,7 @@ class ControlRoomIncidentControllerTest extends TestCase
         DB::flushQueryLog();
         DB::enableQueryLog();
 
-        $version = app(HandleInertiaRequests::class)->version(request());
+        $version = (string) app(HandleInertiaRequests::class)->version(request());
         $this->actingAs($this->admin)
             ->get('/control-room/incidents', [
                 'X-Inertia' => 'true',

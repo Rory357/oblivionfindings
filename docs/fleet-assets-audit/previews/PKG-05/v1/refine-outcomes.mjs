@@ -1,0 +1,12 @@
+import fs from 'node:fs';const p=new URL('./app.tsx',import.meta.url);let s=fs.readFileSync(p,'utf8');
+s=s.replace("const [origin", "const [origin");
+s=s.replace("const originModal=", "const [requestOutcome,setRequestOutcome]=useState('');\n const originModal=");
+s=s.replace("setCreated(false);setRequest(initial);", "setCreated(false);setRequestOutcome('');setRequest(initial);");
+s=s.replace("setRequest(draft);setCreated(true);", "setRequest(draft);setRequestOutcome('');setCreated(true);");
+s=s.replace("setStage(outcome==='unavailable'?'not-fulfilled':'cancelled');event(", "setRequestOutcome(outcome==='unavailable'?'Not fulfilled':outcome==='choice'?'Client chose not to travel':'Requester cancelled');if(!allocated)setStage(outcome==='unavailable'?'not-fulfilled':'cancelled');event(");
+s=s.replace("const primaryAction=()=>{if(stage", "const primaryAction=()=>{if(requestOutcome&&allocated&&!checkedOut){reference('Recorded outcome · reconcile the linked booking');return}if(stage");
+s=s.replace("const actionLabel=stage", "const actionLabel=requestOutcome&&allocated&&!checkedOut?'Review linked obligations':stage");
+s=s.replace("if(modal==='checkout'){if(maintenance", "if(modal==='checkout'){if(requestOutcome){setError('This request has a recorded outcome. Reconcile the linked booking and passenger plan before departure.');return}if(maintenance");
+s=s.replace('<div className="record-tabs">', '<>{requestOutcome&&<Alert tone="warning" title={requestOutcome}>{reason} The demand outcome is retained separately. {checkedOut&&!receiptSaved?"The vehicle is still with its recorded holder. Record its actual return below; source obligations remain open.":"Review linked booking, passenger and custody obligations in their original sources."}</Alert>}</><div className="record-tabs">');
+s=s.replace('Next action target: Mon 28 Sep, 8:30 AM', "{handover==='accepted'&&isHandover?'No custody action due':stage==='out'||stage==='returned'?'Next action target: Mon 28 Sep, 12:45 PM':'Next action target: Mon 28 Sep, 8:30 AM'}");
+fs.writeFileSync(p,s);

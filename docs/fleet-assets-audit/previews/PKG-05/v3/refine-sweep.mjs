@@ -1,0 +1,25 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url));
+let a=fs.readFileSync(path.join(here,'app.tsx'),'utf8');
+a=a.replace("filter==='assessment'&&r.state==='assessment' ||", "filter==='assessment'&&r.state==='assessment' || filter==='needs_review'&&['assessment','information'].includes(r.state) ||");
+a=a.replace("caption:'Resolve the request details',view:'requests',filter:'unallocated'", "caption:'Resolve the request details',view:'requests',filter:'needs_review'");
+a=a.replace("[['all','All requests'],['assessment','Needs assessment']", "[['all','All requests'],['assessment','Needs assessment'],['needs_review','Assessment / information']");
+a=a.replace("value: scoped.filter(r => r.journey?.state === 'in_progress').length, caption: 'In progress or completion due'", "value: scoped.filter(r => r.journey?.state === 'in_progress'&&!r.journey.arrived).length, caption: 'Actual travel underway'");
+a=a.replace("scoped.filter(r => r.booking?.state === 'approved' && !r.journey).length, caption: 'Confirmed bookings'", "scoped.filter(r => !!r.booking&&['approved','checked_out'].includes(r.booking.state) && !r.journey).length, caption: 'Confirmed, preparing to leave'");
+a=a.replace("title: 'Open exceptions', value: scoped.reduce((n, r) => n + r.exceptions.filter(e => e.state === 'open').length, 0), caption: 'Named owner required'", "title: 'Returns with exceptions', value: scoped.filter(r=>r.exceptions.some(e=>e.state==='open')).length, caption: 'Named owner required'");
+a=a.replace('title="Booking plan" icon={CalendarDays}><div className="route-compact">','title="Booking plan" icon={CalendarDays}><div id="journey-route" tabIndex={-1} className="route-compact">');
+a=a.replace("record.booking?openRecord(record,'bookings'):openRecord(record)","record.booking?route.kind==='bookings'?jump('journey-route'):openRecord(record,'bookings'):jump('journey-route')");
+// A hidden form target must never survive a permission or record-state change.
+a=a.replace("const formRecord=store.records.find(r=>r.id===form?.recordId)||record;", "const formTarget=store.records.find(r=>r.id===form?.recordId)||record;\n    const formRecord=formTarget&&permitted(formTarget,role,load)?formTarget:undefined;");
+fs.writeFileSync(path.join(here,'app.tsx'),a);
+let d=fs.readFileSync(path.join(here,'domain.ts'),'utf8');
+d=d.replace("const v=fleet[p.vehicle as Vehicle];requireThat(v.seats", "const v=fleet[p.vehicle as Vehicle];requireThat(v.site===r.site,'Choose a vehicle from the approved request site.');requireThat(v.seats");
+d=d.replace("requireThat(ctx.role==='escort'||canDrive(ctx.role,r)","requireThat(ctx.role==='escort'&&r.booking?.escort===actors.escort.name||canDrive(ctx.role,r)");
+d=d.replace("requireThat(ctx.role==='escort','Open the permitted medication", "requireThat(ctx.role==='escort'&&r.booking?.escort===actors.escort.name,'Open the permitted medication");
+fs.writeFileSync(path.join(here,'domain.ts'),d);
+let f=fs.readFileSync(path.join(here,'forms.tsx'),'utf8');
+f=f.replace("import {Alert, Button", "import {displayTime} from '@/components/fleet-assets/maintenance/time-picker';\nimport {Alert, Button");
+f=f.replace("{p.end.slice(11)} <span>","{displayTime(p.end.slice(11))} <span>");
+fs.writeFileSync(path.join(here,'forms.tsx'),f);

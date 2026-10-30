@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { AttachmentUploader } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -691,7 +692,7 @@ function PaneShell({
     );
 }
 
-function DeclassificationRequestPane({
+export function DeclassificationRequestPane({
     d,
     onDone,
 }: {
@@ -793,7 +794,7 @@ function DeclassificationRequestPane({
     );
 }
 
-function DeclassificationReviewPane({
+export function DeclassificationReviewPane({
     d,
     onDone,
 }: {
@@ -899,7 +900,7 @@ function DeclassificationReviewPane({
     );
 }
 
-function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const staff = d.assignable_staff ?? [];
     const form = useForm<{ assigned_to_user_id: string }>({
         assigned_to_user_id: '',
@@ -948,7 +949,7 @@ function AssignPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     );
 }
 
-function InvestigationPane({
+export function InvestigationPane({
     d,
     onDone,
 }: {
@@ -1073,7 +1074,7 @@ const AUTHORITIES = [
     { value: 'other', label: 'Other' },
 ];
 
-function ReportPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function ReportPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const form = useForm<{
         authority_type: string;
         authority_name: string;
@@ -1198,7 +1199,7 @@ const RISK_OPTS = [
     { value: 'critical', label: 'Critical' },
 ];
 
-function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const form = useForm<{
         overall_risk_level: string;
         risk_to_self: string;
@@ -1338,7 +1339,7 @@ function RiskPane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     );
 }
 
-function ActionItemPane({
+export function ActionItemPane({
     d,
     onDone,
 }: {
@@ -1500,7 +1501,7 @@ const TRIAGE_PATHS = [
     },
 ];
 
-function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const staff = d.assignable_staff ?? [];
     const form = useForm<{
         substantiation: string;
@@ -1641,7 +1642,7 @@ function TriagePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     );
 }
 
-function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
+export function ClosePane({ d, onDone }: { d: ConcernDetail; onDone: () => void }) {
     const invOpen = (d.investigations ?? []).some(
         (i) => !['completed', 'abandoned'].includes(i.status),
     );
@@ -1840,7 +1841,7 @@ function LifecycleTracker({ d }: { d: ConcernDetail }) {
                             <span
                                 className={
                                     active
-                                        ? 'inline-flex items-center gap-1.5 rounded-full bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground'
+                                        ? 'inline-flex items-center gap-1.5 rounded-full bg-primary-fill px-2.5 py-1 text-[11px] font-semibold text-primary-fill-foreground'
                                         : done
                                           ? 'inline-flex items-center gap-1.5 rounded-full bg-status-success-bg px-2.5 py-1 text-[11px] font-medium text-status-success'
                                           : 'inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11px] font-medium text-muted-foreground'
@@ -2277,14 +2278,17 @@ const INVESTIGATION_OUTCOMES = [
 
 // Completing an investigation flips its status → the SafeguardingInvestigationObserver
 // auto-advances the concern to its action-plan stage (W5).
-function InvestigationCompleteForm({
+export function InvestigationCompleteForm({
     concernId,
     investigationId,
+    startOpen = false,
 }: {
     concernId: number;
     investigationId: number;
+    /** The record page's header action lands straight on the form. */
+    startOpen?: boolean;
 }) {
-    const [openForm, setOpenForm] = useState(false);
+    const [openForm, setOpenForm] = useState(startOpen);
     const form = useForm<{
         status: string;
         outcome: string;
@@ -2435,14 +2439,16 @@ function ReportsSection({ d }: { d: ConcernDetail }) {
 
 // Records an authority's acknowledgement of a logged report — clears the "Acks awaited"
 // worklist + hero count once an authority confirms receipt.
-function ReportAckForm({
+export function ReportAckForm({
     concernId,
     reportId,
+    startOpen = false,
 }: {
     concernId: number;
     reportId: number;
+    startOpen?: boolean;
 }) {
-    const [openForm, setOpenForm] = useState(false);
+    const [openForm, setOpenForm] = useState(startOpen);
     const form = useForm<{
         acknowledgement_received: boolean;
         acknowledged_at: string;
@@ -2607,6 +2613,23 @@ function fmtSize(b?: number | null): string {
 function EvidenceSection({ d }: { d: ConcernDetail }) {
     const atts = d.attachments ?? [];
     const canEdit = !!d.can?.update;
+    const [fileToRemove, setFileToRemove] = useState<
+        (typeof atts)[number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(`/safeguarding/${d.id}/attachments/${fileToRemove.id}`, {
+            preserveScroll: true,
+            onStart: () => setRemovingFile(true),
+            onFinish: () => {
+                setRemovingFile(false);
+                setFileToRemove(null);
+            },
+        });
+    };
+
     return (
         <div className="flex flex-col gap-3">
             {canEdit ? (
@@ -2687,12 +2710,8 @@ function EvidenceSection({ d }: { d: ConcernDetail }) {
                                     <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() =>
-                                            router.delete(
-                                                `/safeguarding/${d.id}/attachments/${a.id}`,
-                                                { preserveScroll: true },
-                                            )
-                                        }
+                                        onClick={() => setFileToRemove(a)}
+                                        aria-label={`Remove ${a.name ?? 'evidence file'}`}
                                         className="text-status-critical hover:text-status-critical"
                                     >
                                         <Trash2 className="h-3.5 w-3.5" />
@@ -2705,6 +2724,27 @@ function EvidenceSection({ d }: { d: ConcernDetail }) {
             ) : (
                 <EmptyState icon={Paperclip} text="No evidence attached." />
             )}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.name ?? 'This evidence file'}
+                        </span>{' '}
+                        will be permanently deleted from this concern. This
+                        cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }

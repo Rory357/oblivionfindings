@@ -68,8 +68,19 @@ class MedicationRuleService
             ->keyBy(fn (MedicationAdminRule $rule): int => (int) $rule->id);
     }
 
+    /** Does this rule (saved or not) match this order? The same test doses use. */
+    public function matchesOrder(MedicationAdminRule $rule, ClientMedication $medication): bool
+    {
+        return $this->matches($rule, $medication);
+    }
+
     private function matches(MedicationAdminRule $rule, ClientMedication $medication): bool
     {
+        // P11 / P00 v5: "Controlled status" matches any order flagged controlled.
+        if ($rule->match_type === 'controlled') {
+            return (bool) $medication->controlled_drug;
+        }
+
         $needle = Str::lower(trim((string) $rule->match_value));
 
         if ($needle === '') {

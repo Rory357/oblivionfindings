@@ -6,6 +6,8 @@ use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\SecurityDevices\Config\CategoryPageConfig;
 use App\Domain\SecurityDevices\Config\DeviceTaxonomy;
 use App\Domain\SecurityDevices\Config\WorkspaceConfig;
+use App\Domain\SecurityDevices\Data\NetworkMapExplorationUnavailable;
+use App\Domain\SecurityDevices\Data\NetworkMapFilters;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
@@ -15,6 +17,7 @@ use App\Domain\SecurityDevices\Presenters\FacilitiesWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\HealthcareWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\NetworkItWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\SecurityWorkspacePresenter;
+use App\Domain\SecurityDevices\Presenters\TopologyWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\TrackingWorkspacePresenter;
 use App\Domain\SecurityDevices\Presenters\WorkspacePresenter;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
@@ -25,6 +28,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Arr;
 use Inertia\Inertia;
 use Inertia\Response;
+use InvalidArgumentException;
 
 class CategoryPageController extends Controller
 {
@@ -101,7 +105,7 @@ class CategoryPageController extends Controller
         return $this->redirectLegacyWorkspace($request, '/security-devices/facilities-iot', 'overview');
     }
 
-    private function buildCategoryPage(Request $request, string $slug): Response
+    private function buildCategoryPage(Request $request, string $slug): Response|RedirectResponse
     {
         $user = $request->user();
         abort_unless($user->canDo('securityDevices.devices.view'), 403);
@@ -110,6 +114,27 @@ class CategoryPageController extends Controller
         $config = CategoryPageConfig::get($slug);
         abort_unless($workspaceConfig !== null && $config !== null, 404);
         $activeTab = WorkspaceConfig::activeTab($workspaceConfig, $request->string('tab')->toString());
+        $mapFilters = null;
+        $mapSites = null;
+        if ($slug === 'network-it' && $activeTab['key'] === 'map') {
+            try {
+                $mapFilters = NetworkMapFilters::fromInput($request->query->all());
+            } catch (InvalidArgumentException) {
+                abort(400, 'Network map filters are invalid.');
+            }
+            $mapSites = $this->access->accessibleSites($user)->orderBy('name')->orderBy('id')->get(['id', 'name']);
+            abort_if($mapFilters->siteId !== null && ! $mapSites->contains('id', $mapFilters->siteId), 404);
+        }
+
+        $topologyCursor = null;
+        if ($slug === 'network-it' && $activeTab['key'] === 'map' && $request->query->has('topology_cursor')) {
+            abort_unless(is_string($request->query('topology_cursor')), 400, 'Topology history cursor is invalid.');
+            try {
+                $topologyCursor = TopologyWorkspacePresenter::decodeCursor($request->query('topology_cursor'));
+            } catch (InvalidArgumentException) {
+                abort(400, 'Topology history cursor is invalid.');
+            }
+        }
 
         // ── Base scope ────────────────────────────────────────────
 
@@ -201,6 +226,15 @@ class CategoryPageController extends Controller
             ])->values();
         }
 
+        $networkWorkspace = null;
+        if ($slug === 'network-it') {
+            try {
+                $networkWorkspace = $this->networkItWorkspacePresenter->present($user, $mapFilters?->siteId !== null ? $this->access->visibleDevicesForSite($user, $mapFilters->siteId)->byDomain($config['domain']) : clone $baseScope, $activeTab, $topologyCursor, $mapFilters, $mapSites);
+            } catch (NetworkMapExplorationUnavailable $exception) {
+                return redirect()->to((new NetworkMapFilters($exception->siteId))->href())->with('error', 'Connection exploration is unavailable for this view. The site map is still available.');
+            }
+        }
+
         return Inertia::render('security-devices/category', [
             'devices' => [
                 'data' => $devices->getCollection()->map(fn (Device $d) => $this->mapDeviceForList($d)),
@@ -212,7 +246,7 @@ class CategoryPageController extends Controller
                 ],
             ],
             'stats' => $stats,
-            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source', 'attention']),
+            'filters' => $request->only(['tab', 'device_id', 'subcategory', 'category', 'status', 'health', 'provider', 'assigned', 'search', 'sort', 'direction', 'history_kind', 'severity', 'event_type', 'source', 'attention', 'flow']),
             'filterOptions' => [
                 'subcategories' => $subcategories,
                 'categories' => $categoryOptions,
@@ -241,18 +275,26 @@ class CategoryPageController extends Controller
                     $user,
                     clone $baseScope,
                     $activeTab,
-                    $request->only(['history_kind', 'device_id', 'severity', 'event_type', 'source']),
+                    $request->only(['history_kind', 'device_id', 'severity', 'event_type', 'source', 'attention']),
                 )
                 : null,
             'securityWorkspace' => $slug === 'security'
-                ? $this->securityWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                ? $this->securityWorkspacePresenter->present(
+                    $user,
+                    clone $baseScope,
+                    $activeTab,
+                    $request->only(['status']),
+                )
                 : null,
             'healthcareWorkspace' => $slug === 'healthcare'
-                ? $this->healthcareWorkspacePresenter->present($user, clone $baseScope, $activeTab)
+                ? $this->healthcareWorkspacePresenter->present(
+                    $user,
+                    clone $baseScope,
+                    $activeTab,
+                    $request->only(['flow']),
+                )
                 : null,
-            'networkItWorkspace' => $slug === 'network-it'
-                ? $this->networkItWorkspacePresenter->present($user, clone $baseScope, $activeTab)
-                : null,
+            'networkItWorkspace' => $networkWorkspace,
             'trackingWorkspace' => $slug === 'tracking'
                 ? $this->trackingWorkspacePresenter->present(
                     $user,

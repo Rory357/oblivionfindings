@@ -1,3 +1,4 @@
+import { useChatCalling } from '@/components/chat/chat-calling';
 import { Button } from '@/components/ui/button';
 import {
     SheetContent,
@@ -11,9 +12,20 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { communicationAccess } from '@/components/workforce/communication-workspace-rail';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useStableValue } from '@/hooks/use-stable-value';
-import { cn, resolveUrl } from '@/lib/utils';
+import {
+    controlRoomDestinations,
+    controlRoomPrimaryLinkActive,
+    type ControlRoomNavCapabilities,
+} from '@/lib/control-room-navigation';
+import {
+    EMAR_SEARCH_KEYWORDS,
+    emarHubLinkActive,
+    emarSearchEntries,
+    emarSidebar,
+} from '@/lib/emar-navigation';
 import {
     FINANCE_SECTIONS,
     financeHubContainsUrl,
@@ -21,19 +33,32 @@ import {
     visibleSectionTabs as visibleFinanceSectionTabs,
 } from '@/lib/finance-sections';
 import {
+    canDiscoverFleetNavigation,
+    FLEET_WORKSPACES,
+    fleetPrimaryLinkActive,
+    fleetPrimaryLinks,
+    visibleFleetGroups,
+    type FleetNavigationPermissions,
+} from '@/lib/fleet-navigation';
+import {
     GOVERNANCE_SECTION_GROUP_LABELS,
     GOVERNANCE_SECTIONS,
     governanceHubContainsUrl,
     visibleSectionTabs,
 } from '@/lib/governance-sections';
+import {
+    safetyHubLinkActive,
+    safetySearchEntries,
+    safetySidebar,
+    type SafetyNavigationPermissions,
+} from '@/lib/health-safety/workspace-navigation';
+import { cn, resolveUrl } from '@/lib/utils';
 import { vendorRegisterTab } from '@/lib/vendor-navigation';
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
-    AlertOctagon,
     AlertTriangle,
-    ArrowLeftRight,
     Banknote,
     BarChart3,
     Bell,
@@ -52,46 +77,31 @@ import {
     Clock,
     DollarSign,
     FileText,
-    FlaskConical,
-    Fuel,
     GitBranch,
     GraduationCap,
-    HardHat,
     Heart,
-    HeartPulse,
     Home,
-    Key,
     Landmark,
-    LayoutDashboard,
     LayoutGrid,
     ListChecks,
     Map,
     MapPin,
-    Megaphone,
-    MessageSquare,
     MessageSquareText,
     Package,
-    PersonStanding,
     PieChart,
     Pill,
     Radio,
-    Receipt,
     Route,
     Server,
     Settings,
     Shield,
-    ShieldAlert,
     ShieldCheck,
-    Siren,
-    Smartphone,
     Stethoscope,
     Target,
     Timer,
-    Trash2,
     Truck,
     UserCheck,
     Users,
-    UserSearch,
     Utensils,
     Wrench,
     X,
@@ -105,7 +115,10 @@ import {
     useRef,
     useState,
 } from 'react';
-import { buildSecurityDevicesNavigationGroups } from './security-devices/security-devices-navigation';
+import {
+    buildSecurityDevicesNavigationGroups,
+    securityDevicesPrimaryLinkActive,
+} from './security-devices/security-devices-navigation';
 
 /* Event Horizon ink rail (APP_SHELL_STYLE_GUIDE.md §3). Sits below the
  * 58px command header; the two share the sidebar tokens so they read as one
@@ -311,6 +324,12 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     const normalizedCurrentPath = normalizePath(currentPath);
     const normalizedItemPath = normalizePath(itemPath);
 
+    // Workforce retains legacy /operations URLs, but belongs to its own module.
+    // Apply this to child links too, even when Operations is manually expanded.
+    if (normalizedItemPath === '/operations' && isWorkforceUrl(current)) {
+        return -1;
+    }
+
     if (normalizedItemPath === '/vendors') {
         const selected = vendorRegisterTab(current);
         return selected ? 3000 + item.length : -1;
@@ -330,6 +349,56 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
             ? 2000 + item.length
             : -1;
     }
+
+    const safetyActive = safetyHubLinkActive(current, item);
+    if (safetyActive !== undefined)
+        return safetyActive ? 2000 + item.length : -1;
+    // A Control Room destination stays lit on every view of its rail
+    // (/control-room prefixes every Control Room URL).
+    const controlRoomActive = controlRoomPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (controlRoomActive !== undefined)
+        return controlRoomActive ? 2000 + item.length : -1;
+
+    const fleetActive = fleetPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (fleetActive !== undefined) return fleetActive ? 2000 + item.length : -1;
+
+    // A Medication hub entry is lit on every page of its hub (its landing
+    // varies with permissions, and `/emar` prefixes every eMAR URL).
+    const emarActive = emarHubLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (emarActive !== undefined) return emarActive ? 2000 + item.length : -1;
+
+    // Referral reports is a dedicated destination, not an intake sub-view.
+    const referralReportsPath = '/operations/referrals/reports';
+    if (
+        normalizedItemPath === '/operations/referrals' &&
+        (normalizedCurrentPath === referralReportsPath ||
+            normalizedCurrentPath.startsWith(`${referralReportsPath}/`))
+    ) {
+        return -1;
+    }
+
+    const workforceActive = workforcePrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (workforceActive !== undefined)
+        return workforceActive ? 2000 + item.length : -1;
+
+    const securityDevicesActive = securityDevicesPrimaryLinkActive(
+        normalizedCurrentPath,
+        normalizedItemPath,
+    );
+    if (securityDevicesActive !== undefined)
+        return securityDevicesActive ? 2000 + item.length : -1;
 
     if (itemQuery.length > 0) {
         return normalizedCurrentPath === normalizedItemPath &&
@@ -353,6 +422,9 @@ const WORKFORCE_ROUTE_PREFIXES = [
     '/operations/shifts',
     '/operations/job-board',
     '/operations/rostering',
+    '/operations/workforce-settings',
+    '/operations/qualifications',
+    '/operations/availability',
     '/operations/handovers',
     '/operations/shift-notes',
     '/operations/timesheets',
@@ -380,6 +452,15 @@ export function isIconActive(
     if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
         return false;
     }
+    // Approved scripts belongs to IT & Support › Remote support (see
+    // isSubItemActive), not to the Security & Devices group its URL sits in.
+    if (item.subPanel && subPanelGroups && isApprovedScriptsUrl(currentUrl)) {
+        return subPanelGroups.some((group) =>
+            (group?.items ?? []).some(
+                (sub) => resolveUrl(sub.href) === '/it/remote-support',
+            ),
+        );
+    }
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
         return subPanelGroups.some((group) =>
@@ -391,12 +472,35 @@ export function isIconActive(
     return false;
 }
 
-export function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
+export function isSubItemActive(
+    currentUrl: string,
+    href: NavItem['href'],
+): boolean {
     if (resolveUrl(href) === '/it') {
         const path = normalizePath(resolveUrl(currentUrl));
         return path === '/it' || path.startsWith('/it/tickets/');
     }
+    // Estate overview's address is the start of every Security & Devices
+    // page, so a prefix match lit it beside the real page. It is current only
+    // on itself (the module's own isSecurityDevicesDestinationActive rule).
+    if (resolveUrl(href) === '/security-devices') {
+        return normalizePath(resolveUrl(currentUrl)) === '/security-devices';
+    }
+    // Approved scripts lives under /security-devices but is reached only from
+    // IT & Support › Remote support, so that is the link that stays lit.
+    if (isApprovedScriptsUrl(currentUrl)) {
+        return resolveUrl(href) === '/it/remote-support';
+    }
     return matchScore(currentUrl, href) > 0;
+}
+
+function isApprovedScriptsUrl(url: string): boolean {
+    const path = normalizePath(resolveUrl(url));
+
+    return (
+        path === '/security-devices/scripts' ||
+        path.startsWith('/security-devices/scripts/')
+    );
 }
 
 // ── Build icon nav items ───────────────────────────────────────────────────
@@ -426,19 +530,19 @@ function buildPortalNavItems(
             {
                 id: 'calendar',
                 icon: CalendarDays,
-                label: 'Calendar & Visits',
+                label: 'Calendar & visits',
                 href: `/portal/clients/${cid}/calendar`,
             },
             {
                 id: 'family-notes',
                 icon: CalendarDays,
-                label: 'Notes & To-Dos',
+                label: 'Notes & to-dos',
                 href: `/portal/clients/${cid}/family-notes`,
             },
             {
                 id: 'messages',
                 icon: MessageSquareText,
-                label: 'Messages',
+                label: 'Chat',
                 href: `/portal/clients/${cid}/messages`,
                 dividerAfter: true,
                 badge: unreadMessageCount || undefined,
@@ -446,7 +550,7 @@ function buildPortalNavItems(
             {
                 id: 'health',
                 icon: Heart,
-                label: 'Health & Care',
+                label: 'Health & care',
                 href: `/portal/clients/${cid}/health`,
             },
             {
@@ -464,7 +568,7 @@ function buildPortalNavItems(
             {
                 id: 'photos',
                 icon: Clipboard,
-                label: 'Photo Gallery',
+                label: 'Photo gallery',
                 href: `/portal/clients/${cid}/photos`,
                 dividerAfter: true,
             },
@@ -527,21 +631,10 @@ function buildIconNavItems({
         return buildPortalNavItems(portalClients, unreadMessageCount);
     }
 
-    // PR 3 — `/my-day` is the single canonical frontline home. Staff users
-    // should see ONE clear home destination; managers and HR admins keep the
-    // traditional `/dashboard`. Dashboard routing itself redirects staff to
-    // `/my-day`, so even a stale link stays safe.
-    const isManager = !!can?.shifts?.manageAny || !!can?.timesheets?.manageAny;
-    const isHrAdmin = !!can?.hr?.analytics?.view && !can?.shifts?.manageAny;
-    const showDashboardHome = isManager || isHrAdmin;
+    // Overview summarises permitted work; My Day remains the personal care workspace.
+    const showDashboardHome = true;
 
     const items: IconNavItem[] = [
-        {
-            id: 'my-day',
-            icon: CheckCircle2,
-            label: 'My Day',
-            href: '/my-day',
-        },
         ...(showDashboardHome
             ? [
                   {
@@ -549,6 +642,33 @@ function buildIconNavItems({
                       icon: LayoutGrid,
                       label: 'Overview',
                       href: '/dashboard',
+                  } as IconNavItem,
+              ]
+            : []),
+        ...(can?.companyHub?.view
+            ? [
+                  {
+                      id: 'company-hub',
+                      icon: MessageSquareText,
+                      label: 'Company Hub',
+                      href: '/company-hub',
+                  } as IconNavItem,
+              ]
+            : []),
+        {
+            id: 'my-day',
+            icon: CheckCircle2,
+            label: 'My Day',
+            href: '/my-day',
+        },
+        ...(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny
+            ? [
+                  {
+                      id: 'chat',
+                      icon: MessageSquareText,
+                      label: 'Chat',
+                      href: can?.chat?.use ? '/chat' : '/operations/messages',
+                      badge: unreadMessageCount,
                   } as IconNavItem,
               ]
             : []),
@@ -596,6 +716,8 @@ function buildIconNavItems({
         !!can?.clients?.viewAssigned ||
         !!can?.onboarding?.viewAny ||
         !!can?.onboarding?.view ||
+        !!can?.referrals?.viewAny ||
+        !!can?.referrals?.viewAssigned ||
         !!can?.progress_notes?.viewAny ||
         !!can?.progress_notes?.create ||
         !!can?.progress_notes?.review ||
@@ -612,7 +734,6 @@ function buildIconNavItems({
         !!can?.evv?.viewAny ||
         !!can?.family_portal?.viewAny ||
         !!can?.family_portal?.manage ||
-        !!can?.qualifications?.viewAny ||
         !!can?.operations?.reports?.view ||
         !!can?.reports?.viewAny ||
         !!can?.timeline?.viewAny ||
@@ -628,6 +749,9 @@ function buildIconNavItems({
     }
 
     const hasWorkforce =
+        !!can?.staff?.viewAny ||
+        !!can?.staff?.availabilityUpdateAny ||
+        !!can?.staff?.availabilityUpdateSelf ||
         canAccessShiftHandovers(can) ||
         !!can?.job_board?.viewAny ||
         !!can?.job_board?.claim ||
@@ -643,36 +767,25 @@ function buildIconNavItems({
         });
     }
 
-    // Medications (PR 12 — worker / admin split).
-    //
-    // Frontline workers (administer-record, no orders-manage/audit) get a
-    // single top-level link straight to the operational worker view at
-    // `/meds/today`. They never land on the admin-heavy eMAR dashboard by
-    // default.
-    //
-    // Managers / medication leads (orders, stock, audit, or reports) keep the
-    // full eMAR sub-panel for oversight, now rooted on the worker view so the
-    // first click still matches the frontline experience, with Dashboard kept
-    // one level deeper for compliance / management work.
-    const canAdminEmar =
-        (can?.medications?.view && can?.medications?.ordersManage) ||
-        (can?.medications?.view && can?.medications?.stockUpdate) ||
-        (can?.medications?.view &&
-            can?.medications?.controlledView &&
-            can?.medications?.controlledRecord) ||
-        can?.medications?.auditView ||
-        can?.medications?.reportsExport ||
-        can?.reports?.viewAny;
-    const canWorkerMeds =
-        can?.medications?.administerRecord || can?.medications?.view;
-    if (canAdminEmar) {
-        items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
-    } else if (canWorkerMeds) {
+    // Medication (eMAR second review §2–§3; lib/emar-navigation.ts owns the
+    // hubs). Frontline workers get one "Meds today" entry; everyone else gets
+    // the "Medication" module listing the hubs they may open, each at its
+    // first permitted view. reports.viewAny alone reveals Reports & audit
+    // only. Navigation only — every page is still guarded on the server.
+    const medication = emarSidebar(can);
+    if (medication.mode === 'module') {
+        items.push({
+            id: 'emar',
+            icon: Pill,
+            label: medication.label,
+            subPanel: true,
+        });
+    } else if (medication.mode === 'frontline') {
         items.push({
             id: 'meds-today',
             icon: Pill,
             label: 'Meds today',
-            href: '/meds/today',
+            href: medication.href,
             // Overdue doses for the worker's shift clients (shared by
             // HandleInertiaRequests, 60s cache) — the design's critical chip.
             badge: can?.medications?.overdueTodayCount,
@@ -691,12 +804,7 @@ function buildIconNavItems({
     }
 
     // Health & Safety
-    const hasSafety =
-        can?.incidents?.viewAny ||
-        can?.incidents?.viewAssigned ||
-        can?.compliance?.view ||
-        can?.hazards?.view ||
-        can?.['health-safety']?.view;
+    const hasSafety = safetySidebar(can).length > 0;
     if (hasSafety) {
         items.push({
             id: 'safety',
@@ -707,10 +815,7 @@ function buildIconNavItems({
     }
 
     // Fleet & Assets
-    const hasFleetAssets =
-        can?.fleet?.viewAny ||
-        can?.assets?.viewAny ||
-        can?.assets?.viewAssigned;
+    const hasFleetAssets = canDiscoverFleetNavigation(can);
     if (hasFleetAssets) {
         items.push({
             id: 'fleet-assets',
@@ -890,6 +995,24 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.view || can?.it?.request
                     ? [{ title: 'Service desk', href: '/it', icon: Server }]
                     : []),
+                ...(can?.it?.approved_software
+                    ? [
+                          {
+                              title: 'Approved software',
+                              href: '/security-devices/software',
+                              icon: Package,
+                          },
+                      ]
+                    : []),
+                ...(can?.it?.remote_support
+                    ? [
+                          {
+                              title: 'Remote support',
+                              href: '/it/remote-support',
+                              icon: Server,
+                          },
+                      ]
+                    : []),
                 ...(can?.it?.view ||
                 can?.it?.request ||
                 can?.it?.knowledge_author ||
@@ -944,15 +1067,17 @@ function buildItSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
                 ...(can?.it?.manage
                     ? [{ title: 'Setup', href: '/it/setup', icon: Settings }]
                     : []),
-                ...(can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view
+                ...(can?.vendors?.view ||
+                can?.credentials?.view ||
+                can?.vendors?.contracts_view
                     ? [
                           {
                               title: 'Vendors & Credentials',
                               href: can?.vendors?.view
                                   ? '/vendors?tab=vendors'
                                   : can?.credentials?.view
-                                      ? '/vendors?tab=credentials'
-                                      : '/vendors',
+                                    ? '/vendors?tab=credentials'
+                                    : '/vendors',
                               icon: Package,
                           },
                       ]
@@ -1004,14 +1129,18 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/sites/reports',
             icon: BarChart3,
         });
-    if (can?.vendors?.view || can?.credentials?.view || can?.vendors?.contracts_view)
+    if (
+        can?.vendors?.view ||
+        can?.credentials?.view ||
+        can?.vendors?.contracts_view
+    )
         items.push({
             title: 'Vendors & Credentials',
             href: can?.vendors?.view
                 ? '/vendors?tab=vendors'
                 : can?.credentials?.view
-                    ? '/vendors?tab=credentials'
-                    : '/vendors',
+                  ? '/vendors?tab=credentials'
+                  : '/vendors',
             icon: Package,
         });
     items.push({
@@ -1100,6 +1229,32 @@ function buildOperationsSubPanelGroups({
     const clientLabel = labels?.['client.singular'] ?? 'Client';
     const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
     const clientMgmt: NavItem[] = [];
+    if (can?.referrals?.viewAny || can?.referrals?.viewAssigned)
+        clientMgmt.push({
+            title: 'Referrals',
+            href: '/operations/referrals',
+            icon: ClipboardList,
+        });
+    if (
+        (can?.referrals?.viewAny || can?.referrals?.viewAssigned) &&
+        can?.referrals?.reports?.view
+    )
+        clientMgmt.push({
+            title: 'Referral reports',
+            href: '/operations/referrals/reports',
+            icon: BarChart3,
+        });
+    if (
+        can?.assets?.telemetryView &&
+        (can?.clients?.viewAny ||
+            can?.clients?.viewAssigned ||
+            can?.hazards?.manage)
+    )
+        clientMgmt.push({
+            title: 'People Locations',
+            href: '/operations/people-locations',
+            icon: MapPin,
+        });
     if (can?.clients?.viewAny || can?.clients?.viewAssigned)
         clientMgmt.push({
             title: clientLabelPlural,
@@ -1148,16 +1303,6 @@ function buildOperationsSubPanelGroups({
         groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
 
     // Communications
-    const comms: NavItem[] = [];
-    if (can?.messages?.viewAny || can?.shifts?.viewAny)
-        comms.push({
-            title: 'Messages',
-            href: '/operations/messages',
-            icon: MessageSquareText,
-        });
-    if (comms.length > 0)
-        groups.push({ label: 'Communications', items: comms });
-
     // Tools
     const tools: NavItem[] = [];
     if (can?.mileage?.viewAny || can?.mileage?.viewOwn)
@@ -1192,12 +1337,6 @@ function buildOperationsSubPanelGroups({
             href: '/settings/calendar-sync',
             icon: CalendarDays,
         });
-    if (can?.qualifications?.viewAny)
-        tools.push({
-            title: 'Qualifications',
-            href: '/operations/qualifications',
-            icon: ShieldCheck,
-        });
     if (tools.length > 0) groups.push({ label: 'Tools', items: tools });
 
     // Reports
@@ -1217,16 +1356,41 @@ function buildOperationsSubPanelGroups({
     return groups;
 }
 
+/**
+ * Workforce shows six destinations (Stephan, 12 Oct 2026): Rostering,
+ * Available shifts, Attendance, Timesheets, Handovers and Settings. The
+ * full Shifts list, Conflict queue, Qualifications and Availability are
+ * reached from Rostering's header; Shift notes is a tab in the Handovers
+ * header. Their routes and permissions are unchanged, and they stay in
+ * command search (`workforceSearchEntries`).
+ */
 function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const workforce: NavItem[] = [];
 
-    // The Shifts table is the scheduler view. Frontline staff still use
-    // `/my-day` for their assigned shifts rather than this manager surface.
-    if (can?.shifts?.viewAny)
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Rostering',
+            href: '/operations/rostering',
+            icon: CalendarDays,
+        });
+    // Without roster access there is no Rostering header to reach these
+    // from, so shift readers and availability editors keep a direct entry.
+    if (!can?.rostering?.viewAny && can?.shifts?.viewAny)
         workforce.push({
             title: 'Shifts',
             href: '/operations/shifts',
             icon: CalendarDays,
+        });
+    if (
+        !can?.rostering?.viewAny &&
+        (can?.staff?.viewAny ||
+            can?.staff?.availabilityUpdateAny ||
+            can?.staff?.availabilityUpdateSelf)
+    )
+        workforce.push({
+            title: 'Availability',
+            href: '/operations/availability',
+            icon: Clock,
         });
     if (
         can?.job_board?.viewAny ||
@@ -1235,42 +1399,10 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         can?.shifts?.viewAssigned
     )
         workforce.push({
-            title: 'Job Board',
+            title: 'Available shifts',
             href: '/operations/job-board',
             icon: ClipboardList,
             badge: can?.job_board?.open_count,
-        });
-    // Rostering's own TabStrip is the navigation for its Calendar tab
-    // (/operations/rostering?tab=calendar) — no separate sidebar item.
-    if (can?.rostering?.viewAny)
-        workforce.push({
-            title: 'Rostering',
-            href: '/operations/rostering',
-            icon: CalendarDays,
-        });
-    if (can?.rostering?.viewAny)
-        workforce.push({
-            title: 'Availability',
-            href: '/operations/rostering?tab=availability',
-            icon: Clock,
-        });
-    if (canAccessShiftHandovers(can))
-        workforce.push({
-            title: 'Handovers',
-            href: '/operations/handovers',
-            icon: GitBranch,
-        });
-    if (can?.shifts?.viewAny)
-        workforce.push({
-            title: 'Shift Notes',
-            href: '/operations/shift-notes',
-            icon: BookOpen,
-        });
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
-        workforce.push({
-            title: 'Timesheets',
-            href: '/operations/timesheets',
-            icon: Clock,
         });
     // Attendance (clock sessions ↔ timesheet sync) sits between Shifts and
     // Timesheets in the workflow; the route also admits frontline workers
@@ -1286,11 +1418,31 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/attendance',
             icon: Timer,
         });
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
+        workforce.push({
+            title: 'Timesheets',
+            href: '/operations/timesheets',
+            icon: Clock,
+        });
+    if (canAccessShiftHandovers(can))
+        workforce.push({
+            title: 'Handovers',
+            href: '/operations/handovers',
+            icon: GitBranch,
+        });
+    // Shift notes keeps its own entry only for a shift reader whose Handovers
+    // header doesn't offer the Shift notes tab (that tab is shown to managers).
+    if (can?.shifts?.viewAny && !communicationAccess(can).notes)
+        workforce.push({
+            title: 'Shift notes',
+            href: '/operations/shift-notes',
+            icon: BookOpen,
+        });
     if (can?.rostering?.viewAny)
         workforce.push({
-            title: 'Conflict Queue',
-            href: '/operations/rostering/conflicts',
-            icon: AlertTriangle,
+            title: 'Settings',
+            href: '/operations/workforce-settings',
+            icon: Settings,
         });
 
     return workforce.length > 0
@@ -1298,551 +1450,132 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         : [];
 }
 
-function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
+/** Former sidebar names stay searchable after the six-entry rename. */
+const WORKFORCE_SEARCH_KEYWORDS: Record<string, string[]> = {
+    '/operations/job-board': ['job board', 'open shifts', 'claim a shift'],
+    '/operations/workforce-settings': ['workforce settings'],
+};
 
-    // Worker view (PR 12). Top of the panel so even admins can quickly drop
-    // into the operational frontline surface before diving into compliance.
-    const workerItems: NavItem[] = [];
-    if (can?.medications?.administerRecord || can?.medications?.view)
-        workerItems.push({
-            title: 'Meds today',
-            href: '/meds/today',
-            icon: Activity,
+/**
+ * Workforce pages that are reached from a header rather than the sidebar,
+ * kept in command search under the entry that leads to them.
+ */
+function workforceSearchEntries(can?: any): Array<{
+    label: string;
+    href: string;
+    group: string;
+    icon: LucideIcon;
+    keywords?: string[];
+}> {
+    const entries: Array<{
+        label: string;
+        href: string;
+        group: string;
+        icon: LucideIcon;
+        keywords?: string[];
+    }> = [];
+    if (canAccessShiftHandovers(can) && communicationAccess(can).notes)
+        entries.push({
+            label: 'Shift notes',
+            href: '/operations/shift-notes',
+            group: 'Handovers',
+            icon: BookOpen,
+            keywords: ['progress notes', 'shift documentation'],
         });
-    if (workerItems.length > 0)
-        groups.push({ label: 'Worker view', items: workerItems });
-
-    // Overview
-    if (can?.medications?.view)
-        groups.push({
-            label: 'Overview',
-            items: [{ title: 'Dashboard', href: '/emar', icon: LayoutGrid }],
-        });
-
-    // Administration
-    const admin: NavItem[] = [];
-    if (can?.medications?.view)
-        admin.push({
-            title: 'MAR Charts',
-            href: '/emar/mar',
-            icon: ClipboardCheck,
-        });
-    if (can?.medications?.view)
-        admin.push({
-            title: 'Medication Rounds',
-            href: '/emar/rounds',
-            icon: Clock,
-        });
-    if (can?.medications?.view)
-        admin.push({ title: 'PRN Records', href: '/emar/prn', icon: BookOpen });
-    if (can?.medications?.view && can?.medications?.controlledView)
-        admin.push({
-            title: 'Controlled Drugs',
-            href: '/emar/controlled',
-            icon: Shield,
-        });
-    if (can?.medications?.breakGlass)
-        admin.push({
-            title: 'Emergency Access',
-            href: '/emar/emergency-access',
-            icon: ShieldAlert,
-        });
-    if (admin.length > 0)
-        groups.push({ label: 'Administration', items: admin });
-
-    // Management
-    const mgmt: NavItem[] = [];
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Medications',
-            href: '/emar/medications',
-            icon: Pill,
-        });
-    if (can?.medications?.view && can?.medications?.stockUpdate)
-        mgmt.push({
-            title: 'Stock Management',
-            href: '/emar/stock',
-            icon: Package,
-        });
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Prescriptions',
-            href: '/emar/prescriptions',
-            icon: FileText,
-        });
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Medication Reviews',
-            href: '/emar/reviews',
+    if (!can?.rostering?.viewAny) return entries;
+    entries.push({
+        label: 'Availability',
+        href: '/operations/rostering?tab=availability',
+        group: 'Rostering',
+        icon: Clock,
+    });
+    if (can?.shifts?.viewAny)
+        entries.push({
+            label: 'Shifts',
+            href: '/operations/shifts',
+            group: 'Rostering',
             icon: CalendarDays,
+            keywords: ['shift list', 'all shifts'],
         });
-    if (can?.medications?.view)
-        mgmt.push({
-            title: 'Self-Administration',
-            href: '/emar/self-admin',
-            icon: Users,
-        });
-    if (mgmt.length > 0) groups.push({ label: 'Management', items: mgmt });
-
-    // Compliance
-    const compliance: NavItem[] = [];
-    if (can?.medications?.auditView)
-        compliance.push({
-            title: 'Audit Trail',
-            href: '/emar/audit',
-            icon: Shield,
-        });
-    if (can?.reports?.viewAny || can?.medications?.reportsExport)
-        compliance.push({
-            title: 'Reports',
-            href: '/emar/reports',
-            icon: PieChart,
-        });
-    if (can?.medications?.view)
-        compliance.push({
-            title: 'Competency',
-            href: '/emar/competency',
-            icon: ClipboardCheck,
-        });
-    if (can?.medications?.view && can?.medications?.controlledView)
-        compliance.push({
-            title: 'Destructions',
-            href: '/emar/destructions',
-            icon: Trash2,
-        });
-    if (can?.medications?.view)
-        compliance.push({
-            title: 'Handovers',
-            href: '/emar/handovers',
-            icon: GitBranch,
-        });
-    if (can?.medications?.view)
-        compliance.push({
-            title: 'Medication Errors',
-            href: '/emar/errors',
+    entries.push(
+        {
+            label: 'Conflict queue',
+            href: '/operations/rostering/conflicts',
+            group: 'Rostering',
             icon: AlertTriangle,
-        });
-    if (compliance.length > 0)
-        groups.push({ label: 'Compliance', items: compliance });
-
-    return groups;
+            keywords: ['conflicts', 'coverage problems'],
+        },
+        {
+            label: 'Qualifications',
+            href: '/operations/qualifications',
+            group: 'Rostering',
+            icon: ShieldCheck,
+            keywords: ['requirements', 'skills'],
+        },
+    );
+    return entries;
 }
 
-function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
+/**
+ * Keep the sidebar entry lit for the pages reached from its header:
+ * Rostering for the Shifts list, Conflict queue, Qualifications and
+ * Availability; Handovers for Shift notes.
+ */
+function workforcePrimaryLinkActive(
+    currentPath: string,
+    itemPath: string,
+): boolean | undefined {
+    const within = (prefix: string) =>
+        currentPath === prefix || currentPath.startsWith(`${prefix}/`);
+    if (itemPath === '/operations/rostering') {
+        return [
+            '/operations/rostering',
+            '/operations/shifts',
+            '/operations/qualifications',
+            '/operations/availability',
+        ].some(within);
+    }
+    if (itemPath === '/operations/handovers') {
+        return ['/operations/handovers', '/operations/shift-notes'].some(
+            within,
+        );
+    }
+    return undefined;
+}
 
-    // ── 1. Command centre — the H&S home / "start here" ──────────────────
-    const overview: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        overview.push({
-            title: 'H&S Dashboard',
-            href: '/health-safety',
-            icon: ShieldCheck,
-        });
-    if (overview.length > 0)
-        groups.push({ label: 'Command centre', items: overview });
+/** The Medication module's hubs (lib/emar-navigation.ts), each at its first permitted view. */
+function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const medication = emarSidebar(can);
+    if (medication.mode !== 'module') return [];
+    return [
+        {
+            label: medication.label,
+            items: medication.hubs.map((hub) => ({
+                title: hub.title,
+                href: hub.href,
+                icon: hub.icon,
+            })),
+        },
+    ];
+}
 
-    // ── 2. Report & respond — the front doors. Every safety event is logged
-    //    here (incident / near miss / fleet / safeguarding) before it converges
-    //    into the governance registers below. ─────────────────────────────────
-    const incidents: NavItem[] = [];
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        incidents.push({
-            title: 'Incidents',
-            href: '/incidents',
-            icon: ShieldAlert,
-        });
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned)
-        incidents.push({
-            title: 'Near Misses',
-            href: '/incidents?tab=near_misses',
-            icon: AlertTriangle,
-        });
-    if (can?.fleet?.viewAny || can?.assets?.viewAny || can?.incidents?.viewAny)
-        incidents.push({
-            title: 'Fleet Incidents',
-            href: '/fleet-assets/incidents',
-            icon: Truck,
-        });
-    if (can?.safeguarding?.viewAny || can?.safeguarding?.create)
-        incidents.push({
-            title: 'Safeguarding',
-            href: '/safeguarding',
-            icon: Shield,
-        });
-    if (incidents.length > 0)
-        groups.push({ label: 'Report & respond', items: incidents });
-
-    // ── 3. Investigate & resolve — the governance registers where every event
-    //    converges, is investigated, and is driven to a verified corrective
-    //    action. "Events" is the master register (was mislabelled
-    //    "Investigations"); Corrective Actions is the verification register. ───
-    const investigate: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        investigate.push({
-            title: 'Events',
-            href: '/health-safety/events',
-            icon: ClipboardCheck,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        investigate.push({
-            title: 'Corrective Actions',
-            href: '/health-safety/corrective-actions',
-            icon: Wrench,
-        });
-    if (investigate.length > 0)
-        groups.push({ label: 'Investigate & resolve', items: investigate });
-
-    // ── 4. Analyse & assure — trends, KPIs and board assurance close the loop.
-    //    Sits after the operational registers so the nav reads report →
-    //    investigate → resolve → analyse top-to-bottom. ───────────────────────
-    const analyse: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view || can?.reports?.viewAny)
-        analyse.push({
-            title: 'Analytics',
-            href: '/health-safety/analytics',
-            icon: BarChart3,
-        });
-    if (analyse.length > 0)
-        groups.push({ label: 'Analyse & assure', items: analyse });
-
-    // H&S Management
-    const hsManagement: NavItem[] = [];
-    if (can?.hazards?.view)
-        hsManagement.push({
-            title: 'Hazards',
-            href: '/compliance/hazards',
-            icon: AlertOctagon,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Worker Participation',
-            href: '/health-safety/worker-participation',
-            icon: Users,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Lone Worker Safety',
-            href: '/health-safety/lone-workers',
-            icon: PersonStanding,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        hsManagement.push({
-            title: 'Emergency Drills',
-            href: '/health-safety/drills',
-            icon: Siren,
-        });
-    if (hsManagement.length > 0)
-        groups.push({ label: 'H&S Management', items: hsManagement });
-
-    // Registers
-    const registers: NavItem[] = [];
-    if (can?.hazards?.view || can?.compliance?.view)
-        registers.push({
-            title: 'Chemical Register',
-            href: '/health-safety/substances',
-            icon: FlaskConical,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        registers.push({
-            title: 'PPE & Equipment',
-            href: '/health-safety/ppe',
-            icon: HardHat,
-        });
-    if (can?.hazards?.view || can?.compliance?.view || can?.clinical?.dashboard)
-        registers.push({
-            title: 'First Aid Register',
-            href: '/health-safety/first-aid',
-            icon: HeartPulse,
-        });
-    if (can?.restraints?.view)
-        registers.push({
-            title: 'Restraints & Behaviour Support',
-            href: '/health-safety/restraints',
-            icon: Clipboard,
-        });
-    if (registers.length > 0)
-        groups.push({ label: 'Registers', items: registers });
-
-    // Injury & Recovery
-    const injury: NavItem[] = [];
-    if (can?.hazards?.view || can?.hr?.wellbeing?.view)
-        injury.push({
-            title: 'Workplace Injuries',
-            href: '/health-safety/injuries',
-            icon: Activity,
-        });
-    if (can?.hazards?.view || can?.compliance?.view)
-        injury.push({
-            title: 'Safe Work Procedures',
-            href: '/health-safety/procedures',
-            icon: FileText,
-        });
-    if (injury.length > 0)
-        groups.push({ label: 'Injury & Procedures', items: injury });
-
-    // Compliance & Risk
-    const compliance: NavItem[] = [];
-    if (can?.compliance?.view)
-        compliance.push({
-            title: 'Compliance',
-            href: '/compliance',
-            icon: Shield,
-        });
-    if (can?.risks?.viewAny || can?.risks?.viewAssigned)
-        compliance.push({
-            title: 'Risks',
-            href: '/health-safety/risk-assessments',
-            icon: Target,
-        });
-    if (can?.privacy?.viewRequests)
-        compliance.push({
-            title: 'Privacy',
-            href: '/privacy/dashboard',
-            icon: Shield,
-        });
-    if (compliance.length > 0)
-        groups.push({ label: 'Compliance & Risk', items: compliance });
-
-    return groups;
+export function buildSafetySubPanelGroups({
+    can,
+}: {
+    can?: SafetyNavigationPermissions;
+}): SubPanelGroup[] {
+    const items = safetySidebar(can);
+    return items.length ? [{ label: 'Health & Safety', items }] : [];
 }
 
 function buildFleetAssetsSubPanelGroups({
     can,
 }: {
-    can?: any;
+    can?: FleetNavigationPermissions;
 }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // Overview
-    const overview: SubPanelGroup = {
-        label: 'Overview',
-        items: [
-            { title: 'Dashboard', href: '/fleet-assets', icon: LayoutGrid },
-            { title: 'Live Map', href: '/fleet-assets/map', icon: Map },
-            {
-                title: 'Daily Checks',
-                href: '/fleet-assets/daily-check',
-                icon: CheckCircle2,
-            },
-        ],
-    };
-    groups.push(overview);
-
-    // Fleet
-    const fleet: SubPanelGroup = { label: 'Fleet', items: [] };
-    if (can?.fleet?.viewAny) {
-        fleet.items.push({
-            title: 'Vehicles',
-            href: '/fleet-assets/vehicles',
-            icon: Truck,
-        });
-        fleet.items.push({
-            title: 'Trips',
-            href: '/fleet-assets/trips',
-            icon: Route,
-        });
-        fleet.items.push({
-            title: 'Fuel Logs',
-            href: '/fleet-assets/fuel',
-            icon: Fuel,
-        });
-        fleet.items.push({
-            title: 'Compliance',
-            href: '/fleet-assets/compliance',
-            icon: ShieldCheck,
-        });
-    }
-    if (fleet.items.length > 0) groups.push(fleet);
-
-    // Assets
-    const assets: SubPanelGroup = { label: 'Assets', items: [] };
-    if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
-        assets.items.push({
-            title: 'All Assets',
-            href: '/fleet-assets/assets',
-            icon: Package,
-        });
-    }
-    if (can?.hr?.assets?.view) {
-        assets.items.push({
-            title: 'HR Asset Register',
-            href: '/hr/assets',
-            icon: Briefcase,
-        });
-    }
-    if (can?.assets?.alertsView) {
-        assets.items.push({
-            title: 'Alerts',
-            href: '/fleet-assets/alerts',
-            icon: AlertTriangle,
-        });
-    }
-    if (
-        can?.assets?.geofencesManage ||
-        can?.geofences?.viewAny ||
-        can?.fleet?.viewAny
-    ) {
-        assets.items.push({
-            title: 'Geofences',
-            href: '/fleet-assets/geofences',
-            icon: MapPin,
-        });
-    }
-    if (assets.items.length > 0) groups.push(assets);
-
-    // Maintenance
-    const maintenance: SubPanelGroup = { label: 'Maintenance', items: [] };
-    if (can?.fleet?.viewAny || can?.assets?.viewAny) {
-        maintenance.items.push({
-            title: 'Overview',
-            href: '/fleet-assets/maintenance/dashboard',
-            icon: LayoutGrid,
-        });
-        maintenance.items.push({
-            title: 'Work Orders',
-            href: '/fleet-assets/maintenance/work-orders',
-            icon: Wrench,
-        });
-        maintenance.items.push({
-            title: 'Service Schedules',
-            href: '/fleet-assets/maintenance/schedules',
-            icon: CalendarDays,
-        });
-        maintenance.items.push({
-            title: 'Checklists',
-            href: '/fleet-assets/maintenance/checklists',
-            icon: ClipboardCheck,
-        });
-        maintenance.items.push({
-            title: 'Inspections',
-            href: '/fleet-assets/inspections',
-            icon: ClipboardList,
-        });
-    }
-    if (maintenance.items.length > 0) groups.push(maintenance);
-
-    // People
-    const people: SubPanelGroup = { label: 'People', items: [] };
-    if (can?.fleet?.viewAny || can?.hr?.driver?.view) {
-        people.items.push({
-            title: 'Drivers',
-            href: '/fleet-assets/drivers',
-            icon: Users,
-        });
-    }
-    if (can?.fleet?.viewAny || can?.assets?.viewAny) {
-        people.items.push({
-            title: 'Vehicle Bookings',
-            href: '/fleet-assets/bookings',
-            icon: CalendarDays,
-        });
-        people.items.push({
-            title: 'Key Management',
-            href: '/fleet-assets/keys',
-            icon: Key,
-        });
-        people.items.push({
-            title: 'Resident Tracking',
-            href: '/fleet-assets/resident-tracking',
-            icon: UserSearch,
-        });
-        people.items.push({
-            title: 'Transport Logs',
-            href: '/fleet-assets/transports',
-            icon: UserCheck,
-        });
-        people.items.push({
-            title: 'Medication Transit',
-            href: '/fleet-assets/transports/medications',
-            icon: Pill,
-        });
-        people.items.push({
-            title: 'Outings',
-            href: '/fleet-assets/outings',
-            icon: MapPin,
-        });
-        people.items.push({
-            title: 'Shift Handovers',
-            href: '/fleet-assets/handovers',
-            icon: ArrowLeftRight,
-        });
-    }
-    if (people.items.length > 0) groups.push(people);
-
-    // Devices
-    const devices: SubPanelGroup = { label: 'Devices', items: [] };
-    if (can?.assets?.trackersManage || can?.fleet?.viewAny) {
-        devices.items.push({
-            title: 'Tracking Devices',
-            href: '/fleet-assets/devices',
-            icon: Radio,
-        });
-    }
-    if (devices.items.length > 0) groups.push(devices);
-
-    // Safety — keep label/icon consistent with the Health & Safety flyout's
-    // "Fleet Incidents" entry so the same destination reads the same everywhere.
-    // Wandering Alerts now lives as a tab on Resident Tracking
-    // (/fleet-assets/resident-tracking?tab=wandering), so it no longer gets a
-    // sidebar entry of its own.
-    const safety: SubPanelGroup = { label: 'Safety', items: [] };
-    safety.items.push({
-        title: 'Fleet Incidents',
-        href: '/fleet-assets/incidents',
-        icon: Truck,
-    });
-    if (safety.items.length > 0) groups.push(safety);
-
-    // Reports
-    const reports: SubPanelGroup = { label: 'Reports', items: [] };
-    if (can?.fleet?.viewAny || can?.assets?.viewAny || can?.reports?.viewAny) {
-        reports.items.push({
-            title: 'Reports & Analytics',
-            href: '/fleet-assets/reports',
-            icon: FileText,
-        });
-        reports.items.push({
-            title: 'Usage by House',
-            href: '/fleet-assets/reports/by-house',
-            icon: Building2,
-        });
-        reports.items.push({
-            title: 'Mileage Reimbursement',
-            href: '/fleet-assets/reports/reimbursement',
-            icon: Receipt,
-        });
-        reports.items.push({
-            title: 'Mileage Claims',
-            href: '/fleet-assets/mileage',
-            icon: Receipt,
-        });
-        reports.items.push({
-            title: 'Cost Allocation',
-            href: '/fleet-assets/reports/cost-allocation',
-            icon: PieChart,
-        });
-        reports.items.push({
-            title: 'Community Access',
-            href: '/fleet-assets/reports/community-access',
-            icon: Users,
-        });
-    }
-    if (reports.items.length > 0) groups.push(reports);
-
-    // Settings
-    const settings: SubPanelGroup = { label: 'Settings', items: [] };
-    settings.items.push({
-        title: 'Notifications',
-        href: '/fleet-assets/settings/notifications',
-        icon: Bell,
-    });
-    if (settings.items.length > 0) groups.push(settings);
-
-    return groups;
+    const items = fleetPrimaryLinks(can);
+    return items.length ? [{ label: 'Fleet & Assets', items }] : [];
 }
-
 /**
  * Governance pages a viewer can act in — manage, decide, request, or (for
  * the person being reviewed) take part in — keyed by hub tab key
@@ -1872,10 +1605,7 @@ export function governanceActionableTabKeys(can?: any): Set<string> {
     );
     add('spend-approvals', gov.spend?.request || gov.spend?.approve);
     add('strategy', gov.strategy?.manage);
-    add(
-        'performance',
-        gov.performance?.manage || gov.performance?.reviewee,
-    );
+    add('performance', gov.performance?.manage || gov.performance?.reviewee);
     add('roadmap', can?.roadmap?.manage);
     add('policies', gov.policies?.manage);
     add('documents', gov.documents?.manage);
@@ -2125,100 +1855,18 @@ function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     return groups.filter((g) => g.items.length > 0);
 }
 
+/** Control Room's six destinations (lib/control-room-navigation.ts, approved
+ * 11 Oct 2026: 12 menu items → 6). Each destination's views are tabs on its
+ * header rail, not more sidebar links. */
 function buildControlRoomSubPanelGroups({
     can,
 }: {
-    can?: any;
+    can?: ControlRoomNavCapabilities;
 }): SubPanelGroup[] {
-    const groups: SubPanelGroup[] = [];
-
-    // All items assume `controlRoom.viewAny` because the icon itself is
-    // already gated on that capability. We still gate sub-items that require
-    // richer permissions (alerts, reports, messaging, settings).
-    // The old Dashboard / All Alerts / Escalation Queue / Incident Tracker
-    // entries merged into ONE command centre (tabs on the page itself).
-    const live: NavItem[] = [];
-    if (can?.controlRoom?.viewAny) {
-        live.push({
-            title: 'Desk',
-            href: '/control-room',
-            icon: LayoutDashboard,
-        });
-        live.push({
-            title: 'My queue',
-            href: '/control-room/my-tasks',
-            icon: CheckCircle2,
-        });
-        live.push({ title: 'Live Map', href: '/control-room/map', icon: Map });
-        live.push({
-            title: 'Shifts',
-            href: '/control-room/shifts',
-            icon: Clock,
-        });
-    }
-    if (live.length) groups.push({ label: 'Live Monitoring', items: live });
-
-    const comms: NavItem[] = [];
-    if (can?.controlRoom?.alertsCreate || can?.controlRoom?.alertsManage)
-        comms.push({
-            title: 'Broadcast',
-            href: '/control-room/broadcast',
-            icon: Megaphone,
-        });
-    if (can?.messages?.send || can?.messages?.viewAny)
-        comms.push({
-            title: 'Staff Messaging',
-            href: '/control-room/messaging',
-            icon: MessageSquare,
-        });
-    if (comms.length) groups.push({ label: 'Communications', items: comms });
-
-    const ops: NavItem[] = [];
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'Device signals',
-            href: '/control-room/devices',
-            icon: Smartphone,
-        });
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'Playbooks',
-            href: '/control-room/playbooks',
-            icon: ClipboardCheck,
-        });
-    if (can?.controlRoom?.viewAny)
-        ops.push({
-            title: 'SLA Management',
-            href: '/control-room/sla',
-            icon: Target,
-        });
-    if (ops.length) groups.push({ label: 'Operations', items: ops });
-
-    const analytics: NavItem[] = [];
-    if (can?.controlRoom?.viewAny)
-        analytics.push({
-            title: 'Real-time Stats',
-            href: '/control-room/stats',
-            icon: Activity,
-        });
-    if (can?.controlRoom?.reportsView)
-        analytics.push({
-            title: 'Reports',
-            href: '/control-room/reports',
-            icon: FileText,
-        });
-    if (analytics.length) groups.push({ label: 'Analytics', items: analytics });
-
-    const config: NavItem[] = [];
-    if (can?.controlRoom?.alertsManage)
-        config.push({
-            title: 'Settings',
-            href: '/control-room/settings',
-            icon: Settings,
-        });
-    if (config.length) groups.push({ label: 'Configuration', items: config });
-
-    return groups;
+    const items: NavItem[] = controlRoomDestinations(can).map(
+        ({ title, href, icon }) => ({ title, href, icon }),
+    );
+    return items.length ? [{ label: 'Control Room', items }] : [];
 }
 
 function buildSecurityDevicesSubPanelGroups({
@@ -2683,7 +2331,9 @@ export function AppSidebar({
     const can = useStableValue(auth?.can);
     const portalClients = useStableValue(auth?.portalClients ?? null);
     const labels = useStableValue(labelsProp);
-    const unreadMessageCount = (auth as any)?.unreadMessageCount ?? 0;
+    const chatUnread = useChatCalling()?.unreadCount;
+    const unreadMessageCount =
+        chatUnread ?? (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
     const { collapsed: fallbackCollapsed, setExpanded: setFallbackExpanded } =
         useAppSidebarState((page.props as any)?.sidebarOpen ?? true);
@@ -3107,7 +2757,8 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     const can = useStableValue(auth?.can);
     const portalClients = useStableValue(auth?.portalClients ?? null);
     const labels = useStableValue(labelsProp);
-    const unreadMessageCount = auth?.unreadMessageCount ?? 0;
+    const chatUnread = useChatCalling()?.unreadCount;
+    const unreadMessageCount = chatUnread ?? auth?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
 
     const iconNavItems = useMemo(
@@ -3149,6 +2800,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
     return (
         <SheetContent
             side="left"
+            aria-modal="true"
             overlayClassName="bg-black/50 md:hidden"
             closeButtonClassName="frontline-focus frontline-tap top-1.5 right-2.5 flex items-center justify-center rounded-md text-sidebar-foreground opacity-100 hover:bg-sidebar-accent hover:opacity-100 focus:ring-sidebar-ring [&_svg]:size-5"
             closeLabel="Close menu"
@@ -3188,7 +2840,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                         )
                                     }
                                     className={cn(
-                                        'frontline-focus min-h-11 w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
+                                        'frontline-focus frontline-tap w-full justify-start gap-3 rounded-none px-4 py-2 text-sm font-normal transition-colors',
                                         active
                                             ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
                                             : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
@@ -3226,7 +2878,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                                     }
                                                     prefetch
                                                     className={cn(
-                                                        'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                                        'frontline-focus frontline-tap flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                                         isSubItemActive(
                                                             currentUrl,
                                                             sub.href,
@@ -3271,7 +2923,7 @@ export function AppSidebarMobile({ onClose }: { onClose: () => void }) {
                                 aria-current={active ? 'page' : undefined}
                                 prefetch
                                 className={cn(
-                                    'frontline-focus flex min-h-11 items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                    'frontline-focus frontline-tap flex items-center gap-3 px-4 py-2 text-sm transition-colors',
                                     active
                                         ? 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
                                         : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
@@ -3300,6 +2952,8 @@ export type NavSearchItem = {
     section: string;
     group?: string;
     icon?: LucideIcon;
+    /** Extra search terms, e.g. a module's former name. */
+    keywords?: string[];
 };
 
 export function buildNavSearchCatalog(ctx: {
@@ -3350,6 +3004,57 @@ export function buildNavSearchCatalog(ctx: {
     };
 
     for (const icon of iconNavItems) {
+        if (icon.id === 'workforce') {
+            for (const entry of workforceSearchEntries(can)) {
+                push({
+                    id: `workforce:rostering:${entry.href}`,
+                    label: entry.label,
+                    href: entry.href,
+                    section: icon.label,
+                    group: entry.group,
+                    icon: entry.icon,
+                    ...(entry.keywords ? { keywords: entry.keywords } : {}),
+                });
+            }
+        }
+        // Keep relocated Fleet pages discoverable in command search as well as
+        // their workspace menus; consolidation only shortens the left rail.
+        if (icon.id === 'fleet-assets') {
+            for (const workspace of FLEET_WORKSPACES) {
+                for (const group of visibleFleetGroups(workspace, can)) {
+                    for (const item of group.links) {
+                        push({
+                            id: `fleet-assets:${workspace.key}:${item.href}`,
+                            label: item.label,
+                            href: item.href,
+                            section: icon.label,
+                            group: workspace.label,
+                            icon: workspace.icon,
+                        });
+                    }
+                }
+            }
+        }
+        // Every Medication view the viewer may open is searchable, with
+        // "eMAR" kept as a synonym for the renamed module.
+        if (icon.id === 'emar' || icon.id === 'meds-today') {
+            for (const entry of emarSearchEntries(can)) {
+                push({
+                    id: entry.id,
+                    label: entry.label,
+                    href: entry.href,
+                    section: 'Medication',
+                    group: entry.group,
+                    icon: entry.icon,
+                    keywords: entry.keywords,
+                });
+            }
+        }
+        if (icon.id === 'safety') {
+            for (const entry of safetySearchEntries(can)) {
+                push({ ...entry, section: icon.label });
+            }
+        }
         if (icon.href && !icon.subPanel) {
             push({
                 id: icon.id,
@@ -3357,6 +3062,9 @@ export function buildNavSearchCatalog(ctx: {
                 href: resolveUrl(icon.href),
                 section: 'General',
                 icon: icon.icon,
+                ...(icon.id === 'meds-today'
+                    ? { keywords: EMAR_SEARCH_KEYWORDS }
+                    : {}),
             });
         }
 
@@ -3377,6 +3085,13 @@ export function buildNavSearchCatalog(ctx: {
                         section: icon.label,
                         group: group.label,
                         icon: sub.icon ?? icon.icon,
+                        ...(icon.id === 'emar'
+                            ? { keywords: EMAR_SEARCH_KEYWORDS }
+                            : {}),
+                        ...(icon.id === 'workforce' &&
+                        WORKFORCE_SEARCH_KEYWORDS[href]
+                            ? { keywords: WORKFORCE_SEARCH_KEYWORDS[href] }
+                            : {}),
                     });
                 }
             }

@@ -63,6 +63,9 @@ beforeEach(function (): void {
     $this->worker->permissionOverrides()->syncWithoutDetaching([
         $view->id => ['allowed' => true],
     ]);
+
+    // Observe expense actions after the canonical staff and Site fixtures are complete.
+    Queue::fake();
 });
 
 function expenseCanonicalProfile(User $user, Site $site, array $overrides = []): HrEmployeeProfile

@@ -10,10 +10,14 @@ use App\Models\SiteVendor;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
-    $this->vaultActor = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    $this->vaultActor = User::factory()->create([
+        'role' => 'support_worker', 'approved_at' => now(),
+        'password' => Hash::make('vault-scope-account-password'),
+    ]);
     $this->vaultRole = Role::query()->create([
         'name' => 'vault-scope-'.str()->uuid(), 'label' => 'Restricted vault fixture',
         'level' => 10, 'type' => 'custom',
@@ -82,8 +86,21 @@ test('vault feeds honor only the same explicit all-Sites exception as direct cre
     $this->actingAs($actor)->getJson('/vendors/audit')->assertOk()->assertJsonCount(2, 'logs');
     foreach ($this->vaultCredentials as $credential) {
         expect($actor->can('view', $this->vaultSites->firstWhere('id', $credential->site_id)))->toBeTrue();
+        $original = $credential->fresh()->getRawOriginal();
+        $revealCount = $credential->auditLogs()->where('action', 'reveal')->count();
         $this->actingAs($actor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/reveal")
-            ->assertOk()->assertJsonStructure(['value']);
+            ->assertUnprocessable()->assertJsonValidationErrors(['verification_code'])
+            ->assertJsonMissingPath('value');
+        expect($credential->fresh()->getRawOriginal())->toBe($original)
+            ->and($credential->auditLogs()->where('action', 'reveal')->count())->toBe($revealCount)
+            ->and($credential->auditLogs()->where('action', 'reauth_failed')->where('user_id', $actor->id)->count())->toBe(1);
+
+        $this->actingAs($actor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/reveal", [
+            'password' => 'vault-scope-account-password',
+        ])->assertOk()->assertJsonPath('value', 'synthetic-vault-pin');
+        expect($credential->auditLogs()->where('action', 'reauth_passed')->where('user_id', $actor->id)->count())->toBe(1)
+            ->and($credential->auditLogs()->where('action', 'reveal')->count())->toBe($revealCount + 1)
+            ->and($credential->fresh()->getRawOriginal())->toBe($original);
     }
 
     $this->vaultRole->permissions()->detach($bypass);
@@ -92,6 +109,10 @@ test('vault feeds honor only the same explicit all-Sites exception as direct cre
         ->assertInertia(fn ($page) => $page->has('credentials', 0)->has('vendors', 0));
     $this->actingAs($actor)->getJson('/vendors/audit')->assertOk()->assertExactJson(['logs' => []]);
     $credential = $this->vaultCredentials[0];
+    $original = $credential->fresh()->getRawOriginal();
+    $auditCount = $credential->auditLogs()->count();
     $this->actingAs($actor)->postJson("/sites/{$credential->site_id}/credentials/{$credential->id}/reveal")
-        ->assertNotFound();
+        ->assertNotFound()->assertJsonMissingPath('value');
+    expect($credential->fresh()->getRawOriginal())->toBe($original)
+        ->and($credential->auditLogs()->count())->toBe($auditCount);
 });

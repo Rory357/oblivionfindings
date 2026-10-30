@@ -10,14 +10,39 @@ it('keeps active IT Security Devices and Monitoring partition behavior at absolu
 
 it('keeps the Fleet dashboard on canonical Site and Security Devices projections', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
-    $contents = file_get_contents($root.'/app/Http/Controllers/FleetAssets/DashboardController.php');
+    $controller = file_get_contents($root.'/app/Http/Controllers/FleetAssets/DashboardController.php');
+    $overview = file_get_contents($root.'/app/Services/Fleet/FleetOverviewService.php');
+    $locations = file_get_contents($root.'/app/Services/Fleet/VehicleLocationService.php');
 
-    expect($contents)->toBeString()
-        ->and($contents)->toContain('SecurityDevicesAccessService')
-        ->and($contents)->toContain('visibleDevices($user)')
-        ->and($contents)->not->toMatch('/\b(?:tenant_id|organization_id|organisation_id)\b/u')
-        ->and($contents)->not->toContain("'payload' => \$s->payload")
-        ->and($contents)->not->toContain("'trackers' =>");
+    expect($controller)->toBeString()
+        ->toContain('FleetOverviewService $overview')
+        ->toContain('$this->overview->present($request->user()')
+        ->and($overview)->toBeString()
+        ->toContain('SecurityDevicesAccessService $access')
+        ->toContain("canDo('fleet.viewAny')")
+        ->toContain("canDo('assets.viewAny')")
+        ->toContain("canDo('assets.viewAssigned')")
+        ->toContain('accessibleVehiclesForFleet($viewer)')
+        ->toContain('accessibleAssets($viewer')
+        ->toContain('accessibleSites($viewer)')
+        ->toContain('$this->locations->lastPermittedPosition($viewer, $vehicle)')
+        ->and($locations)->toBeString()
+        ->toContain('accessibleSiteIds($user, self::SITE_BYPASS_PERMISSIONS)')
+        ->toContain('FleetTripSiteScope::vehicles($siteIds)')
+        ->toContain('if (! $this->positionsVisible($user, $vehicle))')
+        ->toContain('$state = $this->state($vehicle, $snapshot, true)')
+        ->toContain('$snapshot->consent_blocked')
+        ->toContain('$snapshot->lastTrip?->consent_blocked')
+        ->toContain('$this->personalAt($vehicle, $observed, $snapshot->lastTrip)');
+
+    foreach ([$controller, $overview, $locations] as $source) {
+        expect($source)->not->toMatch('/\b(?:tenant_id|organization_id|organisation_id)\b/u')
+            ->not->toContain("'payload' => \$s->payload")
+            ->not->toContain("'raw_payload' =>");
+    }
+    foreach ([$controller, $overview] as $source) {
+        expect($source)->not->toContain("'trackers' =>");
+    }
 });
 
 it('keeps native monitoring to IT independent of the Control Room Device projection', function () {
@@ -71,7 +96,9 @@ it('keeps Control Room Device pages focused on signal activity instead of duplic
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $controller = file_get_contents($root.'/app/Http/Controllers/ControlRoom/ControlRoomDeviceController.php');
     $presenter = file_get_contents($root.'/app/Services/ControlRoom/ControlRoomDevicePresenter.php');
-    $sidebar = file_get_contents($root.'/resources/js/components/app-sidebar.tsx');
+    // Control Room's menu lives in one navigation map (12 items → 6, 11 Oct 2026);
+    // the device pages are its Monitoring › Signals view.
+    $navigation = file_get_contents($root.'/resources/js/lib/control-room-navigation.ts');
     $index = file_get_contents($root.'/resources/js/pages/control-room/devices/index.tsx');
 
     expect($controller)
@@ -83,8 +110,9 @@ it('keeps Control Room Device pages focused on signal activity instead of duplic
         ->and($presenter)
         ->not->toContain("'status' => \$projection->status")
         ->not->toContain('isStale(')
-        ->and($sidebar)
-        ->toContain("title: 'Device signals'")
+        ->and($navigation)
+        ->toContain("key: '/control-room/devices',")
+        ->toContain("label: 'Signals',")
         ->and($index)
         ->toContain('Open Device registry')
         ->not->toContain('Signal offline')
@@ -113,8 +141,11 @@ it('keeps Device assignment history in the canonical Device profile payload only
         ->not->toContain('function history(')
         ->and($deviceController)
         ->toContain("'assignmentHistory' =>")
+        // The profile hands the canonical payload to the shared records
+        // component instead of mapping it inline; it never fetches history.
         ->and($deviceProfile)
-        ->toContain('assignmentHistory.map(');
+        ->toContain('rows={assignmentHistory}')
+        ->not->toContain('/assignments`');
 });
 
 it('keeps active IT and Security Devices surfaces free of known inert interaction patterns', function () {
@@ -172,10 +203,11 @@ it('keeps the interaction audit bound to the exact release cross-module source i
         'resources/js/pages/control-room/map.tsx',
         'resources/js/pages/control-room/devices/index.tsx',
         'resources/js/pages/control-room/devices/show.tsx',
-        'resources/js/components/control-room/alert-workspace-dialog.tsx',
+        'resources/js/components/control-room/alert-record/alert-sections.tsx',
+        'resources/js/components/control-room/alert-record/alert-actions.tsx',
         'resources/js/components/control-room/alert-workspace/linked-journey.tsx',
-        'resources/js/components/control-room/alert-worklist/alert-worklist.tsx',
-        'resources/js/components/control-room/alert-worklist/alert-worklist-row.tsx',
+        'resources/js/components/control-room/live-response/response-worklist.tsx',
+        'resources/js/components/control-room/live-response/alert-preview.tsx',
         'resources/js/pages/sites/show.tsx',
         'resources/js/components/sites/site-technology-projection.tsx',
         'resources/js/pages/operations/clients/show.tsx',
@@ -238,9 +270,12 @@ it('keeps the Site Profile technology tab bound to its canonical optional projec
         ->toContain('<SiteTechnologyProjectionPanel')
         ->toContain('data={tabData as SiteTechnologyProjection}')
         ->toContain('canViewHardwarePlacement={props.can.viewHardwarePlacement}')
+        // The Security & Devices Site header links to the Site profile's
+        // technology tab only for someone who may view that profile.
         ->and($securitySite)
-        ->toContain('<SiteProfileDestination')
-        ->toContain('tab="technology"')
+        ->toContain('{can.view_site_profile ? (')
+        ->toContain("'?tab=technology'")
+        ->toContain('<SiteProfileAccessRequired')
         ->and($projection)
         ->toContain('canViewHardwarePlacement &&')
         ->toContain('data.can.view_room_placement ? (')
@@ -812,6 +847,10 @@ it('keeps catalogue authoring publishing and entity choices governed end to end'
     $setupPath = $root.'/resources/js/components/it/it-catalogue-management.tsx';
     $setup = is_file($setupPath) ? file_get_contents($setupPath) : '';
     $requester = file_get_contents($root.'/resources/js/components/it/it-service-catalogue.tsx');
+    $requestWizardPath = $root.'/resources/js/components/it/catalogue-request-wizard.tsx';
+    $requestWizard = is_file($requestWizardPath) ? file_get_contents($requestWizardPath) : '';
+    $requestFieldsPath = $root.'/resources/js/components/it/catalogue-request-fields.tsx';
+    $requestFields = is_file($requestFieldsPath) ? file_get_contents($requestFieldsPath) : '';
 
     expect($routes)
         ->toContain('/it/setup/catalogue-items/{catalogItem}/publish')
@@ -834,7 +873,14 @@ it('keeps catalogue authoring publishing and entity choices governed end to end'
         ->toContain('min-h-11')
         ->and($requester)
         ->toContain('fieldOptions')
+        ->toContain('<CatalogueRequestWizard')
+        ->toContain('fieldOptions={fieldOptions}')
+        ->and($requestWizard)
+        ->toContain('<CatalogFieldControl')
+        ->toMatch('/options=\{\s*fieldOptions\[/')
+        ->and($requestFields)
         ->toContain("['employee', 'user', 'asset'].includes")
+        ->toContain('<CatalogueEntityPicker')
         ->toContain("const numeric = ['integer', 'number']");
 });
 
@@ -843,9 +889,12 @@ it('keeps provisioning creation cancellation and HR handover centrally governed'
     $controller = file_get_contents($root.'/app/Http/Controllers/It/ItProvisioningController.php');
     $service = file_get_contents($root.'/app/Domain/It/Services/ItProvisioningRequestLifecycleService.php');
     $cancelRequest = file_get_contents($root.'/app/Http/Requests/It/CancelProvisioningRequestRequest.php');
-    $dialogPath = $root.'/resources/js/components/it/provisioning-cancel-dialog.tsx';
-    $dialog = is_file($dialogPath) ? file_get_contents($dialogPath) : '';
-    $workspace = file_get_contents($root.'/resources/js/pages/it/index.tsx');
+    $commandsPath = $root.'/app/Domain/It/Services/ItProvisioningCommandService.php';
+    $commands = is_file($commandsPath) ? file_get_contents($commandsPath) : '';
+    $commandFieldsPath = $root.'/resources/js/components/it/provisioning-command-fields.ts';
+    $commandFields = is_file($commandFieldsPath) ? file_get_contents($commandFieldsPath) : '';
+    $taskPage = file_get_contents($root.'/resources/js/pages/it/provisioning/task.tsx');
+    $register = file_get_contents($root.'/resources/js/pages/it/provisioning/index.tsx');
 
     expect($controller)
         ->not->toContain('ItProvisioningRequest::query()->create([')
@@ -859,13 +908,22 @@ it('keeps provisioning creation cancellation and HR handover centrally governed'
         ->toContain("'reason' => \$reason")
         ->and($cancelRequest)
         ->toContain("'reason' => ['required'")
-        ->and($dialog)
-        ->toContain('Reason for cancelling')
+        ->and($commands)
+        ->toContain("'cancel' => \$this->requests->cancel(\$target, \$actor, \$payload['reason'])")
+        ->toContain("in_array(\$operation, ['withdraw_approval', 'reject', 'fail', 'retry', 'cancel', 'reopen', 'reverse'], true)")
+        ->toContain("\$rules['reason'] = ['required'")
+        ->and($commandFields)
+        ->toContain("label: 'Reason and next action'")
+        ->toMatch("/provisioningReasonField: ProvisioningCommandField = \{[^}]*required: true,/")
+        ->toContain("case 'cancel':")
         ->toContain('linked onboarding task remains open')
-        ->toContain('min-h-11')
-        ->and($workspace)
-        ->toContain('ProvisioningCancelDialog')
-        ->toContain('setCancelRequest(r)');
+        ->and($taskPage)
+        ->toContain('<ProvisioningCommandDialog')
+        ->toContain('description={taskCommandDescription(operation)}')
+        ->toContain('fields={taskCommandFields(task, operation)}')
+        ->and($register)
+        ->toContain('<ProvisioningCommandDialog')
+        ->toContain('description={taskCommandDescription(rowCommand.operation)}');
 });
 
 it('detects an injected tenant authorization shortcut in a new file', function () {
@@ -949,10 +1007,16 @@ it('pins the exact compatibility evidence files excluded from active source scan
     $expectedPaths = [
         'tests/Feature/It/ItProvisioningWorkflowTest.php',
         'tests/Feature/It/ItServiceManagementSchemaTest.php',
+        'tests/Feature/Monitoring/MetricRetentionTest.php',
         'tests/Feature/Monitoring/MonitoringFoundationMigrationTest.php',
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php',
         'tests/Feature/Monitoring/MonitoringSchemaTest.php',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php',
+        'resources/js/components/security-devices/collector-installation-profile.test.ts',
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php',
+        'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php',
+        'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php',
+        'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php',
     ];
 
     expect(array_keys(itSecurityCompatibilityEvidenceFingerprints()))->toBe($expectedPaths);
@@ -1423,12 +1487,24 @@ function itSecurityTenantDebtSnapshot(string $root): array
 function itSecurityCompatibilityEvidenceFingerprints(): array
 {
     return [
-        'tests/Feature/It/ItProvisioningWorkflowTest.php' => 'b03da30cdfb02dfb4c1dbb1524a5c0fcb3a3ee24987d2debce5a1e92af4d333b',
+        'tests/Feature/It/ItProvisioningWorkflowTest.php' => '2c3cf7f7160a51ac317a1dd2f1207a8ac27048e1cf1b6c16ad246c8f5162e909',
         'tests/Feature/It/ItServiceManagementSchemaTest.php' => 'e54dc9941b442fa4600dfc033bf203b1d9d0c7abef73f40b7755b2e40a5fd372',
+        'tests/Feature/Monitoring/MetricRetentionTest.php' => '183a09dc2c57e61ac825a7920fc1f2b1c8a66bd8208d5568b794116d4c1fdf74',
         'tests/Feature/Monitoring/MonitoringFoundationMigrationTest.php' => '887bf76dbd5ba516321b4e41dfeac6150b7ac9d66cf803a1da079a09b0bd3b28',
         'tests/Feature/Monitoring/MonitoringObservationProvenanceReconciliationTest.php' => 'ccf15093cf6293e76084781da1142d0621162d8b5fc78e8710f2855bad664e69',
-        'tests/Feature/Monitoring/MonitoringSchemaTest.php' => 'f755c57573d32e70a1746f7558147b3741be022e092d9e3f31498c823185b16e',
+        // Reviewed immutable-evidence regression: only exception wording and
+        // no-effect assertions changed; the three legacy storage writes remain.
+        'tests/Feature/Monitoring/MonitoringSchemaTest.php' => '3159c9921ee8f28862c9234c2386233d249ab011919c709b793f2c5f3db2a6cd',
         'tests/Feature/Monitoring/RuntimeEnvelopePersistenceTest.php' => 'af83c6c0b9e9cd1dcd91aa27740df2a2ebaad85462926a9a49b3878751aeada2',
+        // Reviewed 23 Oct 2026: each mention is a single-tenant negative check —
+        // a request carrying tenant_id is rejected (400 / invalid profile), a
+        // response has no tenant_id key, or a migration's SQL contains neither
+        // tenant_id nor organization_id. No tenant storage or comparison.
+        'resources/js/components/security-devices/collector-installation-profile.test.ts' => 'cd5256ee9c0fa8510d1d6c7956c14290ef5cec982a0db1cc20ac69dd09ab8184',
+        'tests/Feature/SecurityDevices/DeviceGroupMaintenancePreviewTest.php' => '45cb962c87812d1a51f9d32135f6e5ac763a14ee845f56460d5f6f6a2ab591c9',
+        'tests/Feature/SecurityDevices/HikvisionDiscoveryTest.php' => '9f8026a7a883a95d888572e0a5fcadb54c161c59f169d66ec0587e871bb52360',
+        'tests/Unit/SecurityDevices/HikvisionDiscoveryMigrationTest.php' => '0953f8d830067600a33153b476e216f726fe0a42ae7da6af5b9eba865dc98866',
+        'tests/Unit/SecurityDevices/HikvisionSourceMigrationTest.php' => '150ebfb00b38ee3d835bf80898e7d3868c50228ccfc30bb79960fcd7d66e444d',
     ];
 }
 
@@ -2368,6 +2444,7 @@ function itSecurityHistoricalTenantMigrationFingerprints(): array
         'database/migrations/2026_08_02_000015_realign_site_profile_application_identity.php' => 'd59a7523eccb409e82d0e2930733654ea3a4d7e0a1743846c5c5dc2c3a2bb6be',
         'database/migrations/2026_08_02_000016_realign_hr_automation_webhooks_application_identity.php' => '4c40ee432de581f8be741f7a0bb52d3fc1b554a9b04f50620b589a61117e9ff1',
         'database/migrations/2026_08_02_000019_realign_hr_documents_signatures_application_identity.php' => 'a40891f91f8f2c616f35bb74b6ed6dbd7ac37633021b87d42a8eb22259b1c237',
+        'database/migrations/2026_08_23_000230_create_workforce_availability_coverage_actions.php' => 'ae578b7d3fdb082e96350984e180e626166dec43596bb3c12cc77b2d6b6d61d1',
     ];
 }
 

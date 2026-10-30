@@ -1,40 +1,49 @@
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
 import AttentionBar from '@/components/emar/mar/attention-bar';
-import ClinicalRail from '@/components/emar/mar/clinical-rail';
+import ClinicalRail, {
+    type InrRecord,
+} from '@/components/emar/mar/clinical-rail';
 import DoseContextMenu, {
     type DoseCtxTarget,
 } from '@/components/emar/mar/dose-context-menu';
 import MarGrid, { type MarGridMed } from '@/components/emar/mar/mar-grid';
 import PrnCard from '@/components/emar/mar/prn-card';
 import {
+    EmarMeters,
+    EmarRecordTabs,
+} from '@/components/emar/workspace-navigation';
+import {
     addDays,
     DayPickerChip,
     toYmd,
 } from '@/components/meds/day-picker-chip';
+import { type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroMetaItem,
-    type PageHeroStat,
-} from '@/components/page';
-import {
-    EntityFilter,
-    TabStrip,
-    type RosterTabItem,
-} from '@/components/rostering';
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import { EntityFilter, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateOnly } from '@/lib/datetime';
 import MarGovernanceDialogs, {
+    type ChartMedicationOption,
     type MarModal,
     type PendingCorrection,
 } from '@/pages/emar/components/mar-governance-dialogs';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
-import type {
-    ClientInfo,
-    NotGivenReasonOption,
-    PrnMedication,
-    ScheduleRow,
-    WitnessOption,
+import {
+    awaitsOrderCheck,
+    type ClientInfo,
+    type NotGivenReasonOption,
+    type PrnMedication,
+    type ScheduleRow,
+    type WitnessOption,
 } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -65,6 +74,13 @@ type MarData = {
         admin_rules?: { required_observations?: string[] | null } | null;
         dose_times: string[];
     }>;
+    prn?: Array<{
+        id: number;
+        name: string;
+        dosage: string;
+        controlled_drug: boolean;
+        witness_required: boolean;
+    }>;
     attention_alerts?: Array<{
         id: number;
         type: string;
@@ -72,17 +88,7 @@ type MarData = {
         detail?: string | null;
         prompt_on_open: boolean;
     }>;
-    inr_records?: Array<{
-        id: number;
-        medication_name?: string | null;
-        inr_value: string | number;
-        tested_on?: string | null;
-        next_test_date?: string | null;
-        target_range_min?: string | number | null;
-        target_range_max?: string | number | null;
-        medication_dose?: string | null;
-        disabled_at?: string | null;
-    }>;
+    inr_records?: InrRecord[];
     syringe_drivers?: Array<{
         id: number;
         status: string;
@@ -170,6 +176,7 @@ function initials(name: string): string {
 }
 
 export default function MarCharts(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         clients,
         selected_client_info: info,
@@ -257,6 +264,21 @@ export default function MarCharts(props: Props) {
         [marData.scheduled],
     );
 
+    // Active charted medicines (scheduled + PRN) a syringe driver may contain.
+    const chartMedications: ChartMedicationOption[] = useMemo(
+        () =>
+            [...(marData.scheduled ?? []), ...(marData.prn ?? [])]
+                .map((med) => ({
+                    id: med.id,
+                    name: med.name,
+                    dosage: med.dosage,
+                    controlled_drug: med.controlled_drug,
+                    witness_required: med.witness_required,
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name)),
+        [marData.scheduled, marData.prn],
+    );
+
     const searched = useMemo(
         () =>
             search
@@ -297,7 +319,11 @@ export default function MarCharts(props: Props) {
             )
                 cdDue += 1;
         }
-        const total = schedule.length;
+        // Doses waiting for the order check, and doses the person is away
+        // for, are shown but not counted.
+        const total = schedule.filter(
+            (row) => !awaitsOrderCheck(row) && row.status !== 'away',
+        ).length;
         return {
             recorded,
             total,
@@ -332,20 +358,15 @@ export default function MarCharts(props: Props) {
     // whenever one exists, so this is the genuinely-empty state (not a picker).
     if (!info) {
         return (
-            <AppLayout
-                breadcrumbs={[
-                    { title: 'eMAR', href: '/emar' },
-                    { title: 'MAR Charts', href: '/emar/mar' },
-                ]}
-            >
+            <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title="MAR Charts" />
-                <div className="flex flex-col gap-6 p-6">
-                    <PageHero
-                        variant="hero"
-                        category="ops"
+                <div className="flex flex-col gap-5">
+                    <PageHeader
+                        wrapTitle
+                        rail={<EmarHubRail />}
                         icon={Pill}
                         title="MAR Charts"
-                        description="No residents with active medications to chart yet."
+                        subline="No people with active medications to chart yet."
                     />
                     <div className="rounded-2xl border bg-card p-10 text-center text-sm text-muted-foreground">
                         Once a resident has active medication orders, their
@@ -397,23 +418,8 @@ export default function MarCharts(props: Props) {
             : null,
     ].filter(Boolean) as PageHeroBadge[];
 
-    const heroStats: PageHeroStat[] = [
-        { label: 'Recorded', value: `${counts.pct}%` },
-        {
-            label: 'Due now',
-            value: counts.due,
-            tone: counts.due > 0 ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Overdue',
-            value: counts.overdue,
-            tone: counts.overdue > 0 ? 'critical' : 'neutral',
-        },
-        { label: 'PRN today', value: counts.prnGiven },
-    ];
-
     const heroFooter = (
-        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
                 <Button
                     variant="outline"
@@ -444,13 +450,6 @@ export default function MarCharts(props: Props) {
                 )}
             </div>
             <div className="flex flex-wrap items-center gap-2 md:ml-auto">
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search medication…"
-                    className="h-9 w-44 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 text-sm text-primary-foreground placeholder:text-primary-foreground/60 focus:ring-2 focus:ring-primary-foreground/40 focus:outline-none"
-                />
                 <EntityFilter
                     label="Resident"
                     allLabel="All residents"
@@ -467,79 +466,86 @@ export default function MarCharts(props: Props) {
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'MAR Charts', href: '/emar/mar' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`MAR · ${info.name}`} />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    variant="hero"
-                    category="ops"
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    wrapTitle
+                    rail={<EmarHubRail />}
+                    variant="profile"
                     brandColour={brandColour}
-                    avatar={{ fallback: initials(info.name) }}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                {isToday ? (
-                                    <span
-                                        aria-hidden
-                                        className="relative inline-flex h-2 w-2"
-                                    >
-                                        <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                    </span>
-                                ) : (
-                                    <CalendarDays className="h-3 w-3" />
-                                )}
-                                {isToday
-                                    ? 'Live medication chart'
-                                    : 'Medication chart'}
-                            </span>
-                            <span className="mt-1 block text-[28px] leading-tight font-bold">
-                                {info.name}
-                            </span>
+                    mark={
+                        <span className="eh-mark-ring text-sm font-semibold">
+                            {initials(info.name)}
                         </span>
                     }
-                    description={
-                        <span>
-                            Medication administration record for{' '}
-                            <span className="border-b-2 border-primary-foreground/40 font-medium">
-                                {date}
-                            </span>
-                        </span>
+                    title={info.name}
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            MAR chart
+                        </PageHeaderStatusChip>
                     }
-                    meta={heroMeta}
-                    badges={heroBadges}
-                    stats={heroStats}
+                    subline={[
+                        formatDateOnly(date),
+                        ...heroMeta.map((item) => item.label),
+                    ].join(' · ')}
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Recorded',
+                                    value: counts.total
+                                        ? `${counts.pct}%`
+                                        : '—',
+                                    caption: `${counts.recorded} of ${counts.total} doses`,
+                                    onClick: () => setActiveTab('history'),
+                                },
+                                {
+                                    label: 'Due now',
+                                    value: counts.due,
+                                    caption: 'Scheduled doses due',
+                                    tone: counts.due ? 'warning' : 'brand',
+                                    onClick: () => setActiveTab('due'),
+                                },
+                                {
+                                    label: 'Overdue',
+                                    value: counts.overdue,
+                                    caption: 'Review before recording',
+                                    tone: counts.overdue ? 'critical' : 'brand',
+                                    onClick: () => setActiveTab('due'),
+                                },
+                                {
+                                    label: 'As needed',
+                                    value: counts.prnGiven,
+                                    caption: 'Doses given in the last 24 hours',
+                                    onClick: () => setActiveTab('prn'),
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
-                            <Button
-                                asChild
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                            >
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search medication…"
+                                ariaLabel="Search this medication chart"
+                            />
+                            <PageHeaderPrimaryButton asChild>
                                 <a href="/emar/rounds">
                                     Start medication round
                                 </a>
-                            </Button>
+                            </PageHeaderPrimaryButton>
                             {can.record && (
-                                <Button
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                <PageHeaderGlassButton
+                                    icon={Plus}
                                     onClick={() => setModal('addMed')}
                                 >
-                                    <Plus className="h-4 w-4" />
                                     Add medication
-                                </Button>
+                                </PageHeaderGlassButton>
                             )}
                             {can.export_reports && (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                >
+                                <PageHeaderGlassButton asChild>
                                     <a
                                         href={`/emar/pdf/mar-chart?client_id=${info.id}&date_from=${date}&date_to=${date}`}
                                         target="_blank"
@@ -548,12 +554,17 @@ export default function MarCharts(props: Props) {
                                         <FileDown className="h-4 w-4" />
                                         PDF
                                     </a>
-                                </Button>
+                                </PageHeaderGlassButton>
                             )}
                         </>
                     }
-                    footer={heroFooter}
+                    filters={heroFooter}
                 />
+                {heroBadges.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                        {heroBadges.map((item) => item.label).join(' · ')}
+                    </p>
+                )}
 
                 <AttentionBar
                     alerts={marData.attention_alerts ?? []}
@@ -562,7 +573,7 @@ export default function MarCharts(props: Props) {
                     canManage={!!can.manage_settings}
                 />
 
-                <TabStrip
+                <EmarRecordTabs
                     value={activeTab}
                     onChange={setActiveTab}
                     items={TABS}
@@ -698,6 +709,7 @@ export default function MarCharts(props: Props) {
                 awaitingVerification={marData.awaiting_verification ?? []}
                 corrections={pendingCorrections}
                 witnesses={witnesses}
+                medications={chartMedications}
                 suppression={{
                     suppressed:
                         marData.settings?.suppress_med_admin_alerts ?? false,

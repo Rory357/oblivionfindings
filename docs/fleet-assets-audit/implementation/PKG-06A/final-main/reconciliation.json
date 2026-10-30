@@ -1,0 +1,17 @@
+{
+  "FrozenSource": "2d88fdd73d272d062ca8d77b7e951ef2ede8c607",
+  "PublishedMainBase": "79ea01a561f7d2fa5affa592dc096f516d663635",
+  "PreviouslyReviewedCandidate": "05724b4776384e12bf9f392886da6a7a1a3d5f4d",
+  "PreviouslyReviewedSource": "c962e0db1e3b14ed56777d4cc678911b6daf5787",
+  "ApplicationFileCount": 38,
+  "PreviousApplicationFileCount": 38,
+  "PreviousFilesChanged": [
+    "routes/fleet-assets.php"
+  ],
+  "PublishedBaseSourceFileCount": 37,
+  "PublishedBaseSourceExceptions": [
+    "routes/fleet-assets.php"
+  ],
+  "MergeConflicts": 0,
+  "Scope": "Only published origin/main merged; no local-only PKG-03 or unapproved PKG-06B source"
+}

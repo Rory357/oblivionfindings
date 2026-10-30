@@ -35,7 +35,7 @@ export default function WizardStepper({ steps, current }: Props) {
                                     isComplete
                                         ? 'bg-status-success text-primary-foreground'
                                         : isCurrent
-                                          ? 'bg-primary text-primary-foreground'
+                                          ? 'bg-primary-fill text-primary-fill-foreground'
                                           : 'bg-muted text-muted-foreground'
                                 }`}
                                 aria-current={isCurrent ? 'step' : undefined}

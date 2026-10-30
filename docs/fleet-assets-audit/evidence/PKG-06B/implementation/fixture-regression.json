@@ -1,0 +1,15 @@
+{
+    "checks": [
+        "Dispatch preserves canonical parent and component placement",
+        "A linked component cannot dispatch independently",
+        "Acknowledged kit receipt moves parent and component atomically",
+        "Component history retains the kit receipt",
+        "Retirement is blocked by current kit contents",
+        "Legacy unverified images cannot become profile photos",
+        "Presenter retains explicit legacy scan state",
+        "Real QR label PDF variant 1",
+        "Real QR label PDF variant 2",
+        "Real QR label PDF variant 3"
+    ],
+    "count": 10
+}

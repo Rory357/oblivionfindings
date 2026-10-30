@@ -6,9 +6,11 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
 use App\Models\User;
+use App\Services\AuditLogger;
 use App\Services\SsoConfigurationService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -58,7 +60,10 @@ class ProfileController extends Controller
             'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => $request->session()->get('status'),
             'profile' => [
-                'phone' => $user->cellphone ?? $employeeProfile?->work_phone,
+                // Personal mobile only. Never fall back to the HR work phone,
+                // which would present a work number as the personal one.
+                'phone' => $user->cellphone,
+                'onCallCellphoneConsentedAt' => $this->serializeDateTime($user->on_call_cellphone_consented_at),
                 'jobTitle' => $employeeProfile?->position_title,
                 'timezone' => $user->timezone ?? 'Pacific/Auckland',
                 'locale' => $user->locale ?? 'en',
@@ -157,26 +162,32 @@ class ProfileController extends Controller
                 $user->email_verified_at = null;
             }
 
+            // Only the person's own explicit consent field changes consent;
+            // other partial account forms leave it alone. Never change HR contacts.
+            if (array_key_exists('on_call_cellphone_consent', $validated)) {
+                $consented = (bool) $validated['on_call_cellphone_consent'];
+                $before = $user->on_call_cellphone_consented_at !== null;
+                if ($before !== $consented) {
+                    $user->forceFill(['on_call_cellphone_consented_at' => $consented ? now() : null]);
+                    $user->save();
+                    AuditLogger::logOrFail('medications.on_call_cellphone_consent.updated', $user, ['actor_id' => (int) $user->id, 'before' => $before, 'after' => $consented]);
+                }
+            }
             $user->save();
 
-            if (! $employeeProfile) {
+            // The phone here is the user's personal mobile (users.cellphone)
+            // and the email is their sign-in address, which can be personal.
+            // Work contact details (work_phone, work_email) are HR-managed and
+            // shown to every staff member in the directories, so this form
+            // never writes them.
+            if (! $employeeProfile || ! $request->jobTitleWasSubmitted()) {
                 return;
             }
 
-            $profileAttributes = [
-                'work_email' => $user->email,
+            $employeeProfile->forceFill([
+                'position_title' => $validated['job_title'],
                 'updated_by' => $user->id,
-            ];
-
-            if ($request->phoneWasSubmitted()) {
-                $profileAttributes['work_phone'] = $validated['phone'];
-            }
-
-            if ($request->jobTitleWasSubmitted()) {
-                $profileAttributes['position_title'] = $validated['job_title'];
-            }
-
-            $employeeProfile->forceFill($profileAttributes)->save();
+            ])->save();
         });
 
         return to_route('profile.edit');
@@ -330,9 +341,17 @@ class ProfileController extends Controller
             ]);
         }
 
-        Auth::logout();
+        try {
+            $user->delete();
+        } catch (QueryException $exception) {
+            // Care communication (Chat messages, calls, callbacks) references its author and must be retained.
+            throw_unless(($exception->errorInfo[1] ?? null) === 1451, $exception);
+            throw ValidationException::withMessages([
+                'password' => 'This account is linked to retained care communication records, so it cannot be deleted here. Ask the care team to close your portal access instead.',
+            ]);
+        }
 
-        $user->delete();
+        Auth::logout();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();

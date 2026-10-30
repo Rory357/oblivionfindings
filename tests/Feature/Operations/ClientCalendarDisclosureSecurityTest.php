@@ -240,6 +240,9 @@ it('keeps non-medication calendar entries while applying exact controlled and ca
         'client_id' => $client->id,
         'name' => 'Ordinary scheduled medication',
         'frequency' => '09:00',
+        // The factory's random dates could end the order before today.
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
         'active' => true,
         'is_prn' => false,
         'state' => 'active',
@@ -249,6 +252,9 @@ it('keeps non-medication calendar entries while applying exact controlled and ca
         'client_id' => $client->id,
         'name' => 'Controlled scheduled medication',
         'frequency' => '09:00',
+        // The factory's random dates could end the order before today.
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
         'active' => true,
         'is_prn' => false,
         'state' => 'active',
@@ -258,6 +264,9 @@ it('keeps non-medication calendar entries while applying exact controlled and ca
         'client_id' => $client->id,
         'name' => 'Unverified scheduled medication',
         'frequency' => '09:00',
+        // The factory's random dates could end the order before today.
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
         'active' => true,
         'is_prn' => false,
         'state' => 'active',
@@ -268,6 +277,9 @@ it('keeps non-medication calendar entries while applying exact controlled and ca
         'client_id' => $client->id,
         'name' => 'Superseded scheduled medication',
         'frequency' => '09:00',
+        // The factory's random dates could end the order before today.
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
         'active' => true,
         'is_prn' => false,
         'state' => 'active',
@@ -280,6 +292,9 @@ it('keeps non-medication calendar entries while applying exact controlled and ca
         'client_id' => $foreignClient->id,
         'name' => 'Forged foreign medication',
         'frequency' => '09:00',
+        // The factory's random dates could end the order before today.
+        'start_date' => now()->subMonth()->toDateString(),
+        'end_date' => null,
         'active' => true,
         'is_prn' => false,
         'state' => 'active',
@@ -311,10 +326,11 @@ it('keeps non-medication calendar entries while applying exact controlled and ca
         'status' => 'given',
     ]);
 
+    // Through next week: the orders' next doses may fall in the next month.
     $calendarUri = route('client.calendar.events', [
         'client' => $client,
         'start' => now()->startOfMonth()->toIso8601String(),
-        'end' => now()->endOfMonth()->toIso8601String(),
+        'end' => now()->addWeek()->toIso8601String(),
     ], false);
 
     $noMedicationIds = collect($this->actingAs($noMedicationViewer)

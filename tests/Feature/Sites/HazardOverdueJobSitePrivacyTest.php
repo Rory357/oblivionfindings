@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     $this->seed(RbacSeeder::class);
-    Carbon::setTestNow(Carbon::parse('2026-08-31 09:00:00', 'Pacific/Auckland'));
+    Carbon::setTestNow(Carbon::parse('2026-08-31 09:00:00', 'Pacific/Auckland')->utc());
     config(['app.worker_timezone' => 'Pacific/Auckland']);
 });
 

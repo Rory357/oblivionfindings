@@ -9,7 +9,11 @@ use Tests\Support\ClientLocationWorkspaceFixture;
 beforeEach(function () {
     Http::preventStrayRequests();
     Queue::fake();
-    $this->assertStringStartsWith('oblivion_findings_pkg02a_2b9f_test_', DB::connection()->getDatabaseName());
+    $this->assertTrue(static::$isolatedMysqlPrepared);
+    $ownedDatabase = static::$testDatabaseBaseName.'_'.$this->resolveProcessToken();
+    $this->assertSame($ownedDatabase, static::$isolatedMysqlDatabase);
+    $this->assertNotSame(static::$testDatabaseBaseName, $ownedDatabase);
+    $this->assertSame($ownedDatabase, DB::connection()->getDatabaseName());
     config(['fleet.maps.address_search_cache_store' => 'database', 'cache.stores.database.connection' => DB::getDefaultConnection(), 'cache.stores.database.lock_connection' => DB::getDefaultConnection()]);
     $store = Cache::store('database')->getStore();
     $this->assertSame(DB::connection()->getDatabaseName(), $store->getConnection()->getDatabaseName());
@@ -28,6 +32,7 @@ it('does not contact the provider when address lookup is disabled', function () 
 it('reuses the address provider without transmitting client or tracker context', function () {
     config(['fleet.maps.client_zone_address_search_enabled' => true]);
     extract(ClientLocationWorkspaceFixture::make());
+    Queue::fake(); // Observe address search after the staff, Site and client fixtures.
     Http::fake(['nominatim.openstreetmap.org/*' => Http::response([
         ['display_name' => 'Synthetic QA place', 'lat' => '-36.85', 'lon' => '174.76', 'address' => []],
     ])]);

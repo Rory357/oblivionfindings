@@ -1,0 +1,9 @@
+{
+  "candidateBranch": "codex/fleet-consolidation-qa",
+  "candidateCodeCommit": "9782faab62efa0cabe518b0a799a3ad6cd1ffbb5",
+  "existingRefsChecked": 386,
+  "changesToExistingRefs": [],
+  "addedRefs": [
+    "refs/heads/codex/fleet-consolidation-qa"
+  ]
+}

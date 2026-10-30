@@ -311,7 +311,7 @@ export function DepartmentsPane({
                         </Button>
                         <Button
                             onClick={confirmDeactivate}
-                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            variant="destructive"
                         >
                             Deactivate
                         </Button>

@@ -19,6 +19,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 it('prepares complete invoice-basis evidence for mixed rates, bills, invoices, and signed credits', function (): void {
     $orgId = 48101;
@@ -303,6 +304,7 @@ it('uses fractional rates and preserves one source tax component on balanced inv
 });
 
 it('converges concurrent first preparation on one return and one set of source keys on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
@@ -349,6 +351,7 @@ it('converges concurrent first preparation on one return and one set of source k
 });
 
 it('uses one ascending period-chain lock for a forced file and amend interleaving on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

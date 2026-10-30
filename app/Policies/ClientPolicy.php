@@ -4,7 +4,9 @@ namespace App\Policies;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\CurrentAuthorizationReads;
+use App\Services\Medication\MedicationScopeDecisionService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Support\Facades\DB;
 
@@ -58,7 +60,8 @@ class ClientPolicy
 
     /**
      * Medications access is intentionally scoped and may be granted temporarily
-     * via break-glass. This does not grant full client-profile access.
+     * via a covering shift or break-glass. This does not grant full
+     * client-profile access.
      */
     public function viewMedications(User $user, Client $client): bool
     {
@@ -66,15 +69,36 @@ class ClientPolicy
             return $user->canDo('medications.view');
         }
 
-        if (! $user->canDo('medications.view')) {
-            return false;
-        }
+        return $user->canDo('medications.view') && $this->reachesMedicationRecord($user, $client);
+    }
 
+    /**
+     * EA-106: correcting a dose follows the same person rule as reading the
+     * record, with the correction right in place of read access, so someone
+     * who holds only medications.administer.correct corrects wherever that
+     * rule lets them reach the person. Never through the client portal.
+     * Controlled medicines keep their own check in the correction writer.
+     */
+    public function correctMedications(User $user, Client $client): bool
+    {
+        return ! $user->canAccessClientPortal($client)
+            && $user->canDo('medications.administer.correct')
+            && $this->reachesMedicationRecord($user, $client);
+    }
+
+    /**
+     * Whether someone reaches a person's medication record, once their
+     * capability is settled: medication operations or client-wide roles at
+     * the person's house, assigned to the person there, clocked in on a shift
+     * covering them, or break-glass at their house.
+     */
+    private function reachesMedicationRecord(User $user, Client $client): bool
+    {
         $hasMedicationOperationsAccess = collect([
             'medications.stock.update',
             'medications.audit.view',
             'medications.reports.export',
-            'reports.viewAny',
+            'medications.reports.view',
         ])
             ->contains(fn (string $permission): bool => $user->canDo($permission));
 
@@ -95,6 +119,17 @@ class ClientPolicy
         }
 
         if ($this->isAssigned($user, $client) && $this->canAccessClientSite($user, $client)) {
+            return true;
+        }
+
+        // A worker clocked in on a shift covering this client may record their
+        // doses, so they may read the chart too — for that shift only. This is
+        // the recording authority's own definition, not a second one.
+        if ($client->exists && in_array(
+            (int) $client->id,
+            app(MedicationScopeDecisionService::class)->clientIdsWithCurrentAuthority($user, [(int) $client->id], now()),
+            true,
+        )) {
             return true;
         }
 
@@ -139,6 +174,14 @@ class ClientPolicy
             && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
     }
 
+    public function updateFromCurrentEvidence(User $user, Client $client, CurrentAuthorizationReads $reads): bool
+    {
+        $reads->assertActive();
+
+        return $user->canDo('clients.update')
+            && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS, $reads);
+    }
+
     public function delete(User $user, Client $client): bool
     {
         return $user->canDo('clients.delete')
@@ -149,6 +192,41 @@ class ClientPolicy
     {
         return ($user->canDo('sites.meals.view') || $user->canDo('clients.update'))
             && $this->canAccessClientSite($user, $client, self::SITE_SCOPE_BYPASS_PERMISSIONS);
+    }
+
+    /**
+     * S13: staff surfaces under /operations/clients/{client} (the client
+     * calendar, the visit-request desk). `view` also lets a linked family
+     * portal account in, so these refuse portal accounts outright and then
+     * require the ordinary staff route to the person.
+     */
+    public function viewAsStaff(User $user, Client $client): bool
+    {
+        return ! $user->isPortalAccount()
+            && $this->viewDecision($user, $client);
+    }
+
+    /**
+     * Reading a person's family visit requests follows the profile's family
+     * portal section: family communication staff or a client editor.
+     */
+    public function viewVisitRequests(User $user, Client $client): bool
+    {
+        return $this->viewAsStaff($user, $client)
+            && (app(ClientFamilyCommunicationAccess::class)->canView($user, $client)
+                || $this->update($user, $client));
+    }
+
+    /**
+     * Approving or declining a visit is a family communication decision, so
+     * it follows the family-note rule (canManage) or client editing. Read-only
+     * family portal staff (e.g. auditors) see the requests but cannot decide.
+     */
+    public function reviewVisitRequests(User $user, Client $client): bool
+    {
+        return $this->viewAsStaff($user, $client)
+            && (app(ClientFamilyCommunicationAccess::class)->canManage($user, $client)
+                || $this->update($user, $client));
     }
 
     /** @param array<int, string> $bypassPermissions */

@@ -35,17 +35,19 @@ class VehicleBookingAccessService
     /** @return list<int> */
     public function authorizedVehicleIds(User $actor): array
     {
-        return $this->access->accessibleVehiclesForFleet($actor)
+        return $this->access->siteScopedVehiclesForFleet($actor)
             ->orderBy('id')
             ->pluck('id')
             ->map(fn (mixed $id): int => (int) $id)
             ->all();
     }
 
-    public function accessibleBookings(User $actor): Builder
+    public function accessibleBookings(User $actor, bool $forReport = false): Builder
     {
         $siteIds = $this->accessibleSiteIds($actor);
-        $vehicleIds = $this->authorizedVehicleIds($actor);
+        $vehicleIds = $forReport
+            ? $this->access->reportVehiclesForFleet($actor)->pluck('assets.id')->all()
+            : $this->authorizedVehicleIds($actor);
 
         return FleetVehicleBooking::query()
             ->when($vehicleIds === [], fn (Builder $query): Builder => $query->whereRaw('1 = 0'))
@@ -76,7 +78,7 @@ class VehicleBookingAccessService
 
     public function vehicle(User $actor, int $id, bool $lockForUpdate = false): ?Asset
     {
-        $query = $this->access->accessibleVehiclesForFleet($actor)->whereKey($id);
+        $query = $this->access->siteScopedVehiclesForFleet($actor)->whereKey($id);
         if ($lockForUpdate) {
             $query->lockForUpdate();
         }

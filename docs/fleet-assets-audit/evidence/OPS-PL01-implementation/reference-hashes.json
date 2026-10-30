@@ -1,0 +1,8 @@
+{
+  "DESIGN.md": "dbf4a4448ba0d999e0cd17b6c794c2fd7ce493826bd7e114e95f6fba50f47113",
+  "design_styles/APP_SHELL_STYLE_GUIDE.md": "4f433617e4d0df8b51795f6ceb0dbb125913803949de8fb421e7dd9624469201",
+  "design_styles/POPUP_STYLE_GUIDE.md": "c9de50bfc00874987e17f9d2b30b4a509431ae318359fa31dc5f98f9fcf90b1b",
+  "design_styles/LIST_STYLE_GUIDE.md": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+  "design_styles/MAP_GEOFENCING_STYLE_GUIDE.md": "810ed32d26452b54b96b6b24ac4557bd4adae96cee8e7cdd6aa95c978a087fce",
+  "docs/architecture/single-tenant-application.md": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c"
+}

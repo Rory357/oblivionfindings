@@ -205,12 +205,29 @@ it('rejects medication administrations linked to another Clients Shift before si
         'user_id' => $actor->id,
         'created_by' => $actor->id,
     ]);
+    // The actor is genuinely on shift with this Client, so the foreign
+    // shift_id is the only reason the record can be refused.
+    Shift::factory()->create([
+        'client_id' => $client->id,
+        'site_id' => $clientSite->id,
+        'service_context_id' => $serviceContext->id,
+        'user_id' => $actor->id,
+        'created_by' => $actor->id,
+        'starts_at' => now()->subHour(),
+        'ends_at' => now()->addHours(3),
+        'actual_starts_at' => now()->subMinutes(30),
+        'status' => 'in_progress',
+        'started_by' => $actor->id,
+    ]);
+    // PRN, so no scheduled dose slot is needed to reach the shift decision.
     $medication = ClientMedication::query()->create([
         'client_id' => $client->id,
         'created_by' => $actor->id,
         'name' => 'Paracetamol',
         'dosage' => '500mg',
-        'is_prn' => false,
+        'is_prn' => true,
+        'prn_reason' => 'Pain',
+        'max_per_day' => 4,
         'controlled_drug' => false,
         'active' => true,
         'state' => 'active',
@@ -221,6 +238,9 @@ it('rejects medication administrations linked to another Clients Shift before si
         ->shouldReceive('notifyCrud')
         ->zeroOrMoreTimes();
 
+    // MedicationScopeDecisionService only accepts a submitted shift that is
+    // the actor's covering shift for this Client; anything else is refused
+    // as "not assigned" inside the transaction, before any write.
     $this->actingAs($actor)
         ->postJson(route('operations.clients.medical.medications.administrations.store', [
             'client' => $client,
@@ -228,15 +248,16 @@ it('rejects medication administrations linked to another Clients Shift before si
         ], false), [
             'status' => 'given',
             'dose_given' => '500mg',
+            'reason' => 'Pain',
             'shift_id' => $shift->id,
             'pulse_bpm' => 72,
         ])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('shift_id');
+        ->assertForbidden()
+        ->assertJsonPath('message', 'You do not have a current assignment for this medication action.');
 
+    // Not even silently re-pointed at the actor's own covering shift.
     $this->assertDatabaseMissing('client_medication_administrations', [
         'client_id' => $client->id,
-        'shift_id' => $shift->id,
     ]);
     $this->assertDatabaseMissing('clinical_observations', [
         'client_id' => $client->id,

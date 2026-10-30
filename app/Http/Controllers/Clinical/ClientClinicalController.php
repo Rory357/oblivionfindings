@@ -94,14 +94,27 @@ class ClientClinicalController extends Controller
         $this->saveClinicalAttachments($request, $event);
 
         if ($request->wantsJson()) {
+            $discharge = $event->hospital_discharged_at !== null ? $event
+                : ($event->relationLoaded('hospitalDischarges') ? $event->getRelation('hospitalDischarges')->first() : null);
+
             return response()->json([
                 'id' => $event->id,
                 'event_type' => $event->event_type->value,
                 'occurred_at' => $event->occurred_at->toISOString(),
                 'requires_followup' => $event->requires_followup,
+                'hospital_admission_id' => $event->hospital_admission_id,
+                'hospital_discharge_id' => $discharge?->id,
+                'hospital_discharged_at' => $discharge?->hospital_discharged_at?->toISOString(),
             ], 201);
         }
 
         return back()->with('success', 'Clinical event recorded successfully.');
+    }
+
+    public function hospitalAdmissions(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+
+        return response()->json(['admissions' => $this->eventService->openHospitalAdmissions($client, $request->user())->values()]);
     }
 }

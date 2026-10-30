@@ -127,7 +127,7 @@ export function CalendarYearPicker({
                                             className={
                                                 'grid h-5 w-5 place-items-center rounded text-[10px] tabular-nums transition-colors ' +
                                                 (isToday
-                                                    ? 'bg-primary font-bold text-primary-foreground'
+                                                    ? 'bg-primary-fill font-bold text-primary-fill-foreground'
                                                     : isActive
                                                       ? 'bg-accent font-semibold text-foreground'
                                                       : 'hover:bg-muted')

@@ -1,0 +1,21 @@
+{
+  "job": "lint",
+  "command": {
+    "executable": "C:\\Users\\steph\\.hermes\\node\\node.exe",
+    "args": [
+      "node_modules/eslint/bin/eslint.js",
+      "resources/js/pages/fleet-assets/settings/_maps.tsx",
+      "resources/js/pages/fleet-assets/settings/_ui.tsx",
+      "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx",
+      "--max-warnings=0",
+      "--format=json",
+      "--output-file",
+      "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/eslint.json"
+    ],
+    "cwd": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings"
+  },
+  "startedAt": "2026-09-28T04:57:49.523Z",
+  "finishedAt": "2026-09-28T04:58:01.128Z",
+  "exitCode": 0,
+  "signal": null
+}

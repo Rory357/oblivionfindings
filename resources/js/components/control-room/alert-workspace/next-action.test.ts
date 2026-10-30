@@ -31,7 +31,7 @@ describe('alert workspace next action', () => {
         expect(nextAlertAction(base)).toEqual(
             expect.objectContaining({
                 key: 'create_incident',
-                label: 'Create incident and hand over',
+                label: 'Report incident',
             }),
         );
     });
@@ -54,7 +54,7 @@ describe('alert workspace next action', () => {
             expect.objectContaining({
                 key: 'open_incident',
                 label: 'Open incident',
-                statusText: 'Waiting for H&S acceptance',
+                statusText: 'Waiting for Health & Safety to take it on.',
             }),
         );
     });

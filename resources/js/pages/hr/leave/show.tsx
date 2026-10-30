@@ -295,7 +295,6 @@ export default function ShowLeave({ request, can }: Props) {
                                     <Button
                                         variant="default"
                                         onClick={handleApprove}
-                                        className="bg-status-success hover:bg-status-success"
                                     >
                                         <CheckCircle className="mr-2 h-4 w-4" />
                                         Approve
@@ -338,10 +337,10 @@ export default function ShowLeave({ request, can }: Props) {
                         <AlertDialogAction
                             onClick={runAction}
                             disabled={processing}
-                            className={
+                            variant={
                                 confirmAction === 'decline'
-                                    ? 'bg-status-critical hover:bg-status-critical'
-                                    : undefined
+                                    ? 'destructive'
+                                    : 'default'
                             }
                         >
                             {processing

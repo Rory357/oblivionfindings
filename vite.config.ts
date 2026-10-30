@@ -4,6 +4,8 @@ import react from '@vitejs/plugin-react';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
 import { defineConfig } from 'vite';
+import { nodeModulesFsAllow } from './build/node-modules-fs-allow';
+import { pdfjsAssets } from './build/pdfjs-assets';
 
 const heavyVendorChunkGroups: Array<[string, string[]]> = [
     ['vendor-inertia', ['/@inertiajs/']],
@@ -11,9 +13,22 @@ const heavyVendorChunkGroups: Array<[string, string[]]> = [
     // "/react/" in their path (e.g. @fullcalendar/react) don't get pulled
     // into the always-loaded react chunk and drag their whole vendor
     // family onto every page.
-    ['vendor-react', ['/node_modules/react/', '/node_modules/react-dom/', '/node_modules/scheduler/']],
-    ['vendor-ui', ['/@radix-ui/', '/@headlessui/', '/cmdk/', '/input-otp/', '/sonner/']],
-    ['vendor-utils', ['/class-variance-authority/', '/clsx/', '/tailwind-merge/']],
+    [
+        'vendor-react',
+        [
+            '/node_modules/react/',
+            '/node_modules/react-dom/',
+            '/node_modules/scheduler/',
+        ],
+    ],
+    [
+        'vendor-ui',
+        ['/@radix-ui/', '/@headlessui/', '/cmdk/', '/input-otp/', '/sonner/'],
+    ],
+    [
+        'vendor-utils',
+        ['/class-variance-authority/', '/clsx/', '/tailwind-merge/'],
+    ],
     ['vendor-calendar', ['/@fullcalendar/', '/preact/']],
     ['vendor-charts', ['/recharts/', '/d3-']],
     ['vendor-maps', ['/leaflet/', '/react-leaflet/']],
@@ -41,18 +56,31 @@ export default defineConfig({
     },
     server: {
         cors: true,
+        // Worktrees only: also allow the parent checkout's node_modules
+        // (undefined — Vite's default — everywhere else).
+        fs: { allow: nodeModulesFsAllow(__dirname) },
     },
     build: {
+        // Keep immutable hashed assets for pages opened before a rebuild.
+        // Do not prune them during deploy: old tabs still import those URLs.
+        emptyOutDir: false,
         // NOTE: modulePreload must stay ON (the default). Disabling it made
         // the browser discover each page's ~100-500 chunks one at a time in
         // a serial waterfall instead of preloading them in parallel.
         rollupOptions: {
             output: {
                 manualChunks,
+                // Herd and common static hosts register .js, but not .mjs,
+                // as JavaScript. Module workers require a JavaScript MIME type.
+                assetFileNames: (asset) =>
+                    asset.names.some((name) => name === 'pdf.worker.min.mjs')
+                        ? 'assets/[name]-[hash].js'
+                        : 'assets/[name]-[hash][extname]',
             },
         },
     },
     optimizeDeps: {
+        exclude: ['pdfjs-dist'],
         // Pre-bundle the core deps so a dev-server cold start doesn't hit
         // "new dependencies optimized" full-page reloads while navigating.
         include: [
@@ -67,6 +95,7 @@ export default defineConfig({
         ],
     },
     plugins: [
+        pdfjsAssets(),
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.tsx'],
             ssr: 'resources/js/ssr.tsx',

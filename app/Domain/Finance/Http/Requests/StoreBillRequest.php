@@ -17,6 +17,7 @@ class StoreBillRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'site_id' => ['required', 'integer', 'min:1'],
             'vendor_id' => 'required|exists:fin_vendors,id',
             'bill_number' => 'nullable|string|max:50',
             'vendor_reference' => 'nullable|string|max:255',

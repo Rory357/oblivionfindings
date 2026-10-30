@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-09-28T05:08:28.151Z",
+  "base": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+  "reviewedFocusCommit": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+  "basePaths": 22433,
+  "preservedBasePaths": 22431,
+  "preservedPathEntrySha256": "571bf9b50ab993f424c3f06a671e5ebeccaad6bf031dbfb862588f270a3222cf",
+  "changedSource": [
+    "resources/js/pages/fleet-assets/settings/_maps.tsx",
+    "resources/js/pages/fleet-assets/settings/_ui.tsx",
+    "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx"
+  ],
+  "changedExistingPaths": [
+    "resources/js/pages/fleet-assets/settings/_maps.tsx",
+    "resources/js/pages/fleet-assets/settings/_ui.tsx"
+  ],
+  "preservedDocumentationPaths": 12535,
+  "preservedPriorFocusEvidenceFiles": 10,
+  "priorFocusSourceManifestSha256": "1105f7c21e946579f8dd157f8d56d3c0659620efe2728421e84ff2aacd61e789",
+  "authority": {
+    "DESIGN.md": "dbf4a4448ba0d999e0cd17b6c794c2fd7ce493826bd7e114e95f6fba50f47113",
+    "design_styles/PAGE_HEADER_STYLE_GUIDE.md": "33aeeb0e4434d3bb4d3023e3ce95ffee12e95ba1fe62c02f36601f8219827faa",
+    "design_styles/NAVIGATION_STYLE_GUIDE.md": "9295cdb1386322b8a088ae03de41bc3c75a0fbe3e8fa3331c92c704ccb15895d",
+    "design_styles/LIST_STYLE_GUIDE.md": "56b59b464fd46917446b482b8e355d47d7341105915f6c016b6195e2a58138ac",
+    "design_styles/POPUP_STYLE_GUIDE.md": "c9de50bfc00874987e17f9d2b30b4a509431ae318359fa31dc5f98f9fcf90b1b",
+    "design_styles/DESIGN_TOKENS.md": "43f99f4360de9c00b75c326f4e0fbab47378aaa8224d42be56e62e2b8ba3f48b",
+    "design_styles/LOADER_STYLE_GUIDE.md": "cc20485e6e42e0a848b8cacc8ac6124e5e5a01206d966de6ebbbdec39dbe2a91",
+    "design_styles/APP_SHELL_STYLE_GUIDE.md": "4f433617e4d0df8b51795f6ceb0dbb125913803949de8fb421e7dd9624469201",
+    "design_styles/MAP_GEOFENCING_STYLE_GUIDE.md": "810ed32d26452b54b96b6b24ac4557bd4adae96cee8e7cdd6aa95c978a087fce",
+    "docs/architecture/single-tenant-application.md": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c"
+  },
+  "protectedBlade": {
+    "file": "resources/views/app.blade.php",
+    "sha256": "94611dc9b19b3c26b580ee6ceef22eb1df3351ece9cfbb8c61585628dd38fdf0"
+  },
+  "canonicalMaster": {
+    "path": "C:/Users/steph/Downloads/oblivion-findings-fleet-assets-complete-astra-prompt-v10.md",
+    "sha256": "5a887fa690a9556ea1da37a0b026be9f8c7afa93983b643c45caf5d3dcab899f"
+  },
+  "frozenRefs": {
+    "refs/heads/codex/fleet-consolidation-qa": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+    "refs/heads/codex/pkg08-settings-implementation": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+    "refs/heads/main": "abc70200dc232317273b028e28181af6191f87b8",
+    "refs/remotes/origin/HEAD": "a4f869fe5e07b2fc5ecb87526596077f9700a584",
+    "refs/remotes/origin/main": "a4f869fe5e07b2fc5ecb87526596077f9700a584"
+  },
+  "untrackedPublicationReceipts": {
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/before.json": "c4b84008d358dbb66e52c697a9f096eafdb6c96c2e2a033229313b7457b784a3",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/blocked.json": "d1a4dec5d5697626200c98622cd1752841bc75b086784af822229ae9b2017662",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/local.json": "29a56f3ff3d4e809383994697f2c60da9e81233d163a5e9dabff654ced48cd95"
+  },
+  "conflicts": [],
+  "failures": []
+}

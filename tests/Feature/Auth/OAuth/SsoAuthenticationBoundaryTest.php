@@ -145,7 +145,10 @@ class SsoAuthenticationBoundaryTest extends TestCase
         $user = $this->approved('family@example.test', 'google', 'family-google', 'next_of_kin');
         $this->fakeSsoProvider('google', ['id' => 'family-google', 'email' => $user->email, 'name' => 'Family']);
         $this->beginSsoFixture('google');
-        $this->get('/auth/google/callback')->assertForbidden();
+        // Explained on the staff sign-in page ("No staff account for this email").
+        $this->get('/auth/google/callback')
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHas('ssoNotStaffEmail', $user->email);
         $this->assertGuest();
         $this->assertSame('next_of_kin', $user->fresh()->role);
     }

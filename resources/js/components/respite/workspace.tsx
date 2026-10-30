@@ -14,9 +14,9 @@ import {
     type PageHeroMetaItem,
     type PageHeroStat,
 } from '@/components/page';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { ReasonDialog } from '@/components/reason-dialog';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
-import { Button } from '@/components/ui/button';
 import { router, usePage } from '@inertiajs/react';
 import {
     BedDouble,
@@ -69,6 +69,7 @@ type ReasonKind = 'decline' | 'reject' | 'fundingOverride';
 type ProfileCompletionTarget = {
     clientId: number;
     initialValues: Partial<ClientWizardForm>;
+    canEditMedical: boolean;
 };
 
 const REASON_CONFIG: Record<
@@ -194,13 +195,14 @@ export function RespiteWorkspace({
     const openProfileCompletion = (
         row: Pick<
             RespiteReferralRow | RespiteRequestRow,
-            'clientId' | 'clientProfilePrefill'
+            'clientId' | 'clientProfilePrefill' | 'clientProfileCanEditMedical'
         >,
     ) => {
         if (!row.clientId) return;
         setProfileFor({
             clientId: row.clientId,
             initialValues: row.clientProfilePrefill ?? {},
+            canEditMedical: row.clientProfileCanEditMedical,
         });
     };
 
@@ -311,12 +313,12 @@ export function RespiteWorkspace({
                 stats={heroStats}
                 actions={
                     can.create ? (
-                        <Button
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
                             onClick={() => setIntakeOpen(true)}
-                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                         >
-                            <Plus className="h-4 w-4" /> New referral
-                        </Button>
+                            New referral
+                        </PageHeaderPrimaryButton>
                     ) : undefined
                 }
             />
@@ -440,6 +442,7 @@ export function RespiteWorkspace({
                 onClose={() => setProfileFor(null)}
                 clientId={profileFor?.clientId}
                 initialValues={profileFor?.initialValues}
+                canEditMedical={profileFor?.canEditMedical ?? false}
                 onSaved={() => {
                     setProfileFor(null);
                     router.reload({

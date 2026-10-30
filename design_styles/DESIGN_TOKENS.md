@@ -9,7 +9,10 @@ the `--primary` hex, the entire UI retints automatically.
 
 | Use case | Token utilities |
 |---|---|
-| Primary brand (buttons, active nav, focus ring) | `bg-primary`, `text-primary`, `border-primary`, `ring-ring` |
+| Primary brand (active nav, accents, focus ring) | `bg-primary`, `text-primary`, `border-primary`, `ring-ring` |
+| Solid brand fill that carries text (default button, badge, tooltip) | `bg-primary-fill`, `text-primary-fill-foreground` |
+| Brand-coloured text on cards, page ground, tints | `text-primary` (reads `--primary-text`, mode-aware) |
+| Brand-coloured text on an always-white surface (hero white button / pill) | `text-primary-strong` |
 | Tint / subtle primary background | `bg-primary/10`, `bg-accent` |
 | Secondary surfaces (cards, panels) | `bg-card`, `bg-popover`, `bg-background` |
 | Subtle backgrounds (muted section fills) | `bg-muted`, `bg-muted/50` |
@@ -17,6 +20,86 @@ the `--primary` hex, the entire UI retints automatically.
 | Secondary text | `text-muted-foreground` |
 | Destructive / danger actions | `bg-destructive`, `text-destructive-foreground` |
 | Borders / inputs | `border-border`, `border-input` |
+
+## Slate palette — target values (approved by Stephan 2026-10-20)
+
+The Slate look (DESIGN.md "The Slate look") replaces the grey-ground
+neutrals. **Rollout pending:** `app.css` still holds the old values until
+the token change lands; when it does, these are the values to set. Only
+neutrals, chrome and the default brand change — status pairs, tone chips,
+categories (still rotated from `--primary`), chart and calendar tokens
+keep their derivations.
+
+| Token | Light | Dark |
+|---|---|---|
+| `--background` | `oklch(0.984 0.003 248)` #F8FAFC | `oklch(0.208 0.040 266)` #0F172A |
+| `--card`, `--popover` | `oklch(1 0 0)` #FFFFFF | `oklch(0.279 0.037 260)` #1E293B |
+| `--muted`, `--secondary` | `oklch(0.968 0.007 248)` #F1F5F9 | `oklch(0.323 0.042 260)` #273449 |
+| `--border`, `--input` | `oklch(0.929 0.013 256)` #E2E8F0 | `oklch(0.372 0.039 257)` #334155 |
+| `--foreground`, `--card-foreground`, `--popover-foreground`, `--secondary-foreground` | `oklch(0.208 0.040 266)` #0F172A | `oklch(0.968 0.007 248)` #F1F5F9 |
+| `--muted-foreground` | `oklch(0.446 0.037 257)` #475569 | `oklch(0.711 0.035 257)` #94A3B8 |
+| `--accent` (brand tint) | `oklch(0.958 0.023 299)` #F3EEFF | `oklch(0.290 0.061 292)` #2C2547 |
+| `--primary` (default brand) | `oklch(0.517 0.215 292)` #7040D6 | same (fills clamp to L 0.50; `--primary-text` lifts to ≥ 0.70, ≈ #C3A8FF) |
+| `--sidebar` (sidebar **and** top bar) | `oklch(0.279 0.037 260)` #1E293B | same |
+| `--sidebar-foreground` | `oklch(0.711 0.035 257)` #94A3B8 | same |
+| `--sidebar-accent` / `-foreground` | `oklch(0.372 0.039 257)` #334155 / white | `oklch(0.323 0.042 260)` #273449 / white |
+| `--sidebar-border` | #334155 | #334155 |
+| header search input | `oklch(0.208 0.040 266)` #0F172A | same |
+
+Measured contrast (WCAG 2.1): text on ground 17.1:1 (light) / 16.3:1
+(dark); muted on `#F1F5F9` 6.9:1; muted on dark cards 5.7:1; sidebar text
+on `#1E293B` 5.7:1; selected nav item 10.4:1; brand `#7040D6` on
+`#F1F5F9` 5.65:1; white on the brand fill 6.2:1. Cards on the light ground
+are 1.05:1, so `--border` plus a soft shadow carries the lift; never drop
+the border on a card.
+
+The default brand moving from `#4F39F6` (hue 277) to the Journey purple
+`#7040D6` (hue 292) also shifts every category colour and the sign-in
+`--journey-*` tokens (which reproduce the brand sheet exactly at
+`#7040D6`). Re-check the eight category tints when the token change lands.
+
+## Primary fills and foregrounds (added 2026-10-02)
+
+`--primary` does three jobs: the brand fill, brand-coloured text, and the
+base of the Event Horizon sky. One value can't keep text readable in all of
+them, so `app.css` derives four tokens from it. They are **derived only** —
+not a branding setting — and follow whatever `--primary` resolves to on
+`<html>`: the default, an org theme, or a personal accent's inline style.
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--primary-fill` | the brand; a brand that carries white text is never lighter than L 0.50 | the brand clamped to L ≤ 0.50 | solid fills that carry text: `.btn-soft-primary`, default badge, tooltip, checked checkbox, dropzone drag state, text selection |
+| `--primary-fill-foreground` | white, or ink when the fill is L ≥ 0.585 | white | text on `--primary-fill` |
+| `--primary-strong` | the brand clamped to L ≤ 0.50 | same | brand text on a surface that is white in both modes (`PageHeaderPrimaryButton`, the active white pills on hero rails and filters) |
+| `--primary-text` (added 2026-10-02) | the brand clamped to L ≤ 0.46 | the brand lifted to L ≥ 0.70 | `text-primary` everywhere — registered as `--text-color-primary`, so Tailwind's `text-primary` (and `/opacity`, variants) reads it while `bg-`, `border-`, `fill-`, `ring-`, `decoration-primary` keep the fill colour |
+
+`text-primary` measured ≥ 4.8:1 on the card, page ground, muted and
+secondary surfaces for every brand above (including a personal accent's
+inline `--primary`, which overrides `.dark`, and an org theme), in both
+modes; brand icon tiles (`bg-primary/10` + `text-primary`) ≥ 5.6:1. The
+light clamp is 0.46, not 0.50, because green and teal brands fell to 4.45:1
+on the grey page ground at 0.48 once the browser gamut-maps them. Text on a
+surface that stays white in dark mode (`bg-primary-foreground`, `bg-white`)
+uses `text-primary-strong` — the lifted `text-primary` would be ~2.7:1 there.
+
+Measured (WCAG 2.1) across the default brand, the five brand presets, the
+Branding theme presets and a personal accent, light and dark: default-button
+text ≥ 5.2:1 on the base and ≥ 4.6:1 on the top highlight; hero
+white-button text ≥ 5.4:1. White text on a clamped fill holds for every hue
+(worst case green: 5.6:1 base, 4.57:1 highlight). Ink holds for every hue
+from L 0.62; a saturated magenta or violet brand between L 0.585 and 0.62
+can fall to about 3.9:1 (no current preset is in that band).
+
+**The foreground rule.** Text on a solid brand fill is white or ink,
+whichever has the higher WCAG contrast — never a fixed luminance cut-off (the
+old `> 0.5` gave white text at 3.6:1 on orange, teal and green brands).
+`pickForeground()` in `lib/derive-palette.ts` applies it in JS (the sidebar
+logo tile); `--primary-fill-foreground` applies the same crossover in CSS.
+`--primary-foreground` is **not** a fill foreground: it stays white unless
+the brand itself is very light. It is not the band text either — the sky and
+the PageHero band use `--band-foreground`, always white (amended
+2026-10-03). New text-bearing fills use the fill pair, never
+`bg-primary text-primary-foreground`.
 
 ## Status tokens — for badges and severity states
 
@@ -130,6 +213,11 @@ accent, muted-foreground) for the styling.
    `bg-category-hr` so rebrand cascades.
 5. **Dark mode is automatic.** Semantic tokens have light + dark
    variants; you don't need `dark:bg-*` pairs if you use the token.
+6. **Text on a solid brand fill uses the fill pair.** `bg-primary-fill` +
+   `text-primary-fill-foreground` stay ≥ 4.5:1 for any brand in both modes;
+   `bg-primary text-primary-foreground` does not (see "Primary fills and
+   foregrounds"). ESLint `design/no-primary-foreground-on-fill` blocks the
+   pairing within one class string (swept app-wide 2026-10-02).
 
 ## Calendar source tokens
 
@@ -143,10 +231,31 @@ sources stay distinguishable. The module sets:
 | Sites / operations | `event`, `inspection`, `compliance`, `credential`, `checklist`, `hazard`, `vendor`, `asset`, `meal`, `damage`, `emergency`, `drill`, `respite`, `participation`, `ppe`, `medication` |
 | Governance | `meetings`, `decisions`, `obligations`, `policies` |
 | Finance | `invoice-due`, `bill-due`, `payment-run`, `gst-due`, `payroll`, `period-close` |
+| Referrals | `referral-follow-up`, `referral-appointment`, `referral-assessment`, `referral-funding` |
 | Shared | `external` (two-way sync busy — desaturated on purpose) |
 
 A source colour never signals urgency: an entry whose `status` is
 `overdue` renders critical regardless of its source.
+
+## Journey tokens (sign-in pages, added 2026-10-13)
+
+The Oblivion Care "Journey" palette for the sign-in and account screens
+(`layouts/auth/auth-journey-layout.tsx`, `resources/css/journey-auth.css`).
+Every value derives from `--primary`, so Settings › Branding recolours them.
+With `--primary` `#7040D6` they reproduce the brand sheet exactly.
+
+| Token | Utility | Use |
+|---|---|---|
+| `--journey-ink` | `bg-journey-ink` | Staff brand half (≈ `#141019`) |
+| `--journey-ink-muted` | `text-journey-ink-muted` | Secondary text on ink (≥ 7:1) |
+| `--journey-paper` | `text-journey-paper` | Text and light marks on ink (≈ `#FCFAFF`) |
+| `--journey-lavender` | `fill-journey-lavender` | The islands mark and accents on ink (≈ `#D6B9FF`) |
+| `--journey-lilac` | `bg-journey-lilac` | Family brand half (light mode) |
+| `--journey-surface` / `--journey-field` | `bg-journey-surface`, `bg-journey-field` | The form half and its inputs (dark variants in `.dark`) |
+
+Brand text on these surfaces uses `text-primary` (`--primary-text`), never
+the raw brand. Status notices use the `Alert` tone variants (`critical`,
+`warning`, `info`, `success`) on the status token pairs.
 
 ## Adding a new token
 
@@ -175,6 +284,13 @@ Edit [`resources/css/app.css`](../resources/css/app.css):
   iconned non-colour cue.
 - **Focus is always visible.** Interactive chrome (hero CTAs, sub-tabs, MealCards,
   Add buttons, menu items) carries `focus-visible:ring-2 focus-visible:ring-ring`.
+- **44 px targets.** The root font is 14 px, so rem sizes such as `min-h-11`
+  render at 38.5 px. `.frontline-tap` makes a control at least 44×44 px.
+  `.frontline-hit` gives a compact control (row kebab, pagination, tier-2 tab,
+  dialog, wizard and sheet ✕) an invisible 44×44 px target and leaves its
+  drawn size alone. Keep 44 px between the centres of neighbouring
+  `.frontline-hit` targets, and keep each target on screen: the `Sheet` ✕
+  has a 16 px minimum inset because a sheet touches the screen edge.
 - **Reduced motion.** A global `@media (prefers-reduced-motion: reduce)` block in
   `app.css` disables `animate-ping` / `animate-spin` / `animate-pop` /
   `animate-pulse`. New animated chrome should rely on that block (or a

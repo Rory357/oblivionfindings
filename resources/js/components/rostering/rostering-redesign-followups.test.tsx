@@ -198,7 +198,13 @@ describe('rostering redesign follow-up wiring', () => {
             />,
         );
 
-        expect(screen.getByText('Declared today')).toBeVisible();
+        expect(screen.getByText('1 of 1 staff shown')).toBeVisible();
+        expect(screen.queryByText('Total staff')).not.toBeInTheDocument();
+        expect(screen.queryByText('Declared today')).not.toBeInTheDocument();
+        expect(
+            screen.queryByText('Currently on leave'),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByText('No data')).not.toBeInTheDocument();
         expect(screen.getByText('Aroha King')).toBeVisible();
         // Edit no longer navigates — it opens an in-page dialog.
         expect(
@@ -725,11 +731,41 @@ describe('rostering redesign follow-up wiring', () => {
         expect(screen.getByText('Expiring soon')).toBeVisible();
     });
 
-    it('renders daily coverage returned by the controller in analytics', () => {
+    it('keeps low completion rates and empty periods distinct from targets', () => {
         render(
             <AnalyticsPane
                 stats={[]}
-                coverageTrend={[]}
+                completionTrend={[
+                    { week: '14 Sep', completion: 20 },
+                    { week: '21 Sep', completion: 0 },
+                    { week: '28 Sep', completion: null },
+                ]}
+                shiftTypes={[]}
+                fillBySite={[]}
+            />,
+        );
+        expect(
+            screen.getByText('14 Sep: 20% completed', { selector: 'li' }),
+        ).toBeVisible();
+        expect(
+            screen.getByText('21 Sep: 0% completed', { selector: 'li' }),
+        ).toBeVisible();
+        expect(screen.getByText('28 Sep: No shifts')).toBeVisible();
+        expect(screen.getByText('0 shifts · this week')).toBeVisible();
+        expect(screen.queryByText(/target \(95%\)/)).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: '8w' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.getByText('Recorded overtime hours are not available'),
+        ).toBeVisible();
+    });
+
+    it('renders recorded shift starts returned by the controller in analytics', () => {
+        render(
+            <AnalyticsPane
+                stats={[]}
+                completionTrend={[]}
                 shiftTypes={[]}
                 fillBySite={[]}
                 overtimeTrend={[]}
@@ -752,8 +788,8 @@ describe('rostering redesign follow-up wiring', () => {
             />,
         );
 
-        expect(screen.getByText('Daily coverage')).toBeVisible();
-        expect(screen.getByText('4/5 filled')).toBeVisible();
+        expect(screen.getByText('Recorded shift starts')).toBeVisible();
+        expect(screen.getByText('4/5 assigned')).toBeVisible();
         expect(screen.getByText('1 open')).toBeVisible();
     });
 
@@ -761,8 +797,7 @@ describe('rostering redesign follow-up wiring', () => {
         render(
             <CoveragePane
                 stats={[]}
-                windowLabels={['AM 07-15']}
-                rows={[]}
+                sites={[]}
                 alerts={[
                     {
                         site_name: 'Matai House',
@@ -777,11 +812,13 @@ describe('rostering redesign follow-up wiring', () => {
             />,
         );
 
-        expect(screen.getByText('Coverage gaps this week')).toBeVisible();
+        expect(
+            screen.getByText('Coverage windows needing review'),
+        ).toBeVisible();
         expect(screen.getByText('Matai House')).toBeVisible();
         expect(screen.getByText('Night cover')).toBeVisible();
         expect(screen.getByText('1 short')).toBeVisible();
-        expect(screen.getByText('1/2 assigned')).toBeVisible();
+        expect(screen.getByText('1/2 in roster')).toBeVisible();
     });
 
     it('uses caught-up copy when no leave requests are waiting', () => {
@@ -1112,4 +1149,105 @@ describe('rostering redesign follow-up wiring', () => {
             { reason: 'Called in sick', notes: null },
         );
     });
+});
+
+describe('availability scanability and scope', () => {
+    it('shows every overnight interval without a hover and respects row edit denial', () => {
+        render(
+            <AvailabilityPane
+                canManage
+                staff={[
+                    {
+                        id: 71,
+                        name: 'Night worker',
+                        email: 'night@example.test',
+                        can_manage: false,
+                        staff_availability: [
+                            {
+                                id: 1,
+                                day_of_week: 0,
+                                start_time: '22:00',
+                                end_time: '07:00',
+                                ends_next_day: true,
+                            },
+                            {
+                                id: 2,
+                                day_of_week: 1,
+                                start_time: '10:00',
+                                end_time: '13:00',
+                                ends_next_day: false,
+                            },
+                        ],
+                    },
+                ]}
+                upcomingLeave={{}}
+            />,
+        );
+        expect(screen.getByText('22:00–24:00')).toBeVisible();
+        expect(screen.getByText('00:00–07:00 (continues)')).toBeVisible();
+        expect(screen.getByText('10:00–13:00')).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: 'Edit availability' }),
+        ).not.toBeInTheDocument();
+    });
+    it('shows all approved leave entries in the configured worker timezone', () => {
+        render(
+            <AvailabilityPane
+                canManage={false}
+                workerTimezone="Pacific/Honolulu"
+                staff={[
+                    {
+                        id: 71,
+                        name: 'Worker',
+                        email: 'worker@example.test',
+                        staff_availability: [],
+                    },
+                ]}
+                upcomingLeave={{
+                    71: Array.from({ length: 5 }, (_, i) => ({
+                        id: i + 1,
+                        leave_type: 'annual_leave',
+                        starts_at: `2026-10-${String(i + 6).padStart(2, '0')}T01:00:00Z`,
+                        ends_at: `2026-10-${String(i + 6).padStart(2, '0')}T02:00:00Z`,
+                        status: 'approved',
+                    })),
+                }}
+            />,
+        );
+        expect(
+            screen.getByText('5 Oct 2026–5 Oct 2026 · annual leave'),
+        ).toBeVisible();
+        expect(screen.getAllByText(/· annual leave/)).toHaveLength(5);
+        expect(screen.queryByText(/more$/)).not.toBeInTheDocument();
+    });
+});
+
+it('opens the saved roster layout and keeps an explicit in-session layout choice', () => {
+    const view = render(
+        <WeekGridPane
+            days={weekDays}
+            rows={[]}
+            todayKey={null}
+            canManage={false}
+            initialView="list"
+        />,
+    );
+    expect(screen.getByRole('tab', { name: 'List' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Day' }));
+    view.rerender(
+        <WeekGridPane
+            days={weekDays}
+            rows={[]}
+            todayKey={null}
+            canManage={false}
+            initialView="list"
+        />,
+    );
+    expect(screen.getByRole('tab', { name: 'Day' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+    );
 });

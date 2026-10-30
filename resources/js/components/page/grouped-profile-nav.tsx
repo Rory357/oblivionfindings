@@ -239,32 +239,32 @@ export function GroupPillRail({
 const TONE_CYCLE = [
     {
         active: 'bg-primary/12 text-primary',
-        chip: 'bg-primary text-primary-foreground',
+        chip: 'bg-primary-fill text-primary-fill-foreground',
         badge: 'bg-primary/18 text-primary',
         bar: 'bg-primary',
     },
     {
-        active: 'bg-tone-teal/12 text-tone-teal',
+        active: 'bg-tone-teal/12 text-tone-teal-foreground',
         chip: 'bg-tone-chip-teal text-white',
-        badge: 'bg-tone-teal/18 text-tone-teal',
+        badge: 'bg-tone-teal/18 text-tone-teal-foreground',
         bar: 'bg-tone-teal',
     },
     {
-        active: 'bg-status-success/12 text-status-success',
+        active: 'bg-status-success/12 text-status-success-foreground',
         chip: 'bg-tone-chip-success text-white',
-        badge: 'bg-status-success/18 text-status-success',
+        badge: 'bg-status-success/18 text-status-success-foreground',
         bar: 'bg-status-success',
     },
     {
-        active: 'bg-status-warning/12 text-status-warning',
+        active: 'bg-status-warning/12 text-status-warning-foreground',
         chip: 'bg-tone-chip-warning text-white',
-        badge: 'bg-status-warning/18 text-status-warning',
+        badge: 'bg-status-warning/18 text-status-warning-foreground',
         bar: 'bg-status-warning',
     },
     {
-        active: 'bg-status-critical/12 text-status-critical',
+        active: 'bg-status-critical/12 text-status-critical-foreground',
         chip: 'bg-tone-chip-critical text-white',
-        badge: 'bg-status-critical/18 text-status-critical',
+        badge: 'bg-status-critical/18 text-status-critical-foreground',
         bar: 'bg-status-critical',
     },
 ] as const;
@@ -325,14 +325,16 @@ export function TierTwoTabs({
         <div
             role="tablist"
             aria-label={ariaLabel}
-            className="flex flex-wrap items-center gap-1"
+            className="flex flex-wrap items-center gap-x-[4px] gap-y-3"
         >
             {tabs.map((tab, index) => {
                 const isActive = tab.key === activeTab;
                 const tone = TONE_CYCLE[index % TONE_CYCLE.length];
                 const Icon = tab.icon;
                 const className = cn(
-                    'relative inline-flex min-h-10 shrink-0 items-center gap-2 rounded-[9px] px-3 text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
+                    // frontline-hit: a 44 px target without growing the
+                    // strip; gap-y-3 keeps wrapped rows' targets apart.
+                    'frontline-hit relative inline-flex min-h-[40px] shrink-0 items-center gap-[8px] rounded-[9px] px-[12px] text-[13px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:outline-none',
                     isActive
                         ? tone.active
                         : 'text-muted-foreground hover:bg-accent hover:text-foreground',
@@ -342,13 +344,13 @@ export function TierTwoTabs({
                     <>
                         <span
                             className={cn(
-                                'inline-flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-md',
+                                'inline-flex size-[22px] shrink-0 items-center justify-center rounded-[6px]',
                                 isActive
                                     ? tone.chip
                                     : 'bg-muted text-muted-foreground',
                             )}
                         >
-                            <Icon className="h-3.5 w-3.5" />
+                            <Icon className="size-[14px]" />
                         </span>
                         {tab.label}
                         <CountPill
@@ -359,7 +361,7 @@ export function TierTwoTabs({
                         {isActive ? (
                             <span
                                 className={cn(
-                                    'absolute inset-x-3.5 bottom-0 h-0.5 rounded',
+                                    'absolute right-[14px] bottom-0 left-[14px] h-[2px] rounded-[2px]',
                                     tone.bar,
                                 )}
                                 aria-hidden="true"

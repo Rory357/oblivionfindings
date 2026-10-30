@@ -1,0 +1,19 @@
+{
+    "host": "http:\/\/127.0.0.1:8772",
+    "sourceRoot": "C:\\Users\\steph\\.codex\\worktrees\\dcf0\\oblivionfindings",
+    "database": "oblivion_findings_pkg03_browser_dcf0_20260927",
+    "migrations": 1106,
+    "billId": 1,
+    "billStatus": "approved",
+    "journalId": 1,
+    "journalStatus": "posted",
+    "approvalReceipts": 1,
+    "paidAmount": "0.00",
+    "workStatus": "open",
+    "estimate": "575.00",
+    "savedNote": true,
+    "reviewStatus": "submitted",
+    "privateQuoteExists": true,
+    "scannerConfigured": false,
+    "operationalRecordsUsed": false
+}

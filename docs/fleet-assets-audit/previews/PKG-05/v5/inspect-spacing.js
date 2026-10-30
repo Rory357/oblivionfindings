@@ -1,0 +1,1 @@
+async(page)=>({spacing:await page.evaluate(()=>{const hero=document.querySelector('[data-testid=hero]'),head=document.querySelector('[data-testid=workspace-heading]');return {hero:hero.getBoundingClientRect().toJSON(),heading:head.getBoundingClientRect().toJSON(),layout:getComputedStyle(hero.parentElement).gap,wrap:getComputedStyle(head.parentElement).gap}})})

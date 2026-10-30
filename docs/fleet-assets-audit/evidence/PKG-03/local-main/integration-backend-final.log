@@ -1,0 +1,124 @@
+
+   FAIL  Tests\Feature\Finance\BillApprovalSnapshotTest
+  ! it retains estimate revisions with safe retry and rejects stale or unauthorised changes → file_get_conten… 558.93s  
+  ! it invalidates bill approval when the linked quote changes and retains the journal source → file_get_conten… 1.27s  
+  ! it serves only clean current linked quote evidence through bill authorisation → file_get_contents(C:\Users</>… 1.13s  
+  ! it uses canonical vehicle file access while retaining Finance and source ownership checks → file_get_conten… 1.11s  
+  ! it requires the snapshot displayed with the bill and rejects forged snapshots → file_get_contents(C:\Users</>… 0.85s  
+  ! it rejects changes made after review even within the same timestamp second with ('amount') → file_get_conte… 0.91s  
+  ! it rejects changes made after review even within the same timestamp second with ('allocation') → file_get_c… 0.85s  
+  ! it rejects changes made after review even within the same timestamp second with ('line description') → file… 0.86s  
+  ! it does not let a valid review snapshot confer approval permission → file_get_contents(C:\Users\steph\.code… 0.80s  
+  ! it retains an approval receipt and prevents stale cancellation from overwriting a posted bill → file_get_co… 0.97s  
+  ! it conceals bills outside approved sites and aggregates only accessible balances → file_get_contents(C:\Use… 1.17s  
+  ! it requires clean private bill evidence, permits scan recovery and freezes it after approval → file_get_con… 6.43s  
+  ! it withdraws failed evidence once while retaining its bytes and the actor audit → file_get_contents(C:\User… 3.20s  
+  ! it shows bounded duplicate warnings for the same supplier and normalised invoice reference → file_get_conte… 0.92s  
+  ⨯ it serializes independent approval and cancellation workers without duplicate or contradictory posting wit… 73.13s  
+  ⨯ it serializes independent approval and cancellation workers without duplicate or contradictory posting wit… 71.30s  
+
+   WARN  Tests\Feature\Finance\BillSpendApprovalGateTest
+  ! it bounds the bill approval picker by exact governance action and canonical Site scope → file_get_contents(… 1.53s  
+  ! it conceals foreign missing and wrong-source links with zero bill effects → file_get_contents(C:\Users\step… 1.24s  
+  ! it allows explicit global Site scope only with both finance and governance actions → file_get_contents(C:\U… 0.99s  
+  ! it posts only against independently decided current exact bill evidence → file_get_contents(C:\Users\steph</>… 0.99s  
+  ! it recovers a completed approval after governance evidence expires but still checks current bill access → f… 1.18s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('missing-app… 1.04s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('foreign-act… 1.02s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('source-mism… 1.02s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('source-tamp… 0.99s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('decision-ta… 1.02s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('approval-st… 1.01s  
+  ! it rejects missing approval foreign action and source or evidence tamper without posting with ('insufficien… 1.00s  
+  ! it preserves below-threshold and disabled-gate behavior with dataset "below threshold" → file_get_contents(… 0.93s  
+  ! it preserves below-threshold and disabled-gate behavior with dataset "enforcement disabled" → file_get_cont… 0.94s  
+
+   WARN  Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest
+  ! the finance view is concealed without finance access → file_get_contents(C:\Users\steph\.codex\worktrees\dc… 0.88s  
+  ! linked records combine finance and vehicle links without double counting → file_get_contents(C:\Users\steph… 0.86s  
+  ! linking needs fleet management finance access a reason and the vehicles scope → file_get_contents(C:\Users</>… 1.29s  
+  ! unlinking keeps the finance record and needs a reason → file_get_contents(C:\Users\steph\.codex\worktrees\d… 0.87s  
+  ! linkable search is scoped to the vehicle and finance access → file_get_contents(C:\Users\steph\.codex\workt… 0.85s  
+  ! review requests are idempotent scoped and refuse open duplicates → file_get_contents(C:\Users\steph\.codex</>… 1.13s  
+  ! review request files are private and open only for finance viewers → file_get_contents(C:\Users\steph\.code… 1.91s  
+  ! only finance decides a review request → file_get_contents(C:\Users\steph\.codex\worktrees\dcf0\oblivionfind… 1.02s  
+  ! the person who asked for a review cannot decide it → file_get_contents(C:\Users\steph\.codex\worktrees\dcf0… 0.96s  
+  ! finance decides review requests in finance without fleet access → file_get_contents(C:\Users\steph\.codex\w… 1.86s  
+  ! finance queue pages beyond one hundred records without losing scope or filters → file_get_contents(C:\Users… 1.47s  
+  ! finance queue bounds each history and pages older events with site checks → file_get_contents(C:\Users\step… 1.39s  
+  ! open review requests reach finance in all tasks → file_get_contents(C:\Users\steph\.codex\worktrees\dcf0\ob… 1.47s  
+  ! prepared evidence correction resubmission and immutable decision manifest → file_get_contents(C:\Users\step… 1.23s  
+  ! assignment reminders and delivery are scoped durable and deduplicated → file_get_contents(C:\Users\steph\.c… 0.89s  
+  ! vehicle and review surfaces conceal bill details after its site changes → file_get_contents(C:\Users\steph</>… 0.92s  
+  ! due notices recheck changed dates and reviewers before delivery → file_get_contents(C:\Users\steph\.codex\w… 0.99s  
+  ! a queued correction notice is obsolete after the requester resubmits → file_get_contents(C:\Users\steph\.co… 1.69s  
+  ! missing selected vehicle evidence blocks submission and decision → file_get_contents(C:\Users\steph\.codex</>… 1.93s  
+  ! submit affordance and endpoint follow current fleet permission → file_get_contents(C:\Users\steph\.codex\wo… 0.88s  
+  ! delivery reaches eligible reviewers after the first 200 users and rechecks revoked access → file_get_conten… 1.42s  
+
+   WARN  Tests\Feature\FleetAssets\Pkg01MaintenanceProtectedSliceTest
+  ! queue and related-work search retain identity while undated work stays outside All Tasks → file_get_content… 0.37s  
+  ! Finance projection conceals a bill whose canonical asset or site has changed → file_get_contents(C:\Users\s… 0.22s  
+  ! Auckland local minutes reject daylight gaps and require an offset for repeated minutes → file_get_contents(… 0.13s  
+  ! approved configuration versions route, rule and reviewer decisions without default grants → file_get_conten… 1.28s  
+  ! custody receipt access follows the latest exact recipient and approved site → file_get_contents(C:\Users\st… 0.26s  
+  ! a restriction flags existing bookings once and retains an owned follow-up → file_get_contents(C:\Users\step… 0.31s  
+  ! report identity preserves both submissions and requires approved site routing → file_get_contents(C:\Users</>… 0.28s  
+  ! report-only HTTP entry and search stay narrow while selected recipient can accept → file_get_contents(C:\Us… 0.48s  
+  ! checks keep unknown provenance and only an unchanged exact approved version can pass → file_get_contents(C:… 0.24s  
+  ! approved advisory check failures do not create a booking block while unknown provenance remains unassessed…  0.14s  
+  ! required evidence cannot be bypassed by NA or a client claim and a saved private file can satisfy it → file… 0.31s  
+  ! single transitions guard completion, replay identity and handover acknowledgement → file_get_contents(C:\Us… 0.32s  
+  ! triage deadlines and provider responses retain exact Auckland source times → file_get_contents(C:\Users\ste… 0.19s  
+  ! release requires an independent category-granted reviewer, current passing retest and custody → file_get_co… 4.17s  
+  ! a completed held repair can recover a new rule and enabled committed effects deliver once → file_get_conten… 3.43s  
+  ! an overlapping booking decision waits for the asset lock and sees a newly committed hold → file_get_content… 3.19s  
+  ! Designer review: work detail uses permitted projections for custody fleet and Finance readers → file_get_co… 0.30s  
+  ! Designer review: actual default administrator seeding withholds safety configuration authority → file_get_c… 0.63s  
+  ! Designer review: authored template configures and records standalone check evidence without inventing work…  0.43s  
+  ! Designer review: Outing booking waits for the asset lock and a hold leaves no partial outing → file_get_con… 3.59s  
+  ! Designer review: two completed jobs clear only their own holds while the asset remains unavailable → file_g… 0.34s  
+
+   PASS  Tests\Unit\FleetAssets\MaintenanceCostSummaryTest
+  ✓ it deduplicates commitments and keeps invoice, posting and payment separate with decimal precision           0.01s  
+  ✓ it excludes cancelled invoices, unapproved orders and reversed postings
+  ✓ it does not present partial accessible amounts as complete totals
+  ✓ it distinguishes absent records from zero amounts
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Finance\BillApprovalSnapshotTest > it serializes independent approval and…  RuntimeException   
+  Bill workers did not reach the shared lock.
+
+  at tests\Feature\Finance\BillApprovalSnapshotTest.php:313
+    309▕         // lock barrier or any posting/receipt assertions below.
+    310▕         $deadline = microtime(true) + 60;
+    311▕         while (collect($paths)->contains(fn ($path) => ! is_file($path))) {
+    312▕             if (microtime(true) >= $deadline) {
+  ➜ 313▕                 throw new RuntimeException('Bill workers did not reach the shared lock.');
+    314▕             }
+    315▕             usleep(10_000);
+    316▕         }
+    317▕         usleep(200_000);
+
+  1   tests\Feature\Finance\BillApprovalSnapshotTest.php:313
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  Tests\Feature\Finance\BillApprovalSnapshotTest > it serializes independent approval and…  RuntimeException   
+  Bill workers did not reach the shared lock.
+
+  at tests\Feature\Finance\BillApprovalSnapshotTest.php:313
+    309▕         // lock barrier or any posting/receipt assertions below.
+    310▕         $deadline = microtime(true) + 60;
+    311▕         while (collect($paths)->contains(fn ($path) => ! is_file($path))) {
+    312▕             if (microtime(true) >= $deadline) {
+  ➜ 313▕                 throw new RuntimeException('Bill workers did not reach the shared lock.');
+    314▕             }
+    315▕             usleep(10_000);
+    316▕         }
+    317▕         usleep(200_000);
+
+  1   tests\Feature\Finance\BillApprovalSnapshotTest.php:313
+
+
+  Tests:    2 failed, 70 warnings, 4 passed (1388 assertions)
+  Duration: 789.19s
+

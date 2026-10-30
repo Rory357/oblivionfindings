@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\Timesheet;
@@ -119,6 +120,14 @@ class TimesheetUnifiedIndexTest extends TestCase
 
     public function test_archive_route_marks_timesheet_archived_with_reason(): void
     {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         // Build a manual-mode timesheet directly so it doesn't depend on the
         // shift factory's randomised staff assignment (which would trip the
         // ShiftSafetyInvariantService guard).
@@ -142,7 +151,9 @@ class TimesheetUnifiedIndexTest extends TestCase
         $this->assertNotNull($timesheet->archived_at);
         $this->assertSame('End of pay run', $timesheet->archived_reason);
 
-        $this->actingAs($this->admin)->post("/operations/timesheets/{$timesheet->id}/restore");
+        $this->actingAs($this->admin)
+            ->post("/operations/timesheets/{$timesheet->id}/restore")
+            ->assertRedirect();
         $timesheet->refresh();
         $this->assertNull($timesheet->archived_at);
     }

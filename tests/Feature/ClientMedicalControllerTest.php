@@ -61,11 +61,58 @@ class ClientMedicalControllerTest extends TestCase
         $this->createEmployeeProfile($this->viewer);
     }
 
-    public function test_client_medical_page_redirects_to_canonical_emar_medications_page(): void
+    public function test_client_medical_page_redirects_to_the_profile_medical_editor(): void
     {
         $this->actingAs($this->viewer)
             ->get(route('clients.medical.show', $this->client))
-            ->assertRedirect(EmarUrl::medications($this->client));
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
+    }
+
+    public function test_legacy_medical_actions_keep_the_intended_section_and_safe_return_location(): void
+    {
+        $source = '/operations/shifts/12?tab=medications';
+        foreach (['profile', 'conditions', 'emergency_contacts'] as $section) {
+            $this->actingAs($this->viewer)->get(route('clients.medical.show', [
+                'client' => $this->client->id, 'section' => $section, 'return_to' => $source,
+            ]))->assertRedirect(route('operations.clients.show', [
+                'client' => $this->client->id, 'tab' => 'medical', 'medical_section' => $section, 'return_to' => $source,
+            ]));
+        }
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'medications', 'return_to' => $source]))
+            ->assertRedirect(EmarUrl::medications($this->client, ['site_id' => $this->site->id, 'return_to' => $source]));
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'unknown', 'return_to' => '//example.com']))
+            ->assertRedirect(route('operations.clients.show', ['client' => $this->client->id, 'tab' => 'medical', 'medical_section' => 'profile']));
+    }
+
+    public function test_medication_operations_authority_does_not_grant_a_general_medical_profile_editor(): void
+    {
+        $actor = $this->makeRoleUser('support_worker');
+        $this->createEmployeeProfile($actor);
+        foreach (['medications.view' => true, 'medications.stock.update' => true,
+            'clients.viewAny' => false, 'clients.viewAssigned' => true] as $key => $allowed) {
+            $this->grantPermissionOverride($actor, $key, $allowed);
+        }
+        $actor = $actor->fresh();
+        $this->actingAs($actor)->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'conditions']))
+            ->assertForbidden();
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'medications']))
+            ->assertRedirect(EmarUrl::medications($this->client, ['site_id' => $this->site->id]));
+    }
+
+    public function test_general_medical_sections_require_the_medical_section_read_grant(): void
+    {
+        $actor = $this->makeRoleUser('support_worker');
+        $this->createEmployeeProfile($actor);
+        $this->grantPermissionOverride($actor, 'clients.viewAssigned', true);
+        $this->grantPermissionOverride($actor, 'medications.view', false);
+        $this->client->supportWorkers()->attach($actor->id);
+        $this->actingAs($actor->fresh());
+        $this->assertTrue($actor->fresh()->can('view', $this->client));
+        foreach (['profile', 'conditions', 'emergency_contacts'] as $section) {
+            $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => $section]))
+                ->assertForbidden();
+        }
+        $this->get(route('clients.medical.show', ['client' => $this->client->id, 'section' => 'medications']))->assertForbidden();
     }
 
     public function test_client_medical_stock_endpoint_rejects_controlled_medication_without_effects(): void
@@ -379,8 +426,11 @@ class ClientMedicalControllerTest extends TestCase
         $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
-    public function test_client_medical_order_update_conceals_controlled_targets_and_prohibits_reclassification(): void
+    public function test_profile_order_writes_answer_through_p04_and_keep_controlled_concealment(): void
     {
+        // EA-023 (Lane C3): the profile no longer writes orders. It answers
+        // through P04 (MedicationLegacyOrderBridge), which keeps controlled
+        // concealment and never reclassifies or changes state.
         $actor = $this->makeRoleUser('support_worker');
         $this->createEmployeeProfile($actor);
         $this->grantPermissionOverride($actor, 'clients.update', true);
@@ -389,163 +439,30 @@ class ClientMedicalControllerTest extends TestCase
         $this->grantPermissionOverride($actor, 'medications.controlled.record', false);
         $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
         Shift::factory()->create([
-            'client_id' => $this->client->id,
-            'site_id' => $this->site->id,
-            'service_context_id' => $this->client->service_context_id,
-            'user_id' => $actor->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHour(),
-            'actual_starts_at' => now()->subHour(),
-            'status' => 'in_progress',
+            'client_id' => $this->client->id, 'site_id' => $this->site->id,
+            'service_context_id' => $this->client->service_context_id, 'user_id' => $actor->id,
+            'starts_at' => now()->subHour(), 'ends_at' => now()->addHour(), 'actual_starts_at' => now()->subHour(), 'status' => 'in_progress',
         ]);
-        $ordinary = ClientMedication::query()->create([
-            'client_id' => $this->client->id,
-            'name' => 'Ordinary immutable classification',
-            'controlled_drug' => false,
-            'active' => true,
-            'state' => 'active',
-            'approval_status' => 'verified',
-        ]);
-        $controlled = ClientMedication::query()->create([
-            'client_id' => $this->client->id,
-            'name' => 'Controlled immutable classification',
-            'controlled_drug' => true,
-            'active' => true,
-            'state' => 'active',
-            'approval_status' => 'verified',
-        ]);
+        $ordinary = ClientMedication::query()->create(['client_id' => $this->client->id, 'name' => 'Ordinary profile order',
+            'controlled_drug' => false, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
+        $controlled = ClientMedication::query()->create(['client_id' => $this->client->id, 'name' => 'Controlled profile order',
+            'controlled_drug' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified']);
 
-        foreach ([
-            'clients.medical.medications.update',
-            'operations.clients.medical.medications.update',
-        ] as $routeName) {
-            $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $controlled]), ['name' => ''])
-                ->assertNotFound();
-            $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, 999999]), ['name' => ''])
-                ->assertNotFound();
-            $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $ordinary]), ['name' => ''])
-                ->assertSessionHasErrors('name');
-            $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $ordinary]), [
-                    'name' => $ordinary->name,
-                    'controlled_drug' => true,
-                ])
-                ->assertNotFound();
+        foreach (['clients.medical.medications.update', 'operations.clients.medical.medications.update'] as $routeName) {
+            $this->actingAs($actor)->putJson(route($routeName, [$this->client, $controlled]), ['name' => $controlled->name])->assertNotFound();
+            $this->actingAs($actor)->putJson(route($routeName, [$this->client, $ordinary]), ['name' => $ordinary->name, 'controlled_drug' => true, 'state' => 'paused'])
+                ->assertStatus(409);
+        }
+        foreach (['clients.medical.medications.store', 'operations.clients.medical.medications.store'] as $routeName) {
+            $this->actingAs($actor)->postJson(route($routeName, $this->client), ['name' => 'Untrusted controlled classifier', 'controlled_drug' => true])->assertNotFound();
+            $this->actingAs($actor)->postJson(route($routeName, $this->client), ['name' => 'Ordinary flat profile entry', 'controlled_drug' => false])->assertStatus(409);
         }
 
-        $this->grantPermissionOverride($actor, 'medications.controlled.record', true);
-        $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-        $this->actingAs($actor)
-            ->put(route('clients.medical.medications.update', [$this->client, $controlled]), [
-                'name' => $controlled->name,
-                'controlled_drug' => false,
-            ])
-            ->assertNotFound();
-
-        $this->grantPermissionOverride($actor, 'medications.controlled.view', true);
-        $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-        $this->actingAs($actor)
-            ->put(route('clients.medical.medications.update', [$this->client, $ordinary]), [
-                'name' => $ordinary->name,
-                'controlled_drug' => true,
-            ])
-            ->assertSessionHasErrors('controlled_drug');
-        $this->actingAs($actor)
-            ->put(route('clients.medical.medications.update', [$this->client, $controlled]), [
-                'name' => $controlled->name,
-                'controlled_drug' => false,
-            ])
-            ->assertSessionHasErrors('controlled_drug');
-
+        $this->assertDatabaseMissing('client_medications', ['client_id' => $this->client->id, 'name' => 'Untrusted controlled classifier']);
+        $this->assertDatabaseMissing('client_medications', ['client_id' => $this->client->id, 'name' => 'Ordinary flat profile entry']);
         $this->assertFalse((bool) $ordinary->refresh()->controlled_drug);
+        $this->assertSame('active', $ordinary->state);
         $this->assertTrue((bool) $controlled->refresh()->controlled_drug);
-    }
-
-    public function test_manual_medication_classification_requires_both_controlled_capabilities(): void
-    {
-        $actor = $this->makeRoleUser('support_worker');
-        $this->createEmployeeProfile($actor);
-        $this->grantPermissionOverride($actor, 'clients.update', true);
-        $this->grantPermissionOverride($actor, 'medications.orders.manage', true);
-        $this->grantPermissionOverride($actor, 'medications.controlled.view', false);
-        $this->grantPermissionOverride($actor, 'medications.controlled.record', false);
-        $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-        Shift::factory()->create([
-            'client_id' => $this->client->id,
-            'site_id' => $this->site->id,
-            'service_context_id' => $this->client->service_context_id,
-            'user_id' => $actor->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHour(),
-            'actual_starts_at' => now()->subHour(),
-            'status' => 'in_progress',
-        ]);
-        $routes = [
-            'clients.medical.medications.store',
-            'operations.clients.medical.medications.store',
-        ];
-
-        foreach ([[false, false], [true, false], [false, true]] as [$canView, $canRecord]) {
-            $this->grantPermissionOverride($actor, 'medications.controlled.view', $canView);
-            $this->grantPermissionOverride($actor, 'medications.controlled.record', $canRecord);
-            $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-
-            foreach ($routes as $routeName) {
-                $ordinaryName = sprintf(
-                    'Ordinary manual medication %s %d %d',
-                    $routeName,
-                    (int) $canView,
-                    (int) $canRecord,
-                );
-                $this->actingAs($actor)
-                    ->post(route($routeName, $this->client), [
-                        'name' => $ordinaryName,
-                        'controlled_drug' => false,
-                    ])
-                    ->assertRedirect();
-                $this->assertDatabaseHas('client_medications', [
-                    'client_id' => $this->client->id,
-                    'name' => $ordinaryName,
-                    'controlled_drug' => false,
-                ]);
-
-                $this->actingAs($actor)
-                    ->post(route($routeName, $this->client), [
-                        'name' => 'Untrusted controlled classifier',
-                        'controlled_drug' => true,
-                    ])
-                    ->assertNotFound();
-            }
-        }
-
-        $this->assertDatabaseMissing('client_medications', [
-            'client_id' => $this->client->id,
-            'name' => 'Untrusted controlled classifier',
-        ]);
-
-        $this->grantPermissionOverride($actor, 'medications.controlled.view', true);
-        $this->grantPermissionOverride($actor, 'medications.controlled.record', true);
-        $actor->unsetRelation('permissionOverrides')->unsetRelation('roles');
-
-        foreach ([
-            ['clients.medical.medications.store', 'Privileged ordinary classifier', false],
-            ['operations.clients.medical.medications.store', 'Privileged controlled classifier', true],
-        ] as [$routeName, $name, $controlled]) {
-            $this->actingAs($actor)
-                ->post(route($routeName, $this->client), [
-                    'name' => $name,
-                    'controlled_drug' => $controlled,
-                ])
-                ->assertRedirect();
-            $this->assertDatabaseHas('client_medications', [
-                'client_id' => $this->client->id,
-                'name' => $name,
-                'controlled_drug' => $controlled,
-            ]);
-        }
     }
 
     public function test_medication_notifications_require_local_site_and_the_exact_event_and_controlled_capabilities(): void

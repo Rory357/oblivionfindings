@@ -11,23 +11,12 @@ import {
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import {
-    Command,
-    CommandEmpty,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
 import { Textarea } from '@/components/ui/textarea';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { formatDateOnly } from '@/lib/datetime';
+import { RemotePicker } from '@/pages/fleet-assets/geofences/workspace/remote-picker';
 import {
     CalendarDays,
     Check,
@@ -41,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { boundaryCentre, moveBoundary } from './boundary-geometry';
+import { BoundaryHandoff } from './boundary-handoff';
 import ClientLocationMap from './client-location-map';
 import {
     geometryError,
@@ -98,6 +88,7 @@ export default function ZoneDraftDialog({
     boundaries,
     url,
     fingerprint,
+    canUseSharedBuilder = false,
     onClose,
     onSaved,
     onAccessEnded,
@@ -105,6 +96,7 @@ export default function ZoneDraftDialog({
     center: Coordinate;
     draft: ZoneDraft | null;
     boundaries: Boundary[];
+    canUseSharedBuilder?: boolean;
     url: string;
     fingerprint: string;
     onClose: () => void;
@@ -665,47 +657,39 @@ export default function ZoneDraftDialog({
                                             'Boundary encloses an area'}
                                     </p>
                                 )}
-                                <Popover
-                                    open={linkOpen}
-                                    onOpenChange={setLinkOpen}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <Button variant="outline">
-                                            {boundary
-                                                ? `Linked: ${boundary.name}`
-                                                : 'Use an existing site boundary'}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="p-0">
-                                        <Command>
-                                            <CommandInput placeholder="Find a boundary…" />
-                                            <CommandList>
-                                                <CommandEmpty>
-                                                    No eligible site boundaries.
-                                                </CommandEmpty>
-                                                {boundaries.map((item) => (
-                                                    <CommandItem
-                                                        key={item.id}
-                                                        value={`${item.name} ${item.id}`}
-                                                        onSelect={() => {
-                                                            change(
-                                                                item.geometry,
-                                                            );
-                                                            setBoundary(item);
-                                                            setSourceReviewed(
-                                                                true,
-                                                            );
-                                                            setLinkOpen(false);
-                                                            setMode(null);
-                                                        }}
-                                                    >
-                                                        {item.name}
-                                                    </CommandItem>
-                                                ))}
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
+                                {canUseSharedBuilder && (
+                                    <BoundaryHandoff
+                                        url={url}
+                                        fingerprint={fingerprint}
+                                        onSelect={(item) => {
+                                            change(item.geometry);
+                                            setBoundary(item);
+                                            setSourceReviewed(true);
+                                            setMode(null);
+                                            setShapeFocus(item.geometry);
+                                        }}
+                                    />
+                                )}
+                                <RemotePicker<Boundary>
+                                    label="Find an eligible site boundary"
+                                    value={boundary?.name}
+                                    url={(q) =>
+                                        url.replace(/\/\d+$/, '') +
+                                        '/boundaries?q=' +
+                                        encodeURIComponent(q)
+                                    }
+                                    describe={(item) => ({
+                                        id: item.id,
+                                        name: item.name,
+                                    })}
+                                    onSelect={(item) => {
+                                        change(item.geometry);
+                                        setBoundary(item);
+                                        setSourceReviewed(true);
+                                        setMode(null);
+                                        setShapeFocus(item.geometry);
+                                    }}
+                                />
                                 {boundary && (
                                     <p>
                                         This links a snapshot. Editing the shape

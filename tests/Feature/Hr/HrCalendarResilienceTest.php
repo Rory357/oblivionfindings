@@ -180,7 +180,7 @@ test('an active team member can see a team event while other and inactive profil
     ]);
 
     $this->actingAs($this->hr)
-        ->put("/hr/calendar/events/{$event->id}", [
+        ->put("/hr/calendar/events/{$event->id}", ['edit_version' => $event->fresh()->edit_version,
             'audience_type' => 'team',
             'audience_team' => ' CLINICAL   SUPPORT ',
             'audience_user_ids' => [],

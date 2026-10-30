@@ -1,0 +1,222 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox
+- text: Recovery
+- combobox
+- button: Dark theme
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button: Report incident
+  - button:
+  - button:
+  - generic: AM
+- complementary:
+  - navigation:
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button:
+- main:
+  - navigation:
+    - button: Home
+    - generic: ›
+    - button: Fleet & assets
+    - generic: ›
+    - button: Vehicles
+    - generic: ›
+    - generic: Kōwhai van
+  - button:
+  - button:
+  - heading [level=1]: Kōwhai van
+  - generic: Not ready
+  - paragraph: KWH014 · VH-014 · Kōwhai House Toyota Hiace · Diesel · Community transport
+  - button:
+    - generic: Find in this vehicle…
+    - generic: /
+  - button:
+    - text: Calendar
+  - button:
+    - text: Start check
+  - button: Report a problem
+  - button:
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button:
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button:
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button:
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button:
+    - text: Reminders & follow-up
+  - tablist:
+    - tab [selected]:
+      - generic: Service & compliance
+    - button:
+      - generic: More
+    - button:
+  - tablist:
+    - tab:
+      - text: Evidence & due dates
+    - tab:
+      - text: Service schedules
+    - tab [selected]:
+      - text: Reminders
+    - tab:
+      - text: Service history
+    - tab:
+      - text: Mileage
+  - tabpanel:
+    - generic: TIMELY FOLLOW-UP
+    - heading [level=2]: Reminders
+    - paragraph: One place for vehicle follow-ups and obligation reminders.
+    - button:
+      - text: Open calendar
+    - button:
+      - text: Add reminder
+    - strong: "1"
+    - generic: Open follow-ups
+    - strong: "4"
+    - generic: Linked obligations
+    - strong: "1"
+    - generic: Delivery needs attention
+    - heading [level=3]: Vehicle follow-ups
+    - text: Dates appear on the vehicle calendar without blocking bookings.
+    - textbox:
+      - /placeholder: Title, owner or source…
+    - combobox
+    - button [pressed]:
+      - text: List
+    - button:
+      - text: Cards
+    - generic: Vehicle follow-ups
+    - generic: 1 record shown
+    - table:
+      - row:
+        - cell:
+          - generic: Evidence review
+          - generic: "Synthetic walkthrough: review the vehicle evidence list."
+        - cell:
+          - generic: Due / repeat
+          - strong: 26 Sep 2026 · 09:00 AM · Pacific/Auckland
+          - generic: One-off
+        - cell:
+          - generic: Owner & source
+          - generic: Kōwhai House Coordinator
+          - button:
+            - text: Vehicle profile
+          - generic: REM-DEMO-1
+        - cell:
+          - generic: Status / calendar
+          - generic: Scheduled
+          - button:
+            - text: View in calendar
+        - cell:
+          - button:
+    - generic: FROM SERVICE & COMPLIANCE
+    - heading [level=3]: Obligation reminders
+    - generic: 1 delivery failed
+    - generic: Obligation reminders
+    - generic: 4 records shown
+    - table:
+      - row:
+        - cell:
+          - generic: Routine service
+          - generic: SCH-DEMO-07
+        - cell:
+          - generic: Due / owner
+          - strong: 24 Sept 2026
+          - generic: Kōwhai House Coordinator
+        - cell:
+          - generic: Delivery status
+          - generic: Delivery failed
+        - cell:
+          - generic: Next action
+          - button: Retry delivery
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: Passenger lift service
+          - generic: SCH-DEMO-08
+        - cell:
+          - generic: Due / owner
+          - strong: 13 Nov 2026
+          - generic: Equipment Coordinator
+        - cell:
+          - generic: Delivery status
+          - generic: Scheduled
+        - cell:
+          - generic: Next action
+          - button: Acknowledge
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: WoF
+          - generic: WOF-DEMO-14
+        - cell:
+          - generic: Due / owner
+          - strong: 9 Apr 2027
+          - generic: Kōwhai House Coordinator
+        - cell:
+          - generic: Delivery status
+          - generic: Scheduled
+        - cell:
+          - generic: Next action
+          - button: Acknowledge
+        - cell:
+          - button:
+      - row:
+        - cell:
+          - generic: Registration
+          - generic: REG-DEMO-14
+        - cell:
+          - generic: Due / owner
+          - strong: 8 Oct 2026
+          - generic: Kōwhai House Coordinator
+        - cell:
+          - generic: Delivery status
+          - generic: Scheduled
+        - cell:
+          - generic: Next action
+          - button: Acknowledge
+        - cell:
+          - button:
+    - paragraph: Acknowledgement does not complete the service or compliance obligation. Reminder delivery is demonstrated locally; production tasks and notification delivery remain source-owned.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Reminder saved and linked to the vehicle calendar.
+  - button: Undo
+  - button: Dismiss
+- menu "Actions for Evidence review" [active]:
+  - menuitem "View reminder & activity":
+    - text: View reminder & activity
+  - menuitem "View in calendar":
+    - text: View in calendar
+  - menuitem "Edit / reschedule":
+    - text: Edit / reschedule
+  - menuitem "Acknowledge":
+    - text: Acknowledge
+  - menuitem "Complete follow-up":
+    - text: Complete follow-up
+  - menuitem "Pause reminder":
+    - text: Pause reminder

@@ -55,6 +55,7 @@ vi.mock('@/components/wizard/shell', async (importOriginal) => ({
                         {footerEnd}
                     </>
                 )}
+                {/* eslint-disable-next-line no-restricted-syntax -- lightweight WizardShell test double close control */}
                 <button onClick={onClose}>Close dialog</button>
             </section>
         ) : null,

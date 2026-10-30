@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationRoundCompletionConcurrencyTest extends TestCase
@@ -27,7 +28,8 @@ class MedicationRoundCompletionConcurrencyTest extends TestCase
 
     public function test_mysql_completion_waits_for_a_concurrent_verification_and_sees_the_new_canonical_item(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $workerToday = Carbon::today(config('app.worker_timezone', 'Pacific/Auckland'));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
@@ -195,7 +197,7 @@ class MedicationRoundCompletionConcurrencyTest extends TestCase
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[5], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[5], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 file_put_contents($argv[4], 'ready');
 $performer = App\Models\User::query()->findOrFail((int) $argv[2]);
 $round = App\Models\MedicationRound::query()->findOrFail((int) $argv[3]);

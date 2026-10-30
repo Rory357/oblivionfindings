@@ -40,7 +40,7 @@ class ControlRoomNotificationService
     {
         $users = $this->authorizedRecipients(
             $alert,
-            $this->resolveUsers($rule, $queue),
+            $this->resolveUsers($alert, $rule, $queue),
         );
         if ($users->isEmpty()) {
             return;
@@ -61,7 +61,7 @@ class ControlRoomNotificationService
     ): Collection {
         $users = $this->authorizedRecipients(
             $alert,
-            $this->resolveUsers($rule, $queue),
+            $this->resolveUsers($alert, $rule, $queue),
         );
         $generation = $this->routingGeneration($alert, $rule, $queue, $users);
         $template = self::OUTBOX_TEMPLATE_PREFIX.$generation;
@@ -173,7 +173,7 @@ class ControlRoomNotificationService
                 : TriageQueue::query()->find($alert->queue_id);
             $currentUsers = $this->authorizedRecipients(
                 $alert,
-                $this->resolveUsers($rule, $queue),
+                $this->resolveUsers($alert, $rule, $queue),
             );
             $currentGeneration = $this->routingGeneration($alert, $rule, $queue, $currentUsers);
             $currentTemplate = self::OUTBOX_TEMPLATE_PREFIX.$currentGeneration;
@@ -284,7 +284,7 @@ class ControlRoomNotificationService
 
         $users = $this->authorizedRecipients(
             $alert,
-            $this->resolveUsersByRoles($roles->unique()->values()->toArray()),
+            $this->resolveUsersByRoles($alert, $roles->unique()->values()->toArray()),
         );
         if ($users->isEmpty()) {
             return;
@@ -312,7 +312,7 @@ class ControlRoomNotificationService
         $roles = collect($toQueue->assigned_roles ?? []);
         $users = $this->authorizedRecipients(
             $alert,
-            $this->resolveUsersByRoles($roles->unique()->values()->toArray()),
+            $this->resolveUsersByRoles($alert, $roles->unique()->values()->toArray()),
         );
         if ($users->isEmpty()) {
             return;
@@ -367,77 +367,75 @@ class ControlRoomNotificationService
     }
 
     /**
-     * Resolve users from a SignalRule and/or TriageQueue.
+     * Resolve users from a SignalRule and/or TriageQueue: explicitly named
+     * users, plus the role holders who may open this alert.
      */
-    protected function resolveUsers(?SignalRule $rule, ?TriageQueue $queue): Collection
+    protected function resolveUsers(ControlRoomAlert $alert, ?SignalRule $rule, ?TriageQueue $queue): Collection
     {
-        $userIds = collect();
+        $userIds = collect($rule?->notify_users ?? [])
+            ->merge($queue?->assigned_users ?? [])
+            ->unique()
+            ->values();
+        $roles = collect($rule?->notify_roles ?? [])
+            ->merge($queue?->assigned_roles ?? []);
 
-        if ($rule?->notify_users) {
-            $userIds = $userIds->merge($rule->notify_users);
-        }
-        if ($queue?->assigned_users) {
-            $userIds = $userIds->merge($queue->assigned_users);
-        }
+        $named = $userIds->isEmpty()
+            ? collect()
+            : User::query()->whereIn('id', $userIds)->get(['id', 'name', 'email']);
 
-        $roles = collect();
-        if ($rule?->notify_roles) {
-            $roles = $roles->merge($rule->notify_roles);
-        }
-        if ($queue?->assigned_roles) {
-            $roles = $roles->merge($queue->assigned_roles);
-        }
-
-        if ($userIds->isEmpty() && $roles->isEmpty()) {
-            return collect();
-        }
-
-        $users = User::query()
-            ->when($userIds->isNotEmpty(), function ($q) use ($userIds) {
-                $q->whereIn('id', $userIds->unique()->values());
-            })
-            ->when($roles->isNotEmpty(), function ($q) use ($roles) {
-                $q->orWhereHas('roles', fn ($rq) => $rq->whereIn('name', $roles->unique()->values()));
-            })
-            ->get(['id', 'name', 'email']);
-
-        return $users->unique('id')->values();
+        return $named
+            ->merge($this->resolveUsersByRoles($alert, $roles->all()))
+            ->unique('id')
+            ->values();
     }
 
     /**
-     * Resolve users by role names.
+     * Resolve role routing to the role holders who may open this alert.
+     *
+     * Routing fields hold role-group names (the seeded signal rules use
+     * 'managers_core' and 'coordinators', which are not role names) or
+     * literal role names (Settings and the SLA page), so both resolve.
      */
-    protected function resolveUsersByRoles(array $roleNames): Collection
+    protected function resolveUsersByRoles(ControlRoomAlert $alert, array $roleNames): Collection
     {
-        if (empty($roleNames)) {
+        $names = collect($roleNames)
+            ->filter(fn (mixed $name): bool => is_string($name) && $name !== '')
+            ->unique()
+            ->values();
+        if ($names->isEmpty()) {
             return collect();
         }
 
-        // Resolve role group names to actual role names
-        $svc = app(NotificationService::class);
-        $userIds = collect();
-        foreach ($roleNames as $roleName) {
-            $userIds = $userIds->merge($svc->resolveRoleGroupUserIds($roleName));
+        $groups = app(NotificationService::class);
+        $userIds = User::query()
+            ->whereHas('roles', fn ($rq) => $rq->whereIn('name', $names))
+            ->pluck('id');
+        foreach ($names as $name) {
+            $userIds = $userIds->merge($groups->resolveRoleGroupUserIds($name));
         }
 
         if ($userIds->isEmpty()) {
             return collect();
         }
 
-        return User::whereIn('id', $userIds->unique()->values())
-            ->get(['id', 'name', 'email']);
+        return User::query()
+            ->whereIn('id', $userIds->unique()->values())
+            ->get(['id', 'name', 'email'])
+            ->filter(fn (User $user): bool => $this->alertAccess->canReceiveRoleRoutedNotification($alert, $user))
+            ->values();
     }
 
     /**
-     * Controlled-medication alerts can contain governed context in their
-     * summaries, notes and history. Keep ordinary routing unchanged, but never
-     * persist or deliver a controlled notification to a recipient who cannot
-     * open the canonical Site-scoped alert with the exact controlled-content
-     * permission.
+     * Medication alerts carry clinical context, and controlled-medication
+     * alerts governed content, in their summaries, notes and history. Never
+     * persist or deliver a medication notification to a recipient who cannot
+     * open the canonical Site-scoped alert (controlled ones with the exact
+     * controlled-content permission). Other alerts keep their explicitly
+     * named recipients; their role routing is Site-scoped when resolved.
      */
     private function authorizedRecipients(ControlRoomAlert $alert, Collection $users): Collection
     {
-        if (! $this->alertAccess->requiresControlledMedicationPermission($alert)) {
+        if (! $this->alertAccess->isMedicationAlert($alert)) {
             return $users->unique('id')->values();
         }
 

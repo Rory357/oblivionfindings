@@ -1,0 +1,107 @@
+
+ RUN  v4.1.5 <worktree>
+
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-export.test.ts > Fleet visible calendar export > exports busy-only time without record identity or private details 2ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-export.test.ts > Fleet visible calendar export > quotes cells and protects against spreadsheet formulas 0ms
+ ✓ resources/js/lib/fleet-return.test.ts > Fleet source return boundary > retains the exact Fleet view and filters 2ms
+ ✓ resources/js/lib/fleet-return.test.ts > Fleet source return boundary > rejects external, other-record and malformed destinations 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/register-evidence.test.ts > Register source evidence > keeps busy-only evidence and vehicle scope intact 2ms
+ ✓ resources/js/pages/fleet-assets/vehicles/register-evidence.test.ts > Register source evidence > prioritises an active restriction and uses exclusive end boundaries 1ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > opens once only after a short release inside, never on down 3ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > does not inspect after long hold 0ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > does not inspect after drag away and back 0ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > does not inspect after release outside 0ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > does not inspect after cancel 0ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > does not inspect after Escape 0ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > does not inspect after unmount 0ms
+ ✓ resources/js/pages/sites/calendar/protected-press.test.ts > protected calendar presses > ignores another pointer and tolerates movement up to five pixels 0ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/booking-time.test.ts > Auckland booking clock occurrences > requires an explicit occurrence during the repeated autumn hour 4ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/booking-time.test.ts > Auckland booking clock occurrences > rejects skipped spring wall times and resolves normal times 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet calendar Auckland wall time > keeps Auckland hours when the browser uses another timezone 3ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet calendar Auckland wall time > preserves wall times on both sides of the repeated autumn hour 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone UTC > preserves elapsed time from 2027-04-04T01:30:00+13:00 when moved to 2027-04-04T03:30:00+12:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone UTC > preserves elapsed time from 2026-09-27T01:30:00+12:00 when moved to 2026-09-27T03:30:00+13:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone UTC > preserves elapsed time from 2027-04-03T01:30:00+13:00 when moved to 2027-04-03T03:30:00+13:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone UTC > preserves elapsed time from 2026-09-26T01:30:00+12:00 when moved to 2026-09-26T03:30:00+12:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone UTC > offers both repeated start occurrences with matching ends 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone UTC > does not normalise skipped spring times into a different hour 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone Pacific/Auckland > preserves elapsed time from 2027-04-04T01:30:00+13:00 when moved to 2027-04-04T03:30:00+12:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone Pacific/Auckland > preserves elapsed time from 2026-09-27T01:30:00+12:00 when moved to 2026-09-27T03:30:00+13:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone Pacific/Auckland > preserves elapsed time from 2027-04-03T01:30:00+13:00 when moved to 2027-04-03T03:30:00+13:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone Pacific/Auckland > preserves elapsed time from 2026-09-26T01:30:00+12:00 when moved to 2026-09-26T03:30:00+12:00 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone Pacific/Auckland > offers both repeated start occurrences with matching ends 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/calendar-time.test.ts > Fleet moves with browser timezone Pacific/Auckland > does not normalise skipped spring times into a different hour 0ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > shows the worker date and time across daylight saving and UTC date boundaries 20ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > rejects a sign-in page returned in place of an exported report 3ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > sends register commands to the mounted route with CSRF protection 7ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > preserves canonical inventory routes and reports a lost session 1ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > preserves departure time and overnight duration when dropped on a month date 21ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > uses the exact proposed time and duration from week/day resizing 1ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > retains real duration across Auckland DST in a UTC browser 4ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > retains real duration across Auckland DST in a Pacific/Auckland browser 3ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > retains real duration across Auckland DST in a America/Los_Angeles browser 3ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > requires an explicit offset for repeated hours and rejects nonexistent wall times 2ms
+ ✓ resources/js/components/fleet-assets/transport/calendar-actions.test.ts > Transport calendar proposals > offers dragging only for permitted future pending or approved plans 1ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx > vehicle record command recovery > retains multipart values, files, URL and method after an uncertain upload 31ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx > vehicle record command recovery > retries the identical command after an uncertain save, even if a caller supplies different values 3ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx > vehicle record command recovery > keeps field errors editable, assigning a new command identity only when the rejected payload changes 5ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx > vehicle record command recovery > requires source refresh after a stale-version conflict and never retries over the newer source 2ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx > vehicle record command recovery > does not treat a redirected login page or malformed success as a saved record 2ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > keeps unfinished-count guidance accurate when the review has no differences yet 210ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > keeps an unsuccessful answer pending and retries the same command identity 77ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktakes.test.tsx > closes a linked count before refreshing the hub, so reload does not reopen it 197ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktakes.test.tsx > clears count rows while loading site coverage and retains the selected section on a matching hero filter 89ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > resolves a QR before recording a found answer and never finishes automatically 51ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > requires explicit confirmation for a QR outside the checklist 74ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > opens a completed count read-only and handles a revoked export without changing it 28ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > discovers permitted analytics for 'report only' without assuming Fleet operational access 253ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > discovers permitted analytics for 'reports and assigned assets' without assuming Fleet operational access 75ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > discovers permitted analytics for 'reports and asset management' without assuming Fleet operational access 81ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > does not turn unrelated reporting authority into Fleet access: {"reports":{"viewAny":true}} 21ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > does not turn unrelated reporting authority into Fleet access: {} 11ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > renders eight primary links and selects Fleet on a filtered nested vehicle URL 48ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/trips/12/playback?site_id=7 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/transports/12/pre-check in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/handovers/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/assets/12?tab=documents in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/maintenance/checklists/runs/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/inspections/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/daily-check in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/resident-tracking/history/12?tab=wandering in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/devices/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/geofences?edit=12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/mileage?status=pending in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/reports/cost-allocation in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/incidents?incident=12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/settings/notifications in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > does not hijack other modules or similarly prefixed paths 1ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps connected transport sources discoverable in the dedicated workspace 41ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > preserves query and hash on the current operating register and provides the return to Vehicles 34ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > retains assigned inventory and daily checks without denied administrative links 24ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > uses permitted landings for asset managers with no Fleet permission 29ms
+stderr | resources/js/pages/fleet-assets/vehicles/index.test.tsx > Fleet vehicle freshness > formats the last-seen timestamp for NZ workers instead of exposing raw ISO
+React does not recognize the `preserveState` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservestate` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+React does not recognize the `preserveScroll` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `preservescroll` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+
+stderr | resources/js/pages/fleet-assets/vehicles/index.test.tsx > Fleet vehicle freshness > formats the last-seen timestamp for NZ workers instead of exposing raw ISO
+An update to VehiclesIndex inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > requires telemetry permission for the specialist tracking path while retaining device pairing 17ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps relocated tools searchable but gives no Fleet entry to staff without Fleet or asset access 10ms
+ ✓ resources/js/pages/fleet-assets/vehicles/index.test.tsx > Fleet vehicle freshness > formats the last-seen timestamp for NZ workers instead of exposing raw ISO 156ms
+ ✓ resources/js/pages/fleet-assets/vehicles/fleet-map.test.ts > fleet position projection > accepts zero coordinates and keeps unknown metrics unknown 1ms
+ ✓ resources/js/pages/fleet-assets/vehicles/fleet-map.test.ts > fleet position projection > distinguishes stale, missing, trackerless and withheld positions 0ms
+
+ Test Files  14 passed (14)
+      Tests  83 passed (83)
+   Start at  17:58:18
+   Duration  10.92s (transform 2.32s, setup 2.41s, import 17.63s, tests 1.70s, environment 24.24s)

@@ -1,1243 +1,1097 @@
-/* Lone Worker Safety — the coordinator / H&S watch-tower.
- * H&S gold standard: HeroShell + WorkflowRibbon + KPI clusters + NZ badges + footer filter
- * bar; TabStrip (Sessions / Alerts); register tables with left-click detail + right-click
- * context menu; an Add-client-style Start-session wizard; focused lifecycle action modals.
- * Composes the shared kits — no reinvented primitives, tokens only, en-NZ, web-only.
- * Worker check-in lives in My Day; Control Room owns alert triage (deep-link only). */
-import { LoneWorkerActionModal } from '@/components/health-safety/lone-worker-action-form';
-import { LoneWorkerDetailDialog } from '@/components/health-safety/lone-worker-detail-dialog';
+/**
+ * Lone-worker safety (approved H&S drawings pg-hsn-81, 81b — Stephan 23 Oct
+ * 2026): one header with the three coverage numbers and the register filters,
+ * the Risks and prevention hub on the rail and Sessions / Responses as
+ * tier-two tabs (drawing D4), the safety caveat as a note, then the
+ * register as a table. Two summaries (across your sites, the next 24 hours)
+ * sit side by side under the sessions. The coverage and safety caveats keep
+ * the code's wording.
+ */
+import { boardReportHref } from '@/lib/health-safety/board-reports';
 import {
-    type ActionTarget,
+    canonicalControlRoomAlertId,
     type Alert,
-    ALERT_STATUS_META,
-    ALERT_TYPE_META,
-    type Can,
-    type Detail,
     type Filters,
     type Hero,
-    LONE_WORKER_ROUTE,
-    type Options,
-    overdueByMinutes,
     type Paginator,
-    type Session,
-    SESSION_LABEL,
-    SESSION_TONE,
 } from '@/components/health-safety/lone-worker-types';
-import { LoneWorkerWizard } from '@/components/health-safety/lone-worker-wizard';
 import {
-    EntityFilter,
-    type RosterTabItem,
-    ShiftContextMenu,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-    TabStrip,
-} from '@/components/rostering';
-import { Button as GuardrailButton } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+    observationLabel,
+    recordedAt,
+    SessionFact,
+    words,
+} from '@/components/health-safety/lone-workers/session-panels';
+import { SessionStartForm } from '@/components/health-safety/lone-workers/session-start-form';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
+import type {
+    SafetySession,
+    SessionPickers,
+} from '@/components/health-safety/lone-workers/types';
+import {
+    dateTimeWithYear,
+    dateWithYear,
+} from '@/components/incidents/incident-stages';
+import {
+    RecordIdentity,
+    RecordPerson,
+    RecordTable,
+    type RecordTableColumn,
+} from '@/components/incidents/record-table';
+import { compactMenu, type MenuItem } from '@/components/lists/entity-menu';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageLayout,
+} from '@/components/page';
+import { TierTwoTabs } from '@/components/page/grouped-profile-nav';
+import {
+    PageHeaderNumber,
+    PageHeaderNumbers,
+} from '@/components/page/page-header-strip';
+import {
+    Note,
+    Ring,
+    SideBySide,
+    Surface,
+    Tally,
+} from '@/components/signature/blocks';
+import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
+    SafetyFormDraftContext,
+    useSafetyWorkspaceDrafts,
+} from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/datetime';
-import { cn } from '@/lib/utils';
+import { formatTime, toDateInput } from '@/lib/datetime';
 import {
-    fmt,
-    HeroCluster,
-    HeroClusterTile,
-    type HeroComplianceBadge,
-    HeroComplianceBadges,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/health-safety/components/hs-hero-kit';
+    LONE_WORKER_REGISTER,
+    loneWorkerHref,
+    loneWorkerReturn,
+} from '@/lib/health-safety/lone-worker-navigation';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    entityTone,
-    FlagBadge,
-    initials,
-    RegisterTableHeader,
-    TONE_BG,
-    TONE_DOT,
-} from '@/pages/health-safety/components/register-row-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    Activity,
     AlertTriangle,
-    BarChart3,
-    Bell,
-    Check,
-    CheckCircle2,
-    Clock,
+    ClipboardList,
+    ExternalLink,
     Eye,
-    FileText,
-    HeartPulse,
-    Link2,
-    MapPin,
-    MousePointer2,
+    FileDown,
+    Info,
     Plus,
     Radio,
-    RadioTower,
-    Search,
-    ShieldCheck,
-    Trash2,
-    User,
-    Users,
+    Siren,
     X,
-    XCircle,
 } from 'lucide-react';
-import { type MouseEvent as ReactMouseEvent, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
+type SessionRow = Pick<
+    SafetySession,
+    | 'id'
+    | 'reference'
+    | 'status'
+    | 'user'
+    | 'site'
+    | 'client'
+    | 'activity_description'
+    | 'started_at'
+    | 'expected_end_at'
+    | 'ended_at'
+    | 'observation'
+    | 'is_check_in_overdue'
+>;
+type Coverage = {
+    state: string;
+    expected_count: number | null;
+    required_count: number;
+    monitored_count: number;
+    unmonitored_count: number;
+    unknown_count: number;
+    active_duty_count: number;
+    checked_at: string | null;
+    upcoming_expected_count: number;
+    upcoming_unknown_count: number;
+};
 type Props = {
     tab: 'sessions' | 'alerts';
-    sessions: Paginator<Session>;
+    sessions: Paginator<SessionRow>;
     alerts: Paginator<Alert>;
-    detail: Detail | null;
-    tabCounts: { sessions: number; alerts: number };
     hero: Hero;
+    coverage: Coverage;
     filters: Filters;
-    options: Options;
-    can: Can;
+    pickers: SessionPickers;
+    can: { manage: boolean; view: boolean; view_control_room: boolean };
 };
-
-const PERIOD_ITEMS = [
-    { key: 'today', label: 'Today' },
-    { key: 'week', label: 'This week' },
-    { key: '30d', label: '30 days' },
+const sessionStatuses = [
+    { value: 'active', label: 'Active' },
+    { value: 'overdue', label: 'Check-in overdue' },
+    { value: 'emergency', label: 'Help requested' },
+    { value: 'completed', label: 'Ended' },
 ];
-
-const SESSION_STATUS_ITEMS = [
-    { key: '', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'overdue', label: 'Overdue' },
-    { key: 'emergency', label: 'Emergency' },
+const responseStatuses = [
+    { value: 'open', label: 'Open' },
+    { value: 'ack', label: 'Acknowledged' },
+    { value: 'triaging', label: 'Being assessed' },
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'resolved', label: 'Resolved' },
+    { value: 'closed', label: 'Closed' },
+    { value: 'dismissed', label: 'Dismissed' },
 ];
-const ALERT_STATUS_ITEMS = [
-    { key: '', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'acknowledged', label: 'Ack' },
-    { key: 'resolved', label: 'Resolved' },
-];
+const titleLink =
+    'rounded-sm text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
 
-const clean = (m: Record<string, unknown>): Record<string, string> => {
-    const out: Record<string, string> = {};
-    for (const k of [
-        'tab',
-        'site_id',
-        'status',
-        'user_id',
-        'period',
-        'q',
-        'session',
-        'alert',
-    ]) {
-        const v = m[k];
-        if (v === null || v === undefined || v === '') continue;
-        if (k === 'period' && v === 'today') continue; // default — omit for clean URLs
-        out[k] = String(v);
-    }
-    return out;
-};
-
-export default function LoneWorkerIndex({
+export default function LoneWorkersIndex({
     tab,
     sessions,
     alerts,
-    detail,
-    tabCounts,
     hero,
+    coverage,
     filters,
-    options,
+    pickers,
     can,
 }: Props) {
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [wizardOpen, setWizardOpen] = useState(false);
-    const [action, setAction] = useState<ActionTarget | null>(null);
+    const { url } = usePage();
+    const returnTo = loneWorkerReturn(url);
+    const drafts = useSafetyWorkspaceDrafts();
     const [search, setSearch] = useState(filters.q ?? '');
-
-    /* ── Inertia navigation (URL-driven; mirror Incidents) ── */
-    const go = (next: Record<string, unknown>) =>
-        router.get(LONE_WORKER_ROUTE, clean({ ...filters, tab, ...next }), {
-            preserveState: true,
-            preserveScroll: true,
-            replace: true,
-        });
-    const setTab = (id: string) =>
+    const [creating, setCreating] = useState(
+        new URLSearchParams(url.split('?')[1]).get('start') === '1' &&
+            can.manage,
+    );
+    const panel = useRef<HTMLDivElement>(null);
+    const coveragePanel = useRef<HTMLDivElement>(null);
+    const [coverageOpen, setCoverageOpen] = useState(false);
+    const focusCoverage = () => {
+        setCoverageOpen(true);
+        coveragePanel.current?.focus();
+        coveragePanel.current?.scrollIntoView({ block: 'nearest' });
+    };
+    useEffect(() => {
+        if (coverageOpen) {
+            coveragePanel.current?.focus();
+            coveragePanel.current?.scrollIntoView({ block: 'nearest' });
+        }
+    }, [coverageOpen]);
+    useEffect(() => setSearch(filters.q ?? ''), [filters.q]);
+    useEffect(
+        () =>
+            setCreating(
+                new URLSearchParams(url.split('?')[1]).get('start') === '1' &&
+                    can.manage,
+            ),
+        [url, can.manage],
+    );
+    useEffect(() => {
+        if (creating) {
+            panel.current?.focus();
+            panel.current?.scrollIntoView({ block: 'nearest' });
+        }
+    }, [creating]);
+    const go = (next: Partial<Filters> & { tab?: string }) =>
         router.get(
-            LONE_WORKER_ROUTE,
-            clean({ ...filters, status: null, tab: id }),
-            { preserveScroll: true },
-        );
-    const openSession = (id: number) =>
-        router.get(LONE_WORKER_ROUTE, clean({ ...filters, tab, session: id }), {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-    const openAlert = (id: string) =>
-        router.get(LONE_WORKER_ROUTE, clean({ ...filters, tab, alert: id }), {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-    const closeDetail = () =>
-        router.get(LONE_WORKER_ROUTE, clean({ ...filters, tab }), {
-            preserveState: true,
-            preserveScroll: true,
-            only: ['detail'],
-        });
-    const clearFilters = () =>
-        router.get(
-            LONE_WORKER_ROUTE,
-            { tab },
+            LONE_WORKER_REGISTER,
+            Object.fromEntries(
+                Object.entries({
+                    ...filters,
+                    tab,
+                    ...next,
+                    ...((next.tab ?? tab) === 'alerts'
+                        ? { user_id: null }
+                        : {}),
+                }).filter(([, value]) => value != null && value !== ''),
+            ),
             { preserveState: true, preserveScroll: true, replace: true },
         );
-
-    const hrefFor = (extra: Record<string, unknown>) => {
-        const q = new URLSearchParams(
-            clean({ ...filters, tab, ...extra }),
-        ).toString();
-        return q ? `${LONE_WORKER_ROUTE}?${q}` : LONE_WORKER_ROUTE;
-    };
-    const copyLink = (extra: Record<string, unknown>) => {
-        void navigator.clipboard?.writeText(
-            window.location.origin + hrefFor(extra),
+    const toggleCreation = (open: boolean) =>
+        drafts.request(() =>
+            router.replace({
+                url:
+                    returnTo +
+                    (open
+                        ? (returnTo.includes('?') ? '&' : '?') + 'start=1'
+                        : ''),
+                preserveState: true,
+                preserveScroll: true,
+                onSuccess: () => setCreating(open),
+            }),
         );
-    };
-    const exportCsv = () => {
-        const isS = tab === 'sessions';
-        const head = isS
-            ? [
-                  'Worker',
-                  'Site',
-                  'Client',
-                  'Started',
-                  'Expected end',
-                  'Last check-in',
-                  'Status',
-              ]
-            : [
-                  'Worker',
-                  'Site',
-                  'Client',
-                  'Type',
-                  'Triggered',
-                  'Status',
-                  'Source',
-              ];
-        const body = isS
-            ? sessions.data.map((s) => [
-                  s.user?.name ?? '',
-                  s.site?.name ?? '',
-                  s.client?.name ?? '',
-                  formatDateTime(s.started_at),
-                  formatDateTime(s.expected_end_at),
-                  formatDateTime(s.last_check_in_at),
-                  s.status,
-              ])
-            : alerts.data.map((a) => [
-                  a.session?.user?.name ?? '',
-                  a.session?.site?.name ?? '',
-                  a.session?.client?.name ?? '',
-                  ALERT_TYPE_META[a.type]?.label ?? a.type,
-                  formatDateTime(a.triggered_at),
-                  a.status,
-                  a.source,
-              ]);
-        const csv = [head, ...body]
-            .map((r) =>
-                r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','),
+    const paginator = tab === 'sessions' ? sessions : alerts;
+    const exportPage = () => {
+        const rows =
+            tab === 'sessions'
+                ? [
+                      [
+                          'Reference',
+                          'Worker',
+                          'Site',
+                          'Client',
+                          'Status',
+                          'Started (NZ)',
+                          'Expected end (NZ)',
+                          'Last actual check-in (NZ)',
+                          'Observation',
+                      ],
+                      ...sessions.data.map((row) => [
+                          row.reference,
+                          row.user?.name,
+                          row.site?.name,
+                          row.client?.name,
+                          row.status !== 'emergency' &&
+                          row.is_check_in_overdue &&
+                          !row.ended_at
+                              ? 'Check-in overdue'
+                              : sessionState(row.status),
+                          recordedAt(row.started_at),
+                          recordedAt(row.expected_end_at),
+                          recordedAt(row.observation.real_check_in_at),
+                          observationLabel(row.observation.state),
+                      ]),
+                  ]
+                : [
+                      [
+                          'Response',
+                          'Worker',
+                          'Site',
+                          'Type',
+                          'Client',
+                          'Source',
+                          'Recorded state',
+                          'Triggered (NZ)',
+                      ],
+                      ...alerts.data.map((row) => [
+                          row.id,
+                          row.session?.user?.name,
+                          row.session?.site?.name,
+                          words(row.type),
+                          row.session?.client?.name,
+                          row.source === 'control_room'
+                              ? 'Control Room'
+                              : 'Historical alerts',
+                          responseState(row),
+                          recordedAt(row.triggered_at),
+                      ]),
+                  ];
+        const csv = rows
+            .map((row) =>
+                row
+                    .map((value) => {
+                        const text = String(value ?? '');
+                        const safe = /^[\s]*[=+@-]/.test(text)
+                            ? "'" + text
+                            : text;
+                        return '"' + safe.replaceAll('"', '""') + '"';
+                    })
+                    .join(','),
             )
-            .join('\n');
-        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `lone-workers-${tab}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
+            .join('\r\n');
+        const objectUrl = URL.createObjectURL(
+            new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }),
+        );
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download =
+            'lone-worker-' + tab + '-page-' + paginator.current_page + '.csv';
+        anchor.click();
+        URL.revokeObjectURL(objectUrl);
     };
-
-    /* ── Context menus (one actionsFor per entity, powers right-click + kebab) ── */
-    const sessionActions = (s: Session): ShiftCtxItem[] => {
-        const canAct =
-            can.manage && (s.status === 'active' || s.status === 'overdue');
-        return [
-            {
-                icon: <Eye className="h-3.5 w-3.5" />,
-                label: 'View session',
-                sub: `#${s.id} · ${s.user?.name ?? 'Worker'}`,
-                tone: 'primary',
-                onClick: () => openSession(s.id),
-            },
-            ...(canAct
-                ? ([
-                      {
-                          icon: <CheckCircle2 className="h-3.5 w-3.5" />,
-                          label: 'Record check-in',
-                          sub: 'Log worker status',
-                          onClick: () =>
-                              setAction({ kind: 'checkin', session: s }),
-                      },
-                      {
-                          icon: <Clock className="h-3.5 w-3.5" />,
-                          label: 'Extend / edit session',
-                          sub: 'Push out expected end',
-                          onClick: () =>
-                              setAction({ kind: 'extend', session: s }),
-                      },
-                      { sep: true },
-                      {
-                          icon: <XCircle className="h-3.5 w-3.5" />,
-                          label: 'End session',
-                          sub: 'Stop monitoring',
-                          onClick: () => setAction({ kind: 'end', session: s }),
-                      },
-                      {
-                          icon: <AlertTriangle className="h-3.5 w-3.5" />,
-                          label: 'Trigger emergency',
-                          sub: 'Notify contacts now',
-                          tone: 'critical',
-                          onClick: () =>
-                              setAction({ kind: 'emergency', session: s }),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            { sep: true },
-            ...(s.user
-                ? ([
-                      {
-                          icon: <User className="h-3.5 w-3.5" />,
-                          label: 'Open worker profile',
-                          sub: s.user.name,
-                          onClick: () => router.visit(`/staff/${s.user!.id}`),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            {
-                icon: <Link2 className="h-3.5 w-3.5" />,
-                label: 'Copy link',
-                onClick: () => copyLink({ session: s.id }),
-            },
-            ...(can.manage && s.status === 'completed'
-                ? ([
-                      { sep: true },
-                      {
-                          icon: <Trash2 className="h-3.5 w-3.5" />,
-                          label: 'Remove session',
-                          sub: 'Soft-delete · retained for audit',
-                          tone: 'critical',
-                          onClick: () =>
-                              setAction({ kind: 'delete', session: s }),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-        ];
-    };
-
-    const alertActions = (a: Alert): ShiftCtxItem[] => {
-        const crId =
-            a.source === 'control_room' ? a.id.replace('cr_', '') : null;
-        const sessionId = a.session?.id ?? null;
-        return [
-            {
-                icon: <Eye className="h-3.5 w-3.5" />,
-                label: 'View alert',
-                sub: ALERT_TYPE_META[a.type]?.label ?? a.type,
-                tone: 'primary',
-                onClick: () => openAlert(a.id),
-            },
-            ...(crId && can.view_control_room
-                ? ([
-                      {
-                          icon: <RadioTower className="h-3.5 w-3.5" />,
-                          label: 'Open in Control Room',
-                          sub: 'Triage · SLA · playbooks',
-                          tone: 'primary',
-                          onClick: () =>
-                              router.visit(`/control-room/alerts/${crId}`),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            ...(crId && can.manage && a.status === 'active'
-                ? ([
-                      { sep: true },
-                      {
-                          icon: <Bell className="h-3.5 w-3.5" />,
-                          label: 'Acknowledge',
-                          sub: 'Canonical response',
-                          onClick: () =>
-                              setAction({ kind: 'acknowledge', alert: a }),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            ...(crId &&
-            can.manage &&
-            ['active', 'acknowledged', 'confirmed'].includes(a.status)
-                ? ([
-                      {
-                          icon: <Check className="h-3.5 w-3.5" />,
-                          label: 'Resolve',
-                          sub: 'Canonical response',
-                          tone: 'critical',
-                          onClick: () =>
-                              setAction({ kind: 'resolve', alert: a }),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            ...(sessionId
-                ? ([
-                      { sep: true },
-                      {
-                          icon: <Activity className="h-3.5 w-3.5" />,
-                          label: 'Open session',
-                          sub: a.session?.user?.name ?? `#${sessionId}`,
-                          onClick: () => openSession(sessionId),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            {
-                icon: <Link2 className="h-3.5 w-3.5" />,
-                label: 'Copy link',
-                onClick: () => copyLink({ alert: a.id }),
-            },
-        ];
-    };
-
-    const openSessionCtx = (e: ReactMouseEvent, s: Session, kebab = false) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const r = kebab
-            ? (e.currentTarget as HTMLElement).getBoundingClientRect()
-            : null;
-        setCtx({
-            x: r ? r.right - 260 : e.clientX,
-            y: r ? r.bottom + 4 : e.clientY,
-            tag: SESSION_LABEL[s.status] ?? s.status,
-            meta: `${s.user?.name ?? 'Worker'} · ${s.site?.name ?? 'No site'}`,
-            items: sessionActions(s),
-        });
-    };
-    const openAlertCtx = (e: ReactMouseEvent, a: Alert, kebab = false) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const r = kebab
-            ? (e.currentTarget as HTMLElement).getBoundingClientRect()
-            : null;
-        setCtx({
-            x: r ? r.right - 260 : e.clientX,
-            y: r ? r.bottom + 4 : e.clientY,
-            tag: ALERT_STATUS_META[a.status]?.label ?? a.status,
-            meta: `${a.session?.user?.name ?? 'Worker'} · ${ALERT_TYPE_META[a.type]?.label ?? a.type}`,
-            items: alertActions(a),
-        });
-    };
-    const openHeroCtx = (e: ReactMouseEvent) => {
-        e.preventDefault();
-        const items: ShiftCtxItem[] = [
-            ...(can.manage
-                ? ([
-                      {
-                          icon: <Plus className="h-3.5 w-3.5" />,
-                          label: 'Start session',
-                          sub: 'New lone worker session',
-                          tone: 'primary',
-                          onClick: () => setWizardOpen(true),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            {
-                icon: <AlertTriangle className="h-3.5 w-3.5" />,
-                label: 'View emergencies',
-                sub: 'Active emergency sessions',
-                tone: 'critical',
-                onClick: () => go({ tab: 'sessions', status: 'emergency' }),
-            },
-            ...(can.view_control_room
-                ? ([
-                      {
-                          icon: <RadioTower className="h-3.5 w-3.5" />,
-                          label: 'Open Control Room',
-                          sub: 'Alert triage desk',
-                          onClick: () => router.visit('/control-room'),
-                      },
-                  ] satisfies ShiftCtxItem[])
-                : []),
-            { sep: true },
-            {
-                icon: <FileText className="h-3.5 w-3.5" />,
-                label: 'Export register',
-                sub: 'CSV · current view',
-                onClick: exportCsv,
-            },
-        ];
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: 'QUICK',
-            meta: 'Lone worker quick actions',
-            items,
-        });
-    };
-
-    /* ── Hero data ── */
-    const c = hero.clusters;
-    const badgeItems: HeroComplianceBadge[] = [
-        {
-            icon: Users,
-            tone:
-                hero.badges.checked_in < hero.badges.monitored_total
-                    ? 'warning'
-                    : 'success',
-            label: `${hero.badges.checked_in} of ${hero.badges.monitored_total} workers checked in`,
-        },
-        {
-            icon: Clock,
-            tone: hero.badges.overdue > 0 ? 'warning' : 'success',
-            label:
-                hero.badges.overdue > 0
-                    ? `${hero.badges.overdue} overdue check-in${hero.badges.overdue === 1 ? '' : 's'}`
-                    : 'No overdue check-ins',
-        },
-        {
-            icon: AlertTriangle,
-            tone: hero.badges.emergency_active ? 'critical' : 'success',
-            label: hero.badges.emergency_active
-                ? 'Emergency active'
-                : 'No active emergency',
-        },
-        {
-            icon: ShieldCheck,
-            tone: 'success',
-            label: 'HSWA 2015 · lone/remote duty met',
-        },
-        {
-            icon: HeartPulse,
-            tone: 'success',
-            label: hero.badges.after_hours
-                ? 'After-hours cover · ACC ready'
-                : 'Business hours · ACC ready',
-        },
-    ];
-
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'sessions',
-            label: 'Sessions',
-            icon: Radio,
-            tone: 'info',
-            badge: tabCounts.sessions || undefined,
-        },
-        {
-            id: 'alerts',
-            label: 'Alerts',
-            icon: Bell,
-            tone: 'critical',
-            badge: tabCounts.alerts || undefined,
-        },
-    ];
-
-    const hasFilters = !!(
-        filters.site_id ||
-        filters.status ||
+    const filtered = !!(
         filters.q ||
-        (filters.period && filters.period !== 'today')
+        filters.site_id ||
+        filters.user_id ||
+        filters.status ||
+        filters.period !== 'today'
     );
-    const statusItems =
-        tab === 'sessions' ? SESSION_STATUS_ITEMS : ALERT_STATUS_ITEMS;
-
+    const live = hero.clusters.live;
     const footer = (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <HeroSegmented
-                label="Period"
-                variant="pill"
-                ariaLabel="Period"
-                items={PERIOD_ITEMS}
-                value={filters.period}
-                onChange={(k) => go({ period: k })}
-            />
-            <EntityFilter
-                label="Site"
-                allLabel={`All sites · ${options.sites.length}`}
-                items={options.sites}
-                value={filters.site_id}
-                onChange={(id) => go({ site_id: id })}
-                onDark
-            />
-            <HeroSegmented
-                label="Status"
-                variant="segmented"
-                ariaLabel="Status"
-                items={statusItems}
-                value={filters.status ?? ''}
-                onChange={(k) => go({ status: k || null })}
-            />
-            <div className="relative ml-auto">
-                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                {/* eslint-disable-next-line no-restricted-syntax -- on-dark hero search input; not a shadcn control */}
-                <input
-                    type="search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    onKeyDown={(e) =>
-                        e.key === 'Enter' && go({ q: search || null })
-                    }
-                    placeholder="Search workers…"
-                    className="w-[180px] rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus:border-primary-foreground/40 focus:outline-none"
+        <>
+            <p className="text-subtle">
+                {paginator.total
+                    ? `Showing ${(paginator.from ?? 1).toString()}–${(paginator.to ?? paginator.data.length).toString()} of ${paginator.total}`
+                    : 'No records match these filters.'}
+            </p>
+            {paginator.last_page > 1 ? (
+                <LaravelPagination
+                    links={paginator.links}
+                    lastPage={paginator.last_page}
+                    preserveScroll
                 />
-            </div>
-            {hasFilters ? (
-                // eslint-disable-next-line no-restricted-syntax -- on-dark hero clear control
-                <button
-                    type="button"
-                    onClick={() => {
-                        setSearch('');
-                        clearFilters();
-                    }}
-                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-primary-foreground/80 hover:text-primary-foreground"
-                >
-                    <X className="h-3.5 w-3.5" /> Clear
-                </button>
             ) : null}
-        </div>
+        </>
     );
-
+    const headActions = (
+        <>
+            <Button asChild variant="outline" size="sm">
+                <Link href="/health-safety/analytics">Safety trends</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+                <Link href={boardReportHref('board')}>
+                    Board safety summary
+                </Link>
+            </Button>
+        </>
+    );
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Lone workers', href: LONE_WORKER_ROUTE },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Risks and prevention', href: '/health-safety/registers?view=prevention' },
+                { title: 'Lone-worker safety', href: LONE_WORKER_REGISTER },
             ]}
         >
-            <Head title="Lone Worker Safety" />
-
-            <div className="flex flex-col gap-6 p-6">
-                <div onContextMenu={openHeroCtx}>
-                    <HeroShell footer={footer}>
-                        <WorkflowRibbon current="report" />
-
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                                <HeroMedallion icon={Radio} />
-                                <div className="flex flex-col gap-1.5">
-                                    <HeroStatusPill>
-                                        Lone worker monitoring · live
-                                    </HeroStatusPill>
-                                    <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                        Lone Worker Safety
-                                    </h1>
-                                    <p className="max-w-xl text-sm text-primary-foreground/70">
-                                        Live monitoring for staff working alone
-                                        or remotely — start sessions, track
-                                        check-ins, and escalate emergencies.
-                                        Operational alerts are owned by the
-                                        Control Room.
+            <Head title="Lone-worker safety" />
+            <SafetyFormDraftContext.Provider value={drafts.register}>
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            icon={Radio}
+                            title="Lone-worker safety"
+                            subline="Keep contact with workers and follow through when help is needed"
+                            actions={
+                                <>
+                                    <PageHeaderSearch
+                                        value={search}
+                                        onChange={setSearch}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter')
+                                                go({
+                                                    q: search.trim() || null,
+                                                });
+                                        }}
+                                        placeholder={
+                                            tab === 'sessions'
+                                                ? 'Search workers or activity'
+                                                : 'Search responses'
+                                        }
+                                        ariaLabel={
+                                            tab === 'sessions'
+                                                ? 'Search safety sessions'
+                                                : 'Search responses'
+                                        }
+                                    />
+                                    <PageHeaderGlassButton
+                                        icon={FileDown}
+                                        onClick={exportPage}
+                                        disabled={!paginator.data.length}
+                                        aria-label="Export this page"
+                                        title="Export this page as a spreadsheet"
+                                    >
+                                        Export
+                                    </PageHeaderGlassButton>
+                                    {can.manage && (
+                                        <PageHeaderPrimaryButton
+                                            icon={Plus}
+                                            onClick={() => toggleCreation(true)}
+                                        >
+                                            Start session
+                                        </PageHeaderPrimaryButton>
+                                    )}
+                                </>
+                            }
+                            strip={
+                                <PageHeaderNumbers>
+                                    <PageHeaderNumber
+                                        label="Shifts needing a session"
+                                        value={
+                                            coverage.expected_count ?? 'Unknown'
+                                        }
+                                        caption={
+                                            coverage.unknown_count
+                                                ? `${coverage.required_count} known · ${coverage.unknown_count} requirements unknown`
+                                                : 'On shift now'
+                                        }
+                                        tone={
+                                            coverage.expected_count === null
+                                                ? 'warning'
+                                                : undefined
+                                        }
+                                        onClick={focusCoverage}
+                                        pressed={coverageOpen}
+                                        ariaLabel="View current shift coverage: shifts needing a session"
+                                    />
+                                    <PageHeaderNumber
+                                        label="Sessions running"
+                                        value={coverage.monitored_count}
+                                        caption="Matched to a shift"
+                                        onClick={focusCoverage}
+                                        pressed={coverageOpen}
+                                        ariaLabel="View current shift coverage: sessions matched to a shift"
+                                    />
+                                    <PageHeaderNumber
+                                        label="Sessions missing"
+                                        value={coverage.unmonitored_count}
+                                        caption="A shift has no session"
+                                        tone={
+                                            coverage.unmonitored_count > 0
+                                                ? 'critical'
+                                                : undefined
+                                        }
+                                        onClick={focusCoverage}
+                                        pressed={coverageOpen}
+                                        ariaLabel="View current shift coverage: shifts missing a session"
+                                    />
+                                </PageHeaderNumbers>
+                            }
+                            filters={
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="All sites"
+                                        allValue=""
+                                        value={String(filters.site_id ?? '')}
+                                        onChange={(value) =>
+                                            go({
+                                                site_id: value
+                                                    ? Number(value)
+                                                    : null,
+                                            })
+                                        }
+                                        options={[
+                                            { value: '', label: 'All sites' },
+                                            ...pickers.sites.map((site) => ({
+                                                value: String(site.id),
+                                                label: site.name,
+                                            })),
+                                        ]}
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Today"
+                                        allValue="today"
+                                        value={filters.period}
+                                        onChange={(value) =>
+                                            go({
+                                                period: value as Filters['period'],
+                                            })
+                                        }
+                                        options={[
+                                            { value: 'today', label: 'Today' },
+                                            { value: 'week', label: '7 days' },
+                                            { value: '30d', label: '30 days' },
+                                            { value: 'all', label: 'All time' },
+                                        ]}
+                                    />
+                                    {tab === 'sessions' && (
+                                        <PageHeaderFilterSelect
+                                            label="All workers"
+                                            allValue=""
+                                            value={String(
+                                                filters.user_id ?? '',
+                                            )}
+                                            onChange={(value) =>
+                                                go({
+                                                    user_id: value
+                                                        ? Number(value)
+                                                        : null,
+                                                })
+                                            }
+                                            options={[
+                                                {
+                                                    value: '',
+                                                    label: 'All workers',
+                                                },
+                                                ...pickers.workers.map(
+                                                    (worker) => ({
+                                                        value: String(
+                                                            worker.id,
+                                                        ),
+                                                        label: worker.name,
+                                                    }),
+                                                ),
+                                            ]}
+                                        />
+                                    )}
+                                    <PageHeaderFilterSelect
+                                        label="All states"
+                                        allValue=""
+                                        value={filters.status ?? ''}
+                                        onChange={(value) =>
+                                            go({ status: value || null })
+                                        }
+                                        options={[
+                                            { value: '', label: 'All states' },
+                                            ...(tab === 'sessions'
+                                                ? sessionStatuses
+                                                : responseStatuses),
+                                        ]}
+                                    />
+                                    {filtered && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
+                                            onClick={() =>
+                                                go({
+                                                    q: null,
+                                                    site_id: null,
+                                                    user_id: null,
+                                                    status: null,
+                                                    period: 'today',
+                                                })
+                                            }
+                                        >
+                                            Clear filters
+                                        </PageHeaderFilterButton>
+                                    )}
+                                </>
+                            }
+                            rail={
+                                <SafetyWorkspaceRail
+                                    hub="prevention"
+                                    current="lone-workers"
+                                />
+                            }
+                        />
+                    }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={[
+                                {
+                                    key: 'sessions',
+                                    label: 'Sessions',
+                                    icon: ClipboardList,
+                                },
+                                ...(can.view_control_room
+                                    ? [
+                                          {
+                                              key: 'alerts',
+                                              label: 'Responses',
+                                              icon: Siren,
+                                          },
+                                      ]
+                                    : []),
+                            ]}
+                            activeTab={tab}
+                            onTab={(value) => go({ tab: value, status: null })}
+                            testIdPrefix="lone-worker"
+                            ariaLabel="Lone-worker views"
+                            panelId="lone-worker-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
+                    }
+                >
+                    <div
+                        id="lone-worker-panel"
+                        role="tabpanel"
+                        aria-label={tab === 'sessions' ? 'Sessions' : 'Responses'}
+                        className="grid min-w-0 gap-5"
+                    >
+                        <Note
+                            icon={coverage.state === 'unknown' ? AlertTriangle : Info}
+                            tone={
+                                coverage.state === 'unknown'
+                                    ? 'warning'
+                                    : undefined
+                            }
+                        >
+                            {coverage.state === 'no_active_duty'
+                                ? 'No active duty to assess.'
+                                : coverage.state === 'configured_zero'
+                                  ? 'No current shift has a recorded monitoring requirement.'
+                                  : coverage.state === 'unknown'
+                                    ? 'Some shift requirements have not been established; total coverage is unknown.'
+                                    : 'A session does not confirm worker safety or a person watching continuously.'}{' '}
+                            Checked {recordedAt(coverage.checked_at)}.
+                        </Note>
+                        {coverageOpen && (
+                            <Surface title="Current shift coverage">
+                                <div
+                                    ref={coveragePanel}
+                                    tabIndex={-1}
+                                    className="grid gap-4 px-[18px] pt-2 pb-4 outline-none"
+                                >
+                                    <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                        <SessionFact label="Active duty">
+                                            {coverage.active_duty_count}
+                                        </SessionFact>
+                                        <SessionFact label="Known monitoring requirements">
+                                            {coverage.required_count}
+                                        </SessionFact>
+                                        <SessionFact label="Unknown requirements">
+                                            {coverage.unknown_count}
+                                        </SessionFact>
+                                        <SessionFact label="Required shifts with a session">
+                                            {coverage.monitored_count}
+                                        </SessionFact>
+                                        <SessionFact label="Required shifts missing a session">
+                                            {coverage.unmonitored_count}
+                                        </SessionFact>
+                                        <SessionFact label="Source checked">
+                                            {recordedAt(coverage.checked_at)}
+                                        </SessionFact>
+                                    </dl>
+                                    <p className="text-subtle">
+                                        Requirements come from the lone-worker
+                                        setting on actually started Workforce
+                                        shifts. A matching session must have the
+                                        same worker, Site, client and shift.
+                                        Standalone sessions do not satisfy
+                                        another shift's requirement. Check-in
+                                        freshness and response ownership are
+                                        shown on each session.
                                     </p>
                                 </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        {/* eslint-disable-next-line no-restricted-syntax -- on-dark hero CTA; not a shadcn Button */}
-                                        <button
-                                            type="button"
-                                            className="inline-flex items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                        >
-                                            <FileText className="h-4 w-4" />{' '}
-                                            Reports
-                                        </button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        align="end"
-                                        className="w-60 p-1.5"
-                                    >
-                                        <ReportLink
-                                            href="/health-safety/analytics"
-                                            icon={BarChart3}
-                                            title="Safety analytics"
-                                            sub="Trends, LTIFR / TRIFR"
-                                        />
-                                        <ReportLink
-                                            href="/health-safety/reports/board-summary"
-                                            icon={FileText}
-                                            title="Board summary"
-                                            sub="Governance report"
-                                        />
-                                        <GuardrailButton
-                                            unstyled
-                                            type="button"
-                                            onClick={exportCsv}
-                                            className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-muted"
-                                        >
-                                            <FileText className="h-4 w-4 text-muted-foreground" />
-                                            <span>
-                                                <span className="block text-sm font-medium text-foreground">
-                                                    Export current view
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    CSV · this tab
-                                                </span>
-                                            </span>
-                                        </GuardrailButton>
-                                    </PopoverContent>
-                                </Popover>
-
-                                {can.manage ? (
-                                    // eslint-disable-next-line no-restricted-syntax -- on-dark hero primary CTA; not a shadcn Button
-                                    <button
-                                        type="button"
-                                        onClick={() => setWizardOpen(true)}
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-foreground px-3.5 py-2 text-sm font-semibold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90"
-                                    >
-                                        <Plus className="h-4 w-4" /> Start
-                                        session
-                                    </button>
-                                ) : null}
-                            </div>
-                        </div>
-
-                        <div className="grid gap-3 lg:grid-cols-2">
-                            <HeroCluster
-                                title="Live monitoring"
-                                icon={Activity}
-                            >
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'sessions',
-                                        status: 'active',
-                                    })}
-                                    label="Active"
-                                    value={fmt(c.live.active)}
-                                    caption="being monitored"
-                                    tone="success"
-                                />
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'sessions',
-                                        status: 'overdue',
-                                    })}
-                                    label="Overdue"
-                                    value={fmt(c.live.overdue)}
-                                    caption="check-in late"
-                                    tone="warning"
-                                />
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'sessions',
-                                        status: 'emergency',
-                                    })}
-                                    label="Emergencies"
-                                    value={fmt(c.live.emergency)}
-                                    caption="unresolved"
-                                    tone="critical"
-                                />
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'sessions',
-                                        status: '',
-                                    })}
-                                    label="Ending <1h"
-                                    value={fmt(c.live.ending_soon)}
-                                    caption="wrap-up soon"
-                                    tone="warning"
-                                />
-                            </HeroCluster>
-                            <HeroCluster title="Alerts & response" icon={Bell}>
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'alerts',
-                                        status: '',
-                                    })}
-                                    label="Alerts today"
-                                    value={fmt(c.alerts.today)}
-                                    caption="all sources"
-                                    tone="neutral"
-                                />
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'alerts',
-                                        status: 'active',
-                                    })}
-                                    label="Awaiting ack"
-                                    value={fmt(c.alerts.awaiting_ack)}
-                                    caption="need a response"
-                                    tone="warning"
-                                />
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'alerts',
-                                        status: '',
-                                    })}
-                                    label="Unresolved"
-                                    value={fmt(c.alerts.unresolved)}
-                                    caption="Control Room"
-                                    tone="critical"
-                                />
-                                <HeroClusterTile
-                                    href={hrefFor({
-                                        tab: 'sessions',
-                                        status: 'overdue',
-                                    })}
-                                    label="No recent check-in"
-                                    value={fmt(c.alerts.no_recent_checkin)}
-                                    caption=">1 interval"
-                                    tone="warning"
-                                />
-                            </HeroCluster>
-                        </div>
-
-                        <HeroComplianceBadges items={badgeItems} />
-
-                        {hero.lone_shifts_unmonitored > 0 ? (
-                            <Link
-                                href={hrefFor({ tab: 'sessions' })}
-                                className="inline-flex items-center gap-2 self-start rounded-lg border border-status-warning/50 bg-status-warning/20 px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-status-warning/30"
-                            >
-                                <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />
-                                {hero.lone_shifts_unmonitored} rostered lone
-                                shift
-                                {hero.lone_shifts_unmonitored === 1
-                                    ? ''
-                                    : 's'}{' '}
-                                not yet being monitored — start a session
-                            </Link>
-                        ) : null}
-                    </HeroShell>
-                </div>
-
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Lone worker views"
-                />
-
-                <Card>
-                    <CardContent className="p-0">
-                        {tab === 'sessions' ? (
-                            <>
-                                <RegisterTableHeader
-                                    icon={Radio}
-                                    title="Sessions"
-                                    subtitle="live monitoring register"
-                                    hint="Right-click a row for the full list of actions"
-                                    hintIcon={MousePointer2}
-                                />
-                                <SessionsTable
-                                    rows={sessions.data}
-                                    onOpen={openSession}
-                                    onRowCtx={openSessionCtx}
-                                />
-                            </>
-                        ) : (
-                            <>
-                                <RegisterTableHeader
-                                    icon={Bell}
-                                    title="Alerts"
-                                    subtitle="lone worker signals"
-                                    hint="Right-click a row for the full list of actions"
-                                    hintIcon={MousePointer2}
-                                />
-                                <AlertsTable
-                                    rows={alerts.data}
-                                    onOpen={openAlert}
-                                    onRowCtx={openAlertCtx}
-                                />
-                            </>
+                            </Surface>
                         )}
-                    </CardContent>
-                </Card>
-
-                {tab === 'sessions' && sessions.last_page > 1 ? (
-                    <LaravelPagination links={sessions.links} />
-                ) : null}
-                {tab === 'alerts' && alerts.last_page > 1 ? (
-                    <LaravelPagination links={alerts.links} />
-                ) : null}
-            </div>
-
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-            {detail ? (
-                <LoneWorkerDetailDialog
-                    detail={detail}
-                    open
-                    onClose={closeDetail}
-                    can={can}
-                    onOpenSession={openSession}
-                    onOpenAlert={openAlert}
-                />
-            ) : null}
-            {action ? (
-                <LoneWorkerActionModal
-                    target={action}
-                    open
-                    onClose={() => setAction(null)}
-                />
-            ) : null}
-            <LoneWorkerWizard
-                open={wizardOpen}
-                onClose={() => setWizardOpen(false)}
-                options={options}
-            />
+                        {creating && can.manage && (
+                            <Surface aria-label="Start a safety session">
+                                <div
+                                    ref={panel}
+                                    tabIndex={-1}
+                                    className="p-5 outline-none sm:p-6"
+                                >
+                                    <SessionStartForm
+                                        pickers={pickers}
+                                        returnTo={returnTo}
+                                        onCancel={() => toggleCreation(false)}
+                                    />
+                                </div>
+                            </Surface>
+                        )}
+                        {tab === 'sessions' ? (
+                            <SessionRegister
+                                rows={sessions.data}
+                                returnTo={returnTo}
+                                actions={headActions}
+                                footer={footer}
+                            />
+                        ) : (
+                            <ResponseRegister
+                                rows={alerts.data}
+                                returnTo={returnTo}
+                                actions={headActions}
+                                footer={footer}
+                            />
+                        )}
+                        {tab === 'sessions' ? (
+                            <SideBySide>
+                                <Tally
+                                    title="Across all your sites"
+                                    items={[
+                                        {
+                                            label: 'Overdue sessions',
+                                            value: live.overdue,
+                                            tone: 'warning',
+                                        },
+                                        {
+                                            label: 'Help requested',
+                                            value: live.emergency,
+                                            tone: 'critical',
+                                        },
+                                        {
+                                            label: 'Ending soon',
+                                            value: live.ending_soon,
+                                        },
+                                    ]}
+                                    calm={[
+                                        live.overdue === 0 &&
+                                            'No session is overdue',
+                                        live.emergency === 0 &&
+                                            'Nobody has asked for help',
+                                        live.ending_soon === 0 &&
+                                            'None ending soon',
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                />
+                                <Tally
+                                    title={
+                                        filters.site_id
+                                            ? 'Next 24 hours at the selected sites'
+                                            : 'Next 24 hours at your sites'
+                                    }
+                                    keepZeros
+                                    calm=""
+                                    items={[
+                                        {
+                                            label: 'Shifts that need a session',
+                                            value: coverage.upcoming_expected_count,
+                                        },
+                                        {
+                                            label: 'Not known if a session is needed',
+                                            value: coverage.upcoming_unknown_count,
+                                            tone:
+                                                coverage.upcoming_unknown_count >
+                                                0
+                                                    ? 'warning'
+                                                    : undefined,
+                                        },
+                                    ]}
+                                />
+                            </SideBySide>
+                        ) : null}
+                    </div>
+                </PageLayout>
+                {drafts.confirmation}
+            </SafetyFormDraftContext.Provider>
         </AppLayout>
     );
 }
 
-/* ───────────────────────────── Tables ───────────────────────────── */
-
-const TH =
-    'px-4 py-2.5 text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase';
-const TD = 'px-4 py-3 align-top';
-
-function Avatar({ id, name }: { id: number; name: string | null | undefined }) {
+function sessionState(status: string) {
     return (
-        <span
-            className={cn(
-                'flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white',
-                entityTone(id),
-            )}
-        >
-            {initials(name)}
-        </span>
+        sessionStatuses.find((item) => item.value === status)?.label ??
+        words(status)
     );
 }
-
-function StatusPill({ status }: { status: string }) {
-    const tone = SESSION_TONE[status] ?? 'neutral';
+function sessionOverdue(row: SessionRow) {
     return (
-        <span
-            className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                TONE_BG[tone],
-            )}
-        >
-            <span className={cn('h-1.5 w-1.5 rounded-full', TONE_DOT[tone])} />
-            {SESSION_LABEL[status] ?? status}
-        </span>
+        row.status !== 'emergency' && row.is_check_in_overdue && !row.ended_at
     );
 }
-
-function Kebab({ onClick }: { onClick: (e: ReactMouseEvent) => void }) {
+function SessionState({ row }: { row: SessionRow }) {
+    const variant: StatusVariant =
+        row.status === 'emergency' || sessionOverdue(row)
+            ? 'critical'
+            : row.ended_at || row.status === 'completed'
+              ? 'neutral'
+              : 'info';
     return (
-        <GuardrailButton
-            unstyled
-            type="button"
-            onClick={onClick}
-            className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Row actions"
-        >
-            <span className="text-lg leading-none">⋮</span>
-        </GuardrailButton>
+        <StatusBadge variant={variant}>
+            {sessionOverdue(row) ? 'Check-in overdue' : sessionState(row.status)}
+        </StatusBadge>
     );
 }
-
-function SessionsTable({
-    rows,
-    onOpen,
-    onRowCtx,
-}: {
-    rows: Session[];
-    onOpen: (id: number) => void;
-    onRowCtx: (e: ReactMouseEvent, s: Session, kebab?: boolean) => void;
-}) {
-    if (rows.length === 0) {
+function responseState(row: Alert) {
+    if (row.canonical_status)
         return (
-            <EmptyState
-                icon={Radio}
-                title="No lone worker sessions"
-                sub="Start a session to begin monitoring a worker who is working alone or remotely."
-            />
+            responseStatuses.find((item) => item.value === row.canonical_status)
+                ?.label ?? words(row.canonical_status)
         );
-    }
+    return row.status === 'active'
+        ? 'Open'
+        : row.status === 'acknowledged'
+          ? 'Acknowledged or being assessed'
+          : row.status === 'resolved'
+            ? 'Resolved or closed'
+            : words(row.status);
+}
+function responseVariant(row: Alert): StatusVariant {
+    const key = row.canonical_status ?? row.status;
+    if (key === 'open' || key === 'active') return 'warning';
+    if (['ack', 'acknowledged', 'triaging', 'confirmed'].includes(key))
+        return 'info';
+    return 'neutral';
+}
+/** A time on the same NZ day as `base` shows as a time only, otherwise with its date. */
+function clock(value: string | null | undefined, base?: string | null) {
+    if (!value) return 'Not recorded';
+    return base && toDateInput(value) === toDateInput(base)
+        ? formatTime(value)
+        : dateTimeWithYear(value);
+}
+
+function SessionRegister({
+    rows,
+    returnTo,
+    actions,
+    footer,
+}: {
+    rows: SessionRow[];
+    returnTo: string;
+    actions: ReactNode;
+    footer: ReactNode;
+}) {
+    const open = (row: SessionRow) =>
+        router.visit(loneWorkerHref(row.id, { returnTo }));
+    const actionsFor = (row: SessionRow): MenuItem[] =>
+        compactMenu([
+            { label: 'Open session', icon: Eye, onClick: () => open(row) },
+            {
+                label: 'Open check-ins',
+                icon: ClipboardList,
+                onClick: () =>
+                    router.visit(
+                        loneWorkerHref(row.id, {
+                            section: 'check-ins',
+                            returnTo,
+                        }),
+                    ),
+            },
+            {
+                label: 'Open help request and response',
+                icon: Siren,
+                onClick: () =>
+                    router.visit(
+                        loneWorkerHref(row.id, {
+                            section: 'response',
+                            returnTo,
+                        }),
+                    ),
+            },
+        ]);
+    const columns: RecordTableColumn<SessionRow>[] = [
+        {
+            key: 'session',
+            label: 'Session',
+            className: 'min-w-[16rem] max-w-[24rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={loneWorkerHref(row.id, { returnTo })}
+                            onClick={(event) => event.stopPropagation()}
+                            className={titleLink}
+                        >
+                            {row.user?.name ?? 'Worker not available'}
+                        </Link>
+                    }
+                    sub={
+                        <span className="line-clamp-2 break-words">
+                            {row.reference} ·{' '}
+                            {row.activity_description ??
+                                'Activity not recorded'}
+                        </span>
+                    }
+                />
+            ),
+        },
+        {
+            key: 'site',
+            label: 'Site and client',
+            nowrap: true,
+            cell: (row) => (
+                <RecordIdentity
+                    title={row.site?.name ?? 'Not recorded'}
+                    sub={row.client?.name ?? 'No client available to view'}
+                />
+            ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (row) => <SessionState row={row} />,
+        },
+        {
+            key: 'check-ins',
+            label: 'Check-ins',
+            className: 'min-w-[14rem]',
+            cell: (row) => (
+                <RecordIdentity
+                    title={
+                        <Link
+                            href={loneWorkerHref(row.id, {
+                                section: 'check-ins',
+                                returnTo,
+                            })}
+                            onClick={(event) => event.stopPropagation()}
+                            className={titleLink}
+                        >
+                            {observationLabel(row.observation.state)}
+                        </Link>
+                    }
+                    sub={
+                        <>
+                            {row.observation.real_check_in_at
+                                ? dateTimeWithYear(
+                                      row.observation.real_check_in_at,
+                                  )
+                                : 'Starting is not a check-in.'}
+                            {!row.ended_at
+                                ? ` · Next checkpoint: ${clock(
+                                      row.observation.next_due_at,
+                                      row.observation.real_check_in_at ??
+                                          row.started_at,
+                                  )}`
+                                : ''}
+                        </>
+                    }
+                />
+            ),
+        },
+        {
+            key: 'end',
+            label: 'Due to end',
+            nowrap: true,
+            cell: (row) =>
+                row.expected_end_at ? (
+                    <RecordIdentity
+                        title={dateWithYear(row.expected_end_at)}
+                        sub={`${formatTime(row.expected_end_at)}${
+                            row.ended_at
+                                ? ` · ended ${clock(row.ended_at, row.expected_end_at)}`
+                                : ''
+                        }`}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+    ];
     return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b border-border">
-                        <th className={TH}>Worker</th>
-                        <th className={TH}>Site / Client</th>
-                        <th className={TH}>Started</th>
-                        <th className={TH}>Expected end</th>
-                        <th className={TH}>Last check-in</th>
-                        <th className={TH}>Status</th>
-                        <th className={cn(TH, 'w-10')}></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {rows.map((s) => {
-                        const overdue = overdueByMinutes(s);
-                        return (
-                            <tr
-                                key={s.id}
-                                tabIndex={0}
-                                onClick={() => onOpen(s.id)}
-                                onContextMenu={(e) => onRowCtx(e, s)}
-                                onKeyDown={(e) =>
-                                    (e.key === 'Enter' || e.key === ' ') &&
-                                    (e.preventDefault(), onOpen(s.id))
-                                }
-                                className="cursor-pointer transition-colors outline-none hover:bg-muted/55 focus-visible:bg-muted/55 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
-                            >
-                                <td className={TD}>
-                                    <div className="flex items-center gap-2.5">
-                                        <Avatar
-                                            id={s.user?.id ?? s.id}
-                                            name={s.user?.name}
-                                        />
-                                        <div className="min-w-0">
-                                            <div className="font-medium text-foreground">
-                                                {s.user?.name ?? '—'}
-                                            </div>
-                                            {s.location ? (
-                                                <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <MapPin className="h-3 w-3" />{' '}
-                                                    {s.location}
-                                                </div>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className={TD}>
-                                    <div className="text-foreground">
-                                        {s.site?.name ?? '—'}
-                                    </div>
-                                    {s.client ? (
-                                        <div className="text-xs text-muted-foreground">
-                                            {s.client.name}
-                                        </div>
-                                    ) : null}
-                                </td>
-                                <td
-                                    className={cn(
-                                        TD,
-                                        'whitespace-nowrap text-muted-foreground',
-                                    )}
-                                >
-                                    {formatDateTime(s.started_at)}
-                                </td>
-                                <td
-                                    className={cn(
-                                        TD,
-                                        'whitespace-nowrap text-muted-foreground',
-                                    )}
-                                >
-                                    {formatDateTime(s.expected_end_at)}
-                                </td>
-                                <td className={cn(TD, 'whitespace-nowrap')}>
-                                    <div className="text-foreground">
-                                        {formatDateTime(s.last_check_in_at)}
-                                    </div>
-                                    {overdue > 0 ? (
-                                        <div className="font-semibold text-status-warning">
-                                            overdue by {overdue}m
-                                        </div>
-                                    ) : null}
-                                </td>
-                                <td className={TD}>
-                                    <StatusPill status={s.status} />
-                                </td>
-                                <td className={cn(TD, 'text-right')}>
-                                    <Kebab
-                                        onClick={(e) => onRowCtx(e, s, true)}
-                                    />
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
+        <RecordTable
+            title="Sessions"
+            sub="Live sessions remain visible outside the selected period · Coverage uses current shifts at the selected Sites"
+            actions={actions}
+            ariaLabel="Safety sessions matching the selected filters"
+            rows={rows}
+            rowKey={(row) => row.id}
+            onOpen={open}
+            actionsFor={actionsFor}
+            menuTitle={(row) =>
+                `${row.reference} · ${row.user?.name ?? 'Worker not available'}`
+            }
+            menuIcon={Radio}
+            columns={columns}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No records match these filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
     );
 }
 
-function AlertsTable({
+function ResponseRegister({
     rows,
-    onOpen,
-    onRowCtx,
+    returnTo,
+    actions,
+    footer,
 }: {
     rows: Alert[];
-    onOpen: (id: string) => void;
-    onRowCtx: (e: ReactMouseEvent, a: Alert, kebab?: boolean) => void;
+    returnTo: string;
+    actions: ReactNode;
+    footer: ReactNode;
 }) {
-    if (rows.length === 0) {
-        return (
-            <EmptyState
-                icon={Bell}
-                title="No lone worker alerts"
-                sub="Overdue check-ins and emergencies will appear here and in the Control Room."
-            />
-        );
-    }
-    return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <thead>
-                    <tr className="border-b border-border">
-                        <th className={TH}>Worker</th>
-                        <th className={TH}>Site / Client</th>
-                        <th className={TH}>Type</th>
-                        <th className={TH}>Triggered</th>
-                        <th className={TH}>Status</th>
-                        <th className={TH}>Source</th>
-                        <th className={cn(TH, 'w-10')}></th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                    {rows.map((a) => {
-                        const typeMeta = ALERT_TYPE_META[a.type] ?? {
-                            tone: 'neutral' as const,
-                            label: a.type,
-                        };
-                        const statusMeta = ALERT_STATUS_META[a.status] ?? {
-                            tone: 'neutral' as const,
-                            label: a.status,
-                        };
-                        return (
-                            <tr
-                                key={a.id}
-                                tabIndex={0}
-                                onClick={() => onOpen(a.id)}
-                                onContextMenu={(e) => onRowCtx(e, a)}
-                                onKeyDown={(e) =>
-                                    (e.key === 'Enter' || e.key === ' ') &&
-                                    (e.preventDefault(), onOpen(a.id))
-                                }
-                                className="cursor-pointer transition-colors outline-none hover:bg-muted/55 focus-visible:bg-muted/55 focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset"
-                            >
-                                <td className={TD}>
-                                    <div className="flex items-center gap-2.5">
-                                        <Avatar
-                                            id={a.session?.user?.id ?? 0}
-                                            name={a.session?.user?.name}
-                                        />
-                                        <div className="font-medium text-foreground">
-                                            {a.session?.user?.name ?? '—'}
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className={TD}>
-                                    <div className="text-foreground">
-                                        {a.session?.site?.name ?? '—'}
-                                    </div>
-                                    {a.session?.client ? (
-                                        <div className="text-xs text-muted-foreground">
-                                            {a.session.client.name}
-                                        </div>
-                                    ) : null}
-                                </td>
-                                <td className={TD}>
-                                    <span
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                                            TONE_BG[typeMeta.tone],
-                                        )}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'h-1.5 w-1.5 rounded-full',
-                                                TONE_DOT[typeMeta.tone],
-                                            )}
-                                        />
-                                        {typeMeta.label}
-                                    </span>
-                                </td>
-                                <td
-                                    className={cn(
-                                        TD,
-                                        'whitespace-nowrap text-muted-foreground',
-                                    )}
+    const responseHref = (row: Alert) => {
+        const id = canonicalControlRoomAlertId(row.id);
+        return id
+            ? '/control-room/alerts/' +
+                  id +
+                  '?return_to=' +
+                  encodeURIComponent(returnTo)
+            : null;
+    };
+    const sessionHref = (row: Alert) =>
+        row.session?.id
+            ? loneWorkerHref(row.session.id, { section: 'response', returnTo })
+            : null;
+    const open = (row: Alert) => {
+        const target = responseHref(row) ?? sessionHref(row);
+        if (target) router.visit(target);
+    };
+    const actionsFor = (row: Alert): MenuItem[] => {
+        const response = responseHref(row);
+        const session = sessionHref(row);
+        return compactMenu([
+            response !== null && {
+                label: 'Open response',
+                icon: ExternalLink,
+                onClick: () => router.visit(response),
+            },
+            session !== null && {
+                label: 'Open source session',
+                icon: Radio,
+                onClick: () => router.visit(session),
+            },
+        ]);
+    };
+    const columns: RecordTableColumn<Alert>[] = [
+        {
+            key: 'response',
+            label: 'Response',
+            className: 'min-w-[16rem] max-w-[26rem]',
+            cell: (row) => {
+                const id = canonicalControlRoomAlertId(row.id);
+                const href = responseHref(row);
+                return (
+                    <RecordIdentity
+                        title={
+                            href ? (
+                                <Link
+                                    href={href}
+                                    onClick={(event) => event.stopPropagation()}
+                                    className={titleLink}
                                 >
-                                    {formatDateTime(a.triggered_at)}
-                                </td>
-                                <td className={TD}>
-                                    <span
-                                        className={cn(
-                                            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
-                                            TONE_BG[statusMeta.tone],
-                                        )}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'h-1.5 w-1.5 rounded-full',
-                                                TONE_DOT[statusMeta.tone],
-                                            )}
-                                        />
-                                        {statusMeta.label}
-                                    </span>
-                                </td>
-                                <td className={TD}>
-                                    <FlagBadge
-                                        icon={RadioTower}
-                                        tone="info"
-                                        title="Canonical · owned by Control Room"
-                                    >
-                                        Control Room
-                                    </FlagBadge>
-                                </td>
-                                <td className={cn(TD, 'text-right')}>
-                                    <Kebab
-                                        onClick={(e) => onRowCtx(e, a, true)}
-                                    />
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
-    );
-}
-
-function EmptyState({
-    icon: Icon,
-    title,
-    sub,
-}: {
-    icon: typeof Radio;
-    title: string;
-    sub: string;
-}) {
+                                    Response {id} · {words(row.type)}
+                                </Link>
+                            ) : (
+                                'Response unavailable'
+                            )
+                        }
+                        sub={
+                            row.notes ? (
+                                <span className="line-clamp-2 break-words whitespace-pre-wrap">
+                                    {row.notes}
+                                </span>
+                            ) : undefined
+                        }
+                    />
+                );
+            },
+        },
+        {
+            key: 'worker',
+            label: 'Worker',
+            nowrap: true,
+            cell: (row) =>
+                row.session?.user?.name ? (
+                    <RecordPerson name={row.session.user.name} />
+                ) : (
+                    <span className="text-muted-foreground">
+                        Source not available
+                    </span>
+                ),
+        },
+        {
+            key: 'site',
+            label: 'Site',
+            nowrap: true,
+            cell: (row) =>
+                row.session?.site?.name ?? (
+                    <span className="text-muted-foreground">
+                        Source not available
+                    </span>
+                ),
+        },
+        {
+            key: 'raised',
+            label: 'Raised',
+            nowrap: true,
+            cell: (row) =>
+                row.triggered_at ? (
+                    <RecordIdentity
+                        title={dateWithYear(row.triggered_at)}
+                        sub={formatTime(row.triggered_at)}
+                    />
+                ) : (
+                    <span className="text-muted-foreground">Not recorded</span>
+                ),
+        },
+        {
+            key: 'status',
+            label: 'Status',
+            nowrap: true,
+            cell: (row) => (
+                <StatusBadge variant={responseVariant(row)}>
+                    {responseState(row)}
+                </StatusBadge>
+            ),
+        },
+    ];
     return (
-        <div className="flex flex-col items-center gap-2 px-6 py-14 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Icon className="h-5 w-5" />
-            </span>
-            <div className="text-sm font-semibold text-foreground">{title}</div>
-            <p className="max-w-sm text-sm text-muted-foreground">{sub}</p>
-        </div>
-    );
-}
-
-function ReportLink({
-    href,
-    icon: Icon,
-    title,
-    sub,
-}: {
-    href: string;
-    icon: typeof FileText;
-    title: string;
-    sub: string;
-}) {
-    return (
-        <Link
-            href={href}
-            className="flex items-center gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-muted"
-        >
-            <Icon className="h-4 w-4 text-muted-foreground" />
-            <span>
-                <span className="block text-sm font-medium text-foreground">
-                    {title}
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                    {sub}
-                </span>
-            </span>
-        </Link>
+        <RecordTable
+            title="Control room responses"
+            sub="The control room assesses, assigns and resolves each one"
+            actions={actions}
+            ariaLabel="Control room responses matching the selected filters"
+            rows={rows}
+            rowKey={(row) => row.id}
+            onOpen={open}
+            actionsFor={actionsFor}
+            menuTitle={(row) => `Response · ${words(row.type)}`}
+            menuIcon={Siren}
+            columns={columns}
+            empty={
+                <p className="sg-quiet">
+                    <Ring tone="none" />
+                    <span>No records match these filters.</span>
+                </p>
+            }
+            footer={rows.length ? footer : undefined}
+        />
     );
 }

@@ -1,3 +1,4 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { TrainingHero } from '@/components/hr/training-hero';
 import {
     TrainingWizardDialog,
@@ -5,7 +6,19 @@ import {
     type WizardLookups,
     type WizardType,
 } from '@/components/hr/training/training-wizard-dialog';
+import InputError from '@/components/input-error';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { Button as GuardrailButton } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
@@ -16,6 +29,7 @@ import {
     ClipboardList,
     ExternalLink,
     LayoutDashboard,
+    Loader2,
     MoreVertical,
     Plus,
     Search,
@@ -64,6 +78,8 @@ interface Course {
     cost: number | null;
     is_mandatory: boolean;
     is_active: boolean;
+    /** Its certificates prove first-aid cover, so archiving it needs a warning. */
+    counts_for_first_aid: boolean;
     requires_renewal: boolean;
     validity_period_months: number | null;
     cpd_points: number | null;
@@ -228,6 +244,14 @@ interface SheetData {
         score: number | null;
     }[];
 }
+type SheetSession = SheetData['sessions'][number];
+
+/** TrainingController::cancelSession — reason nullable, max 500. */
+const SESSION_CANCEL_REASON_MAX = 500;
+
+/** NzsAssuranceResolver only counts certificates from active first-aid courses. */
+const FIRST_AID_ARCHIVE_WARNING =
+    "Certificates from this course stop counting towards first-aid cover, so Sites will show first-aid cover as needing action until it's active again.";
 
 export default function TrainingHub({
     summary,
@@ -259,6 +283,18 @@ export default function TrainingHub({
     } | null>(null);
     const [sheetId, setSheetId] = useState<number | null>(null);
     const [sheet, setSheet] = useState<SheetData | null>(null);
+    const [sessionToCancel, setSessionToCancel] = useState<SheetSession | null>(
+        null,
+    );
+    const [cancelReason, setCancelReason] = useState('');
+    const [cancelError, setCancelError] = useState<string | undefined>();
+    const [cancellingSession, setCancellingSession] = useState(false);
+    const [assignmentToWaive, setAssignmentToWaive] =
+        useState<Assignment | null>(null);
+    const [courseToArchive, setCourseToArchive] = useState<Course | null>(null);
+    // The selection is captured when the bulk confirmation opens.
+    const [bulkArchiveIds, setBulkArchiveIds] = useState<number[] | null>(null);
+    const [archivingCourses, setArchivingCourses] = useState(false);
     const searchRef = useRef<HTMLInputElement>(null);
 
     /* localStorage tab prefs + deep-link */
@@ -297,6 +333,14 @@ export default function TrainingHub({
         const onKey = (e: KeyboardEvent) => {
             const t = (document.activeElement?.tagName ?? '') as string;
             if (e.key === 'Escape') {
+                // The confirmation and reason dialogs handle their own Escape.
+                if (
+                    sessionToCancel ||
+                    assignmentToWaive ||
+                    courseToArchive ||
+                    bulkArchiveIds
+                )
+                    return;
                 if (wizard) setWizard(null);
                 else if (ctx) setCtx(null);
                 else if (sheetId) setSheetId(null);
@@ -385,23 +429,67 @@ export default function TrainingHub({
     };
 
     /* mutations */
+    // Archive only opens a confirmation (the request is sent from its confirm
+    // button); Activate is sent straight away.
     const toggleArchive = (c: Course) => {
+        if (c.is_active) {
+            setCourseToArchive(c);
+            return;
+        }
         router.patch(
             `/hr/training/courses/${c.id}/toggle`,
             {},
             { preserveScroll: true, onSuccess: () => router.reload() },
         );
     };
-    const cancelSession = (sessionId: number) => {
-        const reason =
-            window.prompt('Reason for cancelling this session?') ?? undefined;
-        router.delete(`/hr/training/sessions/${sessionId}`, {
+    const confirmArchiveCourse = () => {
+        if (courseToArchive === null) return;
+        router.patch(
+            `/hr/training/courses/${courseToArchive.id}/toggle`,
+            {},
+            {
+                preserveScroll: true,
+                onStart: () => setArchivingCourses(true),
+                onSuccess: () => router.reload(),
+                onFinish: () => {
+                    setArchivingCourses(false);
+                    setCourseToArchive(null);
+                },
+            },
+        );
+    };
+    // "Cancel session" opens a dialog with an optional reason; the session is
+    // cancelled only from its destructive button.
+    const cancelSession = (session: SheetSession) => {
+        setCancelReason('');
+        setCancelError(undefined);
+        setSessionToCancel(session);
+    };
+    const submitCancelSession = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (sessionToCancel === null) return;
+        const reason = cancelReason.trim();
+        // Server rule: reason nullable|string|max:500.
+        if (reason.length > SESSION_CANCEL_REASON_MAX) {
+            setCancelError(
+                `Keep the reason to ${SESSION_CANCEL_REASON_MAX} characters or fewer.`,
+            );
+            return;
+        }
+        router.delete(`/hr/training/sessions/${sessionToCancel.id}`, {
             data: { reason },
             preserveScroll: true,
+            onStart: () => setCancellingSession(true),
             onSuccess: () => {
+                setSessionToCancel(null);
                 router.reload();
                 if (sheetId) refetchSheet();
             },
+            onError: (errors) =>
+                setCancelError(
+                    errors.reason ?? 'Could not cancel the session. Try again.',
+                ),
+            onFinish: () => setCancellingSession(false),
         });
     };
     const refetchSheet = () => {
@@ -420,29 +508,55 @@ export default function TrainingHub({
             { preserveScroll: true, onSuccess: () => router.reload() },
         );
     };
-    const waiveAssignment = (a: Assignment) => {
-        const reason = window.prompt(
-            `Waive ${a.course} for ${a.person} — reason?`,
-        );
-        if (!reason) return;
+    // "Waive" opens a reason dialog; the request is sent only from it.
+    const waiveAssignment = (a: Assignment) => setAssignmentToWaive(a);
+    const submitWaive = (reason: string, done: () => void) => {
+        if (assignmentToWaive === null) return;
         router.patch(
-            `/hr/training/assignments/${a.id}/waive`,
+            `/hr/training/assignments/${assignmentToWaive.id}/waive`,
             { reason },
-            { preserveScroll: true, onSuccess: () => router.reload() },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAssignmentToWaive(null);
+                    router.reload();
+                },
+                onError: (errors) =>
+                    toast.error('Could not waive this training', {
+                        description: errors.reason,
+                    }),
+                onFinish: done,
+            },
         );
     };
     const doExport = (type: string) => {
         window.location.href = `/hr/training/export?type=${type}`;
     };
-    const bulkArchive = () => {
+    const bulkArchive = () => setBulkArchiveIds(selected);
+    // Active first-aid courses in the selection; archiving them drops cover.
+    const bulkFirstAidTitles = courses
+        .filter(
+            (c) =>
+                bulkArchiveIds?.includes(c.id) &&
+                c.is_active &&
+                c.counts_for_first_aid,
+        )
+        .map((c) => c.title);
+    const confirmBulkArchive = () => {
+        if (bulkArchiveIds === null) return;
         router.post(
             '/hr/training/courses/bulk-archive',
-            { course_ids: selected, active: false },
+            { course_ids: bulkArchiveIds, active: false },
             {
                 preserveScroll: true,
+                onStart: () => setArchivingCourses(true),
                 onSuccess: () => {
                     setSelected([]);
                     router.reload();
+                },
+                onFinish: () => {
+                    setArchivingCourses(false);
+                    setBulkArchiveIds(null);
                 },
             },
         );
@@ -1017,6 +1131,10 @@ export default function TrainingHub({
                                                 <GuardrailButton
                                                     unstyled
                                                     type="button"
+                                                    aria-label={`Select ${c.title}`}
+                                                    aria-pressed={selected.includes(
+                                                        c.id,
+                                                    )}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setSelected((s) =>
@@ -1057,6 +1175,7 @@ export default function TrainingHub({
                                                 <GuardrailButton
                                                     unstyled
                                                     type="button"
+                                                    aria-label={`Actions for ${c.title}`}
                                                     onClick={(e) =>
                                                         courseCtx(c, e)
                                                     }
@@ -1724,7 +1843,7 @@ export default function TrainingHub({
                                                             tone: 'danger',
                                                             onClick: () =>
                                                                 cancelSession(
-                                                                    s.id,
+                                                                    s,
                                                                 ),
                                                         },
                                                     ])
@@ -1800,6 +1919,176 @@ export default function TrainingHub({
                 courses={courses as unknown as WizardCourse[]}
                 onClose={() => setWizard(null)}
                 onSaved={onSaved}
+            />
+
+            {/* ───────── CANCEL SESSION ───────── */}
+            <Dialog
+                open={sessionToCancel !== null}
+                onOpenChange={(o) => {
+                    if (!o && !cancellingSession) setSessionToCancel(null);
+                }}
+            >
+                {/* Sits above the course sheet (z-[71]) it is opened from. */}
+                <DialogContent className="z-[95] max-w-md">
+                    <form onSubmit={submitCancelSession} className="grid gap-4">
+                        <DialogHeader>
+                            <DialogTitle>Cancel this session?</DialogTitle>
+                            <DialogDescription>
+                                The{' '}
+                                <span className="font-medium text-foreground">
+                                    {fmtDate(
+                                        sessionToCancel?.session_date ?? null,
+                                    )}
+                                </span>{' '}
+                                session
+                                {sheet?.title ? ` of ${sheet.title}` : ''} is
+                                marked cancelled and can&apos;t be reopened. No
+                                one is sent a message about it, so let the
+                                people enrolled know yourself.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="cancel-session-reason">
+                                Reason (optional)
+                            </Label>
+                            <Textarea
+                                id="cancel-session-reason"
+                                value={cancelReason}
+                                onChange={(e) => {
+                                    setCancelReason(e.target.value);
+                                    if (cancelError) setCancelError(undefined);
+                                }}
+                                maxLength={SESSION_CANCEL_REASON_MAX}
+                                rows={3}
+                                placeholder="e.g. Trainer unavailable"
+                                aria-invalid={Boolean(cancelError)}
+                            />
+                            <InputError message={cancelError} />
+                        </div>
+                        <DialogFooter>
+                            <GuardrailButton
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSessionToCancel(null)}
+                                disabled={cancellingSession}
+                            >
+                                Keep session
+                            </GuardrailButton>
+                            <GuardrailButton
+                                type="submit"
+                                variant="destructive"
+                                disabled={cancellingSession}
+                            >
+                                {cancellingSession ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : null}
+                                Cancel session
+                            </GuardrailButton>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ───────── WAIVE ───────── */}
+            <ReasonDialog
+                open={assignmentToWaive !== null}
+                onClose={() => setAssignmentToWaive(null)}
+                title="Waive this training?"
+                description={
+                    assignmentToWaive
+                        ? `${assignmentToWaive.person} won't need to complete ${assignmentToWaive.course}. It stops showing as due or overdue, and assigning the course to them again won't reopen it.`
+                        : undefined
+                }
+                label="Reason"
+                placeholder="e.g. Already holds a current certificate"
+                confirmLabel="Waive training"
+                destructive
+                onConfirm={submitWaive}
+            />
+
+            {/* ───────── ARCHIVE COURSES ───────── */}
+            <ConfirmDialog
+                open={courseToArchive !== null}
+                onClose={() => {
+                    if (!archivingCourses) setCourseToArchive(null);
+                }}
+                onConfirm={confirmArchiveCourse}
+                title="Archive this course?"
+                description={
+                    <div className="space-y-2">
+                        <p>
+                            <span className="font-medium text-foreground">
+                                {courseToArchive?.title}
+                            </span>{' '}
+                            is marked inactive. It stays in the catalogue, and
+                            its sessions, assignments and training records are
+                            kept. New starters are no longer enrolled in it
+                            during induction.
+                        </p>
+                        {courseToArchive?.counts_for_first_aid ? (
+                            <p>{FIRST_AID_ARCHIVE_WARNING}</p>
+                        ) : null}
+                        <p>You can activate it again from its menu.</p>
+                    </div>
+                }
+                confirmText="Archive course"
+                variant="destructive"
+                processing={archivingCourses}
+            />
+            <ConfirmDialog
+                open={bulkArchiveIds !== null}
+                onClose={() => {
+                    if (!archivingCourses) setBulkArchiveIds(null);
+                }}
+                onConfirm={confirmBulkArchive}
+                title={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive 1 course?'
+                        : `Archive ${bulkArchiveIds?.length ?? 0} courses?`
+                }
+                description={
+                    bulkArchiveIds?.length === 1 ? (
+                        <div className="space-y-2">
+                            <p>
+                                The selected course is marked inactive. It stays
+                                in the catalogue, and its sessions, assignments
+                                and training records are kept. New starters are
+                                no longer enrolled in it during induction.
+                            </p>
+                            {bulkFirstAidTitles.length > 0 ? (
+                                <p>{FIRST_AID_ARCHIVE_WARNING}</p>
+                            ) : null}
+                            <p>You can activate it again from its menu.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            <p>
+                                The {bulkArchiveIds?.length ?? 0} selected
+                                courses are marked inactive. They stay in the
+                                catalogue, and their sessions, assignments and
+                                training records are kept. New starters are no
+                                longer enrolled in them during induction.
+                            </p>
+                            {bulkFirstAidTitles.length > 0 ? (
+                                <p>
+                                    {bulkFirstAidTitles.length === 1
+                                        ? `${bulkFirstAidTitles[0]} counts towards first-aid cover. Its certificates stop counting, so Sites will show first-aid cover as needing action until it's active again.`
+                                        : `${bulkFirstAidTitles.join(', ')} count towards first-aid cover. Their certificates stop counting, so Sites will show first-aid cover as needing action until they're active again.`}
+                                </p>
+                            ) : null}
+                            <p>
+                                You can activate each one again from its menu.
+                            </p>
+                        </div>
+                    )
+                }
+                confirmText={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive course'
+                        : 'Archive courses'
+                }
+                variant="destructive"
+                processing={archivingCourses}
             />
         </AppLayout>
     );

@@ -1,0 +1,211 @@
+{
+  "checkedAt": "2026-09-27T18:58:04.489Z",
+  "url": "http://127.0.0.1:8794/fleet-assets/settings/notifications#notifications",
+  "servedScripts": [
+    "http://127.0.0.1:5194/@vite/client",
+    "http://127.0.0.1:5194/resources/js/app.tsx"
+  ],
+  "scope": "Notifications visual alignment with approved v6; actual Laravel application, retained synthetic test account only",
+  "observations": [
+    "Notification-specific cards show real saved counts 3 in-app, 1 email, 3 event overrides, 1 of 2 channels configured. No simulated third channel.",
+    "Import in-app draft toggle updated count3->4 with draft caption; cancel reload retained draft; confirmed reload restored3.",
+    "Booking email saved Off->On through review; GET Reload saved returned On and email count2; saved back Off and count1. Original synthetic preferences restored.",
+    "My overrides card filtered the table to three overridden event types. In-app copies card restored all rows.",
+    "Role-default scope displayed inherited count4 and disabled channel switches.",
+    "Top-level preview selector switched Booking decisions to Import results. Escape restored Preview a notification.",
+    "Kebab preview restored Actions for Booking decisions. Final fresh-load check after selecting Import results inside that preview still restored the originating Booking decisions action.",
+    "Right-click menu retained Preview notification, Use defaults and Open source workspace.",
+    "Try delivery check opened existing no-send diagnostics. No dry run or external delivery was triggered in this pass.",
+    "Changes button selected Change history and showed Settings change history. Footer rules action selected Rules & owners.",
+    "Dark and light theme changed through application Appearance UI and restored to light."
+  ],
+  "preview1280": {
+    "clientWidth": 978,
+    "dialog": {
+      "bottom": 753,
+      "height": 706,
+      "left": 150,
+      "right": 1130,
+      "top": 47,
+      "width": 980,
+      "x": 150,
+      "y": 47
+    },
+    "footer": {
+      "bottom": 752,
+      "height": 57,
+      "left": 399,
+      "right": 1129,
+      "top": 695,
+      "width": 730,
+      "x": 399,
+      "y": 695
+    },
+    "scrollWidth": 978,
+    "text": "Notification preview\n\nSynthetic sample; no message is sent.\n\nImport results\nSynthetic sample\nSample\nPreview channel choices\nRules & source\nInheritance and response\nNotification preview\nImport results\nIn-app\nEmail\nShowing your saved choices. This optional copy would be skipped.\nImport results · example\n\nYour sample source record has an update. Open it to review the current result and any work required.\n\nSample content only. No real person, vehicle or event is used.\n\nClose preview",
+    "viewport": {
+      "height": 800,
+      "width": 1280
+    }
+  },
+  "review1280": {
+    "rect": {
+      "bottom": 567.375,
+      "height": 334.75,
+      "left": 400,
+      "right": 880,
+      "top": 232.625,
+      "width": 480,
+      "x": 400,
+      "y": 232.625
+    },
+    "viewport": 800
+  },
+  "darkPreview1366": {
+    "dialog": {
+      "bottom": 722.9140625,
+      "height": 677.828125,
+      "left": 193,
+      "right": 1173,
+      "top": 45.0859375,
+      "width": 980,
+      "x": 193,
+      "y": 45.0859375
+    },
+    "footer": {
+      "bottom": 721.9140625,
+      "height": 57,
+      "left": 442,
+      "right": 1172,
+      "top": 664.9140625,
+      "width": 730,
+      "x": 442,
+      "y": 664.9140625
+    },
+    "height": 768,
+    "width": 1366
+  },
+  "darkBottom1366": {
+    "footerButton": {
+      "bottom": 671,
+      "height": 28,
+      "left": 1092.5,
+      "right": 1191.140625,
+      "top": 643,
+      "width": 98.640625,
+      "x": 1092.5,
+      "y": 643
+    },
+    "height": 768,
+    "lastRow": {
+      "bottom": 606,
+      "height": 50,
+      "left": 249.5,
+      "right": 1332.5,
+      "top": 556,
+      "width": 1083,
+      "x": 249.5,
+      "y": 556
+    },
+    "pageWidth": 1351,
+    "visibleTables": [
+      {
+        "bottom": 606,
+        "height": 228,
+        "left": 249.5,
+        "right": 1332.5,
+        "top": 378,
+        "width": 1083,
+        "x": 249.5,
+        "y": 378
+      }
+    ]
+  },
+  "lightBottom1280": {
+    "height": 800,
+    "pageWidth": 1265,
+    "reload": {
+      "bottom": 703,
+      "height": 28,
+      "left": 1006.5,
+      "right": 1105.140625,
+      "top": 675,
+      "width": 98.640625,
+      "x": 1006.5,
+      "y": 675
+    },
+    "rows": [
+      {
+        "rect": {
+          "bottom": 438,
+          "height": 28,
+          "left": 249.5,
+          "right": 1246.5,
+          "top": 410,
+          "width": 997,
+          "x": 249.5,
+          "y": 410
+        },
+        "text": "Notification typeIn-appEmailApplied"
+      },
+      {
+        "rect": {
+          "bottom": 488,
+          "height": 50,
+          "left": 249.5,
+          "right": 1246.5,
+          "top": 438,
+          "width": 997,
+          "x": 249.5,
+          "y": 438
+        },
+        "text": "Booking decisionsApproval and decli"
+      },
+      {
+        "rect": {
+          "bottom": 538,
+          "height": 50,
+          "left": 249.5,
+          "right": 1246.5,
+          "top": 488,
+          "width": 997,
+          "x": 249.5,
+          "y": 488
+        },
+        "text": "Maintenance remindersScheduled main"
+      },
+      {
+        "rect": {
+          "bottom": 588,
+          "height": 50,
+          "left": 249.5,
+          "right": 1246.5,
+          "top": 538,
+          "width": 997,
+          "x": 249.5,
+          "y": 538
+        },
+        "text": "Handover updatesA handover sent to "
+      },
+      {
+        "rect": {
+          "bottom": 638,
+          "height": 50,
+          "left": 249.5,
+          "right": 1246.5,
+          "top": 588,
+          "width": 997,
+          "x": 249.5,
+          "y": 588
+        },
+        "text": "Import resultsResults of your asset"
+      }
+    ],
+    "width": 1280
+  },
+  "zoom": "Ordinary viewport checks only. T08-02 genuine125% remains blocked; no new workaround or duplicated user request.",
+  "limits": [
+    "No Main source writes, shared primitive changes, new backend/schema/permissions or provider calls.",
+    "Published global application shell and canonical event text intentionally retained; no mockup persona, fake channel capability or sequential revision number copied."
+  ]
+}

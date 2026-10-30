@@ -5,6 +5,7 @@ use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
 // Existing controllers (root namespace)
+use App\Http\Controllers\ClientContactPreferencesController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
@@ -25,8 +26,8 @@ use App\Http\Controllers\Clinical\ClientSleepChartController;
 use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
-use App\Http\Controllers\Operations\ActivityFeedController;
 // New Operations controllers
+use App\Http\Controllers\Operations\ActivityFeedController;
 use App\Http\Controllers\Operations\CareNoteTemplateController;
 use App\Http\Controllers\Operations\CarePlanController;
 use App\Http\Controllers\Operations\CarePlanGoalController;
@@ -37,12 +38,12 @@ use App\Http\Controllers\Operations\ClientFamilyChatController;
 use App\Http\Controllers\Operations\ClientFundController;
 use App\Http\Controllers\Operations\ClientLeaveExcursionController;
 use App\Http\Controllers\Operations\ClientLocationLocateController;
-use App\Http\Controllers\Operations\ClientTrackerModeController;
 use App\Http\Controllers\Operations\ClientLocationZoneDraftController;
 use App\Http\Controllers\Operations\ClientMealLogController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
 use App\Http\Controllers\Operations\ClientPathPlanController;
 use App\Http\Controllers\Operations\ClientRoutineController;
+use App\Http\Controllers\Operations\ClientTrackerModeController;
 use App\Http\Controllers\Operations\ClientTransportBookingController;
 use App\Http\Controllers\Operations\ConsentRequestController;
 use App\Http\Controllers\Operations\CustomFormController;
@@ -52,6 +53,7 @@ use App\Http\Controllers\Operations\FamilyPortalController;
 use App\Http\Controllers\Operations\FundingClaimController;
 use App\Http\Controllers\Operations\FundingController;
 use App\Http\Controllers\Operations\GeofenceController;
+use App\Http\Controllers\Operations\HandoverCommandController;
 use App\Http\Controllers\Operations\HandoverController;
 use App\Http\Controllers\Operations\JobBoardController;
 use App\Http\Controllers\Operations\MessageController;
@@ -66,14 +68,18 @@ use App\Http\Controllers\Operations\RosterTemplateController;
 use App\Http\Controllers\Operations\ServiceAgreementController;
 use App\Http\Controllers\Operations\ShiftNoteController;
 use App\Http\Controllers\Operations\ShiftReportController;
+use App\Http\Controllers\Operations\WorkforceEligibilityRefreshController;
+use App\Http\Controllers\Operations\WorkforceSettingsController;
 use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
+use App\Http\Controllers\StaffAvailabilityController;
 use App\Http\Controllers\StaffTimeOffController;
 use App\Http\Controllers\SummaryController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\TimesheetController;
+use App\Http\Middleware\ClientMarExportGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -91,9 +97,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     // PR 18 — the operations dashboard is scheduler/admin-first. Frontline
     // staff without any management capability are redirected to `/my-day`
-    // (their canonical home). Managers / admins still see the same dashboard.
+    // (their canonical home). Managers / admins still see the same dashboard,
+    // and so does anyone granted the dashboard itself (the CEO and COO).
     Route::get('/', DashboardController::class)
-        ->middleware('role_scope:my-day')
+        ->middleware('role_scope:my-day,operations.dashboard.view')
         ->name('operations.dashboard');
     Route::get('/activity', [ActivityFeedController::class, 'index'])->name('operations.activity.index');
 
@@ -131,6 +138,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             });
         Route::get('/clients/{client}/location/zones', [ClientLocationZoneDraftController::class, 'index'])
             ->whereNumber('client')->name('operations.clients.location.zones.index');
+        Route::post('/clients/{client}/location/zones/boundary-handoff', [ClientLocationZoneDraftController::class, 'startBoundaryHandoff'])->whereNumber('client')->middleware('throttle:20,1');
+        Route::delete('/clients/{client}/location/zones/boundary-handoff/{token}', [ClientLocationZoneDraftController::class, 'cancelBoundaryHandoff'])->whereNumber('client');
+        Route::get('/clients/{client}/location/zones/boundaries', [ClientLocationZoneDraftController::class, 'boundaries'])->whereNumber('client');
+        Route::get('/clients/{client}/location/zones/boundary-handoff/{token}', [ClientLocationZoneDraftController::class, 'takeBoundaryHandoff'])->whereNumber('client');
         Route::post('/clients/{client}/location/zones/address-search', [ClientLocationZoneDraftController::class, 'searchAddress'])
             ->whereNumber('client')->middleware('throttle:20,1')->name('operations.clients.location.zones.address-search');
         Route::post('/clients/{client}/location/zones', [ClientLocationZoneDraftController::class, 'store'])
@@ -199,6 +210,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->whereNumber('client')
             ->name('operations.clients.mar.show');
         Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
+            ->middleware(ClientMarExportGuard::class)
             ->whereNumber('client')
             ->name('operations.clients.mar.export_csv');
 
@@ -283,6 +295,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::put('/clients/{client}', [ClientController::class, 'update'])
             ->whereNumber('client')
             ->name('operations.clients.update');
+        Route::put('/clients/{client}/contact-preferences', [ClientContactPreferencesController::class, 'update'])
+            ->whereNumber('client')->name('operations.clients.contact-preferences.update');
         Route::patch('/clients/{client}/quick-update', [ClientController::class, 'quickUpdate'])->name('operations.clients.quick_update');
 
         // Archive (soft-delete) / restore — drives the index "Archive client" action
@@ -905,6 +919,15 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Handovers (NEW)
     // -------------------------------------------------------------------------
 
+    // Operations checked commands: current action authority is owned by the command preflight.
+    Route::get('/shifts/{shift}/handover-command-source', [HandoverCommandController::class, 'source'])
+        ->middleware('permission:handovers.create|handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')->name('operations.handover_commands.source');
+    Route::post('/shifts/{shift}/handover-commands', [HandoverCommandController::class, 'create'])->name('operations.handover_commands.create');
+    Route::put('/shifts/{shift}/handovers/{handover}/command', [HandoverCommandController::class, 'update'])->name('operations.handover_commands.update');
+    Route::patch('/shifts/{shift}/handovers/{handover}/command/submit', [HandoverCommandController::class, 'submit'])->name('operations.handover_commands.submit');
+    Route::get('/shifts/{shift}/handover-attempts/{requestId}', [HandoverCommandController::class, 'lookup'])
+        ->middleware('permission:handovers.create|handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')->name('operations.handover_commands.lookup');
+
     Route::get('/handovers', [HandoverController::class, 'index'])
         ->middleware('permission:handovers.viewAny|shifts.viewAny|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('operations.handovers.index');
@@ -937,6 +960,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // old bookmark gets routed home instead of hitting an error page.
     Route::middleware(['role_scope:my-day', 'permission:rostering.viewAny'])->group(function () {
         Route::get('/rostering', [RosteringController::class, 'index'])->name('operations.rostering.index');
+        Route::get('/workforce-settings', [WorkforceSettingsController::class, 'index'])->name('operations.workforce.settings');
+        Route::patch('/workforce-settings', [WorkforceSettingsController::class, 'update'])->name('operations.workforce.settings.update');
+        Route::patch('/workforce-settings/staffing-rules', [WorkforceSettingsController::class, 'updateStaffingRules'])
+            ->middleware('permission:hr.settings.manage')->name('operations.workforce.settings.staffing-rules.update');
+        Route::patch('/workforce-settings/eligibility-rules', [WorkforceSettingsController::class, 'updateEligibilityRules'])
+            ->middleware('permission:hr.settings.manage')->name('operations.workforce.settings.eligibility-rules.update');
+        Route::get('/workforce-settings/history', [WorkforceSettingsController::class, 'history'])
+            ->middleware('permission:hr.settings.manage')->name('operations.workforce.settings.history');
         Route::get('/rostering/conflicts', [RosteringController::class, 'conflicts'])->name('operations.rostering.conflicts');
         Route::post('/rostering/coverage/{key}/ack', [CoverageGapController::class, 'ack'])
             ->name('operations.rostering.coverage.ack');
@@ -958,11 +989,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.rostering.calendar.shifts.update');
     });
 
+    Route::get('/workforce/eligibility-refresh', [WorkforceEligibilityRefreshController::class, 'index'])
+        ->middleware('permission:rostering.viewAny|shifts.viewAny|shifts.viewAssigned')->name('operations.workforce.eligibility-refresh.index');
+    Route::post('/workforce/eligibility-refresh/{shift}/retry', [WorkforceEligibilityRefreshController::class, 'retry'])
+        ->whereNumber('shift')->middleware('permission:shifts.update')->name('operations.workforce.eligibility-refresh.retry');
+
     // Roster templates — now a tab inside the Rostering workspace. The list,
     // create, edit, view and apply all happen in pop-ups on /operations/rostering;
     // only the mutation endpoints live here. The old index URL 302s to the tab so
     // existing bookmarks keep working.
-    Route::get('/rostering/templates', fn () => redirect()->route('operations.rostering.index', ['tab' => 'templates']))
+    Route::get('/rostering/templates', [RosterTemplateController::class, 'index'])
         ->middleware('permission:roster_templates.viewAny|rostering.viewAny')
         ->name('operations.rostering.templates.index');
 
@@ -1029,8 +1065,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     // Availability now lives inside Rostering so there is one scheduler surface.
-    Route::get('/availability', fn () => redirect()->route('operations.rostering.index', ['tab' => 'availability']))
-        ->middleware(['role_scope:my-day', 'permission:rostering.viewAny'])
+    Route::get('/availability', [StaffAvailabilityController::class, 'workspace'])
+        ->middleware('permission:rostering.viewAny|staff.viewAny|staff.availability.updateAny|staff.availability.updateSelf')
         ->name('operations.availability.index');
 
     // -------------------------------------------------------------------------
@@ -1223,6 +1259,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::get('/job-board', [JobBoardController::class, 'index'])
         ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.index');
+    Route::get('/job-board/alerts/preference', [JobBoardController::class, 'alertPreference'])
+        ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
+        ->name('operations.job_board.alerts.preference');
+    Route::get('/job-board/{position}/action-source', [JobBoardController::class, 'actionSource'])
+        ->whereNumber('position')
+        ->middleware('permission:job_board.claim|shifts.viewAssigned|shifts.manageAny|job_board.approve')
+        ->name('operations.job_board.action_source');
+    Route::get('/job-board/postable-shifts', [JobBoardController::class, 'postingShifts'])
+        ->middleware('permission:job_board.create|shifts.manageAny')
+        ->name('operations.job_board.postable_shifts');
     Route::post('/job-board/alerts/toggle', [JobBoardController::class, 'toggleAlerts'])
         ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.alerts.toggle');
@@ -1233,6 +1279,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:job_board.approve|shifts.manageAny')
         ->name('operations.job_board.approve');
     Route::post('/shifts/{shift}/open-position', [JobBoardController::class, 'createPosition'])
+        ->whereNumber('shift')
         ->middleware('permission:job_board.create|shifts.manageAny')
         ->name('operations.job_board.create');
 
@@ -1315,9 +1362,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::middleware('permission:rostering.viewAny')->group(function () {
         Route::get('/qualifications', [QualificationMatchController::class, 'index'])->name('operations.qualifications.index');
-        Route::post('/qualifications', [QualificationMatchController::class, 'store'])->name('operations.qualifications.store');
-        Route::put('/qualifications/{requirement}', [QualificationMatchController::class, 'update'])->name('operations.qualifications.update');
-        Route::delete('/qualifications/{requirement}', [QualificationMatchController::class, 'destroy'])->name('operations.qualifications.destroy');
+        Route::post('/qualifications', [QualificationMatchController::class, 'store'])->name('operations.qualifications.store')
+            ->middleware('permission:qualifications.create');
+        Route::put('/qualifications/{requirement}', [QualificationMatchController::class, 'update'])->name('operations.qualifications.update')
+            ->middleware('permission:qualifications.edit');
+        Route::delete('/qualifications/{requirement}', [QualificationMatchController::class, 'destroy'])->name('operations.qualifications.destroy')
+            ->middleware('permission:qualifications.delete');
         Route::get('/qualifications/check/{shift}', [QualificationMatchController::class, 'checkShift'])->name('operations.qualifications.check');
     });
 

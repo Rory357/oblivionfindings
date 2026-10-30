@@ -1,4 +1,9 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    draftHistoryNavigation,
+    registerDraftHistoryGuard,
+} from '@/lib/draft-history';
+import type { PendingVisit } from '@inertiajs/core';
 import { router } from '@inertiajs/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -8,9 +13,28 @@ export function useSettingsLeaveConfirmation(
     title = 'Discard unsaved settings?',
     description = 'Your unsaved entries will be discarded. A save already sent may still finish; review the saved settings before retrying it. Cancel to keep editing.',
     onDiscard?: () => void,
+    saving = false,
+    /** Let a preserved same-record visit through without asking (e.g. a partial reload of the open record). */
+    allowPreservedVisit?: (visit: PendingVisit) => boolean,
 ) {
-    const [pending, setPending] = useState<{ run: () => void } | null>(null);
+    const [pending, setPending] = useState<{
+        run: () => void;
+        cancel?: () => void;
+    } | null>(null);
     const approved = useRef(false);
+    const preserveAndRun = (run: () => void) => {
+        approved.current = true;
+        try {
+            run();
+        } finally {
+            approved.current = false;
+        }
+    };
+    const discardAndRun = (run: () => void) =>
+        preserveAndRun(() => {
+            onDiscard?.();
+            run();
+        });
     const request = useCallback(
         (run: () => void) => {
             if (dirty) setPending({ run });
@@ -29,36 +53,51 @@ export function useSettingsLeaveConfirmation(
             event.returnValue = '';
         };
         window.addEventListener('beforeunload', unload);
+        const removeHistory = registerDraftHistoryGuard((run, cancel) =>
+            setPending({ run, cancel }),
+        );
         const remove = router.on('before', (event) => {
             const visit = event.detail.visit;
-            if (approved.current || visit.method !== 'get') return;
+            if (
+                approved.current ||
+                visit.method !== 'get' ||
+                allowPreservedVisit?.(visit)
+            )
+                return;
             event.preventDefault();
             setPending({ run: () => router.visit(visit.url, visit) });
         });
         return () => {
             window.removeEventListener('beforeunload', unload);
+            removeHistory();
             remove();
         };
-    }, [dirty]);
+    }, [dirty, allowPreservedVisit]);
 
     return {
         request,
+        historyProtectionAvailable: draftHistoryNavigation() !== null,
+        discardAndRun,
+        preserveAndRun,
         confirmation: (
             <ConfirmDialog
                 open={dirty && pending !== null}
-                onClose={() => setPending(null)}
-                onConfirm={() => {
-                    if (!dirty || !pending) return;
-                    approved.current = true;
-                    try {
-                        onDiscard?.();
-                        pending.run();
-                    } finally {
-                        approved.current = false;
-                    }
+                onClose={() => {
+                    if (saving) return;
+                    pending?.cancel?.();
+                    setPending(null);
                 }}
-                title={title}
-                description={description}
+                onConfirm={() => {
+                    if (saving || !dirty || !pending) return;
+                    discardAndRun(pending.run);
+                }}
+                title={saving ? 'Saving your changes…' : title}
+                description={
+                    saving
+                        ? 'Please wait for the current save to finish. Your writing stays here.'
+                        : description
+                }
+                processing={saving ? true : undefined}
                 confirmText="Discard and continue"
             />
         ),

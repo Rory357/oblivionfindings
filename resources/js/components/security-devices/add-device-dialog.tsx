@@ -1,5 +1,19 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import {
     Select,
     SelectContent,
@@ -15,11 +29,13 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from '@/components/wizard/shell';
+import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import {
     ArrowLeft,
     ArrowRight,
     Check,
+    ChevronsUpDown,
     Cpu,
     LoaderCircle,
     MapPin,
@@ -43,10 +59,20 @@ type DeviceFieldOwnership = {
     >;
 };
 
+type SiteOption = { id: number; name: string };
+
+type ActiveDeviceAssignment = {
+    assignable_type: string;
+    assignable_id: number;
+    label: string | null;
+};
+
 type DeviceFormOptions = {
     taxonomy: DeviceTaxonomy;
     domains: FilterOption[];
     statuses: FilterOption[];
+    sites?: SiteOption[];
+    can_assign?: boolean;
     device?: Partial<EditableDevice>;
 };
 
@@ -68,6 +94,8 @@ type EditableDevice = {
     provider: string | null;
     location_description: string | null;
     notes: string | null;
+    site_id?: number | null;
+    active_assignment?: ActiveDeviceAssignment | null;
     field_ownership?: DeviceFieldOwnership;
 };
 
@@ -116,7 +144,7 @@ const steps: readonly WizardStep[] = [
     {
         key: 'review',
         label: 'Review & register',
-        blurb: 'Confirm the canonical record',
+        blurb: 'Confirm device details',
         icon: NotebookText,
     },
 ];
@@ -183,7 +211,7 @@ function formFromDevice(device: Partial<EditableDevice>): AddDeviceForm {
         notes: device.notes ?? '',
         override_reason: '',
         override_expires_at: '',
-        site_id: null,
+        site_id: device.site_id ?? null,
         _modal: true,
     };
 }
@@ -331,6 +359,11 @@ export function AddDeviceDialog({
     const [options, setOptions] = useState<DeviceFormOptions | null>(null);
     const [optionsError, setOptionsError] = useState<string | null>(null);
     const [completedName, setCompletedName] = useState<string | null>(null);
+    const [baseline, setBaseline] = useState(() =>
+        emptyForm(prefillDomain, prefillSiteId),
+    );
+    const [discardDraft, setDiscardDraft] = useState(false);
+    const [sitePickerOpen, setSitePickerOpen] = useState(false);
     const { data, setData, post, put, processing, errors, clearErrors, reset } =
         useForm<AddDeviceForm>(emptyForm(prefillDomain, prefillSiteId));
     const activeSteps = useMemo(() => dialogSteps(mode), [mode]);
@@ -366,9 +399,12 @@ export function AddDeviceDialog({
                 return (await response.json()) as DeviceFormOptions;
             })
             .then((payload) => {
+                if (controller.signal.aborted) return;
                 setOptions(payload);
                 if (mode === 'edit' && payload.device) {
-                    setDataRef.current(formFromDevice(payload.device));
+                    const loadedForm = formFromDevice(payload.device);
+                    setBaseline(loadedForm);
+                    setDataRef.current(loadedForm);
                 }
             })
             .catch((error: unknown) => {
@@ -408,14 +444,23 @@ export function AddDeviceDialog({
         );
     }, [data.category, data.domain, options]);
 
-    const close = () => {
+    const draftChanged =
+        !completedName && JSON.stringify(data) !== JSON.stringify(baseline);
+    const discardAndClose = () => {
         if (processing) return;
+        setDiscardDraft(false);
+        setBaseline(emptyForm(prefillDomain, prefillSiteId));
         setCompletedName(null);
         setStepIndex(0);
         setOptions(null);
         clearErrors();
         reset();
         onClose();
+    };
+    const close = () => {
+        if (processing) return;
+        if (draftChanged) setDiscardDraft(true);
+        else discardAndClose();
     };
 
     const submit = () => {
@@ -436,6 +481,7 @@ export function AddDeviceDialog({
                             'category',
                             'subcategory',
                             'status',
+                            'site_id',
                         ].includes(key),
                     )
                 ) {
@@ -469,6 +515,32 @@ export function AddDeviceDialog({
     const basicsComplete = Boolean(
         data.name.trim() && data.domain && data.category,
     );
+    const siteOptions = useMemo(() => {
+        const list = options?.sites ?? [];
+        if (
+            prefillSiteId &&
+            prefillSiteName &&
+            !list.some((site) => site.id === prefillSiteId)
+        ) {
+            return [{ id: prefillSiteId, name: prefillSiteName }, ...list];
+        }
+        return list;
+    }, [options?.sites, prefillSiteId, prefillSiteName]);
+    const activeNonSiteAssignment = useMemo(() => {
+        const current = options?.device?.active_assignment;
+        if (!current || current.assignable_type === 'site') return null;
+        return current;
+    }, [options?.device?.active_assignment]);
+    const canAssignSite =
+        !activeNonSiteAssignment &&
+        (options?.can_assign ?? siteOptions.length > 0);
+    const selectedSiteName = useMemo(() => {
+        if (data.site_id === null) return null;
+        return (
+            siteOptions.find((site) => site.id === data.site_id)?.name ??
+            (data.site_id === prefillSiteId ? prefillSiteName : null)
+        );
+    }, [data.site_id, prefillSiteId, prefillSiteName, siteOptions]);
     const providerManaged = Boolean(
         mode === 'edit' && options?.device?.field_ownership?.provider_managed,
     );
@@ -503,575 +575,721 @@ export function AddDeviceDialog({
     );
 
     return (
-        <WizardShell
-            open={open}
-            onClose={close}
-            title={mode === 'edit' ? 'Edit device' : 'Register device'}
-            description={
-                mode === 'edit'
-                    ? 'Update the canonical Security & Devices registry record.'
-                    : 'Create one canonical Security & Devices registry record.'
-            }
-            railIcon={Cpu}
-            railTitle={mode === 'edit' ? 'Edit device' : 'Register device'}
-            railSub="Canonical inventory"
-            steps={activeSteps}
-            stepIndex={stepIndex}
-            onStepClick={(index) => {
-                if (index <= stepIndex || basicsComplete) setStepIndex(index);
-            }}
-            pct={Math.round(((stepIndex + 1) / activeSteps.length) * 100)}
-            pctLabel={
-                mode === 'edit' ? 'Update progress' : 'Registration progress'
-            }
-            maxWidth="min(94vw, 1040px)"
-            maxHeight="min(88vh, 820px)"
-            footerStart={
-                <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={
-                        stepIndex === 0
-                            ? close
-                            : () => setStepIndex((i) => i - 1)
-                    }
-                    disabled={processing}
-                >
-                    {stepIndex === 0 ? (
-                        'Cancel'
-                    ) : (
-                        <>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </>
-                    )}
-                </Button>
-            }
-            footerEnd={
-                stepIndex === activeSteps.length - 1 ? (
+        <>
+            <WizardShell
+                open={open}
+                onClose={close}
+                title={mode === 'edit' ? 'Edit device' : 'Register device'}
+                description={
+                    mode === 'edit'
+                        ? 'Update this device record in Security & Devices.'
+                        : 'Add a device record to Security & Devices.'
+                }
+                railIcon={Cpu}
+                railTitle={mode === 'edit' ? 'Edit device' : 'Register device'}
+                railSub="Device list"
+                steps={activeSteps}
+                stepIndex={stepIndex}
+                onStepClick={(index) => {
+                    if (index <= stepIndex || basicsComplete)
+                        setStepIndex(index);
+                }}
+                pct={Math.round(((stepIndex + 1) / activeSteps.length) * 100)}
+                pctLabel={
+                    mode === 'edit'
+                        ? 'Update progress'
+                        : 'Registration progress'
+                }
+                maxWidth="min(94vw, 1040px)"
+                maxHeight="min(88vh, 820px)"
+                footerStart={
                     <Button
                         type="button"
-                        onClick={submit}
-                        disabled={
-                            !basicsComplete ||
-                            !overrideComplete ||
-                            processing ||
-                            !options
+                        variant="ghost"
+                        onClick={
+                            stepIndex === 0
+                                ? close
+                                : () => setStepIndex((i) => i - 1)
                         }
+                        disabled={processing}
                     >
-                        {processing ? (
-                            <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                        {stepIndex === 0 ? (
+                            'Cancel'
                         ) : (
-                            <Check className="mr-2 h-4 w-4" />
-                        )}
-                        {processing
-                            ? mode === 'edit'
-                                ? 'Saving…'
-                                : 'Registering…'
-                            : mode === 'edit'
-                              ? 'Save changes'
-                              : 'Register device'}
-                    </Button>
-                ) : (
-                    <Button
-                        type="button"
-                        onClick={() => setStepIndex((i) => i + 1)}
-                        disabled={
-                            (stepIndex === 0 && !basicsComplete) ||
-                            !options ||
-                            processing
-                        }
-                    >
-                        Continue <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                )
-            }
-            success={
-                completedName ? (
-                    <WizardSuccessPane
-                        title={
-                            mode === 'edit'
-                                ? 'Device updated'
-                                : 'Device registered'
-                        }
-                        blurb={
                             <>
-                                <strong>{completedName}</strong>{' '}
-                                {mode === 'edit'
-                                    ? 'has been updated in the canonical device registry.'
-                                    : prefillSiteName
-                                      ? `is now registered and assigned to ${prefillSiteName}.`
-                                      : 'is now in the canonical device registry.'}
+                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
                             </>
-                        }
-                        actions={
-                            <Button type="button" onClick={close}>
-                                {mode === 'edit'
-                                    ? 'Return to profile'
-                                    : prefillSiteName
-                                      ? 'Return to Site hardware'
-                                      : 'Return to devices'}
-                            </Button>
-                        }
-                    />
-                ) : undefined
-            }
-        >
-            {!options ? (
-                <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">
-                    {optionsError ? (
-                        <p className="max-w-sm text-center text-destructive">
-                            {optionsError}
-                        </p>
+                        )}
+                    </Button>
+                }
+                footerEnd={
+                    stepIndex === activeSteps.length - 1 ? (
+                        <Button
+                            type="button"
+                            onClick={submit}
+                            disabled={
+                                !basicsComplete ||
+                                !overrideComplete ||
+                                processing ||
+                                !options
+                            }
+                        >
+                            {processing ? (
+                                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Check className="mr-2 h-4 w-4" />
+                            )}
+                            {processing
+                                ? mode === 'edit'
+                                    ? 'Saving…'
+                                    : 'Registering…'
+                                : mode === 'edit'
+                                  ? 'Save changes'
+                                  : 'Register device'}
+                        </Button>
                     ) : (
-                        <>
-                            <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
-                            Loading device details…
-                        </>
-                    )}
-                </div>
-            ) : stepIndex === 0 ? (
-                <WizardStepPane>
-                    <StepHeading
-                        icon={Cpu}
-                        title="What are we registering?"
-                        description="Give the device a recognisable name and place it in the correct technology workspace."
-                    />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <FormField
-                            id="device-name"
-                            label="Device name"
-                            error={errors.name}
-                            required
+                        <Button
+                            type="button"
+                            onClick={() => setStepIndex((i) => i + 1)}
+                            disabled={
+                                (stepIndex === 0 && !basicsComplete) ||
+                                !options ||
+                                processing
+                            }
                         >
-                            <Input
-                                id="device-name"
-                                value={data.name}
-                                onChange={(event) =>
-                                    setData('name', event.target.value)
-                                }
-                                placeholder="e.g. Main entrance camera"
-                                autoFocus
-                            />
-                        </FormField>
-                        <FormField
-                            id="device-status"
-                            label="Status"
-                            error={errors.status}
-                        >
-                            <Select
-                                value={data.status}
-                                onValueChange={(value) =>
-                                    setData('status', value)
-                                }
-                            >
-                                <SelectTrigger id="device-status">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {options.statuses.map((status) => (
-                                        <SelectItem
-                                            key={status.value}
-                                            value={status.value}
-                                        >
-                                            {status.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </FormField>
-                        <FormField
-                            id="device-domain"
-                            label="Workspace"
-                            error={errors.domain}
-                            required
-                        >
-                            <Select
-                                value={data.domain}
-                                onValueChange={(value) =>
-                                    setData({
-                                        ...data,
-                                        domain: value,
-                                        category: '',
-                                        subcategory: '',
-                                    })
-                                }
-                            >
-                                <SelectTrigger id="device-domain">
-                                    <SelectValue placeholder="Select workspace" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {options.domains.map((domain) => (
-                                        <SelectItem
-                                            key={domain.value}
-                                            value={domain.value}
-                                        >
-                                            {domain.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </FormField>
-                        <FormField
-                            id="device-category"
-                            label="Device category"
-                            error={errors.category}
-                            required
-                        >
-                            <Select
-                                value={data.category}
-                                disabled={!data.domain}
-                                onValueChange={(value) =>
-                                    setData({
-                                        ...data,
-                                        category: value,
-                                        subcategory: '',
-                                    })
-                                }
-                            >
-                                <SelectTrigger id="device-category">
-                                    <SelectValue placeholder="Select category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {categories.map((category) => (
-                                        <SelectItem
-                                            key={category.value}
-                                            value={category.value}
-                                        >
-                                            {category.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </FormField>
-                        <FormField
-                            id="device-subcategory"
-                            label="Device type"
-                            error={errors.subcategory}
-                        >
-                            <Select
-                                value={data.subcategory || '_none'}
-                                disabled={subcategories.length === 0}
-                                onValueChange={(value) =>
-                                    setData(
-                                        'subcategory',
-                                        value === '_none' ? '' : value,
-                                    )
-                                }
-                            >
-                                <SelectTrigger id="device-subcategory">
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="_none">None</SelectItem>
-                                    {subcategories.map((subcategory) => (
-                                        <SelectItem
-                                            key={subcategory.value}
-                                            value={subcategory.value}
-                                        >
-                                            {subcategory.label}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </FormField>
-                    </div>
-                </WizardStepPane>
-            ) : stepIndex === 1 ? (
-                <WizardStepPane>
-                    <StepHeading
-                        icon={ScanLine}
-                        title="Hardware identity"
-                        description="Record the identifiers technicians use to match the physical device."
-                    />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <TextField
-                            id="device-manufacturer"
-                            label="Manufacturer"
-                            value={data.manufacturer}
-                            error={errors.manufacturer}
-                            onChange={(value) => setData('manufacturer', value)}
-                        />
-                        <TextField
-                            id="device-model"
-                            label="Model"
-                            value={data.model}
-                            error={errors.model}
-                            onChange={(value) => setData('model', value)}
-                        />
-                        <TextField
-                            id="device-serial-number"
-                            label="Serial number"
-                            value={data.serial_number}
-                            error={errors.serial_number}
-                            onChange={(value) =>
-                                setData('serial_number', value)
+                            Continue <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
+                    )
+                }
+                success={
+                    completedName ? (
+                        <WizardSuccessPane
+                            title={
+                                mode === 'edit'
+                                    ? 'Device updated'
+                                    : 'Device registered'
+                            }
+                            blurb={
+                                <>
+                                    <strong>{completedName}</strong>{' '}
+                                    {mode === 'edit'
+                                        ? 'has been updated in the device list.'
+                                        : selectedSiteName
+                                          ? `is now registered and assigned to ${selectedSiteName}.`
+                                          : 'is now in the device list.'}
+                                </>
+                            }
+                            actions={
+                                <Button type="button" onClick={close}>
+                                    {mode === 'edit'
+                                        ? 'Return to profile'
+                                        : prefillSiteName
+                                          ? 'Return to Site hardware'
+                                          : 'Return to devices'}
+                                </Button>
                             }
                         />
-                        <TextField
-                            id="device-asset-tag"
-                            label="Asset tag"
-                            value={data.asset_tag}
-                            error={errors.asset_tag}
-                            onChange={(value) => setData('asset_tag', value)}
-                        />
-                        <TextField
-                            id="device-mac-address"
-                            label="MAC address"
-                            value={data.mac_address}
-                            error={errors.mac_address}
-                            placeholder="AA:BB:CC:DD:EE:FF"
-                            onChange={(value) => setData('mac_address', value)}
-                        />
-                        <TextField
-                            id="device-imei"
-                            label="IMEI"
-                            value={data.imei}
-                            error={errors.imei}
-                            onChange={(value) => setData('imei', value)}
-                        />
+                    ) : undefined
+                }
+            >
+                {!options ? (
+                    <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">
+                        {optionsError ? (
+                            <p className="max-w-sm text-center text-destructive">
+                                {optionsError}
+                            </p>
+                        ) : (
+                            <>
+                                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
+                                Loading device details…
+                            </>
+                        )}
                     </div>
-                </WizardStepPane>
-            ) : stepIndex === 2 ? (
-                <WizardStepPane>
-                    <StepHeading
-                        icon={Network}
-                        title="Connection and location"
-                        description="Add operational context without storing credentials or raw provider targets."
-                    />
-                    {mode === 'add' && prefillSiteId && prefillSiteName ? (
-                        <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
-                            <MapPin
-                                className="mt-0.5 h-5 w-5 shrink-0 text-primary"
-                                aria-hidden
-                            />
-                            <div>
-                                <p className="text-sm font-medium">
-                                    Initial Site: {prefillSiteName}
-                                </p>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                    Registration and the canonical Site
-                                    assignment are saved together. If either
-                                    fails, neither record is created.
-                                </p>
+                ) : stepIndex === 0 ? (
+                    <WizardStepPane>
+                        <StepHeading
+                            icon={Cpu}
+                            title="What are we registering?"
+                            description="Give the device a recognisable name and place it in the correct technology workspace."
+                        />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <FormField
+                                id="device-name"
+                                label="Device name"
+                                error={errors.name}
+                                required
+                            >
+                                <Input
+                                    id="device-name"
+                                    value={data.name}
+                                    onChange={(event) =>
+                                        setData('name', event.target.value)
+                                    }
+                                    placeholder="e.g. Main entrance camera"
+                                    autoFocus
+                                />
+                            </FormField>
+                            <FormField
+                                id="device-status"
+                                label="Status"
+                                error={errors.status}
+                            >
+                                <Select
+                                    value={data.status}
+                                    onValueChange={(value) =>
+                                        setData('status', value)
+                                    }
+                                >
+                                    <SelectTrigger id="device-status">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {options.statuses.map((status) => (
+                                            <SelectItem
+                                                key={status.value}
+                                                value={status.value}
+                                            >
+                                                {status.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FormField>
+                            <FormField
+                                id="device-domain"
+                                label="Workspace"
+                                error={errors.domain}
+                                required
+                            >
+                                <Select
+                                    value={data.domain}
+                                    onValueChange={(value) =>
+                                        setData({
+                                            ...data,
+                                            domain: value,
+                                            category: '',
+                                            subcategory: '',
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger id="device-domain">
+                                        <SelectValue placeholder="Select workspace" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {options.domains.map((domain) => (
+                                            <SelectItem
+                                                key={domain.value}
+                                                value={domain.value}
+                                            >
+                                                {domain.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FormField>
+                            <FormField
+                                id="device-category"
+                                label="Device category"
+                                error={errors.category}
+                                required
+                            >
+                                <Select
+                                    value={data.category}
+                                    disabled={!data.domain}
+                                    onValueChange={(value) =>
+                                        setData({
+                                            ...data,
+                                            category: value,
+                                            subcategory: '',
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger id="device-category">
+                                        <SelectValue placeholder="Select category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {categories.map((category) => (
+                                            <SelectItem
+                                                key={category.value}
+                                                value={category.value}
+                                            >
+                                                {category.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FormField>
+                            <FormField
+                                id="device-subcategory"
+                                label="Device type"
+                                error={errors.subcategory}
+                            >
+                                <Select
+                                    value={data.subcategory || '_none'}
+                                    disabled={subcategories.length === 0}
+                                    onValueChange={(value) =>
+                                        setData(
+                                            'subcategory',
+                                            value === '_none' ? '' : value,
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger id="device-subcategory">
+                                        <SelectValue placeholder="Select type" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="_none">
+                                            None
+                                        </SelectItem>
+                                        {subcategories.map((subcategory) => (
+                                            <SelectItem
+                                                key={subcategory.value}
+                                                value={subcategory.value}
+                                            >
+                                                {subcategory.label}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </FormField>
+                            <FormField
+                                id="device-site"
+                                label="Site"
+                                error={errors.site_id}
+                            >
+                                <Popover
+                                    open={sitePickerOpen}
+                                    onOpenChange={setSitePickerOpen}
+                                >
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            id="device-site"
+                                            type="button"
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={sitePickerOpen}
+                                            aria-label="Site"
+                                            disabled={!canAssignSite}
+                                            className="w-full justify-between font-normal"
+                                        >
+                                            <span className="truncate">
+                                                {activeNonSiteAssignment
+                                                    ? `Assigned to ${humanise(activeNonSiteAssignment.assignable_type)}${activeNonSiteAssignment.label ? `: ${activeNonSiteAssignment.label}` : ''}`
+                                                    : (selectedSiteName ??
+                                                      'Unassigned (no Site)')}
+                                            </span>
+                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        className="w-72 p-0"
+                                        align="start"
+                                    >
+                                        <Command>
+                                            <CommandInput placeholder="Search Sites…" />
+                                            <CommandList>
+                                                <CommandEmpty>
+                                                    No matching Site found.
+                                                </CommandEmpty>
+                                                <CommandGroup>
+                                                    <CommandItem
+                                                        value="Unassigned (no Site)"
+                                                        onSelect={() => {
+                                                            setData(
+                                                                'site_id',
+                                                                null,
+                                                            );
+                                                            setSitePickerOpen(
+                                                                false,
+                                                            );
+                                                        }}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                'mr-2 h-4 w-4',
+                                                                data.site_id ===
+                                                                    null
+                                                                    ? 'opacity-100'
+                                                                    : 'opacity-0',
+                                                            )}
+                                                        />
+                                                        Unassigned (no Site)
+                                                    </CommandItem>
+                                                    {siteOptions.map((site) => (
+                                                        <CommandItem
+                                                            key={site.id}
+                                                            value={`${site.name} ${site.id}`}
+                                                            onSelect={() => {
+                                                                setData(
+                                                                    'site_id',
+                                                                    site.id,
+                                                                );
+                                                                setSitePickerOpen(
+                                                                    false,
+                                                                );
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn(
+                                                                    'mr-2 h-4 w-4',
+                                                                    data.site_id ===
+                                                                        site.id
+                                                                        ? 'opacity-100'
+                                                                        : 'opacity-0',
+                                                                )}
+                                                            />
+                                                            {site.name}
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                                {activeNonSiteAssignment ? (
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Person, room, and vehicle assignments
+                                        are managed on the Assignments tab.
+                                    </p>
+                                ) : null}
+                            </FormField>
+                            <div className="sm:col-span-2">
+                                <TextField
+                                    id="device-ip-address-classification"
+                                    label="IP address or hostname"
+                                    value={data.ip_address}
+                                    error={errors.ip_address}
+                                    placeholder="e.g. 172.16.0.1 or switch-01.local"
+                                    onChange={(value) =>
+                                        setData('ip_address', value)
+                                    }
+                                />
                             </div>
                         </div>
-                    ) : null}
-                    {providerManaged ? (
-                        <div className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning dark:border-status-warning/40 dark:bg-status-warning-bg dark:text-status-warning">
-                            <p className="font-medium">
-                                Provider-observed fields stay independently
-                                recorded
-                            </p>
-                            <p className="mt-1 text-xs leading-5">
-                                Changing manufacturer, model, hardware IDs,
-                                firmware, IP address or status creates a
-                                temporary governed override. Provider linkage
-                                remains integration-owned. Later observations
-                                remain visible and resume when the override
-                                expires.
-                            </p>
-                            {options?.device?.field_ownership?.conflicts
-                                .length ? (
-                                <p className="mt-2 text-xs font-medium">
-                                    Active conflicts:{' '}
-                                    {options.device.field_ownership.conflicts
-                                        .map(humanise)
-                                        .join(', ')}
-                                </p>
-                            ) : null}
-                        </div>
-                    ) : null}
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <TextField
-                            id="device-provider"
-                            label="Provider"
-                            value={data.provider}
-                            error={errors.provider}
-                            placeholder="e.g. UniFi, Queclink or manual"
-                            disabled={providerManaged}
-                            onChange={(value) => setData('provider', value)}
-                        />
-                        <TextField
-                            id="device-firmware-version"
-                            label="Firmware version"
-                            value={data.firmware_version}
-                            error={errors.firmware_version}
-                            onChange={(value) =>
-                                setData('firmware_version', value)
-                            }
-                        />
-                        <TextField
-                            id="device-ip-address"
-                            label="IP address"
-                            value={data.ip_address}
-                            error={errors.ip_address}
-                            placeholder="192.168.1.1"
-                            onChange={(value) => setData('ip_address', value)}
-                        />
-                        <TextField
-                            id="device-location-description"
-                            label="Location description"
-                            value={data.location_description}
-                            error={errors.location_description}
-                            placeholder="e.g. Server room rack A"
-                            onChange={(value) =>
-                                setData('location_description', value)
-                            }
-                        />
-                        <FormField
-                            id="device-notes"
-                            label="Notes"
-                            error={errors.notes}
-                        >
-                            <textarea
-                                id="device-notes"
-                                rows={5}
-                                value={data.notes}
-                                onChange={(event) =>
-                                    setData('notes', event.target.value)
-                                }
-                                className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-2"
-                                placeholder="Operational notes only—never credentials or secrets."
-                            />
-                        </FormField>
-                        {providerManaged && providerFieldsChanged ? (
-                            <>
-                                <FormField
-                                    id="device-override-reason"
-                                    label="Override reason"
-                                    error={errors.override_reason}
-                                    required
-                                >
-                                    <textarea
-                                        id="device-override-reason"
-                                        rows={3}
-                                        value={data.override_reason}
-                                        onChange={(event) =>
-                                            setData(
-                                                'override_reason',
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="Explain the operational need for this temporary value"
-                                        className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                    />
-                                </FormField>
-                                <FormField
-                                    id="device-override-expires-at"
-                                    label="Override expires"
-                                    error={errors.override_expires_at}
-                                    required
-                                >
-                                    <Input
-                                        id="device-override-expires-at"
-                                        type="datetime-local"
-                                        value={data.override_expires_at}
-                                        onChange={(event) =>
-                                            setData(
-                                                'override_expires_at',
-                                                event.target.value,
-                                            )
-                                        }
-                                    />
-                                </FormField>
-                            </>
-                        ) : null}
-                    </div>
-                </WizardStepPane>
-            ) : (
-                <WizardStepPane>
-                    <StepHeading
-                        icon={NotebookText}
-                        title={
-                            mode === 'edit'
-                                ? 'Review the registry changes'
-                                : 'Review the canonical record'
-                        }
-                        description={
-                            mode === 'edit'
-                                ? 'Confirm the device identity before saving the shared registry record.'
-                                : 'Confirm the device identity before adding it to the shared registry.'
-                        }
-                    />
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <ReviewCard
-                            icon={Cpu}
-                            title="Classification"
-                            onEdit={() => setStepIndex(0)}
-                        >
-                            <ReviewRow label="Name" value={data.name} />
-                            <ReviewRow
-                                label="Workspace"
-                                value={humanise(data.domain)}
-                            />
-                            <ReviewRow
-                                label="Category"
-                                value={humanise(data.category)}
-                            />
-                            <ReviewRow
-                                label="Type"
-                                value={humanise(data.subcategory)}
-                            />
-                            <ReviewRow
-                                label="Status"
-                                value={humanise(data.status)}
-                            />
-                        </ReviewCard>
-                        <ReviewCard
+                    </WizardStepPane>
+                ) : stepIndex === 1 ? (
+                    <WizardStepPane>
+                        <StepHeading
                             icon={ScanLine}
                             title="Hardware identity"
-                            onEdit={() => setStepIndex(1)}
-                        >
-                            <ReviewRow
+                            description="Record the identifiers technicians use to match the physical device."
+                        />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <TextField
+                                id="device-manufacturer"
                                 label="Manufacturer"
                                 value={data.manufacturer}
+                                error={errors.manufacturer}
+                                onChange={(value) =>
+                                    setData('manufacturer', value)
+                                }
                             />
-                            <ReviewRow label="Model" value={data.model} />
-                            <ReviewRow
+                            <TextField
+                                id="device-model"
+                                label="Model"
+                                value={data.model}
+                                error={errors.model}
+                                onChange={(value) => setData('model', value)}
+                            />
+                            <TextField
+                                id="device-serial-number"
                                 label="Serial number"
                                 value={data.serial_number}
+                                error={errors.serial_number}
+                                onChange={(value) =>
+                                    setData('serial_number', value)
+                                }
                             />
-                            <ReviewRow
+                            <TextField
+                                id="device-asset-tag"
                                 label="Asset tag"
                                 value={data.asset_tag}
+                                error={errors.asset_tag}
+                                onChange={(value) =>
+                                    setData('asset_tag', value)
+                                }
                             />
-                            <ReviewRow
+                            <TextField
+                                id="device-mac-address"
                                 label="MAC address"
                                 value={data.mac_address}
+                                error={errors.mac_address}
+                                placeholder="AA:BB:CC:DD:EE:FF"
+                                onChange={(value) =>
+                                    setData('mac_address', value)
+                                }
                             />
-                            <ReviewRow label="IMEI" value={data.imei} />
-                        </ReviewCard>
-                        <ReviewCard
-                            icon={Server}
-                            title="Connection"
-                            span
-                            onEdit={() => setStepIndex(2)}
-                        >
-                            <ReviewRow label="Provider" value={data.provider} />
-                            <ReviewRow
-                                label="Firmware"
-                                value={data.firmware_version}
+                            <TextField
+                                id="device-imei"
+                                label="IMEI"
+                                value={data.imei}
+                                error={errors.imei}
+                                onChange={(value) => setData('imei', value)}
                             />
-                            <ReviewRow
-                                label="IP address"
-                                value={data.ip_address}
-                            />
-                            <ReviewRow
-                                label="Location"
-                                value={data.location_description}
-                            />
-                            {mode === 'add' && prefillSiteName ? (
-                                <ReviewRow
-                                    label="Initial Site"
-                                    value={prefillSiteName}
+                        </div>
+                    </WizardStepPane>
+                ) : stepIndex === 2 ? (
+                    <WizardStepPane>
+                        <StepHeading
+                            icon={Network}
+                            title="Connection and location"
+                            description="Add operational context without storing credentials or raw provider targets."
+                        />
+                        {mode === 'add' && prefillSiteId && prefillSiteName ? (
+                            <div className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4">
+                                <MapPin
+                                    className="mt-0.5 h-5 w-5 shrink-0 text-primary"
+                                    aria-hidden
                                 />
+                                <div>
+                                    <p className="text-sm font-medium">
+                                        Initial Site: {prefillSiteName}
+                                    </p>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Registration and the Site assignment are
+                                        saved together. If either fails, neither
+                                        record is created.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : null}
+                        {providerManaged ? (
+                            <div className="mb-4 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4 text-sm text-status-warning">
+                                <p className="font-medium">
+                                    Provider-observed fields stay independently
+                                    recorded
+                                </p>
+                                <p className="mt-1 text-xs leading-5">
+                                    Changing manufacturer, model, hardware IDs,
+                                    firmware, IP address or status creates a
+                                    temporary override. Provider linkage remains
+                                    integration-owned. Later observations remain
+                                    visible and resume when the override
+                                    expires.
+                                </p>
+                                {options?.device?.field_ownership?.conflicts
+                                    .length ? (
+                                    <p className="mt-2 text-xs font-medium">
+                                        Active conflicts:{' '}
+                                        {options.device.field_ownership.conflicts
+                                            .map(humanise)
+                                            .join(', ')}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <TextField
+                                id="device-provider"
+                                label="Provider"
+                                value={data.provider}
+                                error={errors.provider}
+                                placeholder="e.g. UniFi, Queclink or manual"
+                                disabled={providerManaged}
+                                onChange={(value) => setData('provider', value)}
+                            />
+                            <TextField
+                                id="device-firmware-version"
+                                label="Firmware version"
+                                value={data.firmware_version}
+                                error={errors.firmware_version}
+                                onChange={(value) =>
+                                    setData('firmware_version', value)
+                                }
+                            />
+                            <TextField
+                                id="device-ip-address"
+                                label="IP address or hostname"
+                                value={data.ip_address}
+                                error={errors.ip_address}
+                                placeholder="e.g. 172.16.0.1 or switch-01.local"
+                                onChange={(value) =>
+                                    setData('ip_address', value)
+                                }
+                            />
+                            <TextField
+                                id="device-location-description"
+                                label="Location description"
+                                value={data.location_description}
+                                error={errors.location_description}
+                                placeholder="e.g. Server room rack A"
+                                onChange={(value) =>
+                                    setData('location_description', value)
+                                }
+                            />
+                            <FormField
+                                id="device-notes"
+                                label="Notes"
+                                error={errors.notes}
+                            >
+                                <textarea
+                                    id="device-notes"
+                                    rows={5}
+                                    value={data.notes}
+                                    onChange={(event) =>
+                                        setData('notes', event.target.value)
+                                    }
+                                    className="min-h-28 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none sm:col-span-2"
+                                    placeholder="Operational notes only—never credentials or secrets."
+                                />
+                            </FormField>
+                            {providerManaged && providerFieldsChanged ? (
+                                <>
+                                    <FormField
+                                        id="device-override-reason"
+                                        label="Override reason"
+                                        error={errors.override_reason}
+                                        required
+                                    >
+                                        <textarea
+                                            id="device-override-reason"
+                                            rows={3}
+                                            value={data.override_reason}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'override_reason',
+                                                    event.target.value,
+                                                )
+                                            }
+                                            placeholder="Explain the operational need for this temporary value"
+                                            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        />
+                                    </FormField>
+                                    <FormField
+                                        id="device-override-expires-at"
+                                        label="Override expires"
+                                        error={errors.override_expires_at}
+                                        required
+                                    >
+                                        <Input
+                                            id="device-override-expires-at"
+                                            type="datetime-local"
+                                            value={data.override_expires_at}
+                                            onChange={(event) =>
+                                                setData(
+                                                    'override_expires_at',
+                                                    event.target.value,
+                                                )
+                                            }
+                                        />
+                                    </FormField>
+                                </>
                             ) : null}
-                            <ReviewRow label="Notes" value={data.notes} />
-                        </ReviewCard>
-                    </div>
-                </WizardStepPane>
-            )}
-        </WizardShell>
+                        </div>
+                    </WizardStepPane>
+                ) : (
+                    <WizardStepPane>
+                        <StepHeading
+                            icon={NotebookText}
+                            title={
+                                mode === 'edit'
+                                    ? 'Review the registry changes'
+                                    : 'Review device details'
+                            }
+                            description={
+                                mode === 'edit'
+                                    ? 'Confirm the device identity before saving the shared registry record.'
+                                    : 'Confirm the device identity before adding it to the shared registry.'
+                            }
+                        />
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <ReviewCard
+                                icon={Cpu}
+                                title="Classification"
+                                onEdit={() => setStepIndex(0)}
+                            >
+                                <ReviewRow label="Name" value={data.name} />
+                                <ReviewRow
+                                    label="Workspace"
+                                    value={humanise(data.domain)}
+                                />
+                                <ReviewRow
+                                    label="Category"
+                                    value={humanise(data.category)}
+                                />
+                                <ReviewRow
+                                    label="Type"
+                                    value={humanise(data.subcategory)}
+                                />
+                                <ReviewRow
+                                    label="Status"
+                                    value={humanise(data.status)}
+                                />
+                                <ReviewRow
+                                    label="Site"
+                                    value={selectedSiteName ?? 'Unassigned'}
+                                />
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={ScanLine}
+                                title="Hardware identity"
+                                onEdit={() => setStepIndex(1)}
+                            >
+                                <ReviewRow
+                                    label="Manufacturer"
+                                    value={data.manufacturer}
+                                />
+                                <ReviewRow label="Model" value={data.model} />
+                                <ReviewRow
+                                    label="Serial number"
+                                    value={data.serial_number}
+                                />
+                                <ReviewRow
+                                    label="Asset tag"
+                                    value={data.asset_tag}
+                                />
+                                <ReviewRow
+                                    label="MAC address"
+                                    value={data.mac_address}
+                                />
+                                <ReviewRow label="IMEI" value={data.imei} />
+                            </ReviewCard>
+                            <ReviewCard
+                                icon={Server}
+                                title="Connection"
+                                span
+                                onEdit={() => setStepIndex(2)}
+                            >
+                                <ReviewRow
+                                    label="Provider"
+                                    value={data.provider}
+                                />
+                                <ReviewRow
+                                    label="Firmware"
+                                    value={data.firmware_version}
+                                />
+                                <ReviewRow
+                                    label="IP address"
+                                    value={data.ip_address}
+                                />
+                                <ReviewRow
+                                    label="Location"
+                                    value={data.location_description}
+                                />
+                                {mode === 'add' && prefillSiteName ? (
+                                    <ReviewRow
+                                        label="Initial Site"
+                                        value={prefillSiteName}
+                                    />
+                                ) : null}
+                                <ReviewRow label="Notes" value={data.notes} />
+                            </ReviewCard>
+                        </div>
+                    </WizardStepPane>
+                )}
+            </WizardShell>
+            <ConfirmDialog
+                open={discardDraft}
+                onClose={() => setDiscardDraft(false)}
+                onConfirm={discardAndClose}
+                variant="destructive"
+                title="Discard this device draft?"
+                description="Your unsaved device details will be cleared. Keep reviewing to continue working on them."
+                confirmText="Discard draft"
+                cancelText="Keep reviewing"
+                processing={processing}
+            />
+        </>
     );
 }
 
@@ -1088,6 +1306,7 @@ export function EditDeviceDialog({
         <AddDeviceDialog
             open={open}
             onClose={onClose}
+            key={deviceId}
             mode="edit"
             deviceId={deviceId}
         />

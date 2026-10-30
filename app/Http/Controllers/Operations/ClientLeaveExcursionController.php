@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientExcursionRequest;
 use App\Models\ClientLeaveRequest;
+use App\Services\Clients\ClientLeaveWorkflow;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -15,58 +16,29 @@ class ClientLeaveExcursionController extends Controller
     {
         $this->authorize('update', $client);
 
-        $data = $request->validate([
-            'starts_on' => ['required', 'date'],
-            'ends_on' => ['required', 'date', 'after_or_equal:starts_on'],
-            'destination' => ['nullable', 'string', 'max:255'],
-            'support_required' => ['nullable', 'string'],
-            'risks_and_mitigations' => ['nullable', 'string'],
-            'emergency_contact' => ['nullable', 'string'],
-            'status' => ['nullable', Rule::in(['requested', 'approved', 'declined', 'completed', 'cancelled'])],
-            'approval_notes' => ['nullable', 'string'],
-        ]);
-
-        $leave = ClientLeaveRequest::create(array_merge(
-            $data,
-            [
-                'client_id' => $client->id,
-                'organization_id' => $client->organization_id,
-                'requested_by' => $request->user()?->id,
-                'status' => $data['status'] ?? 'requested',
-            ],
-        ));
+        $leave = app(ClientLeaveWorkflow::class)->create($request->user(), $client, $request->all());
 
         return back()->with('success', "Leave request #{$leave->id} captured.");
     }
 
     public function updateLeave(Request $request, Client $client, ClientLeaveRequest $leave)
     {
-        abort_unless($leave->client_id === $client->id, 404);
+        abort_unless((int) $leave->client_id === (int) $client->id, 404);
         $this->authorize('update', $client);
 
-        $data = $request->validate([
-            'status' => ['required', Rule::in(['requested', 'approved', 'declined', 'completed', 'cancelled'])],
-            'approval_notes' => ['nullable', 'string'],
-        ]);
-
-        $leave->fill($data);
-        if (in_array($data['status'], ['approved', 'declined'], true)) {
-            $leave->approved_by = $request->user()?->id;
-            $leave->approved_at = now();
-        }
-        $leave->save();
+        app(ClientLeaveWorkflow::class)->transition($request->user(), $client, $leave, $request->all());
 
         return back()->with('success', "Leave request #{$leave->id} updated.");
     }
 
     public function destroyLeave(Request $request, Client $client, ClientLeaveRequest $leave)
     {
-        abort_unless($leave->client_id === $client->id, 404);
+        abort_unless((int) $leave->client_id === (int) $client->id, 404);
         $this->authorize('update', $client);
 
-        $leave->delete();
+        app(ClientLeaveWorkflow::class)->transition($request->user(), $client, $leave, ['action' => 'withdraw'] + $request->all());
 
-        return back()->with('success', "Leave request #{$leave->id} removed.");
+        return back()->with('success', "Leave request #{$leave->id} withdrawn; its history is retained.");
     }
 
     public function storeExcursion(Request $request, Client $client)

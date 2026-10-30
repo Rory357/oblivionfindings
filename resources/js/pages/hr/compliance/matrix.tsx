@@ -460,7 +460,7 @@ export default function ComplianceMatrix({
                                                         aria-label={`${q.name} for ${humanize(role)} at ${siteScope === 'all' ? 'all Sites' : humanize(siteScope)}`}
                                                         className={`grid h-[26px] w-[26px] place-items-center rounded-md border transition-colors ${
                                                             level === 2
-                                                                ? 'border-primary bg-primary text-primary-foreground'
+                                                                ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                                 : level === 1
                                                                   ? 'border-primary/40 bg-accent text-primary'
                                                                   : 'border-border bg-transparent hover:bg-muted'

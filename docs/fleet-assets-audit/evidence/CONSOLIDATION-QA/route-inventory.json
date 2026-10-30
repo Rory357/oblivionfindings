@@ -1,0 +1,5071 @@
+{
+    "routes": [
+        {
+            "uri": "fleet-assets/asset-register/labels/workspace",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.asset-labels.workspace",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetLabelController@workspace",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/rooms",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@rooms",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktakes",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktake-checklist",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@checklist",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktakes",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktakes/{stocktake}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "stocktake": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktakes/{stocktake}",
+            "methods": [
+                "PATCH"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "stocktake": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktakes/{stocktake}/resolve",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@resolve",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "stocktake": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/asset-register/stocktakes/{stocktake}/export/{format}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetStocktakeController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "stocktake": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/asset-register/imports",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetImportController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/imports",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetImportController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/imports/{batch}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetImportController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "batch": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/asset-register/imports/{batch}",
+            "methods": [
+                "PATCH"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetImportController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "batch": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/asset-register/labels",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetLabelController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/labels",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetLabelController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/asset-register/labels/{batch}/{format}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetLabelController@download",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "batch": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/mobile/dashboard",
+            "methods": [
+                "GET",
+                "HEAD",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+            ],
+            "name": "fleet-assets.mobile.dashboard",
+            "action": "\\Illuminate\\Routing\\RedirectController",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.dashboard",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DashboardController",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/compliance",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.compliance.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ComplianceController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/daily-check",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.daily-check.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DailyCheckController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/daily-check",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.daily-check.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DailyCheckController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/map",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.map",
+            "action": "App\\Http\\Controllers\\FleetAssets\\LiveMapController",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles/fleet-calendar/events",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.fleet-calendar.events",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@fleetEvents",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles/fleet-map/data",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.fleet-map.data",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@fleetMap",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts-config",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.alerts-config",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@alertsConfig",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/trips",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.trips.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@trips",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/trips/{trip}/playback",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.trips.playback",
+            "action": "App\\Http\\Controllers\\Fleet\\FleetTripController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/trips/{trip}/playback/data",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.trips.playback.data",
+            "action": "App\\Http\\Controllers\\Fleet\\FleetTripController@playback",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/fuel",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.fuel.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@fuel",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/documents/{document}/file",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.documents.file",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@file",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "document": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/documents",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.documents.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/documents/{set}/revisions",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.documents.replace",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@replace",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "set": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/documents/{set}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.documents.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "set": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/document-files/{document}/archive",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.documents.archive",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@archive",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "document": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/document-files/{document}/retry",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.documents.retry",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@retry",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "document": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/document-files/{document}/verify",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.documents.verify",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@verify",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "document": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/photo",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.photo.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@uploadPhoto",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/photo",
+            "methods": [
+                "DELETE"
+            ],
+            "name": "fleet-assets.vehicles.photo.destroy",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDocumentController@removePhoto",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/catalogue/{kind}",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.catalogue.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\FleetCatalogueController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "kind": "[a-z_]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/calendar/events",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.calendar.events",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@events",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/calendar/summary",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.calendar.summary",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@summary",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/calendar/records/{kind}/{id}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.calendar.records.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@record",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "id": "[0-9]+",
+                "kind": "booking|unavailable"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/obligation-reminders/{sourceType}/{sourceId}/acknowledge",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.obligation-reminders.acknowledge",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleObligationReminderController@acknowledge",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "sourceId": "[0-9]+",
+                "sourceType": "service_schedule|compliance_record|vehicle_check"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/obligation-reminders/{sourceType}/{sourceId}/retry",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.obligation-reminders.retry",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleObligationReminderController@retry",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "sourceId": "[0-9]+",
+                "sourceType": "service_schedule|compliance_record|vehicle_check"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/appointments",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.appointments.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@scheduleAppointment",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|fleet.maintenance.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/appointments/undo",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.appointments.undo",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@undoAppointment",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|fleet.maintenance.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/unavailable-periods",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.unavailable.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@storeUnavailable",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/unavailable-periods/{period}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.unavailable.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@updateUnavailable",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "period": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/unavailable-periods/{period}/cancel",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.unavailable.cancel",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@cancelUnavailable",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "period": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/unavailable-periods/{period}/restore",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.unavailable.restore",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCalendarController@restoreUnavailable",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "period": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/mileage-feed/reconcile",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.mileage-feed.reconcile",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMileageFeedController@reconcile",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/mileage-feed/pause",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.mileage-feed.pause",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMileageFeedController@pause",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/trip-history",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.trip-history.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleTripHistoryController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/trip-history/export/{format}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.trip-history.export",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleTripHistoryController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "format": "pdf|excel"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/trip-history/{trip}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.trip-history.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleTripHistoryController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/trip-history/{trip}/driver",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.trip-history.driver",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleTripHistoryController@confirmDriver",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage|fleet.trips.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/checks",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.checks.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/checks",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.checks.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/checks/{run}/amendments",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.checks.amendments.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@amend",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "run": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/checks/{run}/assessments",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.checks.assessments.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@assess",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "run": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/check-templates",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.check-templates.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@storeTemplate",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/check-templates/{template}/versions",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.check-templates.versions.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@publishVersion",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "template": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/check-requirement",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.check-requirement.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@requirement",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/maintenance-reports",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.maintenance-reports.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleCheckController@report",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.maintenance.report|fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/service-schedules",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.service-schedules.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleServiceScheduleController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|fleet.maintenance.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/service-schedules/{schedule}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.service-schedules.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleServiceScheduleController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|fleet.maintenance.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "schedule": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/service-schedules/{schedule}/completions",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.service-schedules.complete",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleServiceScheduleController@complete",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|fleet.maintenance.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "schedule": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/bulk-action",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.bulk-action",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@bulkAction",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts-config",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.alerts-config.save",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@saveAlertsConfig",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/compliance/{kind}",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.compliance.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleEvidenceController@compliance",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "kind": "registration|wof|cof|ruc"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/odometer-observations",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.odometer.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleEvidenceController@odometer",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/reminders",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.reminders.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleReminderController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/reminders/{reminder}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.reminders.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleReminderController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "reminder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/reminders/{reminder}/undo",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.reminders.undo",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleReminderController@undo",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "reminder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/reminders/{reminder}/{action}",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.reminders.act",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleReminderController@act",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "reminder": "[0-9]+",
+                "action": "acknowledge|complete|pause|resume|snooze"
+            }
+        },
+        {
+            "uri": "fleet-assets/trips/{trip}/toggle-personal",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.trips.toggle-personal",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@markPersonal",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/fuel",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.fuel.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleController@storeFuel",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/finance/linkable",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.finance.linkable",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@linkable",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/finance/links",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.finance.links.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@link",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/finance/links/{link}/unlink",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.finance.links.unlink",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@unlink",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "link": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/finance/review-requests/{reviewRequest}/submit",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.finance.requests.submit",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@submitEvidence",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "reviewRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/finance/review-requests",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.finance.requests.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@storeRequest",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/finance/review-requests/{reviewRequest}/decision",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.finance.requests.decide",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleFinanceController@decide",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.manage|finance.ap.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "reviewRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/assets",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.assets.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/assets/{asset}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.assets.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.viewAssigned"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/assets/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.assets.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.create"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/assets",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.assets.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.create"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/assets/{asset}/edit",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.assets.edit",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@edit",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.update"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/assets/{asset}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.assets.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AssetController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.update"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/alerts",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.alerts.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AlertController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.viewAny|assets.alerts.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/alerts/bulk-action",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.alerts.bulk-action",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AlertController@bulkAction",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:controlRoom.alerts.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/alerts/{alert}/acknowledge",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.alerts.acknowledge",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AlertController@acknowledge",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:controlRoom.alerts.manage"
+            ],
+            "wheres": {
+                "alert": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/alerts/{alert}/triage",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.alerts.triage",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AlertController@triage",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:controlRoom.alerts.manage"
+            ],
+            "wheres": {
+                "alert": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/alerts/{alert}/resolve",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.alerts.resolve",
+            "action": "App\\Http\\Controllers\\FleetAssets\\AlertController@resolve",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:controlRoom.alerts.manage"
+            ],
+            "wheres": {
+                "alert": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/settings",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.settings.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/notifications",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.settings.notifications",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/notification-preferences",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/notification-preferences",
+            "methods": [
+                "PUT"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/notification-checks",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@checks",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/notification-checks",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\SettingsNotificationController@check",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "throttle:10,1"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/maps",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@maps",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/maps",
+            "methods": [
+                "PUT"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@updateMaps",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:fleet.settings.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/tracking-devices",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@devices",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/history",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkspaceSettingsController@history",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/settings/map-capabilities/{capability}",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\MapCapabilityController",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "throttle:30,1"
+            ],
+            "wheres": {
+                "capability": "places|geocoding|routes"
+            }
+        },
+        {
+            "uri": "fleet-assets/drivers",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.drivers.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DriverController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|hr.driver.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/drivers/{user}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.drivers.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DriverController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|hr.driver.view"
+            ],
+            "wheres": {
+                "user": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/drivers/{user}/scorecard",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.drivers.scorecard",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DriverController@scorecard",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|hr.driver.view"
+            ],
+            "wheres": {
+                "user": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.bookings.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/bookings/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.bookings.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/bookings",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.bookings.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.bookings.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.bookings.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}/checkout",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.bookings.checkout",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@checkout",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}/return",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.bookings.return",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@returnVehicle",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}/cancel",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.bookings.cancel",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@cancel",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}/approve",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.bookings.approve",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@approve",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.bookings.approve|fleet.manage"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/bookings/{booking}/reject",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.bookings.reject",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleBookingController@reject",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.bookings.approve|fleet.manage"
+            ],
+            "wheres": {
+                "booking": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/devices",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.devices.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.trackers.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/devices/consent",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.devices.consent",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@consentIndex",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.trackers.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/devices/{device}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.devices.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.trackers.manage"
+            ],
+            "wheres": {
+                "device": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/devices/options/search",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.devices.options.search",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@searchPairingOptions",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|assets.trackers.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/devices/pair",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.devices.pair",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@pair",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|assets.trackers.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/devices/{device}/unpair",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.devices.unpair",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@unpair",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|assets.trackers.manage"
+            ],
+            "wheres": {
+                "device": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/devices/{device}/consent/grant",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.devices.consent.grant",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@grantConsent",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|assets.trackers.manage"
+            ],
+            "wheres": {
+                "device": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/devices/{device}/consent/revoke",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.devices.consent.revoke",
+            "action": "App\\Http\\Controllers\\FleetAssets\\DeviceController@revokeConsent",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage|assets.trackers.manage"
+            ],
+            "wheres": {
+                "device": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/location",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.location",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@location",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/location/trail",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.location.trail",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@trail",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/geofences/catalogue",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.geofences.catalogue",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@catalogue",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/telemetry",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.telemetry",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@telemetry",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/geofences/places",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.geofences.places",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@places",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage|assets.geofences.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/geofences/selection",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.geofences.selection",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@selection",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage|assets.geofences.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/geofences",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.geofences.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@storeGeofence",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage|assets.geofences.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/geofences/{assignment}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.geofences.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleMapController@updateGeofence",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage|assets.geofences.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "assignment": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.driving",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving/reviews",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.driving.reviews",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@reviews",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving/speed-limits",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.driving.speed-limits",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@speedLimits",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.alerts.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts/{alert}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.vehicles.alerts.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "alert": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving/trips/{trip}/reviews",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.driving.reviews.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@review",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage|fleet.trips.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving/policy",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.driving.policy.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@publishPolicy",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving/speed-limits",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.driving.speed-limits.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@proposeLimit",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/driving/speed-limits/{limit}/{action}",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.driving.speed-limits.review",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleDrivingController@reviewLimit",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "limit": "[0-9]+",
+                "action": "approve|retire"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts/route",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.alerts.route",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@route",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alert-plan",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.vehicles.alert-plan.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@savePlan",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts/{alert}/follow-up",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.alerts.follow-up",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@followUp",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "alert": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts/signals/{signal}/retry",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.alerts.retry",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@retry",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:controlRoom.alerts.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "signal": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts/{alert}/maintenance",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.alerts.maintenance",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@maintenance",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:controlRoom.alerts.manage"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "alert": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/vehicles/{asset}/alerts/{alert}/{action}",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.vehicles.alerts.act",
+            "action": "App\\Http\\Controllers\\FleetAssets\\VehicleAlertController@act",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny",
+                "permission:controlRoom.alerts.manage|controlRoom.alerts.escalate"
+            ],
+            "wheres": {
+                "asset": "[0-9]+",
+                "alert": "[0-9]+",
+                "action": "acknowledge|triage|escalate|resolve"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.geofences.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/catalogue",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@catalogue",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/summary",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@summary",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/sites",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@sites",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/resources",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@resources",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/rules",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@rules",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/events",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@events",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/handoffs/{token}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@handoff",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/handoffs/{token}/return",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@returnBoundary",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/history",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@history",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/rule-history",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@ruleHistory",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/versions/{revision}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@version",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.geofences.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+",
+                "revision": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/address-search",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@addresses",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage",
+                "throttle:20,1"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/legacy-links",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@legacyLinks",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/history/export",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/rules",
+            "methods": [
+                "POST"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@storeRule",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/rules/{assignment}",
+            "methods": [
+                "PUT"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@updateRule",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "assignment": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/rules/{assignment}",
+            "methods": [
+                "DELETE"
+            ],
+            "name": null,
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@removeRule",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "assignment": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.geofences.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.geofences.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/edit",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.geofences.edit",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@edit",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.geofences.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}/toggle",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.geofences.toggle",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@toggleActive",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/geofences/{geofence}",
+            "methods": [
+                "DELETE"
+            ],
+            "name": "fleet-assets.geofences.destroy",
+            "action": "App\\Http\\Controllers\\FleetAssets\\GeofenceController@destroy",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:assets.geofences.manage|fleet.manage"
+            ],
+            "wheres": {
+                "geofence": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/dashboard",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.maintenance.dashboard",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MaintenanceDashboardController",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.work-orders.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/checklists",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.checklists.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ChecklistController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/checklists/run",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.checklists.run-page",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ChecklistController@runPage",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/schedules",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.schedules.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ServiceScheduleController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/inspections",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.inspections.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\InspectionController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/inspections/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.inspections.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\InspectionController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/inspections/{run}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.inspections.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\InspectionController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "run": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.work-orders.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.report|fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/options/search",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.work-orders.options.search",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@searchOptions",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.report|fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.work-orders.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.report|fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.work-orders.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@show",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.work-orders.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@update",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}/attachments",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.work-orders.attachments.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MaintenanceAttachmentController@store",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}/attachments/{attachment}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.work-orders.attachments.download",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MaintenanceAttachmentController@download",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+",
+                "attachment": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/checklists/runs/{run}/evidence/{question}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.checklists.evidence",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ChecklistController@evidence",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "run": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/bulk-action",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.work-orders.bulk-action",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@bulkAction",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}/retests",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.work-orders.retests.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@retest",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}/checks",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.work-orders.checks.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@check",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/work-orders/{workOrder}/finance-bills",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.work-orders.finance-bills.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WorkOrderController@linkBill",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "workOrder": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/checklists",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.checklists.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ChecklistController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/checklists/{template}/run",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.checklists.run",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ChecklistController@run",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "template": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/schedules",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.schedules.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ServiceScheduleController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/maintenance/schedules/{schedule}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.schedules.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ServiceScheduleController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "schedule": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/maintenance/schedules/{schedule}/mark-complete",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.schedules.mark-complete",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ServiceScheduleController@markComplete",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": {
+                "schedule": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/inspections",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.inspections.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\InspectionController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.maintenance.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/keys",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.keys.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\KeyController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/keys/checkout",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.keys.checkout",
+            "action": "App\\Http\\Controllers\\FleetAssets\\KeyController@checkout",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/keys/return",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.keys.return",
+            "action": "App\\Http\\Controllers\\FleetAssets\\KeyController@returnKey",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/keys/transfer",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.keys.transfer",
+            "action": "App\\Http\\Controllers\\FleetAssets\\KeyController@transfer",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/resident-tracking",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.resident-tracking.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/assign",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.resident-tracking.assign",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@assignPage",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/history/{client}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.resident-tracking.history",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@history",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": {
+                "client": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/history/{client}/privacy-status",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.resident-tracking.privacy-status",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@privacyStatus",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": {
+                "client": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/history/{client}/export",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.resident-tracking.export",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@exportHistory",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:assets.telemetry.view",
+                "permission:assets.telemetry.export"
+            ],
+            "wheres": {
+                "client": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/{client}/locate-now",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.resident-tracking.locate-now",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@locateNow",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": {
+                "client": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/assign",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.resident-tracking.assign.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@assign",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/{device}/unassign",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.resident-tracking.unassign",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@unassign",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "device": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/resident-tracking/{client}/acknowledge-panic",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.resident-tracking.acknowledge-panic",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTrackingController@acknowledgePanic",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": {
+                "client": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/wandering-alerts",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.wandering-alerts.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\WanderingAlertController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/workspace/options",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.workspace.options",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@options",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/workspace/address-search",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.workspace.address-search",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@addressSearch",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny",
+                "throttle:20,1"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/workspace/export",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.workspace.export",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/requests",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.requests.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/requests/{transportRequest}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.requests.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "transportRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports/requests/{transportRequest}/commands",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.requests.command",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@command",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "transportRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports/{view}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.workspace",
+            "action": "App\\Http\\Controllers\\FleetAssets\\TransportWorkspaceController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "view": "overview|requests|planner|calendar|journeys|returns"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/medications",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.medications",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@medicationIndex",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/transports/{transport}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "transport": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports/{transport}/complete",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.complete",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@complete",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "transport": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports/{transport}/pre-check",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.transports.pre-check",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@preCheck",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "transport": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports/{transport}/pre-check",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.pre-check.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@savePreCheck",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "transport": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/transports/{transport}/pack-medication",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.transports.pack-medication",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@packMedication",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.medication.manage"
+            ],
+            "wheres": {
+                "transport": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/medication-transit/{log}/correct-packing-attestation",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.medication-transit.correct-packing-attestation",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@correctPackingAttestation",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.medication.manage"
+            ],
+            "wheres": {
+                "log": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/medication-transit/{log}/return",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.medication-transit.return",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@returnMedication",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.medication.manage"
+            ],
+            "wheres": {
+                "log": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/medication-transit/{log}/administer",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.medication-transit.administer",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ResidentTransportController@administerMedication",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:medications.administer.record"
+            ],
+            "wheres": {
+                "log": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/handovers",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.handovers.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\HandoverController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/handovers/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.handovers.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\HandoverController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/handovers/{handover}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.handovers.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\HandoverController@show",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "handover": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/handovers",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.handovers.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\HandoverController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/handovers/{handover}/accept",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.handovers.accept",
+            "action": "App\\Http\\Controllers\\FleetAssets\\HandoverController@accept",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "handover": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/handovers/{handover}/dispute",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.handovers.dispute",
+            "action": "App\\Http\\Controllers\\FleetAssets\\HandoverController@dispute",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "handover": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.incidents.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/incidents/options/search",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.incidents.options.search",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@searchOptions",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/incidents/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.incidents.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/incidents",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.incidents.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/attachments/{attachment}/download",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.incidents.attachments.download",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@downloadAttachment",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "incident": "[0-9]+",
+                "attachment": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "fleet-assets.incidents.update",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@update",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/status",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.status",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@updateStatus",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/followups",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.followups.add",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@addFollowup",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/followups/{followup}/complete",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.followups.complete",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@completeFollowup",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+",
+                "followup": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/attachments",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.attachments.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@uploadAttachment",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/attachments/{attachment}",
+            "methods": [
+                "DELETE"
+            ],
+            "name": "fleet-assets.incidents.attachments.destroy",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@destroyAttachment",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+",
+                "attachment": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/police-report",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.police-report",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@logPoliceReport",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/claim",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.claim",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@logClaim",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/off-road",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.off-road",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@markOffRoad",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/incidents/{incident}/back-in-service",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.incidents.back-in-service",
+            "action": "App\\Http\\Controllers\\FleetAssets\\IncidentController@backInService",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.incidents.manage|fleet.manage"
+            ],
+            "wheres": {
+                "incident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/outings",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.outings.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/outings/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.outings.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/outings/{outing}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.outings.show",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@show",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": {
+                "outing": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/outings",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.outings.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.outings.manage|fleet.manage"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/outings/{outing}/start",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.outings.start",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@start",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.outings.manage|fleet.manage"
+            ],
+            "wheres": {
+                "outing": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/outings/{outing}/complete",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.outings.complete",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@complete",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.outings.manage|fleet.manage"
+            ],
+            "wheres": {
+                "outing": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/outings/{outing}/cancel",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.outings.cancel",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@cancel",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.outings.manage|fleet.manage"
+            ],
+            "wheres": {
+                "outing": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/outings/{outing}/residents/{resident}/return",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.outings.resident-return",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@markResidentReturned",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.outings.manage|fleet.manage"
+            ],
+            "wheres": {
+                "outing": "[0-9]+",
+                "resident": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/outings/{outing}/residents/return-all",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.outings.return-all",
+            "action": "App\\Http\\Controllers\\FleetAssets\\OutingController@returnAllResidents",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.outings.manage|fleet.manage"
+            ],
+            "wheres": {
+                "outing": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/mileage/export",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.mileage.export",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/mileage",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.mileage.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/mileage/create",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.mileage.create",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@create",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/mileage",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.mileage.store",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@store",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|assets.viewAny"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/mileage/{trip}/approve",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.mileage.approve",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@approve",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.mileage.approve|fleet.manage"
+            ],
+            "wheres": {
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/mileage/{trip}/reject",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.mileage.reject",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@reject",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.mileage.approve|fleet.manage"
+            ],
+            "wheres": {
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/mileage/{trip}/mark-paid",
+            "methods": [
+                "POST"
+            ],
+            "name": "fleet-assets.mileage.mark-paid",
+            "action": "App\\Http\\Controllers\\FleetAssets\\MileageController@markPaid",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.mileage.approve|fleet.manage"
+            ],
+            "wheres": {
+                "trip": "[0-9]+"
+            }
+        },
+        {
+            "uri": "fleet-assets/reports",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.index",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ReportController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/reports/export",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.export",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ReportController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/reports/by-house",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.by-house",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ReportController@byHouse",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/reports/reimbursement",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.reimbursement",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ReportController@reimbursement",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/reports/reimbursement/data",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.reimbursement.data",
+            "action": "App\\Http\\Controllers\\FleetAssets\\ReportController@reimbursementData",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/reports/cost-allocation",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.cost-allocation",
+            "action": "App\\Http\\Controllers\\FleetAssets\\CostAllocationController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "fleet-assets/reports/community-access",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "fleet-assets.reports.community-access",
+            "action": "App\\Http\\Controllers\\FleetAssets\\CommunityAccessController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:fleet.viewAny|fleet.reports.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "finance/vehicle-reviews",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "finance.vehicle-reviews.index",
+            "action": "App\\Domain\\Finance\\Http\\Controllers\\VehicleReviewRequestController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.view|finance.ap.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "finance/vehicle-reviews/{reviewRequest}/assignment",
+            "methods": [
+                "POST"
+            ],
+            "name": "finance.vehicle-reviews.assignment",
+            "action": "App\\Domain\\Finance\\Http\\Controllers\\VehicleReviewRequestController@assign",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.manage|finance.ap.manage"
+            ],
+            "wheres": {
+                "reviewRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "finance/vehicle-reviews/{reviewRequest}/reviewers",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "finance.vehicle-reviews.reviewers",
+            "action": "App\\Domain\\Finance\\Http\\Controllers\\VehicleReviewRequestController@reviewers",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.manage|finance.ap.manage"
+            ],
+            "wheres": {
+                "reviewRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "finance/vehicle-reviews/{reviewRequest}/decision",
+            "methods": [
+                "POST"
+            ],
+            "name": "finance.vehicle-reviews.decision",
+            "action": "App\\Domain\\Finance\\Http\\Controllers\\VehicleReviewRequestController@decide",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.manage|finance.ap.manage"
+            ],
+            "wheres": {
+                "reviewRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "finance/vehicle-reviews/{reviewRequest}/files/{document}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "finance.vehicle-reviews.file",
+            "action": "App\\Domain\\Finance\\Http\\Controllers\\VehicleReviewRequestController@file",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.view|finance.ap.view"
+            ],
+            "wheres": {
+                "reviewRequest": "[0-9]+",
+                "document": "[0-9]+"
+            }
+        },
+        {
+            "uri": "finance/vehicle-reviews/{reviewRequest}/history",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "finance.vehicle-reviews.history",
+            "action": "App\\Domain\\Finance\\Http\\Controllers\\VehicleReviewRequestController@history",
+            "middleware": [
+                "web",
+                "auth",
+                "permission:finance.assets.view|finance.ap.view"
+            ],
+            "wheres": {
+                "reviewRequest": "[0-9]+"
+            }
+        },
+        {
+            "uri": "operations/people-locations/preferences",
+            "methods": [
+                "GET",
+                "PUT",
+                "HEAD"
+            ],
+            "name": "operations.people-locations.preferences",
+            "action": "App\\Http\\Controllers\\Operations\\PeopleLocationController@preferences",
+            "middleware": [
+                "web",
+                "auth",
+                "verified",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "operations/people-locations/report-preview",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operations.people-locations.preview",
+            "action": "App\\Http\\Controllers\\Operations\\PeopleLocationController@preview",
+            "middleware": [
+                "web",
+                "auth",
+                "verified",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "operations/people-locations/export",
+            "methods": [
+                "POST"
+            ],
+            "name": "operations.people-locations.export",
+            "action": "App\\Http\\Controllers\\Operations\\PeopleLocationController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "verified",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "operations/people-locations/{view?}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operations.people-locations.index",
+            "action": "App\\Http\\Controllers\\Operations\\PeopleLocationController@index",
+            "middleware": [
+                "web",
+                "auth",
+                "verified",
+                "permission:assets.telemetry.view"
+            ],
+            "wheres": {
+                "view": "map|people|analytics|alerts|history|settings"
+            }
+        },
+        {
+            "uri": "fleet-assets/reports/builder",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.fleet",
+            "action": "App\\Http\\Controllers\\OperationalReportController@index",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "operations/people-location-reports/{domain}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.people",
+            "action": "App\\Http\\Controllers\\OperationalReportController@index",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": {
+                "domain": "client|staff"
+            }
+        },
+        {
+            "uri": "my-day/safety-reports",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.self",
+            "action": "App\\Http\\Controllers\\OperationalReportController@index",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/validate",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.validate",
+            "action": "App\\Http\\Controllers\\OperationalReportController@validateDefinition",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/targets",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.targets",
+            "action": "App\\Http\\Controllers\\OperationalReportController@targets",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/reports",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.save",
+            "action": "App\\Http\\Controllers\\OperationalReportController@save",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/reports/{report}",
+            "methods": [
+                "PUT"
+            ],
+            "name": "operational-reports.update",
+            "action": "App\\Http\\Controllers\\OperationalReportController@save",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/reports/{report}/versions",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.versions",
+            "action": "App\\Http\\Controllers\\OperationalReportController@versions",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/reports/{report}/archive",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.archive",
+            "action": "App\\Http\\Controllers\\OperationalReportController@archive",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/reports/{report}/share",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.share",
+            "action": "App\\Http\\Controllers\\OperationalReportController@share",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/reports/{report}/subscription",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.subscription",
+            "action": "App\\Http\\Controllers\\OperationalReportController@subscription",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/runs",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.recent",
+            "action": "App\\Http\\Controllers\\OperationalReportController@recent",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/runs",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.run",
+            "action": "App\\Http\\Controllers\\OperationalReportController@run",
+            "middleware": [
+                "web",
+                "auth",
+                "throttle:20,1"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/runs/{run}",
+            "methods": [
+                "GET",
+                "HEAD"
+            ],
+            "name": "operational-reports.status",
+            "action": "App\\Http\\Controllers\\OperationalReportController@status",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/runs/{run}/cancel",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.cancel",
+            "action": "App\\Http\\Controllers\\OperationalReportController@cancel",
+            "middleware": [
+                "web",
+                "auth"
+            ],
+            "wheres": []
+        },
+        {
+            "uri": "report-builder/runs/{run}/export",
+            "methods": [
+                "POST"
+            ],
+            "name": "operational-reports.export",
+            "action": "App\\Http\\Controllers\\OperationalReportController@export",
+            "middleware": [
+                "web",
+                "auth",
+                "throttle:20,1"
+            ],
+            "wheres": []
+        }
+    ],
+    "schedules": [
+        {
+            "command": "App\\Jobs\\PruneIncidentReportDrafts",
+            "expression": "20 2 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": true
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" breakglass:daily-report",
+            "expression": "0 8 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" incidents:remind-high-unreviewed",
+            "expression": "0 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Jobs\\CheckRiskAssessmentReviewsJob",
+            "expression": "15 8 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" safeguarding:review-reminders",
+            "expression": "20 8 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" injuries:review-reminders",
+            "expression": "25 8 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\PostSiteRentJob",
+            "expression": "0 2 1 * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\PostSiteUtilitiesJob",
+            "expression": "30 2 1 * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\PostLeaveProvisionJob",
+            "expression": "0 1 1 * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\GenerateRecurringJournalsJob",
+            "expression": "45 2 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\RunDepreciationJob",
+            "expression": "0 3 1 * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\SyncBankFeedsJob",
+            "expression": "*/30 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\RunPaymentMatchingJob",
+            "expression": "15,45 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\CheckBillDueDatesJob",
+            "expression": "0 7 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\ReconcileUnpostedClientFundJournalsJob",
+            "expression": "*/5 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "finance:process-recurring-charges",
+            "expression": "45 2 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\CalculateGstReturnJob",
+            "expression": "0 4 28 */2 *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\SnapshotFinancialReportsJob",
+            "expression": "55 23 1 * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\SyncAccountingIntegrationJob",
+            "expression": "10 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Hr\\Jobs\\RunHrScheduledReportsJob",
+            "expression": "*/15 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" emar:check-medication-reviews",
+            "expression": "5 7 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" governance:check-risk-reviews",
+            "expression": "45 7 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\SyncBudgetActualsJob",
+            "expression": "0 * * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" governance:sync-site-risk-reviews",
+            "expression": "30 6 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "App\\Domain\\Finance\\Jobs\\PruneFinanceAuditExportsJob",
+            "expression": "0 3 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": false,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" finance:review-notices",
+            "expression": "* * * * *",
+            "timezone": "UTC",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" finance:review-reminders",
+            "expression": "30 8 * * *",
+            "timezone": "Pacific/Auckland",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        },
+        {
+            "command": "\"C:\\Users\\steph\\.config\\herd\\bin\\php84\\php.exe\" \"artisan\" reports:run-schedules",
+            "expression": "*/5 * * * *",
+            "timezone": "UTC",
+            "withoutOverlapping": true,
+            "onOneServer": false
+        }
+    ]
+}

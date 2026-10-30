@@ -1,0 +1,31 @@
+npm notice
+npm notice 📦  jsqr@1.4.0
+npm notice Tarball Contents
+npm notice 11.4kB LICENSE
+npm notice 5.3kB README.md
+npm notice 271B dist/binarizer/index.d.ts
+npm notice 395B dist/BitMatrix.d.ts
+npm notice 208B dist/decoder/decodeData/BitStream.d.ts
+npm notice 634B dist/decoder/decodeData/index.d.ts
+npm notice 68B dist/decoder/decodeData/shiftJISTable.d.ts
+npm notice 146B dist/decoder/decoder.d.ts
+npm notice 582B dist/decoder/reedsolomon/GenericGF.d.ts
+npm notice 545B dist/decoder/reedsolomon/GenericGFPoly.d.ts
+npm notice 82B dist/decoder/reedsolomon/index.d.ts
+npm notice 351B dist/decoder/version.d.ts
+npm notice 278B dist/extractor/index.d.ts
+npm notice 762B dist/index.d.ts
+npm notice 256.9kB dist/jsQR.js
+npm notice 312B dist/locator/index.d.ts
+npm notice 1.5kB package.json
+npm notice Tarball Details
+npm notice name: jsqr
+npm notice version: 1.4.0
+npm notice filename: jsqr-1.4.0.tgz
+npm notice package size: 64.7 kB
+npm notice unpacked size: 279.7 kB
+npm notice shasum: 8efb8d0a7cc6863cb6d95116b9069123ce9eb2d1
+npm notice integrity: sha512-dxLob7q65Xg2D[...]JsbXpdN9HzU/A==
+npm notice total files: 17
+npm notice
+jsqr-1.4.0.tgz

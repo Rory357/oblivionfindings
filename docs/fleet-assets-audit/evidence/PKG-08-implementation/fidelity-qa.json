@@ -1,0 +1,29 @@
+{
+  "checkedAt": "2026-09-27T19:05:48.473Z",
+  "sourceFiles": [
+    "resources/js/pages/fleet-assets/settings/_notifications.tsx",
+    "resources/js/pages/fleet-assets/settings/index.tsx"
+  ],
+  "frontendTests": {
+    "passed": 4,
+    "failed": 0,
+    "files": 1
+  },
+  "eslint": {
+    "errors": 0,
+    "warnings": 0
+  },
+  "typecheck": {
+    "exit": 0
+  },
+  "build": {
+    "exit": 0,
+    "existingLargeChunkWarning": true
+  },
+  "backend": "Unchanged; prior51 tests239 assertions retained, not rerun for UI-only alignment",
+  "browserEvidence": "fidelity-browser-verification.json",
+  "reviewGates": {
+    "T0801": "Closed by Main revision2; renderer unchanged in this successor",
+    "T0802": "Blocked/unverified genuine125% zoom; existing owner-assisted request retained"
+  }
+}

@@ -18,7 +18,6 @@ const workerPages = [
     'incidents/index.tsx',
     'resident-tracking/index.tsx',
     'maintenance/schedules/index.tsx',
-    'maintenance/work-orders/index.tsx',
 ] as const;
 
 const managerPages = [
@@ -34,6 +33,12 @@ const managerPages = [
     'reports/reimbursement.tsx',
     'reports/cost-allocation.tsx',
     'reports/community-access.tsx',
+    // PKG-01 (2026-09-20) rebuilt the work queue on the Event Horizon header
+    // with a Table/Cards toggle. Fleet is desktop web-only (the 2026-07-13
+    // fleet audit set no mobile-card requirement) and DESIGN.md scrolls wide
+    // tables inside their own container, so the queue declares horizontal
+    // scroll instead of taking the worker mobile-card branch.
+    'maintenance/work-orders/index.tsx',
 ] as const;
 
 function source(relativePath: string): string {
@@ -52,11 +57,17 @@ function pageFiles(directory: string): string[] {
 
 describe('Fleet responsive and hero contracts', () => {
     it('gives all 25 audited list/report pages an intentional narrow strategy', () => {
-        expect(workerPages).toHaveLength(13);
-        expect(managerPages).toHaveLength(12);
+        expect(workerPages).toHaveLength(12);
+        expect(managerPages).toHaveLength(13);
 
         for (const relativePath of workerPages) {
             const page = source(relativePath);
+            if (page.includes('<EntityTable')) {
+                expect(page).toContain('hidden md:block');
+                expect(page).toContain('md:hidden');
+                expect(page).toContain('{cards}');
+                continue;
+            }
             if (/<(?:table|Table)(?:\s|>)/.test(page)) {
                 expect(
                     page,
@@ -77,6 +88,21 @@ describe('Fleet responsive and hero contracts', () => {
         }
 
         for (const relativePath of managerPages) {
+            if (relativePath === 'dashboard.tsx') {
+                expect(source(relativePath)).toContain('fo-operations-grid');
+                const styles = source('dashboard.css');
+                expect(styles).toMatch(
+                    /@media \(max-width: 900px\)\s*\{\s*\.fleet-overview \.fo-operations-grid\s*\{\s*grid-template-columns: 1fr;/,
+                );
+                continue;
+            }
+            if (relativePath === 'compliance/index.tsx') {
+                const page = source(relativePath);
+                expect(page).toContain('hidden md:block');
+                expect(page).toContain('md:hidden');
+                expect(page).toContain('{cards}');
+                continue;
+            }
             expect(
                 source(relativePath),
                 `${relativePath} needs a declared narrow strategy`,
@@ -85,15 +111,20 @@ describe('Fleet responsive and hero contracts', () => {
     });
 
     it('keeps every titled Fleet page in the shared hero family', () => {
+        // The Event Horizon page top (PageHeader / PageLayout from
+        // @/components/page; DESIGN.md "Page headers", approved 2026-09-05)
+        // is the current shared hero: PKG-01 work orders and the PKG-02B
+        // vehicle profile use it.
         const outliers = pageFiles(root)
             .filter((file) => readFileSync(file, 'utf8').includes('<Head'))
             .filter((file) => {
                 const page = readFileSync(file, 'utf8');
-                return !/HeroShell|FleetCompactHero|data-fleet-mobile-hero/.test(
+                return !/HeroShell|FleetCompactHero|data-fleet-mobile-hero|<PageHeader[\s>]|<PageLayout[\s>]|<FleetReportHeader[\s>]/.test(
                     page,
                 );
             });
 
         expect(outliers).toEqual([]);
+        expect(source('reports/report-header.tsx')).toContain('<PageHeader');
     });
 });

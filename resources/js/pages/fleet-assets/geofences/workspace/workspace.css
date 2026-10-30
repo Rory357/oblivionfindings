@@ -1,0 +1,3445 @@
+@source './*.tsx';
+@source '../../../../../resources/js/components/ui';
+@source '../../../../../resources/js/components/page';
+@source '../../../../../resources/js/components/lists';
+@source '../../../../../resources/js/components/wizard';
+@source '../../../../../resources/js/components/fleet-assets/maintenance';
+@source '../../../../../resources/js/components/hr/leave-calendar-range.tsx';
+@source '../../../../../resources/js/components/confirm-dialog.tsx';
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) * {
+    box-sizing: border-box;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) button,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) a,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) input,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) select,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) textarea {
+    font: inherit;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    button:not(:disabled),
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) summary {
+    cursor: pointer;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    button:focus-visible,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    summary:focus-visible,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) a:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) p {
+    line-height: 1.55;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) input,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) select,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) textarea {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) select {
+    background: var(--card);
+    border: 1px solid var(--input);
+    border-radius: 8px;
+    min-height: 36px;
+    padding: 6px 10px;
+    color: var(--foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) small {
+    line-height: 1.45;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) h2,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) h3 {
+    line-height: 1.3;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .global-header {
+    position: fixed;
+    z-index: 30;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 58px;
+    background: var(--sidebar);
+    color: var(--sidebar-foreground);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 22px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .wordmark {
+    display: flex;
+    align-items: center;
+    color: var(--sidebar-accent-foreground);
+    font-size: 19px;
+    font-weight: 650;
+    white-space: nowrap;
+    letter-spacing: -0.5px;
+    gap: 1px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .wordmark
+    > span:last-child {
+    font-weight: 450;
+    margin-left: 5px;
+    color: var(--sidebar-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ring-o {
+    width: 21px;
+    height: 21px;
+    border: 3.5px solid
+        color-mix(in oklch, var(--primary) 65%, var(--primary-foreground));
+    border-radius: 50%;
+    box-shadow: 0 0 12px color-mix(in oklch, var(--primary) 50%, transparent);
+    margin-right: 1px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .shell-date {
+    font-size: 12px;
+    margin-left: 35px;
+    white-space: nowrap;
+    color: var(--sidebar-accent-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .shell-date span {
+    color: var(--sidebar-foreground);
+    margin-left: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .command-search {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 34px;
+    width: 285px;
+    border: 1px solid var(--sidebar-border);
+    background: var(--sidebar-accent);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 12px;
+    color: var(--sidebar-foreground);
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .command-search
+    kbd {
+    margin-left: auto;
+    font-size: 10px;
+    opacity: 0.75;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .global-actions {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-left: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .global-actions
+    > button {
+    color: var(--sidebar-accent-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .global-actions
+    > button:first-child {
+    color: var(--primary-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .clock-chip {
+    border: 1px solid var(--sidebar-border);
+    padding: 6px 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: var(--primary);
+    font-weight: 650;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar {
+    position: fixed;
+    z-index: 29;
+    top: 58px;
+    bottom: 0;
+    left: 0;
+    width: 236px;
+    background: var(--sidebar);
+    color: var(--sidebar-foreground);
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar
+    button:not(.collapse-handle) {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 8px 12px;
+    border-radius: 7px;
+    font-size: 13px;
+    min-height: 35px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar
+    button:hover {
+    background: var(--sidebar-accent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .personal-nav {
+    margin-bottom: 23px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar
+    .module-row {
+    font-weight: 600;
+    color: var(--sidebar-accent-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .module-row
+    > svg:last-child {
+    margin-left: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar .fleet {
+    margin-top: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar nav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar
+    nav
+    button {
+    padding-left: 39px !important;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar
+    nav
+    button.active {
+    background: var(--sidebar-accent);
+    color: var(--sidebar-accent-foreground);
+    box-shadow: inset 3px 0 var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .collapsed-nav-icon {
+    display: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar-bottom {
+    margin-top: auto;
+    border-top: 1px solid var(--sidebar-border);
+    padding-top: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .collapse-handle {
+    position: absolute;
+    right: -9px;
+    top: 46%;
+    height: 56px;
+    width: 13px;
+    border-radius: 0 7px 7px 0;
+    background: var(--sidebar);
+    color: var(--sidebar-foreground);
+    display: flex;
+    align-items: center;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .collapse-handle:before {
+    content: '';
+    position: absolute;
+    inset: -4px -12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .main {
+    margin-left: 236px;
+    padding-top: 58px;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .breadcrumbs {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .page-content {
+    padding: 0 20px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .preview-strip {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    align-items: center;
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-bottom: -10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-strip
+    > div {
+    display: flex;
+    gap: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-strip
+    strong {
+    color: var(--foreground);
+    margin-right: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-strip
+    button {
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .demo-controls {
+    padding: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 15px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .demo-controls
+    label {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    flex: 1;
+    min-width: 185px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .demo-controls
+    select {
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .return-strip {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+    margin-bottom: -12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .section-caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 32px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .section-caption
+    h2 {
+    font-size: 14px;
+    font-weight: 650;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .section-caption
+    span {
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-workspace {
+    display: grid;
+    grid-template-columns: 224px minmax(270px, 1fr) 296px;
+    gap: 20px;
+    align-items: start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .boundary-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-list
+    .section-caption {
+    margin-bottom: -8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-list
+    [data-slot='card'] {
+    box-shadow: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-list
+    [data-slot='card']
+    [class*='text-\[15px\]'] {
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-section {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-wrap {
+    height: 490px;
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+    background: var(--muted);
+    isolation: isolate;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-canvas {
+    height: 100%;
+    width: 100%;
+    background: var(--muted);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .leaflet-container {
+    font-family: var(--font-sans) !important;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .leaflet-pane.leaflet-overlay-pane
+    img {
+    filter: grayscale(1);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-tools {
+    position: absolute;
+    right: 12px;
+    top: 12px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-tools button {
+    background: var(--card);
+    box-shadow: 0 1px 4px
+        color-mix(in oklch, var(--foreground) 14%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-attribution {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    z-index: 500;
+    font-size: 9px;
+    padding: 2px 5px;
+    background: var(--card);
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-label {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 11px;
+    box-shadow: 0 2px 8px
+        color-mix(in oklch, var(--foreground) 10%, transparent);
+    padding: 4px 8px;
+    color: var(--foreground);
+    background: var(--card);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .map-label.selected {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-handle {
+    display: grid;
+    place-items: center;
+    background: var(--card);
+    border: 2px solid var(--primary);
+    border-radius: 50%;
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .centre-handle {
+    background: var(--primary);
+    color: var(--primary-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-legend span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .legend-zone {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border: 2px solid var(--primary);
+    border-radius: 50%;
+    background: color-mix(in oklch, var(--primary) 14%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .legend-zone.other {
+    border: 2px dashed var(--muted-foreground);
+    background: transparent;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-footnote {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-footnote svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-instruction {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 64px;
+    z-index: 500;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    font-size: 11px;
+    pointer-events: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-context {
+    position: absolute;
+    z-index: 800;
+    padding: 5px;
+    border: 1px solid var(--border);
+    background: var(--popover);
+    border-radius: 9px;
+    box-shadow: 0 5px 25px
+        color-mix(in oklch, var(--foreground) 20%, transparent);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .map-context
+    button {
+    justify-content: flex-start;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .imagery-state {
+    position: absolute;
+    z-index: 490;
+    bottom: 30px;
+    left: 14px;
+    right: 55px;
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .imagery-state svg {
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .imagery-state p {
+    margin-top: 3px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .panel {
+    padding: 20px;
+    gap: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-inspector {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-inspector
+    .text-section-title {
+    font-size: 17px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-inspector
+    > .text-subtle {
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .boundary-inspector
+    [data-slot='button'] {
+    white-space: normal;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .icon-tile {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: color-mix(in oklch, var(--primary) 12%, var(--card));
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .icon-tile svg {
+    width: 20px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+    font-weight: 650;
+    margin-bottom: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .inline-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .facts {
+    display: flex;
+    flex-direction: column;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .facts > div {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .facts
+    > div:last-child {
+    border-bottom: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .facts dt {
+    color: var(--muted-foreground);
+    flex-shrink: 0;
+    max-width: 46%;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .facts dd {
+    text-align: right;
+    font-weight: 550;
+    overflow-wrap: anywhere;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .linked-rule {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 9px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .linked-rule
+    strong {
+    font-size: 12px;
+    display: block;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .linked-rule small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    display: block;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .linked-rule svg {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .linked-rule:hover
+    strong {
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .flow-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .flow-stack.compact {
+    gap: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 13px 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice > svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice strong {
+    display: block;
+    font-weight: 650;
+    margin-bottom: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice > div {
+    min-width: 0;
+    color: var(--foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice.info {
+    color: var(--status-info);
+    background: var(--status-info-bg);
+    border-color: color-mix(in oklch, var(--status-info) 22%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice.warning {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+    border-color: color-mix(in oklch, var(--status-warning) 25%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice.critical {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+    border-color: color-mix(in oklch, var(--status-critical) 25%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .notice.success {
+    color: var(--status-success);
+    background: var(--status-success-bg);
+    border-color: color-mix(in oklch, var(--status-success) 25%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 13px;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .field > span {
+    font-weight: 600;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .field > small {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    font-weight: 400;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .field textarea {
+    min-height: 88px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .two-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .input-action {
+    display: flex;
+    gap: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .input-action
+    input {
+    flex: 1;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .choice-pair {
+    display: flex;
+    gap: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .choice-pair > * {
+    flex: 1;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .place-results {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .place-result {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--card);
+    text-align: left;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .place-result:hover {
+    border-color: var(--primary);
+    background: var(--accent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .place-result span {
+    flex: 1;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .place-result
+    strong {
+    display: block;
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .place-result
+    small {
+    display: block;
+    color: var(--muted-foreground);
+    font-size: 11px;
+    margin-top: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .place-result
+    > svg {
+    color: var(--primary);
+    width: 18px;
+    height: 18px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .check-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 10px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .check-row
+    [role='checkbox'] {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .check-row small {
+    margin-left: auto;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .use-choices {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 15px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .location-map {
+    height: 220px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .editor-map {
+    height: 300px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .map-edit-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 8px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .coordinate-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 12px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .review-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .impact-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .impact-row p {
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .modal-body {
+    max-height: calc(88vh - 165px);
+    overflow-y: auto;
+    padding: 24px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .empty {
+    min-height: 310px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    gap: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .empty > svg {
+    width: 38px;
+    height: 38px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .empty p {
+    max-width: 540px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .event-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(270px, 1fr);
+    gap: 20px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .action-panel {
+    background: var(--muted);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .timeline {
+    list-style: none;
+    margin: 12px 0;
+    padding-left: 14px;
+    border-left: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .timeline li {
+    padding: 0 0 20px 15px;
+    position: relative;
+    font-size: 12px;
+    color: var(--foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .timeline
+    li:last-child {
+    padding-bottom: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .timeline
+    li:before {
+    content: '';
+    position: absolute;
+    left: -19px;
+    top: 4px;
+    width: 9px;
+    height: 9px;
+    border: 2px solid var(--card);
+    border-radius: 50%;
+    background: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .timeline small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    display: block;
+    margin-top: 5px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .details-box {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .details-box
+    summary {
+    font-weight: 600;
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .details-box[open]
+    > .field {
+    margin: 15px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .details-box
+    .inline-row {
+    display: inline-flex;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .history-layout {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 20px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .recovery-layout {
+    display: grid;
+    grid-template-columns: 255px minmax(0, 1fr);
+    gap: 24px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .recovery-layout
+    nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    border-right: 1px solid var(--border);
+    padding-right: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .recovery-layout
+    nav
+    button {
+    justify-content: flex-start;
+    white-space: normal;
+    text-align: left;
+    height: auto;
+    min-height: 37px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .evaluation-path {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .evaluation-path
+    > div {
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .evaluation-path
+    span {
+    border-radius: 50%;
+    background: var(--primary);
+    color: var(--primary-foreground);
+    width: 23px;
+    height: 23px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .weekday-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .page-footer {
+    display: flex;
+    justify-content: space-between;
+    color: var(--muted-foreground);
+    font-size: 10px;
+    padding-top: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .toast {
+    position: fixed;
+    z-index: 1000;
+    bottom: 22px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    max-width: 85vw;
+    padding: 14px 20px;
+    background: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 7px 30px
+        color-mix(in oklch, var(--foreground) 18%, transparent);
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .toast svg {
+    color: var(--status-success);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .loading-card {
+    padding: 30px;
+    min-height: 400px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .skeleton-row {
+    height: 62px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    background: var(--muted);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar-closed
+    .sidebar {
+    width: 66px;
+    padding: 20px 9px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar-closed
+    .main {
+    margin-left: 66px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar-closed
+    .sidebar
+    span,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar-closed
+    .module-row
+    > svg:last-child {
+    display: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar-closed
+    .sidebar
+    nav
+    button {
+    padding-left: 12px !important;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar-closed
+    .collapsed-nav-icon {
+    display: block;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) progress {
+    height: 5px;
+    width: 100%;
+    accent-color: var(--primary);
+}
+@media (max-width: 1360px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .shell-date {
+        display: none;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .command-search {
+        width: 240px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .global-actions {
+        gap: 10px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-workspace {
+        grid-template-columns: 210px minmax(260px, 1fr) 280px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar {
+        width: 210px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .main {
+        margin-left: 210px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .panel {
+        padding: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-list
+        [data-slot='card']
+        > div:nth-child(2) {
+        padding: 12px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-list
+        [data-slot='card']
+        [class*='h-10'] {
+        width: 30px;
+        height: 30px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-list
+        [data-slot='card']
+        [class*='gap-3'] {
+        gap: 8px;
+    }
+}
+@media (max-width: 1190px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar {
+        width: 66px;
+        padding: 20px 9px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .main {
+        margin-left: 66px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar span,
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .module-row
+        > svg:last-child {
+        display: none;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .sidebar
+        nav
+        button {
+        padding-left: 12px !important;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .collapsed-nav-icon {
+        display: block;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .global-actions
+        .clock-chip {
+        display: none;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-workspace {
+        grid-template-columns: 210px minmax(250px, 1fr) 270px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .preview-strip {
+        flex-wrap: wrap;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-inspector
+        .facts
+        > div {
+        display: block;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-inspector
+        .facts
+        dd {
+        text-align: left;
+        margin-top: 4px;
+    }
+}
+@media (max-width: 1000px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .command-search {
+        width: 210px;
+        left: 46%;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-workspace {
+        grid-template-columns: 220px minmax(0, 1fr);
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-inspector {
+        grid-column: 1/-1;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .boundary-inspector
+        .facts {
+        grid-row: 2/6;
+        grid-column: 1;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .event-layout {
+        grid-template-columns: 1fr 270px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .review-grid {
+        grid-template-columns: 1fr;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .review-grid
+        > * {
+        grid-column: auto;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .preview-strip {
+        gap: 3px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .global-actions
+        > button:first-child {
+        display: none;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .return-strip
+        span {
+        display: none;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) *,
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) *:before,
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) *:after {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* Clip decoration without creating an internally scrollable header on focus return. */
+.pkg07 > .eh-header {
+    overflow: clip;
+}
+
+/* Keep every destination available in short desktop windows. */
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .sidebar nav {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .sidebar
+    nav
+    button {
+    flex-shrink: 0;
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-maps
+    .audit-map {
+    height: 280px;
+    min-height: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-maps
+    .audit-map
+    .map-canvas {
+    height: 100%;
+    min-height: 0;
+}
+
+/* Preview-local composition; shared shell, header and primitives stay canonical. */
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-columns {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 338px;
+    gap: 20px;
+    align-items: start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-map-card {
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+    box-shadow: 0 3px 14px
+        color-mix(in oklch, var(--foreground) 4%, transparent);
+    overflow: hidden;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-map-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-heading
+    .text-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-heading
+    h2
+    span {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    padding-left: 10px;
+    border-left: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-map-surface {
+    position: relative;
+    isolation: isolate;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-surface
+    > .map-wrap {
+    height: 416px;
+    border: 0;
+    border-radius: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-surface
+    .map-attribution {
+    background: color-mix(in oklch, var(--card) 88%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-surface
+    .map-tools {
+    right: 16px;
+    top: 20px;
+    gap: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-surface
+    .map-tools
+    button {
+    width: 34px;
+    height: 34px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-picker {
+    position: absolute;
+    z-index: 600;
+    left: 20px;
+    top: 20px;
+    width: 248px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 4px 16px
+        color-mix(in oklch, var(--foreground) 9%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-picker
+    .field {
+    gap: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-picker
+    .field
+    > span {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-picker
+    [role='combobox'] {
+    min-width: 0;
+    height: 34px;
+    font-size: 12px;
+    justify-content: space-between;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-map-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 13px 20px;
+    border-top: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-footer
+    > .text-caption {
+    font-size: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-footer
+    .map-legend {
+    font-size: 11px;
+    gap: 18px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-inspector {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+    min-width: 0;
+    box-shadow: 0 3px 14px
+        color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-identity {
+    padding: 20px 20px 15px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-identity
+    .inline-row {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-identity
+    .inline-row
+    > div:nth-child(2) {
+    flex: 1;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-identity h2 {
+    overflow-wrap: anywhere;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-identity
+    .icon-tile {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-identity
+    .eyebrow {
+    font-size: 9px;
+    margin-bottom: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-address {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+    margin: 12px 0 10px;
+    line-height: 1.5;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-address svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-key-facts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin: 0 20px 16px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    background: color-mix(in oklch, var(--muted) 55%, var(--card));
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    > div,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    > button {
+    display: grid;
+    grid-template-columns: 16px 1fr;
+    gap: 5px 7px;
+    padding: 12px 10px;
+    text-align: left;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    > button {
+    border-left: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    > button:hover {
+    background: var(--accent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    svg {
+    width: 15px;
+    height: 15px;
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    strong {
+    font-size: 11px;
+    line-height: 15px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-key-facts
+    span {
+    grid-column: 1/-1;
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-attention {
+    margin: 0 20px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-align: left;
+    border: 1px solid
+        color-mix(in oklch, var(--status-warning) 24%, transparent);
+    border-radius: 10px;
+    padding: 11px 12px;
+    background: var(--status-warning-bg);
+    color: var(--status-warning);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-attention
+    > svg {
+    width: 17px;
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-attention
+    > svg:last-child {
+    width: 14px;
+    margin-left: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-attention
+    strong {
+    display: block;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-attention
+    small {
+    display: block;
+    font-size: 10px;
+    margin-top: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-detail-tabs {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    > [role='tablist'] {
+    display: flex;
+    margin: 0 20px;
+    width: calc(100% - 40px);
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--muted);
+    padding: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    [role='tab'] {
+    flex: 1;
+    gap: 5px;
+    font-size: 11px;
+    height: 28px;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    [role='tab'][data-state='active'] {
+    background: var(--card);
+    color: var(--primary);
+    box-shadow: 0 1px 3px color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    [role='tab']
+    span {
+    font-size: 9px;
+    color: inherit;
+    opacity: 0.85;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    [role='tabpanel'] {
+    padding: 8px 20px 16px;
+    margin: 0;
+    min-height: 195px;
+    max-height: 280px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    .facts {
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    .facts
+    > div {
+    padding: 10px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-text-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-context-copy {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    line-height: 1.55;
+    margin: 12px 0 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-context-copy
+    svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    [data-slot='button'] {
+    font-size: 11px;
+    padding-left: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-detail-tabs
+    [role='tabpanel']
+    > .text-caption {
+    margin: 8px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-related {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    text-align: left;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related:last-child {
+    border-bottom: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related
+    > svg {
+    width: 15px;
+    height: 15px;
+    color: var(--muted-foreground);
+    flex-shrink: 0;
+    margin-top: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related
+    > svg:last-child {
+    margin-left: auto;
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related
+    > span {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    align-items: flex-start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related
+    strong {
+    font-size: 11px;
+    line-height: 1.4;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related
+    small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-related:hover
+    strong {
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-inspector-actions {
+    padding: 14px 20px;
+    display: flex;
+    gap: 8px;
+    border-top: 1px solid var(--border);
+    background: color-mix(in oklch, var(--muted) 35%, var(--card));
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-inspector-actions
+    > button {
+    flex: 1;
+    font-size: 11px;
+    padding: 8px;
+    height: 36px;
+    white-space: nowrap;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-inspector-actions
+    svg {
+    width: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-library {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-library
+    .section-caption
+    > div {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-boundary-card {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-boundary-card
+    [class*='text-[15px]'] {
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-expanded-map
+    .map-wrap {
+    height: 65vh;
+    min-height: 320px;
+    max-height: 760px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-workspace
+    button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+@media (min-width: 1700px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-columns {
+        grid-template-columns: minmax(0, 1fr) 360px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-surface
+        > .map-wrap {
+        height: 466px;
+    }
+}
+@media (max-width: 1280px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-columns {
+        grid-template-columns: minmax(0, 1fr) 318px;
+        gap: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-heading {
+        padding: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-picker {
+        left: 16px;
+        width: 218px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-footer {
+        padding: 12px 16px;
+        flex-wrap: wrap;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-heading
+        .eyebrow {
+        font-size: 9px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-heading
+        .text-section-title {
+        font-size: 15px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-heading
+        h2
+        span {
+        display: none;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-library
+        .section-caption
+        > div {
+        display: block;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-library
+        .section-caption
+        > div
+        > span {
+        display: block;
+        margin-top: 5px;
+    }
+}
+@media (max-width: 1000px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-columns {
+        grid-template-columns: minmax(0, 1fr) 302px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-heading {
+        gap: 6px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-heading
+        .inline-row {
+        gap: 6px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-surface
+        > .map-wrap {
+        height: 422px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-picker {
+        width: 205px;
+        left: 12px;
+        top: 12px;
+        padding: 8px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-surface
+        .map-tools {
+        right: 10px;
+        top: 12px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-identity {
+        padding: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-key-facts {
+        margin-inline: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-attention {
+        margin-inline: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-detail-tabs
+        > [role='tablist'] {
+        margin-inline: 16px;
+        width: calc(100% - 32px);
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-detail-tabs
+        [role='tabpanel'] {
+        padding-inline: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-inspector-actions {
+        padding-inline: 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-library-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 800px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-columns {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-map-surface
+        > .map-wrap {
+        height: 380px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-library-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .atlas-detail-tabs
+        [role='tabpanel'] {
+        max-height: 320px;
+    }
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-identity
+    + .atlas-inspector-actions {
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+    padding-top: 0;
+    background: var(--card);
+    margin-bottom: 16px;
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-columns {
+    scroll-margin-top: 78px;
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .library-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-heading
+    h2 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 4px 0 6px;
+    scroll-margin-top: 80px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .library-total {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary);
+    background: var(--primary-soft);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 9px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-heading
+    [role='tablist'] {
+    display: flex;
+    gap: 4px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    padding: 4px;
+    border-radius: 12px;
+    height: 42px;
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-heading
+    [role='tab'] {
+    gap: 7px;
+    min-width: 78px;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-heading
+    [role='tab'][data-state='active'] {
+    background: color-mix(in oklch, var(--primary) 12%, var(--card));
+    color: var(--primary);
+    box-shadow: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .library-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-toolbar
+    label,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-pagination
+    label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-toolbar
+    select,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-pagination
+    select {
+    border: 1px solid var(--border);
+    background: var(--background);
+    color: var(--foreground);
+    padding: 7px 28px 7px 10px;
+    border-radius: 7px;
+    font-size: 12px;
+    min-height: 34px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-toolbar
+    .library-sort {
+    margin-left: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-result-count {
+    margin: 12px 2px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-library
+    [role='tabpanel'] {
+    margin: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-pagination {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-pagination
+    > span {
+    margin-left: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-pagination
+    nav {
+    display: flex;
+    gap: 5px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .library-pagination
+    button {
+    width: 34px;
+    height: 34px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .library-selected {
+    color: var(--primary);
+    font-size: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .library-open {
+    color: var(--status-warning);
+    font-size: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .atlas-map-scope {
+    padding: 9px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-scope
+    label {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    color: var(--foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .atlas-map-scope
+    button {
+    margin-left: auto;
+    font-size: 11px;
+    padding: 0;
+    height: 28px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .picker-limit {
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+    border-top: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .integration-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .integration-grid
+    section {
+    display: flex;
+    gap: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .integration-grid
+    svg {
+    width: 20px;
+    flex-shrink: 0;
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .integration-grid
+    h3,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .integration-scale
+    h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .integration-grid p,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .integration-scale
+    p {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .integration-scale
+    p
+    + p {
+    margin-top: 10px;
+}
+@media (max-width: 1100px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .library-toolbar
+        .library-sort {
+        margin-left: 0;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .library-toolbar {
+        gap: 10px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .library-heading
+        .eyebrow {
+        font-size: 9px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .integration-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-studio {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-heading h2 {
+    font-size: 21px;
+    margin: 5px 0 7px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-layout {
+    display: grid;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-layer-panel {
+    padding: 0;
+    gap: 0;
+    overflow: hidden;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 18px 16px 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-panel-heading
+    h3,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-heading
+    h3 {
+    font-size: 13px;
+    font-weight: 650;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-panel-heading
+    svg {
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-layer-toggles {
+    padding: 0 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-layer-toggles
+    label {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 36px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-layer-toggles
+    strong {
+    margin-left: auto;
+    font-size: 11px;
+    background: var(--muted);
+    border-radius: 15px;
+    padding: 3px 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-layer-toggles
+    svg {
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-compact-select {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin: 0 16px 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-compact-select
+    select {
+    font-size: 11px;
+    width: 100%;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 10px 16px;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-check input,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-layer-toggles
+    input {
+    accent-color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-subtle-options {
+    padding: 2px 0 9px;
+    border-bottom: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-heading
+    span {
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-records {
+    padding: 0 7px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 57px;
+    padding: 8px 9px;
+    text-align: left;
+    border-radius: 9px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button:hover {
+    background: var(--muted);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button.selected {
+    background: color-mix(in oklch, var(--primary) 9%, var(--card));
+    box-shadow: inset 3px 0 var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button
+    > span:nth-child(2) {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-records
+    strong {
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-records small {
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button
+    > svg {
+    color: var(--primary);
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-record-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--muted);
+    color: var(--muted-foreground);
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-icon.inside {
+    color: var(--status-success);
+    background: var(--status-success-bg);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-icon.outside,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-icon.uncertain {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-pagination
+    span {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-right: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-pagination
+    button {
+    width: 30px;
+    height: 30px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-empty {
+    padding: 14px 8px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-map-column {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-map-summary {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 13px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-map-summary
+    span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-map-summary
+    button {
+    margin-left: auto;
+    color: var(--primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-map-stage {
+    position: relative;
+    isolation: isolate;
+    border: 1px solid var(--border);
+    border-top: 0;
+    border-radius: 0 0 14px 14px;
+    overflow: hidden;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-canvas {
+    height: 690px;
+    min-height: 520px;
+    position: relative;
+    isolation: isolate;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-leaflet {
+    position: absolute;
+    inset: 0;
+    background: var(--muted);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-map-tools {
+    position: absolute;
+    z-index: 600;
+    left: 18px;
+    top: 104px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    align-items: flex-start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-map-tools
+    button {
+    background: var(--card);
+    box-shadow: 0 2px 6px #0001;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-map-tools
+    button:not(:last-child) {
+    width: 34px;
+    height: 34px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-attribution {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background: color-mix(in oklch, var(--card) 90%, transparent);
+    font-size: 9px;
+    padding: 4px 7px;
+    z-index: 450;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-boundary-finder {
+    position: absolute;
+    z-index: 600;
+    left: 16px;
+    top: 16px;
+    width: 225px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--card);
+    box-shadow: 0 4px 14px #0001;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-boundary-finder
+    .field {
+    gap: 5px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-boundary-finder
+    .field
+    > span {
+    font-size: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-boundary-finder
+    [role='combobox'] {
+    font-size: 11px;
+    height: 32px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-inspector {
+    position: absolute;
+    z-index: 650;
+    right: 16px;
+    top: 16px;
+    width: 286px;
+    max-height: 650px;
+    overflow-y: auto;
+    padding: 16px;
+    gap: 0;
+    box-shadow: 0 10px 30px #0002;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    > .icon-tile {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    h3 {
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 1.35;
+    margin-top: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    > div {
+    flex: 1;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    .eyebrow {
+    font-size: 9px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    > button {
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    padding: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-status-block {
+    margin: 15px 0 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-status-block
+    p {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+    margin: 9px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector
+    .facts {
+    font-size: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector
+    .facts
+    > div {
+    gap: 10px;
+    padding: 8px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector
+    .facts
+    dd {
+    max-width: 175px;
+    overflow-wrap: anywhere;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-relations {
+    border-top: 1px solid var(--border);
+    margin-top: 5px;
+    padding-top: 4px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-relations
+    button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+    text-align: left;
+    padding: 9px 0;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-relations
+    strong {
+    font-weight: 600;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-relations
+    small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 3px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-rule-summary {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin: 10px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-actions
+    button {
+    font-size: 11px;
+    flex: 1;
+    padding: 8px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-legend {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    padding: 15px 2px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-legend > span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-legend
+    > span:last-child {
+    margin-left: auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-legend i {
+    width: 9px;
+    height: 9px;
+    background: var(--muted-foreground);
+    border-radius: 50%;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-legend
+    i.inside {
+    background: var(--status-success);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-legend
+    i.outside,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-legend
+    i.uncertain {
+    background: var(--status-warning);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-legend
+    i.uncertain {
+    background: var(--card);
+    border: 2px solid var(--status-warning);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-legend
+    i.stale {
+    border: 1px dashed var(--muted-foreground);
+    background: var(--card);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-truth {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    line-height: 1.6;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-truth svg {
+    flex-shrink: 0;
+    color: var(--primary);
+    margin-top: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-marker {
+    height: 34px;
+    width: 34px;
+    border: 2px solid var(--card);
+    box-shadow: 0 2px 8px #0004;
+    background: var(--muted-foreground);
+    color: var(--card);
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-marker.vehicle {
+    border-radius: 50%;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-marker.inside {
+    background: var(--status-success);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-marker.outside {
+    background: var(--status-warning);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-marker.uncertain {
+    background: var(--card);
+    color: var(--status-warning);
+    border: 2px dashed var(--status-warning);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-marker.stale {
+    background: var(--card);
+    color: var(--muted-foreground);
+    border: 2px dashed var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-marker.selected {
+    outline: 3px solid var(--primary);
+    outline-offset: 3px;
+    box-shadow: 0 4px 14px #0004;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-cluster {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--primary);
+    background: var(--card);
+    border: 4px solid color-mix(in oklch, var(--primary) 22%, var(--card));
+    box-shadow: 0 3px 10px #0002;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-leaflet
+    .leaflet-marker-icon:focus-visible {
+    outline: 3px solid var(--ring);
+    outline-offset: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-resource-tooltip {
+    padding: 13px 15px !important;
+    white-space: normal !important;
+    max-width: 295px;
+    border: 1px solid var(--border) !important;
+    border-radius: 12px !important;
+    background: var(--card) !important;
+    color: var(--foreground) !important;
+    box-shadow: 0 6px 20px #0002 !important;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-hover-card {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 230px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-hover-card
+    strong {
+    font-size: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-hover-card
+    span {
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-hover-card
+    small,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-hover-card em {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--muted-foreground);
+    font-style: normal;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-hover-card b {
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-state.inside {
+    color: var(--status-success);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-state.outside,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-state.uncertain,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-state.stale {
+    color: var(--status-warning);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-zone-label {
+    border: 1px solid var(--border) !important;
+    border-radius: 8px !important;
+    padding: 8px 10px !important;
+    background: var(--card) !important;
+    color: var(--foreground) !important;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-zone-label
+    strong,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-zone-label
+    small {
+    display: block;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-zone-label
+    small {
+    font-size: 9px;
+    color: var(--muted-foreground);
+    margin-top: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-map-unavailable {
+    position: absolute;
+    left: 16px;
+    bottom: 32px;
+    max-width: 300px;
+    background: var(--card);
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 11px;
+    z-index: 600;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .rule-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .rule-window {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .rule-window-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .rule-window-heading
+    strong {
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .rule-window-heading
+    button {
+    height: 28px;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .builder-metrics {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 15px;
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .builder-metrics
+    span {
+    color: var(--muted-foreground);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 120px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .builder-metrics
+    strong {
+    color: var(--foreground);
+    font-size: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .geometry-transfer {
+    padding: 15px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .geometry-transfer
+    summary {
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .geometry-transfer
+    textarea {
+    font-family: monospace;
+    font-size: 11px;
+    min-height: 145px;
+    margin: 12px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .rule-test {
+    border: 1px solid var(--border);
+    background: var(--muted);
+    padding: 16px;
+    border-radius: 12px;
+    margin-top: 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .rule-test h3 {
+    font-size: 13px;
+    font-weight: 650;
+    margin-bottom: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .rule-readiness {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .rule-readiness p {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .rule-readiness
+    svg {
+    width: 15px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+@media (min-width: 1800px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-layout {
+        grid-template-columns: 270px minmax(0, 1fr);
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-canvas {
+        height: 750px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-inspector {
+        width: 320px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-record-line
+        > button {
+        min-height: 63px;
+    }
+}
+@media (max-width: 1250px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-layout {
+        grid-template-columns: 224px minmax(0, 1fr);
+        gap: 14px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-inspector {
+        position: relative;
+        right: auto;
+        top: auto;
+        width: auto;
+        max-height: none;
+        margin: 14px;
+        display: block;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-map-stage {
+        overflow: visible;
+        background: var(--card);
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-canvas {
+        height: 480px;
+        min-height: 480px;
+        overflow: hidden;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-boundary-finder {
+        width: 218px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-inspector
+        .facts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0 16px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-inspector
+        .ops-relations {
+        display: flex;
+        gap: 18px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-inspector-actions {
+        justify-content: flex-end;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-inspector-actions
+        button {
+        flex: initial;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-rule-summary {
+        margin-bottom: 8px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-legend
+        > span:last-child {
+        margin-left: 0;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-heading
+        h2 {
+        font-size: 18px;
+    }
+}
+@media (max-width: 950px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-layout {
+        grid-template-columns: 210px minmax(0, 1fr);
+        gap: 10px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-inspector
+        .facts {
+        display: block;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-map-summary {
+        gap: 8px;
+        padding: 10px;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-map-summary
+        button {
+        margin-left: 0;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .rule-config-grid {
+        grid-template-columns: 1fr;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-heading {
+        align-items: flex-start;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .ops-heading
+        > .inline-row {
+        flex-direction: column;
+    }
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .history-filter-card {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr 0.8fr 1fr;
+    gap: 16px;
+    padding: 20px;
+    align-items: end;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .history-filter-card
+    > .field {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .history-filter-card
+    button[role='combobox'] {
+    overflow: hidden;
+    white-space: normal;
+    height: auto;
+    min-height: 38px;
+    text-align: left;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .history-filter-card
+    .time-picker-trigger {
+    width: 100%;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(270px, 1fr);
+    gap: 20px;
+    align-items: start;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-heading {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-heading
+    > div {
+    flex: 1;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-list
+    li
+    + li {
+    border-top: 1px solid var(--border);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-list button {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 145px minmax(0, 1fr) 16px;
+    text-align: left;
+    align-items: start;
+    gap: 18px;
+    padding: 18px 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-list
+    button:hover
+    strong {
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-list p {
+    font-size: 12px;
+    margin-top: 6px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-list small,
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-time {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-list small {
+    display: block;
+    margin-top: 5px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-list strong {
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-time small {
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-pagination {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    align-items: center;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-pagination
+    > span {
+    margin-right: auto;
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-diff {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-diff
+    > strong {
+    width: 110px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-diff > div {
+    flex: 1;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-diff small {
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-maps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-maps h3 {
+    margin-bottom: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-map {
+    height: 250px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .contract-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    list-style: decimal;
+    padding-left: 24px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .contract-steps p {
+    margin-top: 6px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-record-finder {
+    padding: 0 16px 14px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-finder
+    .field
+    > span {
+    font-size: 11px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-finder
+    [role='combobox'] {
+    font-size: 11px;
+    white-space: normal;
+    height: auto;
+    min-height: 38px;
+    text-align: left;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-finder
+    p {
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 7px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    small {
+    overflow-wrap: anywhere;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-page-select {
+    width: auto;
+    min-height: 28px;
+    font-size: 10px;
+    padding: 3px !important;
+    max-width: 76px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .picker-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    white-space: nowrap;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .audit-layout
+    > aside {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-scope-note {
+    margin: 0 16px 12px;
+    font-size: 10px;
+    color: var(--muted-foreground);
+}
+@media (max-width: 1150px) {
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .history-filter-card {
+        grid-template-columns: 1fr 1fr;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .audit-layout {
+        grid-template-columns: 1fr;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .audit-layout
+        > aside {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+    :where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+        .audit-list
+        button {
+        grid-template-columns: 135px minmax(0, 1fr) 16px;
+    }
+}
+
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-simple-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-simple-dialog
+    .modal-body {
+    min-height: 0;
+    overflow-y: auto;
+    max-height: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-form-fields {
+    border: 0;
+    padding: 0;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-form-fields:disabled {
+    opacity: 0.7;
+    pointer-events: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 4px 8px;
+    text-align: left;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+    padding: 13px;
+    font-size: 12px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button
+    svg {
+    width: 20px;
+    height: 20px;
+    grid-row: span 2;
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button
+    small {
+    color: var(--muted-foreground);
+    font-size: 11px;
+    line-height: 1.5;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button[aria-pressed='true'] {
+    border-color: var(--primary);
+    background: color-mix(in oklch, var(--primary) 9%, var(--card));
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button[aria-pressed='true']
+    svg {
+    color: var(--primary);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .preview-choice-tiles
+    button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .field
+    [aria-invalid='true'] {
+    border-color: var(--status-critical);
+}
+/* Detail sections are freely browsed, with no task-completion progress. */
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    [role='dialog']:has([data-detail-body])
+    [data-wizard-region='progress'] {
+    display: none;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    [role='dialog']:has([data-detail-body])
+    [data-wizard-region='rail']
+    button
+    .bg-status-success-bg {
+    background: var(--muted);
+    color: var(--muted-foreground);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    [role='dialog']:has([data-detail-body])
+    [data-wizard-region='rail']
+    button
+    .bg-status-success-bg
+    svg {
+    visibility: hidden;
+}
+/* Preview-only adaptation: the shared ConfirmDialog has no size prop. */
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    [role='alertdialog'] {
+    width: min(92vw, 480px);
+    max-width: min(92vw, 480px);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-record-line {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button {
+    flex: 1;
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > div {
+    flex-shrink: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button
+    > span:nth-child(2) {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-record-line
+    > button
+    strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    > div {
+    min-width: 0;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    > div:has(h3) {
+    flex: 1;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    h3 {
+    overflow-wrap: anywhere;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-inspector-title
+    > div:not(:has(h3)) {
+    flex: 0 0 auto;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-leaflet
+    path:focus-visible {
+    outline: none;
+    stroke: var(--ring);
+    stroke-width: 4px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .ops-map-tools {
+    max-width: calc(100% - 28px);
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form))
+    .ops-map-tools
+    > button:first-child {
+    width: auto;
+    min-width: 112px;
+}
+:where(.pkg07, .bnd-dialog, [role='dialog']:has(.bnd-form)) .field > label {
+    font-size: 12px;
+    font-weight: 600;
+}

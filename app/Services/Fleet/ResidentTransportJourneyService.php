@@ -4,10 +4,13 @@ namespace App\Services\Fleet;
 
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\ClientTransportBooking;
 use App\Models\FleetMedicationTransitLog;
 use App\Models\FleetResidentTransport;
 use App\Models\FleetResidentTransportEvent;
 use App\Models\FleetVehicleBooking;
+use App\Models\MedicationDoseSlot;
 use App\Models\MedicationOrderVersion;
 use App\Models\Shift;
 use App\Models\Site;
@@ -15,29 +18,49 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CoverageRoleService;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
 use App\Services\Medication\ControlledMedicationTransportWitnessService;
+use App\Services\Medication\DoseSlots\DoseSlotGenerator;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationAdministratorCompetencyPolicy;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\Stock\MedicationStockService;
+use App\Services\Medication\Stock\TransitStockContext;
+use App\Services\Medication\WitnessPinService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationRuleService;
+use App\Services\MedicationSafetyService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftOperationalSnapshotService;
 use App\Support\Medication\MedicationStockQuantity;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
+use LogicException;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 
 class ResidentTransportJourneyService
 {
     private const OFFLINE_CAPTURE_FUTURE_SKEW_MINUTES = 5;
+
+    /** Stored as the reason when a transport dose fills a slot whose window has ended. */
+    public const TRANSPORT_LATE_REASON = 'Given during transport';
+
+    public const TRANSPORT_NOT_DUE = 'Record this dose from Meds today. No dose of this medicine is due now and none is overdue without an outcome.';
+
+    public const TRANSPORT_ALREADY_RECORDED = 'This dose is already recorded — nothing new was saved. Return the medicine to the house.';
 
     public function __construct(
         private readonly ResidentTransportJourneyScope $scope,
@@ -141,7 +164,7 @@ class ResidentTransportJourneyService
         }
         if (blank($data['witness_credential'] ?? null)) {
             throw ValidationException::withMessages([
-                'witness_credential' => 'The witness must enter their password or PIN.',
+                'witness_credential' => 'The witness must type their own 6-digit witness PIN.',
             ]);
         }
     }
@@ -203,7 +226,7 @@ class ResidentTransportJourneyService
             ? $actor->getRelation('controlledMedicationPresenceEffectiveAt')
             : null;
         if (! $effectiveAt instanceof CarbonInterface) {
-            throw new \LogicException('Fleet medication presence time was not frozen before authorization Users.');
+            throw new LogicException('Fleet medication presence time was not frozen before authorization Users.');
         }
 
         return $effectiveAt;
@@ -216,7 +239,7 @@ class ResidentTransportJourneyService
             ? $actor->getRelation('controlledMedicationPresenceShifts')
             : null;
         if (! $shifts instanceof Collection) {
-            throw new \LogicException('Fleet medication presence Shifts were not frozen before authorization Users.');
+            throw new LogicException('Fleet medication presence Shifts were not frozen before authorization Users.');
         }
 
         return $shifts;
@@ -285,6 +308,11 @@ class ResidentTransportJourneyService
                 abort_unless($asset->status === 'active', 404);
 
                 $booking = $this->resolveBooking($actor, $data, $asset->id, $site->id);
+                $transportRequest = $booking ? ClientTransportBooking::where('fleet_booking_id', $booking->id)->lockForUpdate()->first() : null;
+                if ($transportRequest) {
+                    abort_unless((int) $transportRequest->client_id === (int) $resident->id, 409,
+                        'The linked transport request must have the same passenger.');
+                }
                 $this->assertShiftWindowAndDriver($actor, $shift, $data);
 
                 $medications = $this->resolveMedicationPayloads(
@@ -333,6 +361,14 @@ class ResidentTransportJourneyService
                     ];
                 }
 
+                if ($transportRequest) {
+                    abort_unless($booking->status === 'checked_out', 409,
+                        'Complete the Fleet checkout before starting the linked journey.');
+                    // Replays above keep their original result after return; new journeys need an unused request link.
+                    abort_if($transportRequest->journey()->exists(), 409,
+                        'This request already has an actual journey. Open its existing journey record.');
+                }
+
                 $snapshot = $shift
                     ? $this->snapshots->snapshotForShift($shift, $actor)
                     : $this->snapshots->snapshotForClient(
@@ -351,6 +387,7 @@ class ResidentTransportJourneyService
                     'driver_user_id' => $actor->id,
                     'resident_id' => $resident->id,
                     'resident_name' => $this->residentName($resident),
+                    'transport_request_id' => $transportRequest?->id,
                     'transport_type' => $data['transport_type'],
                     'pickup_location' => ($data['pickup_location'] ?? null) ?: $shift?->location,
                     'dropoff_location' => $data['dropoff_location'] ?? null,
@@ -487,14 +524,20 @@ class ResidentTransportJourneyService
                 throw new ConflictHttpException('This transport has already been completed or is no longer active.');
             }
 
+            if ($transport->transport_request_id && (! $transport->arrived_at || ! $transport->passengers_accounted_at)) {
+                throw ValidationException::withMessages(['transport' => 'Record arrival and confirm every passenger is accounted for before completing this journey.']);
+            }
+
             $allLogs = FleetMedicationTransitLog::query()->where('transport_id', $transport->id)->count();
             $scopedLogsQuery = FleetMedicationTransitLog::query()->where('transport_id', $transport->id);
             $this->scope->applyMedicationTransitScope($scopedLogsQuery, $actor);
             abort_unless($allLogs === (clone $scopedLogsQuery)->count(), 409, 'Medication custody records do not match this journey.');
 
             $unresolved = (clone $scopedLogsQuery)
-                ->whereNull('administered_at')
-                ->whereNull('returned_to_house_at')
+                ->where(fn ($q) => $q->where(fn ($legacy) => $legacy->whereNull('administered_at')->whereNull('returned_to_house_at'))
+                    ->orWhereExists(fn ($packs) => $packs->selectRaw('1')->from('medication_stock_transit_allocations')
+                        ->whereColumn('medication_stock_transit_allocations.transit_log_id', 'fleet_medication_transit_logs.id')
+                        ->whereRaw('quantity_out > quantity_used + quantity_returned + quantity_missing')))
                 ->lockForUpdate()
                 ->count();
             if ($unresolved > 0) {
@@ -514,7 +557,7 @@ class ResidentTransportJourneyService
 
             $transport->forceFill([
                 'status' => 'completed',
-                'arrived_at' => $data['arrived_at'] ?? now(),
+                'arrived_at' => $transport->transport_request_id ? $transport->arrived_at : ($data['arrived_at'] ?? now()),
                 'notes' => $data['notes'] ?? $transport->notes,
                 'version' => ((int) $transport->version) + 1,
             ])->save();
@@ -616,6 +659,7 @@ class ResidentTransportJourneyService
             'medication_id' => $data['medication_id'] ?? null,
             'medication_order_version_id' => $data['medication_order_version_id'] ?? null,
             'attestation_state' => $attestationState,
+            'pack_lines' => $data['pack_lines'] ?? [],
             'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
             'attestation_reason_hash' => hash('sha256', (string) ($data['attestation_reason'] ?? '')),
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
@@ -666,6 +710,7 @@ class ResidentTransportJourneyService
                         : null,
                     'replayed' => true,
                     'attestation_state' => $attestationState,
+                    'pack_lines' => $data['pack_lines'] ?? [],
                 ];
             }
 
@@ -689,14 +734,15 @@ class ResidentTransportJourneyService
                     'log' => null,
                     'replayed' => false,
                     'attestation_state' => $attestationState,
+                    'pack_lines' => $data['pack_lines'] ?? [],
                 ];
             }
 
-            $duplicate = FleetMedicationTransitLog::query()
-                ->where('transport_id', $transport->id)
-                ->where('medication_id', $prepared['medication']->id)
-                ->exists();
-            abort_if($duplicate, 409, 'This medication is already packed for the journey.');
+            // EA-100: a long outing can need the same medicine more than once
+            // (12:00 and 17:00, or a PRN given twice). Each dose is its own
+            // custody record: packed, witnessed, given or returned, and
+            // settled against its own pack lines. Replays stay idempotent
+            // through the request UUID above, not through this medicine.
 
             $log = $this->createMedicationCustody(
                 $transport,
@@ -772,7 +818,7 @@ class ResidentTransportJourneyService
                 404,
             );
             abort_unless(
-                $log->witness_required || $log->is_controlled_drug,
+                (bool) $log->witness_required,
                 409,
                 'This packing record does not require a second checker.',
             );
@@ -902,6 +948,12 @@ class ResidentTransportJourneyService
             'log_id' => $logId,
             'witnessed_by_user_id' => $data['witnessed_by_user_id'] ?? null,
             'quantity_administered' => $data['quantity_administered'] ?? null,
+            'quantity_unit' => $data['quantity_unit'] ?? null,
+            'pack_lines' => $data['pack_lines'] ?? [],
+            'clinical_facts' => Arr::only($data, RecordingContract::fields()),
+            'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
+            'return_lines' => $data['return_lines'] ?? [],
+            'reconciliation_reason' => $data['reconciliation_reason'] ?? null,
             'notes_hash' => hash('sha256', (string) ($data['notes'] ?? '')),
             'scan_code_hash' => hash('sha256', (string) ($data['scan_code'] ?? '')),
             ...$this->normalizedOfflineProvenanceForFingerprint($data),
@@ -941,12 +993,9 @@ class ResidentTransportJourneyService
                     $lockedPresenceShifts,
                 );
             }
-            $requiresWitness = $action === 'medication_administered'
-                && (
-                    $log->witness_required
-                    || $medication->requiresWitness()
-                    || ($this->medicationRules->requirementsFor($medication, true)['requires_countersign'] ?? false)
-                );
+            $packTracked = DB::table('medication_stock_transit_allocations')->where('transit_log_id', $log->id)->exists();
+            $requiresWitness = ($action === 'medication_administered' && $this->requiresAdministrationWitness($log, $medication, true))
+                || ($action === 'medication_returned' && $packTracked && $medication->controlled_drug);
             $lockedUsers = $this->lockCurrentFleetMedicationUsers(
                 $actor,
                 (int) $resident->site_id,
@@ -1001,7 +1050,7 @@ class ResidentTransportJourneyService
             if (! $replayedEvent) {
                 abort_unless($transport->status === 'in_progress', 409, 'Medication custody can only be resolved during an active journey.');
             }
-            if (! $replayedEvent && ($log->administered_at || $log->returned_to_house_at)) {
+            if (! $replayedEvent && ($log->returned_to_house_at || ($log->administered_at && ($action !== 'medication_returned' || ! $packTracked)))) {
                 throw new ConflictHttpException('This medication custody record has already been resolved.');
             }
 
@@ -1057,18 +1106,31 @@ class ResidentTransportJourneyService
                     $witness = $witnessAttestation['witness'];
                 }
 
+                // A scheduled order's dose is recorded against its owed slot, so
+                // it is one record whichever screen makes it and the house never
+                // sees the same dose as still due (P0: transport double dose).
+                $doseSlot = $medication->is_prn
+                    ? null
+                    : $this->transportDoseSlot($medication, Carbon::instance($actionAt), $requestUuid);
+
                 $emarResult = $this->emar->recordAdministration(
                     $resident,
                     $medication,
                     [
                         'status' => 'given',
                         'administered_at' => $actionAt->toIso8601String(),
+                        ...($doseSlot !== null ? [
+                            'scheduled_for' => $doseSlot['due_at']->toIso8601String(),
+                            ...($doseSlot['late'] ? ['reason' => self::TRANSPORT_LATE_REASON] : []),
+                        ] : []),
                         'dose_given' => $medication->dosage ?: $medication->name,
+                        ...Arr::only($data, RecordingContract::fields()),
                         'notes' => $data['notes'] ?? null,
                         'client_request_uuid' => $requestUuid,
                         'witnessed_by' => $witness?->id,
                         'witness_credential' => $data['witness_credential'] ?? null,
                         'quantity_administered' => $data['quantity_administered'],
+                        'quantity_unit' => $data['quantity_unit'] ?? null,
                         'captured_offline_at' => $data['captured_offline_at'] ?? null,
                         'origin_device_id' => $data['origin_device_id'] ?? null,
                         'queued_offline' => (bool) ($data['queued_offline'] ?? false),
@@ -1078,6 +1140,7 @@ class ResidentTransportJourneyService
                     $actor->canDo('medications.controlled.view'),
                     prelockedPresenceShifts: $this->lockedPresenceShifts($actor),
                     prelockedPresenceEffectiveAt: $this->lockedPresenceEffectiveAt($actor),
+                    transitStock: $packTracked ? TransitStockContext::fromLog($log, $data['quantity_unit'] ?? null, $data['pack_lines'] ?? []) : null,
                 );
                 if (! ($emarResult['success'] ?? false)) {
                     if (($emarResult['status'] ?? null) === 403) {
@@ -1090,6 +1153,14 @@ class ResidentTransportJourneyService
                 }
 
                 $administration = $emarResult['administration'];
+                // Someone else recorded this dose first (a race the slot choice
+                // can't see): nothing new is saved and the medicine goes back.
+                if (($emarResult['duplicate'] ?? false)
+                    && (string) $administration->client_request_uuid !== (string) $requestUuid) {
+                    throw ValidationException::withMessages([
+                        'medication' => self::TRANSPORT_ALREADY_RECORDED,
+                    ]);
+                }
                 abort_unless(
                     (int) $administration->client_id === $resident->id
                         && (int) $administration->client_medication_id === $medication->id
@@ -1105,6 +1176,15 @@ class ResidentTransportJourneyService
                     'notes' => $data['notes'] ?? $log->notes,
                 ])->save();
             } else {
+                if ($requiresWitness) {
+                    $this->validateFleetWitnessInput($data);
+                    $witnessAttestation = $this->transportWitnesses->authenticate($actor, (int) $resident->site_id,
+                        (int) $data['witnessed_by_user_id'], (string) $data['witness_credential'], $actionAt,
+                        witnessErrorKey: 'witnessed_by_user_id', lockedUsers: $lockedUsers,
+                        lockedPresenceShifts: $this->lockedPresenceShifts($actor));
+                    $witness = $witnessAttestation['witness'];
+                }
+                app(MedicationStockService::class)->returnTransit($log, $actor, $data, $witness);
                 $log->forceFill([
                     'returned_to_house_at' => $actionAt,
                     'returned_by_user_id' => $actor->id,
@@ -1122,6 +1202,7 @@ class ResidentTransportJourneyService
                     'request_hash' => $requestHash,
                     ...($action === 'medication_administered' ? [
                         'quantity_administered' => $data['quantity_administered'],
+                        'quantity_unit' => $data['quantity_unit'] ?? null,
                     ] : []),
                     'scan_source' => $scanAudit['scan_source'],
                     'scan_match_source' => $scanAudit['scan_match_source'],
@@ -1154,19 +1235,23 @@ class ResidentTransportJourneyService
                 'request_uuid' => $requestUuid,
                 ...($action === 'medication_administered' ? [
                     'quantity_administered' => $data['quantity_administered'],
+                    'quantity_unit' => $data['quantity_unit'] ?? null,
                 ] : []),
                 'scan_source' => $scanAudit['scan_source'],
                 'scan_match_source' => $scanAudit['scan_match_source'],
                 'entered_code_suffix' => $scanAudit['scan_code_suffix'],
                 ...$this->offlineProvenance($data),
             ]);
-            $this->incidents->resolveTransitException(
-                $log,
-                $action === 'medication_administered'
-                    ? 'Medication administered during transit.'
-                    : 'Medication returned from transit.',
-                $actor->id,
-            );
+            if (! $packTracked || app(MedicationStockService::class)->transitReconciled($log)) {
+                $this->incidents->resolveTransitException(
+                    $log,
+                    $action === 'medication_administered'
+                        ? 'Medication administered during transit.'
+                        : 'Medication returned from transit.',
+                    $actor->id,
+                );
+
+            }
 
             return ['log' => $log, 'replayed' => false];
         }, 3);
@@ -1376,7 +1461,8 @@ class ResidentTransportJourneyService
         return FleetVehicleBooking::query()
             ->whereKey((int) $data['booking_id'])
             ->where('asset_id', $assetId)
-            ->where('user_id', $actor->id)
+            ->where(fn (Builder $driver) => $driver->where('driver_user_id', $actor->id)
+                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('driver_user_id')->where('user_id', $actor->id)))
             ->where(function (Builder $pickup) use ($siteId): void {
                 $pickup->whereNull('pickup_site_id')->orWhere('pickup_site_id', $siteId);
             })
@@ -1546,6 +1632,7 @@ class ResidentTransportJourneyService
             'request_uuid' => $requestUuid,
             'attestation_event_id' => $event->id,
             'attestation_state' => $attestationState,
+            'pack_lines' => $data['pack_lines'] ?? [],
             'witness_user_id' => $witness?->id,
             'attestation_reason' => $reason,
             ...$this->offlineProvenance($payload),
@@ -1572,6 +1659,7 @@ class ResidentTransportJourneyService
             'client_id' => $resident->id,
             'medication_id' => $medication->id,
             'medication_order_version_id' => $orderVersion?->id,
+            'pack_lines' => $payload['pack_lines'] ?? [],
             'parent_request_uuid' => $parentRequestUuid,
             'attestation_state' => $payload['attestation_state'] ?? null,
             'witnessed_by_user_id' => $payload['witnessed_by_user_id'] ?? null,
@@ -1625,6 +1713,7 @@ class ResidentTransportJourneyService
             'packed_at' => $this->medicationCustodyActionAt($transport, $payload),
             'notes' => $payload['notes'] ?? null,
         ]);
+        app(MedicationStockService::class)->packTransit($log, $actor, $payload, $witness);
         $transport->forceFill(['version' => ((int) $transport->version) + 1])->save();
 
         $scanAudit = $prepared['scan_audit'];
@@ -1753,26 +1842,40 @@ class ResidentTransportJourneyService
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
     }
 
+    /** Keep the packing requirement recorded at departure, then apply current dose rules. */
+    public function requiresAdministrationWitness(FleetMedicationTransitLog $log, ClientMedication $medication, bool $lockForUpdate = false): bool
+    {
+        if ((bool) $log->witness_required) {
+            return true;
+        }
+
+        if (! $medication->relationLoaded('client') && $log->relationLoaded('client') && $log->client !== null
+            && (int) $log->client_id === (int) $medication->client_id) {
+            $medication->setRelation('client', $log->client);
+        }
+
+        return $medication->requiresWitness()
+            || (bool) ($this->medicationRules->requirementsFor($medication, $lockForUpdate)['requires_countersign'] ?? false);
+    }
+
     public function governedPackingAttestationGaps(Builder $query): Builder
     {
         return $query
-            ->where(function (Builder $required): void {
-                $required->where('witness_required', true)
-                    ->orWhere('is_controlled_drug', true);
-            })
+            ->where('witness_required', true)
             ->where(function (Builder $gap): void {
                 $gap->whereNull('packing_attestation_event_id')
                     ->orWhereNull('packed_witnessed_by_user_id')
                     ->orWhereNull('packed_witnessed_at')
                     ->orWhereNull('packing_witness_method')
-                    ->orWhere('packing_witness_method', '!=', 'password')
+                    // 'password' attestations predate the witness PIN cutover (PIN-1).
+                    ->orWhereNotIn('packing_witness_method', ['password', WitnessPinService::METHOD])
                     ->orWhereDoesntHave('packingAttestationEvent', function (Builder $event): void {
                         $event->whereIn('action', [
                             'medication_packed',
                             'medication_packing_attestation_corrected',
                         ])
                             ->whereIn('context->attestation->state', ['accepted', 'corrected'])
-                            ->where('context->attestation->method', 'password')
+                            ->whereIn('context->attestation->method', ['password', WitnessPinService::METHOD])
                             ->whereNotNull('context->attestation->subject_digest')
                             ->whereNotNull('witness_user_id')
                             ->whereColumn(
@@ -1921,6 +2024,92 @@ class ResidentTransportJourneyService
         ];
     }
 
+    /**
+     * The owed slot a scheduled order's transport dose fills, on the NZ day
+     * of the given time, with no outcome yet: the slot whose dose window
+     * contains the given time; otherwise the most recent slot whose window
+     * has ended (recorded with the transport late reason). A slot whose
+     * window hasn't opened is never used. Runs under the order's lock: the
+     * day's slots are made sure of, then the chosen slot row is locked before
+     * the record path locks the slot's administrations.
+     *
+     * @return array{due_at: Carbon, late: bool}
+     */
+    private function transportDoseSlot(ClientMedication $medication, Carbon $givenAt, string $requestUuid): array
+    {
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $nzDate = $givenAt->copy()->timezone($timezone)->toDateString();
+        $states = app(ScheduledDoseStates::class);
+        if ($states->holdsDay($nzDate, CarbonImmutable::now()->utc())) {
+            try {
+                app(DoseSlotGenerator::class)->ensureDay($medication, $nzDate, CarbonImmutable::now()->utc());
+            } catch (InvalidArgumentException|LogicException $unreadable) {
+                report($unreadable);
+            }
+        }
+
+        $at = $givenAt->copy()->utc();
+        $doses = collect($states->dosesOn([$medication], $givenAt->copy(), now())[(int) $medication->id] ?? [])
+            ->reject(fn (array $dose): bool => ($dose['state'] ?? null) === DoseSlotProjection::STATE_AWAY);
+        $schedule = app(MarScheduleService::class);
+        // Owed and open: no outcome on the slot and no effective record in
+        // its minute. A record this same request already made (a replay)
+        // still counts as its own slot, so a retry lands where it landed.
+        $isOpen = function (array $dose) use ($medication, $schedule, $requestUuid): bool {
+            $recorded = ClientMedicationAdministration::query()
+                ->effectiveClinicalEvidence()
+                ->where('client_medication_id', $medication->id)
+                ->whereBetween('scheduled_for', $schedule->utcSlotWindow(Carbon::instance($dose['due_at'])))
+                ->pluck('client_request_uuid');
+            if ($recorded->contains(fn ($uuid): bool => (string) $uuid === $requestUuid)) {
+                return true;
+            }
+
+            return $dose['outcome'] === null && $recorded->isEmpty();
+        };
+
+        $containing = $doses
+            ->filter(fn (array $dose): bool => $dose['window_opens_at']->copy()->utc()->lte($at)
+                && $dose['window_ends_at']->copy()->utc()->gte($at))
+            ->sortBy(fn (array $dose): int => abs($dose['due_at']->copy()->utc()->getTimestamp() - $at->getTimestamp()))
+            ->values();
+        $openContaining = $containing->first($isOpen);
+        $overdue = $openContaining !== null
+            ? null
+            : $doses
+                ->filter(fn (array $dose): bool => $dose['window_ends_at']->copy()->utc()->lt($at))
+                ->sortByDesc(fn (array $dose): int => $dose['due_at']->copy()->utc()->getTimestamp())
+                ->first($isOpen);
+
+        $chosen = $openContaining !== null
+            ? ['due_at' => Carbon::instance($openContaining['due_at']), 'late' => false]
+            : ($overdue !== null ? ['due_at' => Carbon::instance($overdue['due_at']), 'late' => true] : null);
+        if ($chosen === null) {
+            throw ValidationException::withMessages([
+                'medication' => $containing->isNotEmpty() ? self::TRANSPORT_ALREADY_RECORDED : self::TRANSPORT_NOT_DUE,
+            ]);
+        }
+        // The record path still asks a reason for a time outside the house
+        // timing (a medicine whose own window is wider): give it the same one.
+        if (! $chosen['late'] && ! app(MedicationSafetyService::class)->validateTimeWindow(
+            $chosen['due_at']->copy(),
+            $givenAt->copy(),
+            $schedule->windowBeforeMinutes(),
+            $schedule->windowAfterMinutes(),
+        )['valid']) {
+            $chosen['late'] = true;
+        }
+
+        MedicationDoseSlot::query()
+            ->where('client_medication_id', $medication->id)
+            ->where('due_at', $chosen['due_at']->copy()->utc()->format('Y-m-d H:i:s'))
+            ->whereNull('superseded_at')
+            ->lockForUpdate()
+            ->get(['id']);
+
+        return $chosen;
+    }
+
     private function requiredAdministrationQuantity(array $payload): string
     {
         if (
@@ -1938,7 +2127,7 @@ class ResidentTransportJourneyService
 
         try {
             $quantity = MedicationStockQuantity::normalizeMovement($payload['quantity_administered']);
-        } catch (\InvalidArgumentException) {
+        } catch (InvalidArgumentException) {
             throw ValidationException::withMessages([
                 'quantity_administered' => 'Quantity administered must use no more than two decimal places and must not exceed '
                     .MedicationStockQuantity::DECIMAL_10_2_MAX.'.',

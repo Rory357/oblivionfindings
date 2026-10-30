@@ -448,16 +448,11 @@ export default function StrategyShow({
                                 </PageHeaderMeterBlock>
                                 <PageHeaderMeterBlock
                                     label="Board approval"
-                                    href={
-                                        approval.resolution
-                                            ? `/governance/resolutions/${approval.resolution.id}`
-                                            : undefined
-                                    }
-                                    onClick={
-                                        approval.resolution
-                                            ? undefined
-                                            : scrollToApproval
-                                    }
+                                    {...(approval.resolution
+                                        ? {
+                                              href: `/governance/resolutions/${approval.resolution.id}`,
+                                          }
+                                        : { onClick: scrollToApproval })}
                                     tone={
                                         APPROVAL_VARIANT[approval.key] ===
                                         'success'

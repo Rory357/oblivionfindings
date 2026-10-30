@@ -259,12 +259,14 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             [
                 'status' => 'expired',
                 'evidence_type' => 'manual',
+                'valid_from' => now()->subYear(),
+                'expires_at' => now()->subDay(),
                 'last_checked_at' => now(),
                 'next_check_at' => now()->addDay(),
             ],
         );
 
-        return Shift::factory()->create([
+        $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -274,6 +276,11 @@ class EscalateUnresolvedEligibilityJobTest extends TestCase
             'status' => 'scheduled',
             'created_by' => $this->staff->id,
         ]);
+
+        // Observe escalation after the fixture's initial eligibility warning.
+        Notification::fake();
+
+        return $shift;
     }
 
     /**

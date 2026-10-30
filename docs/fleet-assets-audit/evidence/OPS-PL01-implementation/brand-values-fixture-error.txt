@@ -1,0 +1,44 @@
+
+   FAIL  Tests\Feature\SettingsControllerTest
+  ✓ branding edit requires authentication                                                                      250.55s
+  ✓ branding update requires authentication                                                                      0.63s
+  ✓ branding edit denied for support worker                                                                      0.86s
+  ✓ branding update denied for support worker                                                                    0.63s
+  ✓ branding edit renders for admin                                                                              0.83s
+  ✓ branding update saves name                                                                                   0.78s
+  ✓ branding update clears name when blank                                                                       0.80s
+  ✓ branding update saves theme css variables                                                                    0.77s
+  ✓ branding update filters disallowed css variables                                                             0.78s
+  ✓ branding omits invalid values on save and when reading legacy rows                                           0.85s
+  ⨯ branding render omits legacy injection and preserves personal accent                                         0.85s
+  ✓ branding update uploads logo                                                                                 1.19s
+  ✓ branding update removes logo                                                                                 0.78s
+  ✓ branding update rejects oversized logo                                                                       0.87s
+  ✓ branding update rejects non image logo                                                                       0.80s
+  ✓ branding update validates name max length                                                                    0.77s
+  ✓ provider manager cannot access branding                                                                      0.72s
+  ✓ branding theme clears when all values empty                                                                  0.80s
+
+   PASS  Tests\Feature\Operations\PeopleLocationsTest
+  ✓ it renders organisation brand tokens for both themes without literal template text                           0.29s
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\SettingsControllerTest > branding render omits legacy injection and preserv…  QueryException
+  SQLSTATE[22001]: String data, right truncated: 1406 Data too long for column 'accent_colour' at row 1 (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: of_people_brand_values_20260928_58472, SQL: update `users` set `accent_colour` = #fff; --status-warning: transparent, `users`.`updated_at` = 2026-09-27 11:58:15 where `id` = 21)
+
+  at vendor\laravel\framework\src\Illuminate\Database\Connection.php:612
+    608▕             $statement = $this->getPdo()->prepare($query);
+    609▕
+    610▕             $this->bindValues($statement, $this->prepareBindings($bindings));
+    611▕
+  ➜ 612▕             $statement->execute();
+    613▕
+    614▕             $this->recordsHaveBeenModified(
+    615▕                 ($count = $statement->rowCount()) > 0
+    616▕             );
+
+  1   vendor\laravel\framework\src\Illuminate\Database\Connection.php:612
+  2   vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+
+
+  Tests:    1 failed, 18 passed (83 assertions)
+  Duration: 264.81s

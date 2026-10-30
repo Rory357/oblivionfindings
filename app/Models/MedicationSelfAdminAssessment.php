@@ -47,6 +47,7 @@ class MedicationSelfAdminAssessment extends Model
         'agreement_signed_at',
         'agreement_signed_by',
         'supersedes_id',
+        'support_agreement_id',
     ];
 
     protected $casts = [
@@ -116,11 +117,11 @@ class MedicationSelfAdminAssessment extends Model
     public function getOutcomeLabelAttribute(): string
     {
         return match ($this->outcome) {
-            'independent' => 'Category 1: Independent Self-Administration',
-            'prompted' => 'Category 2: Self-Administration with Prompting',
-            'supervised' => 'Category 3: Supervised Self-Administration',
-            'administered' => 'Category 4: Full Staff Administration',
-            default => 'Not Assessed',
+            'independent' => 'Self-managed',
+            'prompted' => 'Prompt',
+            'supervised' => 'Assist',
+            'administered' => 'Administer',
+            default => 'Not assessed',
         };
     }
 

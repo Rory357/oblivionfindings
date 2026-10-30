@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Domain\CompanyHub\Services\HubRecognitionReceipt;
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedAttachment;
@@ -9,19 +10,25 @@ use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrFeedReaction;
 use App\Domain\Hr\Models\HrFeedReply;
 use App\Domain\Hr\Models\HrKudos;
+use App\Domain\Hr\Models\HrKudosReply;
 use App\Domain\Hr\Notifications\AnnouncementReplyNotification;
+use App\Domain\Hr\Notifications\FeedReplyNotification;
 use App\Domain\Hr\Services\FeedService;
 use App\Domain\Hr\Services\HrCurrentStaffService;
+use App\Domain\Hr\Services\HrRecognitionMedia;
+use App\Domain\Hr\Services\HrRecognitionReplies;
 use App\Http\Controllers\Concerns\ServesPrivateAttachments;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class FeedController extends Controller
@@ -124,36 +131,29 @@ class FeedController extends Controller
 
     public function sendKudos(Request $request)
     {
+        if ($request->boolean('hub_receipt') && $request->expectsJson() && ! $request->header('X-Inertia')) {
+            return response()->json(app(HubRecognitionReceipt::class)->send($request->user(), $request->all()))
+                ->header('Cache-Control', 'private, no-store');
+        }
         $user = $request->user();
         abort_unless($user, 403);
         abort_unless($this->currentStaff->isCurrent($user), 403);
 
-        $currentStaffRecipientRule = $this->currentStaff->recipientRule();
-
-        $validated = $request->validate([
-            'to_user_id' => ['required_without:to_user_ids', 'integer', 'exists:users,id', $currentStaffRecipientRule],
-            'to_user_ids' => ['required_without:to_user_id', 'array', 'min:1'],
-            'to_user_ids.*' => ['integer', 'exists:users,id', $currentStaffRecipientRule],
-            'category' => ['required', 'string', Rule::in(array_keys(FeedService::KUDOS_CATEGORIES))],
-            'impact' => ['nullable', 'string', Rule::in(array_keys(FeedService::KUDOS_IMPACTS))],
-            'message' => ['required', 'string', 'max:2000'],
-        ]);
-
-        $recipientIds = $validated['to_user_ids'] ?? [$validated['to_user_id']];
+        $validated = $request->validate($this->feedService->recognitionRules($request->all()));
+        abort_if(isset($validated['actor_id']) && (int) $validated['actor_id'] !== (int) $user->id, 409, 'Your signed-in account changed. Reopen recognition before sending.');
 
         try {
-            $this->feedService->sendKudosToMany(
-                $user,
-                $recipientIds,
-                $validated['category'],
-                $validated['message'],
-                $validated['impact'] ?? null,
-            );
+            $this->feedService->sendRecognition($user, $validated);
+        } catch (ValidationException $exception) {
+            throw $exception;
         } catch (\Throwable $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        $count = count($recipientIds);
+        if (! empty($validated['to_department_id'])) {
+            return redirect()->back()->with('success', 'Recognition sent to the whole team! 🎉');
+        }
+        $count = count($validated['to_user_ids'] ?? [$validated['to_user_id']]);
 
         return redirect()->back()->with('success', $count > 1 ? "Kudos sent to {$count} colleagues! 🎉" : 'Kudos sent! 🎉');
     }
@@ -186,7 +186,7 @@ class FeedController extends Controller
         abort_unless($this->currentStaff->isCurrent($user), 403);
 
         $this->assertKudosVisibleTo($kudos, $user);
-        abort_unless(in_array($user->id, [$kudos->from_user_id, $kudos->to_user_id], true), 403);
+        abort_unless($this->feedService->canReplyKudos($kudos, $user), 403);
 
         $validated = $request->validate([
             'body' => ['required', 'string', 'max:2000'],
@@ -275,6 +275,10 @@ class FeedController extends Controller
         $user = $request->user();
         abort_unless($user && $this->currentStaff->isCurrent($user) && $user->canDo('hr.employees.manage'), 403);
 
+        if ($post->kudos?->isTeamRecognition()) {
+            $this->assertKudosVisibleTo($post->kudos, $user);
+        }
+
         $this->removeFeedPost($request, $post);
 
         return redirect()->back()->with('success', 'Post removed.');
@@ -288,6 +292,10 @@ class FeedController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $this->currentStaff->isCurrent($user) && $user->canDo('hr.employees.manage'), 403);
+
+        if ($kudos->isTeamRecognition()) {
+            $this->assertKudosVisibleTo($kudos, $user);
+        }
 
         $post = $kudos->feedPost;
         if ($post) {
@@ -336,6 +344,8 @@ class FeedController extends Controller
                     'author_user_id' => $post->user_id,
                     'content_excerpt' => Str::limit((string) $post->content, 200),
                     'kudos_id' => $kudos?->id,
+                    'recipient_type' => $kudos?->recipient_type ?? 'person',
+                    'to_department_id' => $kudos?->to_department_id,
                 ],
                 'ip_address' => $request->ip(),
                 'user_agent' => (string) $request->userAgent(),
@@ -349,6 +359,9 @@ class FeedController extends Controller
     private function removeKudosRow(Request $request, HrKudos $kudos, bool $auditSeparately = true): void
     {
         DB::transaction(function () use ($request, $kudos, $auditSeparately) {
+            app(HrRecognitionMedia::class)->remove($kudos, entireRecognition: true);
+            DB::table('notifications')->where('type', FeedReplyNotification::class)
+                ->whereIn('data->kudos_reply_id', HrKudosReply::where('kudos_id', $kudos->id)->select('id'))->delete();
             $kudos->reactions()->delete();
             $kudos->replies()->delete();
 
@@ -361,6 +374,8 @@ class FeedController extends Controller
                     'meta' => [
                         'from_user_id' => $kudos->from_user_id,
                         'to_user_id' => $kudos->to_user_id,
+                        'recipient_type' => $kudos->recipient_type ?? 'person',
+                        'to_department_id' => $kudos->to_department_id,
                         'category' => $kudos->category,
                         'content_excerpt' => Str::limit((string) $kudos->message, 200),
                     ],
@@ -484,6 +499,10 @@ class FeedController extends Controller
     private function transformPost($post, int $viewerId, array $postReactions = [], array $postReplies = []): array
     {
         $kudos = $post->post_type === 'kudos' ? $post->kudos : null;
+        $viewer = request()->user();
+        if (! $viewer || (int) $viewer->id !== $viewerId) {
+            $viewer = User::find($viewerId);
+        }
 
         return [
             'id' => $post->id,
@@ -497,8 +516,13 @@ class FeedController extends Controller
             ] : null,
             'kudos' => $kudos ? [
                 'id' => $kudos->id,
+                'recipient_type' => $kudos->isTeamRecognition() ? 'team' : 'person',
+                'to_department_id' => $kudos->to_department_id,
+                'to_department' => $kudos->isTeamRecognition() && $kudos->toDepartment ? ['id' => $kudos->toDepartment->id, 'name' => $kudos->toDepartment->name] : null,
                 'category' => $kudos->category,
-                'impact' => $kudos->impact ?? FeedService::DEFAULT_IMPACT,
+                'category_label' => $kudos->categoryLabel(),
+                'impact' => $kudos->impactKey(),
+                'impact_label' => $kudos->impactLabel(),
                 'from_user' => $kudos->fromUser ? [
                     'id' => $kudos->fromUser->id,
                     'name' => $kudos->fromUser->name,
@@ -508,13 +532,12 @@ class FeedController extends Controller
                     'name' => $kudos->toUser->name,
                 ] : null,
                 'reactions' => $this->summariseReactions($kudos, $viewerId),
-                'replies' => $kudos->replies->map(fn ($reply) => [
-                    'id' => $reply->id,
-                    'user_name' => $reply->user?->name ?? 'Unknown',
-                    'body' => $reply->body,
-                    'created_at' => $reply->created_at?->diffForHumans(),
-                ])->values()->all(),
-                'can_reply' => in_array($viewerId, [$kudos->from_user_id, $kudos->to_user_id], true),
+                'replies' => $viewer ? app(HrRecognitionReplies::class)->project($viewer, $kudos)->map(fn ($reply) => [
+                    'id' => $reply['id'], 'user_name' => $reply['name'], 'body' => $reply['body'],
+                    'created_at' => $reply['created_at'] ? Carbon::parse($reply['created_at'])->diffForHumans() : null,
+                    'version' => $reply['version'], 'can_remove' => $reply['can_remove'],
+                ])->values()->all() : [],
+                'can_reply' => $viewer && $this->feedService->canReplyKudos($kudos, $viewer),
             ] : null,
             // Non-kudos posts (update/question/win/milestone) carry polymorphic
             // feed reactions + an open reply thread.

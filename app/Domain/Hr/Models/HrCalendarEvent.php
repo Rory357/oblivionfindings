@@ -26,6 +26,8 @@ class HrCalendarEvent extends Model
         'is_all_day',
         'rrule',
         'recurrence_until',
+        'recurrence_timezone',
+        'hub_content',
         'recurrence_parent_id',
         'is_exception',
         'exception_date',
@@ -38,6 +40,9 @@ class HrCalendarEvent extends Model
         'archived_at',
         'archived_by',
         'archive_reason',
+        'cancelled_at',
+        'cancelled_by',
+        'cancellation_reason',
     ];
 
     protected $casts = [
@@ -46,8 +51,11 @@ class HrCalendarEvent extends Model
         'is_all_day' => 'boolean',
         'recurrence_until' => 'datetime',
         'is_exception' => 'boolean',
+        'hub_content' => 'array',
         'exception_date' => 'date',
         'archived_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'registration_closes_before_minutes' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */

@@ -102,6 +102,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('observations', [ClientClinicalController::class, 'observations'])->name('observations.index');
         Route::post('observations', [ClientClinicalController::class, 'store'])->name('observations.store');
         Route::post('events', [ClientClinicalController::class, 'storeEvent'])->name('events.store');
+        Route::get('hospital-admissions', [ClientClinicalController::class, 'hospitalAdmissions'])->name('hospital-admissions.index');
     });
 
     // ── Client-scoped Behaviour / ABC charting ────────────────────────────
@@ -118,6 +119,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('observations/due', [ShiftClinicalController::class, 'dueObservations'])->name('observations.due');
         Route::post('observations', [ShiftClinicalController::class, 'store'])->name('observations.store');
         Route::post('events', [ShiftClinicalController::class, 'storeEvent'])->name('events.store');
+        Route::get('hospital-admissions', [ShiftClinicalController::class, 'hospitalAdmissions'])->name('hospital-admissions.index');
     });
 
 });

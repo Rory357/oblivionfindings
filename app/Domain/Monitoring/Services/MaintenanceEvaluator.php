@@ -11,99 +11,52 @@ final class MaintenanceEvaluator
 {
     public function activeWindow(Monitor $monitor, DateTimeInterface $at): ?MonitoringMaintenanceWindow
     {
+        return $this->resolve($monitor, $at)['window'];
+    }
+
+    /** Current configuration evaluated at the supplied occurrence instant; not an assignment-history claim.
+     * @return array{state: string, window: ?MonitoringMaintenanceWindow, specificity: ?string, matching: list<MonitoringMaintenanceWindow>, overridden: list<MonitoringMaintenanceWindow>}
+     */
+    public function resolve(Monitor $monitor, DateTimeInterface $at): array
+    {
         $at = CarbonImmutable::instance($at)->utc();
         $siteId = app(CanonicalDeviceSiteResolver::class)->resolve((int) $monitor->device_id);
-
-        return MonitoringMaintenanceWindow::query()
+        $windows = MonitoringMaintenanceWindow::query()
+            ->useWritePdo()
             ->where('site_id', $siteId)
             ->where('status', 'active')
             ->where('starts_at', '<=', $at)
             ->where(fn ($query) => $query
                 ->whereNull('recurrence_until')
-                ->orWhere('recurrence_until', '>=', $at))
+                ->orWhere('recurrence_until', '>', $at))
             ->where(fn ($query) => $query
                 ->where('monitor_id', $monitor->id)
                 ->orWhere('device_id', $monitor->device_id)
                 ->orWhere(fn ($scope) => $scope->whereNull('monitor_id')->whereNull('device_id')))
-            ->orderByDesc('monitor_id')
-            ->orderByDesc('device_id')
             ->orderBy('id')
             ->get()
-            ->first(fn (MonitoringMaintenanceWindow $window): bool => $this->containsOccurrence($window, $at));
+            ->filter(fn (MonitoringMaintenanceWindow $window): bool => $this->containsOccurrence($window, $at))
+            ->all();
+        if ($windows === []) {
+            return ['state' => 'none', 'window' => null, 'specificity' => null, 'matching' => [], 'overridden' => []];
+        }
+        $rank = fn (MonitoringMaintenanceWindow $window): int => $window->monitor_id !== null ? 2 : ($window->device_id !== null ? 1 : 0);
+        $priority = max(array_map($rank, $windows));
+        $matching = array_values(array_filter($windows, fn ($window): bool => $rank($window) === $priority));
+        $overridden = array_values(array_filter($windows, fn ($window): bool => $rank($window) < $priority));
+        $state = count($matching) > 1 ? 'conflict' : ($matching[0]->policy === 'suppress_notifications_and_ticketing' ? 'applied' : 'unsupported');
+
+        return [
+            'state' => $state,
+            'window' => $state === 'applied' ? $matching[0] : null,
+            'specificity' => ['site', 'device', 'monitor'][$priority],
+            'matching' => $matching,
+            'overridden' => $overridden,
+        ];
     }
 
-    public function containsOccurrence(
-        MonitoringMaintenanceWindow $window,
-        DateTimeInterface $at,
-    ): bool {
-        $at = CarbonImmutable::instance($at)->utc();
-        $start = CarbonImmutable::instance($window->starts_at)->utc();
-        $end = CarbonImmutable::instance($window->ends_at)->utc();
-
-        if ($window->recurrence === null) {
-            return $at >= $start && $at < $end;
-        }
-
-        if ($at < $start || ($window->recurrence_until !== null && $at > $window->recurrence_until)) {
-            return false;
-        }
-
-        $timezone = $window->timezone ?: 'UTC';
-        $startLocal = $start->setTimezone($timezone);
-        $endLocal = $end->setTimezone($timezone);
-        $atLocal = $at->setTimezone($timezone);
-        $candidates = $window->recurrence === 'daily'
-            ? $this->dailyCandidates($startLocal, $atLocal)
-            : $this->weeklyCandidates($startLocal, $atLocal);
-
-        foreach ($candidates as $candidateStart) {
-            if ($candidateStart < $startLocal) {
-                continue;
-            }
-            $candidateEnd = $this->recurringEnd($candidateStart, $startLocal, $endLocal);
-            if ($atLocal >= $candidateStart && $atLocal < $candidateEnd) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** @return list<CarbonImmutable> */
-    private function dailyCandidates(CarbonImmutable $start, CarbonImmutable $at): array
+    public function containsOccurrence(MonitoringMaintenanceWindow $window, DateTimeInterface $at): bool
     {
-        $candidate = $at->setTime(
-            $start->hour,
-            $start->minute,
-            $start->second,
-            $start->micro,
-        );
-
-        return [$candidate, $candidate->subDay()];
-    }
-
-    /** @return list<CarbonImmutable> */
-    private function weeklyCandidates(CarbonImmutable $start, CarbonImmutable $at): array
-    {
-        $elapsedDays = $start->startOfDay()->diffInDays($at->startOfDay(), false);
-        if ($elapsedDays < 0) {
-            return [];
-        }
-        $candidate = $start->addWeeks(intdiv((int) $elapsedDays, 7));
-
-        return [$candidate, $candidate->subWeek()];
-    }
-
-    private function recurringEnd(
-        CarbonImmutable $candidateStart,
-        CarbonImmutable $templateStart,
-        CarbonImmutable $templateEnd,
-    ): CarbonImmutable {
-        $dayOffset = $templateStart->startOfDay()->diffInDays($templateEnd->startOfDay(), false);
-
-        return $candidateStart
-            ->startOfDay()
-            ->addDays((int) $dayOffset)
-            ->setTime($templateEnd->hour, $templateEnd->minute, $templateEnd->second, $templateEnd->micro);
+        return (new MaintenanceSchedule)->contains((new MaintenanceOverlap)->values($window), $at);
     }
 }

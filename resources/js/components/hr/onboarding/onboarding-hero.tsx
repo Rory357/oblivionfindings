@@ -127,7 +127,7 @@ function HeroRail({ summary }: { summary: OnboardingSummary }) {
     }
 
     const toggleBtn = (active: boolean) =>
-        `h-6 rounded-md px-2.5 text-[11px] font-bold ${active ? 'bg-primary-foreground text-primary' : 'text-white/80'}`;
+        `h-6 rounded-md px-2.5 text-[11px] font-bold ${active ? 'bg-primary-foreground text-primary-strong' : 'text-white/80'}`;
 
     return (
         <div className="flex w-[340px] flex-none flex-col justify-center border-l border-white/15 bg-black/10 px-6 py-5">
@@ -305,7 +305,7 @@ export function OnboardingHero({
                             <button
                                 type="button"
                                 onClick={onStart}
-                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary shadow-sm transition-transform hover:scale-[1.02]"
+                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary-strong shadow-sm transition-transform hover:scale-[1.02]"
                             >
                                 <Plus className="h-[15px] w-[15px]" />
                                 Start onboarding

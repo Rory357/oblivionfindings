@@ -9,8 +9,6 @@ use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends FormRequest
 {
-    private bool $phoneWasSubmitted = false;
-
     private bool $jobTitleWasSubmitted = false;
 
     /**
@@ -25,7 +23,6 @@ class ProfileUpdateRequest extends FormRequest
             return;
         }
 
-        $this->phoneWasSubmitted = $this->has('phone');
         $this->jobTitleWasSubmitted = $this->has('job_title');
 
         $this->merge([
@@ -59,17 +56,13 @@ class ProfileUpdateRequest extends FormRequest
                 Rule::unique(User::class)->ignore($this->user()->id),
             ],
             'phone' => ['nullable', 'string', 'max:50'],
+            'on_call_cellphone_consent' => ['sometimes', 'boolean'],
             'job_title' => ['nullable', 'string', 'max:255'],
             'timezone' => ['required', 'timezone'],
             'locale' => ['required', Rule::in(array_keys((array) config('locales.available', ['en' => []])))],
             'date_format' => ['required', Rule::in(['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'])],
             'time_format' => ['required', Rule::in(['12', '24'])],
         ];
-    }
-
-    public function phoneWasSubmitted(): bool
-    {
-        return $this->phoneWasSubmitted;
     }
 
     public function jobTitleWasSubmitted(): bool

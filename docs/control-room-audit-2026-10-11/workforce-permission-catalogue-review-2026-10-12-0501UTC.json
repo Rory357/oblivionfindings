@@ -1,0 +1,53 @@
+{
+  "checked_at_utc": "2026-10-12T05:01:32Z",
+  "packet": "test-results/workforce-work-restriction-permission-catalogue-proposal-20261012",
+  "manifest_sha256": "98A22BA41D94CDD2EA54B719C7DEDBC066706A997BE700046C52F409E2EADB32",
+  "patch_sha256": "36AB4C0DC90C2EEC58D07BA57CA50EFDC5C5AE38F2050CFDBE87E0E94D93C7A8",
+  "review": "BOUNDED_SOURCE_REVIEW_NO_ADDITIONAL_DEFECT_FOUND",
+  "checks": {
+    "packet_hashes": 26,
+    "packet_matches": 26,
+    "declared_input_hashes": 11,
+    "declared_input_matches": 11,
+    "current_main_seeder_baselines": 3,
+    "current_main_matches": 3,
+    "authority_test_restored_sha256": "E2DB42F71D441AE08FD46C78F7089308F2519C3478673CB19CFC4076FE0696A3",
+    "authority_test_matches_original_after_only_removing_refresh_database_import_and_trait": true
+  },
+  "observed_source": {
+    "shared_seeders": [
+      "database/seeders/RbacSeeder.php",
+      "database/seeders/SeedHrPermissionsSeeder.php",
+      "database/seeders/OperationsPermissionsSeeder.php"
+    ],
+    "keys": [
+      "hr.workRestrictions.manageApprovers",
+      "hr.workRestrictions.approve"
+    ],
+    "registration": "Registers both keys; excludes new implicit admin/HR grants.",
+    "retention": "Preserves existing assignments to these two keys across role/admin sync; does not classify existing provenance as explicit.",
+    "seed_all": "Unchanged existing additive helper uses common independent-authority exclusion.",
+    "historical_migration": "Unchanged; existing fixture merely classifies the two new keys as later than the historical revoke migration.",
+    "test_dependency": "Six-path patch includes a new WorkRestrictionApproverListAccessTest. Exact d7f production authority packet is a separate composition dependency, and production class is absent in MAIN."
+  },
+  "tests": {
+    "new_seeding_cases": 3,
+    "retained_authority_controls_owner_declared": 14,
+    "actual_count": null,
+    "runtime_invoked_by_parent": false,
+    "packet_runtime_invoked": false
+  },
+  "state": {
+    "main_applied": false,
+    "grants_added": false,
+    "backfill_added": false,
+    "live_database_inspected": false,
+    "full_authority_workflow_accepted": false
+  },
+  "decision": "Finite source hunks accepted for isolated composition/verification. All three shared seeder hunks must be integrated atomically against current owners; no whole-file adoption. Compose exact authority implementation with its test, or explicitly split catalogue-only test package.",
+  "next_gate": "Actual new seeding cases and complete affected historical/authority suites on composed source under existing isolation/admission guards. Narrow implementation-owner grant/override/audit provenance evidence before activation if existing rows require reconciliation; preserve ambiguous assignments, no automatic grant/removal.",
+  "communication": "One concrete acceptance/dependency message sent to Workforce; no new human product question or H&S reimplementation.",
+  "separate_timesheets_report": "Owner reports current eight-suite rerun hit unchanged 60s deadline without counts; proposes two finite batches of complete suites. Accepted approach only with unchanged guards, one source identity and complete eight-suite/155-case reconciliation. Earlier failures remain failures.",
+  "heartbeat": "ACTIVE",
+  "all_scopes_complete": false
+}

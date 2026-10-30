@@ -12,11 +12,10 @@ use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
-use App\Models\FirstAidFollowup;
 use App\Models\IncidentFollowup;
 use App\Models\LoneWorkerSession;
 use App\Models\MedicationRound;
-use App\Models\PpeAllocation;
+use App\Services\HealthSafety\PpePickerService;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftOpenPosition;
@@ -24,9 +23,20 @@ use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Notifications\ControlRoom\BroadcastRecipientNotice;
+use App\Services\ControlRoom\BroadcastRecipientReadContext;
+use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
 use App\Services\HandoverWorkerNotes;
+use App\Services\HealthSafety\FirstAidService;
+use App\Services\HealthSafety\FirstAidSourceProjectionService;
+use App\Services\HealthSafety\LoneWorkerSessionAccessService;
+use App\Services\HealthSafety\LoneWorkerSessionScope;
+use App\Services\HealthSafety\LoneWorkerSessionService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\MyDay\ShiftTaskHelpService;
 use App\Services\MyDay\ShiftTaskWorkService;
@@ -34,10 +44,11 @@ use App\Services\ShiftHandoverService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\Tasks\TaskItem;
 use App\Services\UserSiteAccessService;
-use App\Support\EmarUrl;
+use App\Support\HealthSafety\LoneWorkerSessionPresenter;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -46,11 +57,20 @@ use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class MyTasksController extends Controller
 {
     private array $unavailableSections = [];
+
+    /**
+     * Controlled doses in My Day's window not listed for this reader, and how
+     * many of them are overdue (EM-12).
+     *
+     * @var array{total: int, overdue: int}
+     */
+    private array $hiddenControlledDoses = ['total' => 0, 'overdue' => 0];
 
     private const PRIORITY_ORDER = [
         'critical' => 0,
@@ -62,12 +82,22 @@ class MyTasksController extends Controller
     public function __construct(
         private readonly UserSiteAccessService $siteAccess,
         private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MarLinkService $marLinks,
     ) {}
 
-    public function __invoke(Request $request): Response
+    public function __invoke(Request $request): HttpResponse
     {
         abort_unless($request->user(), 403);
 
+        return app(BroadcastRecipientReadService::class)->respond(
+            $request->user(),
+            $request,
+            fn (BroadcastRecipientReadContext $broadcastContext): Response => $this->myDayResponse($request, $broadcastContext),
+        );
+    }
+
+    private function myDayResponse(Request $request, BroadcastRecipientReadContext $broadcastContext): Response
+    {
         $user = $request->user();
         $userId = $user->id;
         $canOpenEmar = $user->canDo('medications.view');
@@ -75,8 +105,9 @@ class MyTasksController extends Controller
         $canViewMedications = $canOpenEmar || $canRecordMedications;
         $canRecordControlledMedications = $canRecordMedications
             && $user->canDo('medications.controlled.record');
-        $canAccessControlledMedications = $user->canDo('medications.controlled.view')
-            || $canRecordControlledMedications;
+        // EM-12: only controlled view reveals controlled rows (controlled doses
+        // are never given from My Day, so record authority adds nothing here).
+        $canAccessControlledMedications = $user->canDo('medications.controlled.view');
         $workerNow = Carbon::now($this->workerTimezone());
         $queryNow = $workerNow->copy()->utc();
         $today = $workerNow->copy()->startOfDay()->utc();
@@ -121,22 +152,22 @@ class MyTasksController extends Controller
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($user);
-        $notifications = $this->getDigestNotifications($user);
+        $notifications = $this->getDigestNotifications($user, $broadcastContext);
         $pendingClaimsCount = $this->getPendingClaimsCount($user);
 
         // 8. Stats
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
         $stats = [
             'shifts_today' => $todayShifts->count(),
-            'meds_due' => count($medicationsDue),
+            // Doses waiting for the order check, doses recorded as missed, and
+            // doses the person is away for (C7), are listed but not counted.
+            'meds_due' => collect($medicationsDue)->whereNotIn('status', ['pending_check', 'missed', 'away'])->count(),
             'meds_overdue' => collect($medicationsDue)->where('status', 'overdue')->count(),
             'tasks_open' => $todayShifts->sum(fn ($s) => collect($s['tasks'])->where('is_completed', false)->count()),
             'timesheets_pending' => collect($timesheets)->count(),
             'incidents_open' => count($incidents),
             'cr_alerts' => collect($tasks)->where('type', 'alert')->count(),
-            'notifications_unread' => $this->boardPackAccess
-                ->visibleNotificationQuery($user, unreadOnly: true)
-                ->count(),
+            'notifications_unread' => $this->getUnreadNotificationCount($user, $broadcastContext),
         ];
 
         // 11. Frontline clock state (PR 4)
@@ -144,7 +175,7 @@ class MyTasksController extends Controller
 
         // 12. Active guided medication round (PR 9). Surfaces a resume / start
         //     banner on /my-day for the worker assigned to today's round.
-        $activeRound = $this->getActiveRound($user, $workerNow);
+        $activeRound = $this->getActiveRound($user, $workerNow, $clientIds);
 
         // 13. Shift lifecycle hero payloads.
         $nextShiftBriefing = $clock['open_session']
@@ -182,12 +213,17 @@ class MyTasksController extends Controller
             'today_iso' => $workerNow->toDateString(),
             'shifts' => $shifts->values()->all(),
             'medications_due' => $medicationsDue,
+            // Controlled doses in the same window left off the list for a
+            // reader without controlled-medicine access (EM-12).
+            'medications_hidden_controlled' => $this->hiddenControlledDoses['total'],
+            'medications_hidden_controlled_overdue' => $this->hiddenControlledDoses['overdue'],
             'timesheets' => $timesheets,
             'incidents' => $incidents,
             'tasks' => $tasks,
-            'notifications' => $notifications,
+            'notifications' => Inertia::always($notifications),
+            'broadcast_updates_reader' => Inertia::always($broadcastContext->envelope()),
             'pending_claims_count' => $pendingClaimsCount,
-            'stats' => $stats,
+            'stats' => Inertia::always($stats),
             'clock' => $clock,
             'active_round' => $activeRound,
             // Worker-facing Lone Worker Safety check-in card. Null unless the
@@ -195,11 +231,17 @@ class MyTasksController extends Controller
             // LoneWorkerSession. The one-tap card POSTs to the existing
             // health-safety.lone-workers.sessions.check-in endpoint.
             'active_lone_worker_session' => $this->getActiveLoneWorkerSession($user),
+            'lone_worker_confirmation' => app(LoneWorkerSessionService::class)->confirmationForViewer($user, $request->session()->get('lone_worker_confirmation')),
             // Read-only "First-aid follow-ups assigned to me" card. Lists open
             // (uncompleted) FirstAidFollowup rows owned by the signed-in worker
             // so re-checks / ACC45 lodgements / whānau calls don't slip. Each
             // row deep-links to the register's record modal (no write here).
             'first_aid_followups' => $this->getFirstAidFollowups($user),
+            // The worker's own open workplace injuries (a count only) → "Your workplace injury" link to My HR
+            // (Stephan, 30 Oct). Being the injured worker is the read rule.
+            'own_open_injuries' => \App\Models\WorkplaceInjury::query()->where('user_id', $user->id)
+                ->whereNotIn('status', ['recovered', 'closed'])->count(),
+            'first_aid_confirmation' => app(FirstAidService::class)->confirmationForViewer($user, $request->session()->get('first_aid_confirmation')),
             // Worker-facing "My PPE" card — the worker's own active allocations that
             // still need acknowledgement or an RPE fit-test. Empty unless action is
             // needed. One-tap acknowledge POSTs to ppe.allocations.acknowledge-own
@@ -208,7 +250,7 @@ class MyTasksController extends Controller
             // Cross-module "My tasks" card — the signed-in user's open work
             // items from the /tasks aggregator (assigned=me), capped at 8
             // rows. `total` carries the uncapped count for the footer link.
-            'myTasks' => $this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id')),
+            'myTasks' => Inertia::always($this->getMyAggregatedTasks($user, array_column($activeShiftCard['tasks'] ?? [], 'id'))),
             'active_shift' => $activeShiftCard,
             'task_creation' => [
                 'can_create' => $activeShift && app(ShiftTaskWorkService::class)->canCreate($user, $activeShift),
@@ -245,7 +287,7 @@ class MyTasksController extends Controller
             // `labels` prop shared globally by HandleInertiaRequests for
             // terminology overrides (client.singular, etc.).
             'my_day_labels' => Lang::get('my-day'),
-            'data_unavailable' => array_values(array_unique($this->unavailableSections)),
+            'data_unavailable' => Inertia::always(array_values(array_unique($this->unavailableSections))),
         ]);
     }
 
@@ -468,7 +510,9 @@ class MyTasksController extends Controller
         try {
             $openSession = HrAttendanceSession::query()
                 ->with([
-                    'shift.client:id,first_name,last_name,profile_photo_path',
+                    // site_id: workerShiftPayload resolves a site-less
+                    // shift's Site through its client.
+                    'shift.client:id,first_name,last_name,profile_photo_path,site_id',
                     'shift.serviceContext:id,name',
                     'shift.tasks',
                     'breakEvents',
@@ -525,9 +569,8 @@ class MyTasksController extends Controller
                     'incident' => $openSession->shift_id
                         ? '/incidents/create?shift_id='.$openSession->shift_id
                         : '/incidents',
-                    'emar' => $openShift?->client_id
-                        ? EmarUrl::mar($openShift->client_id, $now->toDateString())
-                        : '/meds/today',
+                    'emar' => $this->marUrlFor($openShift?->client_id, $now->toDateString())
+                        ?? '/meds/today',
                     'escalate' => $openSession->shift_id
                         ? '/control-room?shift_id='.$openSession->shift_id
                         : '/control-room',
@@ -757,7 +800,9 @@ class MyTasksController extends Controller
                 ->tap(fn ($query) => $this->siteAccess->applyShiftScope($query, $user))
                 ->visibleToFrontline()
                 ->whereBetween('starts_at', [$today, $tomorrowEnd])
-                ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
+                // site_id: workerShiftPayload resolves a site-less shift's
+                // Site through its client.
+                ->with(['client:id,first_name,last_name,profile_photo_path,site_id', 'serviceContext:id,name', 'tasks'])
                 ->orderBy('starts_at')
                 ->get()
                 ->map(function (Shift $shift) use ($workerNow, $user) {
@@ -799,103 +844,136 @@ class MyTasksController extends Controller
                 }
             }
 
-            $medications = ClientMedication::whereIn('client_id', $clientIds)
-                ->active()
+            // C6(d): the people the viewer may open (the P02 person rule), and
+            // each dose and its state from the dose-slot projection — the same
+            // doses and states as Meds today and the MAR. Controlled doses are
+            // listed only for readers who may see them named.
+            $clientIds = DoseSlotReaderScope::forViewerClients(auth()->user(), $clientIds)->clientIds ?? [];
+            if ($clientIds === []) {
+                return [];
+            }
+
+            // Verified orders, and orders whose change waits for the order
+            // check (shown, not recordable until checked).
+            // One orders query; the controlled ones are counted, not listed,
+            // for a reader without controlled-medicine access (EM-12).
+            [$controlled, $medications] = ClientMedication::whereIn('client_id', $clientIds)
+                ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                 ->where('is_prn', false)
-                ->when(! $canAccessControlled, fn ($query) => $query->where('controlled_drug', false))
                 ->where(function ($query) {
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
                 })
                 ->with('client:id,first_name,last_name')
-                ->get();
+                ->get()
+                ->partition(fn (ClientMedication $order): bool => ! $canAccessControlled && (bool) $order->controlled_drug);
+            $states = app(ScheduledDoseStates::class);
+            // With the words for an Away dose, as this reader may read them (C7).
+            $doses = $states->withAwayReasons(
+                $states->dosesBetween($medications->concat($controlled), $windowStart, $windowEnd, $now),
+                auth()->user(),
+            );
 
             // One administration query for the whole window, matched in memory
             // per slot — replaces the old per-dose-slot query (an N+1 that
             // re-ran every 60s with the /my-day live refresh).
             $administrations = $scheduleService->administrationsForWindow($clientIds, $windowStart, $windowEnd);
 
+            // EM-12: the controlled doses in the window left off the list for
+            // this reader — counted, never named, with how many are overdue —
+            // so the list reconciles with the badge.
+            foreach ($controlled as $order) {
+                foreach ($doses[(int) $order->id] ?? [] as $dose) {
+                    if (! $dose['due_at']->betweenIncluded($windowStart, $windowEnd)) {
+                        continue;
+                    }
+                    $this->hiddenControlledDoses['total']++;
+                    $record = $administrations->get($scheduleService->slotKey((int) $order->client_id, (int) $order->id, $dose['due_at']));
+                    if (ScheduledDoseStates::statusFor($dose, $record?->status) === 'overdue') {
+                        $this->hiddenControlledDoses['overdue']++;
+                    }
+                }
+            }
+
             $result = [];
 
             foreach ($medications as $med) {
-                $day = $windowStart->copy()->startOfDay();
-                $lastDay = $windowEnd->copy()->startOfDay();
-
-                while ($day->lessThanOrEqualTo($lastDay)) {
-                    foreach ($scheduleService->scheduledTimesForDate($med, $day) as $scheduled) {
-                        if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
-                            continue;
-                        }
-
-                        $scheduledIso = $scheduled->toIso8601String();
-                        $snoozeKey = sprintf(
-                            'my-day.med-snooze.user-%d.med-%d.%s',
-                            auth()->id(),
-                            $med->id,
-                            $scheduledIso,
-                        );
-
-                        if (Cache::has($snoozeKey)) {
-                            continue;
-                        }
-
-                        $administration = $administrations->get(
-                            $scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
-                        );
-
-                        if ($administration && in_array($administration->status, ['given', 'refused', 'withheld'], true)) {
-                            $status = $administration->status;
-                        } elseif ($scheduled->lt($now)) {
-                            $status = 'overdue';
-                        } elseif ($scheduled->lte($now->copy()->addHour())) {
-                            $status = 'due';
-                        } else {
-                            $status = 'upcoming';
-                        }
-
-                        $clientName = $med->client
-                            ? trim($med->client->first_name.' '.$med->client->last_name)
-                            : 'Unknown';
-
-                        $result[] = [
-                            // Compound id: medication + dose-time slot. Stable per
-                            // dose-row so the front-end can key rows and target
-                            // mutations (administer/refuse/snooze) at the right
-                            // occurrence. A medication with two in-window doses
-                            // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
-                            // `medication_id` carries the bare ClientMedication id
-                            // the action endpoints still resolve via route-model
-                            // binding — the occurrence is addressed by that id plus
-                            // `scheduled_for`.
-                            'id' => $med->id.':'.$scheduledIso,
-                            'medication_id' => $med->id,
-                            'client_id' => $med->client_id,
-                            'client_name' => $clientName,
-                            'medication_name' => $med->name,
-                            'dose' => $med->dosage,
-                            'route' => $med->route ?? 'Oral',
-                            'flag' => $med->is_prn ? 'PRN' : null,
-                            'is_controlled' => (bool) $med->controlled_drug,
-                            'can_record' => $canRecord
-                                && (! $med->controlled_drug || $canRecordControlled),
-                            // My Day has no authenticated second-checker flow;
-                            // controlled doses must be given from an eMAR surface.
-                            'can_give' => $canRecord && ! $med->controlled_drug,
-                            'scheduled_for' => $scheduledIso,
-                            'status' => $status,
-                            'emar_url' => $canOpenEmar
-                                ? EmarUrl::mar($med->client_id, $scheduled->toDateString())
-                                : null,
-                        ];
+                foreach ($doses[(int) $med->id] ?? [] as $dose) {
+                    // The slot's due time (the time the record dialog sends).
+                    $scheduled = $dose['due_at']->copy()->timezone($this->workerTimezone());
+                    if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
+                        continue;
+                    }
+                    if ($dose['state'] === 'self_managed') {
+                        continue;
                     }
 
-                    $day->addDay();
+                    $scheduledIso = $scheduled->toIso8601String();
+                    $snoozeKey = sprintf(
+                        'my-day.med-snooze.user-%d.med-%d.%s',
+                        auth()->id(),
+                        $med->id,
+                        $scheduledIso,
+                    );
+
+                    if (Cache::has($snoozeKey)) {
+                        continue;
+                    }
+
+                    $administration = $administrations->get(
+                        $scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
+                    );
+
+                    // The shared mapping Meds today uses: a recorded outcome
+                    // (missed is Missed (recorded), never overdue), else the
+                    // dose's state.
+                    $status = ScheduledDoseStates::statusFor($dose, $administration?->status);
+                    // Waiting for the order check: shown, never recordable here.
+                    $awaitingCheck = $status === 'pending_check';
+
+                    $clientName = $med->client
+                        ? trim($med->client->first_name.' '.$med->client->last_name)
+                        : 'Unknown';
+
+                    $result[] = [
+                        // Compound id: medication + dose-time slot. Stable per
+                        // dose-row so the front-end can key rows and target
+                        // mutations (administer/refuse/snooze) at the right
+                        // occurrence. A medication with two in-window doses
+                        // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
+                        // `medication_id` carries the bare ClientMedication id
+                        // the action endpoints still resolve via route-model
+                        // binding — the occurrence is addressed by that id plus
+                        // `scheduled_for`.
+                        'id' => $med->id.':'.$scheduledIso,
+                        'medication_id' => $med->id,
+                        'client_id' => $med->client_id,
+                        'client_name' => $clientName,
+                        'medication_name' => $med->name,
+                        'dose' => $med->dosage,
+                        'route' => $med->route ?? 'Oral',
+                        'flag' => $med->is_prn ? 'PRN' : null,
+                        'is_controlled' => (bool) $med->controlled_drug,
+                        'can_record' => ! $awaitingCheck && $canRecord
+                            && (! $med->controlled_drug || $canRecordControlled),
+                        // My Day has no authenticated second-checker flow;
+                        // controlled doses must be given from an eMAR surface.
+                        'can_give' => ! $awaitingCheck && $canRecord && ! $med->controlled_drug,
+                        'scheduled_for' => $scheduledIso,
+                        'status' => $status,
+                        'state' => $dose['state'],
+                        // Away (C7): why, shown as "Away · reason".
+                        'away_reason' => $status === 'away' ? $dose['away_reason'] : null,
+                        'emar_url' => $canOpenEmar
+                            ? $this->marUrlFor($med->client_id, $scheduled->toDateString())
+                            : null,
+                    ];
                 }
             }
 
             // Sort: overdue first, then due, then upcoming
             usort($result, function ($a, $b) {
-                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5];
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'pending_check' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5, 'missed' => 6, 'away' => 7];
 
                 return ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
             });
@@ -947,7 +1025,7 @@ class MyTasksController extends Controller
             $briefing['medications_due_during_shift'] = (
                 $user->canDo('medications.view')
                 || $user->canDo('medications.administer.record')
-            )
+            ) && app(\App\Services\Medication\ShiftMedicationCardAccess::class)->canRead($user, $shift->client) // EA-126
                 ? $this->getShiftMedicationsDue($shift, $workerNow, $canOpenEmar, $canAccessControlled)
                 : [];
             $briefing['what_to_know'] = $shift->notes;
@@ -1025,11 +1103,10 @@ class MyTasksController extends Controller
         }
 
         try {
-            $scheduleService = app(MarScheduleService::class);
             $start = $shift->starts_at->copy()->timezone($workerNow->getTimezone());
             $end = $shift->ends_at->copy()->timezone($workerNow->getTimezone());
 
-            return ClientMedication::query()
+            $medications = ClientMedication::query()
                 ->where('client_id', $shift->client_id)
                 ->active()
                 ->where('is_prn', false)
@@ -1038,27 +1115,25 @@ class MyTasksController extends Controller
                     $query->whereNotNull('dose_times')
                         ->orWhereNotNull('frequency');
                 })
-                ->get()
-                ->flatMap(function (ClientMedication $medication) use ($start, $end, $scheduleService, $canOpenEmar) {
+                ->get();
+            // The same doses (and due times) as Meds today and the MAR (C6d).
+            $doses = app(ScheduledDoseStates::class)->dosesBetween($medications, $start, $end, $workerNow);
+
+            return $medications
+                ->flatMap(function (ClientMedication $medication) use ($start, $end, $doses, $canOpenEmar) {
                     $items = [];
-                    $day = $start->copy()->startOfDay();
-                    $lastDay = $end->copy()->startOfDay();
-
-                    while ($day->lessThanOrEqualTo($lastDay)) {
-                        foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduled) {
-                            if ($scheduled->betweenIncluded($start, $end)) {
-                                $items[] = [
-                                    'medication_name' => $medication->name,
-                                    'dose' => $medication->dosage,
-                                    'scheduled_for' => $scheduled->toIso8601String(),
-                                    'emar_url' => $canOpenEmar
-                                        ? EmarUrl::mar($medication->client_id, $scheduled->toDateString())
-                                        : null,
-                                ];
-                            }
+                    foreach ($doses[(int) $medication->id] ?? [] as $dose) {
+                        $scheduled = $dose['due_at']->copy()->timezone($start->getTimezone());
+                        if ($scheduled->betweenIncluded($start, $end)) {
+                            $items[] = [
+                                'medication_name' => $medication->name,
+                                'dose' => $medication->dosage,
+                                'scheduled_for' => $scheduled->toIso8601String(),
+                                'emar_url' => $canOpenEmar
+                                    ? $this->marUrlFor($medication->client_id, $scheduled->toDateString())
+                                    : null,
+                            ];
                         }
-
-                        $day->addDay();
                     }
 
                     return $items;
@@ -1088,7 +1163,7 @@ class MyTasksController extends Controller
      * the guided page itself — so the banner never disagrees with what the
      * worker sees when they tap it.
      */
-    private function getActiveRound(User $user, Carbon $now): ?array
+    private function getActiveRound(User $user, Carbon $now, array $clientIds): ?array
     {
         if (! $user->canDo('medications.administer.record')) {
             return null;
@@ -1103,7 +1178,7 @@ class MyTasksController extends Controller
                 return null;
             }
 
-            $round = MedicationRound::query()
+            $rounds = MedicationRound::query()
                 ->whereNotNull('site_id')
                 ->whereIn('site_id', $siteIds)
                 ->whereDate('round_date', $now->toDateString())
@@ -1114,33 +1189,37 @@ class MyTasksController extends Controller
                 ->whereIn('status', ['in_progress', 'pending'])
                 ->orderByRaw("CASE status WHEN 'in_progress' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END")
                 ->orderBy('scheduled_time')
-                ->first();
-
-            if (! $round) {
-                return null;
-            }
+                ->get();
 
             $service = app(GuidedRoundService::class);
-            $progress = $service->progress(
-                $round,
-                $user->canDo('medications.controlled.view') || $user->canDo('medications.controlled.record'),
-            );
+            $readableClientIds = DoseSlotReaderScope::forViewerClients($user, $clientIds)->clientIds ?? [];
 
-            if ($progress['total'] === 0) {
-                return null;
+            foreach ($rounds as $round) {
+                $progress = $service->progress(
+                    $round,
+                    $user->canDo('medications.controlled.view'),
+                    $readableClientIds,
+                );
+
+                if ($progress['total'] === 0) {
+                    continue;
+                }
+
+                return [
+                    'id' => $round->id,
+                    'name' => $round->name,
+                    'status' => $round->status,
+                    'scheduled_time' => $round->scheduled_time,
+                    'scheduled_at' => $round->scheduledAt()?->toIso8601String(),
+                    'given' => $progress['given'],
+                    'total' => $progress['total'],
+                    'completed' => $progress['completed'],
+                    'percent' => $progress['percent'],
+                    'url' => route('meds.round.show', $round),
+                ];
             }
 
-            return [
-                'id' => $round->id,
-                'name' => $round->name,
-                'status' => $round->status,
-                'scheduled_time' => $round->scheduled_time,
-                'given' => $progress['given'],
-                'total' => $progress['total'],
-                'completed' => $progress['completed'],
-                'percent' => $progress['percent'],
-                'url' => route('meds.round.show', $round),
-            ];
+            return null;
         } catch (\Throwable $e) {
             report($e);
             $this->unavailableSections[] = 'Medication round';
@@ -1150,57 +1229,31 @@ class MyTasksController extends Controller
     }
 
     /**
-     * The signed-in worker's live Lone Worker Safety session, if any.
-     *
-     * Returns the most recent session in a live state (active / overdue /
-     * emergency) where the user is the monitored worker — the data behind the
-     * My Day "You're being monitored — check in" card. Null when the worker is
-     * not currently being monitored (the card is hidden entirely).
-     *
-     * `next_check_in_at` / `is_check_in_overdue` are derived in PHP from the
-     * model's UTC-stored Carbons (never SQL NOW(), which can sit in a different
-     * timezone and skew the comparison — the same trap the coordinator hero hit).
+     * The most recent live session currently readable by its actual worker.
+     * Missing, ended, conflicting or revoked source evidence returns no card.
+     * Received check-in and startup scheduling evidence remain separate facts.
      */
     private function getActiveLoneWorkerSession(User $user): ?array
     {
         try {
-            $session = LoneWorkerSession::query()
-                ->where('user_id', $user->id)
-                ->whereIn('status', ['active', 'overdue', 'emergency'])
-                ->with(['site:id,name', 'client:id,first_name,last_name'])
-                ->latest('started_at')
-                ->first();
+            return app(LoneWorkerSessionAccessService::class)->withCurrentViewer($user, function ($current, $reads, $sites) {
+                $query = app(LoneWorkerSessionScope::class)->applyForSites(LoneWorkerSession::query(), $sites, true);
+                $session = $reads->query($query)->where('user_id', $current->id)
+                    ->whereIn('status', LoneWorkerSessionAccessService::LIVE_STATUSES)->whereNull('ended_at')
+                    ->latest('started_at')->orderByDesc('id')->first();
 
-            if (! $session) {
+                return $session ? app(LoneWorkerSessionPresenter::class)->selfSummary($session, $current) : null;
+            });
+        } catch (HttpException $error) {
+            if (in_array($error->getStatusCode(), [403, 404], true)) {
                 return null;
             }
+            report($error);
+            $this->unavailableSections[] = 'Lone-worker check-in';
 
-            $base = $session->last_check_in_at ?? $session->started_at;
-            $nextCheckInAt = $base
-                ? $base->copy()->addMinutes((int) $session->check_in_interval_minutes)
-                : null;
-
-            return [
-                'id' => $session->id,
-                'status' => $session->status,
-                'started_at' => optional($session->started_at)->toIso8601String(),
-                'expected_end_at' => optional($session->expected_end_at)->toIso8601String(),
-                'last_check_in_at' => optional($session->last_check_in_at)->toIso8601String(),
-                'check_in_interval_minutes' => (int) $session->check_in_interval_minutes,
-                'next_check_in_at' => optional($nextCheckInAt)->toIso8601String(),
-                // Overdue when the 5-min job has already flipped it, or the next
-                // check-in window has lapsed on a still-active session.
-                'is_check_in_overdue' => $session->status === 'overdue' || $session->isCheckInOverdue(),
-                'activity_description' => $session->activity_description,
-                'site' => $session->site
-                    ? ['id' => $session->site->id, 'name' => $session->site->name]
-                    : null,
-                'client' => $session->client
-                    ? ['id' => $session->client->id, 'name' => trim($session->client->first_name.' '.$session->client->last_name)]
-                    : null,
-            ];
-        } catch (\Throwable $e) {
-            report($e);
+            return null;
+        } catch (\Throwable $error) {
+            report($error);
             $this->unavailableSections[] = 'Lone-worker check-in';
 
             return null;
@@ -1213,34 +1266,13 @@ class MyTasksController extends Controller
      * Read-only digest data for the My Day "First-aid follow-ups assigned to
      * me" card. Returns uncompleted FirstAidFollowup rows (whose parent record
      * still exists) ordered by due date, each with a deep-link into the First
-     * Aid Register's record modal. Fail-soft — the home renders without the
+     * Aid record's exact follow-up section. Fail-soft — the home renders without the
      * card if anything throws.
      */
     private function getFirstAidFollowups(User $user): array
     {
         try {
-            return FirstAidFollowup::query()
-                ->where('assigned_to_user_id', $user->id)
-                ->whereNull('completed_at')
-                ->whereHas('record')
-                ->with([
-                    'record:id,treated_person_name,site_id,treatment_date,injury_illness_type',
-                    'record.site:id,name',
-                ])
-                ->orderBy('due_at')
-                ->limit(10)
-                ->get()
-                ->map(fn ($f) => [
-                    'id' => $f->id,
-                    'notes' => $f->notes,
-                    'due_at' => $f->due_at?->toIso8601String(),
-                    'is_overdue' => $f->due_at ? $f->due_at->isPast() : false,
-                    'record_id' => $f->first_aid_record_id,
-                    'treated_person_name' => $f->record?->treated_person_name,
-                    'site_name' => $f->record?->site?->name,
-                    'url' => '/health-safety/first-aid?record='.$f->first_aid_record_id,
-                ])
-                ->all();
+            return app(FirstAidSourceProjectionService::class)->forMyDay($user);
         } catch (\Throwable $e) {
             report($e);
             $this->unavailableSections[] = 'First-aid follow-ups';
@@ -1259,34 +1291,7 @@ class MyTasksController extends Controller
     private function getMyPpe(User $user): array
     {
         try {
-            return PpeAllocation::query()
-                ->where('user_id', $user->id)
-                ->whereNull('returned_at')
-                ->where(function ($q) {
-                    $q->where('acknowledged', false)
-                        ->orWhere(fn ($r) => $r->where('fit_test_completed', false)
-                            ->whereHas('ppeInventory.ppeType', fn ($t) => $t->where('category', 'respiratory')));
-                })
-                ->with(['ppeInventory.ppeType:id,name,category', 'ppeInventory.site:id,name'])
-                ->latest('allocated_at')
-                ->get()
-                ->map(function (PpeAllocation $a) {
-                    $item = $a->ppeInventory;
-                    $isRpe = $item?->ppeType?->category === 'respiratory';
-
-                    return [
-                        'id' => $a->id,
-                        'type_name' => $item?->ppeType?->name ?? 'PPE',
-                        'category' => $item?->ppeType?->category,
-                        'serial_number' => $item?->serial_number,
-                        'site' => $item?->site?->name,
-                        'allocated_at' => optional($a->allocated_at)->toIso8601String(),
-                        'acknowledged' => (bool) $a->acknowledged,
-                        'fit_test_required' => $isRpe,
-                        'fit_test_completed' => (bool) $a->fit_test_completed,
-                    ];
-                })
-                ->all();
+            return app(PpePickerService::class)->ownAllocations($user);
         } catch (\Throwable $e) {
             report($e);
             $this->unavailableSections[] = 'PPE';
@@ -1299,25 +1304,24 @@ class MyTasksController extends Controller
      * The signed-in user's open work items from the company-wide /tasks
      * aggregator (assigned=me), for the My Day "My tasks" card. Permission-
      * scoped exactly like /tasks — the aggregator runs as this user. Capped
-     * at 8 rows; `total` is the uncapped open count. Fail-soft: the home
-     * renders without the card if a provider throws.
+     * at 8 rows; `total` counts the current filtered feed before preview
+     * slicing. Providers may have their own bounds. A provider failure
+     * returns an empty fallback with the separate Other tasks unavailable marker.
      *
-     * @return array{total: int, items: array<int, array<string, mixed>>}
+     * @return array{viewer_id: int, total: int, items: array<int, array<string, mixed>>}
      */
     private function getMyAggregatedTasks(User $user, array $currentShiftTaskIds = []): array
     {
         try {
-            $aggregator = app(TaskAggregator::class);
-            $items = $aggregator->filterItems(
-                $aggregator->itemsFor($user),
-                $user,
-                ['assigned' => 'me'],
-            );
+            // Passing the filter in lets providers that support it (incidents) narrow to the
+            // viewer's own rows before their per-row proofs; itemsFor() still applies it to every row.
+            $items = app(TaskAggregator::class)->itemsFor($user, ['assigned' => 'me']);
             // itemsFor() excludes done items by default; keep a guard anyway.
             $currentIds = array_map(fn ($id) => 'shift_task-'.$id, $currentShiftTaskIds);
             $items = array_values(array_filter($items, fn (TaskItem $i) => $i->bucket !== TaskItem::BUCKET_DONE && ! in_array($i->id, $currentIds, true)));
 
             return [
+                'viewer_id' => (int) $user->id,
                 'total' => count($items),
                 'items' => array_map(fn (TaskItem $i) => [
                     'id' => $i->id,
@@ -1334,7 +1338,7 @@ class MyTasksController extends Controller
             report($e);
             $this->unavailableSections[] = 'Other tasks';
 
-            return ['total' => 0, 'items' => []];
+            return ['viewer_id' => (int) $user->id, 'total' => 0, 'items' => []];
         }
     }
 
@@ -1438,7 +1442,7 @@ class MyTasksController extends Controller
                         'severity' => $incident->severity,
                         'status' => $incident->status,
                         'occurred_at' => $incident->occurred_at?->toIso8601String(),
-                        'url' => '/incidents/'.$incident->id,
+                        'url' => '/incidents/'.$incident->id.'?return_to=%2Fmy-day',
                         'requires_followup' => (bool) $incident->requires_followup,
                     ];
                 })
@@ -1636,7 +1640,7 @@ class MyTasksController extends Controller
                         'description' => $description,
                         'priority' => $incident?->severity ?? 'medium',
                         'status' => 'pending',
-                        'source_url' => '/incidents/'.($followup->client_incident_id),
+                        'source_url' => '/incidents/'.($followup->client_incident_id).'?return_to=%2Fmy-day',
                         'due_at' => $followup->due_at?->toIso8601String(),
                         'created_at' => $followup->created_at->toIso8601String(),
                         'meta' => [
@@ -1691,35 +1695,67 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getDigestNotifications(User $user): array
+    private function getUnreadNotificationCount(User $user, BroadcastRecipientReadContext $broadcastContext): int
     {
-        try {
-            $workerNow = Carbon::now($this->workerTimezone());
+        $visible = $this->boardPackAccess
+            ->visibleNotificationQuery($user, true, null, $broadcastContext)
+            ->reorder();
 
-            return $this->boardPackAccess
-                ->visibleNotificationQuery($user, unreadOnly: true)
-                ->latest()
-                ->limit(5)
-                ->get(['id', 'type', 'data', 'created_at'])
-                ->map(function ($notification) use ($workerNow) {
-                    $data = is_array($notification->data) ? $notification->data : [];
-                    $createdAt = $this->digestNotificationCreatedAt($notification);
+        // One count over the same visible set (the header bell counts the same
+        // way) — never page through every unread row just to count it.
+        $count = (clone $visible)->count();
 
-                    return [
-                        'id' => (string) $notification->id,
-                        'title' => $this->digestNotificationTitle($data, (string) $notification->type),
-                        'at' => $this->digestNotificationAge($createdAt, $workerNow),
-                        'tone' => $this->digestNotificationTone($data),
+        // Counted typed rows also reveal their existence, including rows beyond the five previews.
+        // Register each with the same final proof, then discard the projected message body. Only an
+        // admitted staff-message notice can be typed in this set; ordinary rows project to nothing.
+        (clone $visible)
+            ->where('notifications.type', BroadcastRecipientNotice::class)
+            ->get()
+            ->each(fn (DatabaseNotification $notification) => $broadcastContext->project($notification));
+
+        return $count;
+    }
+
+    private function getDigestNotifications(User $user, BroadcastRecipientReadContext $broadcastContext): array
+    {
+        $workerNow = Carbon::now($this->workerTimezone());
+
+        return $this->boardPackAccess
+            ->visibleNotificationQuery($user, true, null, $broadcastContext)
+            ->latest()
+            ->limit(5)
+            ->get()
+            ->map(function ($notification) use ($workerNow, $broadcastContext) {
+                $broadcast = $broadcastContext->project($notification);
+                $data = $broadcast === null
+                    ? (is_array($notification->data) ? $notification->data : [])
+                    : $broadcast['data'];
+                $createdAt = $broadcast === null
+                    ? $this->digestNotificationCreatedAt($notification)
+                    : Carbon::parse($broadcast['created_at'])->timezone($this->workerTimezone());
+
+                $item = [
+                    'id' => $broadcast === null ? (string) $notification->id : $broadcast['id'],
+                    'title' => $broadcast === null
+                        ? $this->digestNotificationTitle($data, (string) $notification->type)
+                        : Str::limit(trim($data['body']), 90),
+                    'at' => $this->digestNotificationAge($createdAt, $workerNow),
+                    'tone' => $this->digestNotificationTone($data),
+                ];
+                if ($broadcast !== null) {
+                    $item['broadcast'] = [
+                        'schema_version' => $data['schema_version'],
+                        'notification_id' => $broadcast['id'],
+                        'recipient_viewer_id' => $data['recipient_viewer_id'],
+                        'reader_read_id' => $data['reader_read_id'],
+                        'href' => $data['url'],
                     ];
-                })
-                ->values()
-                ->all();
-        } catch (\Throwable $e) {
-            report($e);
-            $this->unavailableSections[] = 'Updates';
+                }
 
-            return [];
-        }
+                return $item;
+            })
+            ->values()
+            ->all();
     }
 
     private function digestNotificationTitle(array $data, string $type): string
@@ -1802,5 +1838,14 @@ class MyTasksController extends Controller
     private function workerTimezone(): string
     {
         return (string) config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
+    /**
+     * My Day is roster-scoped; the MAR is person-scoped (assignment or a
+     * clocked-in covering shift). Link only charts this worker may open.
+     */
+    private function marUrlFor(mixed $clientId, ?string $date = null): ?string
+    {
+        return $this->marLinks->urlFor(request()->user(), $clientId, $date);
     }
 }

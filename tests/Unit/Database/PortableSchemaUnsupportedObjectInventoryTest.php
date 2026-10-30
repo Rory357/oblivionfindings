@@ -23,7 +23,7 @@ it('keeps every known unsupported schema object migration in the audited manifes
 
     expect($audit['blockers'])->toBe([])
         ->and($audit['discovered'])->toBe(PortableSchemaUnsupportedObjectInventory::MANIFEST)
-        ->and(array_sum(array_column($audit['discovered'], 'trigger')))->toBe(16);
+        ->and(array_sum(array_column($audit['discovered'], 'trigger')))->toBe(31);
 });
 
 it('recognises precise ddl variants and php-composed object keywords', function (): void {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\Operations\PeopleLocationsTest" file="tests\Feature\Operations\PeopleLocationsTest.php" tests="1" assertions="5" errors="0" failures="0" skipped="0" time="246.961355">
+    <testcase name="it renders organisation brand tokens for both themes without literal template text" file="tests\Feature\Operations\PeopleLocationsTest.php::it renders organisation brand tokens for both themes without literal template text" class="Tests\Feature\Operations\PeopleLocationsTest" classname="Tests.Feature.Operations.PeopleLocationsTest" assertions="5" time="246.961355"/>
+  </testsuite>
+</testsuites>

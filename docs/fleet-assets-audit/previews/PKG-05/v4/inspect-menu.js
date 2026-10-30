@@ -1,0 +1,1 @@
+async(page)=>({url:page.url(),buttons:await page.getByRole('row').filter({hasText:'Alex Morgan'}).getByRole('button').allTextContents(),labels:await page.getByRole('row').filter({hasText:'Alex Morgan'}).getByRole('button').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('aria-label')))})

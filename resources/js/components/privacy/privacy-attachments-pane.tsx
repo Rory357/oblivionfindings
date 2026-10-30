@@ -8,6 +8,7 @@
  * of existing documents with download + delete. Sensitive files the viewer
  * isn't cleared for arrive as a locked shell (need-to-know).
  */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
     AttachmentUploader,
     formatFileSize,
@@ -22,6 +23,7 @@ import {
     ShieldAlert,
     Trash2,
 } from 'lucide-react';
+import { useState } from 'react';
 
 export type PrivacyAttachmentItem =
     | { id: number; locked: true; is_sensitive: true }
@@ -46,6 +48,14 @@ export type PrivacyAttachableType =
     | 'dpia'
     | 'retention';
 
+const RECORD_NOUN: Record<PrivacyAttachableType, string> = {
+    request: 'privacy request',
+    breach: 'breach record',
+    hold: 'legal hold',
+    dpia: 'privacy impact assessment',
+    retention: 'retention record',
+};
+
 export function PrivacyAttachmentsPane({
     attachableType,
     attachableId,
@@ -57,11 +67,24 @@ export function PrivacyAttachmentsPane({
     attachments: PrivacyAttachmentItem[];
     canManage: boolean;
 }) {
-    const remove = (id: number) =>
-        router.delete(`/privacy/attachments/${id}`, {
+    const [fileToRemove, setFileToRemove] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(`/privacy/attachments/${fileToRemove.id}`, {
             preserveScroll: true,
             preserveState: true,
+            onStart: () => setRemovingFile(true),
+            onFinish: () => {
+                setRemovingFile(false);
+                setFileToRemove(null);
+            },
         });
+    };
 
     return (
         <div className="flex flex-col gap-3">
@@ -137,7 +160,12 @@ export function PrivacyAttachmentsPane({
                                 {canManage ? (
                                     <button
                                         type="button"
-                                        onClick={() => remove(a.id)}
+                                        onClick={() =>
+                                            setFileToRemove({
+                                                id: a.id,
+                                                name: a.name,
+                                            })
+                                        }
                                         aria-label={`Remove ${a.name}`}
                                         className="grid h-8 w-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-status-critical"
                                     >
@@ -165,6 +193,27 @@ export function PrivacyAttachmentsPane({
                     hint="PDF, Word, Excel, images — up to 10 MB each"
                 />
             ) : null}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.name}
+                        </span>{' '}
+                        will be permanently deleted from this{' '}
+                        {RECORD_NOUN[attachableType]}. This cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }

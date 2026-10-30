@@ -2,6 +2,7 @@
  * register (page + all six modals). Keeps the FE contract in one place so the
  * detail dialogs and create wizards stay consistent with each other and with
  * WorkerParticipationController. */
+import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
 import type { Tone } from '@/pages/health-safety/components/register-row-kit';
 import {
     AlertTriangle,
@@ -23,6 +24,7 @@ export const WP_BASE = '/health-safety/worker-participation';
 export type Ref = { id: number; name: string } | null;
 
 export type RepRow = {
+    site_ownership?: 'recorded' | 'unconfirmed';
     id: number;
     user: Ref;
     site: Ref;
@@ -34,6 +36,7 @@ export type RepRow = {
 };
 
 export type MeetingRow = {
+    site_ownership?: 'recorded' | 'unconfirmed';
     id: number;
     committee: Ref;
     scheduled_at: string | null;
@@ -44,6 +47,7 @@ export type MeetingRow = {
 };
 
 export type ConsultationRow = {
+    site_ownership?: 'recorded' | 'unconfirmed';
     id: number;
     title: string;
     consultation_type: string;
@@ -78,6 +82,7 @@ export type RepDetail = RepRow & {
 };
 
 export type MeetingDetail = {
+    site_ownership?: 'recorded' | 'unconfirmed';
     id: number;
     committee: Ref;
     hs_committee_id: number;
@@ -253,25 +258,8 @@ export const MEETING_FREQUENCIES: { value: string; label: string }[] = [
 /*  Formatters                                                          */
 /* ------------------------------------------------------------------ */
 
-export const fmtDate = (d: string | null | undefined) =>
-    d
-        ? new Date(d).toLocaleDateString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-          })
-        : '—';
-
-export const fmtDateTime = (d: string | null | undefined) =>
-    d
-        ? new Date(d).toLocaleString('en-NZ', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-          })
-        : '—';
+export const fmtDate = formatDateOnly;
+export const fmtDateTime = formatDateTimeLong;
 
 export const consultationTypeLabel = (t: string) =>
     CONSULTATION_TYPES.find((x) => x.key === t)?.label ??

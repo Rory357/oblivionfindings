@@ -57,6 +57,7 @@ export function CapacityHeatmapPane({
 }: CapacityHeatmapPaneProps) {
     const totals = rows.map((r) => r.days.reduce((s, x) => s + x, 0));
     const totalScheduled = totals.reduce((s, x) => s + x, 0);
+    const gridMinWidth = 340 + days.length * 80;
     const dayTotals = Array.from({ length: days.length }, (_, di) =>
         rows.reduce((s, r) => s + (r.days[di] ?? 0), 0),
     );
@@ -65,14 +66,20 @@ export function CapacityHeatmapPane({
         <div className="space-y-4">
             <MicroStats stats={stats} />
 
-            <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+            <div
+                role="region"
+                aria-label="Staff capacity grid, scroll across for all days"
+                tabIndex={0}
+                className="overflow-x-auto rounded-[14px] border border-border bg-card focus-visible:ring-2 focus-visible:ring-ring"
+            >
                 <div
                     className="grid border-b border-border bg-muted/50"
                     style={{
                         gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
+                        minWidth: gridMinWidth,
                     }}
                 >
-                    <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <div className="px-3 py-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                         Staff · {rows.length} rostered
                     </div>
                     {days.map((d, i) => {
@@ -82,7 +89,7 @@ export function CapacityHeatmapPane({
                             <div
                                 key={i}
                                 className={cn(
-                                    'px-2 py-2 text-center text-[11px]',
+                                    'px-2 py-2 text-center text-xs',
                                     isToday && 'bg-primary/10 text-primary',
                                 )}
                             >
@@ -102,7 +109,7 @@ export function CapacityHeatmapPane({
                             </div>
                         );
                     })}
-                    <div className="px-2 py-2 text-center text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <div className="px-2 py-2 text-center text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                         Total · Target
                     </div>
                 </div>
@@ -125,11 +132,12 @@ export function CapacityHeatmapPane({
                                 className="grid"
                                 style={{
                                     gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
+                                    minWidth: gridMinWidth,
                                 }}
                             >
                                 <div className="flex items-center gap-2 px-3 py-2">
                                     <div
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold uppercase"
+                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
                                         style={avatarHueStyle(row.hue)}
                                     >
                                         {row.initials}
@@ -144,7 +152,7 @@ export function CapacityHeatmapPane({
                                             />
                                         </div>
                                         {row.role ? (
-                                            <div className="truncate text-[11px] text-muted-foreground">
+                                            <div className="truncate text-xs text-muted-foreground">
                                                 {row.role}
                                             </div>
                                         ) : null}
@@ -180,15 +188,15 @@ export function CapacityHeatmapPane({
                                     <div className="text-sm font-bold tabular-nums">
                                         {total}h
                                     </div>
-                                    <div className="text-[10px] text-muted-foreground">
+                                    <div className="text-xs text-muted-foreground">
                                         / {row.target || '—'}h
                                     </div>
                                     {overload ? (
-                                        <span className="mt-1 rounded bg-status-critical px-1.5 py-0.5 text-[9px] font-bold text-white uppercase">
+                                        <span className="mt-1 rounded bg-status-critical px-1.5 py-0.5 text-xs font-bold text-white uppercase">
                                             Overload
                                         </span>
                                     ) : under ? (
-                                        <span className="mt-1 rounded bg-status-warning px-1.5 py-0.5 text-[9px] font-bold text-white uppercase">
+                                        <span className="mt-1 rounded bg-status-warning px-1.5 py-0.5 text-xs font-bold text-white uppercase">
                                             Under
                                         </span>
                                     ) : null}
@@ -200,9 +208,10 @@ export function CapacityHeatmapPane({
                         className="grid border-t border-border bg-muted/30"
                         style={{
                             gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
+                            minWidth: gridMinWidth,
                         }}
                     >
-                        <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                        <div className="px-3 py-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                             Day totals
                         </div>
                         {dayTotals.map((t, i) => (
@@ -220,7 +229,7 @@ export function CapacityHeatmapPane({
                 </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="font-semibold tracking-wider text-muted-foreground uppercase">
                     Load
                 </span>
@@ -249,7 +258,7 @@ function ComplianceChip({ badge }: { badge?: CapacityRow['complianceBadge'] }) {
     return (
         <span
             className={cn(
-                'inline-flex max-w-full items-center rounded-full border px-1.5 py-0.5 text-[10px] leading-none font-semibold',
+                'inline-flex max-w-full items-center rounded-full border px-1.5 py-0.5 text-xs leading-none font-semibold',
                 isExpired
                     ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                     : 'border-status-warning/30 bg-status-warning-bg text-status-warning',

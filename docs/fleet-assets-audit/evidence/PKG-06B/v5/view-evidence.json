@@ -1,0 +1,156 @@
+[
+  {
+    "url": "http://127.0.0.1:8900/#view=overview&section=summary&scenario=normal",
+    "main": "Overview",
+    "sub": "Summary",
+    "expected": "Summary & next actions",
+    "file": "final-01-summary.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=overview&section=identity&scenario=normal",
+    "main": "Overview",
+    "sub": "Asset details",
+    "expected": "Asset details",
+    "file": "final-02-asset-details.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=overview&section=library&scenario=normal",
+    "main": "Overview",
+    "sub": "Documents",
+    "expected": "Documents & evidence",
+    "file": "final-03-documents.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=overview&section=finance&scenario=normal",
+    "main": "Overview",
+    "sub": "Finance",
+    "expected": "Financial decisions remain in Finance",
+    "file": "final-04-finance.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=custody&section=current&scenario=normal",
+    "main": "Custody",
+    "sub": "Current custody",
+    "expected": "Accountable custody",
+    "file": "final-05-current-custody.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=custody&section=movements&scenario=normal",
+    "main": "Custody",
+    "sub": "Movement history",
+    "expected": "Movement history",
+    "file": "final-06-movement-history.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=checks&section=checks&scenario=normal",
+    "main": "Checks & service",
+    "sub": "Original checks",
+    "expected": "Original submitted checks",
+    "file": "final-07-original-checks.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=checks&section=service&scenario=normal",
+    "main": "Checks & service",
+    "sub": "Service & calibration",
+    "expected": "Service & calibration requirements",
+    "file": "final-08-service-and-calibration.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=maintenance&section=work&scenario=normal",
+    "main": "Maintenance",
+    "sub": "Issues & work",
+    "expected": "Issues & Maintenance history",
+    "file": "final-09-issues-and-work.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=location&section=location&scenario=normal",
+    "main": "Location",
+    "sub": "Location & observations",
+    "expected": "These sources answer different questions",
+    "file": "final-10-location-and-observations.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=components&section=kit&scenario=normal",
+    "main": "Components & kit",
+    "sub": "Kit contents",
+    "expected": "Components & removable kit",
+    "file": "final-11-kit-contents.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=components&section=componentHistory&scenario=normal",
+    "main": "Components & kit",
+    "sub": "Replacement history",
+    "expected": "Component replacement history",
+    "file": "final-12-replacement-history.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=lifecycle&section=timeline&scenario=normal",
+    "main": "History",
+    "sub": "Asset history",
+    "expected": "Asset history",
+    "file": "final-13-asset-history.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  },
+  {
+    "url": "http://127.0.0.1:8900/#view=lifecycle&section=retirement&scenario=normal",
+    "main": "History",
+    "sub": "Retirement review",
+    "expected": "Retirement & disposal review",
+    "file": "final-14-retirement-review.png",
+    "viewport": {
+      "width": 1600,
+      "height": 1000
+    }
+  }
+]

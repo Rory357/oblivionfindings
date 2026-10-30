@@ -48,6 +48,7 @@ class MaintenanceAttachmentService
                 if ($prior) {
                     abort_unless((int) $prior->work_order_id === $workOrderId
                         && hash_equals((string) $prior->request_fingerprint, $fingerprint), 409);
+
                     return $prior;
                 }
 
@@ -69,6 +70,7 @@ class MaintenanceAttachmentService
                     'request_key' => $key, 'request_fingerprint' => $fingerprint,
                     'created_at' => now(),
                 ]);
+
                 return DB::table('fleet_maintenance_attachments')->where('id', $id)->first();
             });
         } catch (\Throwable $error) {
@@ -92,6 +94,15 @@ class MaintenanceAttachmentService
 
     public function download(User $actor, int $workOrderId, int $attachmentId): object
     {
+        $row = $this->record($actor, $workOrderId, $attachmentId);
+        abort_unless(Storage::disk('private')->exists($row->path), 404);
+
+        return $row;
+    }
+
+    /** Same source authorization for metadata and bytes, including a missing original. */
+    public function record(User $actor, int $workOrderId, int $attachmentId): object
+    {
         $order = FleetWorkOrder::query()->whereKey($workOrderId)->firstOrFail();
         $this->access->asset($actor, (int) $order->asset_id);
         $row = DB::table('fleet_maintenance_attachments')->where('id', $attachmentId)
@@ -103,7 +114,6 @@ class MaintenanceAttachmentService
         $this->assertParent($actor, $order,
             $parentCount === 0 ? 'work' : ($row->report_id ? 'report' : ($row->check_run_id ? 'check' : 'action')),
             (int) ($row->report_id ?? $row->check_run_id ?? $row->action_id ?? 0));
-        abort_unless(Storage::disk('private')->exists($row->path), 404);
 
         return $row;
     }

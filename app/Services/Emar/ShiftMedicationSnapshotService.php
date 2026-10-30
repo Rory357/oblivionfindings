@@ -13,9 +13,11 @@ use Illuminate\Support\Collection;
 /**
  * Computes the live medication picture for a single rostering shift's window —
  * the "Medications this shift" lens surfaced in the eMAR handover wizard + detail
- * dialog. Reuses the same battle-tested pipeline the MAR chart / meds board use
- * ({@see EnhancedMarService::build()}) plus {@see MarOmissionService} for
- * omissions, so there is no second medication-state implementation to drift.
+ * dialog. Reuses the same pipeline the MAR chart / meds board use
+ * ({@see EnhancedMarService::build()}, whose doses and states come from the
+ * dose-slot projection — C6b), omissions included (C6e), so there is no second
+ * medication-state implementation to drift: handover, clock-out, Meds today,
+ * My Day and the MAR agree on every dose.
  *
  * This is computed ON DEMAND (one shift at a time via the handover endpoint),
  * never per-handover at index time — build() is heavy, so fanning it across the
@@ -26,7 +28,6 @@ class ShiftMedicationSnapshotService
     public function __construct(
         private readonly EnhancedMarService $marService,
         private readonly MarScheduleService $scheduleService,
-        private readonly MarOmissionService $omissionService,
     ) {}
 
     /**
@@ -51,9 +52,20 @@ class ShiftMedicationSnapshotService
         $windowEnd = ($shift->ends_at ?? $shift->starts_at->copy()->addHours(8))->copy()->timezone($tz);
         $date = $windowStart->copy()->startOfDay();
 
-        // One full-day MAR build for this client, then narrow to the shift window.
+        // One full-day MAR build per NZ day the shift touches (an overnight
+        // shift owes doses on both days, as clock-out counts them), then
+        // narrow to the shift window. PRN and attention alerts come from the
+        // start day's build.
         $mar = $this->marService->build($client, $date, null, $shift->id, $includeControlled);
-        $scheduled = collect(Arr::get($mar, 'scheduled', []))
+        $rows = Arr::get($mar, 'scheduled', []);
+        for ($day = $date->copy()->addDay(); $day->lte($windowEnd); $day->addDay()) {
+            $rows = array_merge($rows, Arr::get(
+                $this->marService->build($client, $day->copy(), null, $shift->id, $includeControlled),
+                'scheduled',
+                [],
+            ));
+        }
+        $scheduled = collect($rows)
             ->filter(function (array $row) use ($windowStart, $windowEnd): bool {
                 $sf = Arr::get($row, 'scheduled_for');
 
@@ -99,12 +111,14 @@ class ShiftMedicationSnapshotService
         $prnGiven = $prnGivenQuery->count();
         $reviewsOutstanding = $reviewsOutstandingQuery->count();
 
-        $omissions = $this->omissionService->omissionsForRange(
-            $windowStart->copy(),
-            $windowEnd->copy(),
-            (int) $client->id,
-            $includeControlled,
-        );
+        // Omissions as Meds today and the MAR read them (C6e): a dose whose
+        // window has ended with nothing recorded — late today, missed on an
+        // earlier day. A dose waiting for the order check is never one.
+        $omissions = $scheduled->filter(fn (array $r) => in_array(
+            Arr::get($r, 'schedule_state'),
+            ['late', 'missed_auto'],
+            true,
+        ));
 
         return [
             'window' => [

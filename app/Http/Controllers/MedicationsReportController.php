@@ -8,6 +8,8 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
+use App\Services\Medication\Reporting\MedicationReportPeriod;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -16,191 +18,6 @@ class MedicationsReportController extends Controller
     use SanitizesCsvOutput;
 
     public function __construct(private readonly MedicationGovernanceScopeService $governanceScope) {}
-
-    public function index(Request $request)
-    {
-        $canViewControlled = $request->user()?->canDo('medications.controlled.view') ?? false;
-        $filters = $request->validate([
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date'],
-            'client_id' => ['nullable', 'integer'],
-            'site_id' => ['nullable', 'integer'],
-            'service_context_id' => ['nullable', 'integer'],
-            'status' => ['nullable', 'in:given,refused,missed,withheld'],
-            'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
-        ]);
-
-        $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(14)->startOfDay();
-        $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
-        [$accessibleSiteIds, $readerSiteIds] = $this->readerSiteIds($request, $filters);
-
-        $admins = $this->governanceScope->scopeCanonicalClientMedicationRows(
-            ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
-            $readerSiteIds,
-            false,
-        )
-            ->with([
-                'client:id,first_name,last_name',
-                'medication:id,client_id,name,is_prn,controlled_drug,deleted_at',
-                'administeredBy:id,name,email',
-                'serviceContext:id,name,type',
-            ])
-            ->whereBetween('administered_at', [$dateFrom, $dateTo]);
-        if (! $canViewControlled) {
-            $this->governanceScope->scopeWithoutControlledMedicationRows($admins);
-        }
-
-        if (! empty($filters['client_id'])) {
-            $admins->where('client_id', (int) $filters['client_id']);
-        }
-        if (! empty($filters['service_context_id'])) {
-            $admins->where('service_context_id', (int) $filters['service_context_id']);
-        }
-        if (! empty($filters['status'])) {
-            $admins->where('status', $filters['status']);
-        }
-
-        $administrations = $admins
-            ->orderByDesc('administered_at')
-            ->orderByDesc('id')
-            ->limit(500)
-            ->get()
-            ->map(function (ClientMedicationAdministration $a) {
-                return [
-                    'id' => $a->id,
-                    'administered_at' => $a->administered_at,
-                    'scheduled_for' => $a->scheduled_for,
-                    'status' => $a->status,
-                    'reason' => $a->reason,
-                    'dose_given' => $a->dose_given,
-                    'notes' => $a->notes,
-                    'client' => $a->client,
-                    'medication' => $a->medication ? [
-                        'id' => $a->medication->id,
-                        'client_id' => $a->medication->client_id,
-                        'name' => $a->medication->historicalDisplayName(),
-                        'is_prn' => $a->medication->is_prn,
-                        'controlled_drug' => $a->medication->controlled_drug,
-                    ] : null,
-                    'administeredBy' => $a->administeredBy,
-                    'serviceContext' => $a->serviceContext ? [
-                        'id' => $a->serviceContext->id,
-                        'name' => $a->serviceContext->name,
-                        'type' => (string) ($a->serviceContext->type?->value ?? $a->serviceContext->type),
-                    ] : null,
-                ];
-            })
-            ->values();
-
-        $discrepancies = collect();
-        if ($canViewControlled) {
-            $discQ = $this->governanceScope->scopeCanonicalClientMedicationRows(
-                ClientControlledDrugDiscrepancy::query(),
-                $readerSiteIds,
-                false,
-            )
-                ->with([
-                    'client:id,first_name,last_name',
-                    'medication:id,client_id,name,controlled_drug',
-                    'reportedBy:id,name,email',
-                    'witnessedBy:id,name,email',
-                    'resolvedBy:id,name,email',
-                    'serviceContext:id,name,type',
-                ])
-                ->whereBetween('reported_at', [$dateFrom, $dateTo]);
-
-            if (! empty($filters['client_id'])) {
-                $discQ->where('client_id', (int) $filters['client_id']);
-            }
-            if (! empty($filters['service_context_id'])) {
-                $discQ->where('service_context_id', (int) $filters['service_context_id']);
-            }
-            if (! empty($filters['discrepancy_status'])) {
-                $discQ->where('status', $filters['discrepancy_status']);
-            }
-
-            $discrepancies = $discQ
-                ->orderByRaw("status = 'open' desc, status = 'under_review' desc")
-                ->orderByDesc('reported_at')
-                ->orderByDesc('id')
-                ->limit(500)
-                ->get()
-                ->map(function (ClientControlledDrugDiscrepancy $d) {
-                    return [
-                        'id' => $d->id,
-                        'status' => $d->status,
-                        'difference' => $d->difference,
-                        'on_hand_before' => $d->on_hand_before,
-                        'on_hand_after' => $d->on_hand_after,
-                        'reason' => $d->reason,
-                        'notes' => $d->notes,
-                        'reported_at' => $d->reported_at,
-                        'resolved_at' => $d->resolved_at,
-                        'resolution_notes' => $d->resolution_notes,
-                        'client' => $d->client,
-                        'medication' => $d->medication,
-                        'reportedBy' => $d->reportedBy,
-                        'witnessedBy' => $d->witnessedBy,
-                        'resolvedBy' => $d->resolvedBy,
-                        'serviceContext' => $d->serviceContext ? [
-                            'id' => $d->serviceContext->id,
-                            'name' => $d->serviceContext->name,
-                            'type' => (string) ($d->serviceContext->type?->value ?? $d->serviceContext->type),
-                        ] : null,
-                    ];
-                })
-                ->values();
-        }
-
-        $clients = Client::query()
-            ->whereIn('site_id', $accessibleSiteIds)
-            ->orderBy('first_name')
-            ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name'])
-            ->map(fn (Client $c) => [
-                'id' => $c->id,
-                'name' => trim("{$c->first_name} {$c->last_name}"),
-            ])
-            ->values();
-
-        $serviceContexts = ServiceContext::query()
-            ->whereIn('id', Client::query()
-                ->whereIn('site_id', $accessibleSiteIds)
-                ->whereNotNull('service_context_id')
-                ->select('service_context_id'))
-            ->where('is_active', true)
-            ->orderBy('type')
-            ->orderBy('name')
-            ->get(['id', 'name', 'type'])
-            ->map(fn (ServiceContext $s) => [
-                'id' => $s->id,
-                'name' => $s->name,
-                'type' => (string) ($s->type?->value ?? $s->type),
-            ])
-            ->values();
-
-        return inertia('reports/medications', [
-            'filters' => [
-                'date_from' => $dateFrom->toDateString(),
-                'date_to' => $dateTo->toDateString(),
-                'client_id' => $filters['client_id'] ?? null,
-                'site_id' => $filters['site_id'] ?? null,
-                'service_context_id' => $filters['service_context_id'] ?? null,
-                'status' => $filters['status'] ?? null,
-                'discrepancy_status' => $filters['discrepancy_status'] ?? null,
-            ],
-            'clients' => $clients,
-            'service_contexts' => $serviceContexts,
-            'administrations' => $administrations,
-            'discrepancies' => $discrepancies,
-            'can_view_controlled' => $canViewControlled,
-        ]);
-    }
-
     public function exportMarCsv(Request $request)
     {
         $canViewControlled = $request->user()?->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY) ?? false;
@@ -211,15 +28,26 @@ class MedicationsReportController extends Controller
             'site_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
+            'include_prn' => ['nullable', 'boolean'],
         ]);
 
+        // NZ days, both ends included (a date is the organisation's day,
+        // never a UTC midnight that drops the morning).
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(14)->startOfDay();
+            ? Carbon::parse($filters['date_from'], $timezone)->startOfDay()->utc()
+            : Carbon::now($timezone)->subDays(14)->startOfDay()->utc();
         $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
+            ? Carbon::parse($filters['date_to'], $timezone)->endOfDay()->utc()
+            : Carbon::now($timezone)->endOfDay()->utc();
         [, $readerSiteIds] = $this->readerSiteIds($request, $filters);
+        if (! empty($filters['client_id'])) {
+            // The report scope limits the house; the person rule follows (P02).
+            app(MedicationRecordAccess::class)->assertReportable(
+                $request->user(),
+                Client::query()->find((int) $filters['client_id']),
+            );
+        }
 
         $q = $this->governanceScope->scopeCanonicalClientMedicationRows(
             ClientMedicationAdministration::query()->effectiveClinicalEvidence(),
@@ -246,6 +74,9 @@ class MedicationsReportController extends Controller
         if (! empty($filters['status'])) {
             $q->where('status', $filters['status']);
         }
+        if (array_key_exists('include_prn', $filters) && ! $request->boolean('include_prn')) {
+            $q->whereHas('medication', fn ($medication) => $medication->where('is_prn', false));
+        }
 
         $filename = 'mar_export_'.now()->format('Ymd_His').'.csv';
 
@@ -269,8 +100,9 @@ class MedicationsReportController extends Controller
                     $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
                     $contextName = $a->serviceContext?->name ?? '';
                     $this->putCsv($out, [
-                        optional($a->administered_at)->toDateTimeString(),
-                        optional($a->scheduled_for)->toDateTimeString(),
+                        // EA-175 (Lane C7): NZ time with its zone, like the NZ-day filter.
+                        $a->administered_at ? \App\Support\WorkerClock::display($a->administered_at, 'Y-m-d H:i:s T') : '',
+                        $a->scheduled_for ? \App\Support\WorkerClock::display($a->scheduled_for, 'Y-m-d H:i:s T') : '',
                         $clientName,
                         $a->medication?->historicalDisplayName() ?? '',
                         $a->status,
@@ -301,12 +133,7 @@ class MedicationsReportController extends Controller
             'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
         ]);
 
-        $dateFrom = isset($filters['date_from']) && $filters['date_from']
-            ? Carbon::parse($filters['date_from'])->startOfDay()
-            : now()->subDays(14)->startOfDay();
-        $dateTo = isset($filters['date_to']) && $filters['date_to']
-            ? Carbon::parse($filters['date_to'])->endOfDay()
-            : now()->endOfDay();
+        [$dateFrom, $dateTo] = MedicationReportPeriod::fromRequest($request)->bounds();
         [, $readerSiteIds] = $this->readerSiteIds($request, $filters, true);
 
         $q = $this->governanceScope->scopeCanonicalClientMedicationRows(
@@ -339,7 +166,7 @@ class MedicationsReportController extends Controller
         return response()->streamDownload(function () use ($q) {
             $out = fopen('php://output', 'w');
             $this->putCsv($out, [
-                'Reported At',
+                'Reported At (Pacific/Auckland)',
                 'Status',
                 'Client',
                 'Medication',
@@ -350,7 +177,7 @@ class MedicationsReportController extends Controller
                 'Reported By',
                 'Witnessed By',
                 'Service Context',
-                'Resolved At',
+                'Resolved At (Pacific/Auckland)',
                 'Resolved By',
                 'Resolution Notes',
                 'Notes',
@@ -360,7 +187,7 @@ class MedicationsReportController extends Controller
                 foreach ($rows as $d) {
                     $clientName = trim(($d->client?->first_name ?? '').' '.($d->client?->last_name ?? ''));
                     $this->putCsv($out, [
-                        optional($d->reported_at)->toDateTimeString(),
+                        $d->reported_at?->timezone('Pacific/Auckland')->format('Y-m-d H:i:s T'),
                         $d->status,
                         $clientName,
                         $d->medication?->name ?? '',
@@ -371,7 +198,7 @@ class MedicationsReportController extends Controller
                         $d->reportedBy?->name ?? '',
                         $d->witnessedBy?->name ?? '',
                         $d->serviceContext?->name ?? '',
-                        optional($d->resolved_at)->toDateTimeString(),
+                        $d->resolved_at?->timezone('Pacific/Auckland')->format('Y-m-d H:i:s T'),
                         $d->resolvedBy?->name ?? '',
                         $d->resolution_notes,
                         $d->notes,

@@ -7,12 +7,21 @@ use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Http\Controllers\Controller;
 use App\Models\Asset;
 use App\Models\AssetAssignment;
+use App\Models\AssetCategory;
+use App\Models\AssetCustodyMovement;
+use App\Models\AssetDocument;
+use App\Models\AssetImportBatch;
+use App\Models\AssetLabelBatch;
 use App\Models\Client;
 use App\Models\ClientEmergencyContact;
 use App\Models\Site;
+use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\Assets\AssetMutationIntegrityService;
+use App\Services\Assets\AssetProfilePresenter;
+use App\Services\Assets\AssetStocktakeService;
 use App\Services\AuditLogger;
+use App\Services\Fleet\VehicleLegacyEvidenceGuard;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -27,18 +36,72 @@ class AssetController extends Controller
         private readonly AssetMutationIntegrityService $mutationIntegrity,
     ) {}
 
-    private function mapAssetAssignment(AssetAssignment $assignment): array
+    private function mapAssetAssignment(AssetAssignment $assignment, User $viewer, ?int $assetSiteId): array
     {
+        $canReadRecipient = $assetSiteId !== null && match ($assignment->assignee_type) {
+            'staff' => $this->deviceAccess->canReadStaffAtSite($viewer, (int) $assignment->assignee_id, $assetSiteId),
+            'client' => $this->deviceAccess->canReadClientAtSite($viewer, (int) $assignment->assignee_id, $assetSiteId),
+            'whanau' => ($clientId = ClientEmergencyContact::query()->whereKey($assignment->assignee_id)->value('client_id'))
+                && $this->deviceAccess->canReadClientAtSite($viewer, (int) $clientId, $assetSiteId),
+            default => false,
+        };
+        $confirmerId = (int) ($assignment->receipt_confirmed_by_user_id ?? 0);
+        $canReadConfirmer = $assetSiteId !== null && $confirmerId > 0
+            && ($confirmerId === (int) $viewer->id
+                || $this->deviceAccess->canReadStaffAtSite($viewer, $confirmerId, $assetSiteId));
+
         return [
             'id' => $assignment->id,
             'assignee' => [
-                'id' => $assignment->assignee_id,
-                'name' => $this->resolveAssignmentAssigneeName($assignment),
+                'id' => $canReadRecipient ? $assignment->assignee_id : null,
+                'name' => $canReadRecipient ? $this->resolveAssignmentAssigneeName($assignment) : 'Recipient details restricted',
             ],
             'assigned_at' => optional($assignment->assigned_at)->toISOString(),
             'returned_at' => optional($assignment->released_at)->toISOString(),
-            'purpose' => $assignment->purpose,
+            'receipt_confirmed_at' => optional($assignment->receipt_confirmed_at)->toISOString(),
+            'receipt_confirmed_by' => $assignment->receipt_confirmed_at
+                ? ($canReadConfirmer ? User::query()->whereKey($confirmerId)->value('name') : 'Staff details restricted')
+                : null,
+            'recipient_visible' => $canReadRecipient,
+            'receipt_note' => $canReadRecipient ? $assignment->receipt_note : null,
+            'purpose' => $canReadRecipient ? $assignment->purpose : null,
         ];
+    }
+
+    /**
+     * A register row for an asset file. Only files that may be opened get a
+     * link; the register route hands vehicle files to the vehicle profile's
+     * download, which rechecks access and the virus check.
+     */
+    private function mapAssetDocument(Asset $asset, AssetDocument $document): array
+    {
+        return [
+            'id' => $document->id,
+            'name' => $document->title ?: ($document->original_name ?: 'Document'),
+            'type' => $document->category ?: ($document->mime_type ?: 'document'),
+            'uploaded_at' => optional($document->created_at)->toISOString(),
+            'url' => $document->isOpenable() ? "/assets/{$asset->id}/documents/{$document->id}/download" : null,
+            'status' => $this->assetDocumentStatus($document),
+        ];
+    }
+
+    /** @return array{label: string, tone: string}|null */
+    private function assetDocumentStatus(AssetDocument $document): ?array
+    {
+        if ($document->isOpenable()) {
+            return $document->archived_at ? ['label' => 'Archived', 'tone' => 'neutral'] : null;
+        }
+
+        // The vehicle profile's wording for files still in (or stopped by) their virus check.
+        return match ($document->state) {
+            'reserved' => ['label' => 'Uploading', 'tone' => 'info'],
+            'stored' => ['label' => 'Checking', 'tone' => 'info'],
+            'scan_unavailable' => ['label' => 'Waiting for virus check', 'tone' => 'warning'],
+            'publication_failed' => ['label' => 'Needs retry', 'tone' => 'warning'],
+            'storage_failed' => ['label' => 'Upload failed', 'tone' => 'critical'],
+            'quarantined' => ['label' => 'Blocked: failed virus check', 'tone' => 'critical'],
+            default => ['label' => 'Not available', 'tone' => 'neutral'],
+        };
     }
 
     private function resolveAssignmentAssigneeName(AssetAssignment $assignment): string
@@ -70,16 +133,19 @@ class AssetController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
         $this->authorize('viewAny', Asset::class);
+        $request->validate(['category' => 'nullable|string|max:120', 'status' => 'nullable|string|max:40', 'search' => 'nullable|string|max:255',
+            'site_id' => 'nullable|integer|min:1', 'site_room_id' => 'nullable|integer|min:1', 'ownership' => 'nullable|in:client,organisation,unknown',
+            'view' => 'nullable|in:inventory,attention,stocktake,imports,labels,archived', 'workflow_status' => 'nullable|string|max:24']);
         $hasFleetFields = $this->hasFleetFields();
 
-        $eagerLoads = ['site:id,name', 'categoryRef:id,name,slug'];
+        $eagerLoads = ['site:id,name', 'canonicalRoom:id,site_id,name', 'categoryRef:id,name,slug'];
         if ($hasFleetFields) {
             $eagerLoads[] = 'homeSite';
         }
 
         $accessibleAssets = $this->deviceAccess->accessibleAssets($user);
         $query = (clone $accessibleAssets)
-            ->with($eagerLoads);
+            ->with($eagerLoads)->withMax('inspections', 'inspected_at')->with(['ownerships' => fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now())->latest('effective_from')]);
         $sites = $this->deviceAccess->accessibleSites($user)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -99,12 +165,34 @@ class AssetController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        $view = $request->string('view', 'inventory')->toString();
+        if ($view === 'archived') {
+            $query->where('status', 'retired');
+        } elseif (! $request->filled('status')) {
+            $query->where('status', '!=', 'retired');
+        }
+        if ($view === 'attention') {
+            $query->where(fn ($q) => $q->where('status', 'out_of_service')->orWhere('inspection_due_at', '<=', now()->addDays(30))->orWhere('maintenance_due_at', '<=', now()->addDays(30)));
+        }
+        if ($request->input('ownership') === 'client') {
+            $query->whereHas('ownerships', fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now())->where('owner_type', 'client'));
+        } elseif ($request->input('ownership') === 'organisation') {
+            $query->whereHas('ownerships', fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now())->where('owner_type', 'site'));
+        } elseif ($request->input('ownership') === 'unknown') {
+            $query->whereDoesntHave('ownerships', fn ($q) => $q->whereNull('effective_to')->where('effective_from', '<=', now()));
+        }
+
         // Site filter
         $siteFilterId = null;
         if ($request->filled('site_id')) {
             $siteFilterId = $request->integer('site_id');
             abort_unless($siteFilterId > 0 && $accessibleSiteIds->contains($siteFilterId), 404);
             $query->where('site_id', $siteFilterId);
+        }
+        if ($request->filled('site_room_id')) {
+            $room = SiteRoom::whereIn('site_id', $accessibleSiteIds)->findOrFail($request->integer('site_room_id'));
+            abort_if($siteFilterId && $room->site_id !== $siteFilterId, 404);
+            $query->where('site_room_id', $room->id);
         }
 
         // Search
@@ -117,6 +205,13 @@ class AssetController extends Controller
             });
         }
 
+        if ($request->boolean('selection')) {
+            $ids = (clone $query)->orderBy('id')->limit(201)->pluck('id');
+            abort_if($ids->count() > 200, 422, 'Narrow the filters to 200 assets or fewer for a label batch.');
+
+            return response()->json(['ids' => $ids]);
+        }
+
         // CSV export follows the same canonical authorization and requested
         // filter scope as the paginated register.
         if ($request->input('export') === 'csv') {
@@ -124,11 +219,11 @@ class AssetController extends Controller
 
             return response()->streamDownload(function () use ($exportQuery) {
                 $handle = fopen('php://output', 'w');
-                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Manufacturer', 'Model', 'Serial Number']);
+                $this->putCsv($handle, ['Name', 'Asset Tag', 'Category', 'Status', 'Site', 'Room', 'Manufacturer', 'Model', 'Serial Number']);
                 foreach ($exportQuery->lazy(200) as $a) {
                     $this->putCsv($handle, [
                         $a->name, $a->asset_tag, $a->category, $a->status,
-                        $a->site?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
+                        $a->site?->name ?? '', $a->canonicalRoom?->name ?? '', $a->manufacturer, $a->model, $a->serial_number,
                     ]);
                 }
                 fclose($handle);
@@ -186,7 +281,14 @@ class AssetController extends Controller
             $createdAssetId = null;
         }
 
+        // Navigation totals are from the same authorised asset scope, before
+        // result filters. Never count a site's unrestricted asset relation.
+        $locationAssets = (clone $accessibleAssets)->when($view === 'archived', fn ($q) => $q->where('status', 'retired'), fn ($q) => $q->where('status', '!=', 'retired'));
+        $siteCounts = (clone $locationAssets)->selectRaw('site_id, COUNT(*) as aggregate')->groupBy('site_id')->pluck('aggregate', 'site_id');
+        $roomCounts = $siteFilterId ? (clone $locationAssets)->where('site_id', $siteFilterId)->selectRaw('site_room_id, COUNT(*) as aggregate')->groupBy('site_room_id')->pluck('aggregate', 'site_room_id') : collect();
+
         return Inertia::render('fleet-assets/assets/index', [
+            'workflow_metrics' => $this->workflowMetrics($user, $view),
             'hero' => [
                 'total' => $heroTotal,
                 'active' => $heroActive,
@@ -205,6 +307,12 @@ class AssetController extends Controller
                         'slug' => $a->categoryRef->slug,
                     ] : null,
                     'status' => $a->status,
+                    'room' => $a->canonicalRoom ? ['id' => $a->canonicalRoom->id, 'name' => $a->canonicalRoom->name] : null,
+                    'location_note' => $a->location,
+                    'ownership' => $a->ownerships->first()?->owner_type ?? 'unknown',
+                    'inspection_due_at' => $a->inspection_due_at,
+                    'maintenance_due_at' => $a->maintenance_due_at,
+                    'last_inspected_at' => $a->inspections_max_inspected_at,
                     'site' => $a->site ? ['id' => $a->site->id, 'name' => $a->site->name] : null,
                     'home_site' => $hasFleetFields
                         && $a->homeSite
@@ -226,17 +334,62 @@ class AssetController extends Controller
                     'total' => $assets->total(),
                 ],
             ],
-            'sites' => $sites,
+            'sites' => $sites->map(fn ($site) => ['id' => $site->id, 'name' => $site->name, 'asset_count' => (int) $siteCounts->get($site->id, 0)]),
+            'rooms' => $siteFilterId ? SiteRoom::where('site_id', $siteFilterId)->orderBy('name')->get(['id', 'name'])->map(fn ($room) => ['id' => $room->id, 'name' => $room->name, 'asset_count' => (int) $roomCounts->get($room->id, 0)]) : [],
+            'staff' => $this->deviceAccess->assignableStaff($user)->orderBy('name')->limit(500)->get(['id', 'name']),
+            'register_permissions' => ['create' => $user->canDo('assets.create'), 'count' => $user->canDo('assets.scan.record')],
             'clients' => $clients,
             'prefill' => $prefill,
             // Set by the modal store() redirect so the wizard success pane can
             // link straight to the newly created asset.
             'created_asset_id' => $createdAssetId,
             'filters' => [
-                ...$request->only(['category', 'status', 'search']),
+                ...$request->only(['category', 'status', 'search', 'site_room_id', 'view', 'ownership', 'workflow_status']),
                 'site_id' => $siteFilterId,
             ],
         ]);
+    }
+
+    public function rooms(Request $request)
+    {
+        $this->authorize('viewAny', Asset::class);
+        $site = $this->deviceAccess->accessibleSites($request->user())->findOrFail($request->integer('site_id'));
+
+        return SiteRoom::where('site_id', $site->id)->orderBy('name')->get(['id', 'name']);
+    }
+
+    private function workflowMetrics(User $user, string $view): array
+    {
+        if ($view === 'stocktake') {
+            $query = app(AssetStocktakeService::class)->visibleQuery($user);
+
+            return [
+                ['label' => 'Open counts', 'value' => (clone $query)->where('status', 'draft')->count(), 'caption' => 'saved counts ready to resume', 'status' => 'draft'],
+                ['label' => 'Counts with follow-ups', 'value' => (clone $query)->where('status', 'completed')->where(fn ($q) => $q->whereJsonContains('entries', ['result' => 'missing'])->orWhereJsonContains('entries', ['expected' => false])->orWhereJsonContains('entries', ['changed' => true]))->count(), 'caption' => 'review the recorded differences', 'status' => 'followups'],
+                ['label' => 'Finished counts', 'value' => (clone $query)->where('status', 'completed')->count(), 'caption' => 'original answers and reports retained', 'status' => 'completed'],
+                ['label' => 'Sites with counts', 'value' => (clone $query)->where('status', 'completed')->distinct()->count('site_id'), 'caption' => 'view historical room coverage', 'status' => 'coverage'],
+            ];
+        }
+        if ($view === 'imports' && $user->canDo('assets.create')) {
+            $query = AssetImportBatch::where('created_by_user_id', $user->id);
+
+            return [
+                ['label' => 'Your imports', 'value' => (clone $query)->count(), 'caption' => 'saved batches', 'status' => ''],
+                ['label' => 'Partial imports', 'value' => (clone $query)->where('status', 'partial')->count(), 'caption' => 'review unfinished rows', 'status' => 'partial'],
+                ['label' => 'Completed', 'value' => (clone $query)->where('status', 'completed')->count(), 'caption' => 'all rows imported', 'status' => 'completed'],
+            ];
+        }
+        if ($view === 'labels') {
+            $query = AssetLabelBatch::where('created_by_user_id', $user->id);
+
+            return [
+                ['label' => 'Your label batches', 'value' => (clone $query)->count(), 'caption' => 'saved layouts and selections', 'status' => ''],
+                ['label' => 'Ready', 'value' => (clone $query)->where('status', 'ready')->where('expires_at', '>', now())->count(), 'caption' => 'available to download', 'status' => 'ready'],
+                ['label' => 'Needs retry', 'value' => (clone $query)->where('status', 'failed')->count(), 'caption' => 'generation did not finish', 'status' => 'failed'],
+            ];
+        }
+
+        return [];
     }
 
     public function show(Request $request, Asset $asset)
@@ -255,7 +408,7 @@ class AssetController extends Controller
 
         $eagerLoads = [
             'site:id,name',
-            'client:id,first_name,last_name',
+            'client:id,first_name,last_name,site_id',
             'inspections' => fn ($q) => $q->latest()->limit(20)->with('inspectedBy:id,name'),
             'maintenanceLogs' => fn ($q) => $q->latest()->limit(20),
             'documents',
@@ -305,7 +458,7 @@ class AssetController extends Controller
         foreach ($asset->inspections as $item) {
             $timeline->push([
                 'type' => 'inspection',
-                'date' => optional($item->created_at)->toISOString(),
+                'date' => optional($item->inspected_at ?? $item->created_at)->toISOString(),
                 'summary' => "Inspection #{$item->id}",
                 'id' => $item->id,
             ]);
@@ -323,8 +476,8 @@ class AssetController extends Controller
         foreach ($asset->scanEvents as $item) {
             $timeline->push([
                 'type' => 'scan',
-                'date' => optional($item->created_at)->toISOString(),
-                'summary' => "QR scan by user #{$item->user_id}",
+                'date' => optional($item->scanned_at)->toISOString(),
+                'summary' => 'QR scan recorded',
                 'id' => $item->id,
             ]);
         }
@@ -350,7 +503,28 @@ class AssetController extends Controller
         }
 
         $timeline = $timeline->sortByDesc('date')->values()->take(50);
-        $currentAssignment = $asset->assignments->first(fn ($assignment) => $assignment->released_at === null);
+        // A long assignment history can exceed the bounded history list.
+        $currentAssignment = $asset->assignments()->whereNull('released_at')->latest()->first();
+        $canManageAssignments = (bool) $user->can('manageAssignments', $asset);
+        $assignmentSiteIds = collect([$asset->site_id, $asset->home_site_id, $asset->client?->site_id])
+            ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id): int => (int) $id)->unique()->values();
+        $assignmentSiteId = $assignmentSiteIds->count() === 1
+            && in_array($assignmentSiteIds->first(), $accessibleSiteIds, true)
+                ? $assignmentSiteIds->first() : null;
+        $searchInput = $request->query('assignment_search');
+        $assignmentSearch = is_string($searchInput) ? mb_substr(trim($searchInput), 0, 80) : '';
+        $assignmentTargets = collect();
+        if ($canManageAssignments && $assignmentSiteId !== null) {
+            $assignmentTargets = $this->deviceAccess->assignableStaffAtSite($user, $assignmentSiteId, $assignmentSearch)
+                ->map(fn (User $staff): array => ['type' => 'staff', 'id' => (int) $staff->id, 'name' => $staff->name]);
+            $assignmentTargets = $assignmentTargets->concat($this->deviceAccess->assignableClientsAtSite($user, $assignmentSiteId, $assignmentSearch)
+                ->map(fn (Client $client): array => ['type' => 'client', 'id' => (int) $client->id,
+                    'name' => trim(($client->first_name ?? '').' '.($client->last_name ?? ''))]));
+            $assignmentTargets = $assignmentTargets->concat($this->deviceAccess->assignableWhanauAtSite($user, $assignmentSiteId, $assignmentSearch)
+                ->map(fn (ClientEmergencyContact $contact): array => ['type' => 'whanau', 'id' => (int) $contact->id,
+                    'name' => $contact->name]));
+        }
 
         // Federation: the HR-register wrapper (if any) so the fleet page can
         // point back at /hr/assets/{id} — link only for hr.assets.view holders.
@@ -421,13 +595,17 @@ class AssetController extends Controller
                 'last_seen_at' => optional($asset->fleetState->last_seen_at)->toISOString(),
                 'consent_blocked' => (bool) $asset->fleetState->consent_blocked,
             ] : null,
-            'documents' => $asset->documents->map(fn ($d) => [
-                'id' => $d->id,
-                'name' => $d->title ?: ($d->original_name ?: 'Document'),
-                'type' => $d->category ?: ($d->mime_type ?: 'document'),
-                'uploaded_at' => optional($d->created_at)->toISOString(),
-                'url' => "/assets/{$asset->id}/documents/{$d->id}/download",
-            ])->values(),
+            // Source-owned vehicle evidence (compliance, mileage, service,
+            // bookings, Finance review, the vehicle photo) stays with its record
+            // in the vehicle profile.
+            'documents' => $asset->documents->reject(fn (AssetDocument $d): bool => $d->isSourceOwned())
+                ->map(fn (AssetDocument $d): array => $this->mapAssetDocument($asset, $d))->values(),
+            // PKG-02B: a vehicle's documents are added and archived in the vehicle profile.
+            'vehicle_documents' => Asset::vehicles()->whereKey($asset->id)->exists() ? [
+                'url' => $user->canDo('fleet.viewAny')
+                    ? route('fleet-assets.vehicles.show', ['asset' => $asset->id, 'view' => 'documents'], false)
+                    : null,
+            ] : null,
             'inspections' => $asset->inspections->map(fn ($i) => [
                 'id' => $i->id,
                 'type' => 'Inspection',
@@ -462,8 +640,8 @@ class AssetController extends Controller
                 'type' => $g->type,
                 'is_active' => $g->is_active,
             ])->values(),
-            'current_assignment' => $currentAssignment ? $this->mapAssetAssignment($currentAssignment) : null,
-            'assignments' => $asset->assignments->map(fn ($a) => $this->mapAssetAssignment($a))->values(),
+            'current_assignment' => $currentAssignment ? $this->mapAssetAssignment($currentAssignment, $user, $assignmentSiteId) : null,
+            'assignments' => $asset->assignments->map(fn ($a) => $this->mapAssetAssignment($a, $user, $assignmentSiteId))->values(),
             'ownerships' => $asset->ownerships->map(fn ($o) => [
                 'id' => $o->id,
                 'owner_type' => $o->owner_type ?? null,
@@ -501,18 +679,23 @@ class AssetController extends Controller
         ];
 
         return Inertia::render('fleet-assets/assets/show', [
+            'boundaries_href' => ($user->canDo('fleet.viewAny') || $user->canDo('assets.geofences.manage'))
+                ? '/fleet-assets/geofences?tab=map&resource='.$asset->id : null,
             'asset' => $safeAsset,
+            'workspace' => app(AssetProfilePresenter::class)->present($user, $asset, $request->integer('history_before') ?: null),
             'active_maintenance_restrictions' => $asset->site_id && $this->hasTable('fleet_maintenance_restrictions')
-                ? \Illuminate\Support\Facades\DB::table('fleet_maintenance_restrictions')
+                ? DB::table('fleet_maintenance_restrictions')
                     ->where('asset_id', $asset->id)->where('state', 'active')->count()
                 : 0,
             'timeline' => $timeline,
+            'can_manage_assignments' => $canManageAssignments && $assignmentSiteId !== null,
+            'assignment_targets' => $assignmentTargets->values(),
             // Edit wizard (AssetWizardDialog) option lists — mirrors index/create.
             'sites' => $this->deviceAccess->accessibleSites($user)
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'clients' => $this->deviceAccess->assignableClients($user),
-            'hr_asset' => $hrAsset ? [
+            'hr_asset' => $user->canDo('hr.assets.view') && $hrAsset ? [
                 'id' => $hrAsset->id,
                 'asset_tag' => $hrAsset->asset_tag,
                 'status' => $hrAsset->status,
@@ -550,6 +733,7 @@ class AssetController extends Controller
             'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_room_id' => ['nullable', 'integer'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
@@ -574,6 +758,12 @@ class AssetController extends Controller
             'maintenance_due_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        if ($this->payloadIsVehicle($data)) {
+            // A new vehicle starts without evidence; its registration, WoF,
+            // CoF, RUC and odometer are recorded as versioned evidence.
+            VehicleLegacyEvidenceGuard::assertUnchanged($request, null);
+            $data = VehicleLegacyEvidenceGuard::strip($data);
+        }
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
         if (! $this->hasFleetFields()) {
@@ -587,6 +777,9 @@ class AssetController extends Controller
 
         $asset = DB::transaction(function () use ($user, $data): Asset {
             $data = $this->authorisePlacement($user, $data, true);
+            if (! empty($data['site_room_id'])) {
+                SiteRoom::where('site_id', $data['site_id'])->findOrFail($data['site_room_id']);
+            }
             $asset = Asset::query()->create($data);
             AuditLogger::logOrFail('assets.create', $asset, [
                 'asset_id' => $asset->id,
@@ -627,10 +820,12 @@ class AssetController extends Controller
         $user = $request->user() ?? abort(403);
         $this->authorize('update', $asset);
         $data = $request->validate([
+            'expected_version' => ['nullable', 'integer', 'min:1'],
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
             'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'site_room_id' => ['sometimes', 'nullable', 'integer'],
             'home_site_id' => ['nullable', 'integer', 'exists:sites,id'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'asset_tag' => ['nullable', 'string', 'max:100'],
@@ -655,6 +850,10 @@ class AssetController extends Controller
             'maintenance_due_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
+        if (Asset::vehicles()->whereKey($asset->id)->exists() || $this->payloadIsVehicle($data)) {
+            VehicleLegacyEvidenceGuard::assertUnchanged($request, $asset);
+            $data = VehicleLegacyEvidenceGuard::strip($data);
+        }
 
         $fleetFields = ['home_site_id', 'registration_number', 'registration_expires_at', 'wof_expires_at', 'cof_expires_at', 'fuel_type', 'odometer_km'];
         if (! $this->hasFleetFields()) {
@@ -665,15 +864,36 @@ class AssetController extends Controller
 
         $asset = DB::transaction(function () use ($user, $asset, $data): Asset {
             $locked = $this->deviceAccess->assignableAsset($user, (int) $asset->getKey(), true) ?? abort(404);
+            if (isset($data['expected_version']) && (int) $locked->asset_profile_version !== (int) $data['expected_version']) {
+                throw ValidationException::withMessages(['name' => 'This asset changed while you were editing. Close this draft and review the latest record before applying changes.']);
+            }
+            unset($data['expected_version']);
             $data = $this->authorisePlacement($user, $data, true);
+            if (Schema::hasColumn('assets', 'asset_profile_version')) {
+                $locked->forceFill(['asset_profile_version' => (int) $locked->asset_profile_version + 1]);
+                if (AssetCustodyMovement::where('asset_id', $locked->id)->whereIn('state', ['pending_receipt', 'incomplete', 'disputed'])->exists()) {
+                    foreach (['site_id', 'site_room_id', 'home_site_id', 'client_id', 'location'] as $field) {
+                        if (array_key_exists($field, $data) && (string) $data[$field] !== (string) $locked->{$field}) {
+                            throw ValidationException::withMessages([$field => 'Resolve the pending receipt before changing asset placement.']);
+                        }
+                    }
+                }
+            }
             $this->mutationIntegrity->assertOrdinaryStatusUpdate($locked, $data['status'] ?? null);
             $this->mutationIntegrity->assertPlacementChangeAllowed($locked, $data);
-            $before = $locked->only(['site_id', 'home_site_id', 'client_id', 'status']);
+            if (array_key_exists('site_room_id', $data)) {
+                if ($data['site_room_id'] !== null) {
+                    SiteRoom::where('site_id', $data['site_id'])->lockForUpdate()->findOrFail($data['site_room_id']);
+                }
+            } elseif ((int) $locked->site_id !== (int) $data['site_id']) {
+                $data['site_room_id'] = null;
+            }
+            $before = $locked->only(['site_id', 'site_room_id', 'home_site_id', 'client_id', 'status']);
             $locked->update($data);
             AuditLogger::logOrFail('assets.update', $locked, [
                 'asset_id' => $locked->id,
                 'before' => $before,
-                'after' => $locked->only(['site_id', 'home_site_id', 'client_id', 'status']),
+                'after' => $locked->only(['site_id', 'site_room_id', 'home_site_id', 'client_id', 'status']),
             ]);
 
             return $locked->fresh();
@@ -717,5 +937,17 @@ class AssetController extends Controller
         }
 
         return $query->first() ?? abort(404);
+    }
+
+    /** @param array<string,mixed> $data */
+    private function payloadIsVehicle(array $data): bool
+    {
+        if (strcasecmp((string) ($data['category'] ?? ''), 'vehicle') === 0) {
+            return true;
+        }
+
+        return ! empty($data['asset_category_id'])
+            && AssetCategory::query()->whereKey((int) $data['asset_category_id'])
+                ->whereRaw('LOWER(slug) = ?', ['vehicle'])->exists();
     }
 }

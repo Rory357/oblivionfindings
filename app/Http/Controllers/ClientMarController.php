@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -39,7 +40,7 @@ class ClientMarController extends Controller
     {
         $this->authorize('viewMedications', $client);
         $user = $request->user();
-        abort_unless($user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny')), 403);
+        abort_unless($user && app(MedicationReportAccess::class)->canExport($user, 'doses'), 403);
 
         $date = app(MarScheduleService::class)->dateFromInput($request->query('date'));
         $payload = app(EnhancedMarService::class)->build(
@@ -49,21 +50,22 @@ class ClientMarController extends Controller
         );
 
         $filename = 'MAR_'.$client->id.'_'.$date->toDateString().'.csv';
+        $timezone = app(MarScheduleService::class)->workerTimezone();
 
-        return response()->streamDownload(function () use ($payload) {
+        return response()->streamDownload(function () use ($payload, $timezone) {
             $out = fopen('php://output', 'w');
             $this->putCsv($out, ['Scheduled', 'Medication', 'Dosage', 'Route', 'Form', 'Status', 'Administered at', 'Reason', 'Notes']);
             // Export scheduled medications
             foreach ($payload['scheduled'] as $row) {
                 $admin = $row['administration'];
                 $this->putCsv($out, [
-                    $row['scheduled_for'] ? Carbon::parse($row['scheduled_for'])->format('Y-m-d H:i') : '',
+                    $row['scheduled_for'] ? Carbon::parse($row['scheduled_for'])->timezone($timezone)->format('Y-m-d H:i') : '',
                     $row['medication']['name'] ?? '',
                     $row['medication']['dosage'] ?? '',
                     $row['medication']['route'] ?? '',
                     $row['medication']['form'] ?? '',
                     $admin['status'] ?? 'not_recorded',
-                    $admin['administered_at'] ? Carbon::parse($admin['administered_at'])->format('Y-m-d H:i') : '',
+                    ($admin['administered_at'] ?? null) ? Carbon::parse($admin['administered_at'])->timezone($timezone)->format('Y-m-d H:i') : '',
                     $admin['reason'] ?? '',
                     $admin['notes'] ?? '',
                 ]);

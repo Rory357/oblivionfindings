@@ -17,10 +17,13 @@ class ControlRoomAlertFactory extends Factory
     {
         $sources = ['fleet', 'personal_tracker', 'manual', 'external', 'compliance', 'other'];
         $severities = ['low', 'medium', 'high', 'critical'];
+        // Medication alerts are concealed from viewers without controlled-drug
+        // access, so a random pick would make ordinary alert fixtures vanish at
+        // random. Use medicationError() when a test needs one.
         $alertTypes = [
             'Speeding', 'Geofence Exit', 'SOS Button', 'Fall Detected',
             'Device Offline', 'Fire Alarm', 'Door Forced', 'Bed Exit',
-            'Training Expired', 'Medication Error', 'Safeguarding Concern',
+            'Training Expired', 'Safeguarding Concern',
         ];
 
         return [
@@ -128,7 +131,15 @@ class ControlRoomAlertFactory extends Factory
     {
         return $this->state(fn () => [
             'source' => 'compliance',
-            'alert_type' => fake()->randomElement(['Training Expired', 'Medication Error', 'Safeguarding Concern']),
+            'alert_type' => fake()->randomElement(['Training Expired', 'Safeguarding Concern']),
+        ]);
+    }
+
+    public function medicationError(): static
+    {
+        return $this->state(fn () => [
+            'source' => 'compliance',
+            'alert_type' => 'Medication Error',
         ]);
     }
 

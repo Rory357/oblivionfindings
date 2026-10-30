@@ -14,6 +14,18 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use Carbon\Carbon;
 
+beforeEach(function () {
+    // Since a8ffbc6ae clients.viewAny no longer bypasses the Client's Site, so
+    // family-portal staff must work at the Site of the Client they serve.
+    // Staff and clients share this Site unless a test says otherwise.
+    $this->clientFamilyStaffSite = Site::factory()->create();
+});
+
+function clientFamilyStaffSite(): Site
+{
+    return test()->clientFamilyStaffSite;
+}
+
 function grantClientFamilyCommunicationPermissions(
     User $user,
     array $permissionKeys,
@@ -43,7 +55,7 @@ function grantClientFamilyCommunicationPermissions(
         ])->isNotEmpty()
         && ! HrEmployeeProfile::query()->where('user_id', $user->id)->exists()
     ) {
-        assignClientFamilyWorkerToSite($user, Site::factory()->create());
+        assignClientFamilyWorkerToSite($user, clientFamilyStaffSite());
     }
 }
 
@@ -68,7 +80,7 @@ function makeClientFamilyCommunicationNote(
 function makeClientFamilyCommunicationClient(?Site $site = null): Client
 {
     return Client::factory()->create([
-        'site_id' => ($site ?? Site::factory()->create())->id,
+        'site_id' => ($site ?? clientFamilyStaffSite())->id,
     ]);
 }
 
@@ -171,7 +183,7 @@ it('does not let a family-portal viewer read a private conversation without join
 });
 
 it('resolves only the current staff participants private family conversation', function () {
-    $site = Site::factory()->create();
+    $site = clientFamilyStaffSite();
     $client = makeClientFamilyCommunicationClient($site);
     $firstManager = User::factory()->create();
     $secondManager = User::factory()->create();
@@ -205,7 +217,7 @@ it('resolves only the current staff participants private family conversation', f
 });
 
 it('redacts unlinked portal and stale worker identities from staff participant payloads', function () {
-    $site = Site::factory()->create();
+    $site = clientFamilyStaffSite();
     $client = makeClientFamilyCommunicationClient($site);
     $manager = User::factory()->create(['approved_at' => now()]);
     grantClientFamilyCommunicationPermissions($manager, [
@@ -552,7 +564,7 @@ it('enforces nested Client binding for family-note actions', function () {
         'clients.viewAny',
         'family_portal.manage',
     ]);
-    $site = Site::factory()->create();
+    $site = clientFamilyStaffSite();
     $client = makeClientFamilyCommunicationClient($site);
     $otherClient = makeClientFamilyCommunicationClient($site);
     $note = makeClientFamilyCommunicationNote($client, $manager);
@@ -717,7 +729,7 @@ it('does not surface a family conversation bound to another Client', function ()
         'clients.viewAny',
         'family_portal.manage',
     ]);
-    $site = Site::factory()->create();
+    $site = clientFamilyStaffSite();
     $client = makeClientFamilyCommunicationClient($site);
     $otherClient = makeClientFamilyCommunicationClient($site);
     $otherConversation = makeClientFamilyConversation($otherClient, $manager);
@@ -750,7 +762,7 @@ it('does not surface messages whose Client does not match the family conversatio
         'clients.viewAny',
         'family_portal.manage',
     ]);
-    $site = Site::factory()->create();
+    $site = clientFamilyStaffSite();
     $client = makeClientFamilyCommunicationClient($site);
     $otherClient = makeClientFamilyCommunicationClient($site);
     $conversation = makeClientFamilyConversation($client, $manager);

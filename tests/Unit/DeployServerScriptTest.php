@@ -8,6 +8,22 @@ it('updates the checkout from origin main before building', function () {
         ->toContain('git pull --ff-only origin main');
 });
 
+it('retains prior hashed assets across preview and deployment builds', function () {
+    $config = file_get_contents(__DIR__.'/../../vite.config.ts');
+    $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
+    $package = json_decode((string) file_get_contents(__DIR__.'/../../package.json'), true, flags: JSON_THROW_ON_ERROR);
+    $ignore = file_get_contents(__DIR__.'/../../.gitignore');
+
+    // Both build entry points use the same retention setting. A CLI override
+    // would delete chunks still requested by an already-open browser tab.
+    expect($config)->toMatch('/\bbuild:\s*\{\s*(?:(?:\/\/[^\r\n]*\R)\s*)*emptyOutDir:\s*false\s*,/')
+        ->and($package['scripts']['build'])->toBe('vite build')
+        ->and($package['scripts']['build:ssr'])->toBe('vite build && vite build --ssr')
+        ->and($script)->toContain('run_app env NODE_OPTIONS="$NODE_OPTIONS" npm run build:ssr')
+        ->not->toContain('--emptyOutDir')
+        ->and($ignore)->toContain('/public/build');
+});
+
 it('restarts from the updated deploy script before provisioning when git advances', function () {
     $script = file_get_contents(__DIR__.'/../../scripts/deploy-server.sh');
 

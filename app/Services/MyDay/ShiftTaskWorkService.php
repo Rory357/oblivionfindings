@@ -10,7 +10,7 @@ use App\Services\AuditLogger;
 use App\Services\UserSiteAccessService;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
-use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -47,12 +47,17 @@ class ShiftTaskWorkService
         $this->sites->assertCanAccessShift($actor, $shift);
     }
 
-    /** Only expose subjects whose ordinary client privacy policy allows access. */
+    /**
+     * Only expose subjects whose ordinary client privacy policy allows access.
+     *
+     * @return Collection<int, Client>
+     */
     public function availableClients(User $actor, Shift $shift): Collection
     {
         $siteId = $shift->site_id ?? $shift->client?->site_id;
         if (! $siteId) {
-            return collect();
+            // Keep the Eloquent type: callers read modelKeys() from it.
+            return new Collection;
         }
 
         return Client::query()->where('site_id', $siteId)

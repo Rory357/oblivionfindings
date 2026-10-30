@@ -57,7 +57,7 @@ class OneChartSettingsTest extends TestCase
         ]);
     }
 
-    public function test_manager_can_create_update_and_delete_admin_rules(): void
+    public function test_manager_can_create_update_and_turn_admin_rules_back_on(): void
     {
         $this->actingAs($this->admin)->get('/emar/settings')->assertOk();
 
@@ -96,11 +96,13 @@ class OneChartSettingsTest extends TestCase
         $this->assertSame('Intravenous', $rule->match_value);
         $this->assertFalse($rule->active);
 
+        // P11: rules are paused and turned back on, never deleted.
         $this->actingAs($this->admin)
-            ->delete("/emar/settings/rules/{$rule->id}")
+            ->post("/emar/settings/rules/{$rule->id}/active", ['active' => true])
             ->assertRedirect();
 
-        $this->assertDatabaseMissing('medication_admin_rules', ['id' => $rule->id]);
+        $this->assertTrue($rule->fresh()->active);
+        $this->assertDatabaseCount('medication_admin_rules', 1);
     }
 
     public function test_admin_rule_requires_a_countersign_or_observation(): void
@@ -137,20 +139,22 @@ class OneChartSettingsTest extends TestCase
         $this->assertDatabaseCount('medication_admin_rules', 0);
     }
 
-    public function test_medication_settings_persist_care_level_and_review_cadence(): void
+    public function test_medication_settings_update_care_level_without_changing_review_cadence(): void
     {
+        $this->client->forceFill([
+            'chart_review_interval_months' => 1,
+            'medication_review_interval_months' => 1,
+            'next_chart_review_date' => today()->addMonth()->toDateString(),
+        ])->save();
         $this->actingAs($this->admin)
-            ->post("/emar/clients/{$this->client->id}/medication-settings", [
-                'care_level' => 'dementia',
-                'chart_review_interval_months' => 1,
-                'next_chart_review_date' => today()->addMonth()->toDateString(),
-            ])
-            ->assertRedirect();
+            ->post("/emar/clients/{$this->client->id}/medication-settings", ['care_level' => 'dementia'])
+            ->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('clients', [
             'id' => $this->client->id,
             'care_level' => 'dementia',
             'chart_review_interval_months' => 1,
+            'medication_review_interval_months' => 1,
             'next_chart_review_date' => today()->addMonth()->toDateString(),
         ]);
     }

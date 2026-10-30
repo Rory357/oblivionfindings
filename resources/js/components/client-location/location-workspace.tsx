@@ -255,6 +255,10 @@ export default function LocationWorkspace({
                     </Button>
                 </nav>
                 <div className="location-actions">
+                    <Button asChild variant="outline">
+                        <Link href={`/operations/people-locations/history?selected=c${clientId}`}>Day &amp; outing reports</Link>
+                    </Button>
+                    <Button asChild variant="outline"><Link href={`/operations/people-location-reports/client?subject=${clientId}`}>Build report</Link></Button>
                     {location.canExport && location.exportUrl && (
                         <Button
                             variant="outline"
@@ -825,6 +829,7 @@ export default function LocationWorkspace({
                     center={editing.center}
                     draft={editing.draft}
                     boundaries={envelope.boundaries}
+                    canUseSharedBuilder={envelope.can_use_shared_builder}
                     url={location.zonesUrl}
                     fingerprint={envelope.access_fingerprint}
                     onAccessEnded={accessEnded}

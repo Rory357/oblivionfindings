@@ -19,6 +19,12 @@ class WorkplaceInjury extends Model
     public const REFERENCE_PREFIX = 'INJ';
 
     protected $fillable = [
+        'source_schema_version',
+        'source_revision',
+        'coordinator_user_id',
+        'coordinator_snapshot',
+        'next_review_date',
+        'source_creation_key',
         'reference_number',
         'user_id',
         'site_id',
@@ -43,6 +49,10 @@ class WorkplaceInjury extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'coordinator_snapshot' => 'array',
+        'next_review_date' => 'date',
         'injury_date' => 'datetime',
         'worksafe_notifiable' => 'boolean',
         'acc_claim_lodged' => 'boolean',
@@ -117,5 +127,11 @@ class WorkplaceInjury extends Model
     public function scopeOfSeverity($query, string $severity)
     {
         return $query->where('severity', $severity);
+    }
+
+    /** Immutable source history; no authority is inherited from this relation. */
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(WorkplaceInjurySourceVersion::class, 'workplace_injury_id');
     }
 }

@@ -1,0 +1,128 @@
+{
+  "recordedAt": "2026-09-29",
+  "baseMain": "dab15310ebaa527109df63aa7b74d2d1c169e5d9",
+  "scope": "Second Fleet secondary-page presentation batch",
+  "sourceAssessment": {
+    "inventoryPages": 50,
+    "activePagesWithSharedHeaderOrReportWrapper": 48,
+    "activeLegacyHeaderPages": 0,
+    "inactiveLegacyBranches": 2,
+    "convertedInThisBatch": 26,
+    "details": "secondary-page-assessment.md"
+  },
+  "localChecks": {
+    "typescript": "passed: tsc --noEmit",
+    "eslint": "passed on all 27 edited TSX files, including the playback test",
+    "prettier": "passed on all 27 edited TSX files",
+    "vitest": {
+      "result": "passed",
+      "files": 7,
+      "tests": 21,
+      "scope": "Fleet playback, maintenance schedules and checklists, resident tracking, and three maps settings suites"
+    },
+    "viteProductionBuild": "passed after substantive source changes; only the existing large-chunk advisory",
+    "gitDiffCheck": "passed",
+    "activeLegacyComponentSearch": "no references in the 26 converted pages; the remaining references are two inactive branches and legacy component definitions",
+    "detailContinuation": {
+      "typescript": "passed: tsc --noEmit",
+      "phpRegression": "passed: pre-check emergency contact relationship, 1 test, 16 assertions",
+      "phpSyntax": "passed on controller and test",
+      "eslint": "passed on two edited detail TSX pages",
+      "prettier": "passed on two edited detail TSX pages",
+      "viteProductionBuild": "passed after banner wrapping fixes",
+      "gitDiffCheck": "passed"
+    }
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:8797",
+    "checkout": "managed fleet-secondary-followup worktree",
+    "database": "separate local synthetic Fleet MySQL schema",
+    "signIn": "normal Laravel login with synthetic Fleet manager",
+    "assetSource": "local Vite development assets for the 17-page narrow sweep, followed by a production-manifest smoke check on six key pages; public/hot absent",
+    "indexAndOverviewPagesRendered": [
+      "bookings/index",
+      "devices/index",
+      "drivers/index",
+      "fuel/index",
+      "handovers/index",
+      "incidents/index",
+      "inspections/index",
+      "keys/index",
+      "maintenance/checklists/index",
+      "maintenance/dashboard",
+      "maintenance/schedules/index",
+      "mileage/index",
+      "outings/index",
+      "resident-tracking/index",
+      "transports/index",
+      "transports/medications",
+      "trips/index"
+    ],
+    "recordAndProcessPagesRendered": [
+      "maintenance/checklists/run",
+      "trips/playback"
+    ],
+    "recordAndProcessPagesWithoutMatchingSyntheticFixtureInFirstSweep": [
+      "drivers/show",
+      "handovers/show",
+      "inspections/show",
+      "outings/show",
+      "resident-tracking/history",
+      "transports/pre-check",
+      "transports/show"
+    ],
+    "fixtureBackedContinuation": {
+      "origin": "http://127.0.0.1:8798",
+      "assetSource": "local production Vite manifest; no public/hot",
+      "database": "isolated synthetic Fleet MySQL schema with North and South records",
+      "signIn": "normal Laravel login with synthetic manager and North-site read-only viewer",
+      "northPagesRendered": [
+        "drivers/show",
+        "handovers/show",
+        "inspections/show",
+        "outings/show",
+        "resident-tracking/history",
+        "transports/pre-check",
+        "transports/show"
+      ],
+      "northPageResult": "all seven rendered one shared header and one main heading without document overflow at the narrow browser viewport",
+      "residentHistoryPrivacy": "active consent and assignment were rechecked asynchronously before the North tracker became visible; no movement points existed",
+      "southDirectObjectDenial": "six 404 responses; handover returned the existing tested 403 site denial; no South record content appeared",
+      "narrowViewport": {
+        "override": "390x844",
+        "measuredCssDocumentWidth": "approximately 300–312 pixels on this host",
+        "documentOverflowAfterFix": false
+      },
+      "discoveredAndFixed": [
+        "transport pre-check selected nonexistent emergency-contact relation column; now reads canonical relationship and maps to the existing UI prop",
+        "inspection and transport detail result/status banners wrapped at narrow width"
+      ]
+    },
+    "narrowViewport": {
+      "overrideWidth": 375,
+      "measuredCssWidth": "288–300 depending on page and host device pixel ratio",
+      "documentOverflow": false,
+      "scope": "all 17 index/overview pages and the two available record/process pages"
+    },
+    "observed": [
+      "Each rendered page had one shared header and one main heading; the incident page passed on direct recheck after a transient hydration wait timeout",
+      "The long Resident Tracking heading wrapped at narrow width",
+      "The incident report launcher label had readable contrast and opened the three existing report choices",
+      "Device consent, resident wandering and booking pending meters opened their matching tabs or filters",
+      "The booking pending filter retained a truthful filtered empty state",
+      "Resident Tracking showed a Leaflet/OpenStreetMap basemap and a zero-resident empty state",
+      "Maps settings showed OpenStreetMap as default and manual address/coordinate fallback while Google capabilities were unconfigured"
+    ],
+    "productionManifestSmoke": "Bookings, incidents, resident tracking, trips, checklist run and trip playback each rendered one shared header and one main heading without document overflow at narrow width; no Vite development client was present",
+    "consoleErrors": 0,
+    "zoom125Percent": "not independently established: host device pixel ratio and viewport override are not proof of browser zoom"
+  },
+  "external": {
+    "hostedCom": "Authenticated Chrome showed the older gradient Fleet bookings hero and app-DpCHbvaC.js; the pushed shared-header revision was not deployed. Hosted visual acceptance remains open.",
+    "googleProvider": "Live Google Maps, Places, Geocoding and Routes were not called; project configuration and billing remain outside this local synthetic check.",
+    "previousMainGitHubActions": "For dab1531, visual-regression, linter and tests failed while database-bootstrap passed.",
+    "currentMainGitHubActions": "For cbd9b3c, database-bootstrap passed; full-repository lint failed with 3,340 problems, tests failed first in unrelated modules, and captured visual failures were non-Fleet snapshots. No Fleet regression was identified in captured logs; later Fleet test execution was not established.",
+    "deployment": "No repository deployment workflow or configured server access, backup/recovery point and reviewed release window were established; scripts/deploy-server.sh is a broad server-side release operation. No hosted deployment performed.",
+    "applicationWideGreen": false
+  }
+}

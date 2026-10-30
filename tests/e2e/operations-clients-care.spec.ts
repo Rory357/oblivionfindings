@@ -48,13 +48,16 @@ async function openClientProfileFromMyDay(page: Page) {
     await expect(careAction).toHaveAttribute('href', /\/clients\/\d+$/);
     await careAction.click();
 
-    await expect(page).toHaveURL(/\/clients\/\d+(?:\?.*)?$/);
+    await page.waitForURL(/\/clients\/\d+(?:\?.*)?$/, { timeout: 30_000 });
     await expect(
         page.getByRole('heading', { name: 'Playwright Meds', level: 1 }),
     ).toBeVisible();
 }
 
 test.describe('canonical client profile care readiness', () => {
+    // Fixture setup, sign-in and canonical redirects precede the care/axe checks.
+    // CI traces show correct results arriving at the previous whole-test limit.
+    test.setTimeout(60_000);
     test.beforeEach(async ({ context }) => {
         resetMedicationReadinessFixtures();
         await context.setOffline(false);
@@ -83,12 +86,16 @@ test.describe('canonical client profile care readiness', () => {
         const profileUrl = new URL(page.url());
         await page.goto(`${profileUrl.pathname}?tab=risk_management`);
 
-        await expect(page.getByText('Active risks')).toBeVisible();
+        const riskPanel = page.getByRole('tabpanel', {
+            name: 'Risk Management',
+        });
+        await expect(riskPanel).toBeVisible();
+        await expect(riskPanel.getByText('Active risks')).toBeVisible();
         await expect(
-            page.getByText('PW Meds active mobility risk'),
+            riskPanel.getByText('PW Meds active mobility risk'),
         ).toBeVisible();
         await expect(
-            page.getByText('Use two-person support for transfers.'),
+            riskPanel.getByText('Use two-person support for transfers.'),
         ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);
@@ -101,12 +108,44 @@ test.describe('canonical client profile care readiness', () => {
 
         await openClientProfileFromMyDay(page);
         const profileUrl = new URL(page.url());
-        await page.goto(`${profileUrl.pathname}?tab=mar`);
+        const clientId = profileUrl.pathname.split('/').at(-1)!;
+        const profileReturn = `${profileUrl.pathname}?tab=mar`;
+        const dayResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname ===
+                    `/emar/clients/${clientId}/day` && response.ok(),
+        );
+        await page.goto(profileReturn);
+        const day = await (await dayResponse).json();
 
-        await expect(page.getByText('Medication administration')).toBeVisible();
-        await expect(page.getByText('PW Meds Morning Tablets')).toBeVisible();
         await expect(
-            page.getByRole('link', { name: 'Full MAR chart' }).first(),
+            page.getByRole('heading', { name: 'Medication', exact: true }),
+        ).toBeVisible();
+        await expect(
+            page.getByText('PW Meds Morning Tablets', { exact: true }).first(),
+        ).toBeVisible();
+        const chartLink = page.getByRole('link', {
+            name: 'Open MAR chart',
+            exact: true,
+        });
+        await expect(chartLink).toBeVisible();
+        const chartUrl = new URL(
+            (await chartLink.getAttribute('href'))!,
+            page.url(),
+        );
+        expect(chartUrl.origin).toBe(profileUrl.origin);
+        expect(chartUrl.pathname).toBe('/emar/mar');
+        expect(Object.fromEntries(chartUrl.searchParams)).toEqual({
+            client_id: clientId,
+            date: day.date,
+            return_to: profileReturn,
+        });
+        await chartLink.click();
+        await expect(page).toHaveURL(chartUrl.href);
+        await page.getByRole('link', { name: 'Back', exact: true }).click();
+        await expect(page).toHaveURL(new URL(profileReturn, profileUrl).href);
+        await expect(
+            page.getByRole('heading', { name: 'Medication', exact: true }),
         ).toBeVisible();
 
         expectNoUnexpectedConsoleErrors(consoleErrors);

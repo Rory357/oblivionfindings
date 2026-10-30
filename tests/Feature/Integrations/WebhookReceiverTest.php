@@ -24,6 +24,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Mockery\MockInterface;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class WebhookReceiverTest extends TestCase
@@ -430,6 +431,7 @@ class WebhookReceiverTest extends TestCase
 
     public function test_concurrent_no_id_replay_stages_and_projects_one_effect_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $key = 'unifi-concurrent-fallback-secret-1234';

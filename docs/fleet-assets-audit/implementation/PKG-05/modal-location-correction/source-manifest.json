@@ -1,0 +1,103 @@
+{
+  "sourceCommit": "cf3670714172132344ec7a280b3ed6a214397666",
+  "publishedBase": "554425e8dddd1b71bca0e81b6d5ddaf9d8f6459f",
+  "capturedAt": "2026-09-27T20:47:14.8742992+13:00",
+  "buildManifestSha256": "4c6c24f31a9dc492bd1eec4e9be048fac1308bc11adb58a6477d3655ad0c2f54",
+  "sources": [
+    {
+      "path": "app/Http/Controllers/FleetAssets/TransportWorkspaceController.php",
+      "sha256": "750d37756033c7cde9c3fe2ef223e49e0799864b290f01d56a1fce6f7e13746d",
+      "gitBlob": "3f599f4c767584c1d4decde476b1463a9a472fee"
+    },
+    {
+      "path": "resources/css/maintenance-date-time.css",
+      "sha256": "353716078b8aeffb594af3e7627913639ed49e7f396137a94960eaa12810f74a",
+      "gitBlob": "949f843348645b70fc0aea38d198ca892632352a"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "a2bebf5ae9ee9d6a39c6a7e26081e396e9361bae15e15aca863dd983c7ca0709",
+      "gitBlob": "c3680000c82126110b8d104775de5f82744ea85f"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/time-picker.tsx",
+      "sha256": "24317f36638d0b85969bc659a21b4f9dc70a7321ce7fa5e35249c22779c9827a",
+      "gitBlob": "7388b259f3f09eccaaa03eccd4e77753547153af"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/use-picker-placement.ts",
+      "sha256": "ce4cb8a4d3d4bf72b53190ac0b89b92ae1220794fc37a7c636b372cd4bffc95d",
+      "gitBlob": "a974249c82c1549b7ef249f4ba6cc561c0af8423"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/dialogs.tsx",
+      "sha256": "712d4ea44408c371ff5b7a5f549032747d99302a64ea5f83c00560e11fcb7967",
+      "gitBlob": "eddc07f3588081c6dad78568ddb4b831353e2d3c"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/location-field.test.tsx",
+      "sha256": "9c690c3dfa90334feb8fc43d0c76cec01ebf08e6ec7c1dfea197cfab86f857e9",
+      "gitBlob": "ae495797d45a705012d1787d7ec34e8db7116cc4"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/location-field.tsx",
+      "sha256": "e29ec22237c56931d3e9f8fbff22a69b334580a75355d1547f524862ef887647",
+      "gitBlob": "e874c4a044a9a587f7983a751121802ee9fb6ab3"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/planner.tsx",
+      "sha256": "e3c316d62eb4144430b976a300943be49f5710a3fcc39e5adcd89aeb85b602cc",
+      "gitBlob": "f703a9832a04d02de31fca68f966533091854020"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/record-detail.tsx",
+      "sha256": "a6800c1d8eb9890733d5b63d988d2c2ea9c01e874a8489306be13d7fea2d96d4",
+      "gitBlob": "d9ff60277ccd25f70dee3b89805134aa76d75302"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/reschedule-dialog.tsx",
+      "sha256": "469adcec14feae57f570fededdf8be462633e3ec9d082a6d3c29c559d4f8db53",
+      "gitBlob": "8cb1ec656d4bf51b228c1ad977cd2c7d680fa2cb"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/transport/transport.css",
+      "sha256": "2dde6db732f1d29a273791474c2db78b43fb9a27099a3c9af64cefc97e3db660",
+      "gitBlob": "0e2eb2a69c4e4d710a9bdf3bcbf83677859b4aec"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/add-evidence-dialog.tsx",
+      "sha256": "2713c79f9e5a1bef54718a54cf9e7a5b350a675a23522961d1428a29ba13564c",
+      "gitBlob": "918d1bb817e10f0f439c5a88d4775c5c38e3f589"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/search-select.tsx",
+      "sha256": "fa308ad84e082b2f7ba8fb5dbc71c4830d74c261e6704807bcfb3bf0253638d4",
+      "gitBlob": "99e00120156db1452e25fc124952da7d2f9f9235"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/wizard-kit.tsx",
+      "sha256": "8a0952123bb051ce547cfd27c9d0784a9ae7da962f67e13b84ea09b1872fd43e",
+      "gitBlob": "b5a8ffde76b4525ade442b3d8c6446c3ea7868bd"
+    },
+    {
+      "path": "resources/js/components/wizard/shell.tsx",
+      "sha256": "6c87c66ecd43362e51043bdc4883aabe3723ad3bb6cdf8adba7d94517770e762",
+      "gitBlob": "d3898c4826df4d22d889797adc1f67300fe8188a"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/transports/workspace.tsx",
+      "sha256": "85f263244f5e6fadd348d1961aa2f1a857fc4f65361a390ce7e69d022ecfc6fa",
+      "gitBlob": "7c1dee09ffb5e3310698f4624f256ba4a6da4166"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "sha256": "012bd93a3d77b8a7fbef5447f1ea9a245945d39cd32cf92adf90433c5998f7b6",
+      "gitBlob": "2090c3f5fc4bb3ec71f6c2ae42dda87674962877"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/TransportWorkspaceTest.php",
+      "sha256": "e90eefce296abe86c4144748dcd3e2288245305d9ccb8ae6b199f706d5d2db21",
+      "gitBlob": "bf16866de44937afe1d9d40c55464670e18a21b9"
+    }
+  ]
+}

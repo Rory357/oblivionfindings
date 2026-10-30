@@ -23,6 +23,7 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { tilePickerGridClass } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 import {
     Building2,
@@ -268,51 +269,48 @@ export function TilePicker({
     columns?: 2 | 3;
 }) {
     return (
-        <div
-            className={cn(
-                'grid grid-cols-2 gap-2',
-                columns === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
-            )}
-        >
-            {options.map((option) => {
-                const Icon = option.icon;
-                const active = value === option.key;
-                return (
-                    // eslint-disable-next-line no-restricted-syntax -- Send-Kudos-style selector tile, not a Button
-                    <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => onChange(option.key)}
-                        aria-pressed={active}
-                        className={cn(
-                            'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all',
-                            'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            active
-                                ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                : 'border-border',
-                        )}
-                    >
-                        <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
-                            <Icon
-                                className={cn(
-                                    'h-4 w-4',
-                                    active ? 'text-primary' : option.accent,
-                                )}
-                            />
-                        </span>
-                        <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">
-                                {option.label}
+        <div className="@container">
+            <div className={tilePickerGridClass(options.length, columns)}>
+                {options.map((option) => {
+                    const Icon = option.icon;
+                    const active = value === option.key;
+                    return (
+                        // eslint-disable-next-line no-restricted-syntax -- Send-Kudos-style selector tile, not a Button
+                        <button
+                            key={option.key}
+                            type="button"
+                            onClick={() => onChange(option.key)}
+                            aria-pressed={active}
+                            className={cn(
+                                'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all',
+                                'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                active
+                                    ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                    : 'border-border',
+                            )}
+                        >
+                            <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
+                                <Icon
+                                    className={cn(
+                                        'h-4 w-4',
+                                        active ? 'text-primary' : option.accent,
+                                    )}
+                                />
                             </span>
-                            {option.description ? (
-                                <span className="block text-xs text-muted-foreground">
-                                    {option.description}
+                            <span className="min-w-0">
+                                <span className="block text-sm font-medium">
+                                    {option.label}
                                 </span>
-                            ) : null}
-                        </span>
-                    </button>
-                );
-            })}
+                                {option.description ? (
+                                    <span className="block text-xs text-muted-foreground">
+                                        {option.description}
+                                    </span>
+                                ) : null}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }

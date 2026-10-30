@@ -469,16 +469,14 @@ export default function PolicyShow({
                                             ? 'View policies overdue for review'
                                             : 'View policy details'
                                     }
-                                    href={
-                                        reviewOverdue
-                                            ? '/governance/policies?review=overdue'
-                                            : undefined
-                                    }
-                                    onClick={
-                                        reviewOverdue
-                                            ? undefined
-                                            : () => scrollTo('policy-details')
-                                    }
+                                    {...(reviewOverdue
+                                        ? {
+                                              href: '/governance/policies?review=overdue',
+                                          }
+                                        : {
+                                              onClick: () =>
+                                                  scrollTo('policy-details'),
+                                          })}
                                 >
                                     <PageHeaderMeterBig>
                                         <span className="text-base">

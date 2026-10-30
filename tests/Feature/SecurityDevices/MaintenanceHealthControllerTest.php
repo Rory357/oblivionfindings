@@ -68,6 +68,9 @@ class MaintenanceHealthControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/maintenance-health')
+                ->where('actor_id', $this->admin->id)
+                ->where('pageMeta.title', 'Maintenance & health')
+                ->where('financeNote', 'Costs shown in legacy maintenance history are informational. Finance remains the authoritative financial record.')
                 ->has('stats')
                 ->has('records.data')
                 ->has('records.meta')

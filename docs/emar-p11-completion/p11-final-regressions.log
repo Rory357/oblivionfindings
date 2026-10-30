@@ -1,0 +1,9 @@
+[heavy-lock] queued behind: P08b-errors-focused-84b32b1ec 37648 1791022376 3817456
+[heavy-lock] queued behind: codex-p06-repaired-functional 12936 1791022503 29798400
+[heavy-lock] queued behind: emar-main-tsc-69cc7bb0d 37360 1791022994 276822273
+[heavy-lock] queued behind: P09 reporting and recorder 42340 1791023089 348920700
+[heavy-lock] queued behind: P05 reviews repaired 38092 1791023195 2639722084
+[heavy-lock] queued behind: emar-p04-candidate-1 41400 1791023464 2744911494
+[heavy-lock] queued behind: P02 focused record and commands 40332 1791023502 442028212
+[heavy-lock] next in line; waiting for: P08a-focused-recovery 9816 1791023196 66158171
+[P11 status] Queued wrapper PID 37580 cancelled during Main heavy-work hold; verified no PHP child. No tests executed in this attempt.

@@ -284,6 +284,9 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.broadcast.index');
         Route::get('/control-room/broadcast/{groupId}', [ControlRoomBroadcastController::class, 'show'])
             ->name('control-room.broadcast.show');
+        // Communications › Delivery problems (read-only; broadcasts have no resend endpoint)
+        Route::get('/control-room/delivery-problems', [ControlRoomBroadcastController::class, 'problems'])
+            ->name('control-room.delivery-problems');
     });
     Route::post('/control-room/broadcast', [ControlRoomBroadcastController::class, 'store'])
         ->middleware('permission:controlRoom.alerts.manage')
@@ -387,6 +390,9 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/control-room/devices/{device}', [ControlRoomDeviceController::class, 'show'])
             ->whereNumber('device')
             ->name('control-room.devices.show');
+        // Monitoring › Coverage: read-only, same boundary as the Signals list.
+        Route::get('/control-room/coverage', \App\Http\Controllers\ControlRoom\ControlRoomCoverageController::class)
+            ->name('control-room.coverage');
     });
 
     // Playbook management

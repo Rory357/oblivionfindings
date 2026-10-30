@@ -72,6 +72,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
     public function test_withdrawal_committed_after_an_old_snapshot_denies_queueing(): void
     {
         $fixture = ClientLocateFixture::make();
+        Queue::fake(); // Observe current-evidence denial after the canonical fixtures.
         $command = $this->ready($fixture);
         $other = DB::connection('locate_interleaving');
         try {
@@ -95,6 +96,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
     public function test_busy_client_evidence_rolls_back_nested_claim_and_recovers_with_same_request(): void
     {
         $fixture = ClientLocateFixture::make();
+        Queue::fake(); // Observe contention, rollback and recovery after the canonical fixtures.
         $command = $this->ready($fixture);
         $expiry = $command->expires_at->toISOString();
         $auditCount = $command->auditEvents()->count();
@@ -182,6 +184,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
     {
         foreach (['scope', 'authority', 'capacity'] as $target) {
             $f = ClientLocateFixture::substitute();
+            Queue::fake(); // Each concurrent revocation starts after its canonical fixtures.
             try {
                 $this->assertTrue(ConsentValidationService::isValidResidentLocationConsent($f['consent'], $f['client']));
                 $command = $this->ready($f);
@@ -208,6 +211,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
             } finally {
                 $f['type']->update(['requires_capacity_assessment' => false]);
             }
+            Queue::assertNothingPushed(); // Preserve every iteration before the next fixture reset.
         }
         Queue::assertNothingPushed();
     }
@@ -237,6 +241,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
     public function test_provider_busy_evidence_unwinds_the_outer_transaction_and_later_reuses_the_same_request(): void
     {
         $f = ClientLocateFixture::awaitingDelivery();
+        Queue::fake(); // Observe the provider claim and rollback after the queued fixtures.
         $expiry = $f['command']->expires_at->toISOString();
         $other = DB::connection('locate_interleaving');
         $other->beginTransaction();
@@ -293,6 +298,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
                 $f['actor']->permissionOverrides()->attach($admin->id, ['allowed' => true]);
             }
             $f['actor']->unsetRelations();
+            Queue::fake(); // Observe current authority after this iteration's staff and Site changes.
             $command = $this->ready($f);
             try {
                 DB::transaction(function () use ($f, $change, $newSite, $eligibleRole, $command): void {
@@ -321,6 +327,7 @@ class ClientLocateConcurrencyTest extends CommittedDatabaseTestCase
             }
             $this->assertSame(0, DB::transactionLevel());
             $this->assertSame(CommandStatus::Ready, $command->fresh()->status);
+            Queue::assertNothingPushed(); // Preserve every iteration before the next fixture reset.
         }
         Queue::assertNothingPushed();
     }

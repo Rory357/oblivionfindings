@@ -224,26 +224,30 @@ class SiteDamageTest extends TestCase
 
     public function test_site_scoped_user_cannot_view_or_report_damage_for_another_site(): void
     {
-        $otherSite = Site::factory()->create(['type' => 'house']);
+        $otherSite = Site::factory()->create(['name' => 'Concealed damage Site', 'type' => 'house']);
 
-        $this->actingAs($this->supportWorker)
-            ->get("/sites/{$otherSite->id}/damages")
-            ->assertForbidden();
+        foreach ([$otherSite->id, (int) Site::query()->max('id') + 1] as $siteId) {
+            $this->actingAs($this->supportWorker)
+                ->get("/sites/{$siteId}/damages")
+                ->assertNotFound()
+                ->assertDontSee($otherSite->name);
 
-        $this->actingAs($this->supportWorker)
-            ->post("/sites/{$otherSite->id}/damages", [
-                'title' => 'Outside assignment',
-                'description' => 'This must not be recorded.',
-                'severity' => 'minor',
-                'damage_date' => '2026-02-19',
-                'discovered_date' => '2026-02-19',
-            ])
-            ->assertForbidden();
+            $this->actingAs($this->supportWorker)
+                ->post("/sites/{$siteId}/damages", [
+                    'title' => 'Outside assignment',
+                    'description' => 'This must not be recorded.',
+                    'severity' => 'minor',
+                    'damage_date' => '2026-02-19',
+                    'discovered_date' => '2026-02-19',
+                ])
+                ->assertNotFound();
+        }
 
         $this->assertDatabaseMissing('site_damages', [
             'site_id' => $otherSite->id,
             'title' => 'Outside assignment',
         ]);
+        $this->assertDatabaseCount('site_damages', 0);
     }
 
     public function test_unauthorized_user_blocked_by_site_middleware(): void

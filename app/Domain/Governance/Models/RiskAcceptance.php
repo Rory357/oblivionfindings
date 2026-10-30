@@ -70,7 +70,8 @@ class RiskAcceptance extends Model
 
     public function isExpiringSoon(int $days = 30): bool
     {
-        return !$this->isExpired() && $this->expires_at->diffInDays(now()) <= $days;
+        // lte() rather than diffInDays(now()) <= $days, which Carbon 3 signs.
+        return !$this->isExpired() && $this->expires_at->lte(now()->addDays($days));
     }
 
     public function scopeActive($query)

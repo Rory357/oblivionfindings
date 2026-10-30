@@ -23,6 +23,8 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Fleet\Telemetry\AdapterRegistry;
 use App\Services\HealthSafety\LoneWorkerSignalService;
+use App\Services\Tracking\ClientTrackerFallService;
+use App\Services\Tracking\ClientZoneMonitoringService;
 use App\Services\UserSiteAccessService;
 use Closure;
 use Illuminate\Support\Carbon;
@@ -624,15 +626,16 @@ class FleetTelemetryIngestService
             }
 
             if (! $privacyBlocked) {
-                app(\App\Services\Tracking\ClientTrackerFallService::class)->evaluate($event);
+                app(ClientTrackerFallService::class)->evaluate($event);
             }
             if (! $privacyBlocked && $normalized['latitude'] !== null && $normalized['longitude'] !== null) {
-                app(\App\Services\Tracking\ClientZoneMonitoringService::class)->evaluate($event);
+                app(ClientZoneMonitoringService::class)->evaluate($event);
                 $this->geofences->evaluate(
                     $asset,
                     (float) $normalized['latitude'],
                     (float) $normalized['longitude'],
-                    $occurredAt
+                    $occurredAt,
+                    $event
                 );
             }
 

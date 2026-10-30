@@ -21,10 +21,12 @@ class BreakGlassFlagDismissal extends Model
         'dismissed_by',
         'reason',
         'dismissed_through',
+        'dismissed_through_access_id',
     ];
 
     protected $casts = [
         'dismissed_through' => 'datetime',
+        'dismissed_through_access_id' => 'integer',
     ];
 
     public function dismissedBy(): BelongsTo

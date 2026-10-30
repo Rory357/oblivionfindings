@@ -112,10 +112,13 @@ function toDate(value: DateInput): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function dateParts(value: Date): Record<string, string> {
+function dateParts(
+    value: Date,
+    timeZone = WORKER_TIMEZONE,
+): Record<string, string> {
     return Object.fromEntries(
         new Intl.DateTimeFormat(WORKER_LOCALE, {
-            timeZone: WORKER_TIMEZONE,
+            timeZone,
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -125,12 +128,43 @@ function dateParts(value: Date): Record<string, string> {
     );
 }
 
-/** "2026-07-13" — the Auckland calendar date for an HTML date input. */
-export function toDateInput(value: DateInput): string {
+/** "2026-07-13" — the worker calendar date for an HTML date input. */
+export function toDateInput(
+    value: DateInput,
+    timeZone = WORKER_TIMEZONE,
+): string {
     const date = toDate(value);
     if (!date) return '';
-    const parts = dateParts(date);
+    const parts = dateParts(date, timeZone);
     return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/** Inclusive reporting days on the NZ calendar, independent of browser timezone. */
+export function workerDayRange(
+    days: number,
+    asAt: DateInput = new Date(),
+): { from: string; to: string } {
+    const to = toDateInput(asAt);
+    if (!to || !Number.isInteger(days) || days < 1) {
+        return { from: '', to: '' };
+    }
+    // UTC is only the arithmetic carrier for calendar components here, not the
+    // zone of the reported events. Subtracting 24-hour instants crosses DST badly.
+    const calendar = new Date(`${to}T00:00:00Z`);
+    calendar.setUTCDate(calendar.getUTCDate() - (days - 1));
+    return { from: calendar.toISOString().slice(0, 10), to };
+}
+
+/** Completed calendar years on the worker's NZ day; a birth date is not an instant. */
+export function ageOnWorkerDay(
+    birthDate: string | null | undefined,
+    asAt: DateInput = new Date(),
+): number | null {
+    if (!birthDate || !formatDateOnly(birthDate, '')) return null;
+    const today = toDateInput(asAt);
+    if (!today || birthDate > today) return null;
+    const years = Number(today.slice(0, 4)) - Number(birthDate.slice(0, 4));
+    return years - (today.slice(5) < birthDate.slice(5) ? 1 : 0);
 }
 
 /** "July 2026" — month heading for Fleet calendars and reports. */
@@ -239,17 +273,38 @@ export function formatDateTimeLong(
     return `${formatDateLong(d)}, ${formatTime(d)}`;
 }
 
+/** Full record timestamp in its explicitly labelled work or pattern timezone. */
+export function formatDateTimeInZone(
+    value: DateInput,
+    timeZone: string = WORKER_TIMEZONE,
+    fallback: string = DEFAULT_FALLBACK,
+): string {
+    const date = toDate(value);
+    if (!date) return fallback;
+    return new Intl.DateTimeFormat(WORKER_LOCALE, {
+        timeZone,
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+    }).format(date);
+}
+
 /**
  * "2026-07-07T22:00" — a UTC instant expressed as NZ wall time for a
  * `<input type="datetime-local">`. Prefill counterpart of servers that parse
  * datetime-local strings in the worker timezone before storing UTC; slicing
  * the raw ISO string instead shows UTC wall time (12 hours out).
  */
-export function toDatetimeLocal(value: DateInput): string {
+export function toDatetimeLocal(
+    value: DateInput,
+    timeZone = WORKER_TIMEZONE,
+): string {
     const d = toDate(value);
     if (!d) return '';
     const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: WORKER_TIMEZONE,
+        timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -261,6 +316,73 @@ export function toDatetimeLocal(value: DateInput): string {
         parts.find((p) => p.type === type)?.value ?? '';
     const hour = get('hour') === '24' ? '00' : get('hour');
     return `${get('year')}-${get('month')}-${get('day')}T${hour}:${get('minute')}`;
+}
+
+const workerOffsetFormatter = new Intl.DateTimeFormat('en', {
+    timeZone: WORKER_TIMEZONE,
+    timeZoneName: 'longOffset',
+});
+
+export function timeOffsetInZone(
+    instant: string,
+    timeZone = WORKER_TIMEZONE,
+): string {
+    const date = new Date(instant);
+    if (!Number.isFinite(date.getTime())) return '';
+    try {
+        const formatter =
+            timeZone === WORKER_TIMEZONE
+                ? workerOffsetFormatter
+                : new Intl.DateTimeFormat('en', {
+                      timeZone,
+                      timeZoneName: 'longOffset',
+                  });
+        return (
+            formatter
+                .formatToParts(date)
+                .find((part) => part.type === 'timeZoneName')
+                ?.value.replace('GMT', '') || '+00:00'
+        );
+    } catch {
+        return '';
+    }
+}
+
+/** Exact local minute choices, ordered first to last; no guessed gap/fold. */
+export function timeOffsetsInZone(
+    local: string,
+    timeZone = WORKER_TIMEZONE,
+): string[] {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(local)) return [];
+    const nominal = Date.parse(`${local}:00Z`);
+    if (!Number.isFinite(nominal)) return [];
+    const candidates = new Set(
+        [-172800000, 0, 172800000].map((delta) =>
+            timeOffsetInZone(new Date(nominal + delta).toISOString(), timeZone),
+        ),
+    );
+    try {
+        return [...candidates]
+            .filter(
+                (offset) =>
+                    offset !== '' &&
+                    toDatetimeLocal(`${local}:00${offset}`, timeZone) === local,
+            )
+            .sort(
+                (a, b) =>
+                    Date.parse(`${local}:00${a}`) -
+                    Date.parse(`${local}:00${b}`),
+            );
+    } catch {
+        return [];
+    }
+}
+
+export function workerTimeOffset(instant: string): string {
+    return timeOffsetInZone(instant);
+}
+export function workerTimeOffsets(local: string): string[] {
+    return timeOffsetsInZone(local);
 }
 
 /**

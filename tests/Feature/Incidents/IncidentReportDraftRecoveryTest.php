@@ -133,6 +133,7 @@ class IncidentReportDraftRecoveryTest extends TestCase
 
     public function test_foreign_missing_and_zero_scope_ids_are_concealed_without_a_draft(): void
     {
+        config(['app.debug' => false]);
         $requestUuid = (string) Str::uuid();
         $this->actingAs($this->actor)
             ->putJson("/incidents/drafts/{$requestUuid}", $this->draftPayload())
@@ -153,8 +154,8 @@ class IncidentReportDraftRecoveryTest extends TestCase
             ->getJson("/incidents/drafts/{$requestUuid}");
         $missing = $this->actingAs($foreignActor)
             ->getJson('/incidents/drafts/'.Str::uuid());
-        $foreign->assertNotFound();
-        $missing->assertNotFound();
+        $foreign->assertNotFound()->assertJsonMissingPath('trace')->assertJsonMissingPath('exception');
+        $missing->assertNotFound()->assertJsonMissingPath('trace')->assertJsonMissingPath('exception');
         $this->assertSame($missing->getContent(), $foreign->getContent());
 
         $invalidForeignReplay = $this->draftPayload();
@@ -282,6 +283,16 @@ class IncidentReportDraftRecoveryTest extends TestCase
 
     public function test_submission_cannot_consume_a_recovery_uuid_bound_to_another_client_or_site(): void
     {
+        $foreignSite = Site::factory()->create();
+        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
+        $this->actor->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()
+                ->where('key', 'healthSafety.viewAllSites')
+                ->firstOrFail()
+                ->id => ['allowed' => true],
+        ]);
+        $this->assertTrue($this->actor->canDo('healthSafety.viewAllSites'));
+
         $sameSiteClient = Client::factory()->create(['site_id' => $this->site->id]);
         $sameSiteClient->supportWorkers()->attach($this->actor->id);
         $clientBoundUuid = (string) Str::uuid();
@@ -299,16 +310,9 @@ class IncidentReportDraftRecoveryTest extends TestCase
                 $sameSiteClient,
                 $this->site,
             ))
-            ->assertSessionHasErrors('report_request_uuid');
+            ->assertRedirect()
+            ->assertSessionHasErrors(['report_request_uuid' => 'The saved recovery draft belongs to a different person.']);
 
-        $foreignSite = Site::factory()->create();
-        $foreignClient = Client::factory()->create(['site_id' => $foreignSite->id]);
-        $this->actor->permissionOverrides()->syncWithoutDetaching([
-            Permission::query()
-                ->where('key', 'healthSafety.viewAllSites')
-                ->firstOrFail()
-                ->id => ['allowed' => true],
-        ]);
         $siteBoundUuid = (string) Str::uuid();
         $siteOnlyDraft = $this->draftPayload();
         $siteOnlyDraft['form']['client_id'] = null;
@@ -321,7 +325,8 @@ class IncidentReportDraftRecoveryTest extends TestCase
                 $foreignClient,
                 $foreignSite,
             ))
-            ->assertSessionHasErrors('report_request_uuid');
+            ->assertRedirect()
+            ->assertSessionHasErrors(['report_request_uuid' => 'The saved recovery draft belongs to a different Site.']);
 
         $this->assertDatabaseCount('client_incidents', 0);
         $this->assertDatabaseHas('incident_report_drafts', [

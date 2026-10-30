@@ -148,7 +148,7 @@ export function PerformanceHero({
                             <button
                                 type="button"
                                 onClick={handlers.onNewReview}
-                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary shadow-sm transition-transform hover:scale-[1.02]"
+                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary-strong shadow-sm transition-transform hover:scale-[1.02]"
                             >
                                 <Plus className="h-[15px] w-[15px]" />
                                 New review
@@ -399,7 +399,7 @@ export function SatelliteHeroAction({
     const className = cn(
         'inline-flex h-[34px] items-center gap-2 rounded-[9px] px-3.5 text-[12.5px] transition-colors',
         primary
-            ? 'bg-primary-foreground font-bold text-primary shadow-sm transition-transform hover:scale-[1.02]'
+            ? 'bg-primary-foreground font-bold text-primary-strong shadow-sm transition-transform hover:scale-[1.02]'
             : 'border border-primary-foreground/[0.28] bg-primary-foreground/[0.12] font-semibold text-primary-foreground hover:bg-primary-foreground/20',
     );
     const inner = (

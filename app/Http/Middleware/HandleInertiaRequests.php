@@ -4,8 +4,13 @@ namespace App\Http\Middleware;
 
 use App\Domain\Clinical\Services\ClinicalSiteAccessService;
 use App\Domain\Finance\Services\FinanceHubCountsService;
+use App\Domain\Governance\Models\PerformanceReview;
 use App\Domain\Governance\Services\BoardPackAccessService;
+use App\Domain\Hr\Services\LeaveReviewReceipt;
 use App\Domain\It\ItModuleNavigation;
+use App\Domain\It\Services\ItRemoteSupportAccess;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwarePackages;
+use App\Http\Controllers\Auth\LocaleController;
 use App\Models\Announcement;
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
@@ -14,10 +19,17 @@ use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Assurance\NzsAssuranceResolver;
+use App\Services\Clients\ClientPortalMembershipService;
+use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\Fleet\FleetMapSettings;
 use App\Services\MarScheduleService;
+use App\Services\Medication\Alerts\MedicationBellOrder;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Operations\OpsMessageVisibilityService;
 use App\Services\Tasks\TaskAggregator;
 use App\Services\UserSiteAccessService;
+use App\Support\Branding\BrandHeroPhoto;
 use App\Support\SchemaCache;
 use Carbon\Carbon;
 use Closure;
@@ -82,13 +94,30 @@ class HandleInertiaRequests extends Middleware
 
     public function share(Request $request): array
     {
+        $external = $request->user();
+        if ($external instanceof User && $external->isExternalClinicianAccount()) {
+            return [
+                ...parent::share($request),
+                'name' => config('app.name'),
+                'auth' => [
+                    'user' => ['id' => $external->id, 'name' => $external->name, 'email' => $external->email, 'role' => 'external_clinician'],
+                    'can' => [],
+                ],
+                'flash' => [
+                    'success' => fn () => $request->session()->get('success'),
+                    'error' => fn () => $request->session()->get('error'),
+                    'warning' => fn () => $request->session()->get('warning'),
+                ],
+            ];
+        }
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         $user = $request->user();
         $availableLocales = (array) config('locales.available', [
             'en' => ['label' => 'English (NZ)', 'native' => 'English (NZ)'],
         ]);
-        $locale = (string) ($user?->locale ?? config('app.locale', 'en'));
+        // Signed-out visitors choose a language on the sign-in pages (cookie).
+        $locale = (string) ($user?->locale ?? $request->cookie(LocaleController::COOKIE) ?? config('app.locale', 'en'));
 
         if (! array_key_exists($locale, $availableLocales)) {
             $locale = (string) config('app.fallback_locale', 'en');
@@ -103,7 +132,11 @@ class HandleInertiaRequests extends Middleware
         if ($user) {
             $can = $this->getUserPermissions($user);
             if (isset($can['job_board'])) {
-                $can['job_board']['open_count'] = $this->jobBoardOpenCount($user);
+                // Only people who see the "Available shifts" item get its badge count (same test as the sidebar),
+                // so everyone else's pages don't query open shifts or their clients.
+                $seesJobBoard = ($can['job_board']['viewAny'] ?? false) || ($can['job_board']['claim'] ?? false)
+                    || ($can['shifts']['viewAny'] ?? false) || ($can['shifts']['viewAssigned'] ?? false);
+                $can['job_board']['open_count'] = $seesJobBoard ? $this->jobBoardOpenCount($user) : 0;
             }
 
             // Overdue-meds badge for the sidebar "Meds today" item. Only
@@ -115,7 +148,7 @@ class HandleInertiaRequests extends Middleware
                 || (($can['medications']['view'] ?? false) && ($can['medications']['stockUpdate'] ?? false))
                 || ($can['medications']['auditView'] ?? false)
                 || ($can['medications']['reportsExport'] ?? false)
-                || ($can['reports']['viewAny'] ?? false)
+                || ($can['medications']['reportsView'] ?? false)
             ) && (
                 ($can['medications']['administerRecord'] ?? false)
                 || ($can['medications']['view'] ?? false)
@@ -129,7 +162,9 @@ class HandleInertiaRequests extends Middleware
             // least one module feed; badge = my open + overdue items. One
             // cache entry per user — the aggregator fans out across ~17
             // modules, and users with no feeds never pay for the badge.
-            $can['tasks'] = $this->taskNavigation($user);
+            $can['tasks'] = $request->isMethod('GET') && $request->routeIs('health-safety.events.show')
+                ? fn () => $this->requestTaskNavigation($request, $user)
+                : $this->taskNavigation($user);
         }
 
         // Pull all app-settings we need for chrome (labels / theme / branding)
@@ -143,6 +178,9 @@ class HandleInertiaRequests extends Middleware
                             'theme.dark',
                             'branding.name',
                             'branding.logo_path',
+                            'branding.logo_dark_path',
+                            BrandHeroPhoto::PATH_SETTING,
+                            BrandHeroPhoto::ALT_SETTING,
                         ]);
                 })
                 ->get(['key', 'value'])
@@ -161,6 +199,12 @@ class HandleInertiaRequests extends Middleware
         $brandingName = $settings->get('branding.name')?->value;
         $logoPath = $settings->get('branding.logo_path')?->value;
         $logoUrl = $logoPath ? Storage::disk('public')->url($logoPath) : null;
+        // The organisation's logo for dark backgrounds (sign-in brand half, dark mode).
+        $logoDarkPath = $settings->get('branding.logo_dark_path')?->value;
+        $logoDarkUrl = $logoDarkPath ? Storage::disk('public')->url($logoDarkPath) : null;
+        // The website and sign-in photo (public home hero, both sign-in pages).
+        $heroUrl = BrandHeroPhoto::url($settings->get(BrandHeroPhoto::PATH_SETTING)?->value);
+        $heroAlt = $settings->get(BrandHeroPhoto::ALT_SETTING)?->value;
 
         $hasOpsMessagingTables = SchemaCache::hasTable('ops_messages')
             && SchemaCache::hasTable('ops_conversation_participants');
@@ -171,6 +215,7 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'chatSharedExperience' => (bool) config('chat.shared_experience'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
 
             // Per-user calendar subscribe (.ics) URL, shared so any calendar surface
@@ -222,8 +267,10 @@ class HandleInertiaRequests extends Middleware
                     ? User::find(app('impersonate')->getImpersonatorId())?->only('id', 'name')
                     : null,
 
-                // Portal client data for sidebar navigation
+                // Portal client data for sidebar navigation. A current or former staff member is never listed
+                // as a portal member (the portal rule in ClientPortalMembershipService).
                 'portalClients' => $user && $user->hasRole('client', 'next_of_kin')
+                    && app(ClientPortalMembershipService::class)->treatsAsPortalMember($user)
                     ? $user->portalClients()->get(['clients.id', 'clients.first_name', 'clients.last_name', 'clients.profile_photo_path'])->map(fn ($c) => [
                         'id' => $c->id,
                         'name' => trim($c->first_name.' '.$c->last_name),
@@ -231,15 +278,12 @@ class HandleInertiaRequests extends Middleware
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
                     : null,
-                // Cached briefly: the batched count is cheap but still runs
-                // on every request. Busted by the user's own writes and by
-                // profile changes (see handle() / forgetNavigationBadges).
+                // Cached briefly (20 s with shared chat, else 60 s): the batched
+                // count is cheap but still runs on every request. Busted by the
+                // user's own writes, by profile changes (see handle() /
+                // forgetNavigationBadges) and when a chat message reaches them.
                 'unreadMessageCount' => $user && $hasOpsMessagingTables
-                    ? (int) Cache::remember(
-                        "user:{$user->id}:ops-unread:v1",
-                        60,
-                        fn (): int => app(OpsMessageVisibilityService::class)->unreadCount($user),
-                    )
+                    ? app(OpsMessageVisibilityService::class)->cachedUnreadCount($user)
                     : 0,
             ],
 
@@ -260,7 +304,13 @@ class HandleInertiaRequests extends Middleware
             'branding' => [
                 'name' => is_string($brandingName) && trim($brandingName) !== '' ? $brandingName : config('app.name'),
                 'logoUrl' => $logoUrl,
+                'logoDarkUrl' => $logoDarkUrl,
+                'heroUrl' => $heroUrl,
+                'heroAlt' => is_string($heroAlt) ? $heroAlt : null,
             ],
+            // The client demo website server (config/demo.php): the public pages may show the
+            // fictional provider's photos and facts. A client's own site never does.
+            'demoSite' => (bool) config('demo.site'),
             // Per-user appearance preferences so the React app can hydrate
             // from server state instead of only trusting localStorage. Null
             // values mean "fall back to brand/org defaults". The `appearance`
@@ -281,15 +331,73 @@ class HandleInertiaRequests extends Middleware
                 'time_format' => $user->time_format ?? '24',
             ] : null,
             'fleet' => [
-                'maps' => [
-                    'apiKey' => config('fleet.maps.api_key'),
-                ],
+                'maps' => $user ? app(FleetMapSettings::class)->browser() : ['provider' => 'osm', 'apiKey' => null],
             ],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
 
             // Flash messages for global toasts
             'flash' => [
+                'attendance_result' => fn () => $request->session()->get('attendance_result'),
+                'leave_review_result' => fn () => LeaveReviewReceipt::forRequester($request),
+                'staff_availability_result' => fn () => $request->session()->get('staff_availability_result'),
+                'workforce_settings_result' => function () use ($request) {
+                    $outcome = $request->session()->get('workforce_settings_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'shift_note_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_note_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'timesheet_result' => function () use ($request) {
+                    $outcome = $request->session()->get('timesheet_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'coverage_gap_result' => function () use ($request) {
+                    $outcome = $request->session()->get('coverage_gap_result');
+
+                    return is_array($outcome) && ($outcome['version'] ?? null) === 1 && ($outcome['scope'] ?? null) === 'coverage_gap'
+                        && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'house_qualification_result' => function () use ($request) {
+                    $outcome = $request->session()->get('house_qualification_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'qualification_requirement_result' => function () use ($request) {
+                    $outcome = $request->session()->get('qualification_requirement_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'eligibility_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id
+                        ? $request->session()->get('eligibility_result') : null;
+                },
+                'roster_template_result' => function () use ($request) {
+                    $outcome = $request->session()->get('roster_template_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'roster_suggestion_result' => function () use ($request) {
+                    $outcome = $request->session()->get('roster_suggestion_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'shift_result' => function () use ($request) {
+                    $outcome = $request->session()->get('shift_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
+                'timesheet_payroll_adjustment_result' => function () use ($request) {
+                    $outcome = $request->session()->get('timesheet_payroll_adjustment_result');
+
+                    return is_array($outcome) && ($outcome['actor_id'] ?? null) === $request->user()?->id ? $outcome : null;
+                },
                 // Many controllers use 'status' (starter-kit convention). Treat it as success.
                 'success' => session('success') ?? session('status'),
                 'error' => session('error'),
@@ -351,6 +459,9 @@ class HandleInertiaRequests extends Middleware
                 'created_alert_id' => session('created_alert_id'),
                 // Sensor triage confirm flashes the incident it created.
                 'confirmed_incident_id' => session('confirmed_incident_id'),
+                // Medication Settings shows its own in-page status message after a
+                // save or "Keep today's value" (Fleet Settings pattern), not a toast.
+                'medication_settings_saved' => session('medication_settings_saved'),
                 // The quick-flag dialog reads these so its success pane can show
                 // the CR-/INC- chips and open either record.
                 'flagged_incident_id' => session('flagged_incident_id'),
@@ -360,32 +471,42 @@ class HandleInertiaRequests extends Middleware
             // Header inbox (notifications + announcements). Deferred so the
             // initial page render doesn't block on these queries — Inertia
             // fetches them in a follow-up request after mount.
-            'inbox' => Inertia::defer(fn () => $user ? [
-                'notifications' => [
-                    'unread_count' => $hasNotificationsTable
-                        ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true)->count()
-                        : 0,
-                    'items' => $hasNotificationsTable
-                        ? $this->boardPackAccess->visibleNotificationQuery($user)
-                            ->latest()
-                            ->limit(8)
-                            ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
-                            ->map(fn ($n) => [
-                                'id' => $n->id,
-                                'type' => $n->type,
-                                'data' => $n->data,
-                                'read_at' => optional($n->read_at)->toISOString(),
-                                'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
-                                'escalation_count' => (int) ($n->escalation_count ?? 0),
-                                'created_at' => optional($n->created_at)->toISOString(),
-                            ])
-                            ->values()
-                        : collect(),
-                ],
-                'announcements' => $hasAnnouncementsTables
-                    ? Announcement::inboxFor($user)
-                    : ['unread_count' => 0, 'items' => []],
-            ] : null),
+            'inbox' => Inertia::defer(function () use ($user, $hasNotificationsTable, $hasAnnouncementsTables) {
+                if (! $user) {
+                    return null;
+                }
+                // Staff broadcast notices appear here only when a broadcast reader is
+                // already active for this request; otherwise they stay excluded.
+                $broadcastContext = BroadcastRecipientReadService::current($user);
+
+                return [
+                    'broadcast_reader' => $broadcastContext?->envelope(),
+                    'notifications' => [
+                        'unread_count' => $hasNotificationsTable
+                            ? $this->boardPackAccess->visibleNotificationQuery($user, unreadOnly: true, broadcastContext: $broadcastContext)->count()
+                            : 0,
+                        'items' => $hasNotificationsTable
+                            ? app(MedicationBellOrder::class)->apply($this->boardPackAccess->visibleNotificationQuery($user, broadcastContext: $broadcastContext))
+                                ->latest()
+                                ->limit(8)
+                                ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
+                                ->map(fn ($n) => $broadcastContext?->project($n) ?? [
+                                    'id' => $n->id,
+                                    'type' => $n->type,
+                                    'data' => $n->data,
+                                    'read_at' => optional($n->read_at)->toISOString(),
+                                    'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
+                                    'escalation_count' => (int) ($n->escalation_count ?? 0),
+                                    'created_at' => optional($n->created_at)->toISOString(),
+                                ])
+                                ->values()
+                            : collect(),
+                    ],
+                    'announcements' => $hasAnnouncementsTables
+                        ? Announcement::inboxFor($user)
+                        : ['unread_count' => 0, 'items' => []],
+                ];
+            }),
         ];
     }
 
@@ -447,6 +568,41 @@ class HandleInertiaRequests extends Middleware
     private const TASK_NAV_TTL = 90;
 
     /**
+     * Only the event-show route consumes a detached current-request projection.
+     * The scalar guards identify its producer; they do not confer record authority.
+     *
+     * @return array{view: bool, badge: int, badgeDegraded: bool}
+     */
+    private function requestTaskNavigation(Request $request, User $viewer): array
+    {
+        $currentViewer = $request->user();
+        if (! $currentViewer instanceof User) {
+            return ['view' => false, 'badge' => 0, 'badgeDegraded' => false];
+        }
+        $routeEvent = $request->route('hsEvent');
+        $projection = $request->attributes->get(TaskAggregator::NAVIGATION_REQUEST_ATTRIBUTE);
+        $sameProducer = $request->isMethod('GET') && $request->routeIs('health-safety.events.show')
+            && (int) $currentViewer->id === (int) $viewer->id
+            && $request->attributes->get(TaskAggregator::NAVIGATION_USER_ATTRIBUTE) === (int) $currentViewer->id
+            && (is_int($routeEvent) || is_string($routeEvent)) && preg_match('/^[1-9][0-9]*$/D', (string) $routeEvent)
+            && $request->attributes->get(TaskAggregator::NAVIGATION_EVENT_ATTRIBUTE) === (int) $routeEvent;
+        $validProjection = is_array($projection) && count($projection) === 3
+            && is_bool($projection['view'] ?? null) && is_int($projection['badge'] ?? null) && $projection['badge'] >= 0
+            && is_bool($projection['degraded'] ?? null)
+            && ($projection['view'] || $projection['badge'] === 0);
+        if (! $sameProducer || ! $validProjection) {
+            // Missing/invalid/deferred/error paths must not substitute the global TTL snapshot.
+            $projection = app(TaskAggregator::class)->navigationBadgeFor($currentViewer);
+        }
+
+        return [
+            'view' => $projection['view'],
+            'badge' => $projection['view'] ? $projection['badge'] : 0,
+            'badgeDegraded' => $projection['degraded'],
+        ];
+    }
+
+    /**
      * Keep task-provider faults out of the global Inertia failure path.
      * The 23-provider fan-out is far too expensive to run per request, so
      * the projection is cached briefly per user and busted after the
@@ -484,7 +640,7 @@ class HandleInertiaRequests extends Middleware
      * Permission map bust — bump when permission shape/keys change so
      * stale caches from previous deploys are ignored.
      */
-    protected const PERMISSIONS_CACHE_VERSION = 'v8';
+    protected const PERMISSIONS_CACHE_VERSION = 'v13';
 
     /**
      * Get user permissions, deduped per-request via `once()` and cached
@@ -517,6 +673,9 @@ class HandleInertiaRequests extends Middleware
     protected function buildUserPermissions($user): array
     {
         return [
+            'companyHub' => [
+                'view' => app(\App\Domain\CompanyHub\Services\HubAccess::class)->canEnter($user),
+            ],
             'sites' => [
                 'viewAny' => $user->canDo('sites.viewAny'),
                 'viewAll' => $user->canDo('sites.viewAll'),
@@ -557,6 +716,7 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('shifts.create'),
                 'update' => $user->canDo('shifts.update'),
                 'manageAny' => $user->canDo('shifts.manageAny'),
+                'overrideEligibility' => $user->canDo('shifts.overrideEligibility'),
                 'tasksUpdateSelf' => $user->canDo('shifts.tasks.updateSelf'),
             ],
 
@@ -597,17 +757,36 @@ class HandleInertiaRequests extends Middleware
             'medications' => [
                 'view' => $user->canDo('medications.view'),
                 'ordersManage' => $user->canDo('medications.orders.manage'),
+                'pharmacyConnectManage' => $user->canDo('medications.pharmacy.connect.manage'),
+                'pharmacySend' => $user->canDo('medications.pharmacy.send'),
+                'externalManage' => $user->canDo('medications.external.manage'),
+                'transfersManage' => $user->canDo('medications.transfers.manage'),
+                'catalogueManage' => $user->canDo('medications.catalogue.manage'),
+                'backupsManage' => $user->canDo('medications.backups.manage'),
+                // Navigation only (lib/emar-navigation.ts: lead hubs and the
+                // Settings entry). Not an authority — every medication route
+                // and action re-checks its own permission on the server.
+                'ordersVerify' => $user->canDo('medications.orders.verify'),
+                'settingsManage' => $user->canDo('medications.settings.manage'),
+                'alertsManageHouse' => $user->canDo('medications.alerts.manage_house'),
                 'administerRecord' => $user->canDo('medications.administer.record'),
                 'administerCorrect' => $user->canDo('medications.administer.correct'),
                 'auditView' => $user->canDo('medications.audit.view'),
                 'reportsExport' => $user->canDo('medications.reports.export'),
+                'reportsView' => $user->canDo('medications.reports.view'),
+                'auditExport' => $user->canDo('medications.audit.export'),
+                'stockReceive' => $user->canDo('medications.stock.receive'),
                 'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledView' => $user->canDo('medications.controlled.view'),
-                'stockUpdate' => $user->canDo('medications.stock.update'),
                 'controlledRecord' => $user->canDo('medications.controlled.record'),
                 'controlledWitness' => $user->canDo('medications.controlled.witness'),
                 'controlledOverride' => $user->canDo('medications.controlled.override'),
                 'breakGlass' => $user->canDo('medications.breakglass'),
+                // PIN-1: every staff member may be chosen as a second person
+                // (witness, co-signer, read-back witness), so staff get the page.
+                'witnessPin' => ! in_array($user->role, ['client', 'next_of_kin'], true)
+                    && ! $user->hasRole('client', 'next_of_kin'),
+                'witnessPinReset' => $user->canDo('medications.witness_pin.reset'),
             ],
 
             'rostering' => [
@@ -618,6 +797,7 @@ class HandleInertiaRequests extends Middleware
 
             'fleet' => [
                 'viewAny' => $user->canDo('fleet.viewAny'),
+                'reportsView' => $user->canDo('fleet.reports.view'),
                 'driverSessionsManage' => $user->canDo('fleet.driverSessions.manage'),
                 'signalsView' => $user->canDo('fleet.signals.view'),
             ],
@@ -647,6 +827,7 @@ class HandleInertiaRequests extends Middleware
                 'monitoringManage' => $user->canDo('securityDevices.monitoring.manage'),
                 'reportsView' => $user->canDo('securityDevices.reports.view'),
                 'commandsAdmin' => $user->canDo('securityDevices.commands.admin'),
+                'commandsApprove' => $user->canDo('securityDevices.commands.approve'),
             ],
 
             'calendar' => [
@@ -691,6 +872,12 @@ class HandleInertiaRequests extends Middleware
                 'create' => $user->canDo('restraints.create'),
                 'manage' => $user->canDo('restraints.manage'),
                 'review' => $user->canDo('restraints.review'),
+                // Create-only reporting (MASTER for Stephan, 30 Oct).
+                'report' => $user->canDo('restraints.report'),
+            ],
+
+            'injuries' => [
+                'report' => $user->canDo('injuries.report'),
             ],
 
             'procedures' => [
@@ -768,6 +955,7 @@ class HandleInertiaRequests extends Middleware
             'integrations' => [
                 'view' => $user->canDo('integrations.view'),
                 'manageSecrets' => $user->canDo('integrations.manage_secrets'),
+                'manageObli' => $user->canDo('settings.access.manage') && $user->canDo('integrations.manage_secrets'),
                 'manageSiteSecrets' => $user->canDo('integrations.manage_site_secrets'),
             ],
 
@@ -788,6 +976,7 @@ class HandleInertiaRequests extends Middleware
 
             'settings' => [
                 'manageAccess' => $user->canDo('settings.access.manage'),
+                'chatInvestigate' => $user->canDo('chat.investigate'),
                 'manageTerminology' => $user->canDo('settings.terminology.manage'),
                 'manageBranding' => $user->canDo('settings.branding.manage'),
                 'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
@@ -811,6 +1000,13 @@ class HandleInertiaRequests extends Middleware
                 'manageLegalHolds' => $user->canDo('privacy.manageLegalHolds'),
                 'reportBreaches' => $user->canDo('privacy.reportBreaches'),
                 'conductDPIA' => $user->canDo('privacy.conductDPIA'),
+            ],
+
+            'referrals' => [
+                'viewAny' => $user->canDo('referrals.viewAny'),
+                'viewAssigned' => $user->canDo('referrals.viewAssigned'),
+                'reports' => ['view' => $user->canDo('referrals.reports.view')],
+                'settings' => ['view' => $user->canDo('referrals.settings.view')],
             ],
 
             'respite' => [
@@ -980,6 +1176,8 @@ class HandleInertiaRequests extends Middleware
             'it' => [
                 'view' => $user->canDo('it.view'),
                 'manage' => $user->canDo('it.manage'),
+                'remote_support' => app(ItRemoteSupportAccess::class)->canOpen($user),
+                'approved_software' => EndpointSoftwarePackages::canOpen($user),
                 'request' => $user->canDo('it.request'),
                 'knowledge_author' => $user->canDo('it.knowledge.author'),
                 'knowledge_review' => $user->canDo('it.knowledge.review'),
@@ -1011,7 +1209,7 @@ class HandleInertiaRequests extends Middleware
                     // own review from the sidebar. Navigation only — the
                     // review policy still authorises every page.
                     'reviewee' => $user->canDo('governance.performance.view')
-                        && \App\Domain\Governance\Models\PerformanceReview::query()
+                        && PerformanceReview::query()
                             ->where('reviewee_id', $user->id)
                             ->exists(),
                 ],
@@ -1174,6 +1372,11 @@ class HandleInertiaRequests extends Middleware
                 'viewAny' => $user->canDo('messages.viewAny'),
                 'send' => $user->canDo('messages.send'),
             ],
+            // Shared Chat is open to every current staff member (ChatController::index), not
+            // only to holders of messages.viewAny, so its navigation follows the same rule.
+            'chat' => [
+                'use' => config('chat.shared_experience') && app(OpsMessageVisibilityService::class)->isCurrentStaff($user),
+            ],
             'handovers' => [
                 'viewAny' => $user->canDo('handovers.viewAny'),
                 'create' => $user->canDo('handovers.create'),
@@ -1278,10 +1481,11 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Today's overdue (scheduled-before-now, unrecorded) doses for the
-     * worker's shift clients — the sidebar "Meds today" badge. Same overdue
-     * semantics as the /meds/today board hero. Cached for 60s per user/day;
-     * WorkerMedsController busts the cache when a dose is recorded.
+     * Today's overdue doses (window ended, nothing recorded) for the worker's
+     * shift clients they may open — the sidebar "Meds today" badge. Same
+     * overdue semantics as the /meds/today board hero (dose-slot projection,
+     * C6d). Cached for 60s per user/day; WorkerMedsController busts the cache
+     * when a dose is recorded.
      */
     public static function medsOverdueBadgeCacheKey(int $userId, string $localDate): string
     {
@@ -1323,12 +1527,16 @@ class HandleInertiaRequests extends Middleware
                         ->values()
                         ->all();
 
+                    // The people the worker may open (the P02 person rule, C6d).
+                    $clientIds = DoseSlotReaderScope::forViewerClients($user, $clientIds)->clientIds ?? [];
                     if (empty($clientIds)) {
                         return 0;
                     }
 
+                    // A count: controlled doses are included for every reader
+                    // (P09 Q6); a dose waiting for the order check never is.
                     $medications = ClientMedication::whereIn('client_id', $clientIds)
-                        ->active()
+                        ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
                         ->where('is_prn', false)
                         ->where(function ($query) {
                             $query->whereNotNull('dose_times')
@@ -1343,24 +1551,22 @@ class HandleInertiaRequests extends Middleware
                     $dayStart = $now->copy()->startOfDay();
                     $administrations = $schedule->administrationsForWindow($clientIds, $dayStart, $now);
 
+                    // Overdue as Meds today, My Day and the MAR read it: the
+                    // dose window has ended with nothing recorded (C6d).
                     $count = 0;
-                    foreach ($medications as $medication) {
-                        foreach ($schedule->scheduledTimesForDate($medication, $dayStart) as $scheduled) {
-                            if ($scheduled->gte($now)) {
-                                continue;
-                            }
-
+                    foreach (app(ScheduledDoseStates::class)->dosesOn($medications, $dayStart, $now) as $orderId => $doses) {
+                        $medication = $medications->firstWhere('id', $orderId);
+                        foreach ($doses as $dose) {
                             $administration = $administrations->get($schedule->slotKey(
                                 (int) $medication->client_id,
                                 (int) $medication->id,
-                                $scheduled,
+                                $dose['due_at'],
                             ));
 
-                            if ($administration && in_array($administration->status, ['given', 'refused', 'withheld', 'missed'], true)) {
-                                continue;
+                            // The shared mapping: Missed (recorded) is never overdue.
+                            if (ScheduledDoseStates::statusFor($dose, $administration?->status) === 'overdue') {
+                                $count++;
                             }
-
-                            $count++;
                         }
                     }
 

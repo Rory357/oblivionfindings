@@ -117,7 +117,14 @@ test.describe('Tracking specialist workspace', () => {
         await expect(page.getByText(fixture.rawSentinel)).toHaveCount(0);
         await expectNoPageOverflow(page);
 
-        await deviceProfileLink.click();
+        const deviceProfileUrl = new RegExp(
+            `/security-devices/devices/${fixture.activeDeviceId}(?:\\?.*)?$`,
+        );
+        // Wait for the actual Inertia navigation before checking its rendered state.
+        await Promise.all([
+            page.waitForURL(deviceProfileUrl, { timeout: 30_000 }),
+            deviceProfileLink.click(),
+        ]);
         await expect(page).toHaveURL(
             new RegExp(
                 `/security-devices/devices/${fixture.activeDeviceId}(?:\\?.*)?$`,

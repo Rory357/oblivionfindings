@@ -9,14 +9,21 @@ use App\Models\MedicationRefusalFollowup;
 use App\Models\MedicationRound;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use App\Services\Medication\Audit\MedicationEventData;
+use App\Services\Medication\Audit\MedicationEventRecorder;
+use App\Services\Medication\Followups\MedicationFollowupService;
+use App\Services\Medication\ForgottenWitnessPinService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Recording\RecordingContract;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\UserSiteAccessService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class MedicationAdministrationCorrectionController extends Controller
@@ -25,7 +32,7 @@ class MedicationAdministrationCorrectionController extends Controller
         private readonly MedicationGovernanceScopeService $governanceScope,
     ) {}
 
-    public function approve(Request $request, ClientMedicationAdministration $correction)
+    public function approve(Request $request, ClientMedicationAdministration $correction, ?array &$auditEvents = null)
     {
         $user = $this->correctionActor($request);
 
@@ -36,7 +43,8 @@ class MedicationAdministrationCorrectionController extends Controller
             ClientMedicationAdministration $effectiveAdministration,
             Collection $corrections,
             ?MedicationRound $round,
-        ) use ($user) {
+            Client $client,
+        ) use ($user, &$auditEvents) {
             $this->assertPendingCorrection($lockedCorrection);
             $this->assertControlledStockNeutralCorrection(
                 $medication,
@@ -52,7 +60,11 @@ class MedicationAdministrationCorrectionController extends Controller
             $requesterId = $lockedCorrection->correction_requested_by
                 ?? $lockedCorrection->administered_by;
             if ((int) $requesterId === (int) $user->id) {
-                return back()->with('error', 'A correction must be approved by someone other than the person who raised it.');
+                // A validation error, not a flash: Inertia treats a flash
+                // redirect as success and the dialog would close (P02).
+                throw ValidationException::withMessages([
+                    'correction' => 'A correction must be approved by someone other than the person who raised it.',
+                ]);
             }
 
             $approvedAt = now();
@@ -81,6 +93,29 @@ class MedicationAdministrationCorrectionController extends Controller
             if ($round !== null && $lockedCorrection->medication_round_id === null) {
                 $approval['medication_round_id'] = $round->id;
             }
+            // A nomination/answer attests the original recorded facts. Approval
+            // cannot copy it onto changed facts or silently nominate again.
+            if (! $medication?->controlled_drug && collect([$original, $effectiveAdministration])
+                ->contains(fn (ClientMedicationAdministration $source): bool => in_array($source->witness_method, [
+                    ForgottenWitnessPinService::METHOD,
+                    ForgottenWitnessPinService::CONFIRMED_METHOD,
+                ], true))) {
+                $given = $lockedCorrection->status === 'given';
+                $approval += [
+                    'witnessed_by' => null,
+                    'witnessed_at' => null,
+                    'witness_method' => null,
+                    'second_person_kind' => $given ? $effectiveAdministration->second_person_kind : null,
+                    'second_person_status' => $given ? RecordingContract::SECOND_NOT_CONFIRMED : null,
+                    'review_required' => $given,
+                    'review_reason_key' => $given ? RecordingContract::REVIEW_SECOND_PERSON_NOT_CONFIRMED : null,
+                    'review_reason' => $given
+                        ? 'The original second-person request or answer does not verify the corrected facts. A house or clinical lead must review this corrected dose.'
+                        : null,
+                    'review_flagged_at' => $given ? $approvedAt : null,
+                    'review_flagged_by' => $given ? $user->id : null,
+                ];
+            }
             $lockedCorrection->update($approval);
 
             $round?->updateCounts();
@@ -100,15 +135,25 @@ class MedicationAdministrationCorrectionController extends Controller
                 $user->id
             );
 
+            // The source aggregate already owns the person, order and correction
+            // locks. Retire former clinical work and create the accepted replacement.
+            $followups = app(MedicationFollowupService::class);
+            $followups->syncAdministration($original);
+            foreach ($corrections->sortBy('id') as $source) {
+                $followups->syncAdministration($source);
+            }
+
+            $this->recordCorrectionEvent('approved', $lockedCorrection, $original, $client, $medication, $user, $auditEvents);
+
             return back()->with('success', 'Correction approved.');
         });
     }
 
-    public function reject(Request $request, ClientMedicationAdministration $correction)
+    public function reject(Request $request, ClientMedicationAdministration $correction, ?array &$auditEvents = null)
     {
         $user = $this->correctionActor($request);
 
-        return $this->withCanonicalCorrection($user, $correction, function (ClientMedicationAdministration $lockedCorrection) use ($request, $user) {
+        return $this->withCanonicalCorrection($user, $correction, function (ClientMedicationAdministration $lockedCorrection, ClientMedicationAdministration $original, ?ClientMedication $medication, ClientMedicationAdministration $effective, Collection $corrections, ?MedicationRound $round, Client $client) use ($request, $user, &$auditEvents) {
             $this->assertPendingCorrection($lockedCorrection);
             $validated = $request->validate(['reason' => 'required|string|max:1000']);
 
@@ -124,12 +169,15 @@ class MedicationAdministrationCorrectionController extends Controller
                 'Unsafe medication correction rejected.',
                 $user->id
             );
+            app(MedicationFollowupService::class)->syncAdministration($lockedCorrection);
+
+            $this->recordCorrectionEvent('rejected', $lockedCorrection, $original, $client, $medication, $user, $auditEvents);
 
             return back()->with('success', 'Correction rejected.');
         });
     }
 
-    public function store(Request $request, Client $client, ClientMedicationAdministration $administration)
+    public function store(Request $request, Client $client, ClientMedicationAdministration $administration, ?array &$auditEvents = null)
     {
         $user = $this->correctionActor($request);
 
@@ -141,7 +189,7 @@ class MedicationAdministrationCorrectionController extends Controller
             $user,
             (int) $client->id,
             'medications.administer.correct',
-            function (Client $canonicalClient) use ($request, $user, $administration) {
+            function (Client $canonicalClient) use ($request, $user, $administration, &$auditEvents) {
                 $administrationSnapshot = $this->administrationSnapshot($canonicalClient, $administration);
                 $lockedMedication = $this->lockMedicationForAdministration($canonicalClient, $administrationSnapshot);
                 $this->assertControlledMutationAuthority($user, $lockedMedication);
@@ -158,7 +206,9 @@ class MedicationAdministrationCorrectionController extends Controller
                 $pendingSibling = $corrections
                     ->first(fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'pending');
                 if ($pendingSibling !== null) {
-                    return back()->with('error', 'A correction for this administration is already awaiting approval.');
+                    throw ValidationException::withMessages([
+                        'correction' => 'A correction for this administration is already awaiting approval.',
+                    ]);
                 }
 
                 // Guardrail: allow quick edits within 30 minutes, otherwise require a correction reason.
@@ -239,11 +289,15 @@ class MedicationAdministrationCorrectionController extends Controller
                     'url' => url(EmarUrl::mar($canonicalClient)),
                     'actor' => ['id' => $user->id, 'name' => $user->name],
                 ]);
-                $this->correctionRecipients(
+                $recipients = $this->correctionRecipients(
                     $user,
                     $canonicalClient,
                     (bool) $lockedMedication?->controlled_drug,
-                )->each(fn (User $recipient) => $recipient->notify($notification));
+                );
+                // A failed final event append must not send a pending-correction
+                // notification for a domain transaction that rolls back.
+                DB::afterCommit(fn () => $recipients->each(fn (User $recipient) => $recipient->notify($notification)));
+                $this->recordCorrectionEvent('requested', $correction, $rootAdministration, $canonicalClient, $lockedMedication, $user, $auditEvents);
 
                 return back()->with('success', 'Correction submitted for approval.');
             },
@@ -256,6 +310,22 @@ class MedicationAdministrationCorrectionController extends Controller
         abort_unless($user?->canDo('medications.administer.correct'), 403);
 
         return $user;
+    }
+
+    /** Pass a collection only when a caller owns a receipt and will append it last. */
+    private function recordCorrectionEvent(string $outcome, ClientMedicationAdministration $correction, ClientMedicationAdministration $original, Client $client, ?ClientMedication $medication, User $actor, ?array &$auditEvents): void
+    {
+        $event = new MedicationEventData(siteId: (int) $client->site_id, kind: 'correction.'.$outcome,
+            subjectType: 'administration', subjectId: (string) $correction->id, actorId: (int) $actor->id,
+            occurredAt: CarbonImmutable::now('UTC'), summary: 'Medication correction '.$outcome,
+            facts: ['original_administration_id' => (int) $original->id, 'client_medication_id' => $medication?->id,
+                'correction_status' => $correction->correction_status, 'requested_by' => $correction->correction_requested_by ?? $correction->administered_by],
+            clientId: (int) $client->id, controlled: (bool) $medication?->controlled_drug);
+        if ($auditEvents !== null) {
+            $auditEvents[] = $event;
+        } else {
+            app(MedicationEventRecorder::class)->append($event);
+        }
     }
 
     private function withCanonicalCorrection(
@@ -286,6 +356,7 @@ class MedicationAdministrationCorrectionController extends Controller
                     $effectiveAdministration,
                     $corrections,
                     $round,
+                    $client,
                 );
             },
         );

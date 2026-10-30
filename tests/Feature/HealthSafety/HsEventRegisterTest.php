@@ -19,6 +19,8 @@ use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SubstanceExposureRecord;
 use App\Models\User;
+use App\Services\HealthSafety\HsEventClosureService;
+use App\Services\HealthSafety\HsEventService;
 use App\Services\HealthSafety\NotifiableEventClassifier;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -322,12 +324,24 @@ class HsEventRegisterTest extends TestCase
                 ->where('detail.worksafe.can_acknowledge', true)
             );
 
-        $notified->update([
-            'status' => HsEvent::STATUS_CLOSED,
-            'closed_at' => now(),
-            'closed_by' => $actor->id,
-            'closure_summary' => 'Closed under an authorised historic exception.',
+        HsInvestigation::factory()->completed()->create([
+            'hs_event_id' => $notified->id,
+            'recommendations' => [],
         ]);
+        app(HsEventService::class)->recordSitePreservationDecision(
+            $notified,
+            false,
+            'HS-REGISTER-CLOSE-01: applicability reviewed as not required.',
+            $actor,
+        );
+        app(HsEventService::class)->acknowledgeWorksafe($notified, now());
+        $closed = app(HsEventClosureService::class)->closeEvent(
+            $notified,
+            'WorkSafe obligations and investigation completed.',
+            $actor,
+        );
+        $this->assertSame(HsEvent::STATUS_CLOSED, $closed->status);
+        $this->assertSame($actor->id, $closed->closed_by);
 
         $this->actingAs($actor)
             ->get('/health-safety/events?event='.$notified->id)
@@ -335,7 +349,7 @@ class HsEventRegisterTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.worksafe.can_decide', false)
                 ->where('detail.worksafe.can_notify', false)
-                ->where('detail.worksafe.can_acknowledge', true)
+                ->where('detail.worksafe.can_acknowledge', false)
             );
     }
 
@@ -436,13 +450,26 @@ class HsEventRegisterTest extends TestCase
 
         $this->assertTrue($event->source->is($incident));
 
+        // H&S officers read incidents (Stephan, 25 Oct), so the officer sees the originating incident link.
         $this->actingAs($officer)
             ->get('/health-safety/events?event='.$event->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('detail.source.type', 'ClientIncident')
-                ->where('detail.source.url', null)
-                ->where('detail.source.unwired', false)
+                ->where('detail.source.url', "/incidents/{$event->source_id}")
+            );
+
+        // Without incident read the event still shows, with no incident link (Stephan, 25 Oct: event yes, incident no).
+        $withoutIncidentRead = $this->hsOfficer($site);
+        $withoutIncidentRead->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'incidents.viewAny')->sole()->id => ['allowed' => false],
+        ]);
+        $this->actingAs($withoutIncidentRead)
+            ->get('/health-safety/events?event='.$event->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('detail.source', null)
+                ->where('detail.linked_access.incident', 'restricted')
             );
 
         $admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);

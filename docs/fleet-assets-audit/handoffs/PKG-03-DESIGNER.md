@@ -1,0 +1,60 @@
+# PKG-03 — Maintenance cost approval and recovery
+
+Owner: MAIN ASTRA. Revision: 2. Updated: 2026-09-27. Status: implementation submitted for local-main candidate preparation; technical approval pending.
+
+## Later direct authority
+
+Main verified Stephan's subsequent local-main request; [intake and custody](../evidence/PKG-03-main-local-integration-intake.md). The existing Designer prepares and reconciles the exact candidate, freezes application source for substantive Main review and owns the eventual approved local integration. Hold main changes for the serial slot; no remote push/deployment is released. Preserve fixture-versus-signed-in evidence distinctions and protected guides. The original design-only launch instructions below are historical where superseded by the later direct implementation/integration authority. No new worker or routine sibling messaging.
+
+## Current authority and coordination
+
+Stephan explicitly requested: “OF | PKG-02B Vehicle Profile | DESIGNER… - is currently busy finishing do not ask the sesion anything. can you please start the next mockup sesion now please”. This releases one separate PKG-03 design task while PKG-02B finishes. It supersedes earlier no-next-design sequencing only for this mockup. Do not message, question, interrupt or wake PKG-02B, its workers or other programme tasks. Do not infer its acceptance or transfer application writer custody.
+
+Use GPT-6 Astra Extra High (`gpt-6-astra`, `xhigh`) for this Designer and all future frontend work. Verify effective model/effort and checkout before substantive writes; a role title alone is not verification. No Sol, Implementer, sibling Designer or subagent is launched by this design assignment. Later backend delegation remains a separate Designer-owned step after exact mockup approval and implementation prerequisites.
+
+Work autonomously inside this task. Do not request routine acknowledgements, source mapping, start permission or intermediate approval from Main. Resolve ordinary design choices from the approved references. Present the finished, frozen candidate to Stephan in this task and stop at exact mockup approval. Keep a self-contained review packet for Main's later review; no continuous cross-task messages or polling. A genuinely material unresolved requirement should be stated to Stephan here while independent design continues.
+
+## Read first and baseline
+
+The existing Section 0 audit and programme approvals stand; do not restart the programme. Read this latest brief first, then the focused current context in `C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/`: `00-project-rules.md`, `05-page-register.md` (latest dated entries), `09-amendments.md`, `01-domain-ownership.md`, WF-09 in `02-approved-workflows.md`, PKG-03 in `03-dependency-map.md`, and relevant Finance rows in `13-integration-matrix.md`. Main's uncommitted context is at those absolute paths, not necessarily the versions inherited by a new checkout. Record the hashes of the focused sources actually used. Read relevant repository instructions and `docs/architecture/single-tenant-application.md` in the new checkout.
+
+Canonical Revision 10 master: `C:/Users/steph/Downloads/oblivion-findings-fleet-assets-complete-astra-prompt-v10.md`, SHA256 `C4837AB675F9DFFDB6A8597636F49D5761DA114E6C155DC08E6BB8A209D63FD0`. Approved amendments and later direct user instructions govern; historical “only PKG-01” and prior pending statements do not revoke this explicit release. No product requirement is removed.
+
+Main fetched and independently verified remote `main` at `fa7b5291988cebfb6beaa6e6e10c6c660fb2a959` on 26 September. Main's local HEAD and origin/main match it; its pre-existing uncommitted programme context and `public/.user.ini` are preserved. Use a separate bounded worktree from this published baseline, not a dirty-tree copy or PKG-02B's active checkout. If setup lands on a newer remote commit, record it and inspect only relevant source changes before proceeding. Do not pull/reset/stash/stage Main's checkout or modify another task's files/processes.
+
+Rory's published `DESIGN.md` and linked `design_styles` guides are authoritative, read-only reference material. At the verified baseline, observed SHA256 values are DESIGN `20D9369EA9857ACE9FAA9566C8DF2A4BA82E15743E5E6F2437C02E683E863474`, POPUP_STYLE_GUIDE `2BED42D34D4515B7A4945549F57ED9717CAC9794079D5D03102BB034DD8708FA`, WORK_RECORD_STYLE_GUIDE `66908EF279682E2C9EB67412150B39FDBB403B2C8DE2C41E25260E07FCD5AA29`. Use current PageHeader/PageHeaderRail, work record, list, overlay, button and token conventions, premium evidence uploads and searchable modal selectors. Do not rewrite/migrate guides or revive retired PageHero guidance. Historical separately approved guide additions do not grant further edits.
+
+## Bounded design scope
+
+This is the approved queue's **Maintenance cost approval and recovery**, WF-09, FA-I01/T03 with applicable T01 and I05. Design one coherent operational work-to-Finance journey: maintenance cost/evidence context, authorised Finance review, canonical approval/result, reconciliation and safe failure recovery. Preserve the return path to the original work/vehicle and readable source identities. Extend existing screens and contracts; do not redesign the entire Finance module or duplicate Vehicle Profile.
+
+Inspect current source first. Starting references verified present include `app/Services/Fleet/MaintenanceFinanceService.php`, `VehicleFinanceService.php`, `VehicleFinancePresenter.php`, `VehicleFinanceReviewQueue.php`, `app/Http/Controllers/FleetAssets/VehicleFinanceController.php`, `app/Models/FleetFinanceReviewRequest.php`, `FleetVehicleFinanceLink.php`, `app/Domain/Finance/Services/AccountsPayableService.php`, `FinancialEventService.php`, `app/Domain/Finance/Policies/FinBillPolicy.php`, `app/Observers/FleetWorkOrderObserver.php`, and `routes/finance.php` / `routes/fleet-assets.php`. Discover their actual rendered page/component and route owners. The published baseline already contains a Finance Vehicle reviews queue and Maintenance-to-FinBill links: assess and reuse these, do not propose a second competing queue based on the older audit's missing-capability assumptions. Existing code is evidence of current behaviour, not proof that a journey is verified or a new policy approved.
+
+Preserve these ownership and accounting contracts:
+
+- `Asset` / Maintenance own operational identity, work, estimates, evidence and release. Finance owns bills, purchasing/approval, accounts, allocations, journals, payment and correction. Work completion, safety release, a received document and a review decision cannot imply financial approval, posting or payment.
+- Invoice-backed work reuses canonical `FinBill` and `AccountsPayableService::approveBill`; it must not also create a work-completion FinancialEvent/journal for the same cost. Link existing records with matching permitted site/asset context. Keep PO/quote commitments, actual invoice expense and payments distinct so summaries do not double-count them.
+- Non-invoice operational expenses retain their existing Finance-owned event identity, approval and retry contracts. Show original event/result, safe repeat/duplicate behaviour, and visible failure/reconciliation ownership. Do not invent an expense type or unlinked reversal, silently reprice history, or correct historical postings.
+- Vehicle Finance review requests are an intake/decision handoff. Acknowledgement, request acceptance and accounting approval are separate facts. Preserve existing source links and return states; record any interface assumption that needs later reconciliation with finishing PKG-02B without contacting that task.
+- Use one operating organisation across approved sites. Permissions, sites, ownership, direct-object denial and privacy are the boundary; no new tenant selector, transport, queue, fixture or schema. Existing legacy organisation columns are not a new product model and must not be removed.
+
+## Required interactive states
+
+Show a realistic populated work/cost view and Finance-owned review/result context, with source-linked evidence and a clear next action/owner. Demonstrate the smallest complete journey across these related surfaces:
+
+1. Record or review an estimate/quote and evidence; find the correct existing supplier, bill, cost centre or permitted asset/work through searchable selectors. Show no matches, loading/error, cancellation and validation. Only expose source-backed choices; catalogue creation or approval-policy setup is not silently added.
+2. Review invoice-backed cost and existing approval status, request missing information, return for correction, and follow the canonical Finance approval/posting result. Show permission-limited operational status without disclosing financial details. A review decision cannot be substituted for the actual Finance approval.
+3. Demonstrate missing/private/quarantined or scan-pending documents, upload progress, failure/retry, replacement/version history and retrieval denial using synthetic fixtures. Use current premium upload and modal patterns. File picker/preview simulation must not pretend to persist or scan a real file.
+4. Demonstrate stale data, changed approval or amount, duplicate submission/retry, failed or unknown posting, and a linked correction/reversal history with the original identity preserved. Show who resolves each condition and why unsafe actions are unavailable.
+5. Demonstrate single versus bulk completion/review result parity, including mixed permitted/blocked/failed items and an honest per-item outcome. No bulk action may turn operational completion into accounting approval or bypass the underlying permission/revalidation contract.
+6. Include empty, denied-site/direct-link, read-only, unavailable-source and history states. Separate estimate, committed/approved cost, posted amount and paid amount with clear source/period/null handling; do not add broad reports or invented metrics.
+
+Existing configured spend thresholds, tax/rate rules, approver permissions and correction rules remain authoritative. Distinguish observed configuration from Stephan-approved operating policy. Do not invent new approval limits, authorisations or legal requirements to fill gaps; label illustrative values as synthetic and show Needs configuration/assessment for unresolved dependent actions. Such gaps need not stop unrelated visual design. Any new policy decision or material financial contract remains explicit and unapproved until separately resolved.
+
+## Artifact, verification and stop gate
+
+Build a polished interactive **desktop-web-only** preview, synthetic and clearly labelled, in a new PKG-03-only versioned artifact directory. Follow the existing preview hosting convention while using an available unique local port; do not stop/reuse another task's server. Preserve frozen versions and manifests. Reuse visual/component conventions through preview-only adapters rather than modifying application components. No app routes/controllers/services/schema, live database, real upload/Finance action, notification, external purchase, migration, merge or push is authorised now.
+
+Verify the key journeys in a real browser at the approved desktop viewports, including keyboard focus, overlays, supported desktop resizing and actual zoom where available. Report unperformed checks honestly. Avoid broad application test/CI runs for this isolated mockup. Keep application behaviour distinct from simulated preview behaviour.
+
+Deliver the reviewable preview URL, desktop screenshots, frozen file/hash manifest, source-to-design reuse map, state/scenario evidence, permission and recovery expectations, known gaps and exact next approval. Keep your page record and evidence under PKG-03 in your checkout; Main owns its programme registers. **Stop after delivering the exact mockup for Stephan's approval. Do not start implementation or another session.** Neither this overlap nor an attractive mockup closes PKG-01/02A/02B or waives subsequent technical/publication/acceptance gates.

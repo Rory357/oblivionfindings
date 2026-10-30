@@ -146,7 +146,7 @@ export default function MyOneOnOnes({
                         <button
                             type="button"
                             onClick={() => setOpenId(latest.id)}
-                            className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground transition-colors hover:bg-primary/90"
+                            className="ml-auto inline-flex items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 py-2.5 text-[13px] font-bold text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
                         >
                             <MessagesSquare className="h-4 w-4" />
                             Review latest 1:1
@@ -181,7 +181,7 @@ export default function MyOneOnOnes({
                                 <button
                                     type="button"
                                     onClick={() => setOpenId(latest.id)}
-                                    className="rounded-[11px] bg-primary-foreground px-4 py-2.5 text-[13px] font-bold text-primary shadow-md"
+                                    className="rounded-[11px] bg-primary-foreground px-4 py-2.5 text-[13px] font-bold text-primary-strong shadow-md"
                                 >
                                     Review last 1:1
                                 </button>

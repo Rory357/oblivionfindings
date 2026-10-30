@@ -198,7 +198,7 @@ export function LeaveCalendarRange({
                                     className={cn(
                                         'grid h-[34px] w-[34px] place-items-center rounded-[10px] text-[13px] transition-colors',
                                         endpoint
-                                            ? 'bg-primary font-bold text-primary-foreground shadow-[0_3px_8px_-2px_var(--primary)]'
+                                            ? 'bg-primary-fill font-bold text-primary-fill-foreground shadow-[0_3px_8px_-2px_var(--primary)]'
                                             : isHoliday
                                               ? 'font-bold text-status-warning'
                                               : weekend

@@ -6,14 +6,23 @@ use App\Domain\Governance\Services\BoardPackAccessService;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\User;
+use App\Services\Medication\MedicationGeneralAuditPrivacy;
 use App\Support\SafeOperationalData;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 final class AuditLogViewService
 {
-    public function __construct(private readonly BoardPackAccessService $boardPackAccess) {}
+    public function __construct(
+        private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MedicationGeneralAuditPrivacy $medicationAudit,
+    ) {}
+
+    /** Clinical and narrative fields of a chemical exposure; never shown in a general audit row. */
+    private const EXPOSURE_CLINICAL_FIELDS = ['circumstances', 'symptoms', 'first_aid_given', 'medical_attention_sought',
+        'medical_treatment', 'medical_outcome'];
 
     /** @var array<string, array{actions: array<int, string>, subjects: array<int, string>}> */
     private const MODULES = [
@@ -90,6 +99,9 @@ final class AuditLogViewService
             ->orderByDesc('id');
 
         $this->boardPackAccess->scopeAuditVisibility($query, $viewer);
+        // EA-020: medication rows follow the medication Site scope, person
+        // rule and controlled view; without a viewer none are shown.
+        $this->medicationAudit->apply($query, $viewer);
 
         if ($filters['search'] ?? null) {
             $needle = $filters['search'];
@@ -119,12 +131,13 @@ final class AuditLogViewService
             $this->applyActionFilter($query, $filters['action']);
         }
 
+        // EA-077 (Lane C7): the filter's dates are NZ calendar days; rows are stored in UTC.
         if ($filters['date_from'] ?? null) {
-            $query->whereDate('created_at', '>=', $filters['date_from']);
+            $query->where('created_at', '>=', WorkerClock::dayStartUtc((string) $filters['date_from']));
         }
 
         if ($filters['date_to'] ?? null) {
-            $query->whereDate('created_at', '<=', $filters['date_to']);
+            $query->where('created_at', '<=', WorkerClock::dayEndUtc((string) $filters['date_to']));
         }
 
         return $query;
@@ -137,6 +150,14 @@ final class AuditLogViewService
         $before = $this->firstArray($meta, ['before', 'old', 'previous']);
         $after = $this->firstArray($meta, ['after', 'attributes', 'new', 'changes', 'values']);
         $recordedFields = is_array($meta['fields'] ?? null) ? $meta['fields'] : [];
+        if ($this->isExposureRecord($log)) {
+            // Stephan, 25 Oct ("Hide the clinical notes"): older exposure rows hold the worker's clinical text. Values
+            // only ever show through the safe allow-list below; an exposure row no longer even lists which clinical
+            // fields changed. The row and its other changes still show.
+            $before = Arr::except($before, self::EXPOSURE_CLINICAL_FIELDS);
+            $after = Arr::except($after, self::EXPOSURE_CLINICAL_FIELDS);
+            $recordedFields = array_values(array_diff($recordedFields, self::EXPOSURE_CLINICAL_FIELDS));
+        }
         $fieldMap = collect([...$recordedFields, ...array_keys($before), ...array_keys($after)])
             ->filter(fn (mixed $field): bool => is_string($field) && $field !== '')
             ->take(100)
@@ -203,10 +224,13 @@ final class AuditLogViewService
     {
         $base = $this->query($filters, $viewer)->reorder();
 
+        // EA-077 (Lane C7): today, this week (from Monday) and this month in NZ time.
+        $today = WorkerClock::today();
+
         return [
-            'today' => (clone $base)->whereDate('created_at', today())->count(),
-            'this_week' => (clone $base)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'this_month' => (clone $base)->where('created_at', '>=', now()->startOfMonth())->count(),
+            'today' => (clone $base)->where('created_at', '>=', $today->utc())->count(),
+            'this_week' => (clone $base)->where('created_at', '>=', $today->startOfWeek()->utc())->count(),
+            'this_month' => (clone $base)->where('created_at', '>=', $today->startOfMonth()->utc())->count(),
         ];
     }
 
@@ -337,6 +361,14 @@ final class AuditLogViewService
     }
 
     /** @param array<string, mixed> $meta */
+    private function isExposureRecord(AuditLog $log): bool
+    {
+        return in_array($log->auditable_type, [
+            \App\Models\SubstanceExposureRecord::class,
+            (new \App\Models\SubstanceExposureRecord)->getMorphClass(),
+        ], true);
+    }
+
     private function firstArray(array $meta, array $keys): array
     {
         foreach ($keys as $key) {

@@ -31,11 +31,75 @@ function asToastText(value: unknown): string | null {
     return null;
 }
 
+/**
+ * The Journey sign-in and account screens show every message in their own
+ * designed notices and panels (approved 13 Oct 2026); a toast would repeat
+ * them, and in rawer words ("These credentials do not match our records").
+ * The careers apply wizard does the same: its success pane and per-field
+ * errors carry the result.
+ */
+function ownsItsMessages(component: string): boolean {
+    return (
+        component.startsWith('auth/') ||
+        component === 'portal/login' ||
+        component === 'portal/invitation' ||
+        component === 'careers/apply'
+    );
+}
+
 export default function FlashToaster() {
-    const props = usePage().props as any;
-    const flash = props.flash as Flash | undefined;
-    const errors = props.errors as Record<string, any> | undefined;
-    const success = asToastText(flash?.success);
+    const page = usePage();
+    const props = page.props as {
+        flash?: Flash;
+        errors?: Record<string, unknown>;
+    };
+    const quiet = ownsItsMessages(page.component);
+    const flash = quiet ? undefined : (props.flash as Flash | undefined);
+    const errors = quiet ? undefined : props.errors;
+    // Shift Notes owns confirmation in its command dialog after matching the
+    // committed receipt. A generic redirect message must not bypass that check.
+    const rawSuccess = asToastText(flash?.success);
+    const timesheetDialogOwnsResult =
+        ['operations/timesheets/index', 'operations/rostering/index'].includes(
+            page.component,
+        ) &&
+        [
+            'Timesheet created.',
+            'Timesheet updated.',
+            'Timesheet submitted.',
+            'Timesheet updated and resubmitted.',
+            'Timesheet approved.',
+            'Timesheet already approved.',
+            'Timesheet rejected.',
+            'Timesheet returned for changes.',
+        ].includes(rawSuccess ?? '');
+    const adjustmentDialogOwnsResult =
+        page.component === 'operations/timesheets/payroll-adjustments' &&
+        [
+            'Payroll adjustment marked as processed.',
+            'This adjustment has already been marked as processed.',
+        ].includes(rawSuccess ?? '');
+    const shiftDialogOwnsResult =
+        [
+            'operations/shifts/index',
+            'operations/rostering/index',
+            'operations/shifts/create',
+            'operations/shifts/show',
+            'operations/clients/show',
+            'operations/rostering/conflicts',
+        ].includes(page.component) &&
+        ['Shift created.', 'Shift updated.'].includes(rawSuccess ?? '');
+    const endSessionDialogOwnsResult =
+        page.component === 'attendance/index' &&
+        rawSuccess?.startsWith('Session ended for ');
+    const success =
+        page.component === 'operations/shift-notes/Index' ||
+        timesheetDialogOwnsResult ||
+        adjustmentDialogOwnsResult ||
+        shiftDialogOwnsResult ||
+        endSessionDialogOwnsResult
+            ? null
+            : rawSuccess;
     const error = asToastText(flash?.error);
     const warning = asToastText(flash?.warning);
     const info = asToastText(flash?.info);

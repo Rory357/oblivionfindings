@@ -1,0 +1,184 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance" [selected]:
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Open work":
+      - text: Open work
+    - tab "Historical work" [selected]:
+      - text: Historical work
+  - tabpanel:
+    - generic: VEHICLE RECORD
+    - heading "Service & work history" [level=2]
+    - textbox "Find service history":
+      - /placeholder: Find a service or reference…
+    - combobox "Service history filter":
+      - option "All outcomes" [selected]
+      - option "Completed"
+      - option "Cancelled"
+    - group "Service history layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - strong: "1"
+    - generic: Completed records
+    - strong: "1"
+    - generic: Source evidence
+    - strong: "1"
+    - generic: Cancelled visits
+    - generic "Service & work records":
+      - generic: Service & work records
+      - generic: 2 records shown
+      - table:
+        - row "Record Date / mileage Outcome Evidence & notes Actions":
+          - columnheader "Record"
+          - columnheader "Date / mileage"
+          - columnheader "Outcome"
+          - columnheader "Evidence & notes"
+          - columnheader "Actions"
+        - row "Cancelled provider visit WO-0210 · Provider not recorded 18 Sept 2026 No mileage recorded Cancelled Provider unavailable. No work performed. Replaced by WO-0268. Cancellation reason retained Upload evidence Actions for Cancelled provider visit":
+          - cell "Cancelled provider visit WO-0210 · Provider not recorded":
+            - generic: Cancelled provider visit
+            - generic: WO-0210 · Provider not recorded
+          - cell "18 Sept 2026 No mileage recorded":
+            - strong: 18 Sept 2026
+            - generic: No mileage recorded
+          - cell "Cancelled":
+            - generic: Cancelled
+          - cell "Provider unavailable. No work performed. Replaced by WO-0268. Cancellation reason retained Upload evidence":
+            - generic: Provider unavailable. No work performed. Replaced by WO-0268.
+            - generic: Cancellation reason retained
+            - button "Upload evidence":
+              - text: Upload evidence
+          - cell "Actions for Cancelled provider visit":
+            - button "Actions for Cancelled provider visit":
+        - row "Routine service WO-0188 · Harbour Workshop · DEMO 24 Mar 2026 74,800 km Completed Oil, filter and recorded inspection completed. EV-DEMO-0188 · service report Upload evidence Actions for Routine service":
+          - cell "Routine service WO-0188 · Harbour Workshop · DEMO":
+            - generic: Routine service
+            - generic: WO-0188 · Harbour Workshop · DEMO
+          - cell "24 Mar 2026 74,800 km":
+            - strong: 24 Mar 2026
+            - generic: 74,800 km
+          - cell "Completed":
+            - generic: Completed
+          - cell "Oil, filter and recorded inspection completed. EV-DEMO-0188 · service report Upload evidence":
+            - generic: Oil, filter and recorded inspection completed.
+            - generic: EV-DEMO-0188 · service report
+            - button "Upload evidence":
+              - text: Upload evidence
+          - cell "Actions for Routine service":
+            - button "Actions for Routine service":
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

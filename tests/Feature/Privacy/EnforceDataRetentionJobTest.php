@@ -8,6 +8,7 @@ use App\Domain\Privacy\Retention\RetentionOwnerRegistry;
 use App\Jobs\EnforceDataRetentionJob;
 use App\Models\AnonymizationLog;
 use App\Models\Client;
+use App\Models\ClientNote;
 use App\Models\DataRetentionExecution;
 use App\Models\DataRetentionExecutionItem;
 use App\Models\DataRetentionPolicy;
@@ -243,6 +244,7 @@ class EnforceDataRetentionJobTest extends TestCase
             'data-retention-v1',
             $policy->id,
             $fingerprint,
+            $policy->approved_fingerprint,
             now('UTC')->toDateString(),
         ]));
         DataRetentionExecution::query()->create([
@@ -313,6 +315,9 @@ class EnforceDataRetentionJobTest extends TestCase
             'last_name' => 'Person',
             'date_of_birth' => '1980-01-01',
             'status' => 'anonymize-me',
+            'phone' => '021 555 0188',
+            'email' => 'fictional-contact@example.test',
+            'contact_preferences' => ['phone' => '021 555 0188', 'email' => 'fictional-contact@example.test', 'safe_time' => 'Private contact instruction'],
         ]);
         $archived = $this->oldClient(['status' => 'archive-me']);
         $anonymizePolicy = $this->approvedPolicy($service, $previewer, $approver, [
@@ -333,9 +338,107 @@ class EnforceDataRetentionJobTest extends TestCase
         $this->assertSame('[REDACTED]', $anonymized->first_name);
         $this->assertSame('[REDACTED]', $anonymized->last_name);
         $this->assertNull($anonymized->date_of_birth);
+        $this->assertNull($anonymized->phone);
+        $this->assertNull($anonymized->email);
+        $this->assertNull($anonymized->contact_preferences);
+        $this->assertNull($anonymized->getRawOriginal('contact_preferences'));
+        $this->assertContains('contact_preferences', $anonymizePolicy->preview_snapshot['anonymization_fields']);
         $this->assertTrue(Client::withTrashed()->findOrFail($archived->id)->trashed());
         $this->assertDatabaseHas('data_retention_execution_items', ['action' => 'anonymize']);
         $this->assertDatabaseHas('data_retention_execution_items', ['action' => 'archive']);
+    }
+
+    public function test_legacy_settings_only_approval_cannot_clear_newly_registered_contact_fields(): void
+    {
+        $service = app(RetentionExecutionService::class);
+        $previewer = User::factory()->create();
+        $approver = User::factory()->create();
+        $client = $this->oldClient(['contact_preferences' => ['phone' => '021 555 0188']]);
+        $policy = $this->approvedPolicy($service, $previewer, $approver, ['hard_delete_after_years' => 1]);
+        // Reproduce the previously deployed contract: settings only, without the native field set.
+        $legacy = [
+            'owner_key' => Client::class, 'retention_period_years' => null, 'archive_after_years' => null,
+            'hard_delete_after_years' => 1, 'retention_conditions' => null, 'applies_to_soft_deleted' => true,
+            'legal_hold_exemption' => true, 'active_case_exemption' => false, 'active' => true,
+        ];
+        ksort($legacy);
+        $fingerprint = hash('sha256', json_encode($legacy, JSON_THROW_ON_ERROR));
+        $policy->forceFill(['preview_fingerprint' => $fingerprint, 'approved_fingerprint' => $fingerprint])->save();
+        try {
+            $service->execute($policy->fresh(), 'manual', $approver);
+            $this->fail('A legacy approval authorized the expanded native field set.');
+        } catch (RetentionContractException $exception) {
+            $this->assertSame('approval_required', $exception->reasonCode);
+        }
+        $this->assertSame(['phone' => '021 555 0188'], $client->fresh()->contact_preferences);
+        $snapshot = $service->preview($policy->fresh(), $previewer);
+        $this->assertContains('contact_preferences', $snapshot['anonymization_fields']);
+        $this->assertNotSame($fingerprint, $policy->fresh()->preview_fingerprint);
+        $service->approve($policy->fresh(), $approver);
+        $outcome = $service->execute($policy->fresh(), 'manual', $approver);
+        $this->assertSame('completed', $outcome['status']);
+        $this->assertNull($client->fresh()->contact_preferences);
+    }
+
+    public function test_settings_only_approvals_stay_current_for_owners_whose_contract_did_not_change(): void
+    {
+        $service = app(RetentionExecutionService::class);
+        $legacy = [
+            'owner_key' => ClientNote::class, 'retention_period_years' => null, 'archive_after_years' => null,
+            'hard_delete_after_years' => 1, 'retention_conditions' => null, 'applies_to_soft_deleted' => true,
+            'legal_hold_exemption' => true, 'active_case_exemption' => false, 'active' => true,
+        ];
+        ksort($legacy);
+        $fingerprint = hash('sha256', json_encode($legacy, JSON_THROW_ON_ERROR));
+        $policy = $this->policy(['model_type' => ClientNote::class, 'policy_name' => 'Note retention', 'hard_delete_after_years' => 1,
+            'execution_state' => 'approved', 'preview_fingerprint' => $fingerprint, 'approved_fingerprint' => $fingerprint]);
+        // An approval recorded under the previously deployed settings-only contract remains current.
+        $this->assertSame($fingerprint, $service->fingerprint($policy->fresh()));
+        $legacy['owner_key'] = Client::class;
+        ksort($legacy);
+        $policy->forceFill(['model_type' => Client::class]);
+        $this->assertNotSame(hash('sha256', json_encode($legacy, JSON_THROW_ON_ERROR)), $service->fingerprint($policy));
+    }
+
+    /**
+     * Referral owners (21 Oct 2026) added optional contract parts: a cutoff date, named protections and
+     * a contract version. Client profiles use only the version: anonymising a person now also anonymises
+     * their referrals (Stephan, 21 Oct), so a Client approval must cover that and binds the version. The
+     * rest of Lane A's Client contract is unchanged. Neither change is deployed, so Client-profile
+     * policies still need just one re-approval in production.
+     */
+    public function test_client_contract_fingerprint_binds_lane_a_contract_and_the_referral_clean_up(): void
+    {
+        $service = app(RetentionExecutionService::class);
+        $owner = app(RetentionOwnerRegistry::class)->resolve(Client::class);
+        $policy = $this->policy(['hard_delete_after_years' => 1]);
+        $contract = [
+            'owner_key' => Client::class,
+            'owner_contract' => [
+                'model' => Client::class,
+                'condition_operators' => $owner->conditionOperators,
+                'anonymization_fields' => $owner->anonymizationFields,
+                'active_case_relation' => '@self',
+                'soft_deletes' => true,
+                'contract_version' => 'client-with-referrals-2026-10-21',
+            ],
+            'retention_period_years' => null, 'archive_after_years' => null, 'hard_delete_after_years' => 1,
+            'retention_conditions' => null, 'applies_to_soft_deleted' => true, 'legal_hold_exemption' => true,
+            'active_case_exemption' => false, 'active' => true,
+        ];
+        $normalize = function (mixed $value) use (&$normalize): mixed {
+            if (! is_array($value)) {
+                return $value;
+            }
+            if (! array_is_list($value)) {
+                ksort($value);
+            }
+
+            return array_map($normalize, $value);
+        };
+
+        $this->assertSame(['contract_version' => 'client-with-referrals-2026-10-21'], $owner->extendedContract());
+        $this->assertSame(hash('sha256', json_encode($normalize($contract), JSON_THROW_ON_ERROR)), $service->fingerprint($policy));
     }
 
     private function oldClient(array $attributes = []): Client

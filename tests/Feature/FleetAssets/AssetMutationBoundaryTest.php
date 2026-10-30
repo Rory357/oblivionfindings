@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class AssetMutationBoundaryTest extends TestCase
@@ -491,6 +492,7 @@ class AssetMutationBoundaryTest extends TestCase
 
     public function test_competing_custody_transfers_are_serialized_and_preserve_assignment_history(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -623,8 +625,8 @@ class AssetMutationBoundaryTest extends TestCase
     {
         $actor = $this->actor(['assets.viewAny', 'assets.ownership.manage', 'clients.viewAny']);
         $asset = Asset::factory()->forSite($this->site)->create();
-        $client = Client::factory()->create(['site_id' => $this->site->id]);
-        $hiddenClient = Client::factory()->create(['site_id' => $this->hiddenSite->id]);
+        $client = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
+        $hiddenClient = Client::factory()->create(['site_id' => $this->hiddenSite->id, 'status' => 'active']);
 
         $this->actingAs($actor)
             ->post("/assets/{$asset->id}/ownerships", [

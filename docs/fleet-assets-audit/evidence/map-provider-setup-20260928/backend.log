@@ -1,0 +1,10 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\fleet-map-provider-fix\oblivionfindings\phpunit.xml
+
+......                                                              6 / 6 (100%)
+
+Time: 14:58.633, Memory: 116.00 MB
+
+[30;42mOK (6 tests, 56 assertions)[0m

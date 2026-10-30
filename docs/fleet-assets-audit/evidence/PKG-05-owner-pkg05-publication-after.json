@@ -1,0 +1,27 @@
+{
+  "verified": "2026-09-27T17:25:21.2472276+13:00",
+  "localMain": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "remoteMain": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "dirtyFilesPreservedImmediatelyAfterFastForward": 62,
+  "dirtyStatusChangesSinceCapture": [],
+  "laterProgrammeFileUpdates": [
+    {
+      "path": "docs/fleet-assets-audit/05-page-register.md",
+      "before": "d96abe70fa95ff44cd118ae55807ee502d199c129ebc9a582098cc1081f5102e",
+      "after": "cb9b935931dfd4b5e4c31e7145201346f131224f01e3c5ce5f702f601d0f1405",
+      "lastWrite": "2026-09-27T17:22:29.4789458+13:00"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-design-start.md",
+      "before": "f983a6939e105a105652e9ed4fb942c3e5d490ff5399a963546c46a825f4b00f",
+      "after": "d4d65f771a473ca15170506bb59262fe3c9c8a55b8e2a61879e00053cf335aab",
+      "lastWrite": "2026-09-27T17:22:28.8778671+13:00"
+    }
+  ],
+  "frontendTests": 38,
+  "frontendExitCode": 0,
+  "typecheckExitCode": 0,
+  "phpSyntaxFiles": 18,
+  "phpSyntaxExitCode": 0,
+  "sourceMatchesApprovedHead": true
+}

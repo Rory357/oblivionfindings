@@ -1,7 +1,18 @@
-import { PageHero, PageLayout } from '@/components/page';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import {
+    PageHeader,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -9,50 +20,52 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ReviewRow } from '@/components/wizard/shell';
+import { useSettingsLeaveConfirmation } from '@/hooks/use-settings-leave-confirmation';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { type BreadcrumbItem } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Building2,
-    CheckCircle,
-    Loader2,
+    KeyRound,
+    LayoutGrid,
+    List,
+    Plug,
     RefreshCw,
     ShieldAlert,
     XCircle,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { SiteCredentialRow } from './site-credentials';
+import { useUnifiAction } from './unifi-actions';
 import {
-    SiteCredentialsCard,
-    type SiteCredentialRow,
-} from './site-credentials';
+    UnifiDiscoveredRecords,
+    UnifiRecords,
+    unifiRowSearchText,
+    unifiRowState,
+    type UnifiListRow,
+} from './unifi-records';
+import { UnifiRoomDialog } from './unifi-room-dialog';
+import {
+    quietHoursTime,
+    UnifiSetupWizard,
+    type UnifiSetupChange,
+    type UnifiSetupKind,
+    type UnifiSetupValues,
+} from './unifi-setup-wizard';
 
 type ProviderConnection = {
     status: 'connected' | 'disconnected' | 'disabled' | 'error';
-    secret_last4?: string;
-    last_tested_at?: string;
-    last_synced_at?: string;
-    sites_synced_at?: string;
+    secret_last4?: string | null;
+    last_tested_at?: string | null;
+    last_synced_at?: string | null;
+    sites_synced_at?: string | null;
     disabled_at?: string | null;
     disabled_reason?: DisableReason | null;
     requires_credential_replacement?: boolean;
@@ -93,13 +106,19 @@ type SiteLite = { id: number; name: string; type?: string };
 type RoomLite = { id: number; site_id: number; name: string };
 type SyncedDevice = {
     id: number;
-    site_id: number;
+    site_id: number | null;
     site_name: string;
     site_type?: string | null;
     room_id?: number | null;
     name: string;
+    domain: string;
     category: string;
-    status: string;
+    subcategory: string | null;
+    manufacturer: string | null;
+    firmware_version: string | null;
+    room_name: string | null;
+    detail_url: string;
+    status: string | null;
     health_status?: string | null;
     model?: string | null;
     last_seen_at?: string | null;
@@ -114,11 +133,22 @@ type SyncLog = {
     items_updated: number;
     items_errored: number;
     failure_category?: string | null;
-    started_at: string;
+    started_at: string | null;
     completed_at?: string | null;
 };
 
-type Props = {
+export type UnifiProps = {
+    actor_id: number;
+    actionOutcome?: {
+        actor_id: number;
+        request_id: string;
+        method: string;
+        path: string;
+        /** "unchanged": the request was accepted but nothing needed changing. */
+        outcome: 'saved' | 'unchanged';
+    } | null;
+    as_of: string;
+    can: { manage: boolean };
     providerConnection: ProviderConnection;
     discoveredSites: DiscoveredSite[];
     siteConfigs: SiteConfig[];
@@ -130,39 +160,17 @@ type Props = {
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
     { title: 'Security & Devices', href: '/security-devices' },
-    { title: 'APIs & Integrations', href: '/security-devices/integrations' },
+    { title: 'Integrations', href: '/security-devices/integrations' },
     { title: 'UniFi', href: '/security-devices/integrations/unifi' },
 ];
 
-const connectionStatusConfig: Record<
-    string,
-    { label: string; className: string; icon: typeof CheckCircle }
-> = {
-    connected: {
-        label: 'Connected',
-        className:
-            'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
-        icon: CheckCircle,
-    },
-    disconnected: {
-        label: 'Disconnected',
-        className:
-            'bg-muted text-foreground dark:bg-muted/50 dark:text-muted-foreground',
-        icon: XCircle,
-    },
-    error: {
-        label: 'Error',
-        className:
-            'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
-        icon: ShieldAlert,
-    },
-    disabled: {
-        label: 'Disabled',
-        className:
-            'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
-        icon: ShieldAlert,
-    },
+const connectionStatusLabels: Record<string, string> = {
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    error: 'Error',
+    disabled: 'Disabled',
 };
 
 const disableReasons: Array<{ value: DisableReason; label: string }> = [
@@ -180,87 +188,174 @@ function disableReasonLabel(reason?: DisableReason | null): string {
     );
 }
 
-const syncStatusConfig: Record<string, string> = {
-    success:
-        'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success',
-    partial:
-        'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
-    failed: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical',
-    started:
-        'bg-status-info-bg text-status-info dark:bg-status-info-bg dark:text-status-info',
-};
-
-function siteTypeLabel(type?: string | null): string {
-    if (type === 'head_office') return 'Head Office';
-    if (type === 'house') return 'House';
-    if (type === 'facility') return 'Facility';
-    return 'Location';
-}
-
 function fmt(value?: string | null): string {
-    if (!value) return '---';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+    if (!value) return 'Not recorded';
+    if (!/(Z|[+-]\d{2}:\d{2})$/.test(value)) return 'Time zone not recorded';
+    return formatDateTimeLong(value, 'Time unavailable');
 }
 
-function deviceStatusBadge(status?: string | null): {
-    label: string;
-    className: string;
-} {
-    switch (status) {
-        case 'active':
-            return {
-                label: 'Online',
-                className: 'border-status-success/30 text-status-success',
-            };
-        case 'offline':
-            return {
-                label: 'Offline',
-                className: 'border-status-critical/30 text-status-critical',
-            };
-        case 'degraded':
-            return {
-                label: 'Degraded',
-                className: 'border-status-warning/30 text-status-warning',
-            };
-        case 'maintenance':
-            return {
-                label: 'Maintenance',
-                className: 'border-status-info/30 text-status-info',
-            };
-        case 'decommissioned':
-            return {
-                label: 'Retired',
-                className: 'border-border/30 text-muted-foreground',
-            };
-        default:
-            return {
-                label: status || 'Unknown',
-                className: 'border-border/30 text-muted-foreground',
-            };
-    }
-}
+const unifiPath = '/security-devices/integrations/unifi';
+const views = [
+    { key: 'connection', label: 'Connection' },
+    { key: 'mappings', label: 'Site mappings' },
+    { key: 'devices', label: 'Devices' },
+    { key: 'defaults', label: 'Defaults' },
+    { key: 'history', label: 'Sync history' },
+    { key: 'credentials', label: 'Site credentials' },
+] as const;
+type UnifiView = (typeof views)[number]['key'];
 
-function formatUnifiSiteLabel(site: DiscoveredSite): {
-    primary: string;
-    secondary?: string;
-    displayName: string;
-} {
-    const siteName = site.name?.trim() || 'Unnamed UniFi site';
-    const deviceCount = site.device_count;
-    const primary = siteName;
-    const secondaryParts: string[] = [];
-    if (deviceCount !== undefined && deviceCount !== null) {
-        secondaryParts.push(
-            `${deviceCount} device${deviceCount === 1 ? '' : 's'}`,
+export default function UnifiIntegration(data: UnifiProps) {
+    const { auth } = usePage<{
+        auth?: {
+            user?: { id: number } | null;
+            can?: {
+                securityDevices?: {
+                    viewAny?: boolean;
+                    integrationsManage?: boolean;
+                };
+            };
+        };
+    }>().props;
+    const [denied, setDenied] = useState(false),
+        [notice, setNotice] = useState('');
+    const alive = useRef(true),
+        active = useRef<string | null>(null);
+    const actor = auth?.user?.id;
+    const [sourceActor] = useState(data.actor_id);
+    const permitted = Boolean(
+        actor &&
+        sourceActor === data.actor_id &&
+        data.actor_id === actor &&
+        data.can.manage &&
+        auth?.can?.securityDevices?.viewAny === true &&
+        auth.can.securityDevices?.integrationsManage === true,
+    );
+    useEffect(() => {
+        alive.current = true;
+        return () => {
+            alive.current = false;
+            active.current = null;
+        };
+    }, []);
+    useEffect(
+        () =>
+            router.on('invalid', (event) => {
+                if (!alive.current || active.current === null) return;
+                const response = event.detail.response;
+                const headers = response.config.headers;
+                const responseMarker =
+                    typeof headers?.get === 'function'
+                        ? headers.get('X-Obli-UniFi-Read')
+                        : headers?.['X-Obli-UniFi-Read'];
+                if (responseMarker !== active.current) return;
+                if (
+                    response.config.method?.toLowerCase() !== 'get' ||
+                    typeof response.config.url !== 'string'
+                )
+                    return;
+                let target: URL;
+                try {
+                    target = new URL(
+                        response.config.url,
+                        window.location.origin,
+                    );
+                } catch {
+                    return;
+                }
+                if (
+                    target.origin !== window.location.origin ||
+                    target.pathname !== unifiPath
+                )
+                    return;
+                event.preventDefault();
+                active.current = null;
+                if ([401, 403, 404].includes(response.status)) {
+                    setDenied(true);
+                    setNotice('');
+                } else
+                    setNotice(
+                        'Refresh failed. Previous records remain dated by their read time. Try Refresh again.',
+                    );
+            }),
+        [],
+    );
+    const refresh = () => {
+        if (active.current !== null) return;
+        const token = crypto.randomUUID();
+        active.current = token;
+        setNotice('');
+        router.visit(unifiPath + window.location.search, {
+            method: 'get',
+            headers: { 'X-Obli-UniFi-Read': token },
+            preserveScroll: true,
+            preserveState: false,
+            onSuccess: (page) => {
+                if (!alive.current || active.current !== token) return;
+                const next = page.props as unknown as UnifiProps & {
+                    auth?: {
+                        user?: { id: number };
+                        can?: {
+                            securityDevices?: {
+                                viewAny?: boolean;
+                                integrationsManage?: boolean;
+                            };
+                        };
+                    };
+                };
+                const valid =
+                    page.component === 'security-devices/integrations/unifi' &&
+                    next.actor_id === actor &&
+                    next.auth?.user?.id === actor &&
+                    next.can?.manage === true &&
+                    next.auth.can?.securityDevices?.viewAny === true &&
+                    next.auth.can?.securityDevices?.integrationsManage === true;
+                setDenied(!valid);
+            },
+            onFinish: () => {
+                if (alive.current && active.current === token)
+                    active.current = null;
+            },
+        });
+    };
+    if (!permitted || denied)
+        return (
+            <AppLayout breadcrumbs={breadcrumbs}>
+                <Head title="UniFi integration" />
+                <div className="space-y-5">
+                    <PageHeader
+                        icon={Plug}
+                        title="UniFi integration"
+                        subline="Connection management is restricted"
+                        actions={
+                            <PageHeaderGlassButton onClick={refresh}>
+                                <RefreshCw className="size-4" />
+                                Refresh
+                            </PageHeaderGlassButton>
+                        }
+                    />
+                    <div role="status">
+                        <EmptyState
+                            icon={ShieldAlert}
+                            title="UniFi records are restricted"
+                            description="You need permission to manage integrations. Ask an administrator to restore access, then Refresh."
+                        />
+                    </div>
+                </div>
+            </AppLayout>
         );
-    }
-    const secondary = secondaryParts.join(' • ');
-    const displayName = primary;
-    return { primary, secondary, displayName };
+    return (
+        <UnifiWorkspace
+            key={String(actor)}
+            {...data}
+            refresh={refresh}
+            notice={notice}
+            onAccessDenied={() => setDenied(true)}
+        />
+    );
 }
 
-export default function UnifiIntegration({
+function UnifiWorkspace({
     providerConnection,
     discoveredSites,
     siteConfigs,
@@ -269,1183 +364,1099 @@ export default function UnifiIntegration({
     syncedDevices,
     syncLogs,
     siteCredentials,
-}: Props) {
-    const [showRotateForm, setShowRotateForm] = useState(false);
-    const [showMapForm, setShowMapForm] = useState(false);
-    const [testingConnection, setTestingConnection] = useState(false);
-    const [syncingSites, setSyncingSites] = useState(false);
-    const [syncingSiteConfigId, setSyncingSiteConfigId] = useState<
-        number | null
-    >(null);
-    const [assigningDeviceId, setAssigningDeviceId] = useState<number | null>(
-        null,
-    );
-    const [savingDefaults, setSavingDefaults] = useState(false);
+    as_of,
+    actor_id,
+    refresh,
+    notice,
+    onAccessDenied,
+}: UnifiProps & {
+    refresh: () => void;
+    notice: string;
+    onAccessDenied: () => void;
+}) {
+    const [scope, setScope] = useState<UnifiView>('connection');
+    const [layout, setLayout] = useState<'cards' | 'table'>('table');
+    const [search, setSearch] = useState('');
+    const [deviceSiteFilter, setDeviceSiteFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [setupKind, setSetupKind] = useState<UnifiSetupKind | null>(null);
+    const [setupSuccess, setSetupSuccess] = useState<{
+        title: string;
+        description: string;
+    } | null>(null);
+    const [roomDeviceId, setRoomDeviceId] = useState<number | null>(null);
+    const [roomDraft, setRoomDraft] = useState<{
+        id: number;
+        site_id: number | null;
+        room_id: number | null;
+        value: string;
+    } | null>(null);
+    const [removeMappingId, setRemoveMappingId] = useState<number | null>(null);
     const [disableOpen, setDisableOpen] = useState(false);
     const [disableReason, setDisableReason] = useState<DisableReason | null>(
         null,
     );
-    const [disabling, setDisabling] = useState(false);
-    const [deviceSiteFilter, setDeviceSiteFilter] = useState<string>('all');
-    const [deviceRoomDraft, setDeviceRoomDraft] = useState<
-        Record<number, string>
-    >(() =>
-        syncedDevices.reduce<Record<number, string>>(
-            (acc, d) => ({
-                ...acc,
-                [d.id]: d.room_id ? String(d.room_id) : 'unassigned',
-            }),
-            {},
-        ),
+    const { auth } = usePage<{
+        auth?: { can?: { securityDevices?: { devicesView?: boolean } } };
+    }>().props;
+    const canViewDevices = auth?.can?.securityDevices?.devicesView === true;
+    const action = useUnifiAction(actor_id, onAccessDenied);
+    const keyForm = useForm({ api_key: '' });
+    const rotateForm = useForm({ api_key: '' });
+    const mapForm = useForm({ site_id: '', mapping_token: '' });
+    const defaultValues = useMemo(
+        () => ({
+            refresh_interval_minutes:
+                providerConnection?.defaults?.refresh_interval_minutes ?? 15,
+            alert_motion_events:
+                providerConnection?.defaults?.alert_motion_events ?? false,
+            alert_device_offline:
+                providerConnection?.defaults?.alert_device_offline ?? true,
+            quiet_hours_start:
+                providerConnection?.defaults?.quiet_hours_start ?? '',
+            quiet_hours_end:
+                providerConnection?.defaults?.quiet_hours_end ?? '',
+        }),
+        [providerConnection?.defaults],
     );
-
-    const hasKey = !!providerConnection;
+    const defaultsForm = useForm(defaultValues);
+    useEffect(() => {
+        if (
+            !defaultsForm.isDirty &&
+            !action.pending &&
+            JSON.stringify(defaultsForm.data) !== JSON.stringify(defaultValues)
+        ) {
+            defaultsForm.setDefaults(defaultValues);
+            defaultsForm.setData(defaultValues);
+        }
+    }, [action.pending, defaultValues, defaultsForm]);
+    const selectedDevice =
+        syncedDevices.find(
+            (d) =>
+                d.id === roomDeviceId &&
+                sites.some((site) => site.id === d.site_id),
+        ) ?? null;
+    const currentRoom = (d: SyncedDevice) =>
+        d.room_id ? String(d.room_id) : 'unassigned';
+    const roomValue =
+        selectedDevice &&
+        roomDraft?.id === selectedDevice.id &&
+        roomDraft.site_id === selectedDevice.site_id &&
+        roomDraft.room_id === (selectedDevice.room_id ?? null)
+            ? roomDraft.value
+            : selectedDevice
+              ? currentRoom(selectedDevice)
+              : 'unassigned';
+    const roomDirty =
+        !!selectedDevice && roomValue !== currentRoom(selectedDevice);
+    const leave = useSettingsLeaveConfirmation(
+        keyForm.isDirty ||
+            rotateForm.isDirty ||
+            mapForm.isDirty ||
+            defaultsForm.isDirty ||
+            roomDirty,
+        'Discard unsaved UniFi settings?',
+        'Your unsaved key, mapping, room and default entries will be discarded. A save already sent may still finish; review saved records before retrying.',
+        () => {
+            keyForm.reset();
+            rotateForm.reset();
+            mapForm.reset();
+            defaultsForm.setDefaults(defaultValues);
+            defaultsForm.setData(defaultValues);
+            setRoomDraft(null);
+            setRoomDeviceId(null);
+            setSetupKind(null);
+            setSetupSuccess(null);
+        },
+    );
+    const hasKey = providerConnection !== null;
     const connectionDisabled =
         providerConnection?.status === 'disabled' ||
         providerConnection?.requires_credential_replacement === true;
     const collectionReady =
         providerConnection?.status === 'connected' && !connectionDisabled;
     const connStatus = providerConnection
-        ? (connectionStatusConfig[providerConnection.status] ??
-          connectionStatusConfig.disconnected)
+        ? (connectionStatusLabels[providerConnection.status] ??
+          connectionStatusLabels.disconnected)
         : null;
-    const roomsBySite = useMemo(
-        () =>
-            rooms.reduce<Record<number, RoomLite[]>>((acc, room) => {
-                (acc[room.site_id] ??= []).push(room);
-                return acc;
-            }, {}),
-        [rooms],
+    // Search covers the text shown on each record, never links or the
+    // opaque mapping tokens.
+    const query = search.trim().toLocaleLowerCase();
+    const matches = (row: UnifiListRow) =>
+        !query || unifiRowSearchText(row).includes(query);
+    // Each list view's own status filter, built from its loaded records.
+    const statusOptions = (rows: UnifiListRow[]) =>
+        [...new Set(rows.map(unifiRowState))]
+            .sort()
+            .map((value) => ({ value, label: value }));
+    const mappingRows: UnifiListRow[] = siteConfigs.map((record) => ({
+            kind: 'mapping',
+            record,
+        })),
+        deviceRows: UnifiListRow[] = syncedDevices.map((record) => ({
+            kind: 'device',
+            record,
+        })),
+        historyRows: UnifiListRow[] = syncLogs.map((record) => ({
+            kind: 'history',
+            record,
+        })),
+        credentialRows: UnifiListRow[] = siteCredentials.map((record) => ({
+            kind: 'credential',
+            record,
+        }));
+    const viewRows: UnifiListRow[] =
+        scope === 'mappings'
+            ? mappingRows
+            : scope === 'devices'
+              ? deviceRows
+              : scope === 'history'
+                ? historyRows
+                : scope === 'credentials'
+                  ? credentialRows
+                  : [];
+    const listView = scope !== 'connection' && scope !== 'defaults';
+    const viewStatusOptions = statusOptions(viewRows);
+    const status = viewStatusOptions.some(
+        (option) => option.value === statusFilter,
+    )
+        ? statusFilter
+        : 'all';
+    const visibleRows = viewRows.filter(
+        (row) =>
+            matches(row) &&
+            (status === 'all' || unifiRowState(row) === status) &&
+            (row.kind !== 'device' ||
+                deviceSiteFilter === 'all' ||
+                row.record.site_id === Number(deviceSiteFilter)),
     );
-    const filteredDevices = useMemo(() => {
-        if (deviceSiteFilter === 'all') return syncedDevices;
-        const siteId = Number(deviceSiteFilter);
-        return syncedDevices.filter((d) => d.site_id === siteId);
-    }, [syncedDevices, deviceSiteFilter]);
-
-    const saveKeyForm = useForm({ api_key: '' });
-    const rotateKeyForm = useForm({ api_key: '' });
-    const mapForm = useForm({ site_id: '', mapping_token: '' });
-    const defaultsForm = useForm({
-        refresh_interval_minutes:
-            providerConnection?.defaults?.refresh_interval_minutes ?? 15,
-        alert_motion_events:
-            providerConnection?.defaults?.alert_motion_events ?? false,
-        alert_device_offline:
-            providerConnection?.defaults?.alert_device_offline ?? true,
-        quiet_hours_start:
-            providerConnection?.defaults?.quiet_hours_start ?? '',
-        quiet_hours_end: providerConnection?.defaults?.quiet_hours_end ?? '',
-    });
-
-    const handleSaveDefaults = (e: React.FormEvent) => {
-        e.preventDefault();
-        setSavingDefaults(true);
-        router.put(
-            '/security-devices/integrations/unifi/defaults',
-            {
-                config: {
-                    refresh_interval_minutes:
-                        defaultsForm.data.refresh_interval_minutes,
-                    alert_motion_events: defaultsForm.data.alert_motion_events,
-                    alert_device_offline:
-                        defaultsForm.data.alert_device_offline,
-                    quiet_hours_start:
-                        defaultsForm.data.quiet_hours_start || null,
-                    quiet_hours_end: defaultsForm.data.quiet_hours_end || null,
+    const visibleDiscovered = discoveredSites.filter(
+        (site) =>
+            !query ||
+            [site.name, site.device_count ?? '']
+                .join(' ')
+                .toLocaleLowerCase()
+                .includes(query),
+    );
+    const selectedMapping =
+        siteConfigs.find((c) => c.id === removeMappingId) ?? null;
+    const blocked = action.pending
+        ? 'Another request is pending.'
+        : action.uncertain
+          ? 'Refresh the saved status before repeating an action.'
+          : undefined;
+    const selectView = (view: UnifiView) => {
+        if (view !== scope)
+            leave.request(() => {
+                setScope(view);
+                setSearch('');
+                setStatusFilter('all');
+                setRoomDeviceId(null);
+            });
+    };
+    const openSetup = (kind: UnifiSetupKind, token?: string) => {
+        if (action.pending || action.uncertain) return;
+        leave.request(() => {
+            action.clearMessage();
+            setSetupSuccess(null);
+            if (token) mapForm.setData('mapping_token', token);
+            setSetupKind(kind);
+        });
+    };
+    const setupValues: UnifiSetupValues = {
+        api_key:
+            setupKind === 'rotate'
+                ? rotateForm.data.api_key
+                : setupKind === 'key'
+                  ? keyForm.data.api_key
+                  : '',
+        site_id: mapForm.data.site_id,
+        mapping_token: mapForm.data.mapping_token,
+        ...defaultsForm.data,
+    };
+    const changeSetup: UnifiSetupChange = (field, value) => {
+        if (field === 'api_key' && typeof value === 'string') {
+            if (setupKind === 'rotate') rotateForm.setData('api_key', value);
+            else keyForm.setData('api_key', value);
+        } else if (
+            (field === 'site_id' || field === 'mapping_token') &&
+            typeof value === 'string'
+        )
+            mapForm.setData(field, value);
+        else if (
+            field === 'refresh_interval_minutes' &&
+            typeof value === 'number'
+        )
+            defaultsForm.setData(field, value);
+        else if (
+            (field === 'alert_motion_events' ||
+                field === 'alert_device_offline') &&
+            typeof value === 'boolean'
+        )
+            defaultsForm.setData(field, value);
+        else if (
+            (field === 'quiet_hours_start' || field === 'quiet_hours_end') &&
+            (typeof value === 'string' || value === null)
+        )
+            defaultsForm.setData(field, value ?? '');
+    };
+    const submitSetup = () => {
+        if (!setupKind || action.pending || action.uncertain) return;
+        if (setupKind === 'key' || setupKind === 'rotate') {
+            // The server trims input before it stores the key and its last
+            // four characters, so compare (and send) the trimmed key.
+            const form = setupKind === 'key' ? keyForm : rotateForm,
+                key = form.data.api_key.trim(),
+                kind = setupKind;
+            if (!key || key.length > 4096) return;
+            action.execute({
+                method: 'post',
+                path: unifiPath + (kind === 'key' ? '/key' : '/rotate'),
+                payload: { api_key: key },
+                label: kind === 'key' ? 'Saving the key' : 'Replacing the key',
+                confirmed: (next) =>
+                    !!next.providerConnection &&
+                    next.providerConnection.secret_last4 === key.slice(-4) &&
+                    next.providerConnection.status === 'disconnected',
+                onConfirmed: () => {
+                    form.reset();
+                    setSetupSuccess({
+                        title: 'Key saved',
+                        description:
+                            'Test the connection before collection can resume.',
+                    });
                 },
-            },
-            {
-                preserveScroll: true,
-                onFinish: () => setSavingDefaults(false),
-            },
-        );
+            });
+        } else if (setupKind === 'mapping') {
+            if (
+                !sites.some(
+                    (site) => String(site.id) === mapForm.data.site_id,
+                ) ||
+                !discoveredSites.some(
+                    (site) => site.mapping_token === mapForm.data.mapping_token,
+                )
+            )
+                return;
+            const siteId = Number(mapForm.data.site_id);
+            const locationName = discoveredSites.find(
+                (site) => site.mapping_token === mapForm.data.mapping_token,
+            )!.name;
+            action.execute({
+                method: 'post',
+                path: unifiPath + '/map-site',
+                payload: {
+                    site_id: mapForm.data.site_id,
+                    mapping_token: mapForm.data.mapping_token,
+                },
+                label: 'Mapping the location',
+                confirmed: (next) =>
+                    next.siteConfigs?.some(
+                        (c) =>
+                            c.site_id === siteId &&
+                            c.is_active &&
+                            c.mapped_external_site_name === locationName,
+                    ) === true,
+                onConfirmed: () => {
+                    mapForm.reset();
+                    setSetupSuccess({
+                        title: 'Site mapped',
+                        description:
+                            'The mapping is saved. Device collection remains a separate action.',
+                    });
+                },
+            });
+        } else {
+            const config = {
+                refresh_interval_minutes:
+                    defaultsForm.data.refresh_interval_minutes,
+                alert_motion_events: defaultsForm.data.alert_motion_events,
+                alert_device_offline: defaultsForm.data.alert_device_offline,
+                quiet_hours_start: defaultsForm.data.quiet_hours_start || null,
+                quiet_hours_end: defaultsForm.data.quiet_hours_end || null,
+            };
+            action.execute({
+                method: 'put',
+                path: unifiPath + '/defaults',
+                payload: { config },
+                label: 'Saving the defaults',
+                confirmed: (next) =>
+                    !!next.providerConnection?.defaults &&
+                    Object.entries(config).every(
+                        ([key, value]) =>
+                            (
+                                next.providerConnection!.defaults as Record<
+                                    string,
+                                    unknown
+                                >
+                            )[key] === value ||
+                            (value === null &&
+                                !(
+                                    next.providerConnection!.defaults as Record<
+                                        string,
+                                        unknown
+                                    >
+                                )[key]),
+                    ),
+                onConfirmed: (next) => {
+                    const d = next.providerConnection!.defaults!;
+                    const saved = {
+                        refresh_interval_minutes:
+                            d.refresh_interval_minutes ?? 15,
+                        alert_motion_events: d.alert_motion_events ?? false,
+                        alert_device_offline: d.alert_device_offline ?? true,
+                        quiet_hours_start: d.quiet_hours_start ?? '',
+                        quiet_hours_end: d.quiet_hours_end ?? '',
+                    };
+                    defaultsForm.setDefaults(saved);
+                    defaultsForm.setData(saved);
+                    setSetupSuccess({
+                        title: 'Defaults saved',
+                        description:
+                            'The saved settings are shown in this record.',
+                    });
+                },
+            });
+        }
     };
-
-    const disableConnection = (event: React.MouseEvent<HTMLButtonElement>) => {
-        event.preventDefault();
-        if (!disableReason || disabling) return;
-
-        setDisabling(true);
-        router.post(
-            '/security-devices/integrations/unifi/disable',
-            { reason: disableReason },
-            {
-                preserveScroll: true,
-                onSuccess: () => setDisableOpen(false),
-                onFinish: () => setDisabling(false),
-            },
-        );
+    const syncMapping = (c: SiteConfig) => {
+        if (!c.is_active || !collectionReady) return;
+        action.execute({
+            method: 'post',
+            path: unifiPath + '/sync-devices',
+            payload: { site_config_id: c.id },
+            label: 'Syncing devices',
+        });
     };
-
+    const saveRoom = () => {
+        const d = selectedDevice;
+        if (!d || !sites.some((site) => site.id === d.site_id)) return;
+        const roomId = roomValue === 'unassigned' ? null : Number(roomValue);
+        if (
+            roomId !== null &&
+            !rooms.some(
+                (room) => room.id === roomId && room.site_id === d.site_id,
+            )
+        )
+            return;
+        action.execute({
+            method: 'put',
+            path: unifiPath + `/hardware/${d.id}/room`,
+            payload: { room_id: roomId },
+            label: 'Assigning the room',
+            confirmed: (next) =>
+                next.syncedDevices?.some(
+                    (device) =>
+                        device.id === d.id &&
+                        device.site_id === d.site_id &&
+                        (device.room_id ?? null) === roomId,
+                ) === true,
+            onConfirmed: () => {
+                setRoomDraft(null);
+                setRoomDeviceId(null);
+            },
+        });
+    };
+    const disableConnection = () => {
+        if (!disableReason) return;
+        action.execute({
+            method: 'post',
+            path: unifiPath + '/disable',
+            payload: { reason: disableReason },
+            label: 'Disabling the connection',
+            unchangedNotice:
+                'The UniFi connection was already disabled, so nothing changed.',
+            confirmed: (next) => next.providerConnection?.status === 'disabled',
+            onConfirmed: () => setDisableOpen(false),
+        });
+    };
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="UniFi Integration" />
-            <PageLayout
-                hero={
-                    <PageHero
-                        variant="compact"
-                        backHref="/security-devices/integrations"
-                        backLabel="Back to APIs & Integrations"
-                        title="UniFi Integration"
-                        description="Dynamic location to room assignment for synced UniFi devices."
-                    />
-                }
-            >
-                <SiteCredentialsCard rows={siteCredentials} />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>API Key</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {!hasKey ? (
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    saveKeyForm.post(
-                                        '/security-devices/integrations/unifi/key',
-                                        {
-                                            preserveScroll: true,
-                                            onSuccess: () =>
-                                                saveKeyForm.reset('api_key'),
-                                        },
-                                    );
-                                }}
-                                className="space-y-4"
-                            >
-                                <div className="space-y-2">
-                                    <Label htmlFor="api_key">API Key</Label>
-                                    <Input
-                                        id="api_key"
-                                        type="password"
-                                        value={saveKeyForm.data.api_key}
-                                        onChange={(e) =>
-                                            saveKeyForm.setData(
-                                                'api_key',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Enter UniFi API key"
-                                    />
-                                </div>
-                                <Button
-                                    type="submit"
-                                    disabled={
-                                        saveKeyForm.processing ||
-                                        !saveKeyForm.data.api_key
+            <Head title="UniFi integration" />
+            <div className="min-w-0 space-y-5">
+                <PageHeader
+                    icon={Plug}
+                    title="UniFi integration"
+                    subline={
+                        'Saved records as at ' +
+                        fmt(as_of) +
+                        ' · live status is not checked here'
+                    }
+                    actions={
+                        <>
+                            {scope !== 'connection' && scope !== 'defaults' && (
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search this view…"
+                                    ariaLabel="Search UniFi records"
+                                />
+                            )}
+                            {scope === 'connection' && (
+                                <PageHeaderGlassButton
+                                    disabled={!!blocked}
+                                    onClick={() =>
+                                        openSetup(hasKey ? 'rotate' : 'key')
                                     }
                                 >
-                                    {saveKeyForm.processing
-                                        ? 'Saving...'
-                                        : 'Save Key'}
-                                </Button>
-                            </form>
-                        ) : (
-                            <>
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <span className="text-sm">
-                                        Key ending in{' '}
-                                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
-                                            •••
-                                            {providerConnection?.secret_last4}
-                                        </code>
-                                    </span>
-                                    {connStatus && (
-                                        <Badge className={connStatus.className}>
-                                            <connStatus.icon className="mr-1 h-3 w-3" />
-                                            {connStatus.label}
-                                        </Badge>
-                                    )}
-                                </div>
-                                <div className="space-y-1 text-sm text-muted-foreground">
-                                    <p>
-                                        Last tested:{' '}
-                                        {fmt(
-                                            providerConnection?.last_tested_at,
-                                        )}
-                                    </p>
-                                    <p>
-                                        Last sync:{' '}
-                                        {fmt(
-                                            providerConnection?.last_synced_at,
-                                        )}
-                                    </p>
-                                </div>
-                                {connectionDisabled && (
-                                    <div
-                                        className="space-y-2 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 text-sm"
-                                        role="status"
-                                    >
-                                        <p className="font-medium text-status-warning">
-                                            Provider traffic is disabled
-                                        </p>
-                                        <p className="text-muted-foreground">
-                                            Scheduled collection, manual
-                                            provider sync and webhook intake are
-                                            stopped. Canonical Devices, Site
-                                            mappings, cursors, sync history and
-                                            monitoring evidence remain
-                                            available.
-                                        </p>
-                                        <p className="text-muted-foreground">
-                                            Reason:{' '}
-                                            <span className="font-medium text-foreground">
-                                                {disableReasonLabel(
-                                                    providerConnection?.disabled_reason,
-                                                )}
-                                            </span>
-                                            {providerConnection?.disabled_at
-                                                ? ` · ${fmt(providerConnection.disabled_at)}`
-                                                : ''}
-                                        </p>
-                                        <p className="text-muted-foreground">
-                                            Replace the API key below, then run
-                                            a successful connection test. The
-                                            disabled key cannot be re-enabled
-                                            implicitly.
-                                        </p>
-                                    </div>
-                                )}
-                                {!connectionDisabled &&
-                                    providerConnection?.status ===
-                                        'disconnected' &&
-                                    providerConnection?.recovery_credentials_replaced_at && (
-                                        <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-4 text-sm text-muted-foreground">
-                                            A replacement key was saved at{' '}
-                                            {fmt(
-                                                providerConnection.recovery_credentials_replaced_at,
-                                            )}
-                                            . Collection remains stopped until
-                                            Test Connection succeeds.
-                                        </div>
-                                    )}
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setTestingConnection(true);
-                                            router.post(
-                                                '/security-devices/integrations/unifi/test',
-                                                {},
-                                                {
-                                                    preserveScroll: true,
-                                                    onFinish: () =>
-                                                        setTestingConnection(
-                                                            false,
-                                                        ),
-                                                },
-                                            );
-                                        }}
-                                        disabled={
-                                            testingConnection ||
-                                            connectionDisabled
-                                        }
-                                        title={
-                                            connectionDisabled
-                                                ? 'Replace the disabled API key before testing.'
-                                                : undefined
-                                        }
-                                    >
-                                        {testingConnection ? (
-                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        ) : (
-                                            <RefreshCw className="mr-2 h-4 w-4" />
-                                        )}
-                                        Test Connection
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
+                                    {connectionDisabled
+                                        ? 'Replace key to recover'
+                                        : hasKey
+                                          ? 'Rotate key'
+                                          : 'Set up connection'}
+                                </PageHeaderGlassButton>
+                            )}
+                            {scope === 'defaults' && (
+                                <PageHeaderGlassButton
+                                    disabled={!!blocked || !hasKey}
+                                    onClick={() => openSetup('defaults')}
+                                >
+                                    Edit defaults
+                                </PageHeaderGlassButton>
+                            )}
+                            {scope === 'mappings' && (
+                                <>
+                                    <PageHeaderGlassButton
+                                        disabled={!!blocked || !collectionReady}
                                         onClick={() =>
-                                            setShowRotateForm((p) => !p)
+                                            action.execute({
+                                                method: 'post',
+                                                path: unifiPath + '/sync-sites',
+                                                payload: {},
+                                                label: 'Syncing UniFi locations',
+                                            })
                                         }
                                     >
-                                        {connectionDisabled
-                                            ? 'Replace Key to Recover'
-                                            : 'Rotate Key'}
-                                    </Button>
-                                    {!connectionDisabled && (
-                                        <Button
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => setDisableOpen(true)}
-                                        >
-                                            <ShieldAlert className="mr-2 h-4 w-4" />
-                                            Disable connection
-                                        </Button>
-                                    )}
-                                </div>
-                                {showRotateForm && (
-                                    <form
-                                        onSubmit={(e) => {
-                                            e.preventDefault();
-                                            rotateKeyForm.post(
-                                                '/security-devices/integrations/unifi/rotate',
-                                                {
-                                                    preserveScroll: true,
-                                                    onSuccess: () => {
-                                                        rotateKeyForm.reset(
-                                                            'api_key',
-                                                        );
-                                                        setShowRotateForm(
-                                                            false,
-                                                        );
-                                                    },
-                                                },
-                                            );
-                                        }}
-                                        className="space-y-3 rounded-lg border p-4"
+                                        Sync UniFi locations
+                                    </PageHeaderGlassButton>
+                                    <PageHeaderGlassButton
+                                        disabled={
+                                            !!blocked ||
+                                            !discoveredSites.length ||
+                                            !sites.length
+                                        }
+                                        onClick={() => openSetup('mapping')}
                                     >
-                                        <Label htmlFor="rotate_api_key">
-                                            {connectionDisabled
-                                                ? 'Replacement API Key'
-                                                : 'New API Key'}
-                                        </Label>
-                                        <Input
-                                            id="rotate_api_key"
-                                            type="password"
-                                            value={rotateKeyForm.data.api_key}
-                                            onChange={(e) =>
-                                                rotateKeyForm.setData(
-                                                    'api_key',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        <div className="flex gap-2">
-                                            <Button
-                                                type="submit"
-                                                size="sm"
-                                                disabled={
-                                                    rotateKeyForm.processing ||
-                                                    !rotateKeyForm.data.api_key
-                                                }
-                                            >
-                                                {rotateKeyForm.processing
-                                                    ? 'Saving...'
-                                                    : connectionDisabled
-                                                      ? 'Save Replacement Key'
-                                                      : 'Save New Key'}
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setShowRotateForm(false);
-                                                    rotateKeyForm.reset(
-                                                        'api_key',
-                                                    );
-                                                }}
-                                            >
-                                                Cancel
-                                            </Button>
-                                        </div>
-                                    </form>
+                                        Map location
+                                    </PageHeaderGlassButton>
+                                </>
+                            )}
+                            <PageHeaderGlassButton
+                                onClick={() => leave.request(refresh)}
+                                disabled={action.pending}
+                            >
+                                <RefreshCw className="size-4" />
+                                Refresh
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={[
+                        {
+                            label: 'Connection',
+                            value: connStatus ?? 'Not configured',
+                            caption:
+                                'Connection state; device health is separate',
+                            view: 'connection',
+                        },
+                        {
+                            label: 'Discovered locations',
+                            value: discoveredSites.length,
+                            caption: 'Last collected provider catalogue',
+                            view: 'mappings',
+                        },
+                        {
+                            label: 'Active mappings',
+                            value: siteConfigs.filter((c) => c.is_active)
+                                .length,
+                            caption: 'Approved application Site bindings',
+                            view: 'mappings',
+                        },
+                        {
+                            label: 'Imported devices',
+                            value: syncedDevices.length,
+                            caption: 'Saved device records',
+                            view: 'devices',
+                        },
+                        {
+                            label: 'Recent sync runs',
+                            value: syncLogs.length,
+                            caption: 'Up to 20 retained runs in this read',
+                            view: 'history',
+                        },
+                        {
+                            label: 'Site credentials',
+                            value: siteCredentials.length,
+                            caption: 'Saved status records',
+                            view: 'credentials',
+                        },
+                    ].map((m) => (
+                        <PageHeaderMeterBlock
+                            key={m.label}
+                            label={m.label}
+                            onClick={() => selectView(m.view as UnifiView)}
+                            ariaLabel={
+                                'Open ' +
+                                views.find((v) => v.key === m.view)?.label +
+                                ' view'
+                            }
+                        >
+                            <PageHeaderMeterBig>{m.value}</PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {m.caption}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ))}
+                    mobileSummary={
+                        (connStatus ?? 'Not configured') +
+                        ' · ' +
+                        syncedDevices.length +
+                        ' imported devices'
+                    }
+                    filters={
+                        listView ? (
+                            <>
+                                <PageHeaderViewToggle
+                                    value={layout}
+                                    onChange={setLayout}
+                                    options={[
+                                        {
+                                            value: 'cards',
+                                            label: 'Cards',
+                                            icon: LayoutGrid,
+                                        },
+                                        {
+                                            value: 'table',
+                                            label: 'Table',
+                                            icon: List,
+                                        },
+                                    ]}
+                                />
+                                {scope === 'devices' && (
+                                    <PageHeaderFilterSelect
+                                        label="Site"
+                                        value={deviceSiteFilter}
+                                        onChange={setDeviceSiteFilter}
+                                        options={[
+                                            {
+                                                value: 'all',
+                                                label: 'All approved Sites',
+                                            },
+                                            ...sites.map((site) => ({
+                                                value: String(site.id),
+                                                label: site.name,
+                                            })),
+                                        ]}
+                                    />
+                                )}
+                                {viewStatusOptions.length > 0 && (
+                                    <PageHeaderFilterSelect
+                                        label={
+                                            scope === 'history'
+                                                ? 'Result'
+                                                : 'Status'
+                                        }
+                                        value={status}
+                                        onChange={setStatusFilter}
+                                        options={[
+                                            { value: 'all', label: 'All' },
+                                            ...viewStatusOptions,
+                                        ]}
+                                    />
                                 )}
                             </>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {hasKey && (
+                        ) : undefined
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={[...views]}
+                            value={scope}
+                            onSelect={selectView}
+                            ariaLabel="UniFi views"
+                        />
+                    }
+                />
+                {(notice || action.notice) && (
+                    <Alert variant="info" role="status">
+                        <AlertTitle>
+                            {notice ? 'Records not refreshed' : 'Please note'}
+                        </AlertTitle>
+                        <AlertDescription>
+                            {notice || action.notice}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                {action.error && !setupKind && !selectedDevice && (
+                    <Alert variant="destructive">
+                        <AlertTitle>Not completed</AlertTitle>
+                        <AlertDescription>{action.error}</AlertDescription>
+                    </Alert>
+                )}
+                {scope === 'connection' && (
                     <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                            <CardTitle>Location Mapping</CardTitle>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setSyncingSites(true);
-                                    router.post(
-                                        '/security-devices/integrations/unifi/sync-sites',
-                                        {},
-                                        {
-                                            preserveScroll: true,
-                                            onFinish: () =>
-                                                setSyncingSites(false),
-                                        },
-                                    );
-                                }}
-                                disabled={syncingSites || !collectionReady}
-                                title={
-                                    collectionReady
-                                        ? undefined
-                                        : 'Connect and test the UniFi API key before syncing locations.'
-                                }
-                            >
-                                {syncingSites ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                ) : (
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                )}
-                                Sync UniFi Locations
-                            </Button>
+                        <CardHeader>
+                            <CardTitle>Connection</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Location</TableHead>
-                                            <TableHead>UniFi Site</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {siteConfigs.map((c) => (
-                                            <TableRow key={c.id}>
-                                                <TableCell>
-                                                    <div className="font-medium">
-                                                        {c.site_name}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {siteTypeLabel(
-                                                            c.site_type,
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="font-medium">
-                                                        {c.mapped_external_site_name ||
-                                                            'Provider location'}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={
-                                                            c.is_active
-                                                                ? 'default'
-                                                                : 'secondary'
-                                                        }
-                                                    >
-                                                        {c.is_active
-                                                            ? 'Active'
-                                                            : 'Inactive'}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                aria-describedby={
-                                                                    !c.is_active ||
-                                                                    !collectionReady
-                                                                        ? `unifi-site-config-${c.id}-sync-help`
-                                                                        : undefined
-                                                                }
-                                                                onClick={() => {
-                                                                    setSyncingSiteConfigId(
-                                                                        c.id,
-                                                                    );
-                                                                    router.post(
-                                                                        '/security-devices/integrations/unifi/sync-devices',
-                                                                        {
-                                                                            site_config_id:
-                                                                                c.id,
-                                                                        },
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                            onFinish:
-                                                                                () =>
-                                                                                    setSyncingSiteConfigId(
-                                                                                        null,
-                                                                                    ),
-                                                                        },
-                                                                    );
-                                                                }}
-                                                                disabled={
-                                                                    !c.is_active ||
-                                                                    !collectionReady ||
-                                                                    syncingSiteConfigId ===
-                                                                        c.id
-                                                                }
-                                                            >
-                                                                {!c.is_active ||
-                                                                !collectionReady
-                                                                    ? 'Sync unavailable'
-                                                                    : syncingSiteConfigId ===
-                                                                        c.id
-                                                                      ? 'Syncing...'
-                                                                      : 'Sync Devices'}
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() =>
-                                                                    router.delete(
-                                                                        `/security-devices/integrations/unifi/map-site/${c.id}`,
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                        },
-                                                                    )
-                                                                }
-                                                            >
-                                                                Remove
-                                                            </Button>
-                                                        </div>
-                                                        {(!c.is_active ||
-                                                            !collectionReady) && (
-                                                            <p
-                                                                id={`unifi-site-config-${c.id}-sync-help`}
-                                                                className="max-w-xs text-xs text-muted-foreground"
-                                                            >
-                                                                {!c.is_active
-                                                                    ? 'This mapping is inactive. Remove it and map the location again before syncing devices.'
-                                                                    : 'The UniFi connection must be enabled and successfully tested before syncing devices.'}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                        {siteConfigs.length === 0 && (
-                                            <TableRow>
-                                                <TableCell
-                                                    colSpan={4}
-                                                    className="text-sm text-muted-foreground"
-                                                >
-                                                    No mapped locations yet.
-                                                </TableCell>
-                                            </TableRow>
+                        <CardContent className="space-y-5">
+                            {hasKey ? (
+                                <>
+                                    <ReviewRow
+                                        label="Saved status"
+                                        value={connStatus ?? 'Not recorded'}
+                                    />
+                                    <ReviewRow
+                                        label="Key ending in"
+                                        value={
+                                            '•••' +
+                                            (providerConnection?.secret_last4 ??
+                                                'Not recorded')
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Last tested"
+                                        value={fmt(
+                                            providerConnection?.last_tested_at,
                                         )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                            {!showMapForm ? (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowMapForm(true)}
-                                >
-                                    <Building2 className="mr-2 h-4 w-4" />
-                                    Map Location
-                                </Button>
-                            ) : (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        mapForm.post(
-                                            '/security-devices/integrations/unifi/map-site',
-                                            {
-                                                preserveScroll: true,
-                                                onSuccess: () => {
-                                                    mapForm.reset();
-                                                    setShowMapForm(false);
-                                                },
-                                            },
-                                        );
-                                    }}
-                                    className="space-y-4 rounded-lg border p-4"
-                                >
-                                    <div className="grid gap-4 md:grid-cols-3">
-                                        <div className="space-y-2">
-                                            <Label>Platform Location</Label>
-                                            <Select
-                                                value={
-                                                    mapForm.data.site_id ||
-                                                    undefined
-                                                }
-                                                onValueChange={(v) =>
-                                                    mapForm.setData(
-                                                        'site_id',
-                                                        v,
-                                                    )
-                                                }
+                                    />
+                                    <ReviewRow
+                                        label="Last sync"
+                                        value={fmt(
+                                            providerConnection?.last_synced_at,
+                                        )}
+                                    />
+                                    <ReviewRow
+                                        label="Provider Sites last collected"
+                                        value={fmt(
+                                            providerConnection?.sites_synced_at,
+                                        )}
+                                    />
+                                    <ReviewRow
+                                        label="Replacement key saved"
+                                        value={fmt(
+                                            providerConnection?.recovery_credentials_replaced_at,
+                                        )}
+                                    />
+                                    {!connectionDisabled &&
+                                        providerConnection?.recovery_credentials_replaced_at &&
+                                        providerConnection.status !==
+                                            'connected' && (
+                                            <p
+                                                role="status"
+                                                className="text-subtle"
                                             >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select location" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {sites.map((s) => (
-                                                        <SelectItem
-                                                            key={s.id}
-                                                            value={String(s.id)}
-                                                        >
-                                                            {s.name} (
-                                                            {siteTypeLabel(
-                                                                s.type,
-                                                            )}
-                                                            )
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2 md:col-span-2">
-                                            <Label>UniFi Location</Label>
-                                            {discoveredSites.length > 0 ? (
-                                                <Select
-                                                    value={
-                                                        mapForm.data
-                                                            .mapping_token ||
-                                                        undefined
-                                                    }
-                                                    onValueChange={(v) => {
-                                                        mapForm.setData(
-                                                            'mapping_token',
-                                                            v,
-                                                        );
-                                                    }}
-                                                >
-                                                    <SelectTrigger>
-                                                        <SelectValue placeholder="Select UniFi location" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {discoveredSites.map(
-                                                            (d) => {
-                                                                const label =
-                                                                    formatUnifiSiteLabel(
-                                                                        d,
-                                                                    );
-                                                                return (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            d.mapping_token
-                                                                        }
-                                                                        value={
-                                                                            d.mapping_token
-                                                                        }
-                                                                        textValue={
-                                                                            label.displayName
-                                                                        }
-                                                                    >
-                                                                        <div className="flex flex-col">
-                                                                            <span className="font-medium">
-                                                                                {
-                                                                                    label.primary
-                                                                                }
-                                                                            </span>
-                                                                            {label.secondary && (
-                                                                                <span className="text-xs text-muted-foreground">
-                                                                                    {
-                                                                                        label.secondary
-                                                                                    }
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                );
-                                                            },
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            ) : (
-                                                <p className="text-sm text-muted-foreground">
-                                                    Sync UniFi locations before
-                                                    creating a mapping.
+                                                The replacement key is saved. A
+                                                connection test must pass before
+                                                collection resumes.
+                                            </p>
+                                        )}
+                                    {connectionDisabled && (
+                                        <Alert variant="warning" role="status">
+                                            <ShieldAlert />
+                                            <AlertTitle>
+                                                Provider traffic is disabled
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                <ReviewRow
+                                                    label="Disabled at"
+                                                    value={fmt(
+                                                        providerConnection?.disabled_at,
+                                                    )}
+                                                />
+                                                <ReviewRow
+                                                    label="Reason"
+                                                    value={disableReasonLabel(
+                                                        providerConnection?.disabled_reason,
+                                                    )}
+                                                />
+                                                <p className="text-subtle">
+                                                    Replace the key and test the
+                                                    connection before collection
+                                                    resumes. Saved device
+                                                    records, Site mappings and
+                                                    history remain available.
                                                 </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
+                                    <div className="flex flex-wrap gap-3">
                                         <Button
-                                            type="submit"
-                                            size="sm"
-                                            disabled={mapForm.processing}
+                                            disabled={
+                                                !!blocked || connectionDisabled
+                                            }
+                                            onClick={() =>
+                                                action.execute({
+                                                    method: 'post',
+                                                    path: unifiPath + '/test',
+                                                    payload: {},
+                                                    label: 'Testing the connection',
+                                                })
+                                            }
                                         >
-                                            {mapForm.processing
-                                                ? 'Saving...'
-                                                : 'Save Mapping'}
+                                            Test connection
                                         </Button>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => {
-                                                setShowMapForm(false);
-                                                mapForm.reset();
-                                            }}
-                                        >
-                                            Cancel
-                                        </Button>
+                                        {!connectionDisabled && (
+                                            <Button
+                                                variant="destructive"
+                                                disabled={!!blocked}
+                                                onClick={() => {
+                                                    setDisableReason(null);
+                                                    setDisableOpen(true);
+                                                }}
+                                            >
+                                                Disable connection
+                                            </Button>
+                                        )}
                                     </div>
-                                </form>
+                                </>
+                            ) : (
+                                <EmptyState
+                                    icon={KeyRound}
+                                    title="No provider key is saved"
+                                    description="Set up the connection, then test it before collecting records."
+                                />
                             )}
                         </CardContent>
                     </Card>
                 )}
-
-                {hasKey && (
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-                            <CardTitle>
-                                Synced Devices & Room Assignment
-                            </CardTitle>
-                            <Select
-                                value={deviceSiteFilter}
-                                onValueChange={setDeviceSiteFilter}
-                            >
-                                <SelectTrigger className="w-56">
-                                    <SelectValue placeholder="Filter by location" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All Locations
-                                    </SelectItem>
-                                    {sites.map((s) => (
-                                        <SelectItem
-                                            key={s.id}
-                                            value={String(s.id)}
-                                        >
-                                            {s.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Location</TableHead>
-                                            <TableHead>Room</TableHead>
-                                            <TableHead>Device</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Model</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Last Seen</TableHead>
-                                            <TableHead>Action</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {filteredDevices.map((d) => {
-                                            const badge = deviceStatusBadge(
-                                                d.status,
-                                            );
-
-                                            return (
-                                                <TableRow key={d.id}>
-                                                    <TableCell>
-                                                        <div className="font-medium">
-                                                            {d.site_name}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {siteTypeLabel(
-                                                                d.site_type,
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="min-w-[190px]">
-                                                        <Select
-                                                            value={
-                                                                deviceRoomDraft[
-                                                                    d.id
-                                                                ] ||
-                                                                'unassigned'
-                                                            }
-                                                            onValueChange={(
-                                                                v,
-                                                            ) =>
-                                                                setDeviceRoomDraft(
-                                                                    (p) => ({
-                                                                        ...p,
-                                                                        [d.id]: v,
-                                                                    }),
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select room" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="unassigned">
-                                                                    Unassigned
-                                                                </SelectItem>
-                                                                {(
-                                                                    roomsBySite[
-                                                                        d
-                                                                            .site_id
-                                                                    ] ?? []
-                                                                ).map((r) => (
-                                                                    <SelectItem
-                                                                        key={
-                                                                            r.id
-                                                                        }
-                                                                        value={String(
-                                                                            r.id,
-                                                                        )}
-                                                                    >
-                                                                        {r.name}
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="font-medium">
-                                                            {d.name}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {d.category || '---'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {d.model || '---'}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Badge
-                                                            variant="outline"
-                                                            className={
-                                                                badge.className
-                                                            }
-                                                        >
-                                                            {badge.label}
-                                                        </Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {fmt(d.last_seen_at)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() => {
-                                                                const raw =
-                                                                    deviceRoomDraft[
-                                                                        d.id
-                                                                    ];
-                                                                const roomId =
-                                                                    !raw ||
-                                                                    raw ===
-                                                                        'unassigned'
-                                                                        ? null
-                                                                        : Number(
-                                                                              raw,
-                                                                          );
-                                                                setAssigningDeviceId(
-                                                                    d.id,
-                                                                );
-                                                                router.put(
-                                                                    `/security-devices/integrations/unifi/hardware/${d.id}/room`,
-                                                                    {
-                                                                        room_id:
-                                                                            roomId,
-                                                                    },
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                        onFinish:
-                                                                            () =>
-                                                                                setAssigningDeviceId(
-                                                                                    null,
-                                                                                ),
-                                                                    },
-                                                                );
-                                                            }}
-                                                            disabled={
-                                                                assigningDeviceId ===
-                                                                d.id
-                                                            }
-                                                        >
-                                                            {assigningDeviceId ===
-                                                            d.id
-                                                                ? 'Saving...'
-                                                                : 'Save Room'}
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })}
-                                        {filteredDevices.length === 0 && (
-                                            <TableRow>
-                                                <TableCell
-                                                    colSpan={8}
-                                                    className="text-sm text-muted-foreground"
-                                                >
-                                                    No synced devices for this
-                                                    filter yet.
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </CardContent>
-                    </Card>
+                {scope === 'mappings' && (
+                    <>
+                        {!collectionReady && (
+                            <Alert variant="info" role="status">
+                                <AlertTitle>Connection needed</AlertTitle>
+                                <AlertDescription>
+                                    Save and test the provider API key before
+                                    discovering new locations. Saved locations
+                                    remain available for mapping.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        <UnifiDiscoveredRecords
+                            rows={visibleDiscovered}
+                            total={discoveredSites.length}
+                            view={layout}
+                            disabled={
+                                blocked ||
+                                (!sites.length
+                                    ? 'No approved Site is available.'
+                                    : undefined)
+                            }
+                            onMap={(token) => openSetup('mapping', token)}
+                        />
+                        <UnifiRecords
+                            kind="mapping"
+                            rows={visibleRows}
+                            view={layout}
+                            total={siteConfigs.length}
+                            actionsFor={(row) =>
+                                row.kind === 'mapping'
+                                    ? [
+                                          {
+                                              label: 'Sync devices',
+                                              icon: RefreshCw,
+                                              disabled: !row.record.is_active
+                                                  ? 'This mapping is inactive. Remove it and map the location again before syncing devices.'
+                                                  : !collectionReady
+                                                    ? 'Connect and test the UniFi key first.'
+                                                    : blocked,
+                                              onClick: () =>
+                                                  syncMapping(row.record),
+                                          },
+                                          {
+                                              label: 'Remove mapping',
+                                              icon: XCircle,
+                                              danger: true,
+                                              disabled: blocked,
+                                              onClick: () => {
+                                                  action.clearMessage();
+                                                  setRemoveMappingId(
+                                                      row.record.id,
+                                                  );
+                                              },
+                                          },
+                                      ]
+                                    : []
+                            }
+                        />
+                    </>
                 )}
-
-                {hasKey && (
+                {scope === 'devices' && (
+                    <UnifiRecords
+                        kind="device"
+                        rows={visibleRows}
+                        view={layout}
+                        total={syncedDevices.length}
+                        canViewDevices={canViewDevices}
+                        actionsFor={(row) =>
+                            row.kind === 'device'
+                                ? [
+                                      {
+                                          label: 'Assign room',
+                                          icon: Building2,
+                                          disabled:
+                                              blocked ||
+                                              (!sites.some(
+                                                  (site) =>
+                                                      site.id ===
+                                                      row.record.site_id,
+                                              )
+                                                  ? 'Assign this device to an approved Site before choosing a room.'
+                                                  : undefined),
+                                          onClick: () =>
+                                              leave.request(() => {
+                                                  action.clearMessage();
+                                                  setRoomDraft(null);
+                                                  setRoomDeviceId(
+                                                      row.record.id,
+                                                  );
+                                              }),
+                                      },
+                                  ]
+                                : []
+                        }
+                    />
+                )}
+                {scope === 'history' && (
+                    <UnifiRecords
+                        kind="history"
+                        rows={visibleRows}
+                        view={layout}
+                        total={syncLogs.length}
+                        actionsFor={() => []}
+                    />
+                )}
+                {scope === 'credentials' && (
+                    <UnifiRecords
+                        kind="credential"
+                        rows={visibleRows}
+                        view={layout}
+                        total={siteCredentials.length}
+                        actionsFor={() => []}
+                    />
+                )}
+                {scope === 'defaults' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle>Refresh & Alert Defaults</CardTitle>
+                            <CardTitle>Collection and alert defaults</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <form
-                                onSubmit={handleSaveDefaults}
-                                className="space-y-6"
-                            >
-                                <div className="grid gap-4 sm:grid-cols-3">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="refresh_interval">
-                                            Refresh Interval (minutes)
-                                        </Label>
-                                        <Input
-                                            id="refresh_interval"
-                                            type="number"
-                                            min={1}
-                                            value={
-                                                defaultsForm.data
-                                                    .refresh_interval_minutes
-                                            }
-                                            onChange={(e) =>
-                                                defaultsForm.setData(
-                                                    'refresh_interval_minutes',
-                                                    Math.max(
-                                                        1,
-                                                        parseInt(
-                                                            e.target.value ||
-                                                                '1',
-                                                            10,
-                                                        ),
-                                                    ),
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="quiet_start">
-                                            Quiet Hours Start
-                                        </Label>
-                                        <Input
-                                            id="quiet_start"
-                                            type="time"
-                                            value={
-                                                defaultsForm.data
-                                                    .quiet_hours_start
-                                            }
-                                            onChange={(e) =>
-                                                defaultsForm.setData(
-                                                    'quiet_hours_start',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="quiet_end">
-                                            Quiet Hours End
-                                        </Label>
-                                        <Input
-                                            id="quiet_end"
-                                            type="time"
-                                            value={
-                                                defaultsForm.data
-                                                    .quiet_hours_end
-                                            }
-                                            onChange={(e) =>
-                                                defaultsForm.setData(
-                                                    'quiet_hours_end',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-3">
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="alert_motion"
-                                            checked={
-                                                defaultsForm.data
-                                                    .alert_motion_events
-                                            }
-                                            onCheckedChange={(v) =>
-                                                defaultsForm.setData(
-                                                    'alert_motion_events',
-                                                    !!v,
-                                                )
-                                            }
-                                        />
-                                        <Label
-                                            htmlFor="alert_motion"
-                                            className="cursor-pointer"
-                                        >
-                                            Alert on motion events
-                                        </Label>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="alert_offline"
-                                            checked={
-                                                defaultsForm.data
-                                                    .alert_device_offline
-                                            }
-                                            onCheckedChange={(v) =>
-                                                defaultsForm.setData(
-                                                    'alert_device_offline',
-                                                    !!v,
-                                                )
-                                            }
-                                        />
-                                        <Label
-                                            htmlFor="alert_offline"
-                                            className="cursor-pointer"
-                                        >
-                                            Alert when a device goes offline
-                                        </Label>
-                                    </div>
-                                </div>
-                                <Button type="submit" disabled={savingDefaults}>
-                                    {savingDefaults
-                                        ? 'Saving...'
-                                        : 'Save Defaults'}
-                                </Button>
-                            </form>
+                        <CardContent className="space-y-5">
+                            <ReviewRow
+                                label="Refresh interval"
+                                value={
+                                    providerConnection?.defaults
+                                        ?.refresh_interval_minutes !== undefined
+                                        ? providerConnection.defaults
+                                              .refresh_interval_minutes +
+                                          ' minutes'
+                                        : 'Not recorded'
+                                }
+                            />
+                            <ReviewRow
+                                label="Motion alerts"
+                                value={
+                                    typeof providerConnection?.defaults
+                                        ?.alert_motion_events === 'boolean'
+                                        ? providerConnection.defaults
+                                              .alert_motion_events
+                                            ? 'Enabled'
+                                            : 'Disabled'
+                                        : 'Not recorded'
+                                }
+                            />
+                            <ReviewRow
+                                label="Offline alerts"
+                                value={
+                                    typeof providerConnection?.defaults
+                                        ?.alert_device_offline === 'boolean'
+                                        ? providerConnection.defaults
+                                              .alert_device_offline
+                                            ? 'Enabled'
+                                            : 'Disabled'
+                                        : 'Not recorded'
+                                }
+                            />
+                            <ReviewRow
+                                label="Quiet hours start"
+                                value={
+                                    providerConnection?.defaults
+                                        ? quietHoursTime(
+                                              providerConnection.defaults
+                                                  .quiet_hours_start,
+                                              'Not configured',
+                                          )
+                                        : 'Not recorded'
+                                }
+                            />
+                            <ReviewRow
+                                label="Quiet hours end"
+                                value={
+                                    providerConnection?.defaults
+                                        ? quietHoursTime(
+                                              providerConnection.defaults
+                                                  .quiet_hours_end,
+                                              'Not configured',
+                                          )
+                                        : 'Not recorded'
+                                }
+                            />
+                            <p className="text-subtle">
+                                Quiet hours use New Zealand time (NZST or NZDT,
+                                whichever applies on the day). Critical alerts
+                                are never held back.
+                            </p>
                         </CardContent>
                     </Card>
                 )}
-
-                {syncLogs.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Recent Sync Activity</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Action</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>Items</TableHead>
-                                            <TableHead>Started</TableHead>
-                                            <TableHead>Completed</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {syncLogs.map((log) => (
-                                            <TableRow key={log.id}>
-                                                <TableCell className="font-medium">
-                                                    {log.action}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        className={
-                                                            syncStatusConfig[
-                                                                log.status
-                                                            ] ??
-                                                            syncStatusConfig.started
-                                                        }
-                                                    >
-                                                        {log.status}
-                                                    </Badge>
-                                                    {log.failure_category && (
-                                                        <p className="mt-1 text-xs text-status-critical">
-                                                            Provider operation
-                                                            failed. Retry or
-                                                            review the bounded
-                                                            diagnostics.
-                                                        </p>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    {log.items_processed}{' '}
-                                                    processed
-                                                    {log.items_created > 0 &&
-                                                        `, ${log.items_created} created`}
-                                                    {log.items_updated > 0 &&
-                                                        `, ${log.items_updated} updated`}
-                                                    {log.items_errored > 0 &&
-                                                        `, ${log.items_errored} errored`}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {log.started_at}
-                                                </TableCell>
-                                                <TableCell className="text-sm">
-                                                    {log.completed_at ?? '---'}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        </CardContent>
-                    </Card>
+                {setupKind && (
+                    <UnifiSetupWizard
+                        key={setupKind}
+                        kind={setupKind}
+                        values={setupValues}
+                        onChange={changeSetup}
+                        providerConnection={providerConnection}
+                        sites={sites}
+                        discoveredSites={discoveredSites}
+                        pending={action.pending}
+                        uncertain={action.uncertain}
+                        error={action.error}
+                        success={setupSuccess}
+                        onSubmit={submitSetup}
+                        onClose={() => {
+                            if (!action.pending)
+                                leave.request(() => {
+                                    setSetupKind(null);
+                                    setSetupSuccess(null);
+                                });
+                        }}
+                    />
                 )}
-
+                {selectedDevice && (
+                    <UnifiRoomDialog
+                        key={JSON.stringify([
+                            selectedDevice.id,
+                            selectedDevice.site_id,
+                            selectedDevice.room_id,
+                        ])}
+                        device={selectedDevice}
+                        rooms={rooms}
+                        value={roomValue}
+                        onValue={(value) =>
+                            setRoomDraft({
+                                id: selectedDevice.id,
+                                site_id: selectedDevice.site_id,
+                                room_id: selectedDevice.room_id ?? null,
+                                value,
+                            })
+                        }
+                        onSave={saveRoom}
+                        onClose={() => {
+                            if (!action.pending)
+                                leave.request(() => setRoomDeviceId(null));
+                        }}
+                        pending={action.pending}
+                        error={action.error}
+                        uncertain={action.uncertain}
+                    />
+                )}
+                <ConfirmDialog
+                    open={!!selectedMapping}
+                    title="Remove UniFi mapping?"
+                    description={
+                        selectedMapping
+                            ? 'Remove the saved provider mapping for ' +
+                              selectedMapping.site_name +
+                              '. Device records and history remain available.'
+                            : ''
+                    }
+                    confirmText="Remove mapping"
+                    variant="destructive"
+                    processing={action.pending}
+                    onClose={() => {
+                        if (!action.pending) setRemoveMappingId(null);
+                    }}
+                    onConfirm={() => {
+                        if (!selectedMapping || action.uncertain) return;
+                        const id = selectedMapping.id;
+                        action.execute({
+                            method: 'delete',
+                            path: unifiPath + `/map-site/${id}`,
+                            label: 'Removing the mapping',
+                            onUnconfirmed: () => setRemoveMappingId(null),
+                            confirmed: (next) =>
+                                !next.siteConfigs?.some((c) => c.id === id),
+                            onConfirmed: () => setRemoveMappingId(null),
+                        });
+                    }}
+                />
                 <AlertDialog
                     open={disableOpen}
                     onOpenChange={(open) => {
-                        setDisableOpen(open);
-                        if (!open) setDisableReason(null);
+                        if (!action.pending) setDisableOpen(open);
                     }}
                 >
                     <AlertDialogContent>
                         <AlertDialogHeader>
                             <AlertDialogTitle>
-                                Disable the UniFi connection?
+                                Disable UniFi connection?
                             </AlertDialogTitle>
                             <AlertDialogDescription>
-                                This is a fail-closed operational containment
-                                action. Choose the exact reason before
-                                continuing.
+                                Stop provider collection and new intake. Saved
+                                records and mappings remain available. Recovery
+                                needs a replacement key and a successful test.
                             </AlertDialogDescription>
                         </AlertDialogHeader>
-
-                        <div className="space-y-4 text-sm">
-                            <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3 text-muted-foreground">
-                                Scheduled collection, manual provider sync and
-                                webhook event intake stop immediately. Existing
-                                Devices, mappings, cursors, sync history and
-                                monitoring evidence are preserved.
-                            </div>
-
-                            <fieldset className="space-y-2">
-                                <legend className="font-medium">
-                                    Reason for disabling
-                                </legend>
-                                {disableReasons.map((option) => (
-                                    <label
-                                        key={option.value}
-                                        className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
+                        <Label id="unifi-disable-reason-label">Reason</Label>
+                        <RadioGroup
+                            value={disableReason ?? ''}
+                            onValueChange={(value) =>
+                                setDisableReason(
+                                    disableReasons.find(
+                                        (reason) => reason.value === value,
+                                    )?.value ?? null,
+                                )
+                            }
+                            disabled={action.pending}
+                            aria-labelledby="unifi-disable-reason-label"
+                        >
+                            {disableReasons.map((reason) => (
+                                <div
+                                    key={reason.value}
+                                    className="flex items-center gap-3 rounded-xl border p-3"
+                                >
+                                    <RadioGroupItem
+                                        id={'unifi-reason-' + reason.value}
+                                        value={reason.value}
+                                    />
+                                    <Label
+                                        htmlFor={'unifi-reason-' + reason.value}
                                     >
-                                        <input
-                                            type="radio"
-                                            name="disable_reason"
-                                            value={option.value}
-                                            checked={
-                                                disableReason === option.value
-                                            }
-                                            onChange={() =>
-                                                setDisableReason(option.value)
-                                            }
-                                            className="mt-0.5 h-4 w-4"
-                                        />
-                                        <span>{option.label}</span>
-                                    </label>
-                                ))}
-                            </fieldset>
-
-                            <p className="text-muted-foreground">
-                                Recovery requires a replacement API key and a
-                                successful connection test. Oblivion will not
-                                reuse the disabled key. If compromise is
-                                suspected, revoke that key in UniFi as well.
+                                        {reason.label}
+                                    </Label>
+                                </div>
+                            ))}
+                        </RadioGroup>
+                        {action.error && (
+                            <p role="alert" className="text-status-critical">
+                                {action.error}
                             </p>
-                        </div>
-
+                        )}
                         <AlertDialogFooter>
-                            <AlertDialogCancel disabled={disabling}>
-                                Keep connection enabled
+                            <AlertDialogCancel disabled={action.pending}>
+                                Cancel
                             </AlertDialogCancel>
-                            <AlertDialogAction
+                            <Button
+                                variant="destructive"
+                                disabled={
+                                    !disableReason ||
+                                    action.pending ||
+                                    action.uncertain
+                                }
                                 onClick={disableConnection}
-                                disabled={!disableReason || disabling}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             >
-                                {disabling
-                                    ? 'Disabling...'
-                                    : 'Disable and revoke use'}
-                            </AlertDialogAction>
+                                Confirm containment
+                            </Button>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
-            </PageLayout>
+                {leave.confirmation}
+            </div>
         </AppLayout>
     );
 }

@@ -4,9 +4,16 @@ namespace App\Services;
 
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationInteraction;
+use App\Services\Medication\CheckedOrderAllergyConfirmation;
+use App\Services\Medication\ClientAllergyRecordService;
+use App\Services\Medication\MedicationSafetyPolicySettings;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class MedicationSafetyService
 {
@@ -20,6 +27,11 @@ class MedicationSafetyService
         'danger' => ['label' => 'Danger', 'color' => 'red', 'icon' => 'shield-alert'],
         'blocked' => ['label' => 'Blocked', 'color' => 'red', 'icon' => 'ban'],
     ];
+
+    public function __construct(
+        private ?ClientAllergyRecordService $allergyRecords = null,
+        private ?MedicationSafetyPolicySettings $policy = null,
+    ) {}
 
     /**
      * Perform complete safety check before medication administration
@@ -51,11 +63,56 @@ class MedicationSafetyService
             return $this->compileSafetyResult($warnings, $alerts, $blocked, $blockReason);
         }
 
-        // 2. Check for allergies
+        // 2. Check for allergies — the medication allergy register and the
+        // canonical health profile. Only an unrated profile entry uses the
+        // organisation's warn/block setting; recorded severity is always retained.
         $allergyCheck = $this->checkAllergies($client, $medication);
         if ($allergyCheck['has_match']) {
-            foreach ($allergyCheck['matches'] as $allergy) {
-                $severity = $allergy->severity === 'life_threatening' ? 'danger' : 'warning';
+            $blockUnratedProfileMatches = ($allergyCheck['profile_match_policy'] ?? 'warn') === 'block';
+            $prescriberConfirmation = app(CheckedOrderAllergyConfirmation::class)->forOrder($medication);
+
+            foreach ($allergyCheck['matches'] as $index => $allergy) {
+                $source = $allergyCheck['sources'][$index] ?? ClientAllergyRecordService::SOURCE_REGISTER;
+                $confirmedMatch = $prescriberConfirmation !== null && collect($prescriberConfirmation['matches'] ?? [])
+                    ->contains(fn ($match) => mb_strtolower(trim($match['allergen'])) === mb_strtolower(trim($allergy->allergen)));
+                if ($confirmedMatch) {
+                    $warnings[] = [
+                        'type' => 'allergy', 'severity' => 'warning',
+                        'message' => 'Recorded allergy to '.$allergy->allergen.'. The prescriber confirmed this checked version is safe: '.$prescriberConfirmation['instruction'],
+                        'details' => ['allergen' => $allergy->allergen, 'severity' => $allergy->severity, 'reaction' => $allergy->reaction, 'source' => $source, 'prescriber_confirmation' => $prescriberConfirmation],
+                    ];
+
+                    continue;
+                }
+                $fromProfile = $source
+                    === ClientAllergyRecordService::SOURCE_PROFILE;
+
+                if ($fromProfile && ! filled($allergy->severity)) {
+                    // Plain-language copy approved in P00 v2 (no emoji, no capitals).
+                    $matchLine = "Possible allergy match — {$medication->name} matches recorded {$allergy->allergen} allergy (health profile)";
+                    $warning = [
+                        'type' => 'allergy',
+                        'severity' => $blockUnratedProfileMatches ? 'danger' : 'warning',
+                        'message' => $matchLine,
+                        'details' => [
+                            'allergen' => $allergy->allergen,
+                            'reaction' => $allergy->reaction,
+                            'severity' => null,
+                            'source' => ClientAllergyRecordService::SOURCE_PROFILE,
+                        ],
+                    ];
+
+                    if ($blockUnratedProfileMatches) {
+                        $blocked = true;
+                        $blockReason = $matchLine.'. Your organisation blocks allergy matches, so this can’t be recorded as given. Check with the prescriber.';
+                    }
+
+                    $warnings[] = $warning;
+
+                    continue;
+                }
+
+                $severity = $allergy->isSevere() ? 'danger' : 'warning';
                 $blocked = $blocked || $allergy->isSevere();
 
                 $warning = [
@@ -66,6 +123,7 @@ class MedicationSafetyService
                         'allergen' => $allergy->allergen,
                         'reaction' => $allergy->reaction,
                         'severity' => $allergy->severity,
+                        'source' => $source,
                     ],
                 ];
 
@@ -141,7 +199,7 @@ class MedicationSafetyService
 
         // 5. Check PRN limits
         if ($medication->is_prn) {
-            $prnCheck = $this->checkPrnLimits($medication);
+            $prnCheck = $this->checkPrnLimits($medication, $adminTime);
 
             if ($prnCheck['blocked']) {
                 $blocked = true;
@@ -163,7 +221,7 @@ class MedicationSafetyService
 
             // 5b. Check PRN minimum interval between doses
             if ($medication->min_hours_between_doses && $medication->min_hours_between_doses > 0) {
-                $intervalCheck = $this->checkPrnInterval($medication);
+                $intervalCheck = $this->checkPrnInterval($medication, $adminTime);
                 if ($intervalCheck['blocked']) {
                     $blocked = true;
                     $blockReason = $intervalCheck['message'];
@@ -192,7 +250,7 @@ class MedicationSafetyService
             $warnings[] = [
                 'type' => 'expired',
                 'severity' => 'danger',
-                'message' => "⚠️ EXPIRED: This medication expired on {$medication->end_date->format('d/m/Y')}",
+                'message' => "⚠️ EXPIRED: This medication ended on {$medication->end_date->format('d/m/Y')}",
                 'details' => [
                     'expiry_date' => $medication->end_date->toDateString(),
                 ],
@@ -204,7 +262,7 @@ class MedicationSafetyService
                 'message' => "Expiring soon: This medication expires on {$medication->end_date->format('d/m/Y')}",
                 'details' => [
                     'expiry_date' => $medication->end_date->toDateString(),
-                    'days_remaining' => $medication->end_date->diffInDays(now()),
+                    'days_remaining' => $medication->daysUntilEnd(),
                 ],
             ];
         }
@@ -241,21 +299,35 @@ class MedicationSafetyService
     /**
      * Check for allergies to a medication
      */
+    /**
+     * Match the medicine against every recorded allergy: the medication
+     * allergy register and the canonical health profile. Profile matches are
+     * unsaved MedicationAllergy instances retaining their clinical fields, using the
+     * same matching rules; `sources[i]` names where `matches[i]` came from.
+     *
+     * @return array{has_match: bool, matches: list<MedicationAllergy>, sources: list<string>, allergy_count: int, profile_match_policy: string}
+     */
     public function checkAllergies(Client $client, ClientMedication $medication): array
     {
-        $allergies = MedicationAllergy::where('client_id', $client->id)->get();
+        $records = ($this->allergyRecords ?? app(ClientAllergyRecordService::class))->forClient($client);
         $matches = [];
+        $sources = [];
+        // EA-052: one matcher with the order check; the class rules load once.
+        $classRules = $records === [] ? collect() : \App\Services\Medication\AllergyMatching::activeRules();
 
-        foreach ($allergies as $allergy) {
-            if ($allergy->matchesMedication($medication->name)) {
-                $matches[] = $allergy;
+        foreach ($records as $record) {
+            if ($record['allergy']->matchesMedication($medication->name, $classRules)) {
+                $matches[] = $record['allergy'];
+                $sources[] = $record['source'];
             }
         }
 
         return [
             'has_match' => count($matches) > 0,
             'matches' => $matches,
-            'allergy_count' => $allergies->count(),
+            'sources' => $sources,
+            'allergy_count' => count($records),
+            'profile_match_policy' => ($this->policy ?? app(MedicationSafetyPolicySettings::class))->profileAllergyMatch(),
         ];
     }
 
@@ -349,9 +421,12 @@ class MedicationSafetyService
     }
 
     /**
-     * Check PRN limits
+     * Evaluate one proposed given dose before insertion. Recording callers must
+     * hold the canonical medication mutex through this check and the insert;
+     * replay/duplicate resolution happens first. These read-side checks grant
+     * no recording authority and never include non-given outcomes as doses.
      */
-    public function checkPrnLimits(ClientMedication $medication): array
+    public function checkPrnLimits(ClientMedication $medication, ?CarbonInterface $adminTime = null): array
     {
         if (! $medication->is_prn || ! $medication->max_per_day) {
             return [
@@ -362,7 +437,6 @@ class MedicationSafetyService
             ];
         }
 
-        $count24h = $medication->prnCountLast24Hours;
         $maxPerDay = (int) filter_var($medication->max_per_day, FILTER_SANITIZE_NUMBER_INT);
 
         if ($maxPerDay <= 0) {
@@ -374,6 +448,17 @@ class MedicationSafetyService
             ];
         }
 
+        // SQL administration instants have second precision. Convert the bounds
+        // to UTC without mutating the caller's NZ time; the lower edge remains
+        // inclusive, as in the existing last-24-hours check.
+        $at = $this->prnInstant($adminTime);
+        $history = $this->prnGivenHistory($medication)
+            ->whereBetween('administered_at', [$at->copy()->subHours(24), $at->copy()->addHours(24)])
+            ->orderBy('administered_at')
+            ->orderBy('id')
+            ->get(['id', 'administered_at'])
+            ->map(fn (ClientMedicationAdministration $dose): Carbon => Carbon::instance($dose->administered_at)->copy()->utc());
+        $count24h = $history->filter(fn (Carbon $time): bool => $time->lte($at))->count();
         $remaining = max(0, $maxPerDay - $count24h);
         $percentUsed = ($count24h / $maxPerDay) * 100;
 
@@ -391,6 +476,34 @@ class MedicationSafetyService
                 'message' => "⛔ PRN LIMIT REACHED: {$count24h}/{$maxPerDay} doses given in last 24 hours. Cannot administer.",
                 'details' => $details,
             ];
+        }
+
+        // A historical insertion also belongs to windows ending at subsequent
+        // doses through at + 24 hours (inclusive). Count it virtually once, not
+        // as a saved dose or an extra dose for every history row. Between dose
+        // instants a rolling count only falls, so these endpoints are sufficient.
+        $left = 0;
+        foreach ($history as $right => $time) {
+            if ($time->lte($at)) {
+                continue;
+            }
+            $start = $time->copy()->subHours(24);
+            while ($history[$left]->lt($start)) {
+                $left++;
+            }
+            $withProposedDose = $right - $left + 2;
+            if ($withProposedDose > $maxPerDay) {
+                return [
+                    'blocked' => true,
+                    'near_limit' => false,
+                    'message' => "This dose would exceed the PRN limit of {$maxPerDay} doses in 24 hours at a later recorded dose. Review the paper and the dose history.",
+                    'details' => $details + [
+                        'proposed_at' => $at->toIso8601String(),
+                        'affected_window_at' => $time->toIso8601String(),
+                        'affected_count_24h' => $withProposedDose,
+                    ],
+                ];
+            }
         }
 
         if ($percentUsed >= 75) {
@@ -521,9 +634,10 @@ class MedicationSafetyService
 
     /**
      * Check PRN minimum interval between doses
-     * Blocks administration if min_hours_between_doses hasn't elapsed since last dose
+     * The proposed instant must be far enough from both neighboring given doses.
+     * Recording uses the same pre-insert order mutex contract as checkPrnLimits.
      */
-    public function checkPrnInterval(ClientMedication $medication): array
+    public function checkPrnInterval(ClientMedication $medication, ?CarbonInterface $adminTime = null): array
     {
         $minHours = (float) $medication->min_hours_between_doses;
 
@@ -535,31 +649,23 @@ class MedicationSafetyService
             ];
         }
 
-        // Find the most recent administration
-        $lastAdmin = $medication->administrations()
-            ->effectiveClinicalEvidence()
-            ->where('client_id', $medication->client_id)
-            ->where('status', 'given')
+        $at = $this->prnInstant($adminTime);
+        $lastAdmin = $this->prnGivenHistory($medication)
+            ->where('administered_at', '<=', $at)
             ->orderByDesc('administered_at')
             ->first();
 
-        if (! $lastAdmin || ! $lastAdmin->administered_at) {
-            return [
-                'blocked' => false,
-                'message' => null,
-                'details' => [],
-            ];
-        }
-
-        $hoursSinceLast = $lastAdmin->administered_at->diffInMinutes(now()) / 60;
-
-        if ($hoursSinceLast < $minHours) {
+        $hoursSinceLast = $lastAdmin !== null ? $lastAdmin->administered_at->diffInMinutes($at, false) / 60 : null;
+        if ($lastAdmin !== null && $hoursSinceLast < $minHours) {
             $remainingMinutes = (int) ceil(($minHours - $hoursSinceLast) * 60);
             $hoursRemaining = round($minHours - $hoursSinceLast, 1);
 
             return [
                 'blocked' => true,
-                'message' => "⛔ INTERVAL NOT ELAPSED: Minimum {$minHours} hours between doses required. Last dose was {$lastAdmin->administered_at->format('H:i')}. Please wait {$remainingMinutes} more minutes.",
+                // EA-119: the last dose time in NZ time, never the UTC hour.
+                'message' => "⛔ INTERVAL NOT ELAPSED: Minimum {$minHours} hours between doses required. Last dose was "
+                    .Carbon::instance($lastAdmin->administered_at)->copy()->timezone((string) config('app.worker_timezone', 'Pacific/Auckland'))->format('g:i a')
+                    .". Please wait {$remainingMinutes} more minutes.",
                 'details' => [
                     'min_hours_between_doses' => $minHours,
                     'hours_since_last' => round($hoursSinceLast, 2),
@@ -570,11 +676,50 @@ class MedicationSafetyService
             ];
         }
 
+        $nextAdmin = $this->prnGivenHistory($medication)
+            ->where('administered_at', '>', $at)
+            ->orderBy('administered_at')
+            ->first();
+        $hoursUntilNext = $nextAdmin !== null ? $at->diffInMinutes($nextAdmin->administered_at, false) / 60 : null;
+        if ($nextAdmin !== null && $hoursUntilNext < $minHours) {
+            return [
+                'blocked' => true,
+                'message' => "This dose is less than the required {$minHours} hours before the next recorded dose. Review the paper and the dose history.",
+                'details' => [
+                    'min_hours_between_doses' => $minHours,
+                    'hours_until_next' => round($hoursUntilNext, 2),
+                    'proposed_at' => $at->toIso8601String(),
+                    'next_administered_at' => $nextAdmin->administered_at->toIso8601String(),
+                ],
+            ];
+        }
+
         return [
             'blocked' => false,
             'message' => null,
             'details' => [],
         ];
+    }
+
+    private function prnInstant(?CarbonInterface $at): Carbon
+    {
+        return Carbon::instance($at ?? now())->copy()->utc()->startOfSecond();
+    }
+
+    private function prnGivenHistory(ClientMedication $medication): Builder
+    {
+        $history = ClientMedicationAdministration::query()
+            ->effectiveClinicalEvidence()
+            ->where('client_id', $medication->client_id)
+            ->where('client_medication_id', $medication->id)
+            ->where('status', 'given')
+            ->whereNotNull('administered_at');
+
+        // EA-056: inside a recording transaction this is a current (locking)
+        // read. A plain read would use the InnoDB snapshot taken before the
+        // person's lock, so two as-needed doses recorded at once would each
+        // miss the other and both pass the interval and the daily limit.
+        return DB::transactionLevel() > 0 ? $history->sharedLock() : $history;
     }
 
     /**

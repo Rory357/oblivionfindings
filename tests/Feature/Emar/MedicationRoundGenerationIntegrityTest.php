@@ -37,7 +37,7 @@ class MedicationRoundGenerationIntegrityTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-08-30 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-30 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->site = Site::factory()->create([
             'is_active' => true,
             'archived' => false,

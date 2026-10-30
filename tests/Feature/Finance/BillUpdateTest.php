@@ -5,6 +5,7 @@ use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinBillLine;
 use App\Domain\Finance\Models\FinVendor;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
 
 /**
@@ -13,7 +14,7 @@ use App\Models\User;
  * locked to draft bills (an approved bill that already posted a GL journal can
  * never be silently mutated).
  */
-function billUpdateUser(): User
+function billUpdateUser(Site $site): User
 {
     $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
     foreach (['finance.ap.view', 'finance.ap.manage'] as $key) {
@@ -21,15 +22,18 @@ function billUpdateUser(): User
         $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
     }
 
+    ensureCanonicalHrStaffProfile($user, $site);
+
     return $user;
 }
 
-function draftBillForUpdate(): FinBill
+function draftBillForUpdate(Site $site): FinBill
 {
     $account = FinAccount::factory()->create(['organization_id' => 1, 'code' => '6000', 'type' => 'expense']);
     $vendor = FinVendor::factory()->create(['organization_id' => 1]);
     $bill = FinBill::factory()->create([
         'organization_id' => 1,
+        'site_id' => $site->id,
         'vendor_id' => $vendor->id,
         'status' => 'draft',
         'total_amount' => '115.00',
@@ -45,10 +49,12 @@ function draftBillForUpdate(): FinBill
 
 it('updates a draft bill from the modal payload and stores GST as a fraction', function () {
     $account = FinAccount::factory()->create(['organization_id' => 1, 'code' => '6100', 'type' => 'expense']);
-    $bill = draftBillForUpdate();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bill = draftBillForUpdate($site);
 
-    $this->actingAs(billUpdateUser())
+    $this->actingAs(billUpdateUser($site))
         ->put(route('finance.bills.update', $bill->id), [
+            'site_id' => $site->id,
             'vendor_id' => $bill->vendor_id,
             'vendor_reference' => 'REF-EDITED',
             'bill_date' => '2026-06-01',
@@ -58,7 +64,9 @@ it('updates a draft bill from the modal payload and stores GST as a fraction', f
                 ['description' => 'Edited line', 'quantity' => 2, 'unit_price' => '50.00', 'gst_rate' => '15', 'account_id' => $account->id],
             ],
         ])
-        ->assertRedirect();
+        ->assertRedirect(route('finance.bills.show', $bill))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success', 'Bill updated successfully.');
 
     $bill->refresh()->load('lines');
 
@@ -70,22 +78,28 @@ it('updates a draft bill from the modal payload and stores GST as a fraction', f
 });
 
 it('refuses to edit a non-draft bill (GL already posted)', function () {
-    $bill = draftBillForUpdate();
+    $site = Site::factory()->create(['is_active' => true, 'archived' => false]);
+    $bill = draftBillForUpdate($site);
     $bill->update(['status' => 'approved']);
 
-    $this->actingAs(billUpdateUser())
+    $this->actingAs(billUpdateUser($site))
         ->put(route('finance.bills.update', $bill->id), [
+            'site_id' => $site->id,
             'vendor_id' => $bill->vendor_id,
             'bill_date' => '2026-06-01',
             'due_date' => '2026-06-30',
             'lines' => [
                 ['description' => 'Hack', 'quantity' => 1, 'unit_price' => '999.00', 'gst_rate' => '15', 'account_id' => FinAccount::where('code', '6000')->first()->id],
             ],
-        ]);
+        ])
+        ->assertRedirect(route('finance.bills.show', $bill))
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('error', 'Only draft bills can be updated.');
 
     // Unchanged — the original line and total survive.
     $bill->refresh()->load('lines');
     expect($bill->lines)->toHaveCount(1)
         ->and($bill->lines->first()->description)->toBe('Original')
-        ->and((float) $bill->total_amount)->toBe(115.0);
+        ->and((float) $bill->total_amount)->toBe(115.0)
+        ->and($bill->status)->toBe('approved');
 });

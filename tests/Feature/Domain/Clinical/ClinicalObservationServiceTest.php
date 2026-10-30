@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class ClinicalObservationServiceTest extends TestCase
@@ -373,6 +374,7 @@ class ClinicalObservationServiceTest extends TestCase
 
     public function test_concurrent_schedule_completion_records_one_observation_and_one_final_effect(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

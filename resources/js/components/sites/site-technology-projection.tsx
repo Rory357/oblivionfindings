@@ -105,6 +105,9 @@ export type SiteTechnologyProjection = {
             name: string;
             kind: string;
             state: string;
+            collector_id?: number | null;
+            collector_name?: string | null;
+            runs_from?: string;
             last_observation_at: string | null;
         }>;
     };
@@ -653,6 +656,9 @@ export function SiteTechnologyProjectionPanel({
                                     </p>
                                     <p className="text-xs text-muted-foreground">
                                         {monitor.kind} ·{' '}
+                                        {monitor.runs_from ??
+                                            'Runs from: server'}{' '}
+                                        ·{' '}
                                         {formatDateTime(
                                             monitor.last_observation_at,
                                         )}

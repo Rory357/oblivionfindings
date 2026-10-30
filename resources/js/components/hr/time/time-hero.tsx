@@ -153,7 +153,7 @@ export function TimeHero({
                             <button
                                 type="button"
                                 onClick={handlers.onAddEntry}
-                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary shadow-sm transition-transform hover:scale-[1.02]"
+                                className="inline-flex h-[34px] items-center gap-2 rounded-[9px] bg-primary-foreground px-3.5 text-[12.5px] font-bold text-primary-strong shadow-sm transition-transform hover:scale-[1.02]"
                             >
                                 <Plus className="h-[15px] w-[15px]" />
                                 Add time entry
@@ -348,7 +348,7 @@ function WorkerHero({
                     <button
                         type="button"
                         onClick={() => router.visit('/my-day')}
-                        className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-primary-foreground px-[18px] text-[13px] font-bold text-primary"
+                        className="inline-flex h-10 items-center gap-2 rounded-[10px] bg-primary-foreground px-[18px] text-[13px] font-bold text-primary-strong"
                     >
                         <Clock className="h-[15px] w-[15px]" />
                         Clock in on My Day
@@ -441,7 +441,7 @@ function RailTab({
             className={cn(
                 'h-6 rounded-md px-2.5 text-[11px] font-bold transition-colors',
                 active
-                    ? 'bg-primary-foreground text-primary'
+                    ? 'bg-primary-foreground text-primary-strong'
                     : 'text-primary-foreground/80 hover:text-primary-foreground',
             )}
         >

@@ -68,10 +68,104 @@ vi.mock('@/hooks/use-initials', () => ({
 }));
 
 describe('inline application navigation', () => {
+    it.each([
+        [
+            '/operations/workforce-settings?tab=safety',
+            'Settings',
+            { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/availability?week=2026-10-12',
+            'Availability',
+            { staff: { availabilityUpdateSelf: true } },
+        ],
+        [
+            '/operations/qualifications?site_id=3',
+            'Rostering',
+            { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/qualifications/check/17',
+            'Rostering',
+            { rostering: { viewAny: true } },
+        ],
+        [
+            '/operations/shift-notes?site_id=3',
+            'Handovers',
+            { shifts: { viewAny: true }, rostering: { viewAny: true } },
+        ],
+    ])(
+        'opens only Workforce automatically on %s',
+        async (url, label, workforceCan) => {
+            const original = usePage<SharedData>();
+            const storageKey = 'oblivionfindings:sidebar-groups';
+            const savedGroups = window.localStorage.getItem(storageKey);
+            window.localStorage.setItem(storageKey, '[]');
+            try {
+                vi.mocked(usePage).mockReturnValue({
+                    ...original,
+                    url,
+                    props: {
+                        ...original.props,
+                        auth: {
+                            ...original.props.auth,
+                            can: {
+                                operations: { dashboard: true },
+                                clients: { viewAny: true },
+                                ...workforceCan,
+                            },
+                        },
+                    },
+                } as never);
+                render(<AppSidebar collapsed={false} />);
+                const operations = screen.getByRole('button', {
+                    name: 'Operations menu',
+                });
+                await waitFor(() =>
+                    expect(
+                        screen.getByRole('button', { name: 'Workforce menu' }),
+                    ).toHaveAttribute('aria-expanded', 'true'),
+                );
+                expect(operations).toHaveAttribute('aria-expanded', 'false');
+                const workforce = () =>
+                    within(
+                        screen.getByRole('group', {
+                            name: 'Workforce navigation',
+                        }),
+                    );
+                expect(
+                    workforce().getByRole('link', { name: label }),
+                ).toHaveAttribute('aria-current', 'page');
+                fireEvent.click(operations);
+                const group = within(
+                    screen.getByRole('group', {
+                        name: 'Operations navigation',
+                    }),
+                );
+                expect(
+                    group.getByRole('link', { name: 'Dashboard' }),
+                ).not.toHaveAttribute('aria-current');
+                expect(
+                    workforce().getByRole('link', { name: label }),
+                ).toHaveAttribute('aria-current', 'page');
+            } finally {
+                vi.mocked(usePage).mockReturnValue(original);
+                if (savedGroups === null)
+                    window.localStorage.removeItem(storageKey);
+                else window.localStorage.setItem(storageKey, savedGroups);
+            }
+        },
+    );
+
     it('discovers register-only access in IT and selects filtered credential deep links without activating Sites', async () => {
         const original = usePage<SharedData>();
         try {
-            for (const [canVendors, canCredentials, currentUrl, canContracts] of [
+            for (const [
+                canVendors,
+                canCredentials,
+                currentUrl,
+                canContracts,
+            ] of [
                 [
                     false,
                     true,
@@ -91,7 +185,10 @@ describe('inline application navigation', () => {
                             ...original.props.auth,
                             can: {
                                 sites: { viewAny: true },
-                                vendors: { view: canVendors, contracts_view: canContracts },
+                                vendors: {
+                                    view: canVendors,
+                                    contracts_view: canContracts,
+                                },
                                 credentials: { view: canCredentials },
                             },
                         },
@@ -153,11 +250,11 @@ describe('inline application navigation', () => {
             name: 'Security & Devices navigation',
         });
         expect(
-            within(navigation).getByRole('link', { name: 'All devices' }),
+            within(navigation).getByRole('link', { name: 'Devices' }),
         ).toHaveAttribute('aria-current', 'page');
         expect(
-            within(navigation).getByRole('link', { name: 'Network & IT' }),
-        ).toHaveAttribute('href', '/security-devices/network-it');
+            within(navigation).getByRole('link', { name: 'Alerts & upkeep' }),
+        ).toHaveAttribute('href', '/security-devices/monitoring');
         expect(
             screen.queryByRole('button', { name: 'Close menu' }),
         ).not.toBeInTheDocument();

@@ -145,7 +145,7 @@ export function OverviewPane({
                     <div className="mt-4 grid w-full grid-cols-2 gap-2">
                         {miniKpi(
                             categoriesHealthy,
-                            'categories â‰¥95%',
+                            'categories at 95% or above',
                             'success',
                         )}
                         {miniKpi(
@@ -206,7 +206,7 @@ export function OverviewPane({
                                 Completion trend
                             </h3>
                             <p className="text-xs text-muted-foreground">
-                                Runs completed Â· last 8 weeks
+                                Runs completed · last 8 weeks
                             </p>
                         </div>
                         <div className="text-right">
@@ -495,7 +495,7 @@ export function OverviewPane({
                                                     {r.template?.name}
                                                 </div>
                                                 <div className="truncate text-[11px] text-muted-foreground">
-                                                    {r.site?.name} Â·{' '}
+                                                    {r.site?.name} ·{' '}
                                                     {relDay(
                                                         r.scheduled_date,
                                                         today,

@@ -4,6 +4,7 @@
  * submit. Every onSuccess applies the mandatory flash-error guard (a blocked
  * action returns 302 + flash.error which fires onSuccess, not onError).
  */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,7 @@ import { WizardShell, type WizardStep } from '@/components/wizard/shell';
 import { type Page } from '@inertiajs/core';
 import { useForm } from '@inertiajs/react';
 import { Ban, ClipboardCheck, Reply, Trash2 } from 'lucide-react';
-import { type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
 const guarded = (onClose: () => void) => (page: Page) => {
     if (!(page.props as { flash?: { error?: string } }).flash?.error) onClose();
@@ -403,58 +404,95 @@ export function DisposeDialog({
         disposal_method: '',
         reason: '',
     });
+    const [confirming, setConfirming] = useState(false);
+    // Disposal is final (PpeController::dispose archives the item and nothing
+    // brings it back), so the footer button only asks; the confirm sends it.
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (!form.data.disposal_method) {
+            form.setError(
+                'disposal_method',
+                'Choose how the item was disposed of.',
+            );
+            return;
+        }
+        form.clearErrors('disposal_method');
+        setConfirming(true);
+    };
+    const dispose = () =>
         form.post(`/health-safety/ppe/inventory/${inventoryId}/dispose`, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: guarded(onClose),
+            onFinish: () => setConfirming(false),
         });
-    };
     return (
-        <ActionShell
-            open={open}
-            onClose={onClose}
-            title="Dispose item"
-            description="Archive a condemned PPE item."
-            railIcon={Trash2}
-            railTitle="Dispose item"
-            railSub={itemLabel}
-            step={{
-                key: 'dispose',
-                label: 'Dispose item',
-                blurb: 'Method & record',
-                icon: Trash2,
-            }}
-            processing={form.processing}
-            submitLabel="Record disposal"
-            onSubmit={submit}
-        >
-            <StepHead
-                icon={Trash2}
-                title="Dispose item"
-                blurb="Record how this condemned item was disposed of."
+        <>
+            <ConfirmDialog
+                open={confirming}
+                onClose={() => {
+                    if (!form.processing) setConfirming(false);
+                }}
+                onConfirm={dispose}
+                title="Dispose of this item?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {itemLabel}
+                        </span>{' '}
+                        will be marked as disposed and moved to the archive. It
+                        can&rsquo;t be returned to stock or issued to anyone
+                        again.
+                    </>
+                }
+                confirmText="Dispose item"
+                variant="destructive"
+                processing={form.processing}
             />
-            <Field
-                label="Disposal method"
-                required
-                error={form.errors.disposal_method}
+            <ActionShell
+                open={open}
+                onClose={onClose}
+                title="Dispose item"
+                description="Archive a condemned PPE item."
+                railIcon={Trash2}
+                railTitle="Dispose item"
+                railSub={itemLabel}
+                step={{
+                    key: 'dispose',
+                    label: 'Dispose item',
+                    blurb: 'Method & record',
+                    icon: Trash2,
+                }}
+                processing={form.processing}
+                submitLabel="Record disposal"
+                onSubmit={submit}
             >
-                <SelectInput
-                    value={form.data.disposal_method}
-                    onChange={(v) => form.setData('disposal_method', v)}
-                    placeholder="Choose a method"
-                    options={DISPOSAL_METHODS}
+                <StepHead
+                    icon={Trash2}
+                    title="Dispose item"
+                    blurb="Record how this condemned item was disposed of."
                 />
-            </Field>
-            <Field label="Notes" hint="Optional" error={form.errors.reason}>
-                <Textarea
-                    rows={3}
-                    value={form.data.reason}
-                    onChange={(e) => form.setData('reason', e.target.value)}
-                    placeholder="Disposal reference, contractor, date collected…"
-                />
-            </Field>
-        </ActionShell>
+                <Field
+                    label="Disposal method"
+                    required
+                    error={form.errors.disposal_method}
+                >
+                    <SelectInput
+                        value={form.data.disposal_method}
+                        onChange={(v) => form.setData('disposal_method', v)}
+                        placeholder="Choose a method"
+                        options={DISPOSAL_METHODS}
+                    />
+                </Field>
+                <Field label="Notes" hint="Optional" error={form.errors.reason}>
+                    <Textarea
+                        rows={3}
+                        value={form.data.reason}
+                        onChange={(e) => form.setData('reason', e.target.value)}
+                        placeholder="Disposal reference, contractor, date collected…"
+                    />
+                </Field>
+            </ActionShell>
+        </>
     );
 }

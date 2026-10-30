@@ -13,6 +13,7 @@ class FleetKeyLog extends Model
 
     protected $fillable = [
         'asset_id',
+        'booking_id',
         'site_id',
         'user_id',
         'action',
@@ -20,6 +21,7 @@ class FleetKeyLog extends Model
         'key_number',
         'location',
         'notes',
+        'site_room_id', 'recorded_by_user_id',
     ];
 
     protected static function booted(): void

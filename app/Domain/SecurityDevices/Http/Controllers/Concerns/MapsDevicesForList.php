@@ -6,6 +6,7 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 trait MapsDevicesForList
 {
@@ -32,7 +33,7 @@ trait MapsDevicesForList
             'manufacturer' => $d->manufacturer,
             'model' => $d->model,
             'status' => $d->status?->value,
-            'health_status' => $d->health_status?->value,
+            'health_status' => $d->effectiveHealthState(),
             'provider' => $d->provider,
             'last_seen_at' => $d->last_seen_at?->toISOString(),
             'last_changed_at' => $d->updated_at?->toISOString(),
@@ -55,11 +56,26 @@ trait MapsDevicesForList
             'room' => $entity?->name ?? "Room #{$assignment->assignable_id}",
             'vehicle' => $entity?->name ?? "Vehicle #{$assignment->assignable_id}",
             'staff' => $entity?->name ?? "Staff #{$assignment->assignable_id}",
-            'client' => $entity?->preferred_name
-                ?: $entity?->first_name
-                ?: "Client #{$assignment->assignable_id}",
+            // Same rule as the device record (DeviceProfilePresenter::clientLocation):
+            // a client is named only to someone who may view that client.
+            'client' => $entity && $this->viewerMayViewClient($entity)
+                ? ($entity->preferred_name ?: $entity->first_name ?: 'Assigned client')
+                : 'Assigned client',
             default => "{$assignment->assignable_type} #{$assignment->assignable_id}",
         };
+    }
+
+    /** @var array<int, bool> per-request answers, so a page of rows asks once per client */
+    private array $clientVisibility = [];
+
+    private function viewerMayViewClient(object $client): bool
+    {
+        $viewer = auth()->user();
+        if (! $viewer) {
+            return false;
+        }
+
+        return $this->clientVisibility[(int) $client->id] ??= Gate::forUser($viewer)->allows('view', $client);
     }
 
     /**
@@ -72,7 +88,13 @@ trait MapsDevicesForList
         }
 
         if ($request->filled('health') && $request->input('health') !== 'all') {
-            $query->byHealth($request->input('health'));
+            if ($request->input('health') === 'not_monitored') {
+                $query->whereDoesntHave('monitors', fn ($m) => $m->where('is_enabled', true))
+                    ->whereNull('last_seen_at')
+                    ->whereNull('last_signal_at');
+            } else {
+                $query->byHealth($request->input('health'));
+            }
         }
 
         if ($request->filled('provider') && $request->input('provider') !== 'all') {

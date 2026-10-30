@@ -10,7 +10,12 @@ use App\Domain\Governance\Notifications\BoardPackPublishedNotification;
 use App\Domain\Governance\Notifications\PreReadReminderNotification;
 use App\Domain\Governance\Support\BoardPackContainedSources;
 use App\Models\User;
+use App\Services\Chat\ChatMessageDelivery;
+use App\Services\ControlRoom\BroadcastRecipientReadContext;
+use App\Services\ControlRoom\BroadcastRecipientReadService;
+use App\Services\Medication\Alerts\MedicationNotificationVisibility;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Notifications\DatabaseNotification;
 
@@ -136,7 +141,7 @@ final class BoardPackAccessService
      * integers — never as manifest text — so id 2 cannot collide with 2999.
      *
      * @param  Builder<BoardPack>  $query
-     * @param  Builder<\Illuminate\Database\Eloquent\Model>|null  $visibleIds
+     * @param  Builder<Model>|null  $visibleIds
      */
     private function excludeHiddenSources(Builder $query, string $type, ?Builder $visibleIds): void
     {
@@ -205,9 +210,30 @@ final class BoardPackAccessService
         return in_array($boardMemberId, $recipientIds, true) ? $boardMemberId : null;
     }
 
-    /** @return MorphMany<DatabaseNotification, User> */
-    public function visibleNotificationQuery(User $viewer, bool $unreadOnly = false): MorphMany
-    {
+    /**
+     * The viewer's own notifications, with every family's visibility rule ANDed in.
+     *
+     * Staff broadcast notices (BroadcastRecipientNotice) are excluded unless a read
+     * producer passes its BroadcastRecipientReadContext as the fourth argument; the
+     * context then re-admits only the viewer's own current, admitted notices. There is
+     * no implicit opt-in: generic read/acknowledge writes pass nothing and never see
+     * typed broadcast notices, even inside an active reader response.
+     *
+     * The third argument is reserved for the H&S read context of the H&S rebuild
+     * (not on main yet); on main it must be null.
+     *
+     * @return MorphMany<DatabaseNotification, User>
+     */
+    public function visibleNotificationQuery(
+        User $viewer,
+        bool $unreadOnly = false,
+        mixed $healthSafetyContext = null,
+        ?BroadcastRecipientReadContext $broadcastContext = null,
+    ): MorphMany {
+        if ($healthSafetyContext !== null) {
+            throw new \LogicException('The H&S read context is not available on this branch.');
+        }
+
         $visiblePacks = $this->visibleQuery($viewer);
         $visiblePackIds = (clone $visiblePacks)
             ->select($visiblePacks->getModel()->qualifyColumn('id'));
@@ -218,7 +244,13 @@ final class BoardPackAccessService
             ? $viewer->unreadNotifications()
             : $viewer->notifications();
 
-        return $query->where(function (Builder $notifications) use ($visiblePackIds, $visibleMeetingIds): void {
+        if ($broadcastContext === null) {
+            $query = app(BroadcastRecipientReadService::class)->exclude($query, $viewer);
+        }
+
+        $query = app(ChatMessageDelivery::class)->filterNotifications($query, $viewer);
+
+        $query = app(MedicationNotificationVisibility::class)->apply($query, $viewer)->where(function (Builder $notifications) use ($visiblePackIds, $visibleMeetingIds): void {
             $notifications
                 ->whereNotIn('type', self::PROTECTED_NOTIFICATION_TYPES)
                 ->orWhere(function (Builder $packNotifications) use ($visiblePackIds): void {
@@ -232,6 +264,9 @@ final class BoardPackAccessService
                         ->whereIn('data->meeting_id', $visibleMeetingIds);
                 });
         });
+
+        // The broadcast context intersects last, after every other family's filter.
+        return $broadcastContext ? $broadcastContext->scope($query) : $query;
     }
 
     public function scopeAuditVisibility(Builder $query, ?User $viewer): Builder

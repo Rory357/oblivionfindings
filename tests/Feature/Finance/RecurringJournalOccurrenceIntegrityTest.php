@@ -24,6 +24,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use LogicException;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class RecurringJournalOccurrenceIntegrityTest extends TestCase
@@ -427,6 +428,7 @@ class RecurringJournalOccurrenceIntegrityTest extends TestCase
 
     public function test_two_independent_mysql_workers_converge_on_one_occurrence_and_journal(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $recurring = $this->recurringJournal();

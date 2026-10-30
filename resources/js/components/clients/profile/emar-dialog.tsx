@@ -3,8 +3,9 @@
 /* eMAR sign-administration popup (design: emar.jsx). A focused sign-off for
  * the profile MAR tab — outcome tiles, structured not-given reasons, PRN
  * indication and controlled-drug witness — submitting to the client-scoped
- * administration endpoint. The full RecordAdministrationDialog (safety
- * checks, scanning, vitals) remains on the Medical/MAR pages. */
+ * administration endpoint. The full dose-recording flow (safety checks,
+ * PRN follow-up) is the record-dose wizard on eMAR / Meds Today. */
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -25,12 +26,24 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import {
+    isFrontlineMedication,
+    type EmarNavigationPermissions,
+} from '@/lib/emar-navigation';
+import {
     createMedicationMutationReplayState,
     prepareMedicationMutationReplayState,
 } from '@/lib/emar-offline';
+import { medsTodayHref } from '@/lib/meds-today-location';
 import { cn } from '@/lib/utils';
-import { router } from '@inertiajs/react';
 import {
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
+import { Link, router, usePage } from '@inertiajs/react';
+import {
+    ArrowUpRight,
     Check,
     Loader2,
     Lock,
@@ -53,7 +66,39 @@ export type EmarMedication = {
     is_prn?: boolean;
     controlled_drug?: boolean;
     witness_required?: boolean;
+    requires_witness?: boolean;
+    /** Server: the profile can record this one (as-needed only). */
+    record_on_profile?: boolean;
 };
+
+/**
+ * Where a scheduled dose is recorded instead of the profile: the MAR chart,
+ * or Meds today for frontline staff. The profile's endpoint carries no
+ * scheduled time, so it records as-needed doses only.
+ */
+export function scheduledDoseRecordLink(
+    clientId: number,
+    can: EmarNavigationPermissions | undefined,
+): { href: string; place: string } {
+    return isFrontlineMedication(can)
+        ? { href: medsTodayHref(clientId), place: 'Meds today' }
+        : { href: `/emar/mar?client_id=${clientId}`, place: 'the MAR chart' };
+}
+
+function ScheduledDosesLink({
+    link,
+}: {
+    link: { href: string; place: string };
+}) {
+    return (
+        <Button variant="link" asChild className="h-auto p-0">
+            <Link href={link.href}>
+                Record scheduled doses on {link.place}
+                <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+        </Button>
+    );
+}
 
 const OUTCOMES = [
     {
@@ -112,7 +157,7 @@ export function EmarRecordDialog({
     medications,
     canRecord,
     canRecordControlled,
-    staffOptions,
+    witnessOptions,
     initialMedicationId,
 }: {
     open: boolean;
@@ -122,7 +167,8 @@ export function EmarRecordDialog({
     medications: EmarMedication[];
     canRecord: boolean;
     canRecordControlled: boolean;
-    staffOptions: { value: string; label: string }[];
+    /** Eligible witnesses at the client's Site, with their witness PIN status. */
+    witnessOptions: WitnessPickerOption[];
     initialMedicationId?: number;
 }) {
     const [medicationId, setMedicationId] = useState<string>(
@@ -160,10 +206,22 @@ export function EmarRecordDialog({
         () =>
             medications.filter(
                 (candidate) =>
-                    !candidate.controlled_drug || canRecordControlled,
+                    Boolean(candidate.record_on_profile) &&
+                    (!candidate.controlled_drug || canRecordControlled),
             ),
         [canRecordControlled, medications],
     );
+    const can = usePage<{ auth?: { can?: EmarNavigationPermissions } }>().props
+        .auth?.can;
+    const scheduledLink = scheduledDoseRecordLink(clientId, can);
+    const hasScheduled = medications.some((m) => !m.record_on_profile);
+    // Asked for a scheduled dose, or no as-needed medicine to record here:
+    // the dialog offers only the link, never a form that would be refused.
+    const linkOnly =
+        recordableMedications.length === 0 ||
+        medications.some(
+            (m) => m.id === initialMedicationId && !m.record_on_profile,
+        );
     const medication = useMemo(
         () =>
             recordableMedications.find(
@@ -176,7 +234,7 @@ export function EmarRecordDialog({
     const needsWitness = Boolean(
         outcome === 'given' &&
         medication &&
-        (medication.controlled_drug || medication.witness_required),
+        (medication.requires_witness ?? medication.witness_required),
     );
     const isPrn = Boolean(medication?.is_prn);
 
@@ -214,8 +272,13 @@ export function EmarRecordDialog({
             toast.error('Select the authorised witness.');
             return;
         }
-        if (needsWitness && !witnessCredential.trim()) {
-            toast.error('Enter the witness password or PIN.');
+        if (
+            needsWitness &&
+            witnessCredential.trim().length !== WITNESS_PIN_LENGTH
+        ) {
+            toast.error(
+                'The witness confirms by typing their 6-digit witness PIN.',
+            );
             return;
         }
         const initialPayload = {
@@ -287,6 +350,37 @@ export function EmarRecordDialog({
         );
     };
 
+    if (linkOnly) {
+        return (
+            <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+                <DialogContent className="sm:max-w-[480px]">
+                    <DialogHeader>
+                        <DialogTitle>Record administration</DialogTitle>
+                        <DialogDescription>
+                            eMAR sign-off · {clientLabel}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                        <p className="font-medium">
+                            Scheduled doses are recorded on{' '}
+                            {scheduledLink.place}
+                        </p>
+                        <p className="text-muted-foreground">
+                            There each dose is matched to its time. Here you can
+                            record as-needed medicines only.
+                        </p>
+                        <ScheduledDosesLink link={scheduledLink} />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={onClose}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     return (
         <Dialog open={open} onOpenChange={(o) => !o && !busy && onClose()}>
             <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-[640px]">
@@ -306,7 +400,7 @@ export function EmarRecordDialog({
                     {!initialMedicationId ? (
                         <div>
                             <Label className="mb-1.5 block">
-                                Medication{' '}
+                                As-needed medicine{' '}
                                 <span className="text-status-critical">*</span>
                             </Label>
                             <Select
@@ -329,6 +423,11 @@ export function EmarRecordDialog({
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {hasScheduled ? (
+                                <div className="mt-1.5">
+                                    <ScheduledDosesLink link={scheduledLink} />
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
 
@@ -474,36 +573,34 @@ export function EmarRecordDialog({
                                             <SelectValue placeholder="Second signature…" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {staffOptions.map((s) => (
-                                                <SelectItem
-                                                    key={s.value}
-                                                    value={s.value}
-                                                >
-                                                    {s.label}
-                                                </SelectItem>
-                                            ))}
+                                            {witnessOptions.length === 0 ? (
+                                                <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                                                    No eligible witness at this
+                                                    house
+                                                </div>
+                                            ) : (
+                                                witnessOptions.map((w) => (
+                                                    <SelectItem
+                                                        key={w.id}
+                                                        value={String(w.id)}
+                                                        disabled={
+                                                            !witnessIsSelectable(
+                                                                w,
+                                                            )
+                                                        }
+                                                    >
+                                                        {witnessOptionLabel(w)}
+                                                    </SelectItem>
+                                                ))
+                                            )}
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div>
-                                    <Label className="mb-1.5 block">
-                                        Witness password / PIN{' '}
-                                        <span className="text-status-critical">
-                                            *
-                                        </span>
-                                    </Label>
-                                    <Input
-                                        type="password"
-                                        autoComplete="off"
-                                        value={witnessCredential}
-                                        onChange={(event) =>
-                                            setWitnessCredential(
-                                                event.target.value,
-                                            )
-                                        }
-                                        placeholder="Witness confirms identity"
-                                    />
-                                </div>
+                                <WitnessPinInput
+                                    required
+                                    value={witnessCredential}
+                                    onChange={setWitnessCredential}
+                                />
                             </div>
                         ) : null}
                     </div>

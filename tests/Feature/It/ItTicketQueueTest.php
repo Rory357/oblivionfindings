@@ -1,12 +1,15 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\It\Services\ItSlaClockService;
 use App\Models\ItQueue;
+use App\Models\ItSlaPolicy;
 use App\Models\ItTeam;
 use App\Models\ItTicket;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +21,22 @@ function itQueueUser(string $role): User
     ]);
 
     return $user;
+}
+
+/** @return array<string, mixed> */
+function itQueueSlaEvidence(CarbonInterface $createdAt): array
+{
+    $policy = (new ItSlaPolicy)->forceFill([
+        'first_response_minutes' => 60,
+        'resolution_minutes' => 240,
+    ]);
+
+    return [
+        'created_at' => $createdAt,
+        'sla_policy_snapshot' => app(ItSlaClockService::class)->policySnapshot('normal', $policy, $createdAt),
+        'first_response_due_at' => $createdAt->copy()->addHour(),
+        'resolution_due_at' => $createdAt->copy()->addHours(4),
+    ];
 }
 
 beforeEach(function () {
@@ -237,14 +256,26 @@ test('the summary counts only measured SLA settlements for the hero compliance r
     // Three tickets settled this month: one met, one breached, and one has no
     // final SLA outcome. The unmeasured ticket remains in resolved throughput
     // but must not dilute the compliance percentage.
-    ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'sla_state' => 'met']);
-    ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'sla_state' => 'breached']);
+    $createdAt = now()->subHours(2);
+    foreach ([30, 70] as $responseMinutes) {
+        ItTicket::factory()->resolved()->create([
+            ...itQueueSlaEvidence($createdAt),
+            'site_id' => $this->site->id,
+            // Cached labels alone never establish a measured settlement.
+            'sla_state' => 'ok',
+            'first_responded_at' => $createdAt->copy()->addMinutes($responseMinutes),
+            'resolved_at' => $createdAt->copy()->addHours(2),
+        ]);
+    }
     ItTicket::factory()->resolved()->create(['site_id' => $this->site->id, 'sla_state' => 'ok']);
-    // An older met settlement (>30d) is outside the window and must not count.
+    // An older measured met settlement (>30d) must not count.
+    $olderCreatedAt = now()->subDays(40)->subHours(2);
     ItTicket::factory()->resolved()->create([
-        'sla_state' => 'met',
+        ...itQueueSlaEvidence($olderCreatedAt),
+        'sla_state' => 'ok',
         'site_id' => $this->site->id,
-        'resolved_at' => now()->subDays(40),
+        'first_responded_at' => $olderCreatedAt->copy()->addMinutes(30),
+        'resolved_at' => $olderCreatedAt->copy()->addHours(2),
     ]);
 
     $this->actingAs($this->hr)
@@ -258,7 +289,13 @@ test('the summary counts only measured SLA settlements for the hero compliance r
 
 test('the overview board serves agents needs-attention lanes and hides from requesters', function () {
     // A breached open ticket → SLA lane (normal priority, unassigned).
-    ItTicket::factory()->create(['site_id' => $this->site->id, 'status' => 'open', 'sla_state' => 'breached']);
+    ItTicket::factory()->create([
+        ...itQueueSlaEvidence(now()->subHours(2)),
+        'site_id' => $this->site->id,
+        'status' => 'open',
+        'sla_state' => 'ok',
+        'first_responded_at' => null,
+    ]);
     // An unassigned urgent open ticket, no first response → awaiting + urgent chip.
     ItTicket::factory()->urgent()->create(['site_id' => $this->site->id, 'status' => 'open']);
     // A responded ticket — 60 minutes to first reply — feeds the avg.

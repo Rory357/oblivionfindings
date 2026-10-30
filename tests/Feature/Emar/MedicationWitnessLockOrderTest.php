@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class MedicationWitnessLockOrderTest extends TestCase
@@ -19,6 +20,7 @@ class MedicationWitnessLockOrderTest extends TestCase
 
     public function test_opposite_caller_order_locks_the_same_user_rows_in_canonical_order(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -71,6 +73,7 @@ class MedicationWitnessLockOrderTest extends TestCase
 
     public function test_opposite_main_and_witness_shift_pairs_share_one_canonical_shift_then_user_prefix(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 

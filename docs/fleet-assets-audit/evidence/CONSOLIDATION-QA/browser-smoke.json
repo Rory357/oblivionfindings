@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-28",
+  "host": "http://127.0.0.1:8974",
+  "checkout": "C:/Users/steph/.codex/worktrees/fleet-personal-reports/oblivionfindings",
+  "database": "of_pkg09b_browser_20484",
+  "authentication": "Existing normal Fortify password/MFA synthetic session; no authentication middleware bypass.",
+  "viewport": {
+    "requestedWidth": 1366,
+    "requestedHeight": 900,
+    "contentWidth": 1351
+  },
+  "zoom125": "UNVERIFIED. No repeat check or substitute attempted. Main/user acceptance amendment remains pending.",
+  "checks": [
+    {
+      "surface": "Fleet Overview",
+      "url": "/fleet-assets",
+      "result": "4 synthetic vehicles, 1 asset, approved-Site scope and unknown readiness shown."
+    },
+    {
+      "surface": "Vehicle Finance",
+      "url": "/fleet-assets/vehicles/2?view=finance",
+      "result": "Linked-record/review panels load. Request wizard requires supporting evidence; cancel/discard removes the unsent draft."
+    },
+    {
+      "surface": "Notifications",
+      "url": "/fleet-assets/settings/notifications",
+      "result": "Unsaved channel draft survives Maps tab switch. Reload saved asks for discard confirmation and restores original 3-email/0-override state; no preference saved."
+    },
+    {
+      "surface": "Map settings",
+      "url": "/fleet-assets/settings/notifications#maps",
+      "result": "OSM/default capability state loads. All three configuration steps reach the impact review; cancelled without changing provider settings or performing paid checks."
+    },
+    {
+      "surface": "Fleet report builder",
+      "url": "/fleet-assets/reports/builder",
+      "result": "20 synthetic source journeys, 570 km. XLSX export returned the success notice. Editing the period with live preview off disabled download until a fresh run."
+    },
+    {
+      "surface": "People history",
+      "url": "/operations/people-locations/history?q=&selected=c1&source=1",
+      "result": "Client selector, canonical source, day window, one recorded position and one sample loaded. Export preview rechecked current authority and required a reason; generation completed and dialog closed."
+    },
+    {
+      "surface": "Client profile",
+      "url": "/operations/clients/1?tab=location",
+      "result": "Both Day & outing reports and Build report links are present, pointing to their own contextual routes."
+    },
+    {
+      "surface": "Client reporting",
+      "url": "/operations/people-location-reports/client?subject=1",
+      "result": "Consent-aware source preview produced one row/group; missing gap remained Unknown."
+    },
+    {
+      "surface": "Staff reporting",
+      "url": "/operations/people-location-reports/staff?subject=1",
+      "result": "Session-location source rejected missing session, then produced one row/group for the authorised completed synthetic staff session; missing gap remained Unknown."
+    },
+    {
+      "surface": "Legacy map redirect",
+      "url": "/fleet-assets/map",
+      "result": "Authenticated permitted reader redirected to /fleet-assets/geofences?tab=map. Canonical directory loads 4 vehicles/1 asset with no available location."
+    }
+  ],
+  "limitations": [
+    "Browser download capture timed out for the blob download event; XLSX success is supported by the visible application confirmation, not an inspected browser download file. Server PDF/XLSX rendering and current-authority behavior are separately covered by backend regressions.",
+    "Current People map showed no active staff because the synthetic staff session is completed; the staff report was verified through the authorised historical session route.",
+    "Mockup composition is preserved (purple header, six-step editor, adjacent report preview); the real authenticated shell, role-aware controls, purpose metadata and source values differ from the static reference. No pixel-identical or genuine 125% acceptance is claimed."
+  ],
+  "externalChanges": "No finance request submitted, notification/provider configuration saved, device command sent, Main publication or deployment performed."
+}

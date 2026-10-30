@@ -1457,7 +1457,7 @@ function SignaturesTab({
                     <button
                         type="button"
                         onClick={onSend}
-                        className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+                        className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 text-[13px] font-semibold text-primary-fill-foreground"
                     >
                         <PenLine className="h-3.5 w-3.5" /> Send for signature
                     </button>
@@ -1719,7 +1719,7 @@ function TemplatesTab({
                     <button
                         type="button"
                         onClick={onNew}
-                        className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+                        className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 text-[13px] font-semibold text-primary-fill-foreground"
                     >
                         <Plus className="h-3.5 w-3.5" /> New template
                     </button>
@@ -1821,7 +1821,7 @@ function TemplatesTab({
                                         <button
                                             type="button"
                                             onClick={() => onGenerate(t.id)}
-                                            className="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground"
+                                            className="inline-flex h-[34px] items-center gap-1.5 rounded-[9px] bg-primary-fill px-3 text-[12.5px] font-semibold text-primary-fill-foreground"
                                         >
                                             <FileText className="h-3.5 w-3.5" />{' '}
                                             Generate
@@ -1881,7 +1881,7 @@ function PoliciesTab({
                 {canManage ? (
                     <a
                         href="/hr/documents/policies/create"
-                        className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+                        className="inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 text-[13px] font-semibold text-primary-fill-foreground"
                     >
                         <Plus className="h-3.5 w-3.5" /> New policy
                     </a>
@@ -2196,7 +2196,7 @@ function DocViewer({
                 <div className="flex gap-2 border-t border-border p-[14px_18px]">
                     <a
                         href={`/hr/documents/${doc.id}/download`}
-                        className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-primary text-[13px] font-semibold text-primary-foreground"
+                        className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-[10px] bg-primary-fill text-[13px] font-semibold text-primary-fill-foreground"
                     >
                         <Download className="h-3.5 w-3.5" /> Download
                     </a>
@@ -2292,7 +2292,7 @@ function CheckBox({
             className={cn(
                 'grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px]',
                 checked
-                    ? 'border-primary bg-primary text-primary-foreground'
+                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                     : 'border-border bg-card',
             )}
         >

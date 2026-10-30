@@ -458,7 +458,7 @@ export default function Review({ period, summary, shifts }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: backHref },
                 {
                     title: t('rostering.title', 'Rostering'),
                     href: backHref,
@@ -480,7 +480,7 @@ export default function Review({ period, summary, shifts }: Props) {
             />
 
             <PageLayout hero={header}>
-                <div data-test="publish-review-page" className="space-y-4">
+                <div data-test="publish-review-page" className="space-y-5">
                     {view === 'blockers' ? (
                         <>
                             <ListCaption

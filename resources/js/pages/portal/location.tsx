@@ -1,3 +1,4 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import LeafletMap, {
     type MapGeofence,
     type MapMarker,
@@ -6,7 +7,6 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { usePersonalLocationPrivacy } from '@/hooks/use-personal-location-privacy';
@@ -97,6 +97,17 @@ export default function PortalLocation({
 
     // History state
     const [showHistory, setShowHistory] = useState(false);
+    // Leaflet writes the colour into an SVG attribute, so resolve the brand
+    // token (Settings › Branding) instead of hard-coding a purple.
+    const routeColor = useMemo(
+        () =>
+            (typeof document !== 'undefined' &&
+                getComputedStyle(document.documentElement)
+                    .getPropertyValue('--primary')
+                    .trim()) ||
+            'currentColor',
+        [],
+    );
     const [historyLocations, setHistoryLocations] = useState<Location[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [dateFrom, setDateFrom] = useState('');
@@ -267,14 +278,14 @@ export default function PortalLocation({
             >
                 {/* Consent Warning */}
                 {!hasConsent && (
-                    <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
+                    <Card className="border-status-warning/30 bg-status-warning-bg">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <ShieldOff className="h-5 w-5 shrink-0 text-status-warning dark:text-status-warning" />
+                            <ShieldOff className="h-5 w-5 shrink-0 text-status-warning" />
                             <div>
-                                <p className="font-medium text-status-warning dark:text-status-warning">
-                                    Location Tracking Consent Not Active
+                                <p className="font-medium text-status-warning">
+                                    Location tracking consent not active
                                 </p>
-                                <p className="text-sm text-status-warning dark:text-status-warning">
+                                <p className="text-sm text-status-warning">
                                     Location tracking requires active consent.
                                     Please contact the care team to update
                                     consent status.
@@ -286,14 +297,14 @@ export default function PortalLocation({
 
                 {/* No Tracker */}
                 {hasConsent && !hasTracker && (
-                    <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">
+                    <Card className="border-status-info/30 bg-status-info-bg">
                         <CardContent className="flex items-center gap-3 p-4">
-                            <Radio className="h-5 w-5 shrink-0 text-status-info dark:text-status-info" />
+                            <Radio className="h-5 w-5 shrink-0 text-status-info" />
                             <div>
-                                <p className="font-medium text-status-info dark:text-status-info">
-                                    No Tracker Assigned
+                                <p className="font-medium text-status-info">
+                                    No tracker assigned
                                 </p>
-                                <p className="text-sm text-status-info dark:text-status-info">
+                                <p className="text-sm text-status-info">
                                     A personal tracker has not been assigned
                                     yet. Please contact the care team to set up
                                     a tracker device.
@@ -311,11 +322,11 @@ export default function PortalLocation({
                             <CardContent className="flex items-center gap-3 p-4">
                                 {isOnline ? (
                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-success-bg">
-                                        <Wifi className="h-5 w-5 text-status-success dark:text-status-success" />
+                                        <Wifi className="h-5 w-5 text-status-success" />
                                     </div>
                                 ) : (
                                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-critical-bg">
-                                        <WifiOff className="h-5 w-5 text-status-critical dark:text-status-critical" />
+                                        <WifiOff className="h-5 w-5 text-status-critical" />
                                     </div>
                                 )}
                                 <div>
@@ -348,9 +359,9 @@ export default function PortalLocation({
                                     }`}
                                 >
                                     {(tracker.battery ?? 100) < 20 ? (
-                                        <BatteryLow className="h-5 w-5 text-status-critical dark:text-status-critical" />
+                                        <BatteryLow className="h-5 w-5 text-status-critical" />
                                     ) : (
-                                        <Battery className="h-5 w-5 text-status-success dark:text-status-success" />
+                                        <Battery className="h-5 w-5 text-status-success" />
                                     )}
                                 </div>
                                 <div>
@@ -370,11 +381,11 @@ export default function PortalLocation({
                         <Card>
                             <CardContent className="flex items-center gap-3 p-4">
                                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-status-info-bg">
-                                    <Clock className="h-5 w-5 text-status-info dark:text-status-info" />
+                                    <Clock className="h-5 w-5 text-status-info" />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">
-                                        Last Seen
+                                        Last seen
                                     </p>
                                     <p className="text-sm font-semibold">
                                         {formatRelativeTime(
@@ -388,8 +399,8 @@ export default function PortalLocation({
                         {/* Consent */}
                         <Card>
                             <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
-                                    <Shield className="h-5 w-5 text-primary dark:text-primary" />
+                                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                                    <Shield className="h-5 w-5 text-primary" />
                                 </div>
                                 <div>
                                     <p className="text-xs text-muted-foreground">
@@ -423,8 +434,8 @@ export default function PortalLocation({
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <MapPin className="h-4 w-4" />
                                     {showHistory
-                                        ? 'Movement History'
-                                        : 'Current Location'}
+                                        ? 'Movement history'
+                                        : 'Current location'}
                                 </CardTitle>
                                 {currentLocation && (
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -462,7 +473,7 @@ export default function PortalLocation({
                                                   animated: true,
                                                   showArrows: true,
                                                   showEndpoints: true,
-                                                  color: '#7c3aed',
+                                                  color: routeColor,
                                               }
                                             : undefined
                                     }
@@ -493,31 +504,41 @@ export default function PortalLocation({
                         <CardHeader className="pb-3">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Clock className="h-4 w-4" />
-                                Movement History
+                                Movement history
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-wrap items-end gap-4">
-                                <div className="space-y-1">
-                                    <Label className="text-xs">From</Label>
-                                    <Input
-                                        type="date"
+                                <div className="w-56 space-y-1">
+                                    <Label
+                                        htmlFor="portal-location-from"
+                                        className="text-xs"
+                                    >
+                                        From
+                                    </Label>
+                                    <DatePicker
+                                        id="portal-location-from"
+                                        label="History from"
                                         value={dateFrom}
-                                        onChange={(e) =>
-                                            setDateFrom(e.target.value)
-                                        }
-                                        className="w-40"
+                                        onChange={setDateFrom}
+                                        allowClear
+                                        compact
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">To</Label>
-                                    <Input
-                                        type="date"
+                                <div className="w-56 space-y-1">
+                                    <Label
+                                        htmlFor="portal-location-to"
+                                        className="text-xs"
+                                    >
+                                        To
+                                    </Label>
+                                    <DatePicker
+                                        id="portal-location-to"
+                                        label="History to"
                                         value={dateTo}
-                                        onChange={(e) =>
-                                            setDateTo(e.target.value)
-                                        }
-                                        className="w-40"
+                                        onChange={setDateTo}
+                                        allowClear
+                                        compact
                                     />
                                 </div>
                                 <Button
@@ -528,7 +549,7 @@ export default function PortalLocation({
                                     <Calendar className="mr-2 h-4 w-4" />
                                     {loadingHistory
                                         ? 'Loading...'
-                                        : 'Show History'}
+                                        : 'Show history'}
                                 </Button>
                                 {showHistory && (
                                     <>
@@ -565,8 +586,8 @@ export default function PortalLocation({
                                                 key={i}
                                                 className="flex items-start gap-3 px-4 py-3"
                                             >
-                                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/30">
-                                                    <MapPin className="h-3.5 w-3.5 text-primary dark:text-primary" />
+                                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
+                                                    <MapPin className="h-3.5 w-3.5 text-primary" />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <p className="text-xs text-muted-foreground">

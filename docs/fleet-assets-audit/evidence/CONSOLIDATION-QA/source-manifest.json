@@ -1,0 +1,5126 @@
+{
+  "codeCommit": "9782faab62efa0cabe518b0a799a3ad6cd1ffbb5",
+  "combinedBeforeCorrection": "f3fd2f77657c7fe09022ff69562e8c3487c9668b",
+  "inputCommits": {
+    "Main": "bb0eea61abe61a14d9b65af59f8bf1add88e8bb5",
+    "PKG03": "fbb0eda96586ca751b73382eb90720abd6b8721a",
+    "PKG08": "38239d35506bf97c4b6f865a13aa10933b4cb439",
+    "People": "352ce7006098b227b945a47c4d55400c9aeff429",
+    "Reports": "50716b9cca0473ee4082e329ce6ff1347833f714"
+  },
+  "allInputsAreAncestors": true,
+  "hashAlgorithm": "Git SHA-1 blob object identifiers from committed content; exact tree hashes avoid checkout line-ending differences.",
+  "changedPathCount": 569,
+  "allowedPathsOnly": true,
+  "protectedMainPaths": 2758,
+  "protectedMainDifferences": [],
+  "postCombinationPaths": [
+    "app/Http/Controllers/FleetAssets/LiveMapController.php",
+    "routes/fleet-assets.php",
+    "tests/Architecture/ItSecuritySingleTenantBoundaryTest.php",
+    "tests/Feature/FleetAssets/FleetLiveMapSiteAccessTest.php",
+    "tests/Feature/FleetAssets/LegacyMapAccessTest.php",
+    "tests/Feature/SecurityDevices/ConsolidatedIntegrationHistoryTest.php"
+  ],
+  "paths": [
+    {
+      "path": "app/Console/Commands/RunOperationalReportSchedules.php",
+      "mainBlob": null,
+      "finalBlob": "a66600b62f9dfa1e6df3ef2db291b472139a793e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Exceptions/StaleBillApprovalException.php",
+      "mainBlob": null,
+      "finalBlob": "0ece96f0244cf434bdc546c065086c99df92a852",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Http/Controllers/BillController.php",
+      "mainBlob": "657c6fe1cf7ef7eb53b12fa4395562f1c346ac18",
+      "finalBlob": "5029030546ddc8aa3cd618b427671419453001ce",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Http/Controllers/BillDocumentController.php",
+      "mainBlob": null,
+      "finalBlob": "9b7c9d754f9b1cb66ce2785f04dd25c290495313",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Http/Controllers/JournalController.php",
+      "mainBlob": "8008f36825a6da0ddd11ab5fcc4a6bfb7d74d3dd",
+      "finalBlob": "62db2ea5c3b31b5504c906c27f100592cb7afcba",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Http/Controllers/VehicleReviewRequestController.php",
+      "mainBlob": "e43667b95e12537dcd6631a72944d638a97bf013",
+      "finalBlob": "d5a25bdd30328156324bf688600c42d04e1b0d86",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Http/Requests/StoreBillRequest.php",
+      "mainBlob": "ce3c1bc84211307ce80045ff0a20dfa25d7ac710",
+      "finalBlob": "782ebf557734cf3e30221588e796148a8cf969fd",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Http/Requests/UpdateBillRequest.php",
+      "mainBlob": "12a75260689ccae2e74811f534ea3757b205b4e0",
+      "finalBlob": "15ff6b6bee2e141d7f74329ed03e2e0e65b86287",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Models/FinBill.php",
+      "mainBlob": "204941ea151733034f24aca0cc7ab369304c161f",
+      "finalBlob": "8251cd1abce756ac25efd7f04b75149ea78f9745",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Models/FinBillApprovalReceipt.php",
+      "mainBlob": null,
+      "finalBlob": "589ab436069303ba7b3398cc7eb444915e7eb16e",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Models/FinBillDocument.php",
+      "mainBlob": null,
+      "finalBlob": "c99dde02861f6ae16219ed46f718914fcd81e81e",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Policies/FinBillPolicy.php",
+      "mainBlob": "f8303790a4929a25c72d61d826c1f02da3afbefb",
+      "finalBlob": "442aefe4dfc61457330edb84c4a1c46b95907c12",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Services/AccountsPayableService.php",
+      "mainBlob": "884544a848a67fee07c9cb361e34126cad9fc4ed",
+      "finalBlob": "1b478c2eb0c9e41bdc9f8b3906d86cb0973cb852",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Services/BillApprovalSnapshot.php",
+      "mainBlob": null,
+      "finalBlob": "bd07a478d31274b14c8489129869cddafc6c5de2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Services/BillDocumentService.php",
+      "mainBlob": null,
+      "finalBlob": "467b919f9e247b1b07b82086eff150add28c3462",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Services/BillSiteScope.php",
+      "mainBlob": null,
+      "finalBlob": "ae4e1b51c9db8e1c75d61c36fedf3f9caaa88c34",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/Finance/Services/BillWorkContext.php",
+      "mainBlob": null,
+      "finalBlob": "cb526c78f0b10562db0f0fb12f6c8606e50db55d",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingLocationExportService.php",
+      "mainBlob": "47ab1ba88633f8e7a6c2764107e396a0f0ec098b",
+      "finalBlob": "d2bff7ac99e22b95197e212ac43c4aa8c036e1d7",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/PersonalTrackingPrivacyService.php",
+      "mainBlob": "8f8ae67f7991c1caa1f1246836cc31b5574215d8",
+      "finalBlob": "ea7e4079d63a17277851c6778ea5a567b8268f78",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Domain/SecurityDevices/Services/SecurityDevicesAccessService.php",
+      "mainBlob": "3dd6eb968d24ff6a4f60bd83d634f43c0fa20476",
+      "finalBlob": "16defcea95ed026f9387cd2296ab15baca774db7",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Exceptions/RecoverableTaskAuthorizationException.php",
+      "mainBlob": "76673a846ff44da858444ca91e57cd16d0370568",
+      "finalBlob": "e071618faec7ef3d2a27405bbeeacfa7866a78ee",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/AssetImportController.php",
+      "mainBlob": "3413204e19f04672c86293d52719ad7c2a87199b",
+      "finalBlob": "3434bbcd20e3c7eef22801532bc17e3064068b54",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/HandoverController.php",
+      "mainBlob": "16b271d92b76f1ec9caab3ac523ec5069ea8cb6a",
+      "finalBlob": "e5acd418dba07ad37ea2494dd6b0af338e918b62",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/LiveMapController.php",
+      "mainBlob": "884a072175d25f632d91b1cc402ac65d6a8d9144",
+      "finalBlob": "56e62f43af1d857b99c82727e41503fde7dc6d88",
+      "matchingInputRefs": [],
+      "disposition": "authorised QA correction/regression"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/MapCapabilityController.php",
+      "mainBlob": null,
+      "finalBlob": "5b7c95f4ab297020291bd3f23be9bf63bd1d41b0",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/SettingsNotificationController.php",
+      "mainBlob": null,
+      "finalBlob": "87972ddd1935853783ef29a96dd2144a3a0b1101",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleFinanceController.php",
+      "mainBlob": "4ca17dd3634bbb8b4cb790412c7dd469b2f521c3",
+      "finalBlob": "e79a1a9d03c26c0d2d1ac179d815240dcf5544aa",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/WorkOrderController.php",
+      "mainBlob": "63a42fc5aebd2534bf7d7528fe93fbc078516799",
+      "finalBlob": "08c5f8ed5f9012ebf58514e98b70cd1e4c000076",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/WorkspaceSettingsController.php",
+      "mainBlob": null,
+      "finalBlob": "82a26855ff362da24439047f63bfa6ae9d71e66b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/HealthSafety/LoneWorkerController.php",
+      "mainBlob": "01181730835f51de45cd2850488b5bc8a130c695",
+      "finalBlob": "e6143c2930f33b3df9c5bdd810dae64897c009b1",
+      "matchingInputRefs": [],
+      "disposition": "shared integration reconciliation"
+    },
+    {
+      "path": "app/Http/Controllers/OperationalReportController.php",
+      "mainBlob": null,
+      "finalBlob": "e6c3c306c57284810df131419126f6d2b19c6cd1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/Operations/PeopleLocationController.php",
+      "mainBlob": null,
+      "finalBlob": "8b60fd2c18fa7bf6d609299f09b8d54279769859",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/Settings/BrandingController.php",
+      "mainBlob": "89bc97bf4dcc932a9aefb13a63c5f3b64b98c2ec",
+      "finalBlob": "f20043ee5dd7992acfcb00ae3eefb2c99d2d9f55",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Controllers/Settings/NotificationPreferencesController.php",
+      "mainBlob": "0f4034e1c10e3b2a53ac4df1da07e9ff4052412b",
+      "finalBlob": "7fa0a56c60b49682f635e275093bc85ab6aa3421",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Middleware/AddContentSecurityPolicy.php",
+      "mainBlob": "d28f1893a082705740f661368c7d51c27486908d",
+      "finalBlob": "bc49b8908210057619e7b1871f97f334b89f0dc0",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Http/Middleware/HandleInertiaRequests.php",
+      "mainBlob": "0b62423086570f5bf484977c99e410577f2cf0c4",
+      "finalBlob": "d4bdbdc3b35ca5ab5c1888aa5757a4018688df4b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Jobs/DeliverFinanceReviewNotice.php",
+      "mainBlob": null,
+      "finalBlob": "e32125b3160662c1b1cfabe65b86a8d0a4468781",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Jobs/GenerateOperationalReport.php",
+      "mainBlob": null,
+      "finalBlob": "68a01b3a9403a1f3814ea262008629e5dd660f3a",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/FleetFinanceReviewRequest.php",
+      "mainBlob": "d45e22bff420ae2f74c99a6dea88ad23647972b6",
+      "finalBlob": "8bdf0b3b0e8a0e8822ecf773629c7a6508335485",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/FleetFinanceReviewRequestEvent.php",
+      "mainBlob": "5e6494cd9b4bf50b63207890f2fd4360e4697a36",
+      "finalBlob": "25d3df686071c84734c0be1f8f2d1ec9b2205787",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/OperationalReport.php",
+      "mainBlob": null,
+      "finalBlob": "1a47bd4c31af6711357c77c3e856c38b5897b2b2",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/OperationalReportRun.php",
+      "mainBlob": null,
+      "finalBlob": "35b4c8822468b366a4c21923c7b858ed7612d0a4",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/OperationalReportSubscription.php",
+      "mainBlob": null,
+      "finalBlob": "5578b9409590224bb6e435065b24f3997a5dd569",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/OperationalReportVersion.php",
+      "mainBlob": null,
+      "finalBlob": "c8f49ab1ca6c449f04b786b4202f2e1b27b48f17",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Models/UserNotificationPreference.php",
+      "mainBlob": "e50fa02895d3aa6205965f01623caf2522d6b1a5",
+      "finalBlob": "dcd4c138e3f3edd2e25d2b42ee1c3b480d9aad67",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Notifications/Fleet/FleetBookingApprovedNotification.php",
+      "mainBlob": "da92455ded69433b212dffb7606eb9106a5f5b9e",
+      "finalBlob": "2bb27f8b9735eb8918e95f3e1e4dba5688da6413",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Notifications/Fleet/FleetBookingRejectedNotification.php",
+      "mainBlob": "ea0e04ec6c6947882d86ad7a9822c680b7c7d62a",
+      "finalBlob": "b553871116466db0c8e31fe6a069aece09d5d4ae",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Notifications/Fleet/FleetComplianceDueNotification.php",
+      "mainBlob": "b3c93b15c193f2b302bfd386758d7f3cfd4d819e",
+      "finalBlob": "6a6e72d090b6b2c55c1da73ab250e703ecf5c6fa",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Notifications/Fleet/FleetSourceUpdateNotification.php",
+      "mainBlob": null,
+      "finalBlob": "0a677febfe4de981ec8a8b32ccb9d30d75b40308",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Notifications/OperationalReportReady.php",
+      "mainBlob": null,
+      "finalBlob": "4c77e3bedb7113cb42e67c9e224935e6d6f2dbc1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Assets/BrandedWorkbook.php",
+      "mainBlob": "fa9ff92d51ce297d2182bc6dce39984d56b41c18",
+      "finalBlob": "c2b829514ec0180d07bb4d8123e50d5dd5b73755",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Clients/ClientProfileSectionAccess.php",
+      "mainBlob": "6b5436d63defcd33c4ece290d3a23d927575f216",
+      "finalBlob": "4c499787ed2df97a86c4a5268741a97eab57694c",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/ConsentValidationService.php",
+      "mainBlob": "fde4861d103b02d61f96a1b7cf327fa14f91766e",
+      "finalBlob": "7da20ab3998e99ecf53b31d518f0ef1badb33c06",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/FinanceReviewEvidence.php",
+      "mainBlob": null,
+      "finalBlob": "6a5a8e1b38009bc250b771fb642177cc022964ba",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/FinanceReviewNotices.php",
+      "mainBlob": null,
+      "finalBlob": "d4db2b991d9e7bbef696b9248f3a8faab066c6e8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/FleetMapSettings.php",
+      "mainBlob": null,
+      "finalBlob": "9802a707bcf0afb93e632d2dca8b0fe379e0d73f",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/FleetNotificationPreferences.php",
+      "mainBlob": null,
+      "finalBlob": "20c173593263ed1eb36e103ccc71e2ec7e486782",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/FleetOptionalNotice.php",
+      "mainBlob": null,
+      "finalBlob": "9c6eadf146994b614c951e36c88bd73eb0f6ef4d",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/Geocoding/GoogleReverseGeocoder.php",
+      "mainBlob": "fcd1d97bb56b63e62d82aebf86671b9198a1c3d6",
+      "finalBlob": "b28e44826139ad6a95f29166f40f3aec972b2630",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/GoogleMapCapabilities.php",
+      "mainBlob": null,
+      "finalBlob": "14f4ce68f016a230dc2213542910b7c90eb15713",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceCostPresenter.php",
+      "mainBlob": null,
+      "finalBlob": "85053adea555ac200ed7105f76d526ab36815037",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceCostSummary.php",
+      "mainBlob": null,
+      "finalBlob": "9f95398aaf546b7b90569437614c142b5bb0e8e6",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceFinanceService.php",
+      "mainBlob": "19d5d0c4980741bdc05ae120fb351d712242c847",
+      "finalBlob": "cdeb6467ce544db9d532d54fc70ddc371270f4c0",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceTransitionService.php",
+      "mainBlob": "64307e72204d93b7cddc4c9fb0658983c141b41f",
+      "finalBlob": "95f140a21ca19a96cdd9fd2c3bac7470a4fdb7ab",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/ReverseGeocodeService.php",
+      "mainBlob": "564ae2c7869befa2492ffd4fbd7539f077e071cb",
+      "finalBlob": "50ec178724eb3652fb1093f60c9d29e123e1e6d6",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleBookingAccessService.php",
+      "mainBlob": "29ccc35779cafc0ea006df1833e9a0a74ef13915",
+      "finalBlob": "2c353976e02f6350fc3c2ace72e6230c0401e952",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleDocumentService.php",
+      "mainBlob": "74b218b186bcbfe14c6b98a471ca49d102fbc1a3",
+      "finalBlob": "78bb7c846fd66895795bedb7b759c9532ac422ec",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleFinancePresenter.php",
+      "mainBlob": "dc992992aaf4d882e690557a608b9700539d3f51",
+      "finalBlob": "7ba548bb2a452126b663ca9c6c8ce4e8a81ba236",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleFinanceReviewQueue.php",
+      "mainBlob": "d18c34bdbf815c19c52d5f3258613f548b713b86",
+      "finalBlob": "27420fc43df0fa6ca2c550115899124b14c8528d",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Fleet/VehicleFinanceService.php",
+      "mainBlob": "61d38be0b5e0ed302e35e54abf96bd98cbe76611",
+      "finalBlob": "bee6ef8fa3d7f6991f371f088d93867ba4cc50d0",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/HealthSafety/LoneWorkerSessionAccessService.php",
+      "mainBlob": null,
+      "finalBlob": "b7d7718a2b083b6d0efdaace23165992d78b8300",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/HealthSafety/LoneWorkerSessionScope.php",
+      "mainBlob": null,
+      "finalBlob": "4c1efd4f7d6d35e34e0c93dbc200d2a1a3543d93",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Integration/IntegrationEventHistoryService.php",
+      "mainBlob": "f3bd4e88f31be88cf0931fb52fcb5fe3c462f891",
+      "finalBlob": "cbcea027dd1a1204be26c1fd0f58f8019c9c42d4",
+      "matchingInputRefs": [],
+      "disposition": "shared integration reconciliation"
+    },
+    {
+      "path": "app/Services/Reporting/FleetSupplementalReports.php",
+      "mainBlob": null,
+      "finalBlob": "21b4b52a57addafb6406ac2275c049bfba92f2fb",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/PersonalReportEvidence.php",
+      "mainBlob": null,
+      "finalBlob": "8695e385679ce1cc9c5e061075c685eae7eed595",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportAccess.php",
+      "mainBlob": null,
+      "finalBlob": "fbcce5a264dd1330dee532cc10ba356f9da155fc",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportDefinition.php",
+      "mainBlob": null,
+      "finalBlob": "28dee2c9644faad7a48ab05e9cd50e4918020b36",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportEngine.php",
+      "mainBlob": null,
+      "finalBlob": "0a6488b163abc5548cb747dcdb568d1ee789f2f2",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportExporter.php",
+      "mainBlob": null,
+      "finalBlob": "963b7f86899dc5094e3680b2c5537bb8a0cdc169",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportFormula.php",
+      "mainBlob": null,
+      "finalBlob": "5866d8616750154da2714c9f6d443eb8da2f3660",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportRuns.php",
+      "mainBlob": null,
+      "finalBlob": "df276571c70c812c2dfdf2b3f4f036c5577f8cb5",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportSourceEvidence.php",
+      "mainBlob": null,
+      "finalBlob": "f86f46e3fc50702f01e6443d11be30a16fd0b597",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Reporting/ReportSourceReader.php",
+      "mainBlob": null,
+      "finalBlob": "af8ae611193466bb782b833bdadf0022b4c0f39e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Tasks/Providers/FleetFinanceReviewProvider.php",
+      "mainBlob": "b956bd88d064f3dea6353ee89ef6d4c07cd3ddb4",
+      "finalBlob": "2523682d2d17d6f4381ced079c44146732dd1fa4",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationHistoryService.php",
+      "mainBlob": "6e6c716ebbe28ebd3a17d1df4ae9a3f37c01b4dd",
+      "finalBlob": "831ecd37d98ec51998c68f6d3b5b4aabb4df10de",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Tracking/ClientLocationReportWindow.php",
+      "mainBlob": null,
+      "finalBlob": "aa05a23fddb6e4ed83617be0b3c8814195b7edb3",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Tracking/PeopleLocationPreferences.php",
+      "mainBlob": null,
+      "finalBlob": "c36799b5f5dc520213a222c85e84b44af1caabfc",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Services/Tracking/PeopleLocationService.php",
+      "mainBlob": null,
+      "finalBlob": "622ea2c54c63bd9b5417b1c150c51b619b27097f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "app/Support/BrandThemeTokens.php",
+      "mainBlob": null,
+      "finalBlob": "fe8e6eddec8910a13a79c907b4a603e6335f66a7",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "build/pdfjs-assets.ts",
+      "mainBlob": null,
+      "finalBlob": "72f2c427ac092e4780ff7745cb31a7261b8dd0a5",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "config/fleet.php",
+      "mainBlob": "8588aa9812d174338bf71e122f4c99642dfa2d1f",
+      "finalBlob": "7c663b9ec28ecd79a5f6ea17b6247e9e4a574b8d",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "config/notification_events.php",
+      "mainBlob": "b3e81a5cc798be0c4260f7d09bf4af5e50ab1c2a",
+      "finalBlob": "2f67346b8b606e9b14b2ee76d01bf460744dbdab",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "config/operational-reports.php",
+      "mainBlob": null,
+      "finalBlob": "6aae6f77d45b011e68da0da8fa75e8bd2c764605",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/migrations/2026_09_27_000100_complete_finance_review_workflow.php",
+      "mainBlob": null,
+      "finalBlob": "d4523e6e9e888153d4c13e8ebc8c658c526a7148",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/migrations/2026_09_27_230000_add_people_location_export_permission.php",
+      "mainBlob": null,
+      "finalBlob": "49ff414e681ef68082ae06c62435dc20b060578f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/migrations/2026_09_27_230000_create_operational_reporting_tables.php",
+      "mainBlob": null,
+      "finalBlob": "c73ab83683e04b8aa0f762e44ac5594118dcc0b0",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/migrations/2026_09_28_000100_add_notification_channel_overrides.php",
+      "mainBlob": null,
+      "finalBlob": "320a134177f93a0c84c7c7dc3ec8265778b6fc78",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/migrations/2026_09_28_010000_add_people_location_history_permission.php",
+      "mainBlob": null,
+      "finalBlob": "0651f3a1927789d8ed88063abd5e6d6e66b23506",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/migrations/2026_09_28_010100_create_people_location_preferences.php",
+      "mainBlob": null,
+      "finalBlob": "e49e2b3899b3b85fa8c9d4ef5060af0c2f2b799c",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "database/seeders/RbacSeeder.php",
+      "mainBlob": "ad72fba24a8fd99011307ad3a458a986c62d5c3c",
+      "finalBlob": "e7409a17e5fdc025fadaed7dd54f75fbef6242d1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/PKG-03-implementation-progress.md",
+      "mainBlob": null,
+      "finalBlob": "6ffa0faf7ff153a826802a4c617517095afdff53",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/PKG-03-mockup-implementation.md",
+      "mainBlob": null,
+      "finalBlob": "23ae6d1b1db427404ce98d1f1cd8c04443ee87bd",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/BRAND-VALUES.md",
+      "mainBlob": null,
+      "finalBlob": "79c9e6288e35cfc290c9e90fc152be6ec3ea168f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/CORRECTIONS.md",
+      "mainBlob": null,
+      "finalBlob": "8d38bc124af8b3a74f728f8aef5e10f02eaa000f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/README.md",
+      "mainBlob": null,
+      "finalBlob": "c3f7fd82ee43367b24e7b7f2273dce022128cb90",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/VISUAL-ALIGNMENT.md",
+      "mainBlob": null,
+      "finalBlob": "f59ee65da86ef0b71246d93216b30c8b7cfe7f1f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/aligned-analytics-1280-light.png",
+      "mainBlob": null,
+      "finalBlob": "f5420e926a1f8838ef0426defff0297468f0c9f7",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/aligned-analytics-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "1210978dd6fc6dd306123722e458b43dace89ddc",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/aligned-analytics-1440-light.png",
+      "mainBlob": null,
+      "finalBlob": "5406a7a5ff82d89f47154861bd96d7dd439f8bc9",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/aligned-history-1280-light.png",
+      "mainBlob": null,
+      "finalBlob": "fcef6e9321ba7d549138ce0e6484f341b2261cba",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/aligned-list-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "90c26d0cdb539125d22f0658a538572cd6efb741",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/aligned-people-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "42e3aa33bb2da7499f333a4ef7bb9e19dc4aa71d",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/analytics-light.png",
+      "mainBlob": null,
+      "finalBlob": "fe225f586934bfade96e6505fd5588e68b3d5208",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/analytics.png",
+      "mainBlob": null,
+      "finalBlob": "75cc56d703c053b8343bb5d8a3fe339c204fed61",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-2026-09-27.md",
+      "mainBlob": null,
+      "finalBlob": "052f909651e1f5cb1b392cb56f54d0bd34d31a45",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-findings.json",
+      "mainBlob": null,
+      "finalBlob": "22dbd9c6955024b3842edfb9f928c3a09e00d3f5",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-build.txt",
+      "mainBlob": null,
+      "finalBlob": "f162b0d7c78a7075c8a91eaa9853069a06c88ee6",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-concurrency.json",
+      "mainBlob": null,
+      "finalBlob": "33c2e79ac062eb349635945a48baebf7e17ac4c4",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-dst.txt",
+      "mainBlob": null,
+      "finalBlob": "41dc5a490471d8aaa4e450dd8c0c4ce8c196cf6e",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-final-backend.txt",
+      "mainBlob": null,
+      "finalBlob": "ff2c065475284658c72336093ef232d6adce0ad4",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-frontend.txt",
+      "mainBlob": null,
+      "finalBlob": "48c37c62728ae38a8c6052dbb91dc59aa580781f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-lint.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-performance.json",
+      "mainBlob": null,
+      "finalBlob": "af366c43296b9aaa87e887bd16615afc4a53602e",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-regressions.txt",
+      "mainBlob": null,
+      "finalBlob": "55052615f6714ddc1457c0a04aa97d4f0ed98518",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-fix-types.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-original-findings.json",
+      "mainBlob": null,
+      "finalBlob": "492983785f3c60d720f931a3b1030e21c4803d99",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-report-dialog-1280x720.png",
+      "mainBlob": null,
+      "finalBlob": "614afc5eb15762d3e6061cd6b19a7bc504d30c15",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/audit-search-selection-mismatch.png",
+      "mainBlob": null,
+      "finalBlob": "5e68e9d98cc50662c7030cfa5f918e03776890f8",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/backend-tests.txt",
+      "mainBlob": null,
+      "finalBlob": "007c26d170154f4c91d1090901fbc927b091f609",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-browser.json",
+      "mainBlob": null,
+      "finalBlob": "3d2c889029262fa3925062dec4e2b05cae89e28b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-checks.json",
+      "mainBlob": null,
+      "finalBlob": "94f4ed54ebc9938838075a1f75f54408c9d1ee75",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-cleanup.json",
+      "mainBlob": null,
+      "finalBlob": "6ae5fb33ea59f8fc021013db09dd3a4200f13276",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-computed-probe.json",
+      "mainBlob": null,
+      "finalBlob": "d6af9056f199c6b9d1935ac51dd1751172fea4a0",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-computed-probe.mjs",
+      "mainBlob": null,
+      "finalBlob": "f754ae8427aaa6b6c758ba4582e65f98166b1be7",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-feature.txt",
+      "mainBlob": null,
+      "finalBlob": "bea9b159d9cebea909b7544b3eb0a847f93a6622",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-feature.xml",
+      "mainBlob": null,
+      "finalBlob": "d1f7a8886ad6aeda911e11f6fa024f955b2de775",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-fixture-error.txt",
+      "mainBlob": null,
+      "finalBlob": "ecd7b44f3a1201eb8bad2c6ee63b88c05e81b367",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-format.txt",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-main-probe.json",
+      "mainBlob": null,
+      "finalBlob": "893eb0dfae3c27d8c5d5705f1f8cd970c04c3f46",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-map-alternate-dark.png",
+      "mainBlob": null,
+      "finalBlob": "cd35976404c99f70f6bc113302d54bbc96fc2430",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-map-alternate-light.png",
+      "mainBlob": null,
+      "finalBlob": "a8f6fff920881dc2b72ce3172a2cdd243ea98bcb",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-restored.png",
+      "mainBlob": null,
+      "finalBlob": "2acc97a9b849e2c0f1b2851cb0c41350709cc920",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-unit.txt",
+      "mainBlob": null,
+      "finalBlob": "0ca74dd2258a4e1c6a13803bb2bcc23ffb1518c7",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/brand-values-unit.xml",
+      "mainBlob": null,
+      "finalBlob": "6f11bb010c36a5e79cb12a01f20b9f7e47bf580c",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/browser-closure.json",
+      "mainBlob": null,
+      "finalBlob": "2df39682df21313ff0add95f595107404c920778",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/browser-outing-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "c7a8beeea99a71c41688d74049fd6d5ea04cb350",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/browser-verification.json",
+      "mainBlob": null,
+      "finalBlob": "88a24e09b8907e972068f977cdc5cece9a6ae163",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/checks.json",
+      "mainBlob": null,
+      "finalBlob": "97cdefbcf203d37fb4fd3d88d8d8e676a65a10a7",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/code-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "475a629d3d075823c36889184ea5a8cccf217b49",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-alternate-normal-window.png",
+      "mainBlob": null,
+      "finalBlob": "bea7796a0aba255e885f10a312e2d1a5922581e3",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-backend.txt",
+      "mainBlob": null,
+      "finalBlob": "59ae2cac7492085f633d310e5a954872770434c5",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-backend.xml",
+      "mainBlob": null,
+      "finalBlob": "1de015c84acb7cc884a9ef96e2861491e322e0d8",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-brand-browser.json",
+      "mainBlob": null,
+      "finalBlob": "e156dd4b4f2c970b1efce256f8c9286ab0ab1bc5",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-brand-fixture.php",
+      "mainBlob": null,
+      "finalBlob": "0f5661f4455a0e9e036438b79be85aff4a548a38",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-brand-template.txt",
+      "mainBlob": null,
+      "finalBlob": "93ad299de9054cc1862dc677ef686435555c5f64",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-brand-template.xml",
+      "mainBlob": null,
+      "finalBlob": "b016988d90e90f89a5a2463e10eee25b24be097b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-build.txt",
+      "mainBlob": null,
+      "finalBlob": "2392082f3e59be34afcf8d889252a62d7668b489",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-checks.json",
+      "mainBlob": null,
+      "finalBlob": "eb13281cde93905317cf8cc2968e84debd6ff5ac",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-dialog-browser.json",
+      "mainBlob": null,
+      "finalBlob": "ce41188796a297a60bc58d37dec9645def254edc",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-frontend.txt",
+      "mainBlob": null,
+      "finalBlob": "5c965b7f47926bc1d40cad852459adcab23bfc5b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-lint.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-main-probe-bootstrap.php",
+      "mainBlob": null,
+      "finalBlob": "22d5ce65eded320df0aa41437c38abd0507e9ddf",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-main-probes.txt",
+      "mainBlob": null,
+      "finalBlob": "ff8e7dc4def52d97dc5fd1b5107ed6db27e28118",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-main-probes.xml",
+      "mainBlob": null,
+      "finalBlob": "2d90133908eb7c3d4ff11ce6fd1ed83899ef46c1",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-midnight-backend.txt",
+      "mainBlob": null,
+      "finalBlob": "22a38af2b3dea3be6cb6102827a1bed2581de045",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-midnight-main-probes.txt",
+      "mainBlob": null,
+      "finalBlob": "75acde9d591c070dbb4dffc167bdc5063af32edc",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-normal-window.png",
+      "mainBlob": null,
+      "finalBlob": "3a0501f5ab92109bea3291ca52d9d4848b021f3f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/correction-types.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/day-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "cc5f66215bc22282181f90d1069a73ccc4121f13",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/day-report.png",
+      "mainBlob": null,
+      "finalBlob": "1a73cf1bef1ea9bc1eed674d8b90bdb95128cb7e",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/final-analytics-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "7cbebf91e374304ed854734778436e2e8806e1e0",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/final-browser-check.json",
+      "mainBlob": null,
+      "finalBlob": "5789fea0d741ee37f04d63cde51b70b6c870b5e1",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/final-map-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "dbb7b5053b665135d1aca22d7bfa5d432769b794",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/fixed-analytics-report-entry-1440.png",
+      "mainBlob": null,
+      "finalBlob": "2e91f638813c4b3d15e98eb67cbc31f277bcf247",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/fixed-outing-export-1280.png",
+      "mainBlob": null,
+      "finalBlob": "f8bfaadc5d7bdd10b758b1469b254f7952949d04",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/fixed-outing-pdf-1.png",
+      "mainBlob": null,
+      "finalBlob": "ef58b4661beda730c8ee231a2f6ad6f85ae40ce8",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/frontend-tests.txt",
+      "mainBlob": null,
+      "finalBlob": "7ff094b4defff9cb482bcb8a903c6a3384d1a90f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/large-report-contact-sheet.jpg",
+      "mainBlob": null,
+      "finalBlob": "e23157f6ab879c985aad72274f6a54f6e372f5dd",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/large-synthetic-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "ea323f1f3784c30ba72965a445da3c72d1fb65dc",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/map-context-menu.png",
+      "mainBlob": null,
+      "finalBlob": "eb717af02b73153e2cd4526e0b87c2c616261ba4",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/outing-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "41edaed913ae67590a8fd54df8235b1fab191700",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/outing-report.png",
+      "mainBlob": null,
+      "finalBlob": "abfb49299d560fc22083b8627970a09b6552d1a3",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/pdf-validation.json",
+      "mainBlob": null,
+      "finalBlob": "81c021db512d1a0b932374bd7830d877fc632217",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/people-cards.png",
+      "mainBlob": null,
+      "finalBlob": "fbe1aad02bd681a3056e06314ee4dbe2c3e0ce95",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/production-build.txt",
+      "mainBlob": null,
+      "finalBlob": "5d4e2af46655ebfcdf4baf670e51044b0e68270b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/reference-hashes.json",
+      "mainBlob": null,
+      "finalBlob": "c4f65fc7d18f3ccd86c7380bd28a19b486dea262",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/v5-people-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "5c817b643fdc2a74916ba5ad92038afdcc39f3d1",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/v5-reference-1440-dark.png",
+      "mainBlob": null,
+      "finalBlob": "9c9f688cdb79a9e6f46279e9efc71a9ab7ba1811",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/v5-reference-1440-light.png",
+      "mainBlob": null,
+      "finalBlob": "40b27c056457d222b0a89f783545953b7a259d4e",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-alignment-browser.json",
+      "mainBlob": null,
+      "finalBlob": "06301096a91eb70c1d6ccf7aef76c1ce6614b361",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-alignment-build.txt",
+      "mainBlob": null,
+      "finalBlob": "3005f4d90b939a26e0dd2c99bf701d358937f563",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-alignment-checks.json",
+      "mainBlob": null,
+      "finalBlob": "5d18f47c0396577d4e803f8a8af5491ab81c48e5",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-alignment-lint.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-alignment-types.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-alignment-ui.txt",
+      "mainBlob": null,
+      "finalBlob": "ca446e2f5652e301f0426c0b7b0fb467c9ae0d23",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-history-map-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "01f875c76591f5c7c3792fdc82f2a1b5eecf36e0",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-implementation/visual-people-1440.png",
+      "mainBlob": null,
+      "finalBlob": "735784a001d3ad6e879a45f51a63c183333a8057",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/REVIEW-HANDOFF.md",
+      "mainBlob": null,
+      "finalBlob": "238ccff1a64252706f7f89bfbf1ada46323f62ad",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/cleanup.json",
+      "mainBlob": null,
+      "finalBlob": "3ced5e6ba0e35d3b7001189dd55da4e9c50090b5",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/frozen-verification.json",
+      "mainBlob": null,
+      "finalBlob": "62d5bf89420eb5fbd13be40ddfd103dda124e4fb",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-backend-complete.log",
+      "mainBlob": null,
+      "finalBlob": "6b43bb71336e64a1d99ffe4a64b06d13aae6890c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-backend-complete.xml",
+      "mainBlob": null,
+      "finalBlob": "d11abaa696f1476feb6a60a4f8417e839c336aeb",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-backend-final.log",
+      "mainBlob": null,
+      "finalBlob": "7a6126c1a37198ad2238257ce3033494628c9cd2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-backend-final.xml",
+      "mainBlob": null,
+      "finalBlob": "910bc3bd359689ebbb13788a935ea3a01d131f7a",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-backend.log",
+      "mainBlob": null,
+      "finalBlob": "917eefa31119545ddf5197a5d40e163a447fb3e2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-backend.xml",
+      "mainBlob": null,
+      "finalBlob": "4f083b1187f651584d98e298ed7bfd4ec021cc97",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-build.log",
+      "mainBlob": null,
+      "finalBlob": "d4a1de2ee64f5149ebecc641b3bc74738c9800b7",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-pint.log",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-test-pint.log",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-types.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/integration-ui.log",
+      "mainBlob": null,
+      "finalBlob": "d31a2fd1ecf4b366d8f15fb53164c4f691963263",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-49e-backend.log",
+      "mainBlob": null,
+      "finalBlob": "768b3f02dcbfa0655ab6f25274df3ed0f54e990a",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-49e-backend.xml",
+      "mainBlob": null,
+      "finalBlob": "a6c5b912fc307a641490afc9d97d787343b9274c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-49e-eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-49e-source-changes.json",
+      "mainBlob": null,
+      "finalBlob": "1fefa13d1d1eabd1102d93ef23bee08e36a3b028",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-49e-types.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-49e-ui.log",
+      "mainBlob": null,
+      "finalBlob": "e111337b189d77e8236c7d77248c0514a8f4b4be",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/reconcile-a6b-eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-approval-pdf.png",
+      "mainBlob": null,
+      "finalBlob": "f7bea8bea6c49797193e3bdb6980dbbdc4288482",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-approval-receipt.png",
+      "mainBlob": null,
+      "finalBlob": "21956156f875ebd7965e75b575285164600fcb8a",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-journal.png",
+      "mainBlob": null,
+      "finalBlob": "9a38d6b91140318af7679539ce32e8c06a810443",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-readback.json",
+      "mainBlob": null,
+      "finalBlob": "28209f053f03ac07e6295d35269d6a53a92df78b",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-self-review-blocked.png",
+      "mainBlob": null,
+      "finalBlob": "3afeeeea5dfd2eb2f513827d698980ae110b67e2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-verifier.zip",
+      "mainBlob": null,
+      "finalBlob": "15be0f49720a852489dcc2bf706e2604862f00ae",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-work-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "127f7469ae6bb7fb1f9f8576d50234a56a4464eb",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-work-note.png",
+      "mainBlob": null,
+      "finalBlob": "dcc293e360bacc356c4e64a76dc722313ae52af8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/signed-in-work-posted.png",
+      "mainBlob": null,
+      "finalBlob": "43590b966eb280ca5d4973e41af45080cc27c1d0",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/source-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "66110038eb4dd17c1b771cc5f3260236ef5b4439",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/local-main/validation.json",
+      "mainBlob": null,
+      "finalBlob": "ddf55293f39a9226aa6c3beb512dc96cc3dcdbd6",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/approval-application-mobile-pdf.png",
+      "mainBlob": null,
+      "finalBlob": "36111073778ce5ce7002b36915065dd586af76f8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/approval-full-shell-dark.png",
+      "mainBlob": null,
+      "finalBlob": "0fa4babb12bb7fe2dc087531984e80c98adbffb8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/approval-quote-preview.png",
+      "mainBlob": null,
+      "finalBlob": "051b67339467b5cb3c1cfef30a6fc75949e4bf49",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/approval-result.png",
+      "mainBlob": null,
+      "finalBlob": "583b71b507e08e8ed77f1dd688009a471436d462",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/approval-review.png",
+      "mainBlob": null,
+      "finalBlob": "0c06c3e961430290c771a51ba90a98fdfd75b86d",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/backend-concurrency-results.xml",
+      "mainBlob": null,
+      "finalBlob": "fd3f3283795425cd4198d8921fbfe3a990543100",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/backend-discovery.log",
+      "mainBlob": null,
+      "finalBlob": "b91d491d4678ea18c4f4824234228efa35dc977e",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/backend-full-results.xml",
+      "mainBlob": null,
+      "finalBlob": "3e69a67d7c8dc4673db1c8fa25bcefa9f07a778f",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/backend-harness.patch",
+      "mainBlob": null,
+      "finalBlob": "351e5b4075f5bdf863ea35a160f4be25413a080b",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/backend-harness.zip",
+      "mainBlob": null,
+      "finalBlob": "666fbddec9c0a5d44b7d7a1c1b136ccc4bed5c5f",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/backend-initial-fixture-failure.log",
+      "mainBlob": null,
+      "finalBlob": "b4e6e93b34eae2fe6c7e3f7a735ab81d27e2dc20",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/batch-partial-results.png",
+      "mainBlob": null,
+      "finalBlob": "019de853b83530d130bf0153541e5298cbfca784",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/batch-review-mobile-dark.png",
+      "mainBlob": null,
+      "finalBlob": "d058f349a6450a6e104f090073d3854bb3327eb8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/bill-application-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "14734612eb509a3c55e6cc61be4f197556586203",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/bill-quote-1280.png",
+      "mainBlob": null,
+      "finalBlob": "30f839e1730c903d7efd9013d57776a34c7e926a",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/bill-workspace.png",
+      "mainBlob": null,
+      "finalBlob": "3d928daf080eb34ca87741e18d9987a305d551ab",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/browser-console.json",
+      "mainBlob": null,
+      "finalBlob": "7e371fb2a552a066db223dad4ff93873ad62ca0b",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/browser-harness.zip",
+      "mainBlob": null,
+      "finalBlob": "d1ffe5bce0035de63f6395ca10691b81f66c2fbf",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-blocked.png",
+      "mainBlob": null,
+      "finalBlob": "c42870aae63dbfae583c88b3f74a9cd626bda29c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-browser-console.json",
+      "mainBlob": null,
+      "finalBlob": "0637a088a01e8ddab3bf3fa98dbe804cbde1a0dc",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-browser-harness.zip",
+      "mainBlob": null,
+      "finalBlob": "b171e2cb2fe13af75adf6074d5f0667ddef49e9e",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-cost-summary-tests.log",
+      "mainBlob": null,
+      "finalBlob": "54e099a05e7bc286b8200d9836de6c28e818e776",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-eslint-cost.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-frozen-verification.json",
+      "mainBlob": null,
+      "finalBlob": "62d5bf89420eb5fbd13be40ddfd103dda124e4fb",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-pint.log",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-production-build.log",
+      "mainBlob": null,
+      "finalBlob": "1af4f839002d2d3119361c9938aa70712998096c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-source-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "4930c187db7ca1e00d22aa186baac6269bb5d991",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-typescript.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/completion-ui-regression.log",
+      "mainBlob": null,
+      "finalBlob": "3dcd849c57081b76b659fb7d93d1090f6d1ae7c6",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/estimate-application-mobile-dark.png",
+      "mainBlob": null,
+      "finalBlob": "e27f826b9d330abeede0f55761b78a3e59f5c48e",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/estimate-review.png",
+      "mainBlob": null,
+      "finalBlob": "46b74ed77a3970cf61baa908d8039bebfa7dceff",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/finance-event.png",
+      "mainBlob": null,
+      "finalBlob": "517633772f15c4e19710a4f5d06e064459bbf3f7",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/finance-queue.png",
+      "mainBlob": null,
+      "finalBlob": "e70d881df77918204af47089e3236077f541ad5a",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/frozen-verification.json",
+      "mainBlob": null,
+      "finalBlob": "4ff2d3299ad43a793e9f34c03720ee34cfb701fa",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/journal-application-1280.png",
+      "mainBlob": null,
+      "finalBlob": "6614642ecd5803d8f9e28dbcfc0d7449b3c2a46c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/journal-application-mobile-dark.png",
+      "mainBlob": null,
+      "finalBlob": "737d0f52b929a2bf488be994996b94d8be4c3eb9",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/journal-application-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "628a13d4fc916003df456f8e44db8471b719bc12",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/pint-final.log",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/pint.log",
+      "mainBlob": null,
+      "finalBlob": "4a9c88a11372d6c6273c953143c0b9391ed4f9ec",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/production-build.log",
+      "mainBlob": null,
+      "finalBlob": "dd43001922cccbcbb133959d9f46f004145bdadd",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/queue-application-desktop.png",
+      "mainBlob": null,
+      "finalBlob": "cf9a2827fa26c30151cb1a77b64db1e981da3e83",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/queue-application-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "f20a1ad43837e189763be07fa0735e023cd0d21c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/source-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "da01a1bd9806c0707c62ff18ac341ccff8c65c59",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/typescript.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/ui-regression.log",
+      "mainBlob": null,
+      "finalBlob": "464b7c1537de36c874b9874ae01f7b4f647c9c26",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/validation.json",
+      "mainBlob": null,
+      "finalBlob": "d5e7a8b807411327a6ab6bf3ee962a947de9cd44",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/work-application-1280.png",
+      "mainBlob": null,
+      "finalBlob": "85856c64e4e0dc547a4a62151d24c60cef468d95",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/work-application-1366.png",
+      "mainBlob": null,
+      "finalBlob": "ac8a36c2ea69d67afe1b65349998e7adf3df4a1f",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/work-application-dark-1280.png",
+      "mainBlob": null,
+      "finalBlob": "9d5cd10539d8148897458a7086109697dfd05d1b",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/work-application-mobile-dark.png",
+      "mainBlob": null,
+      "finalBlob": "5d724d92d735972b2fc4e5ca1ec88c9a23719153",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/mockup-implementation/work-cost-evidence.png",
+      "mainBlob": null,
+      "finalBlob": "e466f1b7c2883a7c79fe5ad3bb184b06dbe44adf",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/COMMANDS.md",
+      "mainBlob": null,
+      "finalBlob": "ecef795ce130f42d87bd7168c9859ad0507981cb",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/REVIEW-PACKET.md",
+      "mainBlob": null,
+      "finalBlob": "ac5305737ee345a4874e08246728b7b43f35dca8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/asset-review-decisions-1440.png",
+      "mainBlob": null,
+      "finalBlob": "2d41c55dc0055261cdd0dc67d4fcd5bedf062466",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/asset-review-pdf-1440.png",
+      "mainBlob": null,
+      "finalBlob": "42ebada22c87e210ac2c8c531a0da28a0a470627",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/backend.log",
+      "mainBlob": null,
+      "finalBlob": "234b7f90fe332db40f80142c5c86dd8f5434eaa9",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/backend.xml",
+      "mainBlob": null,
+      "finalBlob": "de22fe62f083c7718a215c8039e10710f183ede8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/bill-approval-pdf-1280.png",
+      "mainBlob": null,
+      "finalBlob": "651bffbf6c5a90a5f22a723207b8c8828cccdef6",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/browser-results.json",
+      "mainBlob": null,
+      "finalBlob": "bb0622c416258e068449c626aca0a79ea11591df",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/build.log",
+      "mainBlob": null,
+      "finalBlob": "de44e84f1eb37e3bd7e4e024f4af1b5d07578022",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/cleanup.json",
+      "mainBlob": null,
+      "finalBlob": "9710d0cdd4e40ebec15a9253bf84ded06a2b3986",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/frozen-verification.json",
+      "mainBlob": null,
+      "finalBlob": "0a4455f49fa05db1d34e56b6f85069efaf1804e2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/main-context-readonly.json",
+      "mainBlob": null,
+      "finalBlob": "e86904bd8a152b17761c54ba761b3bc3cfb27b34",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/maintenance-cost-1280.png",
+      "mainBlob": null,
+      "finalBlob": "94dbf2e7403f95cd7f147aad6a432566a6728bb1",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/pint.log",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/read-only-references.json",
+      "mainBlob": null,
+      "finalBlob": "b2edadf366a6a3fb21cabfb549bc90ad4dfb916e",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/source-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "0d35be894169f0c7e6b0145130e46f633e9128c1",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/types.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/ui-initial-environment.log",
+      "mainBlob": null,
+      "finalBlob": "3bad53ae588b7899f80590f75eb993a121c44fcf",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/ui.log",
+      "mainBlob": null,
+      "finalBlob": "c1cb110e5a84d551d9c1b462dfc2a3963e43e3ae",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/validation.json",
+      "mainBlob": null,
+      "finalBlob": "47455883aff4da7bedb4e35e02774bf14413a364",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-03/programme-integration/visual-verifier.zip",
+      "mainBlob": null,
+      "finalBlob": "3c7a934193c5aec44d746bd9c6537e9eddc11fe8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/.gitignore",
+      "mainBlob": null,
+      "finalBlob": "0f2fa904505f444585c9d287de8d3336c0d2e557",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/README.md",
+      "mainBlob": null,
+      "finalBlob": "a07781369562f2967775ec1a1aa03daf432490c3",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser-bootstrap.php",
+      "mainBlob": null,
+      "finalBlob": "2d216442276acc4c201d1b20bc34fbdef656a44c",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser-device-fixture.php",
+      "mainBlob": null,
+      "finalBlob": "71b605a5b8f3083f376fcc51c30340c82669302c",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser-map-fixture.php",
+      "mainBlob": null,
+      "finalBlob": "41db4f34cf5a0088a0c68df5c213420e116b5509",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser-router.php",
+      "mainBlob": null,
+      "finalBlob": "d7a01a9343cd47507ce6c4f7b771875e11b014ec",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser-verification.json",
+      "mainBlob": null,
+      "finalBlob": "9db60c9976030eb9549f45b0f2cdbb1b46f92fd2",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/canonical-import-light-1440.png",
+      "mainBlob": null,
+      "finalBlob": "742d156e6fbeb9ff9ef0c1919a6fd9e7e5d865bc",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/dry-run-light-1280.png",
+      "mainBlob": null,
+      "finalBlob": "e61d77ffaf32c9823218b258684bf8da9a3048e9",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-notifications-dark-1366-bottom.png",
+      "mainBlob": null,
+      "finalBlob": "3addcd5e43ee3815d87a9d11ec61786c3c25479f",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-notifications-dark-1366.png",
+      "mainBlob": null,
+      "finalBlob": "e62eb5039fbeec86a1ade9b19c4766a24fb49278",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-notifications-light-1280-bottom.png",
+      "mainBlob": null,
+      "finalBlob": "9336a76d67e028ca72c9f690ea70970ba196075e",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-notifications-light-1440.png",
+      "mainBlob": null,
+      "finalBlob": "6b94de574d3d899bd0d627db7eda45ab81e12815",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-preview-dark-1366.png",
+      "mainBlob": null,
+      "finalBlob": "474f67842d7fa16635bbb6a8d9a154bdb14f4a46",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-preview-light-1280.png",
+      "mainBlob": null,
+      "finalBlob": "cba7ffb7d7fc930b0bd7c91b83f5e824910ad944",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fidelity-review-light-1280.png",
+      "mainBlob": null,
+      "finalBlob": "a7695d0affcb07f31c3a81a220a6394351c5e181",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/fleet-map-repaired.png",
+      "mainBlob": null,
+      "finalBlob": "f18ee86e26918d48add9ec6e0a627197fe268952",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/map-capabilities-dark-1280.png",
+      "mainBlob": null,
+      "finalBlob": "c043f798fd1c2a24bd5dc2d1ef7d81fdc5ae4148",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/map-provider-fallback.png",
+      "mainBlob": null,
+      "finalBlob": "cdd497291e582a57cbaebcd71ccd2ecea18123dc",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/map-validation-light-1280.png",
+      "mainBlob": null,
+      "finalBlob": "78d6d77a6df25a78ea2181da71b596958c39c48d",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/notification-preview-dark-1440.png",
+      "mainBlob": null,
+      "finalBlob": "2d8ff85e66aa4e94095cd8e5208a0c035f0e4c3b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/notifications-dark-1366.png",
+      "mainBlob": null,
+      "finalBlob": "b1efe4237acc7a1ec1031c8540414f4d09e78c1b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/notifications-dark-1440.png",
+      "mainBlob": null,
+      "finalBlob": "38d0c832a557de436793b769d1cfce431a1c169e",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/notifications-light-1280.png",
+      "mainBlob": null,
+      "finalBlob": "809cad7b524c1fc046009b5da571cb8be202a35f",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/notifications-light-1366.png",
+      "mainBlob": null,
+      "finalBlob": "dd97b2a7fef775795bfcfec2e544841613e86eaa",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/notifications-light-1440.png",
+      "mainBlob": null,
+      "finalBlob": "a7a45489966059cdae069586a1644bb6daff0d87",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/permitted-device-dark-1440.png",
+      "mainBlob": null,
+      "finalBlob": "ba5f956cc3d95179c9f975d0b0833af4bb357686",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/settings-implemented-final.png",
+      "mainBlob": null,
+      "finalBlob": "876c514fb2902c797911589281108549f0d44c18",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/tracking-dark-1366.png",
+      "mainBlob": null,
+      "finalBlob": "c8616a3dffdad2051023c14c0e0fb0ab5e870c4a",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/tracking-policy-light-1280.png",
+      "mainBlob": null,
+      "finalBlob": "bb439403b1ab01441b599134360810f6e7e2df1e",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/vehicle-location-repaired.png",
+      "mainBlob": null,
+      "finalBlob": "d4c089c4515070147f01a0b79050c1314909280a",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/browser/vehicle-trip-repaired.png",
+      "mainBlob": null,
+      "finalBlob": "c79c6889664444b3a650d869a18aaa9075fdf2ac",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/build.txt",
+      "mainBlob": null,
+      "finalBlob": "65d006a3ae9e5b32c00ee071c8ef4fa232f05251",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/device-scope-check.json",
+      "mainBlob": null,
+      "finalBlob": "92484b542033f35d5c851b612bd32498a890b11b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/eslint.json",
+      "mainBlob": null,
+      "finalBlob": "3dd7e64006f11d39ca5b1e51f1948a51b15dd73e",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-browser-verification.json",
+      "mainBlob": null,
+      "finalBlob": "3eb8bdec4ab1a72c0d12caf6fbd9a00a83b4c986",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-build.txt",
+      "mainBlob": null,
+      "finalBlob": "e6bae9599efe9449c7a57f4f85b5da5f501b989d",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-eslint.json",
+      "mainBlob": null,
+      "finalBlob": "30c22980857d2e26510c3a0227bd45da39293f32",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-frontend-tests.json",
+      "mainBlob": null,
+      "finalBlob": "0e81519d41f5e2d2c4c788b265fb6af476fb8af0",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-preservation.json",
+      "mainBlob": null,
+      "finalBlob": "2b1b207bddac7154d23f326b4607dc59fd1b695c",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-qa.json",
+      "mainBlob": null,
+      "finalBlob": "077c57d57e7594c57a0fd0c6c92c11a4268ba7da",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/fidelity-typecheck.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/frontend-tests.json",
+      "mainBlob": null,
+      "finalBlob": "42bb7f5dc0be6ea94cf7203322155077283af606",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/legacy-notification-tests.xml",
+      "mainBlob": null,
+      "finalBlob": "3a0e4b885d637e5ce26c49ed088b55068c440b9b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-fixture-result.json",
+      "mainBlob": null,
+      "finalBlob": "291a95310f1c8a79ef81ae56054c6cb12982dcc1",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-layout-fixture.tsx",
+      "mainBlob": null,
+      "finalBlob": "07f31f49907c330d5792be280821204dae74931f",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-layout.html",
+      "mainBlob": null,
+      "finalBlob": "ededee410dc8a9ac12986db819a61165fcb12e44",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/map-sdk-fixture.ts",
+      "mainBlob": null,
+      "finalBlob": "801e8887c05af1905f2d3f1b07695f9a4ad6a87b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/preserved-previews.json",
+      "mainBlob": null,
+      "finalBlob": "3d6dabfb3d1fd0a2253fd7aeacac7b40cf2359b4",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-build.txt",
+      "mainBlob": null,
+      "finalBlob": "1fdb78a9a892163d55bbfb85065fe90512aa5c47",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-eslint.json",
+      "mainBlob": null,
+      "finalBlob": "c8fd84dc23c2a95156a502f23a988b6c00f7ef48",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-frontend-tests.json",
+      "mainBlob": null,
+      "finalBlob": "b7481540d825e669aeacc23b32a5f2a42f36b4eb",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-populated-maps.json",
+      "mainBlob": null,
+      "finalBlob": "2e130b63aeb1db2a2aad75976110747461f9198a",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-preservation.json",
+      "mainBlob": null,
+      "finalBlob": "0519220ca018cd9dc8f14a04b5383fabece072be",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-rendered-map-results.json",
+      "mainBlob": null,
+      "finalBlob": "049c63422ee2ea0a24019674c034591df9744e4e",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-typecheck.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/review-zoom-blocker.json",
+      "mainBlob": null,
+      "finalBlob": "571cdf654674a95556f6a073a8cedbc42624ee22",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/settings-tests.xml",
+      "mainBlob": null,
+      "finalBlob": "879715a85dbc30fd4bd822f0eb912c0ded2a4376",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/source-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "3e1c84c54837c5f5b5f3170619def3e8c81b8fcd",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/typecheck.txt",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/vite.map-regression.mts",
+      "mainBlob": null,
+      "finalBlob": "d823ed78377dc9d5c7fbebeba3dbcc52e0163117",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-08-implementation/vite.settings.mts",
+      "mainBlob": null,
+      "finalBlob": "2df34c92d068e5775bafe7eab0aa19c169c40bc0",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-builder-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "421ec35dd5e7f54cc829eca428885660dedfd560",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-builder-populated-final-1366.png",
+      "mainBlob": null,
+      "finalBlob": "16f6f613b6a35cab0bd543edff997da5deda49cd",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-calendar-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "7ed3bf6844625d5f8a605a760e4ba670e9a260b1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-client-report-1366.png",
+      "mainBlob": null,
+      "finalBlob": "eca6e51feea40d43ff92eb9944556449837fb8fb",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-export-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "794f96195ff51b30f7d2ea6221aee337a1f61a63",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-grouped-filters-1366.png",
+      "mainBlob": null,
+      "finalBlob": "9f6008c8d62f753b7594367f10f8a94e104ab065",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-library-mobile-final.png",
+      "mainBlob": null,
+      "finalBlob": "e2450d34d8b1bd7a53bfc18a294e065832face6a",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-pivot-1366.png",
+      "mainBlob": null,
+      "finalBlob": "a4d0f8c7643c145da0146b74903cdbbfb219e8ec",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.csv",
+      "mainBlob": null,
+      "finalBlob": "af5ad85568a3fb93abdc0d3012c7832af36d3f47",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.json",
+      "mainBlob": null,
+      "finalBlob": "1f64afd2dfa746ce3a626f9c4befb544a53b5fe6",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "0101331ef1e6ee5d7a622edf58e7eba318158cb2",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-report.xlsx",
+      "mainBlob": null,
+      "finalBlob": "0e2834dfc6a5e97b96869f9e233624707657228f",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-source-evidence-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "3e23c21ecb2aa20983b7823d77d8fd4c0e14a330",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-staff-report-1366.png",
+      "mainBlob": null,
+      "finalBlob": "bb849699d9dd325b75e9427fb16f61d46271b3cd",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/app-stale-export-1366.png",
+      "mainBlob": null,
+      "finalBlob": "f03eecb6630a5dca17e78c3f3c69c25cf80d18e4",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/browser-checks.json",
+      "mainBlob": null,
+      "finalBlob": "4eb34e84fea279db8f21f112bad5ba96e1ca920e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/browser-inventory.md",
+      "mainBlob": null,
+      "finalBlob": "b1ed683ed98bcdaa366a91e2bda00ff783200022",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/build-identity.json",
+      "mainBlob": null,
+      "finalBlob": "9bcafed7b32787c31f860aeb9641e2fe8ab2e443",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/database-cleanup.log",
+      "mainBlob": null,
+      "finalBlob": "8ca06b8556b416927d480c329254eb81c1db5528",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/eslint.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/final-tests.log",
+      "mainBlob": null,
+      "finalBlob": "8935fca18e8d4c1ed8602ceb2ce18b7b05ac0346",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/final-tests.xml",
+      "mainBlob": null,
+      "finalBlob": "7c1b57545f0d7fb7a987ef0292bbc2120ec1e672",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-database-cleanup.json",
+      "mainBlob": null,
+      "finalBlob": "76e29da8b9032ee9d7dca86ff6afdca3cd331436",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-tests.log",
+      "mainBlob": null,
+      "finalBlob": "f06b5e798bdd3d4ee1ee3393f6f8318491bc6bc1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-tests.xml",
+      "mainBlob": null,
+      "finalBlob": "dcf7dfb9594059a1be6025a481d4151f81004173",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/fixture-verification.json",
+      "mainBlob": null,
+      "finalBlob": "c2c04f3e21628d11245bf27e6a60761fbd5be200",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/mockup-builder-1366.png",
+      "mainBlob": null,
+      "finalBlob": "226d461eab6e094018485077dd21e8813d8ac29b",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/payload-test.log",
+      "mainBlob": null,
+      "finalBlob": "71ba47b0436637949aec181ce3b70dc836035c10",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/payload-test.xml",
+      "mainBlob": null,
+      "finalBlob": "e49f91ce1f1f97d1d650503c2d859d35182082c0",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/pint.log",
+      "mainBlob": null,
+      "finalBlob": "5a0026db97add6a30d3ab2b19bd15ad809e5a254",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/privacy-tests.log",
+      "mainBlob": null,
+      "finalBlob": "8bcfc946485328163413278b8ca4d1c0dd42e560",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/privacy-tests.xml",
+      "mainBlob": null,
+      "finalBlob": "e1152cf3c32b3a8ed4a15950fb3c2b62d195dec4",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/production-build.log",
+      "mainBlob": null,
+      "finalBlob": "9769fc3770b63d264c82e64e1916f77c389b9195",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/resource-tests.log",
+      "mainBlob": null,
+      "finalBlob": "09b006f39dd6ee06ff9968a845b09e6db459301e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/resource-tests.xml",
+      "mainBlob": null,
+      "finalBlob": "b77737715fd4e67461ca8f7d80827ed30b865199",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/test-summary.json",
+      "mainBlob": null,
+      "finalBlob": "bfb642f80ffe4f625ae2e0f3b0314a204ae4ed89",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/corrections/types.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/QA-INVENTORY.md",
+      "mainBlob": null,
+      "finalBlob": "55897ab48d589db8f0d7b53c875a1e0454fde307",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/acceptance-verified.log",
+      "mainBlob": null,
+      "finalBlob": "d3230eb334a0f8be0c5980d4c36afce96ef2d37e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/builder-dark-verified-1366.png",
+      "mainBlob": null,
+      "finalBlob": "934a67e8b05bb76f99750cd853439d71455d9a24",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/builder-mobile-verified.png",
+      "mainBlob": null,
+      "finalBlob": "03f3d96b18aa0a3e6fe5d049ee2614a9edcf8ef4",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/builder-verified-1366.png",
+      "mainBlob": null,
+      "finalBlob": "6fc68c93ed27c323b2af686c3f9b1bf8a49f45ba",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/calendar-mobile.png",
+      "mainBlob": null,
+      "finalBlob": "8024ef45c47d5e40333761549d84e7ca9eafd941",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/eslint-final.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/export-dark-verified-1366.png",
+      "mainBlob": null,
+      "finalBlob": "56009e30ef482aa304f7477f65207595a26b9415",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/fidelity-evidence.json",
+      "mainBlob": null,
+      "finalBlob": "9374a44e97e0af153dc6675dfe3e7a939fa457bb",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/grouped-filters-1366.png",
+      "mainBlob": null,
+      "finalBlob": "3c1df58fb4a5b9effab33e7f5cdaedebb79f0d12",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/grouped-summary.csv",
+      "mainBlob": null,
+      "finalBlob": "0ad03b7714998179ce2a19c0929419d902f0287e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/library-verified-1366.png",
+      "mainBlob": null,
+      "finalBlob": "24146f9ecd1619fc865d9c97433e09f7ddebe4db",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/production-build-final.log",
+      "mainBlob": null,
+      "finalBlob": "9da4763b35727ec5921f26a98ae573f5018458bd",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/types-final.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/fidelity/weekly-chart-1366.png",
+      "mainBlob": null,
+      "finalBlob": "b20813002bfcd6d349c8c3b3cdfa68318bebb6b0",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/accessibility.json",
+      "mainBlob": null,
+      "finalBlob": "cfd47efdff360da8e57375945f85c93486ea8431",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/browser-qa.json",
+      "mainBlob": null,
+      "finalBlob": "acc44712c92f09eba44b4b13e40b1355cbe05eac",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/browser-summary.csv",
+      "mainBlob": null,
+      "finalBlob": "ccfc5dabd0248d9eecc80f086a2d7cda98c1991a",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/builder-dark-final.png",
+      "mainBlob": null,
+      "finalBlob": "0a0a7d3a251ee6397bcb4e02863af9b0d9b27cc1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/builder-data-1280.png",
+      "mainBlob": null,
+      "finalBlob": "92000a166eade8cd6363462cf0c49a95f7e3a1cb",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/implementation-evidence.json",
+      "mainBlob": null,
+      "finalBlob": "b81eaaf99f21769dc69f99846495a488266c882c",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/layout-verified-1.png",
+      "mainBlob": null,
+      "finalBlob": "19d3b8530259f40dbcf307c35d85c27012e0e04b",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/layout-verified-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "22e5b75961c4a4be082367214f203445269c0616",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/pivot-result-1366.png",
+      "mainBlob": null,
+      "finalBlob": "02219dcfcf8534c0e50af87d92c72a901ddd0971",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/render-final-pdf.php",
+      "mainBlob": null,
+      "finalBlob": "7ae191575312cbd07c19096c573feada171ccc41",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-acceptance-tests.log",
+      "mainBlob": null,
+      "finalBlob": "00546ee420fbc1749d29ea60128f4a37f4ef5785",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-baseline.log",
+      "mainBlob": null,
+      "finalBlob": "04fd200498452dc41f27c8c35ae4b5cb560eb54d",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-build.log",
+      "mainBlob": null,
+      "finalBlob": "0a7b040537cb64618e2122ef9eb57faec01facde",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-eslint-final.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-export-final.log",
+      "mainBlob": null,
+      "finalBlob": "e14aa2055c45fa3f8d77a917b799e8d4acd2902f",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-scope-tests.log",
+      "mainBlob": null,
+      "finalBlob": "5d13f8e182cebed577cdba93c8d34ce71d3b8b33",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-types-final-generated.log",
+      "mainBlob": null,
+      "finalBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/synthetic-report.pdf",
+      "mainBlob": null,
+      "finalBlob": "ba47f9775965affa1d9aa8341e1240f03a7a0999",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/synthetic-report.xlsx",
+      "mainBlob": null,
+      "finalBlob": "2528dc9b0135f7fd629bcba6bdfdb54a21b7a231",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-09B/implementation/time-series-final.png",
+      "mainBlob": null,
+      "finalBlob": "b0fa85ae262ababfc0ed4699c57ee95b7a8fe03d",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.css",
+      "mainBlob": null,
+      "finalBlob": "58517e914eb41396b3b0ae6a496a1931a9194543",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.js",
+      "mainBlob": null,
+      "finalBlob": "02e246b16e145870189151f072e2595e03fd7148",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/app.tsx",
+      "mainBlob": null,
+      "finalBlob": "e9eb63b786aa6dfd1a192e91bcc783ea67c8ba1f",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/build-inputs.json",
+      "mainBlob": null,
+      "finalBlob": "c20b3eb76957cc1a8b297347c4b30e5302a81c50",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/build.mjs",
+      "mainBlob": null,
+      "finalBlob": "2b107d83768350f2e021b5d6ff712207db610579",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/fixtures.json",
+      "mainBlob": null,
+      "finalBlob": "1488e7ce03187dfead5776e67908d85df95afec7",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/index.html",
+      "mainBlob": null,
+      "finalBlob": "b3a98a0ffb49157f69f43790790ab3edfdde82ce",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/layout-stub.tsx",
+      "mainBlob": null,
+      "finalBlob": "812bb0e0d481e940525f07d7b1d1084a91d594bf",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/preview-shell.css",
+      "mainBlob": null,
+      "finalBlob": "1503b1a1f748a0ad5e7999e94631ea31d1cbfca9",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/preview-shell.tsx",
+      "mainBlob": null,
+      "finalBlob": "ba17fceab3330b93534d20345d2f52fe8a1fd94f",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/server.mjs",
+      "mainBlob": null,
+      "finalBlob": "62a7a86169c7ce63c357a99ed46ddbbd01faccbe",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-09B/implementation/synthetic-api.ts",
+      "mainBlob": null,
+      "finalBlob": "3009f09079f5a1b9f118ea08da37123b21c550bd",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/OPERATIONAL-REPORTS-IMPLEMENTATION.md",
+      "mainBlob": null,
+      "finalBlob": "36324d7bb82cc3c6b3c8eff81beb00882ac47d72",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/CORRECTIONS.md",
+      "mainBlob": null,
+      "finalBlob": "b3c21ac4dce53ab7a71fb3131a0641f5ccc4102e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/FIXTURE-CORRECTION.md",
+      "mainBlob": null,
+      "finalBlob": "27cf8b84fdfc136bccc244ba8f75d34eaf9683f7",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/README.md",
+      "mainBlob": null,
+      "finalBlob": "f896f0e859e0fa4100611dcd2fc79acfe9e6b498",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/commit-allowlist.txt",
+      "mainBlob": null,
+      "finalBlob": "7b107a4c2cac6bedda590a84b2053bea30a6453e",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/correction-allowlist.txt",
+      "mainBlob": null,
+      "finalBlob": "08d17d60277cf1b10f2ecec4d30d5b36845ac940",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/correction-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "842a49d7a8b9598b60ab3606cbc25c5045e393af",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/fixture-allowlist.txt",
+      "mainBlob": null,
+      "finalBlob": "c7edce7a999e30318386fbb76202ba8db737d6b4",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/scope-amendments.json",
+      "mainBlob": null,
+      "finalBlob": "2ac20a39d9b51ba04f87b014b753d3552dcf8cf1",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/source-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "3785ab348a8a9e76bec043010a5993abc159e0f6",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/v1-freeze-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "9b9709b212aae87c02cd74a9b35e42dabe7ee7e3",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/v2-01-library-1440-light.png",
+      "mainBlob": null,
+      "finalBlob": "f1591126c6dd00c54e08af0cc0158f410a8798e5",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/v2-02-builder-data-1440-light.png",
+      "mainBlob": null,
+      "finalBlob": "905a656054f76c4995532bae65c67d022cf01723",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "docs/fleet-assets-audit/reports/PKG-09B-REVIEW-PACKET/v2-freeze-manifest.json",
+      "mainBlob": null,
+      "finalBlob": "3714330d7a0abd49664c94c01568d7e896d95fa6",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "package-lock.json",
+      "mainBlob": "d05e379a76769bfd0145e89dc3f8481a37f2e731",
+      "finalBlob": "252d4eb4411911c357c765fdc2eb90e1943d6646",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/css/maintenance-work-record.css",
+      "mainBlob": "b46eb11a3d03084f03102440a84b669da4124446",
+      "finalBlob": "cdd1d3e136ae9701796a3d2e256cdadbd8fb1e5b",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/css/report-studio.css",
+      "mainBlob": null,
+      "finalBlob": "659b489b944c5c120c16586acd4e617294716e0d",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/app-sidebar.tsx",
+      "mainBlob": "fad102ebe75fe27ef4709a7f5bd56ec4c397b534",
+      "finalBlob": "808494c9f1815e5c18c40a9b06451133a77e2011",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/client-location/location-workspace.tsx",
+      "mainBlob": "5ff1ec9cf4089733223c55c2537fb26799a9f851",
+      "finalBlob": "011f7d712c40bc5d4615b5c71695d8ea4709a480",
+      "matchingInputRefs": [],
+      "disposition": "shared integration reconciliation"
+    },
+    {
+      "path": "resources/js/components/finance/bill-review.tsx",
+      "mainBlob": null,
+      "finalBlob": "9a5a82fe8e840dad242aa10e31ba9b5974fa204c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/finance/bill-workspace.tsx",
+      "mainBlob": null,
+      "finalBlob": "176350575b0c01ebb353a5bbb5297bfa965b5bd7",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/finance/document-preview.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "0f8da74cf321a148f4ee6b7e178c907ca7594d7c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/finance/document-preview.tsx",
+      "mainBlob": null,
+      "finalBlob": "e1947e8c3afc858d1d8ca729f84fdd4bf3dcca66",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/finance/new-bill-dialog.tsx",
+      "mainBlob": "676129e6e976bfd94cd0b025f1e9006ea1932918",
+      "finalBlob": "b9a2e4c0a4864668be8772aa0a1e788f70233242",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/finance/record-batch-wizard.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "0cdce7c99146991e40983a2ad2de6476e02948f6",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/finance/record-batch-wizard.tsx",
+      "mainBlob": null,
+      "finalBlob": "742a58e95e775011a96118c28a03bf009e3cc7f0",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "2ace419826ba477ac3f027e3ff0d4643eacba678",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/cost-workspace.tsx",
+      "mainBlob": null,
+      "finalBlob": "89ac6d8cb85821dd7bf7b3eeabcf9052bdae7aad",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-command-results.ts",
+      "mainBlob": null,
+      "finalBlob": "54ffe9e59d8082b2875345ffca0df72a201537bb",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-shared.tsx",
+      "mainBlob": "9bde26c78604df7943d824a36f037a9bc68a87fe",
+      "finalBlob": "b16b849bd4c1320b0af63c2272495051adce9387",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx",
+      "mainBlob": "ddd12ba4f166e3f8ea8910d767a28983cdea053f",
+      "finalBlob": "1c1d16addd997e4c95dfc83e27235642fd91d887",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-studio.tsx",
+      "mainBlob": "85b83e6e02a385cffb30cba7eaa14d27265046ae",
+      "finalBlob": "13821fee0b843cb16224b68c5e1f2fdb782aece7",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-types.ts",
+      "mainBlob": "0c263ceb8994e2b74fca898490c6e061317d6b55",
+      "finalBlob": "47d7c44324680d4319cca1cb0b9d2523230f1be2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/finance-wizards.tsx",
+      "mainBlob": "9bc4648cc40b0430c59d0b4751a703f8c63968cd",
+      "finalBlob": "87f1e7664ed1b243b24632cc8daab2a84375f7be",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx",
+      "mainBlob": "bf3b61d593cbf84a672e7d393f00000debc17487",
+      "finalBlob": "34133a8f845030639a6a644ee09aa0b41b9a17d7",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/record-command.ts",
+      "mainBlob": "a5b311ec404afa8e7a5fed98060ce335803a8049",
+      "finalBlob": "780786fa0e2f035e9c0fd433fba318a633f00d8c",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/vehicle-workspace/wizard-kit.tsx",
+      "mainBlob": "b5a8ffde76b4525ade442b3d8c6446c3ea7868bd",
+      "finalBlob": "44239bd8833abda8bd59d69175b14d80ba0241ae",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/leaflet-map.tsx",
+      "mainBlob": "8bce63c9e2cfc79042a0c41598c98907b8b85449",
+      "finalBlob": "5609e8639db8d786cd57094bac987a279d677396",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/lists/entity-table.tsx",
+      "mainBlob": "0612244a15727196f7333212e12ea5119508f75a",
+      "finalBlob": "6d46cff1efc8673f1e1aac2d6a1d5af84f3a1288",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/maps/google-map.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "21fba45a9cef21e9903c74b2a09c201148a3557c",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/maps/google-map.tsx",
+      "mainBlob": null,
+      "finalBlob": "90dddcef13b83ac580799219ecc7ea2d35f5a9b6",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/maps/google-sdk.test.ts",
+      "mainBlob": null,
+      "finalBlob": "ee245d421fc9bbc5f812d8754b8d4ba29d81280f",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/maps/google-sdk.ts",
+      "mainBlob": null,
+      "finalBlob": "93df88d19df44baadd928d8131c426e673d8d219",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/page/page-header.tsx",
+      "mainBlob": "21e816f03ee947778c5cd8997dcd8bf097d1d12f",
+      "finalBlob": "30ba7cd3ca254a8302af83730880dd9a928f68ca",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/analytics.tsx",
+      "mainBlob": null,
+      "finalBlob": "7766d7569396b599df01aa7c387abcbaff66d167",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/device-evidence.tsx",
+      "mainBlob": null,
+      "finalBlob": "f8cea15556b5096977d736b2802a3b58f8649cef",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/history-panel.tsx",
+      "mainBlob": null,
+      "finalBlob": "fc905d8fb6f48877643da91bd0b1723a33aa3625",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/model.test.ts",
+      "mainBlob": null,
+      "finalBlob": "edfe37cfd8dd4c0ba35f65690bc5f5aa62af585b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/model.ts",
+      "mainBlob": null,
+      "finalBlob": "aa88ccd53bf51b98b81edb2f803b1dd9ff93fc31",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/people-map.tsx",
+      "mainBlob": null,
+      "finalBlob": "edc880ff88099c8957ecee22bc902d95f4741e10",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/people-view.tsx",
+      "mainBlob": null,
+      "finalBlob": "c86dee8153eb0cd8bfd06d1842c02e13b5cd7eb2",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/preferences.tsx",
+      "mainBlob": null,
+      "finalBlob": "4c449fdae659deac4cbcae763a3648b899ff7fe3",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/record-picker.tsx",
+      "mainBlob": null,
+      "finalBlob": "2c65fcc933cb55923cc927e4c407a8bf80a605fd",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/report-dialog.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "95ba031eda068b373db60856fe16d835988cb806",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/report-dialog.tsx",
+      "mainBlob": null,
+      "finalBlob": "be073b9a95c7a0477e98330a43f7d658ef3c8057",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/request.ts",
+      "mainBlob": null,
+      "finalBlob": "3468069b941e5e7008bf7a5b1f6dd3cb0f1f4ef7",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/responses.tsx",
+      "mainBlob": null,
+      "finalBlob": "93715cf532ecfc49618b6e3c921802e458ed2b53",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/people-locations/workspace.css",
+      "mainBlob": null,
+      "finalBlob": "1dcb9c09528bcb9fe76755752e397e4d38012d6a",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/components/user-menu-content.tsx",
+      "mainBlob": "96d86a5bcd22d75ef843291c324688d1612ff15d",
+      "finalBlob": "0de75663e7bdbefa37fc5b653b24bdbdc9a46b11",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/lib/fleet-navigation.ts",
+      "mainBlob": "4a6d711ff3e1aa4d9d03b1c35f4a9aabe1c92ee9",
+      "finalBlob": "3dafb673538f479345719d6e67ad54c8f981d3d4",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/control-room/show.tsx",
+      "mainBlob": "c0efd4f6eaf338599cc9faa1ae6e11930adbe606",
+      "finalBlob": "993cc38869cc26f4e56234e5bb3faa4793c2b7fa",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/bills/Index.tsx",
+      "mainBlob": "1b216ae661ce835394c2aa6e6970cc00f336c409",
+      "finalBlob": "a693742cbdbdcacd3f9c6590de493b43ac633560",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/bills/Show.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "dfa496db12e17a9905d0de3be0c9685ec96e7ee6",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/bills/Show.tsx",
+      "mainBlob": "5cd9c802f79cd488b882329b4f8a328c9bc6068e",
+      "finalBlob": "248d01ea32188f217040741b3df59ea69181defd",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/journals/Show.tsx",
+      "mainBlob": "e08c2b66d5010fea20ef070fb19edcd7f5a76561",
+      "finalBlob": "b2ca846211030a4106cffe8333e2c5ed5fa4a412",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/vehicle-reviews/_dialogs.tsx",
+      "mainBlob": "376fa1c1cd5026e2bd9a244521a7856a519be54c",
+      "finalBlob": "679f2097b9ad5748ded49be6d79ab35015f95ec5",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/vehicle-reviews/history.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "de4940e1b5a37991d3f1c07c1ca6fa3384fad432",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/finance/vehicle-reviews/index.tsx",
+      "mainBlob": "eb5e8e66804d88af56a679c6d00764639437fd32",
+      "finalBlob": "96ca3ec8200bd50fc37d0b70864ddda170c04c98",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "mainBlob": "3d4322e85bf4c4e95ec48b525d4cc7d22f0ebf68",
+      "finalBlob": "6ea689d4b3af6bc0239c6a095561ae12a28f62af",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "mainBlob": "4442c9613f7cdf9c5c61c1c42cd2790b432cf87c",
+      "finalBlob": "bfa185f48c6f8a9306b19f51851a93a7d6974fe7",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/reports/index.tsx",
+      "mainBlob": "cbfb7de831bea8d8f855c80583cdc55d30574b1e",
+      "finalBlob": "f93bcc36396cb75e864b76fa058005f290794bbd",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_map-tools.tsx",
+      "mainBlob": null,
+      "finalBlob": "81daebc51e6979a04f90a23becb565b12b2af26b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_maps.tsx",
+      "mainBlob": null,
+      "finalBlob": "eb086facf90d87592c16188134dc1a05d6cf9373",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_notifications.tsx",
+      "mainBlob": null,
+      "finalBlob": "813576c7966de4509efda3d754941a771eb0857d",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_owners.tsx",
+      "mainBlob": null,
+      "finalBlob": "4822a23cc10ab965727493c0f6515ae6bd427a80",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_types.ts",
+      "mainBlob": null,
+      "finalBlob": "b3e8ebeae4810200f37958431c3de37ceecda640",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/_ui.tsx",
+      "mainBlob": null,
+      "finalBlob": "98d28ddaa04d5d25f1f784d044bf32be07425a73",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/index.tsx",
+      "mainBlob": null,
+      "finalBlob": "a835c6c861edcdb0639651bdf44e2608c81c8fba",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/notifications.tsx",
+      "mainBlob": "1d317fbba7e52878682dd7a94839c625c9a451d4",
+      "finalBlob": "bbf81514332ee70d6b018d16f3ce52b1b4e83699",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/settings/settings-draft.test.ts",
+      "mainBlob": null,
+      "finalBlob": "95ab55c0c5ff99c8c034a2b402c44f4f86796155",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/health-safety/lone-workers/index.tsx",
+      "mainBlob": "49cab29ceeb9eaab8feecb144a86aede002bf559",
+      "finalBlob": "dc02229e92ab3b176dcb39b321817ccca561a480",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/my-day/index.tsx",
+      "mainBlob": "836db619c57538c10d54325203db3e9f16337b1c",
+      "finalBlob": "64d016a3157526a9c6f777a006c59a26857d31c9",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/operations/people-locations/index.test.tsx",
+      "mainBlob": null,
+      "finalBlob": "9e8672ae94926d95e6e17a9c432f51ab7db24c23",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/operations/people-locations/index.tsx",
+      "mainBlob": null,
+      "finalBlob": "58dc8cec3fe1ff1141b3bccbe85ad543e318866c",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/reporting/_dialogs.tsx",
+      "mainBlob": null,
+      "finalBlob": "f6ae230a9401377445b136f5616a1f48e0f6bff0",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/reporting/model.ts",
+      "mainBlob": null,
+      "finalBlob": "02ac3d266e7307f827f0a6121bdee58e2fd039e2",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/reporting/studio-controls.tsx",
+      "mainBlob": null,
+      "finalBlob": "c359813d2b9599aceac78b36ee0fabeed9afbabe",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/reporting/studio-library.tsx",
+      "mainBlob": null,
+      "finalBlob": "200747ee4396e1819c268f6d7cec51530319a37a",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/js/pages/reporting/workspace.tsx",
+      "mainBlob": null,
+      "finalBlob": "79f517e10c7250212a8813ef5644512749656c56",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/views/app.blade.php",
+      "mainBlob": "fc9533a206fc006fde0638408149949de5c4ea46",
+      "finalBlob": "55c59165fdbac4722df64755e11f7d2fa8eb974d",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/views/pdf/operational-report.blade.php",
+      "mainBlob": null,
+      "finalBlob": "0e64a8f687f25249bf4fb2b9db16f31987c32c2f",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/views/pdf/people-location-report.blade.php",
+      "mainBlob": null,
+      "finalBlob": "69b802ce5cf40b48bd1faeb8ca8a81a076549b5b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/views/pdf/report-styles.blade.php",
+      "mainBlob": null,
+      "finalBlob": "442b932b0d74ea794f5b4ccb5e4980e6d8fd89d1",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "resources/views/pdf/vehicle-trip-report.blade.php",
+      "mainBlob": "a4bfeae9d96e7f24e0112fe47d588cbab5ac569e",
+      "finalBlob": "4259865dcfc66a9205dc4b1b33a4db446e9bcd58",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "routes/console.php",
+      "mainBlob": "cf07890c3828f65dd4dd830ede318976e6f3118c",
+      "finalBlob": "394707908a4006054224b76dbdf9dce4130f2ac5",
+      "matchingInputRefs": [],
+      "disposition": "shared integration reconciliation"
+    },
+    {
+      "path": "routes/finance.php",
+      "mainBlob": "922d1a13288a3355d728a117b26114766362cf43",
+      "finalBlob": "d97d1fdc8056eb257dda4e8d85c9045942878736",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "mainBlob": "5badb7cbec24bb3db9b98b8fdf1c6122f770ae92",
+      "finalBlob": "3c4826c628c24d435fa91b680e895b4d2374a10f",
+      "matchingInputRefs": [],
+      "disposition": "authorised QA correction/regression"
+    },
+    {
+      "path": "routes/operational-reports.php",
+      "mainBlob": null,
+      "finalBlob": "aa5e9daa5b534ce4fb533d769136c0360688e47a",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "routes/people-locations.php",
+      "mainBlob": null,
+      "finalBlob": "43db34875aa0dbecfeee99bcba39463d9c164fcd",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "routes/web.php",
+      "mainBlob": "8b3b0fa2091429dfff390eeb453d12b312569ab7",
+      "finalBlob": "968b23b5541c924dffc6b68ad823042dc9e93e02",
+      "matchingInputRefs": [],
+      "disposition": "shared integration reconciliation"
+    },
+    {
+      "path": "tests/Architecture/ItSecuritySingleTenantBoundaryTest.php",
+      "mainBlob": "6e0a5a47834a2ea1f324f438e2380ef83b5ec734",
+      "finalBlob": "47362e870eb0738bf82dc35d12f4274f3e15b383",
+      "matchingInputRefs": [],
+      "disposition": "authorised QA correction/regression"
+    },
+    {
+      "path": "tests/Feature/Finance/BillApprovalSnapshotTest.php",
+      "mainBlob": null,
+      "finalBlob": "52fcb6331483808f3e4d8dca552e9ae2223d785a",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/Finance/BillSpendApprovalGateTest.php",
+      "mainBlob": "e4938c85bb8e5b7ec6eb311db21e4fc679de986d",
+      "finalBlob": "c4e3d630f02c35db00af8e35209bbe92dd9212d2",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/FleetLiveMapSiteAccessTest.php",
+      "mainBlob": "98ee7a2ff555cd44a11b1daaf8ab616a6214a9de",
+      "finalBlob": "0c05daf81b42b7de3ed7eec87fb7e76a650cc2c1",
+      "matchingInputRefs": [],
+      "disposition": "authorised QA correction/regression"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/LegacyMapAccessTest.php",
+      "mainBlob": null,
+      "finalBlob": "b45f3c9ad231ceb502849a17346c15cb0c515dd0",
+      "matchingInputRefs": [],
+      "disposition": "authorised QA correction/regression"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg02bVehicleFinanceTest.php",
+      "mainBlob": "eef3ec748064a53959b0d719e1f546b8caa602f3",
+      "finalBlob": "4ed473efe91f1e2bfa92a653be851f39954b9749",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg06bAssetProfileTest.php",
+      "mainBlob": "02009f607f7ef789a8c5a85591aa69ad7572c852",
+      "finalBlob": "88dc422bfbe4014e63d7757b6d922b5a0aa57053",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/FleetAssets/Pkg08SettingsTest.php",
+      "mainBlob": null,
+      "finalBlob": "cad37e8182f368459285123cbaf514a2cb253c8b",
+      "matchingInputRefs": [
+        "PKG08"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/Operations/PeopleLocationsTest.php",
+      "mainBlob": null,
+      "finalBlob": "4ca3951ec1ca8756f5eeca8288682dc7eab5f5e2",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/Reporting/OperationalReportPrivacyTest.php",
+      "mainBlob": null,
+      "finalBlob": "1fc8ff2cd2b59dc3e6886fb56d76c32e274c0463",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/Reporting/OperationalReportsTest.php",
+      "mainBlob": null,
+      "finalBlob": "df7b8c8b168198ff8f8a1680b2ad8dec61e2f956",
+      "matchingInputRefs": [
+        "Reports"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php",
+      "mainBlob": "b9d536d74862868e9534d65beedde70b14e613e6",
+      "finalBlob": "0091c1d9b4b2e7ae728b6d9ce10d9c0f3c03b715",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Feature/SecurityDevices/ConsolidatedIntegrationHistoryTest.php",
+      "mainBlob": null,
+      "finalBlob": "8f98303aa8122c963da225f799a606c1c3a695fa",
+      "matchingInputRefs": [],
+      "disposition": "authorised QA correction/regression"
+    },
+    {
+      "path": "tests/Feature/SettingsControllerTest.php",
+      "mainBlob": "36a58ea5757022634b755698c1f143d278c96719",
+      "finalBlob": "8c271e67ec5f49dffb85ff604f01bcf1d890a91c",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Unit/BrandThemeTokensTest.php",
+      "mainBlob": null,
+      "finalBlob": "3c9f04dff2d38b229e52241abc4d04455605b80b",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Unit/FleetAssets/MaintenanceCostSummaryTest.php",
+      "mainBlob": null,
+      "finalBlob": "5170f234f7360e23c1e944d452525256e6f90e67",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "tests/Unit/PeopleLocationsReturnUrlTest.php",
+      "mainBlob": null,
+      "finalBlob": "ba026b2a8ec1f0b4cfda3ae6ba64b3e443de072f",
+      "matchingInputRefs": [
+        "People"
+      ],
+      "disposition": "exact approved input"
+    },
+    {
+      "path": "vite.config.ts",
+      "mainBlob": "be4f207a67b964b20534b20aa4b067930af66818",
+      "finalBlob": "9ab27ea98ba17c78f6ad252b55349d2649af36e8",
+      "matchingInputRefs": [
+        "PKG03"
+      ],
+      "disposition": "exact approved input"
+    }
+  ]
+}

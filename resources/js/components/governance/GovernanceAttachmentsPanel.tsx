@@ -381,7 +381,7 @@ export function GovernanceAttachmentsPanel({
                                                                 a,
                                                             )
                                                         }
-                                                        className="bg-status-critical hover:bg-status-critical/90"
+                                                        variant="destructive"
                                                     >
                                                         Remove
                                                     </AlertDialogAction>

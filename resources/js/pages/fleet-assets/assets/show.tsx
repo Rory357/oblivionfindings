@@ -2,11 +2,20 @@ import {
     AssetFinanceTechnologyProjectionPanel,
     type AssetFinanceTechnologyProjection,
 } from '@/components/assets/asset-finance-technology-projection';
+import type { ProfileWorkspace } from '@/components/assets/profile/types';
+import { AssetProfileWorkspace } from '@/components/assets/profile/workspace';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -15,6 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import {
     TabsRoot as Tabs,
     TabsContent,
@@ -30,6 +40,7 @@ import { FleetCompactHero } from '@/pages/fleet-assets/components/fleet-compact-
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowUpRight,
     Calendar,
     CheckCircle,
     Cpu,
@@ -61,7 +72,15 @@ type Document = {
     name: string;
     type: string;
     uploaded_at: string | null;
-    url: string;
+    /** Null while the file can't be opened, e.g. it hasn't passed its virus check. */
+    url: string | null;
+    status: { label: string; tone: StatusVariant } | null;
+};
+
+/** Set on vehicles: their documents are added and archived in the vehicle profile. */
+type VehicleDocuments = {
+    /** The vehicle profile's Documents, or null when the viewer can't open it. */
+    url: string | null;
 };
 
 const uploadDocumentSteps = [
@@ -280,6 +299,103 @@ type Inspection = {
     notes: string | null;
 };
 
+export function AssetDocumentsCard({
+    documents,
+    vehicleDocuments,
+    onUpload,
+}: {
+    documents: Document[];
+    vehicleDocuments: VehicleDocuments | null;
+    onUpload: () => void;
+}) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                    <CardTitle>Documents</CardTitle>
+                    {vehicleDocuments && (
+                        <CardDescription>
+                            Vehicle documents are added and archived in the
+                            vehicle profile, and evidence stays with its record
+                            there.
+                        </CardDescription>
+                    )}
+                </div>
+                {!vehicleDocuments ? (
+                    <Button variant="outline" size="sm" onClick={onUpload}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload
+                    </Button>
+                ) : (
+                    vehicleDocuments.url && (
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href={vehicleDocuments.url}>
+                                <ArrowUpRight className="mr-2 h-4 w-4" />
+                                Manage in vehicle profile
+                            </Link>
+                        </Button>
+                    )
+                )}
+            </CardHeader>
+            <CardContent>
+                {documents.length > 0 ? (
+                    <div className="space-y-2">
+                        {documents.map((doc) => (
+                            <div
+                                key={doc.id}
+                                className="flex items-center justify-between rounded-md border p-3"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <FileText className="h-5 w-5 text-muted-foreground" />
+                                    <div>
+                                        <div className="text-sm font-medium">
+                                            {doc.name}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {doc.type} &middot; Uploaded{' '}
+                                            {formatDate(doc.uploaded_at)}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {doc.status && (
+                                        <StatusBadge
+                                            variant={doc.status.tone}
+                                            size="sm"
+                                        >
+                                            {doc.status.label}
+                                        </StatusBadge>
+                                    )}
+                                    {doc.url && (
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            asChild
+                                        >
+                                            <a
+                                                href={doc.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                aria-label={`Download ${doc.name}`}
+                                            >
+                                                <Download className="h-4 w-4" />
+                                            </a>
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">
+                        No documents uploaded.
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 /** Linked device from canonical Security & Devices registry via device_asset_links. */
 export type LinkedDevice = {
     id: number;
@@ -458,9 +574,13 @@ type Alert = {
 
 type Assignment = {
     id: number;
-    assignee: { id: number; name: string };
+    assignee: { id: number | null; name: string };
     assigned_at: string;
     returned_at: string | null;
+    receipt_confirmed_at: string | null;
+    receipt_confirmed_by: string | null;
+    recipient_visible: boolean;
+    receipt_note: string | null;
     purpose: string | null;
 };
 
@@ -473,8 +593,15 @@ type ServiceSchedule = {
     next_due_at: string | null;
 };
 
-type Props = {
+export type Props = {
+    workspace?: ProfileWorkspace;
     active_maintenance_restrictions: number;
+    can_manage_assignments: boolean;
+    assignment_targets: Array<{
+        type: 'staff' | 'client' | 'whanau';
+        id: number;
+        name: string;
+    }>;
     asset: {
         id: number;
         name: string;
@@ -515,7 +642,9 @@ type Props = {
         trackers: LinkedDevice[];
         inspections: Inspection[];
         documents: Document[];
+        vehicle_documents: VehicleDocuments | null;
         assignments: Assignment[];
+        current_assignment: Assignment | null;
         archived_alerts: Alert[];
         work_orders: WorkOrder[];
         service_schedules: ServiceSchedule[];
@@ -533,6 +662,7 @@ type Props = {
         current_holder_name: string | null;
     } | null;
     can_view_hr_assets: boolean;
+    boundaries_href?: string | null;
     asset_finance_technology: AssetFinanceTechnologyProjection;
     /** Option lists for the edit wizard. */
     sites?: Array<{ id: number; name: string }>;
@@ -578,12 +708,23 @@ function isExpired(dateStr: string | null): boolean {
     return new Date(dateStr) < new Date();
 }
 
-export default function AssetShow({
+export default function AssetShow(props: Props) {
+    return props.workspace ? (
+        <AssetProfileWorkspace {...props} workspace={props.workspace} />
+    ) : (
+        <LegacyAssetShow {...props} />
+    );
+}
+
+function LegacyAssetShow({
     asset,
     active_maintenance_restrictions,
+    can_manage_assignments,
+    assignment_targets,
     timeline,
     hr_asset,
     can_view_hr_assets,
+    boundaries_href,
     asset_finance_technology,
     sites,
     clients,
@@ -642,8 +783,112 @@ export default function AssetShow({
     const alerts = asset?.archived_alerts ?? [];
     const work_orders = asset?.work_orders ?? [];
     const service_schedules = asset?.service_schedules ?? [];
-    const can_edit = true;
-    const can_upload = true;
+    const can_edit = false;
+    const [assignmentTarget, setAssignmentTarget] = useState('');
+    const [targetSearch, setTargetSearch] = useState(() =>
+        typeof window === 'undefined'
+            ? ''
+            : new URLSearchParams(window.location.search).get(
+                  'assignment_search',
+              ) || '',
+    );
+    const [assignmentPurpose, setAssignmentPurpose] = useState('');
+    const [receiptNote, setReceiptNote] = useState('');
+    const [verifiedReceived, setVerifiedReceived] = useState(false);
+    const [assignmentBusy, setAssignmentBusy] = useState(false);
+    const [assignmentError, setAssignmentError] = useState('');
+    const [releaseOpen, setReleaseOpen] = useState(false);
+    const searchAssignmentTargets = () => {
+        setAssignmentTarget('');
+        router.get(
+            `/fleet-assets/assets/${asset.id}`,
+            {
+                tab: 'assignments',
+                assignment_search: targetSearch.trim(),
+            },
+            {
+                only: ['assignment_targets'],
+                preserveState: true,
+                preserveScroll: true,
+            },
+        );
+    };
+    const createAssignment = () => {
+        const [assignee_type, id] = assignmentTarget.split(':');
+        if (!assignee_type || !id) {
+            setAssignmentError('Choose a recipient.');
+            return;
+        }
+        setAssignmentBusy(true);
+        setAssignmentError('');
+        router.post(
+            `/assets/${asset.id}/assignments`,
+            {
+                assignee_type,
+                assignee_id: Number(id),
+                purpose: assignmentPurpose.trim() || null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setAssignmentTarget('');
+                    setAssignmentPurpose('');
+                },
+                onError: (errors) =>
+                    setAssignmentError(
+                        Object.values(errors)[0] ||
+                            'Assignment could not be created.',
+                    ),
+                onFinish: () => setAssignmentBusy(false),
+            },
+        );
+    };
+    const confirmReceipt = (assignment: Assignment) => {
+        if (!verifiedReceived) {
+            setAssignmentError('Confirm that receipt has been verified.');
+            return;
+        }
+        setAssignmentBusy(true);
+        setAssignmentError('');
+        router.post(
+            `/assets/${asset.id}/assignments/${assignment.id}/confirm-receipt`,
+            {
+                verified_received: true,
+                receipt_note: receiptNote.trim() || null,
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setVerifiedReceived(false);
+                    setReceiptNote('');
+                },
+                onError: (errors) =>
+                    setAssignmentError(
+                        Object.values(errors)[0] ||
+                            'Receipt verification could not be saved.',
+                    ),
+                onFinish: () => setAssignmentBusy(false),
+            },
+        );
+    };
+    const releaseAssignment = (assignment: Assignment) => {
+        setAssignmentBusy(true);
+        setAssignmentError('');
+        router.post(
+            `/assets/${asset.id}/assignments/${assignment.id}/release`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setReleaseOpen(false),
+                onError: (errors) =>
+                    setAssignmentError(
+                        Object.values(errors)[0] ||
+                            'Assignment could not be released.',
+                    ),
+                onFinish: () => setAssignmentBusy(false),
+            },
+        );
+    };
     const [docOpen, setDocOpen] = useState(false);
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docTitle, setDocTitle] = useState('');
@@ -751,11 +996,30 @@ export default function AssetShow({
                     backLabel="Assets"
                 />
 
-                {active_maintenance_restrictions > 0 && <div role="status" className="rounded-lg border border-status-critical/40 bg-status-critical-bg px-5 py-4 text-sm text-status-critical">
-                    <strong>Do not use — {active_maintenance_restrictions} active maintenance {active_maintenance_restrictions === 1 ? 'hold' : 'holds'}</strong>
-                    <p className="mt-1">An authorised release is required. Review the maintenance work below before planning use.</p>
-                    <Link className="mt-2 inline-block underline" href={`/fleet-assets/maintenance/work-orders?asset_id=${asset.id}`}>View maintenance work</Link>
-                </div>}
+                {active_maintenance_restrictions > 0 && (
+                    <div
+                        role="status"
+                        className="rounded-lg border border-status-critical/40 bg-status-critical-bg px-5 py-4 text-sm text-status-critical"
+                    >
+                        <strong>
+                            Do not use — {active_maintenance_restrictions}{' '}
+                            active maintenance{' '}
+                            {active_maintenance_restrictions === 1
+                                ? 'hold'
+                                : 'holds'}
+                        </strong>
+                        <p className="mt-1">
+                            An authorised release is required. Review the
+                            maintenance work below before planning use.
+                        </p>
+                        <Link
+                            className="mt-2 inline-block underline"
+                            href={`/fleet-assets/maintenance/work-orders?asset_id=${asset.id}`}
+                        >
+                            View maintenance work
+                        </Link>
+                    </div>
+                )}
 
                 {/* Header Banner Card */}
                 <div
@@ -1140,6 +1404,7 @@ export default function AssetShow({
 
                             <div className="space-y-4">
                                 {/* Location Map */}
+                                {boundaries_href && <Button asChild variant="outline"><Link href={boundaries_href}><MapPin/>Open in Maps & boundaries</Link></Button>}
                                 {trackerMarkers.length > 0 && (
                                     <Card>
                                         <CardHeader>
@@ -1272,69 +1537,14 @@ export default function AssetShow({
 
                     {/* Documents Tab */}
                     <TabsContent value="documents">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Documents</CardTitle>
-                                {can_upload && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            setDocOpen(true);
-                                            setDocError('');
-                                        }}
-                                    >
-                                        <Upload className="mr-2 h-4 w-4" />
-                                        Upload
-                                    </Button>
-                                )}
-                            </CardHeader>
-                            <CardContent>
-                                {(documents ?? []).length > 0 ? (
-                                    <div className="space-y-2">
-                                        {documents.map((doc) => (
-                                            <div
-                                                key={doc.id}
-                                                className="flex items-center justify-between rounded-md border p-3"
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <FileText className="h-5 w-5 text-muted-foreground" />
-                                                    <div>
-                                                        <div className="text-sm font-medium">
-                                                            {doc.name}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {doc.type} &middot;
-                                                            Uploaded{' '}
-                                                            {formatDate(
-                                                                doc.uploaded_at,
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    asChild
-                                                >
-                                                    <a
-                                                        href={doc.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                    >
-                                                        <Download className="h-4 w-4" />
-                                                    </a>
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">
-                                        No documents uploaded.
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <AssetDocumentsCard
+                            documents={documents}
+                            vehicleDocuments={asset?.vehicle_documents ?? null}
+                            onUpload={() => {
+                                setDocOpen(true);
+                                setDocError('');
+                            }}
+                        />
 
                         <UploadAssetDocumentWizard
                             open={docOpen}
@@ -1703,6 +1913,14 @@ export default function AssetShow({
                     {/* Assignments Tab */}
                     <TabsContent value="assignments">
                         <div className="space-y-4">
+                            {assignmentError && (
+                                <p
+                                    className="text-sm text-destructive"
+                                    role="alert"
+                                >
+                                    {assignmentError}
+                                </p>
+                            )}
                             {asset.current_assignment && (
                                 <Card>
                                     <CardHeader>
@@ -1734,10 +1952,298 @@ export default function AssetShow({
                                                     }
                                                 </div>
                                             )}
+                                            <div className="mt-3 rounded-lg border p-3">
+                                                {asset.current_assignment
+                                                    .receipt_confirmed_at ? (
+                                                    <div className="space-y-1">
+                                                        <Badge variant="secondary">
+                                                            Receipt verified
+                                                        </Badge>
+                                                        <p className="text-muted-foreground">
+                                                            Recorded{' '}
+                                                            {formatDateTime(
+                                                                asset
+                                                                    .current_assignment
+                                                                    .receipt_confirmed_at,
+                                                            )}
+                                                            {asset
+                                                                .current_assignment
+                                                                .receipt_confirmed_by &&
+                                                                ` by ${asset.current_assignment.receipt_confirmed_by}`}
+                                                        </p>
+                                                        {asset
+                                                            .current_assignment
+                                                            .receipt_note && (
+                                                            <p>
+                                                                {
+                                                                    asset
+                                                                        .current_assignment
+                                                                        .receipt_note
+                                                                }
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        <Badge variant="outline">
+                                                            Receipt awaiting
+                                                            verification
+                                                        </Badge>
+                                                        <p className="text-muted-foreground">
+                                                            The assignment
+                                                            itself does not
+                                                            confirm delivery.
+                                                            Record a
+                                                            verification only
+                                                            after checking that
+                                                            the recipient
+                                                            received this Asset.
+                                                        </p>
+                                                        {can_manage_assignments &&
+                                                            asset
+                                                                .current_assignment
+                                                                .recipient_visible && (
+                                                                <>
+                                                                    <label className="flex items-center gap-2">
+                                                                        <input
+                                                                            type="checkbox"
+                                                                            checked={
+                                                                                verifiedReceived
+                                                                            }
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) =>
+                                                                                setVerifiedReceived(
+                                                                                    event
+                                                                                        .target
+                                                                                        .checked,
+                                                                                )
+                                                                            }
+                                                                        />{' '}
+                                                                        I have
+                                                                        verified
+                                                                        that the
+                                                                        recipient
+                                                                        received
+                                                                        this
+                                                                        Asset
+                                                                    </label>
+                                                                    <label className="block">
+                                                                        Verification
+                                                                        note
+                                                                        (optional)
+                                                                        <Input
+                                                                            maxLength={
+                                                                                500
+                                                                            }
+                                                                            value={
+                                                                                receiptNote
+                                                                            }
+                                                                            onChange={(
+                                                                                event,
+                                                                            ) =>
+                                                                                setReceiptNote(
+                                                                                    event
+                                                                                        .target
+                                                                                        .value,
+                                                                                )
+                                                                            }
+                                                                        />
+                                                                    </label>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        disabled={
+                                                                            assignmentBusy ||
+                                                                            !verifiedReceived
+                                                                        }
+                                                                        onClick={() =>
+                                                                            asset.current_assignment &&
+                                                                            confirmReceipt(
+                                                                                asset.current_assignment,
+                                                                            )
+                                                                        }
+                                                                    >
+                                                                        Record
+                                                                        receipt
+                                                                        verification
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                        {can_manage_assignments &&
+                                                            !asset
+                                                                .current_assignment
+                                                                .recipient_visible && (
+                                                                <p className="text-muted-foreground">
+                                                                    The
+                                                                    recipient is
+                                                                    no longer in
+                                                                    your
+                                                                    approved
+                                                                    Site scope.
+                                                                    Review the
+                                                                    assignment
+                                                                    before
+                                                                    recording a
+                                                                    receipt.
+                                                                </p>
+                                                            )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {can_manage_assignments && (
+                                                <Button
+                                                    className="mt-3"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    disabled={assignmentBusy}
+                                                    onClick={() => {
+                                                        setAssignmentError('');
+                                                        setReleaseOpen(true);
+                                                    }}
+                                                >
+                                                    Release assignment
+                                                </Button>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
                             )}
+
+                            <ConfirmDialog
+                                open={releaseOpen}
+                                onClose={() => setReleaseOpen(false)}
+                                onConfirm={() =>
+                                    asset.current_assignment &&
+                                    releaseAssignment(asset.current_assignment)
+                                }
+                                title="Release assignment"
+                                description={
+                                    assignmentError ||
+                                    'This ends the current assignment. Any unverified receipt remains unverified in the history.'
+                                }
+                                confirmText="Release assignment"
+                                variant="default"
+                                processing={assignmentBusy}
+                            />
+
+                            {!asset.current_assignment &&
+                                can_manage_assignments && (
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">
+                                                Assign this Asset
+                                            </CardTitle>
+                                            <CardDescription>
+                                                Choose an eligible recipient at
+                                                this Asset’s Site.
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                            <div className="flex flex-wrap items-end gap-2">
+                                                <label className="min-w-48 flex-1 text-sm">
+                                                    Find recipient
+                                                    <Input
+                                                        maxLength={80}
+                                                        value={targetSearch}
+                                                        onChange={(event) =>
+                                                            setTargetSearch(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        onKeyDown={(event) => {
+                                                            if (
+                                                                event.key ===
+                                                                'Enter'
+                                                            )
+                                                                searchAssignmentTargets();
+                                                        }}
+                                                        placeholder="Search staff or clients"
+                                                    />
+                                                </label>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={
+                                                        searchAssignmentTargets
+                                                    }
+                                                >
+                                                    Search
+                                                </Button>
+                                            </div>
+                                            {assignment_targets.length > 0 ? (
+                                                <>
+                                                    <label className="block text-sm">
+                                                        Recipient
+                                                    </label>
+                                                    <Select
+                                                        value={assignmentTarget}
+                                                        onValueChange={
+                                                            setAssignmentTarget
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select recipient" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {assignment_targets.map(
+                                                                (target) => (
+                                                                    <SelectItem
+                                                                        key={`${target.type}:${target.id}`}
+                                                                        value={`${target.type}:${target.id}`}
+                                                                    >
+                                                                        {
+                                                                            target.name
+                                                                        }{' '}
+                                                                        ·{' '}
+                                                                        {target.type ===
+                                                                        'staff'
+                                                                            ? 'Staff'
+                                                                            : target.type ===
+                                                                                'client'
+                                                                              ? 'Client'
+                                                                              : 'Whānau'}
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <label className="block text-sm">
+                                                        Purpose (optional)
+                                                        <Input
+                                                            maxLength={255}
+                                                            value={
+                                                                assignmentPurpose
+                                                            }
+                                                            onChange={(event) =>
+                                                                setAssignmentPurpose(
+                                                                    event.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                    </label>
+                                                    <Button
+                                                        disabled={
+                                                            assignmentBusy ||
+                                                            !assignmentTarget
+                                                        }
+                                                        onClick={
+                                                            createAssignment
+                                                        }
+                                                    >
+                                                        Create assignment
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <p className="text-sm text-muted-foreground">
+                                                    No matching eligible
+                                                    recipients at this Site. Try
+                                                    another search.
+                                                </p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                )}
 
                             <Card>
                                 <CardHeader>
@@ -1760,6 +2266,9 @@ export default function AssetShow({
                                                         </th>
                                                         <th className="pb-2 font-medium">
                                                             Returned
+                                                        </th>
+                                                        <th className="pb-2 font-medium">
+                                                            Receipt
                                                         </th>
                                                         <th className="pb-2 font-medium">
                                                             Purpose
@@ -1793,6 +2302,13 @@ export default function AssetShow({
                                                                         Active
                                                                     </Badge>
                                                                 )}
+                                                            </td>
+                                                            <td className="py-2 text-muted-foreground">
+                                                                {a.receipt_confirmed_at
+                                                                    ? `Verified ${formatDate(a.receipt_confirmed_at)}${a.receipt_confirmed_by ? ` by ${a.receipt_confirmed_by}` : ''}`
+                                                                    : a.returned_at
+                                                                      ? 'Not verified'
+                                                                      : 'Awaiting verification'}
                                                             </td>
                                                             <td className="py-2 text-muted-foreground">
                                                                 {a.purpose ??

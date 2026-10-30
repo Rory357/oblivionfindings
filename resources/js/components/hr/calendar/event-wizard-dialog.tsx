@@ -21,8 +21,14 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import {
+    emptyEventHubContent,
+    EventHubFields,
+    removePhotoReference,
+    type EventHubContentInput,
+} from './event-hub-fields';
 
 import {
     AlertDialog,
@@ -37,6 +43,7 @@ import {
 import { FileDropzone, StagedFileCard } from '@/components/ui/file-dropzone';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { formatDateOnly, formatDateTime } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { PeoplePicker, type PersonOption } from '../people-picker';
 import {
@@ -53,9 +60,24 @@ import {
     WizardSuccessPane,
     type WizardStep,
 } from './../wizard';
+import { EventBookingCutoff } from './event-booking-cutoff';
+import { EventDateField } from './event-date-field';
+import type { EventLibraryPhoto } from './event-image-library';
+import {
+    EventPageEditor,
+    type EventEditorData,
+    type EventPublicationMode,
+} from './event-page-editor';
+import { eventTimeInput, eventTimeInstant } from './event-time';
 
 export interface CalendarEventInitial {
     id: number;
+    edit_version: number;
+    registration_enabled?: boolean;
+    registration_capacity?: number | null;
+    registration_version?: number;
+    registration_closes_before_minutes?: number | null;
+    recurrence_parent_id?: number | null;
     title: string;
     description: string | null;
     event_type: string;
@@ -67,6 +89,8 @@ export interface CalendarEventInitial {
     site_id: number | null;
     rrule?: string | null;
     recurrence_until?: string | null;
+    recurrence_timezone?: 'UTC' | 'Pacific/Auckland';
+    hub_content?: EventHubContentInput;
     audience_type?: 'org' | 'site' | 'department' | 'team' | 'people' | null;
     audience_team?: string | null;
     audience_user_ids?: number[];
@@ -93,14 +117,10 @@ export interface EventAttachment {
     mime: string | null;
     size: number;
     url: string;
-}
-
-/** Read Laravel's XSRF cookie for non-Inertia multipart uploads. */
-function xsrfToken(): string {
-    const match = document.cookie
-        .split('; ')
-        .find((c) => c.startsWith('XSRF-TOKEN='));
-    return match ? decodeURIComponent(match.split('=')[1]) : '';
+    preview_url?: string | null;
+    download_url?: string;
+    eventId?: number;
+    inherited?: boolean;
 }
 
 const STEPS: readonly WizardStep[] = [
@@ -180,7 +200,9 @@ const RECUR_PRESETS: { key: string; label: string; rrule: string | null }[] = [
     },
 ];
 const presetFromRrule = (rrule: string | null | undefined): string =>
-    RECUR_PRESETS.find((p) => p.rrule === (rrule || null))?.key ?? 'none';
+    RECUR_PRESETS.find(
+        (p) => p.rrule === (rrule?.replace(/;COUNT=\d+/gi, '') || null),
+    )?.key ?? 'none';
 const rruleFromPreset = (key: string): string | null =>
     RECUR_PRESETS.find((p) => p.key === key)?.rrule ?? null;
 
@@ -195,19 +217,18 @@ function recurrenceSummary(preset: string, until: string): string {
     return `${base} until ${d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 }
 
-/** Trim a server ISO string to what a datetime-local / date input wants. */
-const toLocalInput = (value: string, allDay: boolean) =>
-    value ? value.substring(0, allDay ? 10 : 16) : '';
+const toLocalInput = eventTimeInput;
 
 function prettyWhen(start: string, end: string, allDay: boolean): string {
     if (!start) return '—';
-    const fmt = (v: string) =>
-        new Date(v).toLocaleDateString('en-NZ', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            ...(allDay ? {} : { hour: 'numeric', minute: '2-digit' }),
-        });
+    const fmt = (v: string) => {
+        if (allDay) return formatDateOnly(v);
+        try {
+            return formatDateTime(eventTimeInstant(v, false));
+        } catch {
+            return `${v.replace('T', ' ')} · check clock-change time`;
+        }
+    };
     const a = fmt(start);
     const b = end ? fmt(end) : '';
     return b && b !== a ? `${a} – ${b}` : a;
@@ -216,8 +237,7 @@ function prettyWhen(start: string, end: string, allDay: boolean): string {
 /**
  * The full event wizard for `/hr/calendar` — Add-Client-grade, the single
  * instance used for both create and edit (the quick-add popover escalates into
- * it). Posts to /hr/calendar/events. Audience/RSVP, recurrence, reminders and
- * attachments are a tracked follow-up; this covers the live schema end-to-end.
+ * it). Details and files are saved together against the canonical event scope.
  */
 export function EventWizardDialog({
     open,
@@ -228,31 +248,64 @@ export function EventWizardDialog({
     teams,
     categories,
     staff,
+    storyOptions = [],
+    emailAvailable = true,
+    publishing,
     initial,
     defaultDate,
+    presentation = 'dialog',
 }: {
     open: boolean;
     onClose: () => void;
-    /** Called after a successful save so the page can refetch the feed. */
+    /** Refresh the feed after a save, or after closing an editor with a stale version. */
     onSaved: () => void;
     sites: IdName[];
     departments: IdName[];
     teams: string[];
     categories: EventCategoryOption[];
     staff: PersonOption[];
+    storyOptions?: { id: number; title: string }[];
+    emailAvailable?: boolean;
+    publishing?: {
+        draft_id?: number;
+        version?: number;
+        can_publish: boolean;
+        can_schedule?: boolean;
+        cutoff_supported?: boolean;
+        publish_at?: string | null;
+        actor_id?: number;
+    };
+    presentation?: 'dialog' | 'page';
     initial?: CalendarEventInitial | null;
     /** Click-to-create prefill (YYYY-MM-DD) when creating a new event. */
     defaultDate?: string | null;
 }) {
-    const isEdit = !!initial;
+    const isEdit = !!initial?.id;
+    const isSingleDate =
+        !!initial &&
+        (initial.scope === 'this' || !!initial.recurrence_parent_id);
+    const canArchive =
+        isEdit &&
+        (!publishing || (!publishing.draft_id && publishing.can_publish)) &&
+        (!initial.scope || initial.scope === 'all');
+    const isInheritedFile = (file: EventAttachment) =>
+        file.inherited ||
+        (initial?.scope === 'this' && !initial.recurrence_parent_id);
     const wizard = useWizard(STEPS.length);
     const [submitted, setSubmitted] = useState(false);
+    const [draftKey] = useState(() => crypto.randomUUID());
+    const [publicationMode, setPublicationMode] =
+        useState<EventPublicationMode>('draft');
+    const pendingSave = useRef(false);
+    const editorGeneration = useRef(0);
+    const [pageBaseline, setPageBaseline] = useState('');
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [keepAdding, setKeepAdding] = useState(false);
     const [reminderChannel, setReminderChannel] = useState<
         'notification' | 'email'
     >('notification');
     const [stagedFiles, setStagedFiles] = useState<File[]>([]);
+    const [libraryPhotos, setLibraryPhotos] = useState<EventLibraryPhoto[]>([]);
     const [existingAttachments, setExistingAttachments] = useState<
         EventAttachment[]
     >([]);
@@ -260,7 +313,7 @@ export function EventWizardDialog({
         [],
     );
 
-    const form = useForm({
+    const form = useForm<EventEditorData>({
         title: '',
         description: '',
         event_type: 'company',
@@ -269,6 +322,7 @@ export function EventWizardDialog({
         is_all_day: false,
         rrule: '' as string,
         recurrence_until: '' as string,
+        recurrence_timezone: 'Pacific/Auckland' as 'UTC' | 'Pacific/Auckland',
         audience_type: 'org' as
             | 'org'
             | 'site'
@@ -281,13 +335,19 @@ export function EventWizardDialog({
         location: '',
         department_id: '',
         site_id: '',
+        hub_content: emptyEventHubContent(),
+        registration_enabled: false,
+        registration_capacity: '',
+        registration_closes_before_minutes: '',
     });
 
     // Seed (create defaults or edit values) each time the dialog opens.
     useEffect(() => {
+        editorGeneration.current++;
+        pendingSave.current = false;
         if (!open) return;
         if (initial) {
-            form.setData({
+            const seeded: EventEditorData = {
                 title: initial.title,
                 description: initial.description ?? '',
                 event_type: initial.event_type,
@@ -298,6 +358,7 @@ export function EventWizardDialog({
                 recurrence_until: initial.recurrence_until
                     ? initial.recurrence_until.substring(0, 10)
                     : '',
+                recurrence_timezone: initial.recurrence_timezone ?? 'UTC',
                 audience_type: initial.audience_type ?? 'org',
                 audience_team: initial.audience_team ?? '',
                 audience_user_ids: initial.audience_user_ids ?? [],
@@ -307,7 +368,20 @@ export function EventWizardDialog({
                     ? String(initial.department_id)
                     : '',
                 site_id: initial.site_id ? String(initial.site_id) : '',
-            });
+                hub_content: {
+                    ...emptyEventHubContent(),
+                    ...initial.hub_content,
+                    cover_ref: initial.hub_content?.cover_ref ?? '',
+                },
+                registration_enabled: initial.registration_enabled ?? false,
+                registration_capacity:
+                    initial.registration_capacity?.toString() ?? '',
+                registration_closes_before_minutes:
+                    initial.registration_closes_before_minutes?.toString() ??
+                    '',
+            };
+            form.setData(seeded);
+            setPageBaseline(JSON.stringify(seeded));
             setReminderChannel(
                 (initial.reminders?.[0]?.channel as 'notification' | 'email') ??
                     'notification',
@@ -321,15 +395,30 @@ export function EventWizardDialog({
                 is_all_day: false,
             }));
         }
+        if (!initial && !defaultDate)
+            setPageBaseline(JSON.stringify(form.data));
         wizard.reset();
         setSubmitted(false);
         setStagedFiles([]);
+        setLibraryPhotos([]);
         setRemovedAttachmentIds([]);
         if (!initial) setExistingAttachments([]);
+        return () => {
+            // Invalidate the current request generation; this ref does not hold a DOM node.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            editorGeneration.current++;
+            if (pendingSave.current) form.cancel();
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
 
     const close = () => {
+        if (form.processing || pendingSave.current) return;
+        if (presentation === 'page') {
+            onClose();
+            return;
+        }
+        const needsRefresh = 'edit_version' in form.errors;
         form.reset();
         form.clearErrors();
         wizard.reset();
@@ -338,27 +427,7 @@ export function EventWizardDialog({
         setExistingAttachments([]);
         setRemovedAttachmentIds([]);
         onClose();
-    };
-
-    const uploadStagedFiles = async (eventId: number): Promise<void> => {
-        const token = xsrfToken();
-        for (const file of stagedFiles) {
-            const body = new FormData();
-            body.append('file', file);
-            await fetch(`/hr/calendar/events/${eventId}/attachments`, {
-                method: 'POST',
-                body,
-                credentials: 'same-origin',
-                headers: { 'X-XSRF-TOKEN': token, Accept: 'application/json' },
-            }).catch(() => undefined);
-        }
-        for (const id of removedAttachmentIds) {
-            await fetch(`/hr/calendar/attachments/${id}`, {
-                method: 'DELETE',
-                credentials: 'same-origin',
-                headers: { 'X-XSRF-TOKEN': token, Accept: 'application/json' },
-            }).catch(() => undefined);
-        }
+        if (needsRefresh) onSaved();
     };
 
     const selectedCategory =
@@ -467,46 +536,118 @@ export function EventWizardDialog({
         }));
     };
 
-    const transform = () =>
-        form.transform((data) => ({
-            ...data,
-            site_id: data.site_id === '' ? null : data.site_id,
-            department_id:
-                data.department_id === '' ? null : data.department_id,
-            audience_team:
-                data.audience_type === 'team' ? data.audience_team : null,
-            rrule: data.rrule === '' ? null : data.rrule,
-            recurrence_until:
-                data.recurrence_until === '' ? null : data.recurrence_until,
-            ...(isEdit && initial?.scope
-                ? {
-                      scope: initial.scope,
-                      occurrence_date: initial.occurrence_date ?? null,
-                  }
-                : {}),
-        }));
+    const transform = (
+        mode: EventPublicationMode = 'draft',
+        publishAt?: string,
+    ) =>
+        form.transform((data) => {
+            const {
+                registration_enabled,
+                registration_capacity,
+                registration_closes_before_minutes,
+                ...details
+            } = data;
+            return {
+                ...details,
+                ...(initial && !publishing
+                    ? { _method: 'put', edit_version: initial.edit_version }
+                    : {}),
+                ...(publishing
+                    ? {
+                          mode,
+                          ...(publishing.actor_id
+                              ? { actor_id: publishing.actor_id }
+                              : {}),
+                          ...(publishAt ? { publish_at: publishAt } : {}),
+                          draft_key: draftKey,
+                          version: publishing.version ?? null,
+                          source_event_id: initial?.id || null,
+                          edit_version: initial?.edit_version ?? null,
+                          ...(!isSingleDate
+                              ? {
+                                    registration_enabled,
+                                    ...(publishing.cutoff_supported
+                                        ? {
+                                              registration_closes_before_minutes:
+                                                  registration_closes_before_minutes ===
+                                                  ''
+                                                      ? null
+                                                      : Number(
+                                                            registration_closes_before_minutes,
+                                                        ),
+                                          }
+                                        : {}),
+                                    registration_capacity: registration_capacity
+                                        ? Number(registration_capacity)
+                                        : null,
+                                    registration_version:
+                                        initial?.registration_version ?? null,
+                                }
+                              : {}),
+                      }
+                    : {}),
+                files: stagedFiles,
+                ...(libraryPhotos.length
+                    ? {
+                          hub_library_images: libraryPhotos.map((photo) => ({
+                              media_id: photo.id,
+                              version: photo.version,
+                          })),
+                      }
+                    : {}),
+                removed_attachment_ids: removedAttachmentIds,
+                // Multipart omits empty arrays; preserve the intent to clear every reminder.
+                replace_reminders: true,
+                starts_at: eventTimeInstant(
+                    data.starts_at,
+                    data.is_all_day,
+                    initial?.starts_at,
+                ),
+                ends_at: eventTimeInstant(
+                    data.ends_at,
+                    data.is_all_day,
+                    initial?.ends_at,
+                ),
+                site_id: data.site_id === '' ? null : data.site_id,
+                department_id:
+                    data.department_id === '' ? null : data.department_id,
+                audience_team:
+                    data.audience_type === 'team' ? data.audience_team : null,
+                rrule: data.rrule === '' ? null : data.rrule,
+                recurrence_until:
+                    data.recurrence_until === '' ? null : data.recurrence_until,
+                ...(isEdit && initial?.scope
+                    ? {
+                          scope: initial.scope,
+                          occurrence_date: initial.occurrence_date ?? null,
+                      }
+                    : {}),
+            };
+        });
 
-    const onError = () => {
-        if (form.errors.title || form.errors.event_type) wizard.goTo(0);
-        else if (form.errors.starts_at || form.errors.ends_at) wizard.goTo(1);
+    const onError = (errors: Record<string, string>) => {
+        if (errors.title || errors.event_type) wizard.goTo(0);
+        else if (errors.starts_at || errors.ends_at || errors.rrule)
+            wizard.goTo(1);
+        else if (
+            Object.keys(errors).some(
+                (key) =>
+                    key === 'files' ||
+                    key.startsWith('files.') ||
+                    key.startsWith('hub_content'),
+            )
+        )
+            wizard.goTo(3);
     };
 
-    const finishSave = async (
-        eventId: number | undefined,
-        addAnother: boolean,
-    ) => {
-        if (
-            (stagedFiles.length > 0 || removedAttachmentIds.length > 0) &&
-            eventId
-        ) {
-            await uploadStagedFiles(eventId);
-        }
-        onSaved();
+    const finishSave = (addAnother: boolean) => {
+        if (presentation !== 'page') onSaved();
         if (addAnother) {
             form.reset();
             form.clearErrors();
             wizard.reset();
             setStagedFiles([]);
+            setLibraryPhotos([]);
             setRemovedAttachmentIds([]);
             setKeepAdding(true);
             toast.success('Event saved — add another');
@@ -515,43 +656,187 @@ export function EventWizardDialog({
         }
     };
 
-    const submit = (addAnother = false) => {
-        transform();
+    const submit = (
+        addAnother = false,
+        mode: EventPublicationMode = 'draft',
+        publishAt?: string,
+    ) => {
+        if (!open || pendingSave.current || form.processing || submitted)
+            return;
+        if (
+            libraryPhotos.length +
+                stagedFiles.length +
+                (publishing?.draft_id
+                    ? existingAttachments.filter((file) => file.id < 0).length
+                    : 0) >
+            10
+        ) {
+            form.setError(
+                'hub_content',
+                'Choose up to 10 files in total for this save, including selected library images.',
+            );
+            return;
+        }
+        for (const field of ['starts_at', 'ends_at'] as const) {
+            try {
+                eventTimeInstant(
+                    form.data[field],
+                    form.data.is_all_day,
+                    initial?.[field],
+                );
+            } catch (error) {
+                form.setError(field, (error as Error).message);
+                wizard.goTo(1);
+                return;
+            }
+        }
+        pendingSave.current = true;
+        const generation = editorGeneration.current;
+        const current = () => editorGeneration.current === generation;
+        setPublicationMode(mode);
+        transform(mode, publishAt);
         const opts = {
             preserveScroll: true,
             preserveState: true,
-            onError,
+            forceFormData: true,
+            onError: (errors: Record<string, string>) => {
+                if (current()) onError(errors);
+            },
+            onFinish: () => {
+                if (current()) pendingSave.current = false;
+            },
         };
-        if (isEdit && initial) {
-            form.put(`/hr/calendar/events/${initial.id}`, {
+        if (publishing) {
+            form.post(
+                `/company-hub/event-drafts${publishing.draft_id ? `/${publishing.draft_id}` : ''}`,
+                {
+                    ...opts,
+                    onSuccess: () => {
+                        if (current()) finishSave(false);
+                    },
+                },
+            );
+        } else if (isEdit && initial) {
+            form.post(`/hr/calendar/events/${initial.id}`, {
                 ...opts,
-                onSuccess: () => void finishSave(initial.id, addAnother),
+                onSuccess: () => {
+                    if (current()) finishSave(addAnother);
+                },
             });
         } else {
             form.post('/hr/calendar/events', {
                 ...opts,
-                onSuccess: (page) => {
-                    const flash = (
-                        page.props as { flash?: { createdEventId?: number } }
-                    ).flash;
-                    void finishSave(flash?.createdEventId, addAnother);
+                onSuccess: () => {
+                    if (current()) finishSave(addAnother);
                 },
             });
         }
     };
 
     const doArchive = () => {
-        if (!initial) return;
+        if (!initial || !canArchive || pendingSave.current || form.processing)
+            return;
+        pendingSave.current = true;
+        const generation = editorGeneration.current;
+        form.transform(() => ({
+            edit_version: initial.edit_version,
+            scope: 'all',
+        }));
         form.delete(`/hr/calendar/events/${initial.id}`, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => {
+                if (editorGeneration.current !== generation) return;
+                pendingSave.current = false;
                 onSaved();
                 toast.success('Event archived');
                 close();
             },
+            onFinish: () => {
+                if (editorGeneration.current === generation)
+                    pendingSave.current = false;
+            },
         });
     };
+
+    if (presentation === 'page' && publishing) {
+        if (!open) return null;
+        return (
+            <EventPageEditor
+                data={form.data}
+                set={(key, value) =>
+                    form.setData((data) => ({ ...data, [key]: value }))
+                }
+                errors={form.errors}
+                busy={form.processing}
+                dirty={
+                    !!pageBaseline &&
+                    (JSON.stringify(form.data) !== pageBaseline ||
+                        stagedFiles.length > 0 ||
+                        libraryPhotos.length > 0 ||
+                        removedAttachmentIds.length > 0)
+                }
+                submitted={submitted}
+                savedMode={publicationMode}
+                canSubmit={canSubmit}
+                canPublish={publishing.can_publish}
+                canSchedule={!!publishing.can_schedule}
+                cutoffSupported={!!publishing.cutoff_supported}
+                initialPublishAt={publishing.publish_at}
+                initial={initial}
+                sites={sites}
+                departments={departments}
+                teams={teams}
+                categories={categories}
+                staff={staff}
+                stories={storyOptions}
+                emailAvailable={emailAvailable}
+                attachments={existingAttachments}
+                files={stagedFiles}
+                libraryPhotos={libraryPhotos}
+                libraryActorId={publishing.actor_id}
+                retainedDraftFiles={
+                    publishing.draft_id
+                        ? existingAttachments.filter((file) => file.id < 0)
+                              .length
+                        : 0
+                }
+                onLibraryPhotosChange={setLibraryPhotos}
+                inherited={isInheritedFile}
+                addFiles={(files) =>
+                    setStagedFiles((prev) => [...prev, ...files])
+                }
+                removeFile={(index) => {
+                    form.setData(
+                        'hub_content',
+                        removePhotoReference(
+                            form.data.hub_content,
+                            'upload:' + index,
+                        ),
+                    );
+                    setStagedFiles((prev) =>
+                        prev.filter((_, i) => i !== index),
+                    );
+                }}
+                removeAttachment={(file) => {
+                    if (isInheritedFile(file)) return;
+                    form.setData(
+                        'hub_content',
+                        removePhotoReference(
+                            form.data.hub_content,
+                            'file:' + file.id,
+                        ),
+                    );
+                    setRemovedAttachmentIds((prev) => [...prev, file.id]);
+                    setExistingAttachments((prev) =>
+                        prev.filter((item) => item.id !== file.id),
+                    );
+                }}
+                onClose={close}
+                onSave={(mode, publishAt) => submit(false, mode, publishAt)}
+            />
+        );
+    }
 
     const RailIcon = meta.icon;
 
@@ -560,11 +845,29 @@ export function EventWizardDialog({
             <WizardShell
                 open={open}
                 onClose={close}
-                title={isEdit ? 'Edit event' : 'New event'}
-                description="Create or edit a company / HR calendar event."
+                title={
+                    publishing?.draft_id
+                        ? 'Edit event draft'
+                        : isEdit
+                          ? 'Edit event'
+                          : 'New event'
+                }
+                description={
+                    publishing
+                        ? 'Prepare a private draft, send it for review or publish it to the company calendar.'
+                        : 'Create or edit a company / HR calendar event.'
+                }
                 railIcon={RailIcon}
-                railTitle={isEdit ? 'Edit event' : 'New event'}
-                railSub="HR · Calendar"
+                railTitle={
+                    publishing?.draft_id
+                        ? 'Edit event draft'
+                        : isEdit
+                          ? 'Edit event'
+                          : 'New event'
+                }
+                railSub={
+                    publishing ? 'Company Hub · Event draft' : 'HR · Calendar'
+                }
                 steps={STEPS}
                 stepIndex={wizard.index}
                 onStepClick={wizard.goTo}
@@ -574,8 +877,22 @@ export function EventWizardDialog({
                 success={
                     submitted ? (
                         <WizardSuccessPane
-                            title={isEdit ? 'Event updated' : 'Event created'}
-                            blurb={`“${form.data.title}” is on the calendar for ${prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)}.`}
+                            title={
+                                publishing
+                                    ? publicationMode === 'publish'
+                                        ? 'Event published'
+                                        : publicationMode === 'review'
+                                          ? 'Sent for review'
+                                          : 'Private draft saved'
+                                    : isEdit
+                                      ? 'Event updated'
+                                      : 'Event created'
+                            }
+                            blurb={
+                                publishing && publicationMode !== 'publish'
+                                    ? 'Staff keep seeing the published event. Your draft and its new files are available in Event drafts to authorised editors.'
+                                    : `“${form.data.title}” is on the calendar for ${prettyWhen(form.data.starts_at, form.data.ends_at, form.data.is_all_day)}.`
+                            }
                             actions={
                                 <button
                                     type="button"
@@ -599,7 +916,7 @@ export function EventWizardDialog({
                                 Back
                             </button>
                         ) : null}
-                        {isEdit ? (
+                        {canArchive ? (
                             <button
                                 type="button"
                                 onClick={() => setConfirmDelete(true)}
@@ -616,13 +933,45 @@ export function EventWizardDialog({
                         <button
                             type="button"
                             onClick={close}
+                            disabled={form.processing}
                             className="rounded-md px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted"
                         >
                             Cancel
                         </button>
                         {wizard.isLast ? (
                             <>
-                                {!isEdit ? (
+                                {publishing && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                submit(false, 'draft')
+                                            }
+                                            disabled={
+                                                !canSubmit || form.processing
+                                            }
+                                            className="rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                                        >
+                                            Save draft
+                                        </button>
+                                        {publishing.can_publish && (
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    submit(false, 'review')
+                                                }
+                                                disabled={
+                                                    !canSubmit ||
+                                                    form.processing
+                                                }
+                                                className="rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+                                            >
+                                                Send for review
+                                            </button>
+                                        )}
+                                    </>
+                                )}
+                                {!isEdit && !publishing ? (
                                     <button
                                         type="button"
                                         onClick={() => submit(true)}
@@ -638,7 +987,16 @@ export function EventWizardDialog({
                                 ) : null}
                                 <button
                                     type="button"
-                                    onClick={() => submit(false)}
+                                    onClick={() =>
+                                        submit(
+                                            false,
+                                            publishing?.can_publish
+                                                ? 'publish'
+                                                : publishing
+                                                  ? 'review'
+                                                  : 'draft',
+                                        )
+                                    }
                                     disabled={!canSubmit || form.processing}
                                     style={
                                         !canSubmit || form.processing
@@ -649,16 +1007,20 @@ export function EventWizardDialog({
                                               }
                                     }
                                     className={cn(
-                                        'inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:brightness-95',
+                                        'inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-fill-foreground hover:brightness-95',
                                         (!canSubmit || form.processing) &&
                                             'cursor-not-allowed opacity-50',
                                     )}
                                 >
                                     {form.processing
                                         ? 'Saving…'
-                                        : isEdit
-                                          ? 'Save changes'
-                                          : 'Create event'}
+                                        : publishing
+                                          ? publishing.can_publish
+                                              ? 'Publish event'
+                                              : 'Send for review'
+                                          : isEdit
+                                            ? 'Save changes'
+                                            : 'Create event'}
                                     {!form.processing && (
                                         <ArrowRight className="h-[15px] w-[15px]" />
                                     )}
@@ -672,7 +1034,7 @@ export function EventWizardDialog({
                                     boxShadow:
                                         '0 6px 16px -6px oklch(from var(--primary) l c h / 0.7)',
                                 }}
-                                className="inline-flex items-center gap-2 rounded-[10px] bg-primary px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-foreground hover:brightness-95"
+                                className="inline-flex items-center gap-2 rounded-[10px] bg-primary-fill px-[18px] py-2.5 text-sm font-semibold whitespace-nowrap text-primary-fill-foreground hover:brightness-95"
                             >
                                 Continue
                                 <ArrowRight className="h-[15px] w-[15px]" />
@@ -681,6 +1043,27 @@ export function EventWizardDialog({
                     </>
                 }
             >
+                {Object.keys(form.errors).length > 0 && (
+                    <div
+                        role="alert"
+                        className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+                    >
+                        {Array.from(new Set(Object.values(form.errors))).map(
+                            (message) => (
+                                <p key={message}>{message}</p>
+                            ),
+                        )}
+                    </div>
+                )}
+                {isEdit && initial?.scope && (
+                    <p className="mb-4 rounded-lg bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                        {isSingleDate
+                            ? 'Editing this date only. The series audience and repeat pattern stay the same.'
+                            : initial.scope === 'following'
+                              ? 'Editing this and following dates. Their registrations move with them; earlier dates stay as they are.'
+                              : 'Editing the event or whole series.'}
+                    </p>
+                )}
                 {/* ── Step 1 · Basics ── */}
                 {wizard.index === 0 && (
                     <WizardStepPane>
@@ -780,7 +1163,7 @@ export function EventWizardDialog({
                         <StepHead
                             icon={CalendarRange}
                             title="When is it?"
-                            blurb="Set the start and end. Toggle all-day for closures or full-day events."
+                            blurb="Times are in New Zealand time. Toggle all-day for closures or full-day events."
                         />
                         <label className="mb-4 inline-flex cursor-pointer items-center gap-2 text-sm font-medium">
                             <input
@@ -792,43 +1175,26 @@ export function EventWizardDialog({
                             All-day event
                         </label>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <Field
+                            <EventDateField
                                 label="Starts"
-                                required
+                                dateOnly={form.data.is_all_day}
+                                value={form.data.starts_at}
+                                onChange={(value) =>
+                                    form.setData('starts_at', value)
+                                }
+                                disabled={form.processing}
                                 error={form.errors.starts_at}
-                            >
-                                <Input
-                                    type={
-                                        form.data.is_all_day
-                                            ? 'date'
-                                            : 'datetime-local'
-                                    }
-                                    value={form.data.starts_at}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'starts_at',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
-                            </Field>
-                            <Field
+                            />
+                            <EventDateField
                                 label="Ends"
-                                required
+                                dateOnly={form.data.is_all_day}
+                                value={form.data.ends_at}
+                                onChange={(value) =>
+                                    form.setData('ends_at', value)
+                                }
+                                disabled={form.processing}
                                 error={form.errors.ends_at}
-                            >
-                                <Input
-                                    type={
-                                        form.data.is_all_day
-                                            ? 'date'
-                                            : 'datetime-local'
-                                    }
-                                    value={form.data.ends_at}
-                                    onChange={(e) =>
-                                        form.setData('ends_at', e.target.value)
-                                    }
-                                />
-                            </Field>
+                            />
                         </div>
                         <div className="mt-4 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-[12.5px] text-muted-foreground">
                             <AlarmClock className="h-4 w-4" />
@@ -840,8 +1206,46 @@ export function EventWizardDialog({
                         </div>
 
                         {/* Recurrence */}
-                        <div className="mt-5">
+                        <fieldset
+                            disabled={isSingleDate}
+                            className="mt-5 disabled:opacity-70"
+                        >
                             <SubHead icon={Repeat}>Repeats</SubHead>
+                            {form.data.rrule && !form.data.is_all_day && (
+                                <label className="mt-3 flex items-start gap-2 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={
+                                            form.data.recurrence_timezone ===
+                                            'Pacific/Auckland'
+                                        }
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'recurrence_timezone',
+                                                e.target.checked
+                                                    ? 'Pacific/Auckland'
+                                                    : 'UTC',
+                                            )
+                                        }
+                                        className="mt-1"
+                                    />
+                                    <span>
+                                        Keep the same New Zealand time all year
+                                        <span className="mt-1 block text-xs text-muted-foreground">
+                                            {form.data.recurrence_timezone ===
+                                            'Pacific/Auckland'
+                                                ? 'Adjusts for daylight saving. Monthly repeats use the same day number, or the last day of a shorter month.'
+                                                : 'Keeps the existing fixed timing. Local times may shift when the clocks change. Use a future date to change an older series.'}
+                                        </span>
+                                    </span>
+                                </label>
+                            )}
+                            {isSingleDate && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    The repeat pattern belongs to the series.
+                                    You are editing this date only.
+                                </p>
+                            )}
                             <div className="mt-2 grid gap-4 sm:grid-cols-2">
                                 <Field label="Repeat">
                                     <SelectInput
@@ -865,18 +1269,22 @@ export function EventWizardDialog({
                                     />
                                 </Field>
                                 {form.data.rrule ? (
-                                    <Field label="Until (optional)">
-                                        <Input
-                                            type="date"
-                                            value={form.data.recurrence_until}
-                                            onChange={(e) =>
-                                                form.setData(
-                                                    'recurrence_until',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                    </Field>
+                                    <EventDateField
+                                        label="Until (optional)"
+                                        dateOnly
+                                        clearable
+                                        value={form.data.recurrence_until}
+                                        onChange={(value) =>
+                                            form.setData(
+                                                'recurrence_until',
+                                                value,
+                                            )
+                                        }
+                                        disabled={
+                                            isSingleDate || form.processing
+                                        }
+                                        error={form.errors.recurrence_until}
+                                    />
                                 ) : null}
                             </div>
                             {form.data.rrule ? (
@@ -887,7 +1295,15 @@ export function EventWizardDialog({
                                     )}
                                 </p>
                             ) : null}
-                        </div>
+                            {/COUNT=(\d+)/i.test(form.data.rrule) && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    This saved series contains{' '}
+                                    {form.data.rrule.match(/COUNT=(\d+)/i)?.[1]}{' '}
+                                    dates. Choosing a different repeat pattern
+                                    replaces that limit.
+                                </p>
+                            )}
+                        </fieldset>
                     </WizardStepPane>
                 )}
 
@@ -899,7 +1315,10 @@ export function EventWizardDialog({
                             title="Who & where"
                             blurb="Scope it to a site and add a location. Leave the site blank for org-wide."
                         />
-                        <div className="grid gap-4 sm:grid-cols-2">
+                        <fieldset
+                            disabled={isSingleDate}
+                            className="grid gap-4 disabled:opacity-70 sm:grid-cols-2"
+                        >
                             <Field label="Site" error={form.errors.site_id}>
                                 <SelectInput
                                     value={form.data.site_id || 'none'}
@@ -949,7 +1368,7 @@ export function EventWizardDialog({
                                     ]}
                                 />
                             </Field>
-                        </div>
+                        </fieldset>
                         <div className="mt-4">
                             <Field
                                 label="Location"
@@ -966,8 +1385,17 @@ export function EventWizardDialog({
                         </div>
 
                         {/* Audience */}
-                        <div className="mt-5">
+                        <fieldset
+                            disabled={isSingleDate}
+                            className="mt-5 disabled:opacity-70"
+                        >
                             <SubHead icon={Users}>Audience</SubHead>
+                            {isSingleDate && (
+                                <p className="mt-2 text-sm text-muted-foreground">
+                                    This date keeps the series audience, Site
+                                    and department.
+                                </p>
+                            )}
                             <div className="mt-2">
                                 <Segmented
                                     value={form.data.audience_type}
@@ -1125,7 +1553,7 @@ export function EventWizardDialog({
                             <p className="mt-2 text-[12px] text-muted-foreground">
                                 {reachText}
                             </p>
-                        </div>
+                        </fieldset>
                     </WizardStepPane>
                 )}
 
@@ -1139,6 +1567,21 @@ export function EventWizardDialog({
                         />
 
                         <SubHead icon={Bell}>Reminders</SubHead>
+                        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                            Reminders go to the event audience, or confirmed and
+                            interested people when registration is open. Each
+                            person’s notification choices, quiet time and email
+                            summary schedule apply. Delayed reminders are
+                            retried until the event ends.
+                        </p>
+                        {!emailAvailable && (
+                            <p className="mt-2 rounded-lg border p-3 text-xs text-muted-foreground">
+                                External email is not configured. Email
+                                reminders can be saved, but will only be
+                                delivered if email is configured before the
+                                event ends.
+                            </p>
+                        )}
                         <div className="mt-2">
                             <Segmented
                                 value={reminderChannel}
@@ -1230,29 +1673,43 @@ export function EventWizardDialog({
                                             >
                                                 {a.name}
                                             </a>
-                                            <button
-                                                type="button"
-                                                aria-label={`Remove ${a.name}`}
-                                                onClick={() => {
-                                                    setRemovedAttachmentIds(
-                                                        (prev) => [
-                                                            ...prev,
-                                                            a.id,
-                                                        ],
-                                                    );
-                                                    setExistingAttachments(
-                                                        (prev) =>
-                                                            prev.filter(
-                                                                (x) =>
-                                                                    x.id !==
-                                                                    a.id,
+                                            {isInheritedFile(a) ? (
+                                                <span className="text-xs text-muted-foreground">
+                                                    Shared by the series
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Remove ${a.name}`}
+                                                    onClick={() => {
+                                                        form.setData(
+                                                            'hub_content',
+                                                            removePhotoReference(
+                                                                form.data
+                                                                    .hub_content,
+                                                                `file:${a.id}`,
                                                             ),
-                                                    );
-                                                }}
-                                                className="text-muted-foreground hover:text-status-critical"
-                                            >
-                                                <X className="h-3.5 w-3.5" />
-                                            </button>
+                                                        );
+                                                        setRemovedAttachmentIds(
+                                                            (prev) => [
+                                                                ...prev,
+                                                                a.id,
+                                                            ],
+                                                        );
+                                                        setExistingAttachments(
+                                                            (prev) =>
+                                                                prev.filter(
+                                                                    (x) =>
+                                                                        x.id !==
+                                                                        a.id,
+                                                                ),
+                                                        );
+                                                    }}
+                                                    className="text-muted-foreground hover:text-status-critical"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -1266,7 +1723,11 @@ export function EventWizardDialog({
                                             ...files,
                                         ])
                                     }
-                                    hint="PDF, Word, Excel, images — up to 10 MB each"
+                                    hint={
+                                        publishing
+                                            ? 'PDF, Word, Excel, PowerPoint, images — up to 10 files, 10 MB each. New files stay private until publication.'
+                                            : 'PDF, Word, Excel, PowerPoint, images — up to 10 files, 10 MB each. Saved with the event.'
+                                    }
                                 />
                             </div>
                             {stagedFiles.length > 0 ? (
@@ -1275,18 +1736,97 @@ export function EventWizardDialog({
                                         <StagedFileCard
                                             key={`${file.name}-${i}`}
                                             file={file}
-                                            onRemove={() =>
+                                            onRemove={() => {
+                                                form.setData(
+                                                    'hub_content',
+                                                    removePhotoReference(
+                                                        form.data.hub_content,
+                                                        `upload:${i}`,
+                                                    ),
+                                                );
                                                 setStagedFiles((prev) =>
                                                     prev.filter(
                                                         (_, idx) => idx !== i,
                                                     ),
-                                                )
-                                            }
+                                                );
+                                            }}
                                         />
                                     ))}
                                 </div>
                             ) : null}
                         </div>
+                        <EventHubFields
+                            draftMode={!!publishing}
+                            value={form.data.hub_content}
+                            onChange={(value) =>
+                                form.setData('hub_content', value)
+                            }
+                            files={stagedFiles}
+                            attachments={existingAttachments}
+                            staff={staff}
+                            stories={storyOptions}
+                        />
+                        {publishing && !isSingleDate && (
+                            <section
+                                className="mt-6 space-y-3 border-t pt-6"
+                                aria-label="Event registration"
+                            >
+                                <h3 className="font-semibold">
+                                    Places & registration
+                                </h3>
+                                <label className="flex items-center gap-3 text-sm">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.data.registration_enabled}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'registration_enabled',
+                                                e.target.checked,
+                                            )
+                                        }
+                                    />
+                                    Open registration when published
+                                </label>
+                                <Field
+                                    label="Places per date · leave empty for unlimited"
+                                    error={form.errors.registration_capacity}
+                                >
+                                    <Input
+                                        aria-label="Places per date"
+                                        type="number"
+                                        min={1}
+                                        max={100000}
+                                        value={form.data.registration_capacity}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'registration_capacity',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                </Field>
+                                {publishing.cutoff_supported && (
+                                    <EventBookingCutoff
+                                        value={
+                                            form.data
+                                                .registration_closes_before_minutes
+                                        }
+                                        onChange={(value) =>
+                                            form.setData(
+                                                'registration_closes_before_minutes',
+                                                value,
+                                            )
+                                        }
+                                        disabled={form.processing}
+                                    />
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    Each date has its own places and waiting
+                                    list. Existing confirmed places are
+                                    protected when capacity changes.
+                                </p>
+                            </section>
+                        )}
                     </WizardStepPane>
                 )}
 
@@ -1295,8 +1835,16 @@ export function EventWizardDialog({
                     <WizardStepPane>
                         <StepHead
                             icon={ClipboardCheck}
-                            title="Review & save"
-                            blurb="Check the details, then save the event."
+                            title={
+                                publishing
+                                    ? 'Review & publish'
+                                    : 'Review & save'
+                            }
+                            blurb={
+                                publishing
+                                    ? 'Save privately, ask for a review, or publish when you have permission. Staff see changes only after publication.'
+                                    : 'Check the details, then save the event.'
+                            }
                         />
                         <ReviewCard
                             icon={RailIcon}
@@ -1332,8 +1880,9 @@ export function EventWizardDialog({
                                 <ReviewRow
                                     label="Reminders"
                                     value={form.data.reminders
-                                        .map((r) =>
-                                            reminderLabel(r.offset_minutes),
+                                        .map(
+                                            (r) =>
+                                                `${reminderLabel(r.offset_minutes)} · ${r.channel === 'email' ? 'Email' : 'In-app'}`,
                                         )
                                         .join(', ')}
                                 />
@@ -1357,6 +1906,56 @@ export function EventWizardDialog({
                                     value={form.data.description}
                                 />
                             ) : null}
+                            {form.data.hub_content.host_id && (
+                                <ReviewRow
+                                    label="Host"
+                                    value={
+                                        staff.find(
+                                            (person) =>
+                                                Number(person.value) ===
+                                                form.data.hub_content.host_id,
+                                        )?.label ?? 'Selected colleague'
+                                    }
+                                />
+                            )}
+                            {form.data.hub_content.agenda && (
+                                <ReviewRow
+                                    label="Agenda"
+                                    value={form.data.hub_content.agenda}
+                                />
+                            )}
+                            <ReviewRow
+                                label="Event cover"
+                                value={
+                                    form.data.hub_content.cover_ref
+                                        ? 'Selected photo'
+                                        : 'No cover image'
+                                }
+                            />
+                            {form.data.hub_content.recap && (
+                                <ReviewRow
+                                    label="Recap (after the event)"
+                                    value={form.data.hub_content.recap}
+                                />
+                            )}
+                            {form.data.hub_content.gallery_refs.length > 0 && (
+                                <ReviewRow
+                                    label="Recap gallery"
+                                    value={`${form.data.hub_content.gallery_refs.length} selected photos`}
+                                />
+                            )}
+                            {form.data.hub_content.story_id && (
+                                <ReviewRow
+                                    label="Related story"
+                                    value={
+                                        storyOptions.find(
+                                            (story) =>
+                                                story.id ===
+                                                form.data.hub_content.story_id,
+                                        )?.title ?? 'Selected story'
+                                    }
+                                />
+                            )}
                         </ReviewCard>
                     </WizardStepPane>
                 )}

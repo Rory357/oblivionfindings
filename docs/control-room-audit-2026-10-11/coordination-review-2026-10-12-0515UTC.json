@@ -1,0 +1,57 @@
+{
+  "checked_at_utc": "2026-10-12T05:14:50Z",
+  "scope_sha256": "579791F57A66C790541BF347E40C158103D4FC3863ECEAB9D0C6039F58652BF3",
+  "targets": [
+    {
+      "threadId": "01a12a29-0449-7150-ba1e-0a66a970110e",
+      "cursor": "a8154e4a-be4a-449b-a690-548c53e7eaf3:32",
+      "status": "idle",
+      "turnId": "01a12c7e-9557-74a2-ac94-541bae0b912a"
+    },
+    {
+      "threadId": "01a108fc-c419-7861-a22e-e5d4b7f26fd1",
+      "cursor": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:36",
+      "status": "active",
+      "turnId": "01a12e0b-9a93-7f73-a1ed-0458089f979d"
+    },
+    {
+      "threadId": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+      "cursor": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:53",
+      "status": "active",
+      "turnId": "01a12e2e-2669-7353-971c-b266bfe35535"
+    }
+  ],
+  "human_decision": {
+    "threadId": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+    "userMessageId": "01a12e6d-e559-7061-a5e5-ce9d0398f8ab",
+    "question": "When a report names the usual manager or another staff member as involved, should that person also be blocked from reading the report and receiving its notifications during independent review?",
+    "answer": "make this a setting",
+    "verified_direct_user_message": true,
+    "implementation_choices_not_additional_human_answers": [
+      "Stronger read/notification/assignment protection by default",
+      "Retain each report's accepted policy"
+    ]
+  },
+  "coordination": {
+    "action": "One concise message to H&S: carry the canonical accepted-report-policy/current-involved-person source admission through audit, Tasks, notifications and linked CR details; assignment-only mode grants no read rights or privacy bypass. Document legacy policy provenance and preserve independent urgent CR work.",
+    "shared_five_consumer_owner": "H&S unchanged",
+    "control_room_restarted": false,
+    "parent_runtime_or_app_edits": false,
+    "new_human_question": false,
+    "approved_contract_updated": true
+  },
+  "workforce_owner_report": {
+    "navigation": "CommunicationWorkspaceRail and Handovers/Shift notes owning pages changed locally; distinct tabs retain current route permissions and loaded week/Site. Source review, tests, lint and browser pending; no shared sidebar change.",
+    "timesheets": "Current-source full rerun deadline expired without counts; reviewed partition into two batches of whole suites. Batch A first attempt held before child, B unrun. Prior155 remains bound to commit763572ca, current two fixes uncommitted, push pending.",
+    "backend": "Request-only policy splice review found original-parent-binding and JSON-order fixture defects under repair. Named list authority/catalogue remain inactive pending coupled source, actual tests and full updater/HTTP admission.",
+    "acceptance": "No new completed package or runtime result verified this review"
+  },
+  "health_safety_owner_report": {
+    "routing": "Settings/draft/response recovery repairs and public/private chemical pages connected in isolated source; syntax/formatting owner-reported, behavioural/browser checks outstanding.",
+    "policy": "Two-mode setting in existing Incident routing view, no extra navigation destination; entry-point/notification adoption in progress.",
+    "acceptance": "No completed combined source/API/notification handoff"
+  },
+  "next_gate": "Completed canonical H&S source-policy and combined notification handoff; WF actual same-source eight-suite result, targeted owned integration and verified navigation. No full design/workflow sign-off.",
+  "heartbeat": "ACTIVE",
+  "all_scopes_complete": false
+}

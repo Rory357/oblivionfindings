@@ -11,6 +11,7 @@ use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteChecklistTemplateItem;
 use App\Models\SiteCredential;
+use App\Models\SiteCredentialAuditLog;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SiteVendor;
 use App\Models\User;
@@ -335,11 +336,29 @@ class SitesModuleIntegrationTest extends TestCase
         $this->assertSame(0, $scheduler->generateRunsForAssignment($assignment, now()->addDays(7)));
         $this->assertSame(1, SiteChecklistRun::where('assignment_id', $assignment->id)->count());
 
-        $run->update([
-            'status' => 'completed',
-            'completed_at' => now(),
-            'completed_by_user_id' => $this->admin->id,
+        $item = SiteChecklistTemplateItem::create([
+            'template_id' => $template->id,
+            'sort_order' => 1,
+            'question' => 'Are the exits clear?',
+            'response_type' => 'yes_no',
+            'is_required' => true,
         ]);
+        $responses = [['template_item_id' => $item->id, 'response_value' => 'yes']];
+
+        $this->actingAs($this->admin)
+            ->postJson("/checklists/runs/{$run->id}/complete", ['responses' => $responses])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('signature_name');
+        $this->assertSame('in_progress', $run->fresh()->status);
+        $this->assertNull($run->fresh()->signature_payload_hash);
+
+        $this->actingAs($this->admin)
+            ->post("/checklists/runs/{$run->id}/complete", [
+                'responses' => $responses,
+                'signature_name' => $this->admin->name,
+            ])
+            ->assertRedirect();
+        $this->assertTrue($run->fresh()->hasVerifiableSignatureProvenance());
 
         $this->assertSame(1, $scheduler->generateRunsForAssignment($assignment->fresh(), now()->addDays(7)));
         $this->assertSame(2, SiteChecklistRun::where('assignment_id', $assignment->id)->count());
@@ -361,11 +380,33 @@ class SitesModuleIntegrationTest extends TestCase
 
         $this->actingAs($this->admin)
             ->postJson("/sites/{$site->id}/credentials/{$credential->id}/reveal")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('verification_code')
+            ->assertJsonMissingPath('value');
+        $this->assertFalse(SiteCredentialAuditLog::query()
+            ->where('credential_id', $credential->id)
+            ->whereIn('action', ['reveal', 'copy_intent', 'copy_reported_succeeded'])
+            ->exists());
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$site->id}/credentials/{$credential->id}/reveal", ['password' => 'password'])
             ->assertOk()
             ->assertJson(['value' => 'TopSecretValue']);
 
+        $copy = $this->actingAs($this->admin)
+            ->postJson("/sites/{$site->id}/credentials/{$credential->id}/copy", ['password' => 'password'])
+            ->assertOk()
+            ->assertJson(['value' => 'TopSecretValue'])
+            ->assertJsonStructure(['intent_id']);
+        $this->assertDatabaseMissing('site_credential_audit_logs', [
+            'credential_id' => $credential->id,
+            'action' => 'copy_reported_succeeded',
+        ]);
         $this->actingAs($this->admin)
-            ->postJson("/sites/{$site->id}/credentials/{$credential->id}/copy")
+            ->postJson("/sites/{$site->id}/credentials/{$credential->id}/copy-result", [
+                'intent_id' => $copy->json('intent_id'),
+                'outcome' => 'succeeded',
+            ])
             ->assertOk();
 
         $this->assertDatabaseHas('site_credential_audit_logs', [
@@ -375,7 +416,12 @@ class SitesModuleIntegrationTest extends TestCase
 
         $this->assertDatabaseHas('site_credential_audit_logs', [
             'credential_id' => $credential->id,
-            'action' => 'copy',
+            'action' => 'copy_intent',
+        ]);
+        $this->assertDatabaseHas('site_credential_audit_logs', [
+            'credential_id' => $credential->id,
+            'action' => 'copy_reported_succeeded',
+            'copy_intent_id' => $copy->json('intent_id'),
         ]);
     }
 

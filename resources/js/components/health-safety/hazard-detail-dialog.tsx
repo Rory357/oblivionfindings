@@ -29,6 +29,7 @@ import {
     type HazardDetail,
     type HazardSectionKey,
 } from '@/components/health-safety/hazard-kit';
+import { HazardStaffPicker } from '@/components/health-safety/hazard-staff-picker';
 import { Button } from '@/components/ui/button';
 import {
     AttachmentUploader,
@@ -49,7 +50,7 @@ import {
     WizardShell,
     type WizardStep,
 } from '@/components/wizard/shell';
-import { Link, useForm } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -76,8 +77,21 @@ import {
     Wrench,
     type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState, type ComponentType, type FormEvent } from 'react';
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    type ComponentType,
+    type FormEvent,
+} from 'react';
 
+import {
+    useSafetyDraftState,
+    useSafetyForm,
+} from '@/hooks/use-safety-workspace-drafts';
+import { toDateInput } from '@/lib/datetime';
+export const HazardPaneCancelContext = createContext<(() => void) | null>(null);
 /* --------------------------------------------------------------- panes */
 
 type ActivePane =
@@ -109,10 +123,7 @@ function paneFromAction(action: HazardActionKey | null): ActivePane | null {
 }
 
 function todayInput(): string {
-    const d = new Date();
-    return new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-        .toISOString()
-        .slice(0, 10);
+    return toDateInput(new Date());
 }
 
 function staffOptions(
@@ -245,7 +256,7 @@ export function HazardDetailDialog({
             </span>
             {d.worksafe_notifiable ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2 py-0.5 font-medium text-status-critical">
-                    <ShieldAlert className="h-3 w-3" /> WorkSafe-notifiable
+                    <ShieldAlert className="h-3 w-3" /> Critical rating
                 </span>
             ) : null}
         </div>
@@ -256,7 +267,7 @@ export function HazardDetailDialog({
     const footerEnd = pane ? null : readOnly ? (
         <Link
             href={`${registerHref}?site_id=${d.site?.id ?? ''}&hazard=${d.id}`}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3 py-2 text-sm font-medium text-primary-fill-foreground transition-colors hover:bg-primary-fill/90"
         >
             <ExternalLink className="h-4 w-4" /> Open in register
         </Link>
@@ -460,7 +471,7 @@ function OverviewSection({ d }: { d: HazardDetail }) {
                     <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-status-critical" />
                     <div>
                         <p className="text-sm font-semibold text-status-critical">
-                            WorkSafe-notifiable hazard
+                            Critical hazard · review needed
                         </p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                             {WORKSAFE_BANNER}
@@ -612,9 +623,12 @@ function RiskSection({ d }: { d: HazardDetail }) {
             </div>
 
             <div>
-                <SectionLabel icon={Gauge}>WorkSafe risk matrix</SectionLabel>
+                <SectionLabel icon={Gauge}>Hazard risk matrix</SectionLabel>
                 <p className="mt-0.5 mb-2 text-xs text-muted-foreground">
                     Severity × Likelihood. The current rating is highlighted.
+                    <span className="block sm:hidden">
+                        Scroll across to see all ratings.
+                    </span>
                 </p>
                 <HazardRiskMatrix
                     severity={d.severity}
@@ -855,7 +869,7 @@ function EvidenceSection({ d, canAct }: { d: HazardDetail; canAct: boolean }) {
                 <SectionLabel icon={Camera}>Photos</SectionLabel>
                 {canAct ? (
                     <div className="mt-2">
-                        <AttachmentUploader
+                        <HazardAttachmentUploader
                             endpoint={`/hazards/${d.id}/media`}
                             accept="image/*"
                             hint="JPG, PNG — up to 10 MB each"
@@ -878,7 +892,7 @@ function EvidenceSection({ d, canAct }: { d: HazardDetail; canAct: boolean }) {
                 </SectionLabel>
                 {canAct ? (
                     <div className="mt-2">
-                        <AttachmentUploader
+                        <HazardAttachmentUploader
                             endpoint={`/hazards/${d.id}/media`}
                             accept=".pdf,.doc,.docx,.xls,.xlsx"
                             hint="PDF, DOC — reports, SDS, certificates"
@@ -908,6 +922,14 @@ function EvidenceSection({ d, canAct }: { d: HazardDetail; canAct: boolean }) {
             ) : null}
         </div>
     );
+}
+
+function HazardAttachmentUploader(
+    props: React.ComponentProps<typeof AttachmentUploader>,
+) {
+    const [state, setState] = useState({ dirty: false, busy: false });
+    useSafetyDraftState(state);
+    return <AttachmentUploader {...props} onStateChange={setState} />;
 }
 
 function ImageGallery({ paths }: { paths: string[] }) {
@@ -1074,25 +1096,30 @@ function PaneFooter({
     submitLabel,
     processing,
     danger = false,
+    disabled = false,
 }: {
     onDone: () => void;
     submitLabel: string;
     processing: boolean;
     danger?: boolean;
+    disabled?: boolean;
 }) {
+    const cancel = useContext(HazardPaneCancelContext) ?? onDone;
     return (
         <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onDone}>
+            <Button
+                type="button"
+                variant="outline"
+                className="frontline-tap"
+                onClick={cancel}
+            >
                 Cancel
             </Button>
             <Button
                 type="submit"
-                disabled={processing}
-                className={
-                    danger
-                        ? 'bg-status-critical text-primary-foreground hover:bg-status-critical/90'
-                        : ''
-                }
+                disabled={processing || disabled}
+                className="frontline-tap"
+                variant={danger ? 'destructive' : 'default'}
             >
                 {processing ? (
                     <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
@@ -1145,12 +1172,24 @@ function PaneRenderer({
 }
 
 function AssignPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
-    const form = useForm<{ assigned_to_user_id: string; due_date: string }>({
+    const form = useSafetyForm<{
+        assigned_to_user_id: string;
+        due_date: string;
+        expected_assigned_to_user_id: number | null;
+        expected_due_date: string | null;
+    }>({
         assigned_to_user_id: d.assigned_to ? String(d.assigned_to.id) : '',
         due_date: d.due_date ?? '',
+        expected_assigned_to_user_id: d.assigned_to?.id ?? null,
+        expected_due_date: d.due_date,
     });
+    const changed =
+        form.data.expected_assigned_to_user_id !==
+            (d.assigned_to?.id ?? null) ||
+        form.data.expected_due_date !== d.due_date;
     const submit = (e: FormEvent) => {
         e.preventDefault();
+        if (changed) return;
         form.post(`/hazards/${d.id}/assign`, {
             preserveScroll: true,
             onSuccess: onPaneSuccess(onDone),
@@ -1168,11 +1207,12 @@ function AssignPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                 required
                 error={form.errors.assigned_to_user_id}
             >
-                <SelectInput
+                <HazardStaffPicker
                     value={form.data.assigned_to_user_id}
                     onChange={(v) => form.setData('assigned_to_user_id', v)}
                     placeholder="Select a staff member"
                     options={staffOptions(d)}
+                    disabled={form.processing}
                 />
             </Field>
             <Field label="Due date" error={form.errors.due_date}>
@@ -1182,17 +1222,42 @@ function AssignPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                     onChange={(e) => form.setData('due_date', e.target.value)}
                 />
             </Field>
+            {changed ? (
+                <InfoCard icon={AlertTriangle} tone="warn">
+                    <p>
+                        The assignment changed while you were editing. Current
+                        owner: {d.assigned_to?.name ?? 'Unassigned'}. Due date:{' '}
+                        {d.due_date ? fmtDay(d.due_date) : 'Not set'}. Review
+                        these details before saving your proposed change.
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="frontline-tap mt-2 h-auto whitespace-normal"
+                        onClick={() => {
+                            form.setData(
+                                'expected_assigned_to_user_id',
+                                d.assigned_to?.id ?? null,
+                            );
+                            form.setData('expected_due_date', d.due_date);
+                        }}
+                    >
+                        I have reviewed the current assignment
+                    </Button>
+                </InfoCard>
+            ) : null}
             <PaneFooter
                 onDone={onDone}
                 submitLabel="Save assignment"
                 processing={form.processing}
+                disabled={changed}
             />
         </form>
     );
 }
 
 function StartPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
-    const form = useForm<{ status: string; note: string }>({
+    const form = useSafetyForm<{ status: string; note: string }>({
         status: 'in_progress',
         note: '',
     });
@@ -1232,7 +1297,7 @@ function StartPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
 }
 
 function MitigatePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
-    const form = useForm<{
+    const form = useSafetyForm<{
         status: string;
         control_hierarchy: string[];
         residual_severity: string;
@@ -1286,7 +1351,7 @@ function MitigatePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                                 className={`flex items-center gap-3 rounded-lg border p-2.5 text-left transition-colors ${on ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted'}`}
                             >
                                 <span
-                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${on ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${on ? 'bg-primary-fill text-primary-fill-foreground' : 'bg-muted text-muted-foreground'}`}
                                 >
                                     {on ? (
                                         <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1364,7 +1429,7 @@ function MitigatePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
 }
 
 function AddActionPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
-    const form = useForm<{
+    const form = useSafetyForm<{
         title: string;
         action_type: string;
         assigned_to_user_id: string;
@@ -1388,7 +1453,7 @@ function AddActionPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
             <StepHead
                 icon={ListChecks}
                 title="Add corrective action"
-                blurb="Log a corrective action against this hazard. It becomes trackable in the corrective-action register."
+                blurb="Record an action on this hazard. All its actions must be completed before the hazard can close."
             />
             <Field label="Action title" required error={form.errors.title}>
                 <Input
@@ -1417,7 +1482,7 @@ function AddActionPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                 </Field>
             </div>
             <Field label="Owner" error={form.errors.assigned_to_user_id}>
-                <SelectInput
+                <HazardStaffPicker
                     value={form.data.assigned_to_user_id}
                     onChange={(v) => form.setData('assigned_to_user_id', v)}
                     placeholder="Assign to"
@@ -1442,7 +1507,7 @@ function CompleteActionPane({
     a: HazardAction;
     onDone: () => void;
 }) {
-    const form = useForm<{ completion_notes: string }>({
+    const form = useSafetyForm<{ completion_notes: string }>({
         completion_notes: '',
     });
     const submit = (e: FormEvent) => {
@@ -1488,7 +1553,7 @@ function CompleteActionPane({
 }
 
 function ReviewPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
-    const form = useForm<{ note: string }>({ note: '' });
+    const form = useSafetyForm<{ note: string }>({ note: '' });
     const submit = (e: FormEvent) => {
         e.preventDefault();
         form.post(`/hazards/${d.id}/review`, {
@@ -1523,7 +1588,7 @@ function ReviewPane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
 function ClosePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
     const gate = d.close_gate;
     const blocked = (gate?.blockers.length ?? 0) > 0;
-    const form = useForm<{
+    const form = useSafetyForm<{
         resolution_summary: string;
         resolution_evidence: File[];
     }>({ resolution_summary: '', resolution_evidence: [] });
@@ -1554,7 +1619,6 @@ function ClosePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
             />
             {/* eslint-disable-next-line no-restricted-syntax -- closure gate checklist surface */}
             <div className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 p-3">
-                <GateRow ok label="Hazard reviewed" />
                 <GateRow
                     ok={gate?.actions_ok ?? true}
                     label={
@@ -1567,8 +1631,8 @@ function ClosePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
             </div>
             {blocked ? (
                 <InfoCard icon={AlertTriangle} tone="warn">
-                    You can still close this hazard, but outstanding corrective
-                    actions remain open in the register.
+                    Complete the outstanding corrective actions before closing
+                    this hazard.
                 </InfoCard>
             ) : null}
             <Field
@@ -1610,8 +1674,18 @@ function ClosePane({ d, onDone }: { d: HazardDetail; onDone: () => void }) {
                 onDone={onDone}
                 submitLabel="Close hazard"
                 processing={form.processing}
+                disabled={blocked}
                 danger
             />
         </form>
     );
 }
+
+export {
+    ActionsSection as HazardActionsSection,
+    EvidenceSection as HazardEvidenceSection,
+    HistorySection as HazardHistorySection,
+    OverviewSection as HazardOverviewSection,
+    PaneRenderer as HazardPaneRenderer,
+    RiskSection as HazardRiskSection,
+};

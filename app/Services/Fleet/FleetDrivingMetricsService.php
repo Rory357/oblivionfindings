@@ -5,6 +5,7 @@ namespace App\Services\Fleet;
 use App\Models\FleetDrivingMetric;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetVehicleStateSnapshot;
+use App\Support\SchemaCache;
 
 class FleetDrivingMetricsService
 {
@@ -17,6 +18,7 @@ class FleetDrivingMetricsService
             return;
         }
 
+        $hasOtherHarsh = SchemaCache::hasColumn('fleet_driving_metrics', 'harsh_other_count');
         $periodDate = $event->occurred_at?->copy()->startOfDay() ?? now()->startOfDay();
         $metric = FleetDrivingMetric::firstOrCreate(
             [
@@ -27,6 +29,7 @@ class FleetDrivingMetricsService
             [
                 'harsh_brake_count' => 0,
                 'accel_count' => 0,
+                ...($hasOtherHarsh ? ['harsh_other_count' => 0] : []),
                 'speeding_events' => 0,
                 'idle_minutes' => 0,
                 'score' => 100,
@@ -38,13 +41,31 @@ class FleetDrivingMetricsService
         $idleAfterMinutes = (int) config('fleet.behaviour.idle_after_minutes', 2);
         $maxIdleIncrement = (int) config('fleet.behaviour.max_idle_increment_minutes', 15);
 
+        // Queclink reports harsh driving as `harsh_behaviour` and speed alarms
+        // as `speed_alarm`; both carry their kind in the report type.
         $eventType = $event->event_type ?? '';
-        $harshBrakingTypes = ['harsh_braking', 'harsh_brake', 'brake_hard'];
-        $harshAccelTypes = ['harsh_acceleration', 'rapid_acceleration', 'accel_hard'];
+        $reportType = in_array($eventType, FleetDrivingEventClassifier::REPORT_TYPED_EVENTS, true)
+            ? FleetDrivingEventClassifier::reportType($event->raw_payload)
+            : null;
+        $harshKind = FleetDrivingEventClassifier::harshKind($eventType, $reportType);
 
-        $harshBrakeCount = in_array($eventType, $harshBrakingTypes, true) ? 1 : 0;
-        $accelCount = in_array($eventType, $harshAccelTypes, true) ? 1 : 0;
-        $speedingCount = ($event->speed_kph !== null && $event->speed_kph >= $speedingKph) ? 1 : 0;
+        $harshBrakeCount = $harshKind === FleetDrivingEventClassifier::BRAKING ? 1 : 0;
+        $accelCount = $harshKind === FleetDrivingEventClassifier::ACCELERATION ? 1 : 0;
+        // Cornering, or a harsh report whose type was not recorded.
+        $harshOtherCount = in_array($harshKind, [FleetDrivingEventClassifier::CORNERING, FleetDrivingEventClassifier::UNCLASSIFIED], true) ? 1 : 0;
+
+        // Speeding counts episodes, not packets: a tracker speed alarm (unless
+        // it reports the speed coming back into range), or a sample that
+        // crosses the fleet threshold from below.
+        $alarmPhase = FleetDrivingEventClassifier::speedAlarmPhase($eventType, $reportType);
+        if ($alarmPhase !== null) {
+            $speedingCount = $alarmPhase === 'end' ? 0 : 1;
+        } else {
+            $speedingCount = $event->speed_kph !== null
+                && (float) $event->speed_kph >= $speedingKph
+                && ($previousEvent?->speed_kph === null || (float) $previousEvent->speed_kph < $speedingKph)
+                ? 1 : 0;
+        }
 
         $idleIncrement = 0;
         if (
@@ -65,6 +86,7 @@ class FleetDrivingMetricsService
 
         if ($harshBrakeCount) $metric->increment('harsh_brake_count', $harshBrakeCount);
         if ($accelCount) $metric->increment('accel_count', $accelCount);
+        if ($harshOtherCount && $hasOtherHarsh) $metric->increment('harsh_other_count', $harshOtherCount);
         if ($speedingCount) $metric->increment('speeding_events', $speedingCount);
         if ($idleIncrement) $metric->increment('idle_minutes', $idleIncrement);
 
@@ -80,10 +102,14 @@ class FleetDrivingMetricsService
         $accelWeight = (int) ($weights['accel'] ?? 3);
         $speedingWeight = (int) ($weights['speeding'] ?? 4);
         $idleWeight = (float) ($weights['idle'] ?? 0.5);
+        // No weight is configured for cornering or unclassified harsh reports;
+        // they take the lower acceleration weight rather than an invented one.
+        $otherHarshWeight = (int) ($weights['harsh_other'] ?? $accelWeight);
 
         $score = 100
             - ($metric->harsh_brake_count * $harshBrakeWeight)
             - ($metric->accel_count * $accelWeight)
+            - ((int) ($metric->harsh_other_count ?? 0) * $otherHarshWeight)
             - ($metric->speeding_events * $speedingWeight)
             - (int) round($metric->idle_minutes * $idleWeight);
 

@@ -323,6 +323,8 @@ class InspectionController extends Controller
                 'user' => $run->user ? ['id' => $run->user->id, 'name' => $run->user->name] : null,
                 'passed' => $run->passed,
                 'outcome' => $run->outcome ?? 'needs_assessment',
+                // Daily checks are recorded observations: no rule assesses their answers.
+                'check_kind' => $run->check_kind,
                 'presented_template' => $run->presented_template_json,
                 'answer_outcomes' => $answerOutcomes,
                 'notes' => $run->notes,

@@ -619,10 +619,10 @@ export function KnowledgeRevisionDialog({
                                     event.preventDefault();
                                     command();
                                 }}
-                                className={
+                                variant={
                                     confirmation === 'discard'
-                                        ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                                        : undefined
+                                        ? 'destructive'
+                                        : 'default'
                                 }
                             >
                                 {busy

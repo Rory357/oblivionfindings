@@ -1,0 +1,49 @@
+{
+  "reviewed_at_utc": "2026-10-12T07:40:45Z",
+  "status": "HOLD_SOURCE_COPY_PRIVACY",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "source_receipt_sha256": "98F3496FBAB33EB648F37BA179707163D481B1003CAD7A1EDDC935F605AB587D",
+  "source_pins_checked": 12,
+  "source_pin_mismatches": [],
+  "review_scope": "New accepted-history services/controller branch, frontend history and editable dispatch, related canonical snapshot/note projection and persistence, whole new backend history test source. No broad source or runtime certification.",
+  "positive_source_observations": [
+    "Explicit accepted-state GET validates persisted prepared payload, acceptance identity/time/duty linkage and matching audit/version.",
+    "Accepted frontend component mounts before editable draft hooks and has no form, write callback or draft effect.",
+    "Command and prepared validator hashes match the prior accepted baseline; no acceptance relaxation inferred.",
+    "Incomplete persisted acceptance is unavailable without rebuilding a live workload or backfilling history."
+  ],
+  "findings": [
+    {
+      "id": "CR-HISTORY-NOTES-01",
+      "priority": 1,
+      "paths": [
+        "app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php::acceptedHistoryProperties",
+        "app/Services/ControlRoom/ControlRoomGovernanceReadService.php::forSnapshotViewer",
+        "resources/js/pages/control-room/shifts/accepted-handover-history.tsx:82"
+      ],
+      "finding": "Saved Site/person binding is checked only for required alert rows. Canonical source shaping only maps snapshot.alerts, leaving copied pinned/follow-up notes unchanged. Note-only alert IDs can be currently readable after original Site/person reassociation or private-source withdrawal, while the saved note content still belongs to the old source context.",
+      "impact": "New accepted-history props/body can expose old copied information to a viewer who no longer has the original source authority.",
+      "repair": "Use canonical original-note/source provenance and current admission; when original proof is unavailable explicitly withhold copied content. Preserve independently proved operator text and lawful transfer history, never infer provenance from today's association or rewrite historical storage. Coordinate any narrow H&S API need rather than forking its policy.",
+      "acceptance": "Actual persisted pinned/follow-up note-only histories with Site/person rebind and private-source withdrawal; lawful unchanged and independent operational positives; matching unavailable count/body and no GET mutations. Existing summary-only denial case is insufficient."
+    },
+    {
+      "id": "CR-HISTORY-NOTES-02",
+      "priority": 2,
+      "finding": "The Notes meter and body concatenate pinned and follow-up arrays; one note satisfying both flags is counted/rendered twice.",
+      "repair": "Deduplicate by canonical note ID in the permitted display projection and count."
+    }
+  ],
+  "actual_verification": {
+    "supplement_sha256": "7146F25325AEF809BD2A33ABC3DEAA3EAB963DEF8DAEC9312A3F55819ED5A419",
+    "config_sha256": "BA55A230A512AC837F2CC98D5D42AE97FEC07E6FED210167BDD629613F0EA9A9",
+    "result_sha256": "F52E1735606475253FBEEE77194BEFAABA7588D94C24F7401DF368DBDE2AE74A",
+    "hashes_match": true,
+    "state": "HELD_OR_FAILED",
+    "started": false,
+    "exit": null,
+    "test_counts": null,
+    "after_read_complete": true,
+    "native_and_browser": "UNRUN"
+  },
+  "coordination_action": "One finding/action/acceptance message sent to authorised CR owner. No H&S owner change, shared route adoption, duplicate test or app source edit."
+}

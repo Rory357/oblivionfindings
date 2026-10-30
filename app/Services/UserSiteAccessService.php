@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\WorkplaceInjury;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class UserSiteAccessService
 {
@@ -1127,6 +1128,21 @@ class UserSiteAccessService
     }
 
     /**
+     * Clients in the user's client Site scope that ClientPolicy::view also
+     * allows — the policy has no SQL form, so it is evaluated per client.
+     *
+     * @param  array<int, string>  $bypassPermissions
+     * @return array<int, int>
+     */
+    public function viewableClientIds(User $user, array $bypassPermissions = []): array
+    {
+        return $this->applyClientScope(Client::query(), $user, $bypassPermissions)
+            ->get()
+            ->filter(fn (Client $client) => Gate::forUser($user)->allows('view', $client))
+            ->modelKeys();
+    }
+
+    /**
      * @param  array<int, string>  $bypassPermissions
      */
     public function applyClientIncidentScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
@@ -1337,8 +1353,13 @@ SQL;
     /**
      * @param  array<int, string>  $bypassPermissions
      */
-    public function applyStaffScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
+    public function applyStaffScope(Builder $query, ?User $user, array $bypassPermissions = [], ?CurrentAuthorizationReads $reads = null): Builder
     {
+        // Caller prepares/locks the actor; refresh only staff/Site query evidence.
+        if ($reads) {
+            $reads->assertActive();
+            $reads->query($query);
+        }
         $query->staff()
             ->whereNotNull($query->qualifyColumn('approved_at'))
             ->whereHas('hrEmployeeProfile', fn (Builder $profileQuery) => $this->applyCurrentEmployeeProfileScope($profileQuery));
@@ -1347,7 +1368,7 @@ SQL;
             return $query;
         }
 
-        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions);
+        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions, $reads);
         if ($siteIds === []) {
             return $query->whereRaw('1 = 0');
         }
@@ -1458,9 +1479,9 @@ SQL;
      * Scope retained employee provenance through the explicit HR all-Sites
      * permission while continuing to reject missing or invalid Site identity.
      */
-    public function applyHistoricalHrEmployeeStaffScope(Builder $query, ?User $user): Builder
+    public function applyHistoricalHrEmployeeStaffScope(Builder $query, ?User $user, ?CurrentAuthorizationReads $reads = null): Builder
     {
-        $siteIds = $this->accessibleSiteIds($user, self::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS);
+        $siteIds = $this->accessibleSiteIds($user, self::HR_EMPLOYEE_SITE_BYPASS_PERMISSIONS, $reads);
         if ($siteIds === []) {
             return $query->whereRaw('1 = 0');
         }
@@ -1474,6 +1495,10 @@ SQL;
                     $siteQuery->orWhereJsonContains('secondary_site_ids', $siteId);
                 }
             });
+
+        if ($reads) {
+            $reads->query($profiles);
+        }
 
         return $query->whereIn($query->qualifyColumn('id'), $profiles);
     }
@@ -1635,14 +1660,14 @@ SQL;
     /**
      * @param  array<int, string>  $bypassPermissions
      */
-    public function applyAlertScope(Builder $query, ?User $user, array $bypassPermissions = []): Builder
+    public function applyAlertScope(Builder $query, ?User $user, array $bypassPermissions = [], ?CurrentAuthorizationReads $reads = null): Builder
     {
-        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions);
+        $siteIds = $this->accessibleSiteIds($user, $bypassPermissions, $reads);
         if ($siteIds === []) {
             return $query->whereRaw('1 = 0');
         }
 
-        return $this->applyAlertSitePrecedenceScope($query, $siteIds);
+        return $reads ? $reads->query($this->applyAlertSitePrecedenceScope($query, $siteIds)) : $this->applyAlertSitePrecedenceScope($query, $siteIds);
     }
 
     /**
@@ -1669,7 +1694,7 @@ SQL;
      * SQL expression for the same effective site precedence used by alert
      * authorization: direct alert site, direct client site, then context site.
      */
-    public function alertEffectiveSiteExpression(Builder $query): string
+    public function alertEffectiveSiteExpression(Builder $query, ?CurrentAuthorizationReads $reads = null): string
     {
         $table = $query->getModel()->getTable();
         $alertSiteColumn = sprintf('`%s`.`site_id`', $table);
@@ -1678,6 +1703,12 @@ SQL;
             '(SELECT `cr_effective_client`.`site_id` FROM `clients` AS `cr_effective_client` WHERE `cr_effective_client`.`id` = %s AND `cr_effective_client`.`deleted_at` IS NULL LIMIT 1)',
             $alertClientColumn,
         );
+
+        if ($reads !== null) {
+            $reads->assertActive();
+            // Raw scalar subqueries are outside lockTree: request their own current locking read.
+            $clientSiteExpression = str_replace('LIMIT 1)', 'LIMIT 1 FOR SHARE NOWAIT)', $clientSiteExpression);
+        }
 
         return sprintf(
             'COALESCE(%s, %s, %s)',
@@ -1904,7 +1935,7 @@ SQL;
         $userColumn = $query->qualifyColumn('user_id');
         $clientSite = "(SELECT `site_id` FROM `clients` AS `shift_client_site` WHERE `shift_client_site`.`id` = {$row}.`client_id` LIMIT 1)";
         $authoritativeSite = "COALESCE({$row}.`site_id`, {$clientSite})";
-        $today = now()->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return $query
             ->where(function (Builder $siteIntegrity) use ($siteColumn) {
@@ -1945,6 +1976,13 @@ SQL;
         $authoritativeSite = "COALESCE({$directSite}, {$shiftSite}, {$clientSite})";
 
         return $query
+            // Direct access already validates current linked-worker eligibility.
+            // Reuse that Shift query boundary so invalid rows cannot appear as
+            // approvable in the Timesheet list before a durable write denies them.
+            ->where(function (Builder $shiftIntegrity) use ($query): void {
+                $shiftIntegrity->whereNull($query->qualifyColumn('shift_id'))
+                    ->orWhereHas('shift', fn (Builder $shiftQuery) => $this->applyShiftIntrinsicIntegrity($shiftQuery));
+            })
             ->whereRaw("EXISTS (SELECT 1 FROM `users` AS `ts_user` WHERE `ts_user`.`id` = {$row}.`user_id`)")
             ->whereRaw("({$row}.`shift_site_id` IS NULL OR {$row}.`site_id` IS NULL OR {$row}.`shift_site_id` = {$row}.`site_id`)")
             ->whereRaw("{$authoritativeSite} IS NOT NULL")
@@ -2188,7 +2226,7 @@ SQL;
 
     private function applyCurrentEmployeeProfileScope(Builder $query): Builder
     {
-        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return $query
             ->where($query->qualifyColumn('is_active'), true)
@@ -2204,7 +2242,7 @@ SQL;
 
     private function isCurrentEmployeeProfile(HrEmployeeProfile $profile): bool
     {
-        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        $today = now((string) (config('app.worker_timezone') ?: config('app.timezone') ?: 'UTC'))->toDateString();
 
         return ! $profile->trashed()
             && (bool) $profile->is_active
@@ -2219,3 +2257,4 @@ SQL;
             : null;
     }
 }
+

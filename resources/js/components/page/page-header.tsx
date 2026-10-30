@@ -15,12 +15,13 @@
  * PageHeaderFilterSelect, PageHeaderRail, …).
  *
  * Theme purity (enforced by the components/page/** ESLint scope): light
- * glass is --primary-foreground tokens, the sky/ring/meter surfaces are
+ * glass is --band-foreground tokens, the sky/ring/meter surfaces are
  * the `.eh-header` / `.eh-mark-ring` / `.eh-meter` utilities in app.css —
  * all --primary-derived via color-mix so branding retints everything
  * (safety tones stay the fixed status tokens).
  */
 import { Link, router } from '@inertiajs/react';
+import { Slot, Slottable } from '@radix-ui/react-slot';
 import {
     ArrowUpRight,
     Check,
@@ -33,14 +34,19 @@ import {
     X,
 } from 'lucide-react';
 import {
-    type ButtonHTMLAttributes,
-    type ComponentType,
-    type ReactNode,
-    type Ref,
+    createContext,
+    useCallback,
+    useContext,
     useEffect,
+    useId,
     useLayoutEffect,
     useRef,
     useState,
+    type ButtonHTMLAttributes,
+    type ComponentType,
+    type CSSProperties,
+    type ReactNode,
+    type Ref,
 } from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -65,12 +71,24 @@ import { cn } from '@/lib/utils';
 
 type IconType = ComponentType<{ className?: string }>;
 
+/** Opt in once on the band; React context also reaches its portalled menus. */
+const PageHeaderFrontlineContext = createContext(false);
+const PageHeaderRevealContext = createContext<(() => void) | undefined>(
+    undefined,
+);
+const useFrontlineTap = () =>
+    useContext(PageHeaderFrontlineContext) ? 'frontline-tap' : undefined;
+
 /* ------------------------------------------------------------------ */
 /*  The band                                                           */
 /* ------------------------------------------------------------------ */
 
 export interface PageHeaderProps {
+    /** Optional approved site's brand, scoped to the header's token-derived sky. */
+    brandColour?: string | null;
     variant?: 'index' | 'profile';
+    /** Actual ≥44px controls, with reflow, for support-worker surfaces only. */
+    frontline?: boolean;
     /** Module icon rendered inside the 48px Event Horizon ring. */
     icon?: IconType;
     /** Custom mark (e.g. an avatar) — wins over `icon`, rendered inside the ring. */
@@ -93,21 +111,38 @@ export interface PageHeaderProps {
     /** Top row, right: scoped search + glass secondaries + exactly ONE primary. */
     actions?: ReactNode;
     /**
+     * Record facts under the identity row — <PageHeaderFacts>: a few
+     * value + label chips (severity, owner, due date). Optional.
+     */
+    facts?: ReactNode;
+    /**
+     * One full-width strip in place of the meter row — <PageHeaderNumbers>
+     * (up to four number boxes) or <PageHeaderStages> (a record's stage
+     * line with its next step). Pass either `meters` or `strip`, not both.
+     */
+    strip?: ReactNode;
+    /**
      * The full-width meter row: 4–6 <PageHeaderMeterBlock> links. Every
      * block navigates to the view where its number lives; a block whose
      * data source doesn't exist yet is dropped, never faked (DESIGN.md
      * anti-pattern "dead or decorative meter blocks").
      */
     meters?: ReactNode;
-    /** Filter row: page-specific filter pills, all 23px tall. */
+    /** Filter row: compact pills by default; frontline mode grows their real boxes. */
     filters?: ReactNode;
+    /** Keep the current task visible on phones; all meters and filters remain expandable. */
+    mobileSummary?: string;
+    /** Supplementary content inside the existing expandable details region. */
+    expandedContent?: ReactNode;
     /** Bottom edge: the connected-tab rail — <PageHeaderRail>. */
     rail?: ReactNode;
     className?: string;
 }
 
 export function PageHeader({
+    brandColour,
     variant = 'index',
+    frontline = false,
     icon: Icon,
     mark,
     backHref,
@@ -117,104 +152,195 @@ export function PageHeader({
     titleChip,
     subline,
     actions,
+    facts,
+    strip,
     meters,
     filters,
+    mobileSummary,
+    expandedContent,
     rail,
     className,
 }: PageHeaderProps) {
+    const [mobileExpanded, setMobileExpanded] = useState(false);
+    const revealMobileDetails = useCallback(() => setMobileExpanded(true), []);
+    const summaryId = useId();
     return (
-        <header className={cn('eh-header text-primary-foreground', className)}>
-            <div className="relative z-[1] flex h-full flex-col">
-                <div className="flex flex-col px-[22px] pt-[18px]">
-                    {/* top row — identity left, search/actions right */}
-                    <div
-                        className={cn(
-                            'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6',
-                            wrapTitle && 'lg:flex-wrap',
-                        )}
-                    >
-                        <div
-                            className={cn(
-                                'flex min-w-0 items-start gap-[13px]',
-                                wrapTitle && 'lg:flex-[1_0_28rem]',
-                            )}
-                        >
-                            {variant === 'profile' && backHref ? (
-                                <Link
-                                    href={backHref}
-                                    aria-label="Back"
-                                    className="mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 transition-colors outline-none hover:bg-primary-foreground/20 focus-visible:ring-2 focus-visible:ring-primary-foreground/70"
-                                >
-                                    <ChevronLeft className="size-4" />
-                                </Link>
-                            ) : null}
-                            {mark ??
-                                (Icon ? (
-                                    <span className="eh-mark-ring">
-                                        <Icon className="size-5" />
-                                    </span>
-                                ) : null)}
-                            <div className="flex min-w-0 flex-col">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h1
-                                        dusk={titleDusk}
-                                        className={cn(
-                                            'text-[22px] leading-tight font-bold tracking-tight',
-                                            wrapTitle
-                                                ? 'max-w-full min-w-0 break-words whitespace-normal'
-                                                : 'truncate',
-                                        )}
-                                    >
-                                        {title}
-                                    </h1>
-                                    {titleChip}
-                                </div>
-                                {subline ? (
-                                    <p className="mt-[3px] text-[13px] text-primary-foreground/65">
-                                        {subline}
-                                    </p>
-                                ) : null}
-                            </div>
-                        </div>
-                        {actions ? (
+        <PageHeaderFrontlineContext.Provider value={frontline}>
+            <PageHeaderRevealContext.Provider
+                value={
+                    frontline && mobileSummary && expandedContent
+                        ? revealMobileDetails
+                        : undefined
+                }
+            >
+                <header
+                    style={
+                        brandColour
+                            ? ({ '--primary': brandColour } as CSSProperties)
+                            : undefined
+                    }
+                    className={cn(
+                        'eh-header text-band-foreground',
+                        frontline && 'eh-header-frontline',
+                        className,
+                    )}
+                >
+                    <div className="relative z-[1] flex h-full flex-col">
+                        <div className="flex flex-col px-[22px] pt-[18px]">
+                            {/* top row — identity left, search/actions right */}
                             <div
+                                data-slot="page-header-top"
                                 className={cn(
-                                    'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
-                                    wrapTitle && 'lg:ml-auto',
+                                    'flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6',
+                                    (wrapTitle || frontline) && 'lg:flex-wrap',
                                 )}
                             >
-                                {actions}
+                                <div
+                                    className={cn(
+                                        'flex min-w-0 items-start gap-[13px]',
+                                        wrapTitle && 'lg:flex-[1_0_28rem]',
+                                    )}
+                                >
+                                    {variant === 'profile' && backHref ? (
+                                        <Link
+                                            href={backHref}
+                                            aria-label="Back"
+                                            className={cn(
+                                                'mt-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 transition-colors outline-none hover:bg-band-foreground/20 focus-visible:ring-2 focus-visible:ring-band-foreground/70',
+                                                frontline && 'frontline-tap',
+                                            )}
+                                        >
+                                            <ChevronLeft className="size-4" />
+                                        </Link>
+                                    ) : null}
+                                    {mark ??
+                                        (Icon ? (
+                                            <span className="eh-mark-ring">
+                                                <Icon className="size-5" />
+                                            </span>
+                                        ) : null)}
+                                    <div className="flex min-w-0 flex-col">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <h1
+                                                dusk={titleDusk}
+                                                className={cn(
+                                                    'text-[22px] leading-tight font-bold tracking-tight',
+                                                    wrapTitle
+                                                        ? 'max-w-full min-w-0 break-words whitespace-normal'
+                                                        : 'truncate',
+                                                )}
+                                            >
+                                                {title}
+                                            </h1>
+                                            {titleChip}
+                                        </div>
+                                        {subline ? (
+                                            <p
+                                                data-slot="page-header-subline"
+                                                title={
+                                                    typeof subline === 'string'
+                                                        ? subline
+                                                        : undefined
+                                                }
+                                                className="mt-[3px] text-[13px] text-band-foreground/65"
+                                            >
+                                                {subline}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                {actions ? (
+                                    <div
+                                        className={cn(
+                                            'flex shrink-0 flex-wrap items-center gap-2 lg:justify-end',
+                                            wrapTitle &&
+                                                'max-w-full lg:ml-auto',
+                                            frontline &&
+                                                'w-full max-w-full min-w-0 lg:ml-auto lg:w-auto',
+                                        )}
+                                    >
+                                        {actions}
+                                    </div>
+                                ) : null}
                             </div>
-                        ) : null}
-                    </div>
 
-                    {/* the meter row — full width, every block a link */}
-                    {meters ? (
-                        <div className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2">
-                            {meters}
+                            {mobileSummary && (
+                                <button
+                                    type="button"
+                                    className="frontline-tap frontline-focus my-2 flex w-full items-center justify-between gap-2 rounded-lg border border-band-foreground/20 bg-band-foreground/10 px-3 text-left text-[13px] md:hidden"
+                                    aria-expanded={mobileExpanded}
+                                    aria-controls={summaryId}
+                                    onClick={() =>
+                                        setMobileExpanded((value) => !value)
+                                    }
+                                >
+                                    <span>{mobileSummary}</span>
+                                    <span className="shrink-0">
+                                        {mobileExpanded
+                                            ? 'Hide details'
+                                            : 'Details & filters'}
+                                    </span>
+                                </button>
+                            )}
+                            <div
+                                id={summaryId}
+                                className={cn(
+                                    mobileSummary &&
+                                        !mobileExpanded &&
+                                        'hidden md:block',
+                                )}
+                            >
+                                {expandedContent}
+                                {facts ? (
+                                    <div
+                                        data-slot="page-header-facts"
+                                        className="mt-3 flex flex-wrap items-center gap-2"
+                                    >
+                                        {facts}
+                                    </div>
+                                ) : null}
+                                {/* one strip: number boxes or a record's stage line */}
+                                {strip ? (
+                                    <div
+                                        data-slot="page-header-strip"
+                                        className="mt-[13px]"
+                                    >
+                                        {strip}
+                                    </div>
+                                ) : null}
+                                {/* the meter row — full width, every block a link */}
+                                {meters ? (
+                                    <div
+                                        data-slot="page-header-meters"
+                                        className="mt-[13px] flex min-h-[80px] flex-wrap items-stretch gap-2"
+                                    >
+                                        {meters}
+                                    </div>
+                                ) : null}
+
+                                {/* filter row */}
+                                {filters ? (
+                                    <div className="mt-[10px] flex flex-wrap items-center justify-end gap-1.5 pb-3">
+                                        {filters}
+                                    </div>
+                                ) : (
+                                    <div className="pb-3" />
+                                )}
+                            </div>
                         </div>
-                    ) : null}
 
-                    {/* filter row */}
-                    {filters ? (
-                        <div className="mt-[10px] flex flex-wrap items-center justify-end gap-1.5 pb-3">
-                            {filters}
-                        </div>
-                    ) : (
-                        <div className="pb-3" />
-                    )}
-                </div>
-
-                {/* the rail — main view tabs, flush with the bottom edge */}
-                {rail ? (
-                    <div className="flex min-h-[46px] shrink-0 items-end px-[14px]">
-                        {rail}
+                        {/* the rail — main view tabs, flush with the bottom edge */}
+                        {rail ? (
+                            <div className="flex min-h-[46px] shrink-0 items-end px-[14px]">
+                                {rail}
+                            </div>
+                        ) : (
+                            <div className="h-[18px] shrink-0" />
+                        )}
                     </div>
-                ) : (
-                    <div className="h-[18px] shrink-0" />
-                )}
-            </div>
-        </header>
+                </header>
+            </PageHeaderRevealContext.Provider>
+        </PageHeaderFrontlineContext.Provider>
     );
 }
 
@@ -262,15 +388,19 @@ export function PageHeaderSearch({
     onChange,
     onKeyDown,
     placeholder,
+    ariaLabel,
     className,
 }: {
     value: string;
     onChange: (value: string) => void;
     onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
     placeholder: string;
+    ariaLabel?: string;
     className?: string;
 }) {
     const inputRef = useRef<HTMLInputElement>(null);
+    const tap = useFrontlineTap();
+    const revealMobileDetails = useContext(PageHeaderRevealContext);
 
     useEffect(() => {
         const onKey = (e: KeyboardEvent) => {
@@ -286,11 +416,16 @@ export function PageHeaderSearch({
                 return;
             }
             e.preventDefault();
-            inputRef.current?.focus();
+            if (revealMobileDetails) {
+                revealMobileDetails();
+                requestAnimationFrame(() => inputRef.current?.focus());
+            } else {
+                inputRef.current?.focus();
+            }
         };
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
-    }, []);
+    }, [revealMobileDetails]);
 
     return (
         <div
@@ -299,7 +434,7 @@ export function PageHeaderSearch({
                 className,
             )}
         >
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-band-foreground/60" />
             <input
                 ref={inputRef}
                 type="search"
@@ -307,11 +442,15 @@ export function PageHeaderSearch({
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder={placeholder}
-                className="h-9 w-full rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground outline-none placeholder:text-primary-foreground/55 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40"
+                aria-label={ariaLabel ?? placeholder}
+                className={cn(
+                    'h-9 w-full rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 pr-8 pl-9 text-[13px] text-band-foreground outline-none placeholder:text-band-foreground/55 focus-visible:border-band-foreground/50 focus-visible:bg-band-foreground/15 focus-visible:ring-2 focus-visible:ring-band-foreground/40',
+                    tap,
+                )}
             />
             <kbd
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-band-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-band-foreground/55"
             >
                 /
             </kbd>
@@ -335,20 +474,22 @@ export function PageHeaderSearchTrigger({
     onOpen: () => void;
     className?: string;
 }) {
+    const tap = useFrontlineTap();
     return (
         <button
             type="button"
             onClick={onOpen}
             className={cn(
-                'relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-primary-foreground/20 bg-primary-foreground/10 pr-8 pl-9 text-[13px] text-primary-foreground/55 transition-colors outline-none hover:bg-primary-foreground/15 focus-visible:border-primary-foreground/50 focus-visible:bg-primary-foreground/15 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 lg:w-[250px] lg:flex-none',
+                'relative inline-flex h-9 min-w-[200px] flex-1 items-center rounded-[10px] border border-band-foreground/20 bg-band-foreground/10 pr-8 pl-9 text-[13px] text-band-foreground/55 transition-colors outline-none hover:bg-band-foreground/15 focus-visible:border-band-foreground/50 focus-visible:bg-band-foreground/15 focus-visible:ring-2 focus-visible:ring-band-foreground/40 lg:w-[250px] lg:flex-none',
+                tap,
                 className,
             )}
         >
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary-foreground/60" />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-band-foreground/60" />
             <span className="truncate">{placeholder}</span>
             <kbd
                 aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-primary-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-primary-foreground/55"
+                className="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rounded-[5px] border border-band-foreground/25 px-1.5 py-px text-[10.5px] font-semibold text-band-foreground/55"
             >
                 /
             </kbd>
@@ -356,55 +497,71 @@ export function PageHeaderSearchTrigger({
     );
 }
 
+/**
+ * `asChild` renders the single child element (a `<Link>` or `<a>`) with the
+ * button's styling, so navigation keeps real link semantics; `icon` is
+ * placed inside that child.
+ */
+type HeaderButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+    ref?: Ref<HTMLButtonElement>;
+    icon?: IconType;
+    asChild?: boolean;
+};
+
 /** Glass secondary action (36px, radius 10). `active` inverts to solid. */
 export function PageHeaderGlassButton({
     icon: Icon,
     active = false,
+    asChild = false,
     className,
     children,
     ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-    icon?: IconType;
-    active?: boolean;
-}) {
+}: HeaderButtonProps & { active?: boolean }) {
+    const Comp = asChild ? Slot : 'button';
+    const tap = useFrontlineTap();
     return (
-        <button
-            type="button"
+        <Comp
+            {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70 disabled:pointer-events-none disabled:opacity-50',
                 children == null && 'w-9 justify-center px-0',
                 active
-                    ? 'border-primary-foreground bg-primary-foreground text-primary'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                    ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                    : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
+                tap && 'frontline-tap h-auto max-w-full py-2 whitespace-normal',
                 className,
             )}
         >
             {Icon ? <Icon className="size-4" /> : null}
-            {children}
-        </button>
+            <Slottable>{children}</Slottable>
+        </Comp>
     );
 }
 
 /** THE primary action — white fill, brand-dark text. Never render two. */
 export function PageHeaderPrimaryButton({
     icon: Icon,
+    asChild = false,
     className,
     children,
     ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: IconType }) {
+}: HeaderButtonProps) {
+    const Comp = asChild ? Slot : 'button';
+    const tap = useFrontlineTap();
     return (
-        <button
-            type="button"
+        <Comp
+            {...(asChild ? {} : { type: 'button' as const })}
             {...rest}
             className={cn(
-                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-primary-foreground px-3.5 text-[13px] font-semibold text-primary shadow-sm transition-all outline-none hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/70 active:scale-[0.98]',
+                'inline-flex h-9 items-center gap-1.5 rounded-[10px] bg-band-foreground px-3.5 text-[13px] font-semibold text-primary-strong shadow-sm transition-all outline-none hover:bg-band-foreground/90 focus-visible:ring-2 focus-visible:ring-band-foreground/70 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50',
+                tap && 'frontline-tap h-auto max-w-full py-2 whitespace-normal',
                 className,
             )}
         >
             {Icon ? <Icon className="size-4" /> : null}
-            {children}
-        </button>
+            <Slottable>{children}</Slottable>
+        </Comp>
     );
 }
 
@@ -413,6 +570,15 @@ export function PageHeaderPrimaryButton({
 /* ------------------------------------------------------------------ */
 
 export type PageHeaderMeterTone = 'brand' | 'success' | 'warning' | 'critical';
+
+/**
+ * Where a meter block goes. "Every block is a link — no exceptions"
+ * (PAGE_HEADER_STYLE_GUIDE §5), so the type demands a page `href` or an
+ * in-page `onClick`; a block with neither is a compile error.
+ */
+export type PageHeaderMeterTarget =
+    | { href: string; onClick?: () => void }
+    | { href?: string; onClick: () => void };
 
 /**
  * One instrument block on the meter row. Dark glass; toned blocks take
@@ -430,33 +596,35 @@ export function PageHeaderMeterBlock({
     preserveState,
     preserveScroll,
     onClick,
+    pressed,
     ariaLabel,
     className,
     children,
-}: {
+}: PageHeaderMeterTarget & {
     label: string;
     /** Optional headline value on the head row (e.g. "0/41 beds"). */
     value?: ReactNode;
     tone?: PageHeaderMeterTone;
-    href?: string;
     /** Keep an in-page workspace and its unsent fields mounted when following a meter. */
     preserveState?: boolean;
     preserveScroll?: boolean;
-    onClick?: () => void;
+    /** Mark a meter that selects the current in-page view. */
+    pressed?: boolean;
     /** Accessible name; defaults to "View <label>". */
     ariaLabel?: string;
     className?: string;
     children?: ReactNode;
 }) {
+    const tap = useFrontlineTap();
     const body = (
         <>
             <ArrowUpRight aria-hidden="true" className="eh-meter-go" />
-            <span className="flex w-full items-baseline justify-between gap-3 pr-2.5">
-                <span className="eh-meter-label text-[10px] leading-none font-semibold tracking-[0.08em] whitespace-nowrap uppercase">
+            <span className="flex w-full min-w-0 items-baseline justify-between gap-3 pr-2.5">
+                <span className="eh-meter-label min-w-0 text-xs leading-snug font-semibold tracking-[0.08em] break-words uppercase">
                     {label}
                 </span>
                 {value != null ? (
-                    <span className="eh-meter-value text-[13px] leading-none font-bold tabular-nums">
+                    <span className="eh-meter-value shrink-0 text-[13px] leading-none font-bold tabular-nums">
                         {value}
                     </span>
                 ) : null}
@@ -467,8 +635,9 @@ export function PageHeaderMeterBlock({
     const shared = {
         'aria-label': ariaLabel ?? `View ${label.toLowerCase()}`,
         className: cn(
-            'eh-meter outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
+            'eh-meter outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/70',
             tone !== 'brand' && `eh-meter--${tone}`,
+            tap,
             className,
         ),
     };
@@ -483,7 +652,12 @@ export function PageHeaderMeterBlock({
             {body}
         </Link>
     ) : (
-        <button type="button" onClick={onClick} {...shared}>
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={pressed}
+            {...shared}
+        >
             {body}
         </button>
     );
@@ -501,7 +675,10 @@ export function PageHeaderMeterBig({ children }: { children: ReactNode }) {
 /** Muted 10.5px context line ("across 3 regions", "0% occupied · 41 available"). */
 export function PageHeaderMeterCaption({ children }: { children: ReactNode }) {
     return (
-        <span className="max-w-full truncate text-[10.5px] leading-tight text-primary-foreground/50">
+        <span
+            data-slot="page-header-meter-caption"
+            className="max-w-full truncate text-[10.5px] leading-tight text-band-foreground/70"
+        >
             {children}
         </span>
     );
@@ -618,14 +795,14 @@ export function PageHeaderMeterAvatars({
                                 index > 0 && (tight ? '-ml-3' : '-ml-2'),
                             )}
                         >
-                            <Avatar className="size-[26px] border-2 border-primary-foreground/35">
+                            <Avatar className="size-[26px] border-2 border-band-foreground/35">
                                 {person.photo_url ? (
                                     <AvatarImage
                                         src={person.photo_url}
                                         alt={person.name}
                                     />
                                 ) : null}
-                                <AvatarFallback className="bg-primary-foreground/15 text-[9px] font-semibold text-primary-foreground">
+                                <AvatarFallback className="bg-band-foreground/15 text-[9px] font-semibold text-band-foreground">
                                     {avatarInitials(person.name)}
                                 </AvatarFallback>
                             </Avatar>
@@ -636,12 +813,12 @@ export function PageHeaderMeterAvatars({
                             {person.name}
                         </span>
                         {person.detail ? (
-                            <span className="block text-primary-foreground/75">
+                            <span className="block text-primary-fill-foreground">
                                 {person.detail}
                             </span>
                         ) : null}
                         {person.href ? (
-                            <span className="block text-primary-foreground/60">
+                            <span className="block text-primary-fill-foreground/90">
                                 Click to open profile
                             </span>
                         ) : null}
@@ -651,7 +828,7 @@ export function PageHeaderMeterAvatars({
             {overflow > 0 ? (
                 <span
                     className={cn(
-                        'z-[1] inline-flex size-[26px] items-center justify-center rounded-full border-2 border-primary-foreground/35 bg-primary-foreground/15 text-[9px] font-bold text-primary-foreground tabular-nums',
+                        'z-[1] inline-flex size-[26px] items-center justify-center rounded-full border-2 border-band-foreground/35 bg-band-foreground/15 text-[9px] font-bold text-band-foreground tabular-nums',
                         people.length > 0 && (tight ? '-ml-3' : '-ml-2'),
                     )}
                 >
@@ -685,23 +862,21 @@ export function PageHeaderMeterContacts({
                     key={contact.label}
                     className="flex min-w-0 items-baseline gap-1.5 text-[10.5px] leading-tight"
                 >
-                    <span className="eh-meter-label shrink-0 text-[9px] leading-none font-semibold tracking-[0.08em] uppercase">
+                    <span className="eh-meter-label shrink-0 text-xs leading-none font-semibold tracking-[0.08em] uppercase">
                         {contact.label}
                     </span>
                     {contact.name ? (
-                        <span className="min-w-0 truncate font-medium text-primary-foreground/85">
+                        <span className="min-w-0 truncate font-medium text-band-foreground/85">
                             {contact.name}
                             {contact.phone ? (
-                                <span className="font-normal text-primary-foreground/55">
+                                <span className="font-normal text-band-foreground/70">
                                     {' '}
                                     · {contact.phone}
                                 </span>
                             ) : null}
                         </span>
                     ) : (
-                        <span className="text-primary-foreground/45">
-                            No info
-                        </span>
+                        <span className="text-band-foreground/70">No info</span>
                     )}
                 </span>
             ))}
@@ -733,7 +908,7 @@ export function PageHeaderMeterDonut({
                         r="16"
                         fill="none"
                         strokeWidth="4"
-                        className="stroke-primary-foreground/15"
+                        className="stroke-band-foreground/15"
                     />
                     <circle
                         cx="20"
@@ -751,7 +926,7 @@ export function PageHeaderMeterDonut({
                 </span>
             </span>
             {caption ? (
-                <span className="text-[10.5px] leading-[1.35] text-primary-foreground/50">
+                <span className="text-[10.5px] leading-[1.35] text-band-foreground/70">
                     {caption}
                 </span>
             ) : null}
@@ -764,7 +939,22 @@ export function PageHeaderMeterDonut({
 /* ------------------------------------------------------------------ */
 
 const FILTER_FIELD =
-    'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70';
+    'box-border h-[23px] rounded-[8px] border text-[11.5px] font-semibold transition-colors outline-none';
+
+/**
+ * Focus ring for a focusable filter-row control, drawn on the control
+ * itself and inset so it never changes the drawn 23px / 38px geometry or
+ * spills onto a neighbour. On the glass chip it is band text (white on the
+ * sky); on the white active fill it is the chip's own brand text, so it
+ * stays ≥ 3:1 against whatever it sits on.
+ */
+const filterFocus = (onWhite: boolean) =>
+    cn(
+        'focus-visible:ring-2 focus-visible:ring-inset',
+        onWhite
+            ? 'focus-visible:ring-primary-strong'
+            : 'focus-visible:ring-band-foreground',
+    );
 
 /**
  * Generic 23px glass filter-row button for page-specific controls that
@@ -784,17 +974,20 @@ export function PageHeaderFilterButton({
     active?: boolean;
     ref?: Ref<HTMLButtonElement>;
 }) {
+    const tap = useFrontlineTap();
     return (
         <button
             type="button"
             {...rest}
             className={cn(
-                'inline-flex items-center gap-1 px-2',
+                'inline-flex items-center gap-1 px-2 disabled:pointer-events-none disabled:opacity-50',
                 FILTER_FIELD,
+                filterFocus(active),
                 children == null && 'w-[23px] justify-center px-0',
                 active
-                    ? 'border-primary-foreground bg-primary-foreground text-primary'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                    ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                    : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
+                tap && 'frontline-tap h-auto max-w-full py-2 whitespace-normal',
                 className,
             )}
         >
@@ -804,25 +997,37 @@ export function PageHeaderFilterButton({
     );
 }
 
-/** Glass dropdown filter chip (label + chevron; ✕ clears when active). */
+/**
+ * Glass dropdown filter chip (label + chevron; ✕ clears when active).
+ *
+ * `size="comfortable"` is the taller 38px dropdown approved for the role
+ * Overview (Stephan, 13 Oct 2026; DESIGN.md "Role overview pilot"). It is
+ * opt-in while it is piloted there; the default stays the 23px chip.
+ */
 export function PageHeaderFilterSelect({
+    testId,
     icon: Icon,
     label,
     value,
     allValue = 'all',
     options,
     onChange,
+    size = 'default',
 }: {
+    testId?: string;
     icon?: IconType;
     label: string;
     value: string;
     allValue?: string;
     options: { value: string; label: string }[];
     onChange: (value: string) => void;
+    size?: 'default' | 'comfortable';
 }) {
     const [open, setOpen] = useState(false);
+    const tap = useFrontlineTap();
     const current = options.find((o) => o.value === value);
     const active = value !== allValue;
+    const comfortable = size === 'comfortable';
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -832,27 +1037,53 @@ export function PageHeaderFilterSelect({
                 className={cn(
                     'inline-flex items-center',
                     FILTER_FIELD,
+                    comfortable &&
+                        'h-[38px] rounded-[10px] text-[0.857rem] font-medium shadow-xs',
+                    tap && 'h-auto max-w-full',
                     active
-                        ? 'border-primary-foreground bg-primary-foreground text-primary'
-                        : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                        ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                        : comfortable
+                          ? 'border-band-foreground/15 bg-band-foreground/5 text-band-foreground hover:bg-band-foreground/15'
+                          : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
                 )}
             >
                 <PopoverTrigger asChild>
                     <button
                         type="button"
+                        data-test={testId}
                         className={cn(
-                            'inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none',
-                            active ? 'pr-1' : 'pr-2',
+                            // relative z-[1]: the trigger stays above the
+                            // clear ✕'s 44px hit area where they meet.
+                            'relative z-[1] inline-flex h-full items-center gap-1 rounded-[8px] pl-2 outline-none',
+                            filterFocus(active),
+                            comfortable && 'gap-2 rounded-[10px] pl-3',
+                            active ? 'pr-1' : comfortable ? 'pr-3' : 'pr-2',
+                            tap,
                         )}
                     >
                         {Icon ? (
-                            <Icon className="size-2.5 shrink-0 opacity-70" />
+                            <Icon
+                                className={cn(
+                                    'shrink-0 opacity-70',
+                                    comfortable ? 'size-3.5' : 'size-2.5',
+                                )}
+                            />
                         ) : null}
-                        <span className="max-w-[130px] truncate">
+                        <span
+                            className={cn(
+                                'truncate',
+                                comfortable ? 'max-w-[180px]' : 'max-w-[130px]',
+                            )}
+                        >
                             {active ? (current?.label ?? label) : label}
                         </span>
                         {!active ? (
-                            <ChevronDown className="size-3 opacity-70" />
+                            <ChevronDown
+                                className={cn(
+                                    'opacity-70',
+                                    comfortable ? 'size-3.5' : 'size-3',
+                                )}
+                            />
                         ) : null}
                     </button>
                 </PopoverTrigger>
@@ -861,7 +1092,14 @@ export function PageHeaderFilterSelect({
                         type="button"
                         aria-label={`Clear ${label}`}
                         onClick={() => onChange(allValue)}
-                        className="mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] hover:bg-primary/20"
+                        className={cn(
+                            // The ✕ only shows on the white active chip, so its
+                            // ring is the chip's brand text, not band white.
+                            'mr-1.5 inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] outline-none hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-primary-strong',
+                            tap
+                                ? 'frontline-tap mr-0 self-stretch rounded-[7px]'
+                                : 'frontline-hit',
+                        )}
                     >
                         <X className="size-2.5" />
                     </button>
@@ -878,6 +1116,7 @@ export function PageHeaderFilterSelect({
                         }}
                         className={cn(
                             'flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-2 text-sm text-foreground hover:bg-muted',
+                            tap,
                             o.value === value && 'font-semibold text-primary',
                         )}
                     >
@@ -902,6 +1141,7 @@ export function PageHeaderFilterCheck({
     checked: boolean;
     onChange: (checked: boolean) => void;
 }) {
+    const tap = useFrontlineTap();
     return (
         <button
             type="button"
@@ -911,9 +1151,11 @@ export function PageHeaderFilterCheck({
             className={cn(
                 'inline-flex items-center gap-1.5 px-2',
                 FILTER_FIELD,
+                filterFocus(checked),
+                tap && 'frontline-tap h-auto max-w-full py-2',
                 checked
-                    ? 'border-primary-foreground bg-primary-foreground text-primary'
-                    : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                    ? 'border-band-foreground bg-band-foreground text-primary-strong'
+                    : 'border-band-foreground/20 bg-band-foreground/10 text-band-foreground hover:bg-band-foreground/20',
             )}
         >
             <span
@@ -921,8 +1163,8 @@ export function PageHeaderFilterCheck({
                 className={cn(
                     'flex size-3 items-center justify-center rounded-[3px] border',
                     checked
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-primary-foreground/60 text-transparent',
+                        ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
+                        : 'border-band-foreground/60 text-transparent',
                 )}
             >
                 <Check className="size-2.5" />
@@ -944,6 +1186,7 @@ export function PageHeaderViewToggle<K extends string>({
     options: { value: K; label: string; icon?: IconType }[];
     ariaLabel?: string;
 }) {
+    const tap = useFrontlineTap();
     return (
         <div
             role="radiogroup"
@@ -951,7 +1194,8 @@ export function PageHeaderViewToggle<K extends string>({
             className={cn(
                 'inline-flex items-stretch gap-0.5 p-[2px]',
                 FILTER_FIELD,
-                'border-primary-foreground/20 bg-primary-foreground/10',
+                'border-band-foreground/20 bg-band-foreground/10',
+                tap && 'h-auto max-w-full flex-wrap',
             )}
         >
             {options.map((o) => {
@@ -965,10 +1209,12 @@ export function PageHeaderViewToggle<K extends string>({
                         aria-checked={on}
                         onClick={() => onChange(o.value)}
                         className={cn(
-                            'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/70',
+                            'inline-flex items-center gap-1 rounded-[6px] px-2 text-[11.5px] font-semibold outline-none',
+                            filterFocus(on),
+                            tap,
                             on
-                                ? 'bg-primary-foreground text-primary'
-                                : 'text-primary-foreground/80 hover:text-primary-foreground',
+                                ? 'bg-band-foreground text-primary-strong'
+                                : 'text-band-foreground/80 hover:text-band-foreground',
                         )}
                     >
                         {Icon ? <Icon className="size-2.5" /> : null}
@@ -985,33 +1231,37 @@ export function PageHeaderViewToggle<K extends string>({
 /* ------------------------------------------------------------------ */
 
 export interface PageHeaderRailItem<K extends string = string> {
+    testId?: string;
     key: K;
     label: string;
     icon?: IconType;
     count?: number;
     /** Alert counts keep the fixed critical pair in every state. */
     alert?: boolean;
+    /** Optional discovery copy shown only inside More; tab geometry stays unchanged. */
+    overflow?: { description: string; icon?: IconType; unread?: boolean };
 }
 
 /** Must match the rail container's `gap-1`. */
 const RAIL_GAP = 4;
 
-const railTabClass = (on: boolean) =>
+const railTabClass = (on: boolean, frontline = false) =>
     cn(
-        'inline-flex shrink-0 items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/80',
+        'inline-flex shrink-0 items-center gap-[7px] outline-none focus-visible:ring-2 focus-visible:ring-band-foreground/80',
         on
             ? // pb-[6px] keeps the active label on the
               // inactive pills' optical text line: their
               // centre sits 34/2 + 6px margin = 23px above
               // the band edge; (40 − 6)/2 + 6 = 23px here
               // (DESIGN.md "Sunken active-rail labels").
-              'h-10 rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
-            : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground',
+              'h-[40px] rounded-t-[12px] bg-background px-[17px] pb-[6px] text-[13.5px] font-semibold text-primary'
+            : 'mb-[6px] h-[34px] rounded-[9px] px-[13px] text-[13px] font-medium text-band-foreground/80 transition-colors hover:bg-band-foreground/10 hover:text-band-foreground',
+        frontline && 'frontline-hit min-w-0 shrink',
     );
 
 /** Ghost utility pills at the rail's end (⋯ More, ⌕ Find) — inactive-pill geometry. */
 const railPillClass =
-    'mb-[6px] inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-primary-foreground/80 transition-colors outline-none hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:ring-2 focus-visible:ring-primary-foreground/80';
+    'mb-[6px] inline-flex h-[34px] shrink-0 items-center gap-1.5 rounded-[9px] px-[13px] text-[13px] font-medium text-band-foreground/80 transition-colors outline-none hover:bg-band-foreground/10 hover:text-band-foreground focus-visible:ring-2 focus-visible:ring-band-foreground/80';
 
 /** Inner content of a rail tab — shared by the live row and the measurement row. */
 function RailTabInner({
@@ -1024,20 +1274,26 @@ function RailTabInner({
     decoration?: ReactNode;
 }) {
     const Icon = item.icon;
+    const frontline = useContext(PageHeaderFrontlineContext);
     return (
         <>
-            {Icon ? <Icon className="size-[15px]" /> : null}
-            <span>{item.label}</span>
+            {Icon ? (
+                <Icon className={cn('size-[15px]', frontline && 'shrink-0')} />
+            ) : null}
+            <span className={frontline ? 'min-w-0 truncate' : undefined}>
+                {item.label}
+            </span>
             {decoration}
             {item.count != null ? (
                 <span
                     className={cn(
                         'inline-flex min-w-[22px] items-center justify-center rounded-[6px] px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+                        frontline && 'shrink-0',
                         item.alert && item.count > 0
                             ? 'bg-status-critical-bg text-status-critical'
                             : on
                               ? 'bg-primary/15 text-primary'
-                              : 'bg-primary-foreground/15 text-primary-foreground',
+                              : 'bg-band-foreground/15 text-band-foreground',
                     )}
                 >
                     {item.count}
@@ -1074,9 +1330,11 @@ export function PageHeaderRail<K extends string>({
     value,
     onSelect,
     onFind,
+    showFind = true,
     ariaLabel = 'Views',
     onItemContextMenu,
     decorations,
+    maxVisible,
 }: {
     items: PageHeaderRailItem<K>[];
     value: K;
@@ -1084,10 +1342,16 @@ export function PageHeaderRail<K extends string>({
     /** Custom palette opener (record profiles); omitted → the rail's own
      *  built-in views palette. */
     onFind?: () => void;
+    /** Two-view workspaces can omit the redundant Find control. */
+    showFind?: boolean;
     ariaLabel?: string;
     onItemContextMenu?: (key: K, event: React.MouseEvent) => void;
     decorations?: Partial<Record<K, ReactNode>>;
+    /** Optional visual cap; overflow retains every destination and the active tab. */
+    maxVisible?: number;
 }) {
+    const frontline = useContext(PageHeaderFrontlineContext);
+    const pillClass = cn(railPillClass, frontline && 'frontline-hit');
     const [viewsFindOpen, setViewsFindOpen] = useState(false);
     const [moreOpen, setMoreOpen] = useState(false);
     /** Keys of the tabs shown on the rail; null = everything fits. */
@@ -1106,12 +1370,16 @@ export function PageHeaderRail<K extends string>({
         if (!container || !measureRow) return;
 
         const compute = () => {
+            const limit =
+                maxVisible === undefined
+                    ? items.length
+                    : Math.max(1, Math.floor(maxVisible));
             const available = container.clientWidth;
             if (available <= 0) return;
             // Measurement row: one node per item, then More, then Find.
             const nodes = Array.from(measureRow.children) as HTMLElement[];
             if (nodes.length < items.length + 2) return;
-            const findW = nodes[nodes.length - 1].offsetWidth;
+            const findW = showFind ? nodes[nodes.length - 1].offsetWidth : 0;
             const moreW = nodes[nodes.length - 2].offsetWidth;
             const itemW = nodes
                 .slice(0, items.length)
@@ -1119,7 +1387,7 @@ export function PageHeaderRail<K extends string>({
 
             const total =
                 itemW.reduce((acc, w) => acc + w + RAIL_GAP, 0) + findW;
-            if (total <= available) {
+            if (total <= available && items.length <= limit) {
                 setVisibleKeys(null);
                 return;
             }
@@ -1130,6 +1398,7 @@ export function PageHeaderRail<K extends string>({
             let fit = 0;
             while (
                 fit < items.length &&
+                fit < limit &&
                 used + itemW[fit] + (fit > 0 ? RAIL_GAP : 0) <= budget
             ) {
                 used += itemW[fit] + (fit > 0 ? RAIL_GAP : 0);
@@ -1148,6 +1417,7 @@ export function PageHeaderRail<K extends string>({
                 let rest = budget - itemW[activeIdx] - RAIL_GAP;
                 const kept: K[] = [];
                 for (let i = 0; i < items.length; i += 1) {
+                    if (kept.length >= limit - 1) break;
                     if (i === activeIdx) continue;
                     const w = itemW[i] + (kept.length > 0 ? RAIL_GAP : 0);
                     if (w > rest) break;
@@ -1172,7 +1442,7 @@ export function PageHeaderRail<K extends string>({
         observer.observe(measureRow);
         return () => observer.disconnect();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- itemsKey stands in for items
-    }, [itemsKey, value, onFind]);
+    }, [itemsKey, value, onFind, showFind, frontline, maxVisible]);
 
     const visibleItems =
         visibleKeys == null
@@ -1214,7 +1484,7 @@ export function PageHeaderRail<K extends string>({
             {onFind ? (
                 <kbd
                     aria-hidden="true"
-                    className="hidden rounded-[5px] border border-primary-foreground/30 px-1 text-[10px] sm:inline"
+                    className="hidden rounded-[5px] border border-band-foreground/30 px-1 text-[10px] sm:inline"
                 >
                     /
                 </kbd>
@@ -1235,78 +1505,118 @@ export function PageHeaderRail<K extends string>({
           visibleItems[0]?.key);
     return (
         <div
-            role="tablist"
-            aria-label={ariaLabel}
             ref={containerRef}
-            className="relative flex w-full flex-nowrap items-end gap-1"
+            className={cn(
+                'relative flex w-full flex-nowrap items-end gap-1',
+                frontline && 'min-w-0 gap-[4px]',
+            )}
         >
-            {visibleItems.map((it) => {
-                const on = it.key === value;
-                return (
-                    <button
-                        key={it.key}
-                        type="button"
-                        role="tab"
-                        aria-selected={on}
-                        ref={(button) => {
-                            if (button) tabButtons.current.set(it.key, button);
-                            else tabButtons.current.delete(it.key);
-                        }}
-                        tabIndex={it.key === entryKey ? 0 : -1}
-                        onFocus={() => setFocusedKey(it.key)}
-                        onKeyDown={(event) => {
-                            const index = visibleItems.findIndex(
-                                (item) => item.key === it.key,
-                            );
-                            const next =
-                                event.key === 'Home'
-                                    ? 0
-                                    : event.key === 'End'
-                                      ? visibleItems.length - 1
-                                      : event.key === 'ArrowRight'
-                                        ? (index + 1) % visibleItems.length
-                                        : event.key === 'ArrowLeft'
-                                          ? (index + visibleItems.length - 1) %
-                                            visibleItems.length
-                                          : null;
-                            if (next === null) return;
-                            event.preventDefault();
-                            // Manual activation keeps navigation and unsaved-work guards
-                            // with the existing Enter/Space/click action.
-                            tabButtons.current
-                                .get(visibleItems[next].key)
-                                ?.focus();
-                        }}
-                        onClick={() => onSelect(it.key)}
-                        onContextMenu={
-                            onItemContextMenu
-                                ? (event) => onItemContextMenu(it.key, event)
-                                : undefined
-                        }
-                        className={railTabClass(on)}
-                    >
-                        <RailTabInner
-                            item={it}
-                            on={on}
-                            decoration={decorations?.[it.key]}
-                        />
-                    </button>
-                );
-            })}
+            <div
+                role="tablist"
+                aria-label={ariaLabel}
+                className={cn(
+                    'flex shrink-0 flex-nowrap items-end gap-1',
+                    frontline && 'min-w-0 flex-1 shrink gap-[4px]',
+                )}
+            >
+                {visibleItems.map((it) => {
+                    const on = it.key === value;
+                    return (
+                        <button
+                            key={it.key}
+                            type="button"
+                            role="tab"
+                            data-test={it.testId}
+                            aria-selected={on}
+                            ref={(button) => {
+                                if (button)
+                                    tabButtons.current.set(it.key, button);
+                                else tabButtons.current.delete(it.key);
+                            }}
+                            tabIndex={it.key === entryKey ? 0 : -1}
+                            onFocus={() => setFocusedKey(it.key)}
+                            onKeyDown={(event) => {
+                                const index = visibleItems.findIndex(
+                                    (item) => item.key === it.key,
+                                );
+                                const next =
+                                    event.key === 'Home'
+                                        ? 0
+                                        : event.key === 'End'
+                                          ? visibleItems.length - 1
+                                          : event.key === 'ArrowRight'
+                                            ? (index + 1) % visibleItems.length
+                                            : event.key === 'ArrowLeft'
+                                              ? (index +
+                                                    visibleItems.length -
+                                                    1) %
+                                                visibleItems.length
+                                              : null;
+                                if (next === null) return;
+                                event.preventDefault();
+                                // Manual activation keeps navigation and unsaved-work guards
+                                // with the existing Enter/Space/click action.
+                                tabButtons.current
+                                    .get(visibleItems[next].key)
+                                    ?.focus();
+                            }}
+                            onClick={() => onSelect(it.key)}
+                            onContextMenu={
+                                onItemContextMenu
+                                    ? (event) =>
+                                          onItemContextMenu(it.key, event)
+                                    : undefined
+                            }
+                            className={railTabClass(on, frontline)}
+                        >
+                            <RailTabInner
+                                item={it}
+                                on={on}
+                                decoration={decorations?.[it.key]}
+                            />
+                        </button>
+                    );
+                })}
+            </div>
             {overflowItems.length > 0 ? (
                 <Popover open={moreOpen} onOpenChange={setMoreOpen}>
                     <PopoverTrigger asChild>
                         <button
                             type="button"
                             aria-label={`More views (${overflowItems.length})`}
-                            className={railPillClass}
+                            className={pillClass}
                         >
                             {morePill(overflowAlertCount)}
                         </button>
                     </PopoverTrigger>
-                    <PopoverContent align="end" className="w-60 p-1.5">
+                    <PopoverContent
+                        align="end"
+                        className={cn(
+                            'p-1.5',
+                            overflowItems.some((item) => item.overflow)
+                                ? 'w-80'
+                                : 'w-60',
+                        )}
+                        onCloseAutoFocus={(event) => {
+                            const content = event.currentTarget;
+                            const active = document.activeElement;
+                            // A closing menu must not steal focus from a control
+                            // or dialog the worker has already moved on to.
+                            if (
+                                frontline &&
+                                content instanceof HTMLElement &&
+                                active instanceof HTMLElement &&
+                                active !== document.body &&
+                                active.isConnected &&
+                                active.getClientRects().length &&
+                                !content.contains(active)
+                            ) {
+                                event.preventDefault();
+                            }
+                        }}
+                    >
                         {overflowItems.map((it) => {
-                            const Icon = it.icon;
+                            const Icon = it.overflow?.icon ?? it.icon;
                             return (
                                 <button
                                     key={it.key}
@@ -1324,13 +1634,31 @@ export function PageHeaderRail<K extends string>({
                                                   )
                                             : undefined
                                     }
-                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+                                    className={cn(
+                                        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted',
+                                        frontline && 'frontline-tap',
+                                    )}
                                 >
                                     {Icon ? (
                                         <Icon className="size-4 text-muted-foreground" />
                                     ) : null}
-                                    <span className="flex-1 truncate">
-                                        {it.label}
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-center gap-2">
+                                            <span className="truncate">
+                                                {it.label}
+                                            </span>
+                                            {it.overflow?.unread && (
+                                                <span
+                                                    className="size-1.5 shrink-0 rounded-full bg-primary"
+                                                    aria-label="New updates"
+                                                />
+                                            )}
+                                        </span>
+                                        {it.overflow && (
+                                            <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                                                {it.overflow.description}
+                                            </span>
+                                        )}
                                     </span>
                                     {it.count != null ? (
                                         <span
@@ -1350,29 +1678,34 @@ export function PageHeaderRail<K extends string>({
                     </PopoverContent>
                 </Popover>
             ) : null}
-            <button
-                type="button"
-                ref={findButton}
-                onClick={
-                    onFind ??
-                    (() => {
-                        pickedKey.current = null;
-                        setViewsFindOpen(true);
-                    })
-                }
-                title={onFind ? 'Find a section (/)' : 'Find a view'}
-                aria-label={onFind ? 'Find a section' : 'Find a view'}
-                className={cn(railPillClass, 'ml-auto')}
-            >
-                {findChip}
-            </button>
+            {showFind && (
+                <button
+                    type="button"
+                    ref={findButton}
+                    onClick={
+                        onFind ??
+                        (() => {
+                            pickedKey.current = null;
+                            setViewsFindOpen(true);
+                        })
+                    }
+                    title={onFind ? 'Find a section (/)' : 'Find a view'}
+                    aria-label={onFind ? 'Find a section' : 'Find a view'}
+                    className={cn(pillClass, 'ml-auto')}
+                >
+                    {findChip}
+                </button>
+            )}
             {/* Hidden measurement row — mirrors every tab (plus the widest
                 possible More pill and the Find chip) so the overflow point
                 is computed from real widths, never guessed. */}
             <div
                 ref={measureRef}
                 aria-hidden="true"
-                className="pointer-events-none invisible absolute bottom-0 left-0 flex w-max flex-nowrap items-end gap-1"
+                className={cn(
+                    'pointer-events-none invisible absolute bottom-0 left-0 flex w-max flex-nowrap items-end gap-1',
+                    frontline && 'gap-[4px]',
+                )}
             >
                 {items.map((it) => {
                     const on = it.key === value;
@@ -1381,7 +1714,7 @@ export function PageHeaderRail<K extends string>({
                             key={it.key}
                             type="button"
                             tabIndex={-1}
-                            className={railTabClass(on)}
+                            className={railTabClass(on, frontline)}
                         >
                             <RailTabInner
                                 item={it}
@@ -1391,14 +1724,14 @@ export function PageHeaderRail<K extends string>({
                         </button>
                     );
                 })}
-                <button type="button" tabIndex={-1} className={railPillClass}>
+                <button type="button" tabIndex={-1} className={pillClass}>
                     {morePill(totalAlertCount)}
                 </button>
-                <button type="button" tabIndex={-1} className={railPillClass}>
+                <button type="button" tabIndex={-1} className={pillClass}>
                     {findChip}
                 </button>
             </div>
-            {onFind ? null : (
+            {onFind || !showFind ? null : (
                 <RailViewsPalette
                     items={items}
                     open={viewsFindOpen}
@@ -1446,6 +1779,7 @@ function RailViewsPalette<K extends string>({
     ariaLabel: string;
     onCloseAutoFocus: (event: Event) => void;
 }) {
+    const tap = useFrontlineTap();
     const [query, setQuery] = useState('');
     useEffect(() => {
         if (open) setQuery('');
@@ -1475,7 +1809,10 @@ function RailViewsPalette<K extends string>({
                     }}
                     placeholder="Find a view…"
                     aria-label={ariaLabel}
-                    className="h-9 w-full rounded-md border border-input bg-background pr-9 pl-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                    className={cn(
+                        'h-9 w-full rounded-md border border-input bg-background pr-9 pl-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                        tap,
+                    )}
                 />
                 <div className="-mx-1 max-h-[300px] overflow-y-auto px-1">
                     {list.length === 0 ? (
@@ -1490,7 +1827,10 @@ function RailViewsPalette<K extends string>({
                                     key={it.key}
                                     type="button"
                                     onClick={() => onPick(it.key)}
-                                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted"
+                                    className={cn(
+                                        'flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted',
+                                        tap,
+                                    )}
                                 >
                                     {Icon ? (
                                         <Icon className="size-4 text-muted-foreground" />

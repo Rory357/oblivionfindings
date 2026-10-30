@@ -32,6 +32,13 @@ class SafetyDataSheet extends Model
     ];
 
     protected $casts = [
+        'source_schema_version' => 'integer',
+        'source_revision' => 'integer',
+        'hazardous_substance_id' => 'integer',
+        'document_size' => 'integer',
+        'uploaded_by' => 'integer',
+        'created_by' => 'integer',
+        'updated_by' => 'integer',
         'issue_date' => 'date',
         'review_date' => 'date',
     ];
@@ -48,6 +55,11 @@ class SafetyDataSheet extends Model
     public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
+    }
+
+    public function sourceVersions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(ChemicalSourceVersion::class, 'source_id')->where('source_type', 'sds');
     }
 
     public function creator(): BelongsTo

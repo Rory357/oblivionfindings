@@ -1,0 +1,528 @@
+{
+    "uploaded": {
+        "actor_id": 43,
+        "script": {
+            "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+            "script_version": 1,
+            "status": "uploaded",
+            "status_version": 1,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+            "manifest": {
+                "architecture": "amd64",
+                "execution_policy": {
+                    "expected_observation_schema": null,
+                    "network_mode": "reviewed_network",
+                    "output_bytes": 4096,
+                    "output_retention_hours": 24,
+                    "runtime_seconds": 60,
+                    "success_exit_codes": [
+                        0
+                    ],
+                    "timeout_mode": "report_only"
+                },
+                "interpreter": "powershell7",
+                "interpreter_version": "7.6.0",
+                "name": "Synthetic inspection",
+                "parameter_schema": [],
+                "publisher_label": "Synthetic publisher",
+                "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                "size_bytes": 46,
+                "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "review": {
+                "child_processes": [],
+                "compensation": "No mutation approved.",
+                "effect": "read_only",
+                "network_destinations": [],
+                "no_detached_work": true,
+                "no_dynamic_code": true,
+                "output_sensitivity": "operational",
+                "restart_behavior": "none"
+            },
+            "uploaded_by_user_id": 43,
+            "reviewed_by_user_id": null,
+            "can_submit": true,
+            "can_review": false,
+            "can_withdraw": false,
+            "can_read_material": false,
+            "publication_issue": null,
+            "submitted_at": null,
+            "published_at": null,
+            "withdrawn_at": null
+        },
+        "receipt": {
+            "request_key": "aeabd7a7-8bfa-4ec0-bd93-7a53d1efa2d5",
+            "event": "upload",
+            "status": "uploaded",
+            "status_version": 1,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c"
+        }
+    },
+    "pending": {
+        "actor_id": 43,
+        "script": {
+            "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+            "script_version": 1,
+            "status": "pending_review",
+            "status_version": 2,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+            "manifest": {
+                "architecture": "amd64",
+                "execution_policy": {
+                    "expected_observation_schema": null,
+                    "network_mode": "reviewed_network",
+                    "output_bytes": 4096,
+                    "output_retention_hours": 24,
+                    "runtime_seconds": 60,
+                    "success_exit_codes": [
+                        0
+                    ],
+                    "timeout_mode": "report_only"
+                },
+                "interpreter": "powershell7",
+                "interpreter_version": "7.6.0",
+                "name": "Synthetic inspection",
+                "parameter_schema": [],
+                "publisher_label": "Synthetic publisher",
+                "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                "size_bytes": 46,
+                "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "review": {
+                "child_processes": [],
+                "compensation": "No mutation approved.",
+                "effect": "read_only",
+                "network_destinations": [],
+                "no_detached_work": true,
+                "no_dynamic_code": true,
+                "output_sensitivity": "operational",
+                "restart_behavior": "none"
+            },
+            "uploaded_by_user_id": 43,
+            "reviewed_by_user_id": null,
+            "can_submit": false,
+            "can_review": false,
+            "can_withdraw": false,
+            "can_read_material": false,
+            "publication_issue": null,
+            "submitted_at": "2026-10-20T10:24:14.000000Z",
+            "published_at": null,
+            "withdrawn_at": null
+        },
+        "receipt": {
+            "request_key": "bb3effb4-43e4-41c1-8526-68401d0cf6cb",
+            "event": "submit",
+            "status": "pending_review",
+            "status_version": 2,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c"
+        }
+    },
+    "material": {
+        "actor_id": 44,
+        "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+        "manifest": {
+            "architecture": "amd64",
+            "execution_policy": {
+                "expected_observation_schema": null,
+                "network_mode": "reviewed_network",
+                "output_bytes": 4096,
+                "output_retention_hours": 24,
+                "runtime_seconds": 60,
+                "success_exit_codes": [
+                    0
+                ],
+                "timeout_mode": "report_only"
+            },
+            "interpreter": "powershell7",
+            "interpreter_version": "7.6.0",
+            "name": "Synthetic inspection",
+            "parameter_schema": [],
+            "publisher_label": "Synthetic publisher",
+            "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+            "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+            "script_version": 1,
+            "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+            "size_bytes": 46,
+            "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "review": {
+            "child_processes": [],
+            "compensation": "No mutation approved.",
+            "effect": "read_only",
+            "network_destinations": [],
+            "no_detached_work": true,
+            "no_dynamic_code": true,
+            "output_sensitivity": "operational",
+            "restart_behavior": "none"
+        },
+        "artifact": "# Synthetic catalogue fixture. Never execute.\n",
+        "runtime_manifest": "{\"version\":1,\"interpreter\":\"powershell7\",\"interpreter_version\":\"7.6.0\",\"architecture\":\"amd64\",\"entrypoint\":\"pwsh.exe\",\"files\":[{\"path\":\"obli-script-wrapper.ps1\",\"size_bytes\":10,\"sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"},{\"path\":\"pwsh.exe\",\"size_bytes\":20,\"sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\"}]}"
+    },
+    "published": {
+        "actor_id": 44,
+        "script": {
+            "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+            "script_version": 1,
+            "status": "published",
+            "status_version": 3,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+            "manifest": {
+                "architecture": "amd64",
+                "execution_policy": {
+                    "expected_observation_schema": null,
+                    "network_mode": "reviewed_network",
+                    "output_bytes": 4096,
+                    "output_retention_hours": 24,
+                    "runtime_seconds": 60,
+                    "success_exit_codes": [
+                        0
+                    ],
+                    "timeout_mode": "report_only"
+                },
+                "interpreter": "powershell7",
+                "interpreter_version": "7.6.0",
+                "name": "Synthetic inspection",
+                "parameter_schema": [],
+                "publisher_label": "Synthetic publisher",
+                "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                "size_bytes": 46,
+                "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "review": {
+                "child_processes": [],
+                "compensation": "No mutation approved.",
+                "effect": "read_only",
+                "network_destinations": [],
+                "no_detached_work": true,
+                "no_dynamic_code": true,
+                "output_sensitivity": "operational",
+                "restart_behavior": "none"
+            },
+            "uploaded_by_user_id": 43,
+            "reviewed_by_user_id": 44,
+            "can_submit": false,
+            "can_review": false,
+            "can_withdraw": true,
+            "can_read_material": true,
+            "publication_issue": null,
+            "submitted_at": "2026-10-20T10:24:14.000000Z",
+            "published_at": "2026-10-20T10:24:15.000000Z",
+            "withdrawn_at": null
+        },
+        "receipt": {
+            "request_key": "b5d9b515-3204-4008-89c4-f059802145b5",
+            "event": "review",
+            "status": "published",
+            "status_version": 3,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c"
+        }
+    },
+    "withdrawn": {
+        "actor_id": 44,
+        "script": {
+            "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+            "script_version": 1,
+            "status": "withdrawn",
+            "status_version": 4,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+            "manifest": {
+                "architecture": "amd64",
+                "execution_policy": {
+                    "expected_observation_schema": null,
+                    "network_mode": "reviewed_network",
+                    "output_bytes": 4096,
+                    "output_retention_hours": 24,
+                    "runtime_seconds": 60,
+                    "success_exit_codes": [
+                        0
+                    ],
+                    "timeout_mode": "report_only"
+                },
+                "interpreter": "powershell7",
+                "interpreter_version": "7.6.0",
+                "name": "Synthetic inspection",
+                "parameter_schema": [],
+                "publisher_label": "Synthetic publisher",
+                "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                "size_bytes": 46,
+                "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            },
+            "review": {
+                "child_processes": [],
+                "compensation": "No mutation approved.",
+                "effect": "read_only",
+                "network_destinations": [],
+                "no_detached_work": true,
+                "no_dynamic_code": true,
+                "output_sensitivity": "operational",
+                "restart_behavior": "none"
+            },
+            "uploaded_by_user_id": 43,
+            "reviewed_by_user_id": 44,
+            "can_submit": false,
+            "can_review": false,
+            "can_withdraw": false,
+            "can_read_material": true,
+            "publication_issue": null,
+            "submitted_at": "2026-10-20T10:24:14.000000Z",
+            "published_at": "2026-10-20T10:24:15.000000Z",
+            "withdrawn_at": "2026-10-20T10:24:15.000000Z"
+        },
+        "receipt": {
+            "request_key": "02f6f61c-cb49-415d-92a8-49ef73eaf930",
+            "event": "withdraw",
+            "status": "withdrawn",
+            "status_version": 4,
+            "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c"
+        }
+    },
+    "index_pending": {
+        "actor_id": 44,
+        "can_upload": true,
+        "identity_confirmed": true,
+        "identity_confirm_href": "\/security-devices\/scripts\/confirm-identity?expected_actor_id=44",
+        "execution_available": false,
+        "summary": {
+            "uploaded": 0,
+            "pending_review": 1,
+            "published": 0,
+            "withdrawn": 0
+        },
+        "query": {
+            "status": "all",
+            "search": ""
+        },
+        "pagination": {
+            "limit": 20,
+            "shown": 1,
+            "previous_href": null,
+            "next_href": null,
+            "reset_href": "\/security-devices\/scripts?expected_actor_id=44&status=all&search=",
+            "position_reset": false
+        },
+        "scripts": [
+            {
+                "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "status": "pending_review",
+                "status_version": 2,
+                "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+                "manifest": {
+                    "architecture": "amd64",
+                    "execution_policy": {
+                        "expected_observation_schema": null,
+                        "network_mode": "reviewed_network",
+                        "output_bytes": 4096,
+                        "output_retention_hours": 24,
+                        "runtime_seconds": 60,
+                        "success_exit_codes": [
+                            0
+                        ],
+                        "timeout_mode": "report_only"
+                    },
+                    "interpreter": "powershell7",
+                    "interpreter_version": "7.6.0",
+                    "name": "Synthetic inspection",
+                    "parameter_schema": [],
+                    "publisher_label": "Synthetic publisher",
+                    "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                    "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                    "script_version": 1,
+                    "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                    "size_bytes": 46,
+                    "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "review": {
+                    "child_processes": [],
+                    "compensation": "No mutation approved.",
+                    "effect": "read_only",
+                    "network_destinations": [],
+                    "no_detached_work": true,
+                    "no_dynamic_code": true,
+                    "output_sensitivity": "operational",
+                    "restart_behavior": "none"
+                },
+                "uploaded_by_user_id": 43,
+                "reviewed_by_user_id": null,
+                "can_submit": false,
+                "can_review": true,
+                "can_withdraw": true,
+                "can_read_material": true,
+                "publication_issue": null,
+                "submitted_at": "2026-10-20T10:24:14.000000Z",
+                "published_at": null,
+                "withdrawn_at": null
+            }
+        ]
+    },
+    "index_published": {
+        "actor_id": 44,
+        "can_upload": true,
+        "identity_confirmed": true,
+        "identity_confirm_href": "\/security-devices\/scripts\/confirm-identity?expected_actor_id=44",
+        "execution_available": false,
+        "summary": {
+            "uploaded": 0,
+            "pending_review": 0,
+            "published": 1,
+            "withdrawn": 0
+        },
+        "query": {
+            "status": "all",
+            "search": ""
+        },
+        "pagination": {
+            "limit": 20,
+            "shown": 1,
+            "previous_href": null,
+            "next_href": null,
+            "reset_href": "\/security-devices\/scripts?expected_actor_id=44&status=all&search=",
+            "position_reset": false
+        },
+        "scripts": [
+            {
+                "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "status": "published",
+                "status_version": 3,
+                "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+                "manifest": {
+                    "architecture": "amd64",
+                    "execution_policy": {
+                        "expected_observation_schema": null,
+                        "network_mode": "reviewed_network",
+                        "output_bytes": 4096,
+                        "output_retention_hours": 24,
+                        "runtime_seconds": 60,
+                        "success_exit_codes": [
+                            0
+                        ],
+                        "timeout_mode": "report_only"
+                    },
+                    "interpreter": "powershell7",
+                    "interpreter_version": "7.6.0",
+                    "name": "Synthetic inspection",
+                    "parameter_schema": [],
+                    "publisher_label": "Synthetic publisher",
+                    "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                    "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                    "script_version": 1,
+                    "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                    "size_bytes": 46,
+                    "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "review": {
+                    "child_processes": [],
+                    "compensation": "No mutation approved.",
+                    "effect": "read_only",
+                    "network_destinations": [],
+                    "no_detached_work": true,
+                    "no_dynamic_code": true,
+                    "output_sensitivity": "operational",
+                    "restart_behavior": "none"
+                },
+                "uploaded_by_user_id": 43,
+                "reviewed_by_user_id": 44,
+                "can_submit": false,
+                "can_review": false,
+                "can_withdraw": true,
+                "can_read_material": true,
+                "publication_issue": null,
+                "submitted_at": "2026-10-20T10:24:14.000000Z",
+                "published_at": "2026-10-20T10:24:15.000000Z",
+                "withdrawn_at": null
+            }
+        ]
+    },
+    "index_withdrawn": {
+        "actor_id": 44,
+        "can_upload": true,
+        "identity_confirmed": true,
+        "identity_confirm_href": "\/security-devices\/scripts\/confirm-identity?expected_actor_id=44",
+        "execution_available": false,
+        "summary": {
+            "uploaded": 0,
+            "pending_review": 0,
+            "published": 0,
+            "withdrawn": 1
+        },
+        "query": {
+            "status": "all",
+            "search": ""
+        },
+        "pagination": {
+            "limit": 20,
+            "shown": 1,
+            "previous_href": null,
+            "next_href": null,
+            "reset_href": "\/security-devices\/scripts?expected_actor_id=44&status=all&search=",
+            "position_reset": false
+        },
+        "scripts": [
+            {
+                "uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                "script_version": 1,
+                "status": "withdrawn",
+                "status_version": 4,
+                "content_hash": "13d3517a1ee6fa955b028f873c2b7ed9c09f4d1e1eddde8f499810726494dd8c",
+                "manifest": {
+                    "architecture": "amd64",
+                    "execution_policy": {
+                        "expected_observation_schema": null,
+                        "network_mode": "reviewed_network",
+                        "output_bytes": 4096,
+                        "output_retention_hours": 24,
+                        "runtime_seconds": 60,
+                        "success_exit_codes": [
+                            0
+                        ],
+                        "timeout_mode": "report_only"
+                    },
+                    "interpreter": "powershell7",
+                    "interpreter_version": "7.6.0",
+                    "name": "Synthetic inspection",
+                    "parameter_schema": [],
+                    "publisher_label": "Synthetic publisher",
+                    "runtime_manifest_sha256": "2a2a471f60acb486f956155a26b17dced8d0d91c712fc03dc7dfe60e086c42f8",
+                    "script_uuid": "76bc7c42-e719-4c5b-9073-dcda667874f8",
+                    "script_version": 1,
+                    "sha256": "6abe431b2bf49b5dbeba6938c4e47c0af93496568a66ad9cc71e0da0f1cbff38",
+                    "size_bytes": 46,
+                    "wrapper_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                },
+                "review": {
+                    "child_processes": [],
+                    "compensation": "No mutation approved.",
+                    "effect": "read_only",
+                    "network_destinations": [],
+                    "no_detached_work": true,
+                    "no_dynamic_code": true,
+                    "output_sensitivity": "operational",
+                    "restart_behavior": "none"
+                },
+                "uploaded_by_user_id": 43,
+                "reviewed_by_user_id": 44,
+                "can_submit": false,
+                "can_review": false,
+                "can_withdraw": false,
+                "can_read_material": true,
+                "publication_issue": null,
+                "submitted_at": "2026-10-20T10:24:14.000000Z",
+                "published_at": "2026-10-20T10:24:15.000000Z",
+                "withdrawn_at": "2026-10-20T10:24:15.000000Z"
+            }
+        ]
+    }
+}

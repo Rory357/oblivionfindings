@@ -9,6 +9,7 @@ use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationCompetencyAssessment;
+use App\Models\MedicationFollowup;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationRound;
 use App\Models\Permission;
@@ -20,15 +21,19 @@ use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class MedicationScopeAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     private User $worker;
 
@@ -48,7 +53,7 @@ class MedicationScopeAuthorizationTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-08-14 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-14 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $this->site = Site::factory()->create([
@@ -138,6 +143,9 @@ class MedicationScopeAuthorizationTest extends TestCase
 
     public function test_a_shift_for_another_resident_at_the_same_site_does_not_authorize_the_action(): void
     {
+        // EA-006 (Stephan's D1): a shift at the house covers the residents the
+        // worker is assigned to support (LaneASharedHouseTest), never anyone else.
+        $this->client->supportWorkers()->detach($this->worker->id);
         $otherClient = Client::factory()->create([
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -172,88 +180,99 @@ class MedicationScopeAuthorizationTest extends TestCase
         $this->assertDatabaseCount('client_medication_administrations', 0);
     }
 
-    public function test_guided_round_rejects_a_medication_from_another_site_before_any_effect(): void
+    /**
+     * EA-151 (Lane C10): the guided round's own item writer is retired — round
+     * doses record through Meds today. Any item post, for this house or
+     * another, live or queued offline, is refused with nothing written.
+     */
+    public function test_the_retired_guided_round_item_writer_records_nothing(): void
     {
         $round = $this->round();
         $otherSite = Site::factory()->create(['is_active' => true]);
-        $otherClient = Client::factory()->create([
+        $otherMedication = $this->scheduledMedication(Client::factory()->create([
             'site_id' => $otherSite->id,
             'service_context_id' => $this->serviceContext->id,
-        ]);
-        $otherMedication = $this->scheduledMedication($otherClient);
+        ]));
 
-        $this->actingAs($this->worker)
-            ->postJson(
-                "/emar/rounds/{$round->id}/guided/items/{$otherMedication->id}",
-                [
-                    'status' => 'given',
-                    'scheduled_for' => now()->toIso8601String(),
-                ],
-            )
-            ->assertNotFound();
+        foreach ([$this->medication->id, $otherMedication->id] as $medicationId) {
+            foreach ([false, true] as $queued) {
+                $this->actingAs($this->worker)
+                    ->postJson("/emar/rounds/{$round->id}/guided/items/{$medicationId}", [
+                        'status' => 'given', 'scheduled_for' => now()->toIso8601String(),
+                        'client_request_uuid' => '145511d4-772d-42b5-8cfa-6e72426cfbd9', 'queued_offline' => $queued,
+                    ])
+                    ->assertConflict()
+                    ->assertJsonPath('success', false)
+                    ->assertJsonPath('message', \App\Http\Controllers\Emar\GuidedRoundController::RETIRED_MESSAGE);
+            }
+        }
+        // A live tap (no replay header) only gets the message.
+        $followups = fn () => \App\Models\MedicationFollowup::query()->where('type', \App\Services\Medication\Recording\OfflineReplayReview::TYPE);
+        $this->assertSame(0, $followups()->count());
+
+        // A queued replay (the device's replay header, here 13 h old — past
+        // Lane A's age limit too) is refused the same way and, for someone
+        // who could record for the person now, raises ONE lead follow-up.
+        $replay = fn (int $medicationId, string $uuid) => $this->actingAs($this->worker)
+            ->postJson("/emar/rounds/{$round->id}/guided/items/{$medicationId}", [
+                'status' => 'given', 'scheduled_for' => now()->toIso8601String(),
+                'client_request_uuid' => $uuid, 'queued_offline' => true,
+                'captured_offline_at' => now()->subHours(13)->toIso8601String(),
+            ], [\App\Services\Medication\Recording\OfflineReplayReview::REPLAY_HEADER => now()->subHours(13)->toIso8601String()])
+            ->assertConflict()
+            ->assertJsonPath('message', \App\Http\Controllers\Emar\GuidedRoundController::RETIRED_MESSAGE);
+        $replay($this->medication->id, '0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21');
+        $replay($this->medication->id, '0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21');
+        $followup = $followups()->sole();
+        $this->assertSame('offline-review:0b7b1f43-5d0e-4c57-8f0d-2a4b8b7f9e21', $followup->source_key);
+        $this->assertSame((int) $this->client->id, (int) $followup->client_id);
+        $this->assertSame(\App\Services\Medication\Recording\OfflineReplayReview::REFUSED, $followup->context['reason_key']);
+        // Someone who can't record for that person raises nothing and learns nothing.
+        $replay($otherMedication->id, '6f1d0e2a-3b4c-4d5e-8f60-718293a4b5c6');
+        $this->assertSame(1, $followups()->count());
 
         $this->assertDatabaseCount('client_medication_administrations', 0);
         $this->assertSame(0, $this->administrationTimelineCount());
     }
 
-    public function test_a_durable_replay_identifier_cannot_be_reused_for_another_round_medication(): void
-    {
-        $round = $this->round();
-        $otherMedication = $this->scheduledMedication($this->client, ['name' => 'Second scheduled medicine']);
-        $uuid = '145511d4-772d-42b5-8cfa-6e72426cfbd9';
-        $payload = [
-            'status' => 'given',
-            'scheduled_for' => now()->toIso8601String(),
-            'client_request_uuid' => $uuid,
-            'queued_offline' => false,
-        ];
-
-        $this->actingAs($this->worker)
-            ->postJson("/emar/rounds/{$round->id}/guided/items/{$this->medication->id}", $payload)
-            ->assertOk()
-            ->assertJsonPath('success', true);
-
-        $this->actingAs($this->worker)
-            ->postJson("/emar/rounds/{$round->id}/guided/items/{$otherMedication->id}", $payload)
-            ->assertConflict()
-            ->assertJsonPath(
-                'errors.client_request_uuid.0',
-                'This submission identifier was already used with different medication administration details.',
-            );
-
-        $this->assertDatabaseCount('client_medication_administrations', 1);
-        $this->assertSame(1, $this->administrationTimelineCount());
-        $this->assertDatabaseHas('client_medication_administrations', [
-            'client_medication_id' => $this->medication->id,
-            'client_request_uuid' => $uuid,
-        ]);
-    }
-
-    public function test_foreign_site_prn_effectiveness_id_is_not_disclosed_or_mutated(): void
+    public function test_unassigned_and_foreign_site_prn_effectiveness_ids_are_not_disclosed_or_mutated(): void
     {
         $otherSite = Site::factory()->create(['is_active' => true]);
-        $otherClient = Client::factory()->create(['site_id' => $otherSite->id]);
-        $otherPrn = ClientMedication::factory()->create([
-            'client_id' => $otherClient->id,
-            'is_prn' => true,
-            'active' => true,
-            'state' => 'active',
-            'approval_status' => 'verified',
-        ]);
-        $foreignAdministration = ClientMedicationAdministration::query()->create([
-            'client_id' => $otherClient->id,
-            'client_medication_id' => $otherPrn->id,
-            'administered_by' => User::factory()->create()->id,
-            'administered_at' => now()->subHour(),
-            'status' => 'given',
-        ]);
+        $foreignClient = Client::factory()->create(['site_id' => $otherSite->id, 'status' => 'active']);
+        $foreignClient->supportWorkers()->attach($this->worker->id);
+        $unassignedClient = Client::factory()->create(['site_id' => $this->site->id, 'status' => 'active']);
 
-        $this->actingAs($this->worker)
-            ->post('/meds/today/prn/effect', [
-                'client_medication_administration_id' => $foreignAdministration->id,
-                'effectiveness' => 'effective',
-            ])
-            ->assertNotFound();
+        foreach ([$unassignedClient, $foreignClient] as $hiddenClient) {
+            $prn = ClientMedication::factory()->create([
+                'client_id' => $hiddenClient->id,
+                'is_prn' => true,
+                'controlled_drug' => false,
+                'active' => true,
+                'state' => 'active',
+                'approval_status' => 'verified',
+                'start_date' => today()->subMonth(),
+                'end_date' => null,
+            ]);
+            $administration = ClientMedicationAdministration::query()->create([
+                'client_id' => $hiddenClient->id,
+                'client_medication_id' => $prn->id,
+                'administered_by' => User::factory()->create()->id,
+                'administered_at' => now()->subHour(),
+                'status' => 'given',
+            ]);
+            $before = $administration->fresh()->getRawOriginal();
+
+            $this->actingAs($this->worker)
+                ->post(route('meds.today.prn_effect'), [
+                    'client_medication_administration_id' => $administration->id,
+                    'effectiveness' => 'effective',
+                    'request_uuid' => (string) Str::uuid(),
+                    'revision' => 1,
+                ])
+                ->assertNotFound();
+
+            $this->assertSame($before, $administration->fresh()->getRawOriginal());
+        }
 
         $this->assertDatabaseCount('medication_prn_effectiveness', 0);
         $this->assertDatabaseCount('break_glass_access_events', 0);
@@ -264,6 +283,7 @@ class MedicationScopeAuthorizationTest extends TestCase
         $prn = ClientMedication::factory()->create([
             'client_id' => $this->client->id,
             'is_prn' => true,
+            'controlled_drug' => false,
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
@@ -296,7 +316,13 @@ class MedicationScopeAuthorizationTest extends TestCase
         $rejected = $makeCorrection('rejected', now()->subMinutes(3));
         $olderApproved = $makeCorrection('approved', now()->subMinutes(2));
         $winner = $makeCorrection('approved', now()->subMinute());
-        $payload = ['effectiveness' => 'effective'];
+        $administrations = collect([$original, $pending, $rejected, $olderApproved, $winner]);
+        $before = $administrations->mapWithKeys(fn ($row) => [$row->id => $row->fresh()->getRawOriginal()])->all();
+        $payload = [
+            'effectiveness' => 'effective',
+            'request_uuid' => (string) Str::uuid(),
+            'revision' => 1,
+        ];
 
         foreach ([
             ['meds.today.prn_effect', $original],
@@ -324,18 +350,24 @@ class MedicationScopeAuthorizationTest extends TestCase
             'client_medication_administration_id' => $winner->id,
             'effectiveness' => 'effective',
         ]);
+        $revision = MedicationFollowup::query()->where('administration_id', $winner->id)->where('type', 'effect')->value('revision');
+        $this->assertSame(2, (int) $revision);
         $this->actingAs($this->worker)
             ->post(route('emar.prn_effectiveness.store'), [
                 'client_medication_administration_id' => $winner->id,
                 'effectiveness' => 'partially_effective',
+                'request_uuid' => (string) Str::uuid(),
+                'revision' => $revision,
             ])
-            ->assertRedirect();
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
 
         $this->assertDatabaseHas('medication_prn_effectiveness', [
             'client_medication_administration_id' => $winner->id,
             'effectiveness' => 'partially_effective',
         ]);
         $this->assertDatabaseCount('medication_prn_effectiveness', 1);
+        $this->assertSame($before, $administrations->mapWithKeys(fn ($row) => [$row->id => $row->fresh()->getRawOriginal()])->all());
     }
 
     public function test_canonical_finite_break_glass_allows_and_audits_an_otherwise_off_shift_dose(): void
@@ -422,8 +454,9 @@ class MedicationScopeAuthorizationTest extends TestCase
         ]);
         $foreignMedication = $this->scheduledMedication($otherClient, ['name' => 'Foreign resident medicine']);
 
+        // EA-053 (Lane C3): the old prescriber-order register is read only.
         $this->actingAs($this->worker)
-            ->post('/emar/prescriptions', [
+            ->postJson('/emar/prescriptions', [
                 'client_id' => $this->client->id,
                 'client_medication_id' => $foreignMedication->id,
                 'order_type' => 'cease',
@@ -434,18 +467,58 @@ class MedicationScopeAuthorizationTest extends TestCase
                 'frequency' => 'Once daily',
                 'order_date' => today()->toDateString(),
             ])
-            ->assertNotFound();
+            ->assertStatus(409);
 
         $this->assertDatabaseCount('medication_prescriber_orders', 0);
         $this->assertTrue((bool) $foreignMedication->fresh()->active);
 
+        $before = $this->medication->fresh()->getRawOriginal();
         $this->actingAs($this->worker)
             ->put("/emar/medications/{$this->medication->id}", [
                 'client_id' => $otherClient->id,
                 'medication_name' => 'Illicit reassignment',
             ])
-            ->assertRedirect()
-            ->assertSessionHasErrors('client_id');
+            ->assertNotFound();
+
+        $this->actingAs($this->worker)
+            ->post(route('emar.orders.enter'), [
+                'client_id' => $otherClient->id,
+                'medication_id' => $this->medication->id,
+                'request_key' => (string) Str::uuid(),
+                'expected_version' => $this->medication->version,
+                'change_reason' => 'Prescriber source instruction',
+                'source' => [
+                    'type' => 'written',
+                    'prescriber' => 'Dr Scope',
+                    'received_at' => now()->toIso8601String(),
+                ],
+                'source_file' => UploadedFile::fake()->create('scope-prescription.pdf', 1, 'application/pdf'),
+                'prescription' => [
+                    'name' => $this->medication->name,
+                    'dosage' => $this->medication->dosage,
+                    'frequency' => $this->medication->frequency,
+                    'dose_times' => $this->medication->dose_times,
+                    'is_prn' => false,
+                    'route' => 'Oral',
+                    'indication' => 'Indication from the prescriber source',
+                    'start_date' => today()->toDateString(),
+                    'controlled_drug' => false,
+                ],
+            ])
+            ->assertNotFound();
+
+        $this->actingAs($this->worker)
+            ->post(route('emar.orders.stop', $foreignMedication->id), [
+                'client_id' => $this->client->id,
+                'reason' => 'Prescriber ceased this order',
+                'request_key' => (string) Str::uuid(),
+            ])
+            ->assertNotFound();
+
+        $this->assertSame($before, $this->medication->fresh()->getRawOriginal());
+        $this->assertTrue((bool) $foreignMedication->fresh()->active);
+        $this->assertDatabaseCount('medication_order_versions', 0);
+        $this->assertDatabaseCount('medication_order_actions', 0);
 
         $this->assertSame($this->client->id, (int) $this->medication->fresh()->client_id);
         $this->assertNotSame('Illicit reassignment', $this->medication->fresh()->name);
@@ -465,17 +538,17 @@ class MedicationScopeAuthorizationTest extends TestCase
         $replacement = $this->scheduledMedication($this->client, ['name' => 'Replacement medicine']);
 
         $this->actingAs($this->worker)
-            ->put("/emar/prescriptions/{$order->id}", [
+            ->putJson("/emar/prescriptions/{$order->id}", [
                 'client_medication_id' => $replacement->id,
             ])
-            ->assertRedirect()
-            ->assertSessionHasErrors('client_medication_id');
+            ->assertStatus(409);
 
         $this->assertSame($this->medication->id, (int) $order->fresh()->client_medication_id);
     }
 
     public function test_concurrent_shift_reassignment_wins_before_the_administration_write(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow();
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
@@ -624,7 +697,7 @@ class MedicationScopeAuthorizationTest extends TestCase
                 Carbon::setTestNow(Carbon::parse(
                     '2026-08-14 09:30:00',
                     config('app.worker_timezone', 'Pacific/Auckland'),
-                ));
+                )->utc());
             }
         }
     }

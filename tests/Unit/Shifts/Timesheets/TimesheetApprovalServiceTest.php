@@ -23,7 +23,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Mockery;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
@@ -781,7 +780,7 @@ class TimesheetApprovalServiceTest extends TestCase
                 $this->assertSame('site', $drift);
                 $this->assertSame(403, $exception->getStatusCode());
                 $this->assertStringContainsString(
-                    'not authorized to access records for this site',
+                    'not authorized to access timesheets for this site',
                     $exception->getMessage(),
                 );
             }
@@ -838,13 +837,29 @@ class TimesheetApprovalServiceTest extends TestCase
                 ->zeroOrMoreTimes();
             $mock->shouldReceive('syncToHr')
                 ->times($times)
-                ->with(Mockery::type(Timesheet::class), null, true);
+                ->withArgs(function ($timesheet, $entry, $prepared, $snapshot): bool {
+                    $this->assertInstanceOf(Timesheet::class, $timesheet);
+                    $this->assertNull($entry);
+                    $this->assertTrue($prepared);
+                    $this->assertSame($timesheet->shift_site_id, $snapshot['shift_site_id']);
+                    $this->assertSame($timesheet->client_name_snapshot, $snapshot['client_name_snapshot']);
+                    $this->assertSame($timesheet->staff_name_snapshot, $snapshot['staff_name_snapshot']);
+
+                    return true;
+                });
         });
 
         $this->mock(BillingService::class, function ($mock) use ($times): void {
             $mock->shouldReceive('generateFromTimesheet')
                 ->times($times)
-                ->with(Mockery::type(Timesheet::class))
+                ->withArgs(function ($timesheet, $snapshot): bool {
+                    $this->assertInstanceOf(Timesheet::class, $timesheet);
+                    $this->assertSame($timesheet->shift_site_id, $snapshot['site_id']);
+                    $this->assertSame($timesheet->client_name_snapshot, $snapshot['client_name_snapshot']);
+                    $this->assertSame($timesheet->staff_name_snapshot, $snapshot['staff_name_snapshot']);
+
+                    return true;
+                })
                 ->andReturn(new Collection);
         });
     }

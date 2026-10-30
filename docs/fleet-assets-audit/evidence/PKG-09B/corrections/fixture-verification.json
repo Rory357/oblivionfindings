@@ -1,0 +1,118 @@
+{
+  "package": "PKG-09B",
+  "parent": "ba2e0aeec341ff68dedbfafd4fb4d64642e8bd5b",
+  "scope": "Only the canonical history success fixture consent type changed; production guards and authoritative consent evidence are unchanged.",
+  "sourceDelta": "tests/Feature/SecurityDevices/CanonicalIntegrationEventHistoryTest.php",
+  "oldConsentType": "Asset Location Tracking (Safety)",
+  "newConsentType": "Personal Tracker (Wandering Risk)",
+  "previous48SourceHashChanges": [],
+  "ownedDatabase": "of_pkg09b_fixture_20260928_34344",
+  "databaseIsolation": "Tests\\TestCase appends the process token and prunes only numeric siblings of of_pkg09b_fixture_20260928. Main review database family is excluded.",
+  "checks": {
+    "phpSyntax": "passed",
+    "gitDiffWhitespace": "passed"
+  },
+  "priorFailureEvidencePreserved": [
+    "docs/fleet-assets-audit/evidence/PKG-09B/implementation/reports-baseline.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/corrections/final-tests.log",
+    "docs/fleet-assets-audit/evidence/PKG-09B/corrections/final-tests.xml"
+  ],
+  "openAcceptance": "Main review and genuine 125% zoom acceptance/amendment remain pending.",
+  "recordedAt": "2026-09-27T23:43:25.991Z",
+  "latestRun": {
+    "tests": 6,
+    "assertions": 136,
+    "failures": 0,
+    "errors": 0,
+    "durationSeconds": 257.985,
+    "cases": [
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity",
+        "assertions": 15,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.DeviceCustodyAuthorizationTest::test_generic_fleet_or_asset_consent_does_not_authorise_resident_location",
+        "assertions": 9,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.PersonalTrackingConsentWithdrawalTest::test_withdrawal_stops_collection_and_blocks_ui_api_export_direct_url_and_cached_recheck",
+        "assertions": 94,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      }
+    ]
+  },
+  "latestScopedResults": {
+    "unique_cases": 48,
+    "passing_cases": 48,
+    "passing_assertions": 838,
+    "failures": [],
+    "latest_run_cases": [
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity",
+        "assertions": 6,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity",
+        "assertions": 15,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.DeviceCustodyAuthorizationTest::test_generic_fleet_or_asset_consent_does_not_authorise_resident_location",
+        "assertions": 9,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      },
+      {
+        "case": "Tests.Feature.SecurityDevices.PersonalTrackingConsentWithdrawalTest::test_withdrawal_stops_collection_and_blocks_ui_api_export_direct_url_and_cached_recheck",
+        "assertions": 94,
+        "passed": true,
+        "evidence": "fixture-tests.xml"
+      }
+    ]
+  },
+  "databaseCleanup": {
+    "owned_database_family": "of_pkg09b_fixture_20260928_<PID>",
+    "present": [],
+    "checked_at": "2026-09-27T23:42:46+00:00",
+    "read_only_check": true
+  },
+  "noProductionBuildRerun": "Test fixture only; all 48 previous application/test source hashes remain identical, so the authenticated preview build is unchanged."
+}

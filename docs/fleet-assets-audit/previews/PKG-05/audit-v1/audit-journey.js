@@ -1,0 +1,30 @@
+async(page)=>{
+ await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});page.setDefaultTimeout(7000);
+ const findings=[],b=n=>page.getByRole('button',{name:n,exact:true}),seen=async t=>page.getByText(t,{exact:false}).first().waitFor({state:'visible',timeout:4000});
+ const reset=async()=>page.goto('http://127.0.0.1:4395/');const scenario=async n=>{await reset();await b('Preview scenarios').click();await b(n).click()};const test=async(id,fn)=>{try{findings.push({id,...await fn()})}catch(e){findings.push({id,error:String(e).slice(0,1400)})}};
+ await test('J01-journey-hierarchy',async()=>{
+  await scenario('Medication unresolved');const panels=await page.locator('.card-title h2').allTextContents();const geometry=await page.locator('.card-body').evaluateAll(es=>es.map(e=>({title:e.querySelector('h2')?.textContent||e.querySelector('h3')?.textContent||'',top:e.getBoundingClientRect().top,height:e.getBoundingClientRect().height})));await page.screenshot({path:'C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/audit-v1/screenshots/J01-journey-full.png',fullPage:true});return {panels,geometry,result:'Actual passenger/medication work appears below repeated request summary and vehicle details.'};
+ });
+ await test('J02-completion-offscreen',async()=>{
+  await scenario('Return receipt retry');await b('Record return').click();await b('Continue').click();await page.getByRole('checkbox',{name:/Keys and equipment received in full/}).check();await page.getByRole('checkbox',{name:/Passenger return confirmed in source/}).check();await b('Continue').click();await b('Record return receipt').click();await b('Check receipt RC-311').click();await b('Open record').click();await page.keyboard.press('Control+Home');const box=await b('Complete journey').boundingBox();const primary=await page.locator('.action-panel').innerText();await page.screenshot({path:'C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/audit-v1/screenshots/J02-returned-journey-full.png',fullPage:true});return {completionBox:box,viewportHeight:1000,primary,result:'Completion is below the fold while the prominent action requires next-shift handover.'};
+ });
+ await test('J03-return-before-departure',async()=>{
+  await scenario('Return receipt retry');await b('Record return').click();await page.getByRole('button',{name:/Observed return date:/}).click();await page.getByRole('button',{name:'Fri 25 September 2026',exact:true}).click();await b('Use date').click();await b('Continue').click();await b('Continue').click();await b('Record return receipt').click();await b('Check receipt RC-311').click();await seen('Return receipt recorded');await page.screenshot({path:'C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/audit-v1/screenshots/J03-return-before-departure-accepted.png'});return {confirmed:true,result:'25 Sep return accepted for the 28 Sep journey; chronological consistency is not checked.'};
+ });
+ await test('J04-replay-changed-payload',async()=>{
+  await scenario('Return receipt retry');await b('Record return').click();await b('Continue').click();await b('Continue').click();await b('Record return receipt').click();await seen('Receipt acknowledgement was interrupted');await b('Back').click();await b('Back').click();await page.getByLabel('Return odometer (km)').fill('48999');await b('Continue').click();await b('Continue').click();await b('Check receipt RC-311').click();await b('Open record').click();await b('History').click();await seen('48999');await page.screenshot({path:'C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/audit-v1/screenshots/J04-original-receipt-mutated.png'});return {confirmed:true,result:'Original RC-311 recovery uses changed draft odometer 48999 instead of the original 48248; no immutable receipt snapshot.'};
+ });
+ await test('J05-history-leaks-into-new-request',async()=>{
+  await reset();await page.getByRole('row').filter({hasText:'TR-1042'}).click();await b('Add note').click();await page.getByLabel('Transport note').fill('Original request only: bring blue folder.');await b('Save note').click();await page.getByRole('tab',{name:'Requests',exact:true}).click();await b('Request transport').first().click();await page.getByLabel('Purpose',{exact:true}).fill('Different request');await b('Continue').click();await b('Continue').click();await b('Submit request').click();await b('Open record').click();const body=await page.locator('body').innerText();await page.screenshot({path:'C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/audit-v1/screenshots/J05-new-request-inherits-old-note.png',fullPage:true});return {confirmed:body.includes('Original request only: bring blue folder.'),result:'New TR-1044 inherits TR-1042 notes and history.'};
+ });
+ await test('J06-missing-information-dead-end',async()=>{
+  await reset();await page.getByRole('row').filter({hasText:'TR-1043'}).click();const dialog=await page.getByRole('dialog').innerText();return {dialog,result:'Needs-information row has explanation only, no request/amendment/resolution action.'};
+ });
+ await test('J07-filter-cycle-no-menu',async()=>{
+  await reset();await b('All approved sites').click();const popups=await page.getByRole('menu').count();const text=await page.locator('body').innerText();return {menus:popups,nextSite:text.includes('Kōwhai House')?'some Kōwhai content visible':'Aurora only',result:'Chevron-labelled site filter cycles values instead of opening choices.'};
+ });
+ await test('J08-direct-unknown-record',async()=>{
+  await page.goto('http://127.0.0.1:4395/#/fleet-assets/transports/J-99999');const heading=await page.getByRole('heading',{level:1}).innerText();const body=await page.locator('body').innerText();return {heading,showsJ608:body.includes('J-608'),result:'Unknown journey URL renders the active fixture instead of not-found.'};
+ });
+ await reset();return findings;
+}

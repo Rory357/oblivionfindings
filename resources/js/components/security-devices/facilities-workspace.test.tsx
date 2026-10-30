@@ -195,10 +195,10 @@ describe('FacilitiesWorkspacePanels', () => {
                 'Technical facilities evidence, not building control',
             ),
         ).toBeInTheDocument();
-        expect(screen.getByText('1 environmental devices')).toBeInTheDocument();
-        expect(screen.getByText('1 building systems')).toBeInTheDocument();
-        expect(screen.getByText('1 utilities')).toBeInTheDocument();
-        expect(screen.getByText('1 automations')).toBeInTheDocument();
+        expectFact('Environmental devices', '1');
+        expectFact('Building systems', '1');
+        expectFact('Utilities', '1');
+        expectFact('Automations', '1');
         expect(screen.getByText('Active facility events')).toBeInTheDocument();
         expect(screen.getByText('Kauri House')).toBeInTheDocument();
     });
@@ -305,7 +305,7 @@ describe('FacilitiesWorkspacePanels', () => {
 
         expect(
             screen.getByRole('heading', {
-                name: 'Canonical facility history',
+                name: 'Facility history',
             }),
         ).toBeInTheDocument();
         expect(
@@ -319,4 +319,36 @@ describe('FacilitiesWorkspacePanels', () => {
             '/security-devices/reports/events.csv?domain=facilities',
         );
     });
+
+    it('renders active attention filter banner and matching devices on overview', () => {
+        render(
+            <FacilitiesWorkspacePanels
+                data={withTab('overview', {
+                    attentionFilter: {
+                        key: 'device-attention',
+                        label: 'Facility devices requiring attention',
+                    },
+                    devices: [device],
+                })}
+            />,
+        );
+
+        expect(screen.getByText(/Filtered to:/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Clear attention filter' }),
+        ).toHaveAttribute(
+            'href',
+            '/security-devices/facilities-iot?tab=overview',
+        );
+        expect(
+            screen.getByRole('link', { name: 'Kauri cool room sensor' }),
+        ).toBeInTheDocument();
+    });
 });
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

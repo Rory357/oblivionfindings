@@ -1,0 +1,18 @@
+{
+  "url": "http://127.0.0.1:8896/#view=overview&section=summary&scenario=normal",
+  "port": 8896,
+  "pid": 42352,
+  "execSession": 18498,
+  "host": "127.0.0.1",
+  "sourceHeader": "8821-v1",
+  "servedJsSha256": "628e1eb15a267c782460ef80dcdc98e2b2baf45e14e445e3251218d7b08daf4e",
+  "diskJsSha256": "628e1eb15a267c782460ef80dcdc98e2b2baf45e14e445e3251218d7b08daf4e",
+  "match": true,
+  "methods": "GET and HEAD only",
+  "requestsFromPreview": [
+    "http://127.0.0.1:8896/",
+    "http://127.0.0.1:8896/app.css",
+    "http://127.0.0.1:8896/app.js"
+  ],
+  "state": "Server left running for review"
+}

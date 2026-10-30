@@ -40,25 +40,39 @@ import {
     StepHead,
 } from '@/components/wizard/primitives';
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
+import { draftHistoryNavigation, registerDraftHistoryGuard } from '@/lib/draft-history';
+import {
+    sanitiseWitnessPin,
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 
 import {
     type Catalogue,
     type CatalogueShift,
-    type Handover,
-    MOODS,
     clientName,
     fmtTime,
+    type Handover,
     incomingHandoverShifts,
     moodEmoji,
+    MOODS,
     nextShiftIdAfter,
     outgoingHandoverShifts,
     shiftOptionLabel,
 } from './shared';
 import { type ShiftMedSnapshot, ShiftMedSummary } from './shift-med-snapshot';
+import { retainHandoverDraft } from './handover-work-lifetime';
+import { useOperationsHandoverCommand } from './use-operations-handover-command';
+import { handoverCommandWeek } from './handover-command-week';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 const SELECT_CLASS =
-    'h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
+    'h-10 w-full max-md:min-h-[44px] rounded-lg border border-input bg-background px-3 text-sm text-foreground transition-colors focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-60';
 const INPUT_CLASS = SELECT_CLASS;
 const BAD_CLASS = 'border-status-critical focus:ring-status-critical/30';
 
@@ -325,6 +339,11 @@ export function HandoverWizard({
     onSubmitted,
     basePath = '/operations/handovers',
     medicationFocus = false,
+    checkedCommands = false,
+    submitOnly = false,
+    editingUnavailable = false,
+    addClientActive = false,
+    timeZone = WORKER_TIMEZONE,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -339,14 +358,53 @@ export function HandoverWizard({
     // Operations behaviour.
     basePath?: string;
     medicationFocus?: boolean;
+    checkedCommands?: boolean;
+    submitOnly?: boolean;
+    editingUnavailable?: boolean;
+    addClientActive?: boolean;
+    timeZone?: string;
 }) {
+    // A mounted save owner cannot downgrade to a legacy writer mid-attempt.
+    // Installation readiness is chosen on entry; reopen the page to change it.
+    const [commandMode] = useState(() => checkedCommands && !medicationFocus && basePath === '/operations/handovers');
+    const submissionReview = commandMode && submitOnly && editing !== null;
+    const isMobile = useIsMobile();
     const [stepIndex, setStepIndex] = useState(0);
     const [f, setF] = useState<WizForm>(emptyForm);
+    const { session: commandSession, state: commandState } = useOperationsHandoverCommand(commandMode, currentUser.id, {
+        recordId: editing?.id ?? null, version: editing?.version ?? null,
+        shiftId: editing?.outgoing_shift?.id ?? (f.outgoing_shift ? Number(f.outgoing_shift) : null),
+        canRead: !editingUnavailable,
+        canWrite: !editingUnavailable && (!editing || (editing.status === 'draft' &&
+            (submissionReview ? editing.can_submit : editing.can_edit))),
+    });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
+    const [discardOpen, setDiscardOpen] = useState(false);
+    const [initialDraft, setInitialDraft] = useState<string | null>(null);
+    const seededRecord = useRef<string | undefined>(undefined);
+    const commandTargetWeek = useRef<Date | null>(null);
+    const draftKey = JSON.stringify(retainHandoverDraft(f));
+    const dirty = commandMode && initialDraft !== null && draftKey !== initialDraft;
+    const commandBusy = commandMode && !['editing', 'confirmed'].includes(commandState.phase);
+    const historyBlocked = commandMode && open && Boolean(commandSession?.belongsTo(currentUser.id)) &&
+        commandState.phase !== 'unavailable' && (!commandSession?.canClose() || (commandState.phase !== 'confirmed' && dirty));
+    useEffect(() => {
+        if (commandMode && commandState.phase === 'unavailable') {
+            toast.warning('This handover is no longer available in your current view. Reopen Handovers to check your access.');
+        }
+    }, [commandMode, commandState.phase]);
     // eMAR lens: live medication picture for the selected outgoing shift's window.
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
+    const [snapshotRevision, setSnapshotRevision] = useState(0);
+    useEffect(() => setSnapshotRevision(0), [open, f.outgoing_shift]);
+    useEffect(() => {
+        if (!open || !medicationFocus) return;
+        const refresh = () => setSnapshotRevision((revision) => revision + 1);
+        window.addEventListener('focus', refresh);
+        return () => window.removeEventListener('focus', refresh);
+    }, [open, medicationFocus]);
     const [editLockState, setEditLockState] =
         useState<EditLockState>('not_needed');
     const [editLockHolder, setEditLockHolder] = useState<string | null>(null);
@@ -363,6 +421,11 @@ export function HandoverWizard({
 
     const closeWizard = () => {
         clearWitnessCredential();
+        if (commandSession && !commandSession.canClose()) return;
+        if (dirty && commandState.phase !== 'confirmed') {
+            setDiscardOpen(true);
+            return;
+        }
         onOpenChange(false);
     };
 
@@ -378,23 +441,74 @@ export function HandoverWizard({
             );
             return;
         }
-        setStepIndex(0);
+        const seedKey = `${editing?.id ?? 'new'}:${submissionReview}`;
+        if (commandMode && seededRecord.current === seedKey && commandState.phase !== 'confirmed') return;
+        if (commandSession && !commandSession.reset()) return;
+        setStepIndex(submissionReview ? 3 : 0);
         setErrors({});
-        setF(
-            editing
+        const seeded = editing
                 ? initFromEditing(
                       editing,
                       medicationFocus && catalogue.capabilities.view_controlled,
                   )
-                : emptyForm(),
-        );
+                : emptyForm();
+        setInitialDraft(JSON.stringify(retainHandoverDraft(seeded)));
+        seededRecord.current = seedKey;
+        setF(seeded);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         open,
         editing?.id,
         medicationFocus,
         catalogue.capabilities.view_controlled,
+        submissionReview,
     ]);
+
+    useEffect(() => {
+        if (!commandMode || !open) return;
+        const blocked = () => {
+            if (!commandSession || !commandSession.belongsTo(currentUser.id) || commandSession.snapshot().phase === 'unavailable') return false;
+            return !commandSession.canClose() || (commandSession.snapshot().phase !== 'confirmed' && dirty);
+        };
+        const unload = (event: BeforeUnloadEvent) => {
+            if (!blocked()) return;
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        const removeVisit = router.on('before', (event) => {
+            // Adding a client refreshes only the permitted catalogue, without
+            // replacing this page or its retained handover work.
+            const visit = event.detail.visit;
+            const currentUrl = new URL(window.location.href);
+            const samePage = visit.url.origin === currentUrl.origin && visit.url.pathname === currentUrl.pathname &&
+                visit.url.search === currentUrl.search;
+            if (visit.method === 'get' && samePage && visit.preserveState === true && visit.only.length === 1 &&
+                visit.only[0] === 'catalogue' && commandSession?.canEdit()) return;
+            if (addClientActive && visit.method === 'post' && visit.url.origin === currentUrl.origin &&
+                visit.url.pathname === '/operations/clients' && visit.preserveState === true &&
+                commandSession?.canEdit()) return;
+            if (blocked()) {
+                event.preventDefault();
+                toast.warning(commandSession?.canClose()
+                    ? 'Save or discard your handover typing before leaving.'
+                    : 'Check whether your handover saved before leaving.');
+            }
+        });
+        window.addEventListener('beforeunload', unload);
+        return () => { removeVisit(); window.removeEventListener('beforeunload', unload); };
+    }, [commandMode, commandSession, open, dirty, currentUser.id, addClientActive]);
+
+    useEffect(() => {
+        if (!historyBlocked) return;
+        return registerDraftHistoryGuard((_continueHistory, cancelHistory) => {
+            // Retain the original work, without capturing a destination to replay later.
+            cancelHistory();
+            if (!commandSession?.belongsTo(currentUser.id)) return;
+            toast.warning(commandSession.canClose()
+                ? 'Save or discard your handover typing before using Back or Forward.'
+                : 'Check whether your handover saved before leaving.');
+        });
+    }, [historyBlocked, commandSession, currentUser.id]);
 
     // A client added via the inline Add Client dialog selects itself here.
     useEffect(() => {
@@ -430,7 +544,7 @@ export function HandoverWizard({
                 const snap: ShiftMedSnapshot | null =
                     res.data?.snapshot ?? null;
                 setSnapshot(snap);
-                if (snap && snap.due.length > 0) {
+                if (snap && snap.due.length > 0 && snapshotRevision === 0) {
                     setF((p) =>
                         p.medications.length === 0
                             ? {
@@ -453,7 +567,7 @@ export function HandoverWizard({
         return () => {
             cancelled = true;
         };
-    }, [open, medicationFocus, f.outgoing_shift, basePath]);
+    }, [open, medicationFocus, f.outgoing_shift, basePath, snapshotRevision]);
 
     // eMAR lens: take a presence edit-lock while editing an existing draft. Only
     // release it if this wizard instance actually acquired it; a failed/blocked
@@ -532,12 +646,12 @@ export function HandoverWizard({
     const canGovernControlled =
         canViewControlled && catalogue.capabilities.record_controlled;
     const immutable = Boolean(
-        editing && (editing.status !== 'draft' || !editing.can_edit),
+        editing && (editing.status !== 'draft' || !(submissionReview ? editing.can_submit : editing.can_edit)),
     );
     const editLockUnavailable = Boolean(
         editing && medicationFocus && editLockState !== 'acquired',
     );
-    const mutationDisabled = immutable || editLockUnavailable;
+    const mutationDisabled = immutable || editLockUnavailable || commandBusy;
 
     const siteName = (siteId: number | null) =>
         catalogue.sites.find((s) => s.id === siteId)?.name ?? '';
@@ -653,9 +767,12 @@ export function HandoverWizard({
             }
             if (f.cd_result && !f.cd_witness)
                 e.cd_witness_id = 'Select the witnessing worker';
-            if (f.cd_result && !f.cd_witness_credential.trim())
+            if (
+                f.cd_result &&
+                f.cd_witness_credential.trim().length !== WITNESS_PIN_LENGTH
+            )
                 e.cd_witness_credential =
-                    'The witness must enter their password or PIN';
+                    'The witness must type their own 6-digit witness PIN';
             if (f.cd_result === 'discrepancy' && !f.cd_notes.trim())
                 e.cd_notes = 'Describe the discrepancy before continuing';
         }
@@ -663,14 +780,19 @@ export function HandoverWizard({
     }
 
     const goNext = () => {
+        if (submissionReview || (commandSession && !commandSession.canEdit())) return;
         const e = validate(cur.key);
         setErrors(e);
         if (Object.keys(e).length) return;
         setStepIndex((i) => Math.min(i + 1, WIZ_STEPS.length - 1));
     };
-    const goBack = () => setStepIndex((i) => Math.max(i - 1, 0));
+    const goBack = () => {
+        if (submissionReview || (commandSession && !commandSession.canEdit())) return;
+        setStepIndex((i) => Math.max(i - 1, 0));
+    };
 
     const submit = (asDraft: boolean) => {
+        if (commandSession && !commandSession.canEdit()) return;
         if (mutationDisabled) {
             toast.error(
                 immutable
@@ -680,12 +802,12 @@ export function HandoverWizard({
             return;
         }
 
-        const all = {
+        const all: Record<string, string> = submissionReview ? {} : {
             ...validate('shift'),
             ...validate('narrative'),
             ...validate('lists'),
         };
-        if (!asDraft && f.leave_open) {
+        if (!submissionReview && !asDraft && f.leave_open) {
             all.incoming_shift =
                 'Assign the bounded incoming shift before submitting. You can keep this as a draft while cover is arranged.';
         }
@@ -731,7 +853,15 @@ export function HandoverWizard({
         const targetShift = catalogue.shifts.find(
             (s) => String(s.id) === f.outgoing_shift,
         );
-        const targetWeek = startOfWeek(
+        const commandStartsAt = editing?.outgoing_shift && String(editing.outgoing_shift.id) === f.outgoing_shift
+            ? editing.outgoing_shift.starts_at : targetShift?.starts_at;
+        const commandWeek = commandMode ? handoverCommandWeek(commandStartsAt, timeZone) : null;
+        if (commandMode && !commandWeek) {
+            clearWitnessCredential();
+            toast.error('This shift needs a valid start time before its handover can be saved. Your typing is still here.');
+            return;
+        }
+        const targetWeek = commandWeek ? new Date(`${commandWeek}T12:00:00`) : startOfWeek(
             targetShift?.starts_at
                 ? new Date(targetShift.starts_at)
                 : new Date(),
@@ -741,6 +871,21 @@ export function HandoverWizard({
         // input/state before the network round-trip so retries require the witness
         // to authenticate again and no secret lingers in the open wizard.
         clearWitnessCredential();
+        if (commandSession) {
+            commandTargetWeek.current = targetWeek;
+            const { cd_witness_credential: credential, ...fields } = payload as typeof payload & { cd_witness_credential?: string | null };
+            void commandSession.save(Number(f.outgoing_shift), editing?.id ?? null,
+                editing?.version ?? null, submissionReview ? {} : Object.freeze(fields),
+                submissionReview ? null : credential, submissionReview).then((saved) => {
+                if (!saved || !commandSession.confirmedFor(saved, currentUser.id)) return;
+                setInitialDraft(draftKey);
+                clearWitnessCredential();
+                onOpenChange(false);
+                toast.success(saved.status === 'draft' ? 'Handover saved as draft' : 'Handover submitted');
+                onSubmitted(targetWeek);
+            });
+            return;
+        }
         setSubmitting(true);
         const opts = {
             preserveScroll: true,
@@ -798,8 +943,12 @@ export function HandoverWizard({
     };
 
     const footerStart =
-        !mutationDisabled && stepIndex > 0 ? (
-            <Button variant="ghost" onClick={goBack}>
+        !mutationDisabled && !submissionReview && stepIndex > 0 ? (
+            <Button
+                variant="ghost"
+                className="max-md:min-h-[44px] max-md:min-w-[44px]"
+                onClick={goBack}
+            >
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Back
             </Button>
@@ -807,14 +956,20 @@ export function HandoverWizard({
 
     const footerEnd = (
         <>
-            <Button variant="outline" onClick={closeWizard}>
+            <Button
+                variant="outline"
+                className="max-md:min-h-[44px] max-md:min-w-[44px]"
+                onClick={closeWizard}
+                disabled={commandBusy}
+            >
                 {immutable ? 'Close' : 'Cancel'}
             </Button>
             {!mutationDisabled && cur.key === 'review' ? (
                 <>
-                    {!editing || editing.status === 'draft' ? (
+                    {!submissionReview && (!editing || editing.status === 'draft') ? (
                         <Button
                             variant="secondary"
+                            className="max-md:min-h-[44px] max-md:min-w-[44px]"
                             onClick={() => submit(true)}
                             disabled={submitting || mutationDisabled}
                         >
@@ -822,6 +977,7 @@ export function HandoverWizard({
                         </Button>
                     ) : null}
                     <Button
+                        className="max-md:min-h-[44px] max-md:min-w-[44px]"
                         onClick={() => submit(false)}
                         disabled={submitting || mutationDisabled}
                     >
@@ -839,7 +995,10 @@ export function HandoverWizard({
                     </Button>
                 </>
             ) : !mutationDisabled ? (
-                <Button onClick={goNext}>
+                <Button
+                    className="max-md:min-h-[44px] max-md:min-w-[44px]"
+                    onClick={goNext}
+                >
                     Continue
                     <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
@@ -847,14 +1006,16 @@ export function HandoverWizard({
         </>
     );
 
+    if (commandState.phase === 'unavailable' || (commandSession && !commandSession.belongsTo(currentUser.id))) return null;
     return (
+        <>
         <WizardShell
             open={open}
             onClose={closeWizard}
-            title={editing ? 'Edit handover' : 'New handover'}
-            description="A guided wizard to record a shift-to-shift handover."
+            title={submissionReview ? 'Submit handover' : editing ? 'Edit handover' : 'New handover'}
+            description={submissionReview ? 'Review this saved draft before submitting it to the incoming worker.' : 'A guided wizard to record a shift-to-shift handover.'}
             railIcon={editing ? FileText : ArrowLeftRight}
-            railTitle={editing ? 'Edit handover' : 'New handover'}
+            railTitle={submissionReview ? 'Submit handover' : editing ? 'Edit handover' : 'New handover'}
             railSub={
                 editing
                     ? `${clientName(editing.client)} · update`
@@ -862,14 +1023,41 @@ export function HandoverWizard({
             }
             steps={WIZ_STEPS}
             stepIndex={stepIndex}
-            onStepClick={setStepIndex}
+            onStepClick={(step) => {
+                if (!submissionReview && (!commandSession || commandSession.canEdit())) setStepIndex(step);
+            }}
             pct={pct}
             pctLabel="Handover readiness"
-            maxWidth="min(96vw, 1000px)"
+            maxWidth={
+                isMobile
+                    ? 'min(1000px, calc(100% - 2rem))'
+                    : 'min(96vw, 1000px)'
+            }
             maxHeight="min(92vh, 820px)"
             footerStart={footerStart}
             footerEnd={footerEnd}
         >
+            {historyBlocked && !draftHistoryNavigation() ? (
+                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-subtle">
+                    Browser Back and Forward cannot protect this handover here. Use the buttons in this window until you have saved, discarded your typing, or checked whether your save went through.
+                </div>
+            ) : null}
+            {commandMode && commandState.message ? (
+                <div role="status" className="mb-4 rounded-lg border border-border bg-muted p-3 text-subtle">
+                    <p>{commandState.message}</p>
+                    {commandState.phase === 'uncertain' ? (
+                        <Button className="mt-2" variant="outline" onClick={() => {
+                            void commandSession?.recover().then((saved) => {
+                                if (!saved || !commandSession?.confirmedFor(saved, currentUser.id)) return;
+                                setInitialDraft(draftKey);
+                                onOpenChange(false);
+                                toast.success(saved.status === 'draft' ? 'Handover saved as draft' : 'Handover submitted');
+                                if (commandTargetWeek.current) onSubmitted(commandTargetWeek.current);
+                            });
+                        }}>Check if it saved</Button>
+                    ) : null}
+                </div>
+            ) : null}
             {errors.handover ? (
                 <div
                     role="alert"
@@ -986,7 +1174,7 @@ export function HandoverWizard({
                                     <button
                                         type="button"
                                         onClick={onAddClient}
-                                        className="font-semibold text-primary underline underline-offset-2"
+                                        className="font-semibold text-primary underline underline-offset-2 max-md:inline-flex max-md:min-h-[44px] max-md:min-w-[44px] max-md:items-center"
                                     >
                                         Add a client
                                     </button>{' '}
@@ -1083,7 +1271,7 @@ export function HandoverWizard({
                                               : 'Next shift (auto-suggested)'
                                     }
                                 />
-                                <label className="mt-1 flex cursor-pointer items-center gap-2 text-[12.5px] font-medium">
+                                <label className="mt-1 flex cursor-pointer items-center gap-2 text-[12.5px] font-medium max-md:min-h-[44px]">
                                     <input
                                         type="checkbox"
                                         checked={f.leave_open}
@@ -1226,23 +1414,30 @@ export function HandoverWizard({
                             title="What must the next shift action?"
                             blurb="Add discrete items — they appear as checklists for the incoming worker."
                         />
+                        {medicationFocus && (
+                            <ShiftMedSummary
+                                snapshot={snapshot}
+                                loading={snapLoading}
+                                hasShift={!!f.outgoing_shift}
+                                showControlled={canViewControlled}
+                                onRetry={() =>
+                                    setSnapshotRevision(
+                                        (revision) => revision + 1,
+                                    )
+                                }
+                                noShiftHint="Select the outgoing shift to load its live medication picture."
+                                note={
+                                    canViewControlled &&
+                                    snapshot &&
+                                    snapshot.due.length > 0
+                                        ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
+                                        : undefined
+                                }
+                            />
+                        )}
                         <div className="grid gap-4 lg:grid-cols-2">
                             {canViewControlled ? (
                                 <div className="space-y-2">
-                                    {medicationFocus && (
-                                        <ShiftMedSummary
-                                            snapshot={snapshot}
-                                            loading={snapLoading}
-                                            hasShift={!!f.outgoing_shift}
-                                            noShiftHint="Select the outgoing shift to load its live medication picture."
-                                            note={
-                                                snapshot &&
-                                                snapshot.due.length > 0
-                                                    ? 'Due meds were pre-filled into the list below — edit or remove as needed.'
-                                                    : undefined
-                                            }
-                                        />
-                                    )}
                                     {medicationFocus && canGovernControlled && (
                                         <div className="rounded-xl border border-border bg-card p-3">
                                             <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
@@ -1391,12 +1586,31 @@ export function HandoverWizard({
                             canViewControlled={canViewControlled}
                             canGovernControlled={canGovernControlled}
                             editing={editing}
-                            editable={!mutationDisabled}
+                            editable={!mutationDisabled && !submissionReview}
                         />
                     </div>
                 </WizardStepPane>
             ) : null}
         </WizardShell>
+        <ConfirmDialog
+            open={discardOpen}
+            onClose={() => setDiscardOpen(false)}
+            title="Discard unsaved handover typing?"
+            description="Your changes have not been sent. Save as a draft to keep them, or discard them to close this window."
+            cancelText="Keep editing"
+            confirmText="Discard typing"
+            onConfirm={() => {
+                if (!commandSession?.canClose() || commandSession.snapshot().phase !== 'editing') return;
+                seededRecord.current = undefined;
+                setInitialDraft(null);
+                clearWitnessCredential();
+                setF(emptyForm());
+                setStepIndex(0);
+                setErrors({});
+                onOpenChange(false);
+            }}
+        />
+        </>
     );
 }
 
@@ -1424,7 +1638,7 @@ function DerivedWorker({
 function SubHead({ n, text }: { n: number; text: string }) {
     return (
         <div className="flex items-center gap-2 pt-1 text-[13px] font-bold">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[11px] text-primary-foreground">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-fill text-[11px] text-primary-fill-foreground">
                 {n}
             </span>
             {text}
@@ -1454,7 +1668,7 @@ function CdVerificationSection({
     witnessCredentialRef: React.RefObject<HTMLInputElement | null>;
     notes: string;
     cdDue: number;
-    witnesses: { id: number; name: string }[];
+    witnesses: WitnessPickerOption[];
     onResult: (v: '' | 'verified' | 'discrepancy') => void;
     onWitness: (v: string) => void;
     onWitnessCredential: (v: string) => void;
@@ -1548,8 +1762,12 @@ function CdVerificationSection({
                                 : 'Record a result first'}
                         </option>
                         {witnesses.map((w) => (
-                            <option key={w.id} value={w.id}>
-                                {w.name}
+                            <option
+                                key={w.id}
+                                value={w.id}
+                                disabled={!witnessIsSelectable(w)}
+                            >
+                                {witnessOptionLabel(w)}
                             </option>
                         ))}
                     </select>
@@ -1565,23 +1783,41 @@ function CdVerificationSection({
                             htmlFor="handover-cd-witness-credential"
                             className="text-[12.5px] font-semibold"
                         >
-                            Witness password or PIN
+                            Their witness PIN
                         </label>
                         <input
                             ref={witnessCredentialRef}
                             id="handover-cd-witness-credential"
                             type="password"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={WITNESS_PIN_LENGTH}
                             autoComplete="new-password"
                             spellCheck={false}
                             data-lpignore="true"
-                            className={cn(INPUT_CLASS, 'h-9')}
+                            data-1p-ignore="true"
+                            className={cn(
+                                INPUT_CLASS,
+                                'h-9 tracking-[0.3em] tabular-nums',
+                            )}
                             value={witnessCredential}
                             disabled={!witness}
                             aria-invalid={Boolean(errors.credential)}
+                            aria-describedby="handover-cd-witness-credential-help"
                             onChange={(event) =>
-                                onWitnessCredential(event.target.value)
+                                onWitnessCredential(
+                                    sanitiseWitnessPin(event.target.value),
+                                )
                             }
                         />
+                        <p
+                            id="handover-cd-witness-credential-help"
+                            className="text-caption"
+                        >
+                            Their own 6-digit witness PIN — not their login
+                            password. They type it here, at the medicine
+                            cupboard.
+                        </p>
                         {errors.credential ? (
                             <FieldError>{errors.credential}</FieldError>
                         ) : null}

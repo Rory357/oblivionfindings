@@ -1,0 +1,63 @@
+{
+  "reviewed_at_utc": "2026-10-12T00:10:32Z",
+  "status": "SOURCE_REVIEW_AND_SHARED_OWNER_ALLOCATION_ONLY",
+  "approved_scope_sha256": "0B8491C2F56D602BD8991E3FB224CCABF68AB5C5F12D871ECE1D63E4BE41C69C",
+  "cursors": {
+    "control_room": "a8154e4a-be4a-449b-a690-548c53e7eaf3:31",
+    "workforce": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:29",
+    "health_safety": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:47"
+  },
+  "snapshot": {
+    "control_room": "Not loaded; unchanged completed R23 acknowledgement. Not restarted.",
+    "workforce": "Active. Page-wide timesheet command coordination under author work; completed form recovery successor inspected.",
+    "health_safety": "Active. Private follow-up task/My Day connections under author work; source lineage composition sampled."
+  },
+  "workforce_finite_review": {
+    "manifest": "test-results/workforce-timesheet-access-recovery-guidance-proposal-r2-20261012/manifest.json",
+    "manifest_sha256": "B39D5F33C7F9603FB81D3ABC8292909F3C14FC044AC04F1A4F9CC2C83D77FF3A",
+    "independent_review_sha256": "5B115D1CF3829279AAFDAED624BE25836D0C9D93EC82BC05C81ADE1FDE7C51A4",
+    "checked_packet_pins": 40,
+    "checked_dependency_pins": 362,
+    "drift": [],
+    "observations": [
+      "Read complete R1 and R2 finite parent patches, source-bound recovery URL and actor/target privacy branch.",
+      "R1 adds an existing canonical record GET link in a new tab with noopener/noreferrer and shared Button/frontline-tap; avoids telling a worker to discard a page-only draft.",
+      "R2 changes one product wording literal from unsaved entries to neutral entries and appends an attempted-unknown then grant-withdrawal test; seven other proposed source images retain parent hashes.",
+      "Mock callback fixture preserves original note, disabled Save and exactly one attempted PUT. It does not prove persistence, an actual external read, authorization recovery or browser behaviour."
+    ],
+    "conclusion": "No additional concrete blocker in this finite guidance delta. Candidate only; not applied or activation accepted.",
+    "inventoried_prospective_cases": 69,
+    "actual_cases": null,
+    "execution": "UNRUN",
+    "still_open": "Page-wide legacy/correction admission, complete current privacy and command/backend authority, original-attempt recovery, physical receipt/HTTP and real browser acceptance. Six versus seven Workforce menu choice remains in the owner's existing human question; no answer inferred."
+  },
+  "health_safety_observations": {
+    "source_service_sha256": "357DA1FF830200A2E0D5076EFC2CFA829C0DB67F07AD53C9609DE3DA7D5E9076",
+    "access_service_sha256": "3CC49C948C1C08FB692AB08236DB6F27C87E6B4B9F7FAD695FA0243D64899558",
+    "command_access_sha256": "5C8EDE7A82A7BA314B18B21FD90D74F8478B9AD4DE1AD0E998F8DEF8FBAB2BEC",
+    "observed": "These three saved isolated-candidate pins match the later notification handoff. CommandAccess selects root identity then invokes historical receipt metadata admission before medical root hydration, and rechecks the admitted tuple. Source lineage rejects a retained linked legacy origin with unknown original context despite a later association. This is a bounded source observation, not acceptance of complete source/privacy/races/cost/HTTP behaviour.",
+    "state": "Earlier BODY-LINEAGE-HANDOFF unapplied wording is historical relative to this explicit isolated composition. Collection/notification/task/fact/recovery composition remains active and unverified.",
+    "approval_limits": "Existing risk/audit guard and newly reported recovery incident-picker API were rejected by automatic review and remain unmounted. No retry, bypass, extra API approval or human answer inferred. Unknown medical-attention/incident-reporting answer question remains owner-managed; no new parent product decision."
+  },
+  "new_shared_seam": {
+    "cr_patch": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings/docs/control-room-audit-2026-10-11/inbox-note-main-integration.patch",
+    "cr_patch_sha256": "2255E2BA18A3887541B43B67CF0166AAD5E288F7F4B0340F85F96F05FE6E8771",
+    "hs_patch": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings/docs/health-safety-audit-2026-10-07/CHEMICAL-EXPOSURE-NOTIFICATION-CONSUMERS-UNAPPLIED.patch",
+    "hs_patch_sha256": "47BEA80876EB7037A8F355A1195C2F4AFEDA101CE35068D39B8C288453C30CB5",
+    "overlapping_files": [
+      "app/Http/Controllers/MyTasksController.php",
+      "app/Http/Controllers/NotificationInboxController.php",
+      "app/Http/Controllers/Portal/PortalNotificationController.php",
+      "app/Http/Middleware/HandleInertiaRequests.php",
+      "routes/portal.php"
+    ],
+    "finding": "Both patches replace the same shared notification consumers. CR adapter calls BoardPack visibleNotificationQuery without an exposure context; the HS proposal's default path excludes private exposure notices. Merely applying the HS common-query hunk alongside CR consumers would suppress legitimate exposure notices. Replacing CR consumers with exposure-only consumers risks losing CR source scoping/projection.",
+    "allocated_owner": "H&S owns the next UNAPPLIED combined five-consumer semantic proposal and its exposure-specific common-query hunk. CR retains its canonical adapter; required API changes must be proposed to coordinator before any CR-owned edit. Company Hub MAIN/global owner and WF My Day sections remain protected.",
+    "message": "One concise finding/impact/ownership/action/acceptance message successfully dispatched to authorised H&S thread, settings unchanged. CR was not restarted; no repeated WF prompt.",
+    "acceptance": "Both permitted families plus ordinary notices; each family independently revoked; matching counts/pages/header/My Day/direct read/read-all/ack; retained medication/BoardPack behaviour and CR escalation guard; no operational acknowledgement or source completion from reading a notice. Fresh source scopes at actual/deferred origins; no stale builder/permission escape; complete retained suites and honest UNRUN limits."
+  },
+  "next_gate": "Completed combined source proposal or concrete canonical API question, plus ongoing original source/task/recovery work. Review minimal rebased shared deltas before integration. All three approved scopes remain incomplete.",
+  "parent_actions": "Read-only source/evidence inspection and coordinator docs; one authorised owner message. No app edits, runtime tests, builds, databases, browser/process/resource probes, provider/live actions or infrastructure changes.",
+  "runtime": "External HOLD unchanged; no reservation or admission.",
+  "heartbeat": "ACTIVE"
+}

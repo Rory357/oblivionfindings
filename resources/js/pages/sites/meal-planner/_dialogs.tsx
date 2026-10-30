@@ -2151,7 +2151,7 @@ export function SettingsDialog({
                                 onClick={() => setBuilderOpen(true)}
                                 className="mb-2 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 text-left transition-colors hover:bg-primary/10"
                             >
-                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-fill text-primary-fill-foreground">
                                     <LayoutTemplate className="h-5 w-5" />
                                 </span>
                                 <span className="min-w-0 flex-1">

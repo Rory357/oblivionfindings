@@ -1,0 +1,34 @@
+{
+  "CheckedAtUtc": "2026-09-26T21:53:20.4280266Z",
+  "Port": 8901,
+  "ProcessId": 14576,
+  "ExecSession": 57935,
+  "Root": "C:\\Users\\steph\\.codex\\worktrees\\8821\\oblivionfindings\\docs\\fleet-assets-audit\\previews\\PKG-06B\\v6",
+  "Resources": [
+    {
+      "File": "index.html",
+      "Status": 200,
+      "Source": "8821-v6",
+      "ServedSha256": "593b5d98ed8a1386ace17a106f72a5aa15c17e46166e9b4b6002d7c4a5151181",
+      "DiskSha256": "593b5d98ed8a1386ace17a106f72a5aa15c17e46166e9b4b6002d7c4a5151181",
+      "Match": true
+    },
+    {
+      "File": "app.js",
+      "Status": 200,
+      "Source": "8821-v6",
+      "ServedSha256": "c719812aa48b300722f4d1d2882f317034d0bd68059558219380d72a7a781fec",
+      "DiskSha256": "c719812aa48b300722f4d1d2882f317034d0bd68059558219380d72a7a781fec",
+      "Match": true
+    },
+    {
+      "File": "app.css",
+      "Status": 200,
+      "Source": "8821-v6",
+      "ServedSha256": "d060777b915c4d16116317a60d9ac87e77794c3e5af34ef65bbcb78a37a2e63a",
+      "DiskSha256": "d060777b915c4d16116317a60d9ac87e77794c3e5af34ef65bbcb78a37a2e63a",
+      "Match": true
+    }
+  ],
+  "Note": "Static GET/HEAD-only loopback preview; no-store; connect-src none. PID recorded at launch."
+}

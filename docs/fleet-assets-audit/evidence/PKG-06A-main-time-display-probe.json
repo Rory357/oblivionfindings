@@ -1,0 +1,15 @@
+{
+  "source": "C:/Users/steph/.codex/worktrees/6421/oblivionfindings/resources/js/pages/fleet-assets/assets/register/api.ts",
+  "sha256": "33dd178a3a149167894d935ba92fa09d19f84487b35c7e0f3a8bda808c9ec469",
+  "instant": "2026-09-27T01:00:00Z",
+  "probes": [
+    {
+      "zone": "UTC",
+      "display": "27 Sept 2026, 1:00 am"
+    },
+    {
+      "zone": "Pacific/Auckland",
+      "display": "27 Sept 2026, 2:00 pm"
+    }
+  ]
+}

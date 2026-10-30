@@ -1,0 +1,14 @@
+{
+  "mapsLink": "/fleet-assets/geofences?tab=map&resource=1",
+  "scripts": [
+    "http://127.0.0.1:8905/build/assets/app-DGSJd41Z.js"
+  ],
+  "title": "Transfer hoist · Asset Profile - Laravel",
+  "url": "http://127.0.0.1:8905/fleet-assets/assets/1#view=location&section=location",
+  "errors": [],
+  "mapsDestination": {
+    "url": "http://127.0.0.1:8905/fleet-assets/geofences?resource=1&tab=map",
+    "heading": "Maps & boundaries",
+    "selectedAsset": "Transfer hoist"
+  }
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "Source": "storage/logs/assets-integration-backend.txt",
+    "Evidence": "backend.log",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged",
+    "EvidenceSHA256": "d734c726e03734b0c5c9fcc7f63893d166f8c256f0dcd538563cb0806494804e",
+    "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0",
+    "SourceSHA256": "b63cb5195d45c65a3d672c3b2f221539606402e8390737a015b6af75014bfa1f"
+  },
+  {
+    "Source": "storage/logs/assets-integration-ui.txt",
+    "Evidence": "ui.log",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged",
+    "EvidenceSHA256": "d3edf54ba564d4d84979d407970cca47256d7e783bf864f322e8ea25b00fce4c",
+    "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0",
+    "SourceSHA256": "34dfe2aaa3f9db2dd03b08e7d5452045f1a0e9261b305d7fd536379573d5b5b2"
+  },
+  {
+    "Source": "storage/logs/assets-integration-types.txt",
+    "Evidence": "types.log",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged",
+    "EvidenceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0",
+    "SourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "Source": "storage/logs/assets-integration-eslint.txt",
+    "Evidence": "eslint.log",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged",
+    "EvidenceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0",
+    "SourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "Source": "storage/logs/assets-integration-pint.txt",
+    "Evidence": "pint.log",
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged",
+    "EvidenceSHA256": "9fa3c401d4d7dcf9d616a4e847f09d73bafe2397e5f1b5b77531e2516436ed5a",
+    "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0",
+    "SourceSHA256": "acbf5da6385237b6f4cd342c4454d93f6c4df8bfcf1687838edb3b651981c4e1"
+  },
+  {
+    "Sanitization": "Absolute worktree path replaced with <worktree>; ANSI styling and trailing whitespace removed; LF endings; outcome text unchanged",
+    "Source": "storage/logs/assets-integration-build.txt",
+    "EvidenceSHA256": "297e12122be7ad03008787f9901cea5d8c8660ac7b7e7cbb2698677776a3eb38",
+    "SourceCommit": "556e582cbd43aff875e1640ebc9e32fb9f52f6a0",
+    "Evidence": "build.log",
+    "SourceSHA256": "366ffdc8b7d0735ffde9f4fcb5d8e2df87a4b60b4cc5cf8aab273152159d088b"
+  }
+]

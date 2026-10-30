@@ -5,17 +5,23 @@ namespace App\Services\Fleet;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\FleetGeofenceState;
+use App\Models\FleetTelemetryEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class FleetGeofenceService
 {
-    public function __construct(protected FleetSignalService $signals)
-    {
-    }
+    public function __construct(protected FleetSignalService $signals) {}
 
-    public function evaluate(Asset $asset, float $lat, float $lon, CarbonInterface $occurredAt): void
+    public function evaluate(Asset $asset, float $lat, float $lon, CarbonInterface $occurredAt, ?FleetTelemetryEvent $sourceEvent = null): void
     {
+        // Never infer a historical source from the latest position or a matching timestamp.
+        $sourceEventId = $sourceEvent?->exists && (int) $sourceEvent->asset_id === (int) $asset->id
+            && $sourceEvent->occurred_at?->getTimestamp() === $occurredAt->getTimestamp()
+            && $sourceEvent->latitude !== null && $sourceEvent->longitude !== null
+            && abs((float) $sourceEvent->latitude - $lat) < 0.0000001
+            && abs((float) $sourceEvent->longitude - $lon) < 0.0000001
+            ? $sourceEvent->id : null;
         $geofences = AssetGeofence::query()
             ->where('is_active', true)
             ->where(function ($query) use ($asset) {
@@ -26,7 +32,14 @@ class FleetGeofenceService
             ->get();
 
         foreach ($geofences as $geofence) {
-            DB::transaction(function () use ($asset, $geofence, $lat, $lon, $occurredAt) {
+            DB::transaction(function () use ($asset, $geofence, $lat, $lon, $occurredAt, $sourceEventId) {
+                // Serialise against canonical edits and retirement, then recheck the link.
+                $geofence = AssetGeofence::query()->whereKey($geofence->id)->lockForUpdate()->first();
+                if (! $geofence || ! $geofence->is_active || $geofence->retired_at
+                    || ((int) $geofence->asset_id !== (int) $asset->id && ! $geofence->assignedAssets()->whereKey($asset->id)->exists())
+                    || VehicleGeofenceRules::fromBoundary($geofence) === null) {
+                    return;
+                }
                 $inside = $this->isInside($geofence, $lat, $lon);
 
                 $state = FleetGeofenceState::query()
@@ -35,7 +48,7 @@ class FleetGeofenceService
                     ->lockForUpdate()
                     ->first();
 
-                if (!$state) {
+                if (! $state) {
                     $state = new FleetGeofenceState([
                         'asset_id' => $asset->id,
                         'geofence_id' => $geofence->id,
@@ -55,10 +68,14 @@ class FleetGeofenceService
                             'asset_id' => $asset->id,
                             'geofence_id' => $geofence->id,
                             'signal_type' => 'geofence.enter',
+                            'source_event_id' => $sourceEventId,
                             'severity_hint' => 'low',
                             'occurred_at' => $occurredAt,
                             'payload' => [
                                 'geofence_name' => $geofence->name,
+                                'boundary_version' => $geofence->geometry_version,
+                                'boundary_revision' => $geofence->revision,
+                                'boundary_snapshot' => VehicleGeofenceRules::fromBoundary($geofence),
                             ],
                         ]);
                     } else {
@@ -68,10 +85,14 @@ class FleetGeofenceService
                             'asset_id' => $asset->id,
                             'geofence_id' => $geofence->id,
                             'signal_type' => 'geofence.breach',
+                            'source_event_id' => $sourceEventId,
                             'severity_hint' => $geofence->breach_type === 'hard' ? 'high' : 'medium',
                             'occurred_at' => $occurredAt,
                             'payload' => [
                                 'geofence_name' => $geofence->name,
+                                'boundary_version' => $geofence->geometry_version,
+                                'boundary_revision' => $geofence->revision,
+                                'boundary_snapshot' => VehicleGeofenceRules::fromBoundary($geofence),
                             ],
                         ]);
                     }
@@ -91,11 +112,15 @@ class FleetGeofenceService
                             'asset_id' => $asset->id,
                             'geofence_id' => $geofence->id,
                             'signal_type' => 'geofence.dwell',
+                            'source_event_id' => $sourceEventId,
                             'severity_hint' => 'low',
                             'occurred_at' => $occurredAt,
                             'idempotency_key' => $idempotency,
                             'payload' => [
                                 'geofence_name' => $geofence->name,
+                                'boundary_version' => $geofence->geometry_version,
+                                'boundary_revision' => $geofence->revision,
+                                'boundary_snapshot' => VehicleGeofenceRules::fromBoundary($geofence),
                                 'dwell_minutes' => $dwellMinutes,
                             ],
                         ]);
@@ -139,6 +164,7 @@ class FleetGeofenceService
         $dLon = deg2rad($lon2 - $lon1);
         $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
         return $earthRadius * $c;
     }
 
@@ -164,7 +190,7 @@ class FleetGeofenceService
                 && ($lat < ($xj - $xi) * ($lon - $yi) / ($yj - $yi + 0.0) + $xi);
 
             if ($intersect) {
-                $inside = !$inside;
+                $inside = ! $inside;
             }
         }
 

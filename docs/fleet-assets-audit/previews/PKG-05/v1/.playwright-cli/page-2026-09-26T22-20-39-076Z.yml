@@ -1,0 +1,185 @@
+- generic [ref=f21e2]:
+  - generic [ref=f21e3]:
+    - strong [ref=f21e4]: DESIGN PREVIEW · PKG-05 v4
+    - generic [ref=f21e5]: Synthetic records · changes stay in this browser until reload
+    - generic [ref=f21e6]:
+      - generic [ref=f21e7]:
+        - text: View as
+        - combobox "Preview role" [ref=f21e8]:
+          - option "Ava Thompson · Requester"
+          - option "Mia Chen · Transport allocator" [selected]
+          - option "Rory Williams · Booking approver"
+          - option "Nia Patel · Assigned driver"
+          - option "Sara Wilson · Assigned escort"
+          - option "Ben Carter · Receiving worker"
+      - button "Preview scenarios" [ref=f21e9] [cursor=pointer]
+  - generic [ref=f21e10]:
+    - generic [ref=f21e11]:
+      - text: oblivion
+      - generic [ref=f21e13]: findings
+    - generic [ref=f21e14]: Fleet & Assets
+    - generic [ref=f21e15]:
+      - generic [ref=f21e19]: Mia Chen
+      - generic [ref=f21e20]: MC
+  - generic [ref=f21e21]:
+    - complementary [ref=f21e22]:
+      - button "My Day" [ref=f21e23] [cursor=pointer]
+      - button "Sites" [ref=f21e28] [cursor=pointer]
+      - button "Clients" [ref=f21e34] [cursor=pointer]
+      - generic [ref=f21e42]: Fleet & Assets
+      - button "Overview" [ref=f21e43] [cursor=pointer]
+      - button "Fleet" [ref=f21e50] [cursor=pointer]
+      - button "Transport" [ref=f21e56] [cursor=pointer]
+      - button "Assets" [ref=f21e62] [cursor=pointer]
+      - button "Maintenance" [ref=f21e67] [cursor=pointer]
+      - button "Maps & boundaries" [ref=f21e71] [cursor=pointer]
+      - button "Reports" [ref=f21e76] [cursor=pointer]
+      - button "Settings" [ref=f21e81] [cursor=pointer]
+    - main [ref=f21e86]:
+      - generic [ref=f21e87]:
+        - button "Fleet & Assets" [ref=f21e88] [cursor=pointer]
+        - generic [ref=f21e89]: /
+        - button "Transport" [ref=f21e90] [cursor=pointer]
+      - generic [ref=f21e91]:
+        - generic "Page summary and actions" [ref=f21e92]:
+          - generic [ref=f21e94]:
+            - generic [ref=f21e95]:
+              - generic [ref=f21e96]:
+                - generic [ref=f21e102]:
+                  - heading "Returns & handovers" [level=1] [ref=f21e104]
+                  - paragraph [ref=f21e105]: Vehicle receipts, missing items and optional shift handovers
+                - generic [ref=f21e106]:
+                  - generic [ref=f21e107]:
+                    - searchbox "Search vehicle, receipt, key or person" [ref=f21e108]
+                    - generic [aria-hidden]: /
+                  - button "Request transport" [ref=f21e109] [cursor=pointer]
+                  - button "Workspace actions" [ref=f21e112] [cursor=pointer]
+              - generic [ref=f21e118]:
+                - button "View due back" [ref=f21e119] [cursor=pointer]:
+                  - generic [ref=f21e123]: Due back
+                  - generic [ref=f21e125]: "1"
+                  - generic [ref=f21e126]: 1 overdue · driver records return
+                - button "View items to receive" [ref=f21e127] [cursor=pointer]:
+                  - generic [ref=f21e131]: Items to receive
+                  - generic [ref=f21e133]: "1"
+                  - generic [ref=f21e134]: Keys or equipment outstanding
+                - button "View handovers to review" [ref=f21e135] [cursor=pointer]:
+                  - generic [ref=f21e139]: Handovers to review
+                  - generic [ref=f21e141]: "0"
+                  - generic [ref=f21e142]: Named incoming worker
+                - button "View exceptions to resolve" [ref=f21e143] [cursor=pointer]:
+                  - generic [ref=f21e147]: Exceptions to resolve
+                  - generic [ref=f21e149]: "1"
+                  - generic [ref=f21e150]: Assigned owner follows up
+              - generic [ref=f21e152]:
+                - generic [ref=f21e153]:
+                  - text: Site
+                  - combobox "Site filter" [ref=f21e154]:
+                    - option "All permitted sites" [selected]
+                    - option "Aurora House"
+                    - option "Kōwhai House"
+                - generic [ref=f21e155]:
+                  - text: Date
+                  - combobox "Date filter" [ref=f21e156]:
+                    - option "Mon 28 September" [selected]
+                    - option "Tue 29 September"
+                    - option "All dates"
+                - generic [ref=f21e157]: Pacific/Auckland · Example time 10:35 am
+            - tablist "Views" [ref=f21e159]:
+              - tab "Overview" [ref=f21e160] [cursor=pointer]
+              - tab "Requests & approvals" [ref=f21e167] [cursor=pointer]
+              - tab "Planner" [ref=f21e172] [cursor=pointer]
+              - tab "Journeys" [ref=f21e176] [cursor=pointer]
+              - tab "Returns & handovers" [selected] [ref=f21e182] [cursor=pointer]
+              - button "Find a view" [ref=f21e187] [cursor=pointer]:
+                - generic [ref=f21e191]: Find
+        - generic [ref=f21e192]:
+          - generic [ref=f21e193]:
+            - generic [ref=f21e198]:
+              - strong [ref=f21e199]: 1. Record the return
+              - generic [ref=f21e200]: Driver records arrival, condition and receiver.
+            - generic [ref=f21e205]:
+              - strong [ref=f21e206]: 2. Confirm received items
+              - generic [ref=f21e207]: Missing keys or kit stay assigned until received.
+            - generic [ref=f21e214]:
+              - strong [ref=f21e215]: Shift handover · only if needed
+              - generic [ref=f21e216]: Incoming worker acknowledges or disputes a custody change.
+          - generic [ref=f21e218]:
+            - heading "Return work queue" [level=2] [ref=f21e219]
+            - paragraph [ref=f21e220]: 3 matching records · A recorded vehicle return does not complete the passenger journey.
+          - group "Queue filter" [ref=f21e221]:
+            - button "All returns" [pressed] [ref=f21e222] [cursor=pointer]
+            - button "Due back" [ref=f21e223] [cursor=pointer]
+            - button "Items to receive" [ref=f21e224] [cursor=pointer]
+            - button "Handovers to review" [ref=f21e225] [cursor=pointer]
+            - button "Exceptions" [ref=f21e226] [cursor=pointer]
+            - button "Completed returns" [ref=f21e227] [cursor=pointer]
+          - generic [ref=f21e228]:
+            - paragraph [ref=f21e229]:
+              - strong [ref=f21e230]: "3"
+              - text: matching records
+            - button "Export PDF" [ref=f21e231] [cursor=pointer]
+          - table [ref=f21e234]:
+            - row [ref=f21e235]:
+              - columnheader "Passenger / vehicle" [ref=f21e236]
+              - columnheader "Expected / actual return" [ref=f21e237]
+              - columnheader "Status" [ref=f21e238]
+              - columnheader "Next person" [ref=f21e239]
+              - columnheader "Next step" [ref=f21e240]
+              - columnheader "Actions"
+            - row [ref=f21e241] [cursor=pointer]:
+              - cell "Sam Wilson Koru · Toyota Hiace" [ref=f21e242]:
+                - generic [ref=f21e247]:
+                  - generic [ref=f21e248]: Sam Wilson
+                  - generic [ref=f21e250]: Koru · Toyota Hiace
+              - cell "10:00 AM Expected · overdue" [ref=f21e251]:
+                - generic [ref=f21e252]:
+                  - strong [ref=f21e253]: 10:00 AM
+                  - generic [ref=f21e254]: Expected · overdue
+              - cell "Overdue return" [ref=f21e255]
+              - cell "NP Nia Patel" [ref=f21e257]:
+                - generic [ref=f21e258]:
+                  - generic [ref=f21e259]: NP
+                  - generic [ref=f21e260]: Nia Patel
+              - cell [ref=f21e261]:
+                - button "Record return" [ref=f21e262]
+              - cell [ref=f21e265]:
+                - button "Actions for Sam Wilson" [ref=f21e267]
+            - row [ref=f21e272] [cursor=pointer]:
+              - cell "Charlie Brown Koru · Toyota Hiace" [ref=f21e273]:
+                - generic [ref=f21e278]:
+                  - generic [ref=f21e279]: Charlie Brown
+                  - generic [ref=f21e281]: Koru · Toyota Hiace
+              - cell "08:10 AM Actual return" [ref=f21e282]:
+                - generic [ref=f21e283]:
+                  - strong [ref=f21e284]: 08:10 AM
+                  - generic [ref=f21e285]: Actual return
+              - cell "Return complete" [ref=f21e286]
+              - cell "BC Ben Carter" [ref=f21e288]:
+                - generic [ref=f21e289]:
+                  - generic [ref=f21e290]: BC
+                  - generic [ref=f21e291]: Ben Carter
+              - cell [ref=f21e292]:
+                - button "Return work complete" [ref=f21e293]
+              - cell [ref=f21e296]:
+                - button "Actions for Charlie Brown" [ref=f21e298]
+            - row [ref=f21e303] [cursor=pointer]:
+              - cell "Casey Jones Koru · Toyota Hiace" [ref=f21e304]:
+                - generic [ref=f21e309]:
+                  - generic [ref=f21e310]: Casey Jones
+                  - generic [ref=f21e312]: Koru · Toyota Hiace
+              - cell "06:35 AM Actual return" [ref=f21e313]:
+                - generic [ref=f21e314]:
+                  - strong [ref=f21e315]: 06:35 AM
+                  - generic [ref=f21e316]: Actual return
+              - cell "Items missing" [ref=f21e317]
+              - cell "BC Ben Carter" [ref=f21e319]:
+                - generic [ref=f21e320]:
+                  - generic [ref=f21e321]: BC
+                  - generic [ref=f21e322]: Ben Carter
+              - cell [ref=f21e323]:
+                - button "Receive missing items" [ref=f21e324]
+              - cell [ref=f21e327]:
+                - button "Actions for Casey Jones" [ref=f21e329]
+          - paragraph [ref=f21e334]: Select a row for a quick view. Use Open full record for the complete page, or right-click for actions.
+        - generic [ref=f21e335]: PKG-05 v4 · desktop design candidate · example date 28 September 2026 · no operational changes

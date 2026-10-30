@@ -15,6 +15,7 @@ const ROUND_TONE_BADGE: Record<string, string> = {
 
 const DOSE_TONE_BADGE: Record<string, string> = {
     success: 'bg-status-success-bg text-status-success',
+    info: 'bg-status-info-bg text-status-info',
     warning: 'bg-status-warning-bg text-status-warning',
     critical: 'bg-status-critical-bg text-status-critical',
     muted: 'bg-muted text-muted-foreground',
@@ -22,6 +23,7 @@ const DOSE_TONE_BADGE: Record<string, string> = {
 
 const DOSE_DOT_BG: Record<string, string> = {
     success: 'bg-status-success',
+    info: 'bg-status-info',
     warning: 'bg-status-warning',
     critical: 'bg-status-critical',
     muted: 'bg-muted-foreground',

@@ -1,0 +1,11 @@
+# Timesheet creation permission alias — 8 October 2026
+
+Status: implemented and verified. The focused 18 creation cases pass with 337 assertions; both independent reviews and syntax/format checks pass.
+
+Creating a timesheet for another worker already accepts the established timesheets.manageAny / hr.time.manage permission pair. The creation command reloaded only the canonical name after taking its locks, so an alias-only grant could be lost and an explicit alias denial could be missed. This change adds the existing alias to that command's locked evidence. Existing deny precedence, approved account, worker, Shift, Client and Site checks remain in place. Approval, update and submission already load their relevant aliases and are unchanged. No permission, policy, route or shared authorization helper is added. Control Room remains independent.
+
+Two regressions cover actual root creation under an alias-only role grant and an independently committed alias denial after a stale REPEATABLE READ snapshot, with another current worker's completed Shift and closed attendance. They check source, payroll/HR/billing, queue, audit and receipt boundaries. All original 61 cases and all other service bytes are preserved. The focused 18 selection includes these two cases and 16 affected creation-preservation cases.
+
+Actual acceptance is 17 original passing cases / 298 assertions plus the identical corrected denial case / 39 assertions. Its first attempt failed a pre-service fixture assertion: Eloquent rebound a cloned writer connection to the stale primary connection. The fixture now pins the fresh actor to the independent writer and proves the User, override and role query PDO identities. The actual service 403 and complete no-effect assertions remain. All other test/helper bytes were preserved; the failed 22 partial assertions are excluded.
+
+Evidence: test-results/workforce-main-payroll76-unique-final-receipt.json reconstructs 76 unique cases / 1,252 assertions across this correction and Payroll58 / 915. Both raw native runs retain their actual outcomes. Owned processes and schemas were removed, all 5,553 frozen source hashes stayed unchanged during each run, and five protected preview identities remained intact. Known isolated missing-.env warnings are retained. Unchanged passing cases were not rerun to inflate acceptance.

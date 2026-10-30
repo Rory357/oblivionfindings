@@ -5,10 +5,71 @@ namespace Database\Seeders;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\Medication\Reporting\MedicationReportingPermissions;
 use Illuminate\Database\Seeder;
 
 class RbacSeeder extends Seeder
 {
+    /**
+     * The Fleet Manager role's grants. The deploy-time grant migrations
+     * (2026_09_24_000200, 2026_09_24_000400) give a newly created role the
+     * same set.
+     */
+    public const FLEET_MANAGER_PERMISSIONS = [
+        'fleet.viewAny', 'fleet.manage', 'fleet.vehicles.viewAllSites', 'fleet.settings.manage',
+        'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
+        'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve',
+        'fleet.incidents.manage', 'fleet.maintenance.manage', 'fleet.maintenance.report',
+        'fleet.mileage.approve', 'fleet.outings.manage', 'assets.documents.manage',
+    ];
+
+    /**
+     * The CFO role's finance grants: read-only, the same set auditors hold.
+     * The grant migration 2026_10_19_120000 gives existing sites the same set.
+     */
+    public const CFO_FINANCE_READ = [
+        'finance.dashboard', 'finance.insights.viewAllSites', 'finance.payments.viewAllSites', 'finance.ledger.view',
+        'finance.ap.view', 'finance.ar.view', 'finance.bank.view', 'finance.tax.view', 'finance.assets.view',
+        'finance.petty_cash.view', 'finance.reports.view',
+    ];
+
+    /**
+     * Independent safety/privacy decisions. Only the explicit product policy
+     * in run() assigns them; broad administrator access does not imply them.
+     * Every seeder that backfills the admin role must exclude these keys.
+     */
+    public const RESTRICTED_INDEPENDENT_AUTHORITY = [
+        ...\App\Domain\Referrals\ReferralPermissions::INDEPENDENT,
+        'restraints.approve',
+        'healthSafety.events.close',
+        'healthSafety.events.closeAny',
+        'healthSafety.closureExceptions.request',
+        'healthSafety.closureExceptions.approve',
+        'safeguarding.declassification.approve',
+        'fleet.maintenance.release',
+        'fleet.maintenance.configure',
+        'assets.telemetry.history',
+        'medications.controlled.manage',
+        // Connected services require explicit assignment, never a blanket admin grant.
+        'medications.pharmacy.connect.manage',
+        'medications.pharmacy.send',
+        'medications.external.manage',
+        'medications.transfers.manage',
+        'medications.catalogue.manage',
+        'medications.backups.manage',
+        // Private staff chat inspection: named investigators only. Grant migration:
+        // 2026_10_20_101000_register_chat_investigation_permission (no role grants).
+        'chat.investigate',
+        // Approved Windows scripts: named people only. Registration migration:
+        // 2026_10_22_090000_register_endpoint_script_permissions (no role grants).
+        'securityDevices.endpoints.scriptUpload',
+        'securityDevices.endpoints.scriptReview',
+        'securityDevices.endpoints.scriptPolicyManage',
+        'securityDevices.endpoints.scriptRun',
+        'securityDevices.endpoints.scriptUnattended',
+        'securityDevices.endpoints.scriptOutputView',
+    ];
+
     public function run(): void
     {
         /*
@@ -38,6 +99,7 @@ class RbacSeeder extends Seeder
             ['name' => 'risk_lead', 'label' => 'Risk Lead', 'level' => 66, 'type' => 'system', 'description' => 'Manages organizational risk'],
             ['name' => 'it_manager', 'label' => 'IT Manager', 'level' => 65, 'type' => 'system', 'description' => 'Manages IT systems and integrations'],
             ['name' => 'facilities_manager', 'label' => 'Facilities Manager', 'level' => 64, 'type' => 'system', 'description' => 'Manages facilities and maintenance'],
+            ['name' => 'fleet_manager', 'label' => 'Fleet Manager', 'level' => 63, 'type' => 'system', 'description' => 'Manages the vehicle fleet across all Sites'],
             ['name' => 'roadmap_manager', 'label' => 'Roadmap Manager', 'level' => 62, 'type' => 'system', 'description' => 'Manages organizational roadmap'],
 
             // Department leads
@@ -91,6 +153,7 @@ class RbacSeeder extends Seeder
         $roadmapManager = Role::where('name', 'roadmap_manager')->first();
         $itManager = Role::where('name', 'it_manager')->first();
         $facilitiesManager = Role::where('name', 'facilities_manager')->first();
+        $fleetManager = Role::where('name', 'fleet_manager')->first();
         $clientRole = Role::where('name', 'client')->first();
         $nextOfKinRole = Role::where('name', 'next_of_kin')->first();
         $boardChair = Role::where('name', 'board_chair')->first();
@@ -118,6 +181,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.access.edit_roles', 'description' => 'Edit role permissions', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.delete_roles', 'description' => 'Delete custom roles', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.impersonate', 'description' => 'Impersonate other users', 'group' => 'access_control', 'module' => 'System'],
+            ['key' => 'chat.investigate', 'description' => 'Inspect private staff chats for an authorised investigation and place preservation holds', 'group' => 'chat', 'module' => 'System'],
 
             // Sites
             ['key' => 'sites.viewAny', 'description' => 'View sites', 'group' => 'sites', 'module' => 'Operations'],
@@ -144,6 +208,7 @@ class RbacSeeder extends Seeder
             ['key' => 'assets.trackers.manage', 'description' => 'Manage asset trackers', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.ingest', 'description' => 'Ingest asset telemetry', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.view', 'description' => 'View asset telemetry', 'group' => 'assets', 'module' => 'Resources'],
+            ['key' => 'assets.telemetry.history', 'description' => 'Read retained staff tracker observations within an authorised safety session', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.telemetry.export', 'description' => 'Export authorised personal location telemetry with a recorded purpose', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.alerts.view', 'description' => 'View asset alerts', 'group' => 'assets', 'module' => 'Resources'],
             ['key' => 'assets.alerts.manage', 'description' => 'Manage asset alerts', 'group' => 'assets', 'module' => 'Resources'],
@@ -175,6 +240,8 @@ class RbacSeeder extends Seeder
             // Fleet
             ['key' => 'fleet.viewAny', 'description' => 'View fleet management', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.manage', 'description' => 'Full fleet management access', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.vehicles.viewAllSites', 'description' => 'See every vehicle and its profile across all Sites; bookings, trips, drivers and Finance keep their own Site rules', 'group' => 'fleet', 'module' => 'Resources'],
+            ['key' => 'fleet.settings.manage', 'description' => 'Change fleet-wide settings every Site shares: vehicle checklists used beyond one vehicle and the driving score policy', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.driverSessions.manage', 'description' => 'Start/end driver sessions', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.signals.view', 'description' => 'View fleet signals', 'group' => 'fleet', 'module' => 'Resources'],
             ['key' => 'fleet.trips.manage', 'description' => 'Manage fleet trips (edit/delete)', 'group' => 'fleet', 'module' => 'Resources'],
@@ -254,21 +321,38 @@ class RbacSeeder extends Seeder
 
             // Medications
             ['key' => 'medications.view', 'description' => 'View medications module', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.reviews.manage', 'description' => 'Book and record medication reviews', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.orders.manage', 'description' => 'Create/update medication orders', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.settings.manage', 'description' => 'Manage facility medication administration rules', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.pharmacy.connect.manage', 'description' => 'Manage approved pharmacy connections', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.pharmacy.send', 'description' => 'Send pharmacy supply orders', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.external.manage', 'description' => 'Manage named external clinician access', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.transfers.manage', 'description' => 'Manage provider medication handovers', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.catalogue.manage', 'description' => 'Manage licensed medicine image sources', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.backups.manage', 'description' => 'Manage protected medication backups', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.followups.manage', 'description' => 'Manage medication follow-ups and lead sign-offs', 'group' => 'medications', 'module' => 'Clinical'],
+            // P11 B2 Q3. Grant migration: 2026_10_02_100000_grant_medication_alert_and_settings_keys.
+            ['key' => 'medications.alerts.manage_house', 'description' => 'Choose alert extras, quiet hours and the on-call contact for your own houses', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.record', 'description' => 'Record medication administrations (MAR)', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.override_safety', 'description' => 'Authorise a blocked medication safety-check override', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.competency.exempt', 'description' => 'Approve a finite site-scoped medication competency exemption', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.errors.manage', 'description' => 'Triage, investigate and close medication errors', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.correct', 'description' => 'Correct medication administrations', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.stock.receive', 'description' => 'Receive medicine deliveries, photograph packs, count stock and record medicines going out or coming back at their own houses', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.stock.update', 'description' => 'Update medication stock counts', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.downtime.manage', 'description' => 'Run medication downtimes: declare them, make the downtime pack, review and finish paper records', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.controlled.view', 'description' => 'View controlled drug register entries', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.controlled.record', 'description' => 'Record controlled drug register entries', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.controlled.witness', 'description' => 'Witness controlled drug administrations', 'group' => 'medications', 'module' => 'Clinical'],
-            ['key' => 'medications.controlled.override', 'description' => 'Override controlled drug discrepancy blocks', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.controlled.override', 'description' => 'Decide shift-limited controlled dose witness overrides', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.controlled.manage', 'description' => 'Independently resolve controlled discrepancies and manage immutable register corrections', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.witness_pin.reset', 'description' => 'Reset another person\'s witness PIN (they must choose a new one; nobody sees the PIN)', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.audit.view', 'description' => 'View medication-focused audit log', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.reports.export', 'description' => 'Export MAR/audit/medications reports', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.breakglass', 'description' => 'Use break-glass emergency access', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.breakglass.end', 'description' => 'End another person’s medication emergency access', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.emergency_policy.manage', 'description' => 'Change the application emergency medication access policy', 'group' => 'medications', 'module' => 'Clinical'],
 
             // Health & Clinical
             ['key' => 'clinical.observations.view', 'description' => 'View clinical observations', 'group' => 'clinical', 'module' => 'Clinical'],
@@ -295,13 +379,17 @@ class RbacSeeder extends Seeder
             ['key' => 'clinical.accessAllSites', 'description' => 'Apply granted clinical permissions across all Sites', 'group' => 'clinical', 'module' => 'Health & Clinical'],
 
             // Incidents
-            ['key' => 'incidents.viewAny', 'description' => 'View all incidents', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.viewAny', 'description' => 'View incidents for all supported people within approved Sites', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.viewAssigned', 'description' => 'View incidents for assigned clients', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.create', 'description' => 'Create incident reports', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.update', 'description' => 'Update incident reports', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.submit', 'description' => 'Submit standalone incident reports', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.approve', 'description' => 'Review/close incidents', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.reopen', 'description' => 'Reopen closed incidents', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.assign', 'description' => 'Assign an accountable owner within incident access and conflict boundaries', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.hold', 'description' => 'Hold accountable ownership of an eligible incident', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.holdRestricted', 'description' => 'Hold ownership of restricted incidents when separately authorized to read them', 'group' => 'incidents', 'module' => 'Compliance'],
+            ['key' => 'incidents.owner.request', 'description' => 'Request a change of ownership for an owned incident', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.export', 'description' => 'Export incidents', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.templates.manage', 'description' => 'Manage incident templates', 'group' => 'incidents', 'module' => 'Compliance'],
             ['key' => 'incidents.portal.manage', 'description' => 'Control portal visibility for incidents', 'group' => 'incidents', 'module' => 'Compliance'],
@@ -489,12 +577,18 @@ class RbacSeeder extends Seeder
             ['key' => 'healthSafety.events.closeAny', 'description' => 'Close an H&S event owned by another H&S lead', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.closureExceptions.request', 'description' => 'Request a narrow H&S closure exception', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'healthSafety.closureExceptions.approve', 'description' => 'Independently decide or revoke H&S closure exceptions', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'healthSafety.settings.manage', 'description' => 'Configure the organisation approval workflow with an attributable change history', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Restraints & Behaviour Support
             ['key' => 'restraints.view', 'description' => 'View the restraint register & behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.create', 'description' => 'Record restraint events & create behaviour support plans', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.manage', 'description' => 'Manage restraint events & behaviour support plan lifecycle', 'group' => 'restraints', 'module' => 'Compliance'],
             ['key' => 'restraints.review', 'description' => 'Review restraint events & sign off plan reviews', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'restraints.approve', 'description' => 'Explicitly designated behaviour support plan approval authority, subject to current source access and policy', 'group' => 'restraints', 'module' => 'Compliance'],
+            // Create-only reporting (MASTER for Stephan, 30 Oct): open the report form and save it. No register, no
+            // evidence afterwards, no plans, no review or approval.
+            ['key' => 'restraints.report', 'description' => 'Report a restraint (create only; no register, review or plans)', 'group' => 'restraints', 'module' => 'Compliance'],
+            ['key' => 'injuries.report', 'description' => 'Report a workplace injury (create only; no register or recovery work)', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Safe Work Procedures (controlled SWMS document library)
             ['key' => 'procedures.view', 'description' => 'View safe work procedures', 'group' => 'procedures', 'module' => 'Compliance'],
@@ -559,7 +653,7 @@ class RbacSeeder extends Seeder
             ['key' => 'funding.viewAllSites', 'description' => 'View funding records across all active Sites', 'group' => 'funding', 'module' => 'Finance'],
         ];
 
-        foreach ($permissionDefinitions as $permDef) {
+        foreach ([...$permissionDefinitions, ...\App\Domain\Referrals\ReferralPermissions::definitions()] as $permDef) {
             Permission::firstOrCreate(
                 ['key' => $permDef['key']],
                 [
@@ -589,18 +683,10 @@ class RbacSeeder extends Seeder
 
         // Independent safety/privacy decisions are assigned by the explicit
         // product policy below. Broad administrator access does not imply them.
-        $restrictedIndependentAuthority = [
-            'healthSafety.events.close',
-            'healthSafety.events.closeAny',
-            'healthSafety.closureExceptions.request',
-            'healthSafety.closureExceptions.approve',
-            'safeguarding.declassification.approve',
-            'fleet.maintenance.release',
-            'fleet.maintenance.configure',
-        ];
         $admin?->permissions()->sync(
             Permission::query()
-                ->whereNotIn('key', $restrictedIndependentAuthority)
+                ->whereNotIn('key', self::RESTRICTED_INDEPENDENT_AUTHORITY)
+                ->where('key', 'not like', 'securityDevices.endpoints.script%')
                 ->pluck('id'),
         );
 
@@ -615,11 +701,18 @@ class RbacSeeder extends Seeder
 
         // Provider Manager
         $syncPermissions($providerManager, [
+            'medications.errors.manage',
             'sites.viewAny', 'sites.viewAll', 'sites.create', 'sites.update',
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'staff.viewAny', 'staff.create', 'staff.update', 'staff.invite', 'staff.assignments.update',
             'staff.credentials.viewAny', 'staff.credentials.updateAny', 'staff.availability.updateAny',
             'workers.viewAny', 'reports.viewAny', 'rostering.viewAny',
+            // Own-site operations dashboard; OperationsPermissionsSeeder creates the key
+            // and grants it on a fresh install, this keeps it on a reseed (20 Oct 2026).
+            'operations.dashboard.view',
+            // Read the H&S Overview and Safety reviews for their own Sites (Stephan, 30 Oct, option A). Reading only;
+            // Site scope still applies. Grant migration: 2026_10_30_120000_grant_provider_manager_hazards_view.
+            'hazards.view',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view', 'fleet.trips.manage',
             'fleet.fuel.manage', 'fleet.reports.view', 'fleet.bookings.approve', 'fleet.incidents.manage',
             'fleet.maintenance.manage', 'fleet.medication.manage', 'fleet.mileage.approve', 'fleet.outings.manage',
@@ -634,12 +727,13 @@ class RbacSeeder extends Seeder
             'timesheets.viewAny', 'timesheets.create', 'timesheets.update', 'timesheets.approve', 'timesheets.manageAny',
             'clients.viewAny', 'clients.create', 'clients.update', 'clients.assignments.update', 'clients.onboarding.manage',
             'family_portal.viewAny', 'family_portal.manage',
-            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt',
-            'medications.administer.correct', 'medications.stock.update', 'medications.controlled.view',
-            'medications.controlled.record', 'medications.controlled.witness', 'medications.controlled.override',
-            'medications.audit.view', 'medications.reports.export', 'medications.breakglass',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.reviews.manage', 'medications.followups.manage', 'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt',
+            'medications.administer.correct', 'medications.stock.update', 'medications.downtime.manage', 'medications.controlled.view',
+            'medications.controlled.record', 'medications.controlled.witness', 'medications.controlled.override', 'medications.controlled.manage',
+            'medications.audit.view', 'medications.reports.export', 'medications.breakglass', 'medications.emergency_policy.manage',
             'incidents.viewAny', 'incidents.create', 'incidents.update', 'incidents.submit',
             'incidents.approve', 'incidents.reopen', 'incidents.followups.manage', 'incidents.export',
+            'incidents.owner.assign', 'incidents.owner.hold', 'incidents.owner.holdRestricted', 'incidents.owner.request',
             'incidents.portal.manage', 'incidents.view.portal', 'incidents.attachments.view.portal',
             'respite.viewAny', 'respite.create', 'respite.update', 'respite.bookings.manage',
             'respite.stays.manage', 'respite.resources.manage', 'respite.procedures.manage',
@@ -687,16 +781,19 @@ class RbacSeeder extends Seeder
 
         // Coordinator
         $syncPermissions($coordinator, [
+            'medications.errors.manage',
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'staff.viewAny', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
             'staff.availability.updateAny', 'clients.viewAny', 'clients.assignments.update',
             'clients.onboarding.manage', 'family_portal.viewAny', 'family_portal.manage',
-            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
-            'medications.administer.record', 'medications.administer.correct', 'medications.stock.update',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.reviews.manage',
+            'medications.alerts.manage_house', 'medications.followups.manage',
+            'medications.administer.record', 'medications.administer.correct', 'medications.stock.update', 'medications.downtime.manage',
             'medications.controlled.view', 'medications.controlled.record', 'medications.controlled.witness',
             'medications.audit.view', 'medications.reports.export',
             'incidents.viewAny', 'incidents.create', 'incidents.update', 'incidents.approve',
             'incidents.reopen', 'incidents.followups.manage',
+            'incidents.owner.assign', 'incidents.owner.hold', 'incidents.owner.request',
             'respite.viewAny', 'respite.create', 'respite.update', 'respite.bookings.manage',
             'respite.stays.manage', 'respite.resources.manage', 'respite.procedures.manage',
             'respite.procedures.run', 'respite.tasks.view', 'respite.tasks.manage', 'respite.tasks.approve',
@@ -749,6 +846,8 @@ class RbacSeeder extends Seeder
 
         // Support Worker
         $syncPermissions($supportWorker, [
+            // Create-only reporting of restraints and workplace injuries (MASTER for Stephan, 30 Oct).
+            'restraints.report', 'injuries.report',
             'clients.viewAssigned', 'medications.view', 'timeline.create',
             'progress_notes.viewAny', 'progress_notes.create',
             'shifts.viewAssigned', 'shifts.tasks.updateSelf', 'shifts.tasks.createSelf',
@@ -862,10 +961,17 @@ class RbacSeeder extends Seeder
 
         // Team Lead
         $syncPermissions($teamLead, [
+            'medications.errors.manage',
+            'medications.controlled.manage',
             'sites.viewAny', 'sites.update',
             'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
             'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
             'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
+            'safeguarding.create',
+            // Report incidents (Stephan, 30 Oct): read the clients at their sites, report from /incidents/report.
+            // No incident register. Grant migration: 2026_10_30_110000_grant_team_lead_incident_reporting.
+            'incidents.create', 'clients.viewAny',
             'healthSafety.events.close', 'healthSafety.closureExceptions.request',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.schedule',
@@ -887,7 +993,17 @@ class RbacSeeder extends Seeder
             'clinical.assessments.viewAny', 'clinical.assessments.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
-            'medications.view', 'medications.orders.verify',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.reviews.manage', 'medications.witness_pin.reset',
+            // P11 B2 Q3: their own houses' alert extras, quiet hours and on-call contact.
+            'medications.alerts.manage_house', 'medications.followups.manage',
+            'medications.stock.receive', 'medications.stock.update', 'medications.downtime.manage',
+            // eMAR role baseline (1 Oct 2026): house leads give medicines, see
+            // and record controlled medicines, and witness, so they hold the
+            // same frontline keys as support_worker. Competency, eligibility
+            // and a covering shift still decide who may actually give a dose.
+            // Grant migration: 2026_10_01_100000_grant_team_lead_frontline_medication_keys.
+            'medications.administer.record', 'medications.administer.correct',
+            'medications.controlled.view', 'medications.controlled.record', 'medications.controlled.witness',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
         ]);
 
@@ -897,7 +1013,10 @@ class RbacSeeder extends Seeder
             'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
             'healthSafety.viewAllSites', 'healthSafety.events.close', 'healthSafety.events.closeAny',
             'healthSafety.closureExceptions.request',
-            'incidents.create',
+            // Stephan 25 Oct 2026: H&S officers read incidents (Site and privacy rules still apply).
+            'incidents.create', 'incidents.viewAny',
+            // Raise a safeguarding concern (create only; MASTER for Stephan, 30 Oct).
+            'safeguarding.create',
             'procedures.view', 'procedures.create', 'procedures.manage', 'procedures.approve',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',
@@ -915,8 +1034,19 @@ class RbacSeeder extends Seeder
                         'safeguarding.viewAny',
                         'safeguarding.viewSensitive',
                         'safeguarding.declassification.approve',
+                        // Read the compliance dashboard their role is named for (19 Oct 2026).
+                        'compliance.view',
                     ])
                     ->pluck('id'),
+            );
+        }
+
+        // CFO: read every finance record (the auditor's view-only set). Approving,
+        // posting and paying stay with Finance until Stephan decides otherwise.
+        // Grant migration: 2026_10_19_120000_grant_back_office_read_access.
+        if ($cfo) {
+            $cfo->permissions()->syncWithoutDetaching(
+                Permission::query()->whereIn('key', self::CFO_FINANCE_READ)->pluck('id'),
             );
         }
 
@@ -932,6 +1062,12 @@ class RbacSeeder extends Seeder
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
         ]);
+
+        // Fleet Manager: central oversight of every vehicle and its profile
+        // (fleet.vehicles.viewAllSites) without other Site access. Bookings,
+        // trips, drivers and Finance keep their own Site rules. Mirrors
+        // 2026_09_24_000200_grant_fleet_vehicles_view_all_sites.
+        $syncPermissions($fleetManager, self::FLEET_MANAGER_PERMISSIONS);
 
         // Board Trustee
         $syncPermissions($boardTrustee, [
@@ -949,6 +1085,7 @@ class RbacSeeder extends Seeder
 
         // Clinical Lead: full clinical module access + medications view
         $syncPermissions($clinicalLead, [
+            'medications.errors.manage',
             'clinical.observations.view', 'clinical.observations.record',
             'clinical.observations.viewAny', 'clinical.observations.recordClinical', 'clinical.observations.correct',
             'clinical.events.view', 'clinical.events.record',
@@ -959,8 +1096,8 @@ class RbacSeeder extends Seeder
             'clinical.mealRestrictions.author', 'clinical.mealRestrictions.approve',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard', 'clinical.accessAllSites',
-            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
-            'medications.administer.record', 'medications.administer.override_safety', 'medications.competency.exempt', 'medications.audit.view',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.reviews.manage',
+            'medications.administer.record', 'medications.followups.manage', 'medications.downtime.manage', 'medications.administer.override_safety', 'medications.competency.exempt', 'medications.audit.view', 'medications.witness_pin.reset',
             'clients.viewAny',
         ]);
 
@@ -985,12 +1122,42 @@ class RbacSeeder extends Seeder
             }
         }
 
+        // Referral role presets (specification §10). Mirrors the deploy grant migrations
+        // 2026_10_20_090000_grant_referral_role_presets and 2026_10_21_120000_grant_referral_communications_send
+        // (staff messaging: coordinators and service managers). Runs after the role syncs above;
+        // syncWithoutDetaching augments rather than replaces. Admin never gets the independent keys.
+        foreach (\App\Domain\Referrals\ReferralPermissions::rolePresets() as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
+        }
+
+        // Provider managers create and approve drafts made from referrals (Stephan, 21 Oct 2026).
+        // Mirrors 2026_10_21_130000_grant_provider_manager_service_agreements. The keys are created
+        // here because OperationsPermissionsSeeder runs after this seeder.
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::PERMISSION_DEFINITIONS as $definition) {
+            Permission::firstOrCreate(['key' => $definition['key']], ['description' => $definition['description'], 'group' => 'service_agreements', 'module' => 'Operations']);
+        }
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::ROLE_GRANTS as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
+        }
+        // Finance reads agreements (Stephan, 23 Oct 2026). Mirrors 2026_10_23_090000_grant_finance_service_agreement_view.
+        foreach (\App\Domain\Referrals\Services\ReferralServiceAgreements::READ_ONLY_ROLE_GRANTS as $roleName => $keys) {
+            Role::where('name', $roleName)->first()?->permissions()
+                ->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id')->all());
+        }
+
         // Self-service IT ticketing: every STAFF role can raise and track its
         // own helpdesk tickets. Dynamic over the roles table so niche roles
         // (it_manager, board_*, exec) are covered; the external portal
         // personas are excluded — they are not staff and never see the
         // internal helpdesk. Mirrors 2026_07_07_100001. Runs after the role
         // syncs above; syncWithoutDetaching augments rather than replaces.
+        // P10 approved ending authority; the auditor remains read-only.
+        $emergencyEndIds = Permission::where('key', 'medications.breakglass.end')->pluck('id')->all();
+        Role::whereIn('name', ['admin', 'provider_manager', 'coordinator', 'clinical_lead'])
+            ->each(fn (Role $role) => $role->permissions()->syncWithoutDetaching($emergencyEndIds));
+
         $itRequestId = Permission::where('key', 'it.request')->pluck('id')->all();
         foreach (Role::whereNotIn('name', ['client', 'next_of_kin'])->get() as $staffRole) {
             $staffRole->permissions()->syncWithoutDetaching($itRequestId);
@@ -1006,7 +1173,8 @@ class RbacSeeder extends Seeder
             ->chunk(200, function ($users) use (
                 $admin, $providerManager, $coordinator, $supportWorker,
                 $finance, $hr, $auditor, $roadmapManager, $itManager,
-                $facilitiesManager, $ceo, $cfo, $coo, $complianceLead, $riskLead
+                $facilitiesManager, $fleetManager, $ceo, $cfo, $coo, $complianceLead, $riskLead,
+                $healthSafetyOfficer
             ) {
                 foreach ($users as $user) {
                     $roleName = $user->role ?? 'support_worker';
@@ -1021,11 +1189,13 @@ class RbacSeeder extends Seeder
                         'roadmap_manager' => $roadmapManager,
                         'it_manager' => $itManager,
                         'facilities_manager' => $facilitiesManager,
+                        'fleet_manager' => $fleetManager,
                         'ceo' => $ceo,
                         'cfo' => $cfo,
                         'coo' => $coo,
                         'compliance_lead' => $complianceLead,
                         'risk_lead' => $riskLead,
+                        'health_safety_officer' => $healthSafetyOfficer,
                         default => $supportWorker,
                     };
 
@@ -1034,5 +1204,6 @@ class RbacSeeder extends Seeder
                     }
                 }
             });
+        MedicationReportingPermissions::install();
     }
 }

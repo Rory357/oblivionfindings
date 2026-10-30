@@ -1,0 +1,33 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+.....
+   PASS  Tests\Feature\FleetAssets\Pkg07BoundariesTest
+  ✓ versioned writes are scoped retry safe and keep original evidence                                            8.02s
+  ✓ scale search rule proposals and dependency checks share the canonical register                               1.02s
+  ✓ client handoff is opaque and rechecks consent and source versions                                            1.60s
+  ✓ protected geometry and public geocoding cannot be bypassed                                                   0.31s
+  ✓ schedule windows and rule retry retain only valid reviewed proposals                                         0.50s
+......
+   PASS  Tests\Feature\Sites\SiteGeofenceTest
+  ✓ site boundary creation stays inactive and completes geometry readiness                                       2.79s
+  ✓ explicit site boundary edits preserve purpose settings and reject stale writes                               1.11s
+  ✓ site retirement retains evidence and blocks linked dependencies without fake crossings                       1.22s
+  ✓ assigned site geofence is evaluated for assigned fleet assets                                                1.17s
+  ✓ geofence containment treats invalid or incomplete shapes as outside                                          0.54s
+  ✓ site geofence routes require geofence management permission                                                  0.62s
+..                                                     13 / 13 (100%)
+   PASS  Tests\Feature\FleetAssets\Pkg07MapPrivacyTest
+  ✓ directory and history withhold private vehicle evidence even without a trip link                             1.07s
+  ✓ asset positions require observations from the current unambiguous pairing                                    0.77s
+
+  Tests:    13 passed (150 assertions)
+  Duration: 25.08s
+
+
+
+Time: 00:20.960, Memory: 110.00 MB
+
+OK (13 tests, 150 assertions)

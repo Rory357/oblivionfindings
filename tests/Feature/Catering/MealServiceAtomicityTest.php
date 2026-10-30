@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 uses(RefreshDatabase::class);
 
@@ -262,7 +263,7 @@ test('wrong Site and mismatched nested scope deny before meal or stock side effe
         ->assertNotFound();
     $this->actingAs($this->stockWorker)
         ->postJson("/sites/{$this->otherStockSite->id}/meal-plan/{$otherEntry->id}/serve")
-        ->assertForbidden();
+        ->assertNotFound();
     expect(fn () => app(MealServiceCommand::class)->serve(
         $this->otherStockSite->id,
         $otherEntry->id,
@@ -416,6 +417,7 @@ test('unserve refuses unlinked legacy stock and later dependent stocktakes witho
 });
 
 test('parallel serve unserve and opposing actions serialize without duplicate effects', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     Notification::fake();
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');

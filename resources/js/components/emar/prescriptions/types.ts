@@ -1,5 +1,6 @@
 /* Shared types for the redesigned eMAR Prescriptions & Orders page. Mirrors
  * EmarController@prescriptions. */
+import type { WitnessPinStatus } from '@/lib/witness-pin';
 
 export interface PrescriptionOrder {
     id: number;
@@ -67,6 +68,8 @@ export interface MedOption {
 export interface StaffOption {
     id: number;
     name: string;
+    /** PIN-1: witness PIN status; unusable PINs are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
 }
 
 export function orderStatusTone(status: string): string {

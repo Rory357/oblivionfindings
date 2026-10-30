@@ -173,7 +173,7 @@ export function CalendarDetailPopover({
                         <button
                             type="button"
                             onClick={onEdit}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:brightness-95"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-2.5 py-1.5 text-[12px] font-semibold text-primary-fill-foreground hover:brightness-95"
                         >
                             <Pencil className="h-3.5 w-3.5" /> Edit
                         </button>
@@ -196,7 +196,7 @@ export function CalendarDetailPopover({
                     <button
                         type="button"
                         onClick={() => onDeepLink(detail.deepLink as string)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground hover:brightness-95"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-2.5 py-1.5 text-[12px] font-semibold text-primary-fill-foreground hover:brightness-95"
                     >
                         <ExternalLink className="h-3.5 w-3.5" />{' '}
                         {DEEP_LINK_LABEL[detail.layer] ?? 'Open'}

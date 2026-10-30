@@ -140,7 +140,10 @@ return new class extends Migration
             ->whereIn('key', ['funding.viewAllSites', 'funding.claims.retryPosting'])
             ->pluck('id');
         if ($permissionIds->isNotEmpty()) {
-            DB::table('permission_role')->whereIn('permission_id', $permissionIds)->delete();
+            // Role grants live in role_permission (Role::permissions()); up()
+            // granted through that relation. This line named a non-existent
+            // permission_role table, so any rollback of 000140 failed here.
+            DB::table('role_permission')->whereIn('permission_id', $permissionIds)->delete();
             DB::table('permission_user')->whereIn('permission_id', $permissionIds)->delete();
             Permission::query()->whereIn('id', $permissionIds)->delete();
         }

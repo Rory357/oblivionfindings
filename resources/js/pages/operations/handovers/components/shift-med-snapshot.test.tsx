@@ -68,7 +68,9 @@ describe('ShiftMedSummary', () => {
         // Stat-tile labels.
         expect(screen.getByText('Due')).toBeInTheDocument();
         expect(screen.getByText('CD due')).toBeInTheDocument();
-        expect(screen.getByText('Reviews due')).toBeInTheDocument();
+        expect(
+            screen.getByText('Effect checks from shift'),
+        ).toBeInTheDocument();
         expect(screen.getByText('Omissions')).toBeInTheDocument();
 
         // A couple of distinct count values (3 = due, 7 = omissions).

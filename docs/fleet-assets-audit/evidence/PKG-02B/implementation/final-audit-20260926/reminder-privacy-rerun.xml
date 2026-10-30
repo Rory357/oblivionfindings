@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest" file="Pkg02b Vehicle Finance (Tests\Feature\FleetAssets\Pkg02bVehicleFinance)" tests="1" assertions="40" errors="0" failures="0" skipped="0" time="247.151397">
+    <testcase name="Review request files are private and open only for finance viewers" file="Pkg02b Vehicle Finance (Tests\Feature\FleetAssets\Pkg02bVehicleFinance)::Review request files are private and open only for finance viewers" class="Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest" classname="Tests.Feature.FleetAssets.Pkg02bVehicleFinanceTest" assertions="40" time="247.151397"/>
+  </testsuite>
+</testsuites>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\MedicationsApiController;
+use App\Http\Middleware\MedicationExportGuard;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -71,7 +72,7 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
 
     Route::get('/clients/{client}/medications/{medication}/prn-history', [MedicationsApiController::class, 'getPrnHistory'])
         ->middleware('permission:medications.view|clients.viewAny|clients.viewAssigned')
-        ->name('api.medications.prn.history');
+        ->name('api.medications.prnHistory');
 
     // Alerts
     Route::get('/alerts', [MedicationsApiController::class, 'getDashboardAlerts'])
@@ -99,11 +100,12 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
     // Mixed report endpoints stay available for ordinary report types. The
     // controller conjunctively exact-gates controlled selectors.
     Route::get('/reports', [MedicationsApiController::class, 'getReports'])
-        ->middleware('permission:medications.reports.export|reports.viewAny')
+        ->middleware('permission:medications.reports.view')
         ->name('api.medications.reports');
 
     Route::get('/reports/export', [MedicationsApiController::class, 'exportReportCsv'])
-        ->middleware('permission:medications.reports.export|reports.viewAny')
+        ->middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])
+        ->middleware(MedicationExportGuard::class.':doses')
         ->name('api.medications.reports.export');
 
     // Shift summary
@@ -143,7 +145,9 @@ Route::middleware(['auth:web,sanctum'])->prefix('api/medications')->group(functi
         ->middleware('permission:medications.view')
         ->name('api.medications.interactions.index');
 
+    // Interaction rules apply to every resident's safety checks, so authoring
+    // them is clinical governance (NF-09), not a dose-correction right.
     Route::post('/interactions', [MedicationsApiController::class, 'createDrugInteraction'])
-        ->middleware('permission:medications.administer.correct')
+        ->middleware('permission:medications.settings.manage')
         ->name('api.medications.interactions.store');
 });

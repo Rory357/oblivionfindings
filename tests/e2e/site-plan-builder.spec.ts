@@ -55,6 +55,8 @@ async function clickCanvasAt(page: Page, xRatio: number, yRatio: number) {
 test('site plan builder supports select, retyping, and emergency mode', async ({
     page,
 }) => {
+    // This journey saves a draft, switches surfaces, publishes and reloads.
+    test.setTimeout(60_000);
     const errors = collectConsoleErrors(page);
     const { siteId } = seedSitePlanBuilderFixture();
 
@@ -121,6 +123,10 @@ test('site plan builder supports select, retyping, and emergency mode', async ({
     await expect(dialog).toContainText(/All changes saved/i);
     await dialog.getByRole('button', { name: /Close/i }).click();
     await expect(page.getByText(/Ready to export/i).first()).toBeVisible();
+    await expect(page.getByTestId('emergency-plan-download')).toBeEnabled();
+    await page.reload();
+    await expect(page.getByText(/Ready to export/i).first()).toBeVisible();
+    await expect(page.getByTestId('emergency-plan-download')).toBeEnabled();
 
     expectNoConsoleErrors(errors);
 });

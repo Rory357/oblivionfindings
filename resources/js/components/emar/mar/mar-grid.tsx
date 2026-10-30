@@ -1,8 +1,13 @@
+import { secondPersonDisplay } from '@/lib/medication-second-person';
 /* eslint-disable no-restricted-syntax -- the MAR time-grid uses custom-styled
    <button> dose cells (84×46 tap targets) and a bordered panel that intentionally
    diverge from <Button>/<Card>; see design_styles/POPUP_STYLE_GUIDE.md and the MAR handoff. */
 import { cn } from '@/lib/utils';
-import type { DoseStatus, ScheduleRow } from '@/pages/meds/today/types';
+import {
+    awaitsOrderCheck,
+    type DoseStatus,
+    type ScheduleRow,
+} from '@/pages/meds/today/types';
 import { Pill } from 'lucide-react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 
@@ -65,6 +70,17 @@ const STATUS_CELL: Record<DoseStatus, { label: string; className: string }> = {
     upcoming: {
         label: 'Due',
         className: 'border-border/70 bg-muted/40 text-muted-foreground',
+    },
+    // Waiting for the order check: shown, not recordable until checked.
+    pending_check: {
+        label: 'Order check',
+        className: 'border-status-info/40 bg-status-info-bg text-status-info',
+    },
+    // The person is away (checked in at respite at another Site): shown
+    // with its reason, never due or overdue.
+    away: {
+        label: 'Away',
+        className: 'border-status-info/40 bg-status-info-bg text-status-info',
     },
 };
 
@@ -164,6 +180,10 @@ export default function MarGrid({
                         label="Not given"
                         className="border-status-warning/40 bg-status-warning-bg"
                     />
+                    <LegendItem
+                        label="Away"
+                        className="border-status-info/40 bg-status-info-bg"
+                    />
                 </div>
             </div>
 
@@ -252,12 +272,34 @@ export default function MarGrid({
                                             );
                                         }
                                         const cell = STATUS_CELL[row.status];
+                                        const confirmation = row.recorded
+                                            ? secondPersonDisplay(row.recorded)
+                                            : null;
+                                        const unsettled =
+                                            confirmation?.tone === 'warning' ||
+                                            confirmation?.tone === 'critical'
+                                                ? confirmation
+                                                : null;
                                         const isRecordable =
                                             canRecord &&
+                                            !awaitsOrderCheck(row) &&
                                             (!row.is_controlled ||
                                                 canRecordControlled);
                                         const recordedTime =
                                             row.recorded?.time ?? row.time;
+                                        const awayReason =
+                                            row.status === 'away'
+                                                ? (row.away_reason ?? null)
+                                                : null;
+                                        const cellLabel = unsettled
+                                            ? cell.label +
+                                              ' · ' +
+                                              unsettled.label +
+                                              ' · ' +
+                                              unsettled.detail
+                                            : awayReason
+                                              ? `${cell.label} · ${awayReason}`
+                                              : cell.label;
                                         return (
                                             <td
                                                 key={time}
@@ -274,19 +316,41 @@ export default function MarGrid({
                                                     onContextMenu={(event) =>
                                                         onContext(event, row)
                                                     }
-                                                    title={`${med.name} — ${cell.label} ${recordedTime}`}
-                                                    aria-label={`${med.name}, ${cell.label} at ${recordedTime} — record dose (right-click for quick actions)`}
+                                                    title={`${med.name} — ${cellLabel} ${recordedTime}`}
+                                                    aria-label={`${med.name}, ${cellLabel} at ${recordedTime} — record dose (right-click for quick actions)`}
                                                     className={cn(
                                                         'mx-auto flex h-[46px] w-[84px] flex-col items-center justify-center rounded-lg border text-[11px] font-semibold transition hover:ring-2 hover:ring-primary/30',
                                                         !isRecordable &&
                                                             'cursor-default opacity-70 hover:ring-0',
-                                                        cell.className,
+                                                        unsettled
+                                                            ? unsettled.tone ===
+                                                              'critical'
+                                                                ? 'border-status-critical/40 bg-status-critical-bg text-status-critical'
+                                                                : 'border-status-warning/40 bg-status-warning-bg text-status-warning'
+                                                            : cell.className,
+                                                        unsettled &&
+                                                            'h-auto min-h-[58px] py-1',
                                                     )}
                                                 >
                                                     <span>{cell.label}</span>
-                                                    <span className="text-[10px] font-normal opacity-80">
-                                                        {recordedTime}
-                                                    </span>
+                                                    {unsettled && (
+                                                        <span className="max-w-[80px] text-[9.5px] leading-tight">
+                                                            {unsettled.label}
+                                                        </span>
+                                                    )}
+                                                    {awayReason ? (
+                                                        // Where they are; the full reason (with "until") is in the title.
+                                                        <span className="line-clamp-2 max-w-[78px] text-[9.5px] leading-tight font-normal opacity-80">
+                                                            {awayReason.replace(
+                                                                / \(until [^)]*\)$/,
+                                                                '',
+                                                            )}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] font-normal opacity-80">
+                                                            {recordedTime}
+                                                        </span>
+                                                    )}
                                                 </button>
                                             </td>
                                         );

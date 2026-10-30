@@ -253,7 +253,7 @@ export function OffboardingWizardDialog({
                             onClick={submit}
                             disabled={!canSubmit || form.processing}
                             className={cn(
-                                'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity',
+                                'rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground transition-opacity',
                                 (!canSubmit || form.processing) &&
                                     'cursor-not-allowed opacity-50',
                             )}
@@ -271,7 +271,7 @@ export function OffboardingWizardDialog({
                                 form.data.employee_profile_id === ''
                             }
                             className={cn(
-                                'rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground',
+                                'rounded-md bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground',
                                 wizard.index === 0 &&
                                     form.data.employee_profile_id === '' &&
                                     'cursor-not-allowed opacity-50',

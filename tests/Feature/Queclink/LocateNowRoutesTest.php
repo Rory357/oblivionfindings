@@ -4,6 +4,7 @@ namespace Tests\Feature\Queclink;
 
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
@@ -12,6 +13,7 @@ use App\Models\Queclink\QueclinkDevice;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -105,6 +107,7 @@ class LocateNowRoutesTest extends TestCase
             'assignable_id' => $client->id,
             'assigned_at' => now(),
             'consent_id' => $consent->id,
+            'tracking_purpose' => $consent->decision_purpose,
         ]);
 
         $this->actingAs($this->admin)
@@ -116,10 +119,49 @@ class LocateNowRoutesTest extends TestCase
         $this->assertDatabaseCount('queclink_pending_commands', 0);
     }
 
+    public function test_valid_generic_tracking_consent_cannot_authorise_resident_location_shortcuts(): void
+    {
+        ['client' => $client, 'device' => $device, 'queclinkDevice' => $queclinkDevice] = $this->createPairedResidentTracker(
+            '861106050000003', 'Asset Location Tracking (Safety)',
+        );
+        $consent = ClientConsent::query()->where('client_id', $client->id)->sole();
+        $assignment = DeviceAssignment::query()->where('device_id', $device->id)->sole();
+        $this->assertTrue(ConsentValidationService::isValidTrackingConsent($consent, $client));
+        $this->assertFalse(ConsentValidationService::isValidResidentLocationConsent($consent, $client));
+        $this->assertSame($consent->decision_purpose, $assignment->tracking_purpose);
+        $privacy = app(PersonalTrackingPrivacyService::class);
+        $this->assertTrue($privacy->assignmentAuthorisesClient($assignment, $client));
+        $this->assertFalse($privacy->assignmentAuthorisesResidentLocation($assignment, $client));
+        $before = [
+            'client' => $client->fresh()->getRawOriginal(),
+            'consent' => $consent->fresh()->getRawOriginal(),
+            'assignment' => $assignment->fresh()->getRawOriginal(),
+            'device' => $device->fresh()->getRawOriginal(),
+            'queclink' => $queclinkDevice->fresh()->getRawOriginal(),
+        ];
+
+        $this->actingAs($this->admin)
+            ->post("/fleet-assets/resident-tracking/{$client->id}/locate-now")
+            ->assertForbidden();
+        $this->actingAs($this->admin)
+            ->post("/operations/clients/{$client->id}/location/locate-now")
+            ->assertForbidden();
+
+        $this->assertSame($before, [
+            'client' => $client->fresh()->getRawOriginal(),
+            'consent' => $consent->fresh()->getRawOriginal(),
+            'assignment' => $assignment->fresh()->getRawOriginal(),
+            'device' => $device->fresh()->getRawOriginal(),
+            'queclink' => $queclinkDevice->fresh()->getRawOriginal(),
+        ]);
+        $this->assertDatabaseCount('queclink_pending_commands', 0);
+        $this->assertDatabaseCount('device_command_requests', 0);
+    }
+
     /**
      * @return array{client: Client, device: Device, queclinkDevice: QueclinkDevice}
      */
-    private function createPairedResidentTracker(string $imei): array
+    private function createPairedResidentTracker(string $imei, string $consentTypeName = 'Personal Tracker (Wandering Risk)'): array
     {
         $client = Client::create([
             'first_name' => 'Amelia',
@@ -127,7 +169,7 @@ class LocateNowRoutesTest extends TestCase
             'site_id' => $this->site->id,
             'status' => 'active',
         ]);
-        $consent = $this->createTrackingConsent($client);
+        $consent = $this->createTrackingConsent($client, $consentTypeName);
         $device = Device::factory()->tracking()->create([
             'provider' => 'queclink',
             'imei' => $imei,
@@ -139,6 +181,7 @@ class LocateNowRoutesTest extends TestCase
             'assignable_id' => $client->id,
             'assigned_at' => now(),
             'consent_id' => $consent->id,
+            'tracking_purpose' => $consent->decision_purpose,
         ]);
         $queclinkDevice = QueclinkDevice::create([
             'imei' => $imei,
@@ -150,10 +193,10 @@ class LocateNowRoutesTest extends TestCase
         return compact('client', 'device', 'queclinkDevice');
     }
 
-    private function createTrackingConsent(Client $client): ClientConsent
+    private function createTrackingConsent(Client $client, string $typeName = 'Personal Tracker (Wandering Risk)'): ClientConsent
     {
         $type = ConsentType::query()->firstOrCreate(
-            ['name' => 'Asset Location Tracking (Safety)'],
+            ['name' => $typeName],
             [
                 'category' => 'operational',
                 'description' => 'Fleet location tracking',

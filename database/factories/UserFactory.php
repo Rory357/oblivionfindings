@@ -2,8 +2,11 @@
 
 namespace Database\Factories;
 
+use App\Models\User;
+use App\Models\UserWitnessPin;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 /**
@@ -15,6 +18,41 @@ class UserFactory extends Factory
      * The current password being used by the factory.
      */
     protected static ?string $password;
+
+    /**
+     * PIN-1: factory users can act as a medication second person, so each gets
+     * this known 6-digit witness PIN (tests and local demo data only). Use
+     * withoutWitnessPin() for the "no PIN set" path.
+     */
+    public const TEST_WITNESS_PIN = '482915';
+
+    protected static ?string $witnessPinHash = null;
+
+    protected static ?bool $witnessPinTableExists = null;
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            if (! (static::$witnessPinTableExists ??= Schema::hasTable('user_witness_pins'))) {
+                return;
+            }
+            UserWitnessPin::query()->firstOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'pin_hash' => static::$witnessPinHash ??= Hash::make(self::TEST_WITNESS_PIN),
+                    'set_at' => now(),
+                ],
+            );
+        });
+    }
+
+    /** The person hasn't set a witness PIN, so they can't witness or co-sign yet. */
+    public function withoutWitnessPin(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            UserWitnessPin::query()->where('user_id', $user->id)->delete();
+        });
+    }
 
     /**
      * Define the model's default state.

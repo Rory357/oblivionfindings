@@ -2,26 +2,32 @@
 
 namespace Tests\Feature\Emar;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\Signal;
 use App\Models\ControlRoomAlert;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Tests\TestCase;
+use Tests\Support\RecordsDosesLikeTheDialog;
 
 class PrnQuickRecordTest extends TestCase
 {
     use RefreshDatabase;
+    use RecordsDosesLikeTheDialog;
 
     protected User $worker;
 
@@ -33,12 +39,39 @@ class PrnQuickRecordTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
         Cache::flush();
 
         $this->worker = $this->makeRoleUser('support_worker');
         $this->grantPermissions($this->worker, ['medications.administer.record']);
+
+        // A current Site worker with a valid, independently assessed
+        // competency — the administration path fails closed without both.
+        $site = Site::factory()->create(['is_active' => true]);
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->worker->id,
+            'primary_site_id' => $site->id,
+            'secondary_site_ids' => [],
+            'start_date' => now()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
+        $assessor = User::factory()->create([
+            'role' => 'manager',
+            'approved_at' => now(),
+        ]);
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $this->worker->id,
+            'assessor_id' => $assessor->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->subMonth()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
+        ]);
 
         $serviceContext = ServiceContext::factory()->create([
             'name' => 'PRN Quick',
@@ -48,11 +81,13 @@ class PrnQuickRecordTest extends TestCase
 
         $this->client = Client::factory()->create([
             'service_context_id' => $serviceContext->id,
+            'site_id' => $site->id,
             'status' => 'active',
         ]);
 
         Shift::factory()->create([
             'client_id' => $this->client->id,
+            'site_id' => $site->id,
             'service_context_id' => $serviceContext->id,
             'user_id' => $this->worker->id,
             'starts_at' => now()->subHour(),
@@ -92,9 +127,7 @@ class PrnQuickRecordTest extends TestCase
                 'reason' => 'Pain',
                 'dose_given' => '500mg',
                 'notes' => 'Settled after lunch.',
-                'client_request_uuid' => 'prn-quick-uuid',
-                'captured_offline_at' => now()->toIso8601String(),
-                'origin_device_id' => 'test-device',
+                'client_request_uuid' => '3f6c2a1e-9b4d-4e7a-8c5f-1d2e3f4a5b6c',
                 'queued_offline' => false,
             ])
             ->assertRedirect('/meds/today')
@@ -116,7 +149,7 @@ class PrnQuickRecordTest extends TestCase
             'client_medication_id' => $this->prn->id,
             'reason' => 'Pain',
             'dose_given' => '500mg',
-            'client_request_uuid' => 'prn-replay-uuid',
+            'client_request_uuid' => '6a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d',
             'captured_offline_at' => now()->toIso8601String(),
             'origin_device_id' => 'test-device',
             'queued_offline' => true,
@@ -127,7 +160,7 @@ class PrnQuickRecordTest extends TestCase
             ->post('/meds/today/prn', $payload)
             ->assertRedirect('/meds/today');
 
-        Cache::forget('offline:idempotency:prn:prn-replay-uuid');
+        Cache::forget('offline:idempotency:prn:6a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d');
 
         $this->actingAs($this->worker)
             ->from('/meds/today')
@@ -137,14 +170,16 @@ class PrnQuickRecordTest extends TestCase
 
         $this->assertDatabaseCount('client_medication_administrations', 1);
         $this->assertDatabaseHas('client_medication_administrations', [
-            'client_request_uuid' => 'prn-replay-uuid',
+            'client_request_uuid' => '6a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3d',
         ]);
     }
 
     public function test_stale_outer_replay_marker_cannot_suppress_a_prn_over_limit_incident(): void
     {
-        $attemptId = 'prn-stale-outer-marker';
-        $this->prn->update(['max_per_day' => 1]);
+        $attemptId = '8d7c6b5a-4f3e-4d2c-b1a0-9f8e7d6c5b4a';
+        // A verified order whose limit is already 1 — a model update would
+        // (correctly) send the changed order back for re-verification.
+        ClientMedication::query()->whereKey($this->prn->id)->update(['max_per_day' => 1]);
         ClientMedicationAdministration::query()->create([
             'client_id' => $this->client->id,
             'client_medication_id' => $this->prn->id,
@@ -187,6 +222,92 @@ class PrnQuickRecordTest extends TestCase
             ClientIncident::query()->sole()->id,
             data_get(ControlRoomAlert::query()->sole()->context, 'incident_id'),
         );
+    }
+
+    public function test_delayed_prn_submission_checks_the_previous_dose_at_the_captured_time(): void
+    {
+        $this->receiveDelayedSubmissionAt('13:00');
+        ClientMedication::query()->whereKey($this->prn->id)->update(['min_hours_between_doses' => 4]);
+        $this->givenAt('2026-04-30T08:00:00+12:00');
+
+        $this->actingAs($this->worker)->from('/meds/today')
+            ->post('/meds/today/prn', [...$this->capturedPrnAt('2026-04-30T09:00:00+12:00'),
+                'administered_at' => '2026-04-30T09:00:00+12:00'])
+            ->assertRedirect('/meds/today')->assertSessionHasErrors('client_medication_id');
+
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_delayed_prn_submission_checks_the_next_dose_at_the_captured_time(): void
+    {
+        $this->receiveDelayedSubmissionAt('15:00');
+        ClientMedication::query()->whereKey($this->prn->id)->update(['min_hours_between_doses' => 4]);
+        $this->givenAt('2026-04-30T10:00:00+12:00');
+
+        $this->actingAs($this->worker)->from('/meds/today')
+            ->post('/meds/today/prn', $this->capturedPrnAt('2026-04-30T09:00:00+12:00'))
+            ->assertRedirect('/meds/today')->assertSessionHasErrors('client_medication_id');
+
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_delayed_prn_submission_enforces_a_limit_that_has_left_the_receipt_time_window(): void
+    {
+        $this->receiveDelayedSubmissionAt('15:00');
+        ClientMedication::query()->whereKey($this->prn->id)->update(['max_per_day' => 1]);
+        $this->givenAt('2026-04-29T10:00:00+12:00');
+
+        $this->actingAs($this->worker)->from('/meds/today')
+            ->post('/meds/today/prn', $this->capturedPrnAt('2026-04-30T09:00:00+12:00'))
+            ->assertRedirect('/meds/today')->assertSessionHasErrors('client_medication_id');
+
+        $this->assertDatabaseCount('client_medication_administrations', 1);
+    }
+
+    public function test_valid_historical_prn_is_saved_once_even_when_receipt_time_would_fail_the_interval(): void
+    {
+        $this->receiveDelayedSubmissionAt('13:00');
+        ClientMedication::query()->whereKey($this->prn->id)->update(['min_hours_between_doses' => 2]);
+        $this->givenAt('2026-04-30T12:00:00+12:00');
+        $payload = $this->capturedPrnAt('2026-04-30T09:00:00+12:00');
+
+        $this->actingAs($this->worker)->from('/meds/today')->post('/meds/today/prn', $payload)
+            ->assertRedirect('/meds/today')->assertSessionHas('success');
+        $this->actingAs($this->worker)->from('/meds/today')->post('/meds/today/prn', $payload)
+            ->assertRedirect('/meds/today')->assertSessionHas('success', 'Already saved — no changes needed.');
+
+        $this->assertDatabaseCount('client_medication_administrations', 2);
+        $saved = ClientMedicationAdministration::query()->where('client_request_uuid', $payload['client_request_uuid'])->sole();
+        $this->assertTrue($saved->administered_at->equalTo(Carbon::parse($payload['captured_offline_at'])));
+        $this->assertDatabaseCount('client_incidents', 0);
+    }
+
+    private function receiveDelayedSubmissionAt(string $time): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-30 '.$time, 'Pacific/Auckland')->utc());
+        Shift::query()->where('user_id', $this->worker->id)->update([
+            'starts_at' => Carbon::parse('2026-04-30T07:00:00+12:00')->utc(),
+            'actual_starts_at' => Carbon::parse('2026-04-30T07:00:00+12:00')->utc(),
+            'ends_at' => Carbon::parse('2026-04-30T16:00:00+12:00')->utc(),
+        ]);
+    }
+
+    private function givenAt(string $instant): void
+    {
+        ClientMedicationAdministration::query()->create([
+            'client_id' => $this->client->id, 'client_medication_id' => $this->prn->id,
+            'administered_by' => $this->worker->id, 'status' => 'given',
+            'administered_at' => Carbon::parse($instant)->utc(),
+        ]);
+    }
+
+    private function capturedPrnAt(string $instant): array
+    {
+        return [
+            'client_medication_id' => $this->prn->id, 'reason' => 'Pain', 'dose_given' => '500mg',
+            'client_request_uuid' => (string) Str::uuid(), 'captured_offline_at' => $instant,
+            'origin_device_id' => 'synthetic-delayed-prn-device', 'queued_offline' => true,
+        ];
     }
 
     protected function makeRoleUser(string $roleName): User

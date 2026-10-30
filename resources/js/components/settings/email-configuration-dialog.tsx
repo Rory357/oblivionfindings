@@ -44,7 +44,7 @@ const steps = [
     },
     {
         key: 'identity',
-        label: 'Support identity',
+        label: 'Sender identity',
         blurb: 'Sender and reply mailbox',
         icon: Inbox,
     },
@@ -123,11 +123,45 @@ export function EmailConfigurationDialog({
           )
         : undefined;
     const locked = pending !== null || failure !== null;
+    const backupFields =
+        draft.provider === 'smtp'
+            ? [
+                  { label: 'SMTP host', complete: !!draft.smtp_host.trim() },
+                  {
+                      label: 'sender address',
+                      complete: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+                          draft.from_address.trim(),
+                      ),
+                  },
+                  {
+                      label: 'SMTP password',
+                      complete:
+                          !draft.smtp_username.trim() ||
+                          !!draft.smtp_password ||
+                          (base.smtp_password_saved &&
+                              !draft.clear_smtp_password),
+                  },
+              ]
+            : [
+                  {
+                      label: 'approved connected sending mailbox',
+                      complete:
+                          !!selected?.connected &&
+                          selected.provider === draft.provider &&
+                          selected.configuration_version ===
+                              draft.support_connection_version &&
+                          selected.sending_issue === null,
+                  },
+              ];
+    const missingBackupFields = backupFields
+        .filter((field) => !field.complete)
+        .map((field) => field.label);
     const completion = (() => {
         const fields = [
             draft.provider,
             draft.from_name.trim(),
             draft.public_reply_mode,
+            ...backupFields.map((field) => (field.complete ? 'complete' : '')),
         ];
         if (draft.support_enabled) {
             fields.push(
@@ -355,10 +389,10 @@ export function EmailConfigurationDialog({
                 open
                 onClose={close}
                 title="Edit email settings"
-                description="Choose the outgoing provider, approved support identity and public-reply content, then review the changes."
+                description="Choose the shared email provider and sender, then review the changes. Protected eMAR backups use this configuration; IT support has its own delivery switch."
                 railIcon={Mail}
                 railTitle="Email settings"
-                railSub="IT support delivery"
+                railSub="Shared outgoing email"
                 steps={steps}
                 stepIndex={step}
                 onStepClick={(index) => {
@@ -414,7 +448,13 @@ export function EmailConfigurationDialog({
                     saved ? (
                         <WizardSuccessPane
                             title="Email settings saved"
-                            blurb="The saved configuration is available for IT support delivery. Provider acceptance still needs its own test."
+                            blurb={
+                                missingBackupFields.length > 0
+                                    ? 'Saved with incomplete backup email setup. Complete ' +
+                                      missingBackupFields.join(', ') +
+                                      ' before sending protected backups.'
+                                    : 'The configuration is saved. Check delivery readiness in eMAR before sending protected backups. Saving does not confirm delivery.'
+                            }
                             actions={<Button onClick={onClose}>Done</Button>}
                         />
                     ) : undefined
@@ -545,7 +585,7 @@ export function EmailConfigurationDialog({
                                 <StepHead
                                     icon={Mail}
                                     title="Choose the delivery provider"
-                                    blurb="These settings control IT messages when support delivery is enabled. Mail capture remains active in an isolated environment."
+                                    blurb="Protected eMAR backups use this saved provider. The IT support switch controls IT messages only. Local mail capture still prevents external sending."
                                 />
                                 <TilePicker
                                     value={draft.provider}
@@ -718,8 +758,8 @@ export function EmailConfigurationDialog({
                             <WizardStepPane key="identity">
                                 <StepHead
                                     icon={Inbox}
-                                    title="Choose the support identity"
-                                    blurb="The selected mailbox is the sender and receives replies. Manage account connections from Support mailbox settings."
+                                    title="Choose the sender identity"
+                                    blurb="For Microsoft 365 or Google Workspace, select the approved connected mailbox. SMTP backups use the sender address below. IT support also requires a connected reply mailbox."
                                 />
                                 <Field
                                     label="Support mailbox"
@@ -782,6 +822,44 @@ export function EmailConfigurationDialog({
                                             settings.
                                         </p>
                                     )}
+                                {selected &&
+                                    selected.configuration_version !==
+                                        draft.support_connection_version && (
+                                        <Alert>
+                                            <AlertTitle>
+                                                Mailbox connection changed
+                                            </AlertTitle>
+                                            <AlertDescription>
+                                                <p>
+                                                    Review{' '}
+                                                    {selected.mailbox_email ??
+                                                        'this mailbox'}{' '}
+                                                    and use its current
+                                                    connection before saving.
+                                                </p>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={
+                                                        !selected.connected
+                                                    }
+                                                    onClick={() =>
+                                                        setDraft((current) => ({
+                                                            ...current,
+                                                            support_connection_version:
+                                                                selected.configuration_version,
+                                                            from_address:
+                                                                selected.mailbox_email ??
+                                                                current.from_address,
+                                                        }))
+                                                    }
+                                                >
+                                                    Use current mailbox
+                                                </Button>
+                                            </AlertDescription>
+                                        </Alert>
+                                    )}
                                 {selected?.sending_issue &&
                                     draft.provider !== 'smtp' && (
                                         <Alert>
@@ -812,13 +890,26 @@ export function EmailConfigurationDialog({
                                     label="Sender and reply address"
                                     required
                                     error={errors.from_address}
-                                    hint="Must match the selected support mailbox."
+                                    hint="For Microsoft 365, Google Workspace or enabled IT support, this must match the selected mailbox."
                                 >
                                     <Input
-                                        readOnly
+                                        type="email"
+                                        readOnly={
+                                            draft.provider !== 'smtp' ||
+                                            draft.support_enabled
+                                        }
                                         value={
-                                            selected?.mailbox_email ??
-                                            draft.from_address
+                                            draft.provider === 'smtp' &&
+                                            !draft.support_enabled
+                                                ? draft.from_address
+                                                : (selected?.mailbox_email ??
+                                                  draft.from_address)
+                                        }
+                                        onChange={(event) =>
+                                            change(
+                                                'from_address',
+                                                event.target.value,
+                                            )
                                         }
                                     />
                                 </Field>
@@ -879,6 +970,23 @@ export function EmailConfigurationDialog({
                                     title="Review email settings"
                                     blurb="Saving changes configuration. It does not send a test message or prove delivery."
                                 />
+                                {missingBackupFields.length > 0 && (
+                                    <Alert>
+                                        <ShieldCheck />
+                                        <AlertTitle>
+                                            Backup email setup incomplete
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            Complete{' '}
+                                            {missingBackupFields.join(', ')}{' '}
+                                            before sending protected backups.
+                                            You can save these entries now;
+                                            incomplete saved settings block
+                                            backup email and do not use server
+                                            mail settings instead.
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
                                 <ReviewCard
                                     icon={Mail}
                                     title="Provider"
@@ -913,12 +1021,24 @@ export function EmailConfigurationDialog({
                                 </ReviewCard>
                                 <ReviewCard
                                     icon={Inbox}
-                                    title="Support identity"
+                                    title="Sender identity"
                                     onEdit={() => setStep(1)}
                                 >
                                     <ReviewRow
                                         label="Sender name"
                                         value={draft.from_name}
+                                    />
+                                    <ReviewRow
+                                        label="Sender address"
+                                        value={
+                                            draft.provider === 'smtp' &&
+                                            !draft.support_enabled
+                                                ? draft.from_address ||
+                                                  'Not set'
+                                                : (selected?.mailbox_email ??
+                                                      draft.from_address) ||
+                                                  'Not set'
+                                        }
                                     />
                                     <ReviewRow
                                         label="Mailbox"

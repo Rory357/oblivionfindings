@@ -1,0 +1,410 @@
+{
+  "version": "PKG-02B-v1",
+  "candidateId": "b7094f5a15659e23a511a2dd6d372a03e09de0483dcc7faa4dce030ddf0b8ae1",
+  "frozenAt": "2026-09-21T07:59:27.334Z",
+  "previewUrl": "http://127.0.0.1:4336/PKG-02B/v1/",
+  "branch": "codex/pkg-02b-vehicle-profile-design",
+  "base": "5307692ec59be84f3503c06354419b7da95be805",
+  "task": "01a0c2bb-fcff-7cb1-8bab-882d84477c6c",
+  "worktree": "5b0a",
+  "model": "gpt-6-astra",
+  "effort": "xhigh",
+  "status": "Frozen design candidate; Main review and Stephan exact mockup approval pending; no implementation release",
+  "candidateIdAlgorithm": "SHA256 of UTF-8 concatenation of sorted relative path, TAB, lowercase SHA256, LF for each preview file. Includes sources, README and dist; excludes .vite. Does not hash this manifest into itself.",
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/README.md",
+      "bytes": 3503,
+      "sha256": "208fb4e9e62507324215d48ba1d20ba9b40865b9bf623babe93313741e407b75"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/dist/assets/index--V2KTTov.js",
+      "bytes": 626247,
+      "sha256": "b9578e81538fafc25b92bcb839c5888dac05a3bae4ffecae0195f5a5f63120ab"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/dist/assets/index-DGCZXgZj.css",
+      "bytes": 313085,
+      "sha256": "babd12c3b4fa17ad902076103ae21a77f22fe66c5cf86383d30e61a38a6fb9dd"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/dist/index.html",
+      "bytes": 394,
+      "sha256": "8182e3fbbc3fa00f8da67ddfeb2ad2010576c3407bc12db375ba50f4da087607"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/flows.tsx",
+      "bytes": 31947,
+      "sha256": "46bc77c72f6ef3a0abf0641e15135b1e40bd8358d629aecc4f36e8c11cc4a967"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/index.html",
+      "bytes": 291,
+      "sha256": "5bf0298f0ebeb94edc36320bc042da2173f1a5b481b117a927b9fb3027403505"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/main.tsx",
+      "bytes": 78769,
+      "sha256": "0debbae9caf85fb376822c9c66172f65d309f1f4c267fcfc8f9ba0a72a42dbab"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/serve.mjs",
+      "bytes": 1709,
+      "sha256": "71507b8f37c6ae05b85f1ffeebd481535f0576f44280477fabeb37a300269057"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/styles.css",
+      "bytes": 15853,
+      "sha256": "b577b510b9e63472b4e8b192e6b4e5a70717f7b3294672889a3a2ea6c0aa6cf5"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/tsconfig.json",
+      "bytes": 109,
+      "sha256": "41a6c9d9859b91862807093d8882086534846424b9e382c39abd0e0b7ec9fcd2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/ui.tsx",
+      "bytes": 6356,
+      "sha256": "d9df7272ca6f28c8d35a1c319d00b2d1df5fa629b9e81f0cead6a85f0d19d3ab"
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-02B/v1/vite.config.mjs",
+      "bytes": 536,
+      "sha256": "73d7a90f628d81831263a14925de70927c6222aaa5c107fb0426c10e3a318c75"
+    }
+  ],
+  "references": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 1081,
+      "sha256": "2972a5612c834f4745010658aeaa2cd4640d4d7a29d932e9952e406c790718ed"
+    },
+    {
+      "path": "DESIGN.md",
+      "bytes": 47007,
+      "sha256": "c3d733ac6c5ecf12ac9e21e746c52109ad35ebf0fef8d25675b35d16b7ac05ad"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/ChecklistController.php",
+      "bytes": 9814,
+      "sha256": "25bbbb1b3adf507010d1558f928b2c956137900ca0dae00c316438766ffec1f5"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/ComplianceController.php",
+      "bytes": 6912,
+      "sha256": "7b74c8a9a58d27a6fb37080b7caa796ad9027415db099978376e77d3c2f27a21"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/DailyCheckController.php",
+      "bytes": 7456,
+      "sha256": "e517cf535bdd6807ef03c0c1b263b774af79b9c4d78a11aa5ed614e652cc18a7"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/InspectionController.php",
+      "bytes": 17648,
+      "sha256": "2fb96a985b3699502383b0e35e709fdc53d94bf6569cde276fb56a1423fbb991"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/MaintenanceAttachmentController.php",
+      "bytes": 1808,
+      "sha256": "9a5928cd93eb2842065d1a31c5cdba0acbc0d4d3eb259d5feb16c618f7ee086f"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/MileageController.php",
+      "bytes": 13204,
+      "sha256": "b21beb1118a0f30f967be4e9a0044ed2a7c6a308a86dd48fffb8c4861e8741a9"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/ServiceScheduleController.php",
+      "bytes": 9911,
+      "sha256": "8a7918aab5e50f29281a35ae980d4c522b91d688a669ac3964fcee88014d4250"
+    },
+    {
+      "path": "app/Http/Controllers/FleetAssets/VehicleController.php",
+      "bytes": 55945,
+      "sha256": "999b975c3ce8902e852f56193a810bf467bbc06f9df5378f54165c1457b4977c"
+    },
+    {
+      "path": "app/Models/Asset.php",
+      "bytes": 9053,
+      "sha256": "ba455db793fd59faff49f3092695227f7fe5b1db17d9ada3610ce62835d28012"
+    },
+    {
+      "path": "app/Models/FleetChecklistRun.php",
+      "bytes": 1587,
+      "sha256": "a1ca1ad18ac51b59082229fd39eba892881d785934fa51d258648d6ea97dd9b1"
+    },
+    {
+      "path": "app/Models/FleetChecklistTemplate.php",
+      "bytes": 580,
+      "sha256": "a8b294859d923972b8554def5ccd89636f3e27f88e9efd302a69998009f9aee2"
+    },
+    {
+      "path": "app/Models/FleetServiceSchedule.php",
+      "bytes": 831,
+      "sha256": "6eb8f6c5d09ee2051df61fd45921dd444915dce4d1c5ec5de760b287a8a6aeae"
+    },
+    {
+      "path": "app/Models/FleetVehicleBooking.php",
+      "bytes": 3291,
+      "sha256": "778e9682d0e90a8ea6b12caaa9f29101599730b4c76f2f4e2348b742734e43bf"
+    },
+    {
+      "path": "app/Models/FleetVehicleStateSnapshot.php",
+      "bytes": 1352,
+      "sha256": "a3b49e45dbba0149445904bf261fceea74c366ff3fef81b211f6eb596908a688"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceCheckService.php",
+      "bytes": 11243,
+      "sha256": "4aadfceff743eada73792868d2874f278802f6325c9df5c8e7a99ddf94e75805"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceReportService.php",
+      "bytes": 8609,
+      "sha256": "883dd88b98f3a6391397e9ef23545fca5e267d656d2d767bb11e382f4bffb796"
+    },
+    {
+      "path": "app/Services/Fleet/MaintenanceRestrictionService.php",
+      "bytes": 2498,
+      "sha256": "44b660fe43cba4249b1e2f2e2fc3c1e8cef4fd8c78d74b345886f0fc16397ad5"
+    },
+    {
+      "path": "design_styles/POPUP_STYLE_GUIDE.md",
+      "bytes": 34793,
+      "sha256": "3d41375aa9aad71cff5cfa58d2a2a60933bce18ec957e74c0f7e7e6def28c7e1"
+    },
+    {
+      "path": "design_styles/WORK_RECORD_STYLE_GUIDE.md",
+      "bytes": 7873,
+      "sha256": "66908ef279682e2c9eb67412150b39fdbb403b2c8de2c41e25260e07fcd5aa29"
+    },
+    {
+      "path": "docs/architecture/single-tenant-application.md",
+      "bytes": 1936,
+      "sha256": "3dea6218db87ce22bed3cab6b9c500d1a850445d04e9325cb16c23a604979b3c"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/reuse-contract-v1.md",
+      "bytes": 7326,
+      "sha256": "d39ce4de7d0c13181f2d6c60cfc6068ccdaa3323d89081411939063fc2e14937"
+    },
+    {
+      "path": "resources/css/app.css",
+      "bytes": 47036,
+      "sha256": "4fe49b94d074dde840d79d0813adeba3759dff243956bbfa404325bd00df149a"
+    },
+    {
+      "path": "resources/css/maintenance-date-time.css",
+      "bytes": 5817,
+      "sha256": "1eeb18e92ac20a7a2fc0d99d235414b8905307e3372e7cad4a14ac500b8d0bfe"
+    },
+    {
+      "path": "resources/js/components/fleet-assets/maintenance/date-time-field.tsx",
+      "bytes": 2758,
+      "sha256": "e31c726e8b7296a2feb5ed986044ce48255151247135ff3518b52baf10b97b05"
+    },
+    {
+      "path": "resources/js/components/hr/leave-calendar-range.tsx",
+      "bytes": 9300,
+      "sha256": "cac7e3a14857159ef67f1248ae20cf1b3744dfa270598362ba11ec2bec8c0c08"
+    },
+    {
+      "path": "resources/js/components/page/grouped-profile-nav.tsx",
+      "bytes": 19799,
+      "sha256": "bc98ec02b540dbb86db6abe59f5f0956652a1cf9250c3e21da07aebfcd4ad5cd"
+    },
+    {
+      "path": "resources/js/components/page/page-header.tsx",
+      "bytes": 59547,
+      "sha256": "fbd198fe142bf1dc2321878bc924c9a8baa1eed6b0add0cc7e28a40e70f01427"
+    },
+    {
+      "path": "resources/js/components/ui/button.tsx",
+      "bytes": 2247,
+      "sha256": "e8ae39c3616c4aaf689014c4eb9de6235e5e4ff16e581c2be2e970cd36191cc1"
+    },
+    {
+      "path": "resources/js/components/ui/command.tsx",
+      "bytes": 3890,
+      "sha256": "ecb3830ccd643fd8871367333cfa2d2b45c057619d0bc47dd972c9c7e873aa14"
+    },
+    {
+      "path": "resources/js/components/ui/dialog.tsx",
+      "bytes": 5178,
+      "sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6"
+    },
+    {
+      "path": "resources/js/components/ui/file-dropzone.tsx",
+      "bytes": 13298,
+      "sha256": "f74b8a5e4ffe239c55b736199bc27a35617c2a423217aef1b134065be7284ede"
+    },
+    {
+      "path": "resources/js/components/ui/popover.tsx",
+      "bytes": 1621,
+      "sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652"
+    },
+    {
+      "path": "resources/js/components/ui/status-badge.tsx",
+      "bytes": 2546,
+      "sha256": "d1d83d69c9f091a1dea57b7f7312f794097f2a8278dd70d7ba14a288d459c130"
+    },
+    {
+      "path": "resources/js/components/wizard/shell.tsx",
+      "bytes": 17190,
+      "sha256": "a8ea265daa622fa839a6c714188118b6605e4f6a21ed900cf57d71dc7a552c7e"
+    },
+    {
+      "path": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "bytes": 99332,
+      "sha256": "653c208ac90350ed348714e8707410e26a4fa931412e0054cf40450469a6bec5"
+    },
+    {
+      "path": "routes/fleet-assets.php",
+      "bytes": 29791,
+      "sha256": "dd6237c4c0dba659c441486639bb94581f10547f08664d4ddb50821dab2b7fff"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/01-overview-1440.png",
+      "bytes": 126856,
+      "sha256": "c7b8dc86274c8d59f6acc648fa842b08a6c2f39fec5549f443cad0b697fd77d7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/02-check-review.png",
+      "bytes": 91609,
+      "sha256": "4fb4a4fe15b08e145ca134972b15618b181f5be0166debc67a4bab9a28e416d3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/03-maintenance-link-review.png",
+      "bytes": 83006,
+      "sha256": "a5ad3430162d188feb84906812553ce694dac47eb9d9f0385032e31b42e5663e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/04-upload-recovery.png",
+      "bytes": 78490,
+      "sha256": "dbf28f0ae00a88fcf4de6569a5b9ff5e9633e202909b9a8eb41b996fd0a7a95d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/05-ready.png",
+      "bytes": 70435,
+      "sha256": "31b1eb3fdeb437681b961ee688972b16a0900a1075f9c0d9cc405060d60aebe2"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/06-denied.png",
+      "bytes": 53607,
+      "sha256": "0f52df2fb97af494eb63836c7b4969726ec9037e63bea8388382c0b9874eba08"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/07-report-retry.png",
+      "bytes": 97573,
+      "sha256": "ba51c983d0217d2675d072e7f4ee50bf736144fa19873c90e34a0e1333ef559e"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/08-busy-only.png",
+      "bytes": 111403,
+      "sha256": "0564ffe1f01b849e3531db1b8940f1e5282a53a570271fade059c026f446d0fc"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/09-overview-1280.png",
+      "bytes": 98957,
+      "sha256": "7a3315a045d37681512ce0c069545b46ac4a75a9f4a976f9de576a2391cb1f84"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/10-overview-1920.png",
+      "bytes": 141003,
+      "sha256": "edfcb6c46d77bc792d03ad7b71e91627820e9c66ea96043c5d0d83955e0a1a6d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/11-final-overview-1280.png",
+      "bytes": 36885,
+      "sha256": "e9685b32093d77abb5228ae6584de1d0f111ecb15d4b1f7274606bcfc35cc223"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/12-final-compliance-1440.png",
+      "bytes": 110866,
+      "sha256": "6375e47878c1006102f0b1f6d000b0d5db2d760abd791d3c6b526779eddc7182"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/13-final-overview-1440.png",
+      "bytes": 126856,
+      "sha256": "c7b8dc86274c8d59f6acc648fa842b08a6c2f39fec5549f443cad0b697fd77d7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/14-final-calendar-1920.png",
+      "bytes": 144667,
+      "sha256": "b69ef8e2c1edb5cffe2571edef0d9a6621cea079de06bc7fd05452be61f2d2db"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/15-final-check-review.png",
+      "bytes": 93043,
+      "sha256": "24464be18da990ba4de19d8359d82fca9c0a1a3aa583df18545d1119f0674350"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/16-frozen-overview-1440.png",
+      "bytes": 104287,
+      "sha256": "a907be7008f6cd287186bf6541547e1e3839e0f0dc1684609633c4b92e1a017d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/17-frozen-check-review-1440.png",
+      "bytes": 74352,
+      "sha256": "5359069db058eaf38d91c6c8a72418e5b59374372667f790149172dfd018b858"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/18-frozen-overview-1280.png",
+      "bytes": 94529,
+      "sha256": "8457889e7c34691e0b2dde4e23ec3b896f6ca1bf860fe50716e7c333adfa216f"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/19-frozen-overview-1440.png",
+      "bytes": 104283,
+      "sha256": "c98ffe3dcbaf9c8265e8c86331facf7c1897b703e97cc6c60fb9c772959784a7"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/20-frozen-calendar-1920.png",
+      "bytes": 106241,
+      "sha256": "6e939e0255a7987d6158da9b9011387d32d5571d2fb115d11301e1d90a80ca8d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/21-candidate-check-review-1440.png",
+      "bytes": 70827,
+      "sha256": "be7b48a116c6b7dc389d759e64a288e31cde5306581406aa03b86a3cb4e4f1ca"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/22-candidate-overview-1280.png",
+      "bytes": 94529,
+      "sha256": "c7d7106162e3261a484a5319301cc7f9c9a97d38cf9d829d365b6f59f3e56983"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/23-candidate-overview-1440.png",
+      "bytes": 104311,
+      "sha256": "48c602260b8bea3832922a695ad0971a2e464e9a6e4842b152c6969ad5d2bfa3"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/24-candidate-calendar-1920.png",
+      "bytes": 106241,
+      "sha256": "6e939e0255a7987d6158da9b9011387d32d5571d2fb115d11301e1d90a80ca8d"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/25-candidate-compliance-1440.png",
+      "bytes": 90525,
+      "sha256": "f2a8e06480bbabc4cbe18e52020d228cf952c4712659f7cf78fd662896e630a8"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/REVIEW.md",
+      "bytes": 10368,
+      "sha256": "54304491fe6134b226e49d6995c9b9dadea89354d91a30fe7c6bb749a97f4ce9"
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B/v1/browser-observations.json",
+      "bytes": 40907,
+      "sha256": "4a4d1175e91e9dfe2bc113f99ad7a6085860354a421b2a9f7e9a26ca326ad8a2"
+    }
+  ],
+  "limitations": [
+    "Genuine 200% browser zoom unverified; resized viewports are not zoom evidence.",
+    "Synthetic UI only; no backend, authorisation, persistence, production or operational acceptance proof.",
+    "Files 01–20 are development/pre-freeze evidence; only numbered files 21 onward show the exact final bundle."
+  ]
+}

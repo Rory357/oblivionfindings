@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\DoseSlots\DoseSlotOutcomeWriter;
+use App\Services\Medication\OverdueDoseAlerts;
+use App\Services\Medication\Support\SupportRecordingGuard;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientMedicationAdministration extends Model
@@ -13,6 +17,38 @@ class ClientMedicationAdministration extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+
+    protected $hidden = ['secondPersonConfirmation'];
+
+    /**
+     * P01 foundation C3: every write that can change a dose's effective
+     * evidence updates its slot's outcome in the same transaction.
+     */
+    protected static function booted(): void
+    {
+        $sync = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->syncFor($administration);
+        // The order row before this row: the lock order every medication
+        // write uses (client → order → administration → slots).
+        $lockOrder = static fn (self $administration) => app(DoseSlotOutcomeWriter::class)->lockOrderOf($administration);
+
+        static::saving($lockOrder);
+        static::saving(static fn (self $record) => app(SupportRecordingGuard::class)->saving($record));
+        static::deleting($lockOrder);
+        static::restoring($lockOrder);
+        static::forceDeleting($lockOrder);
+        static::saved($sync);
+        static::deleted($sync);
+        static::restored($sync);
+        static::forceDeleted($sync);
+
+        // C6f: once the change commits, the person's overdue alerts for doses
+        // now settled resolve themselves (once per person per transaction).
+        $overdueAlerts = static fn (self $administration) => OverdueDoseAlerts::queueAfterCommit((int) $administration->client_id);
+        static::saved($overdueAlerts);
+        static::deleted($overdueAlerts);
+        static::restored($overdueAlerts);
+        static::forceDeleted($overdueAlerts);
+    }
 
     public const ADMINISTRATION_ONLY_EVIDENCE_FIELDS = [
         'blood_glucose_level',
@@ -71,9 +107,24 @@ class ClientMedicationAdministration extends Model
         'correction_rejection_reason',
         'witnessed_at',
         'witness_method',
+        'witness_override_id',
+        // P01 C1 recording contract.
+        'late_reason',
+        'amount_mode',
+        'amount_reason',
+        'quantity_given',
+        'second_person_kind',
+        'second_person_status',
+        'review_reason_key',
+        'reoffer_of_id',
+        'effect_check_due_at',
     ];
 
     protected $casts = [
+        'quantity_given' => 'decimal:2',
+        'witness_override_id' => 'integer',
+        'reoffer_of_id' => 'integer',
+        'effect_check_due_at' => 'datetime',
         'scheduled_for' => 'datetime',
         'administered_at' => 'datetime',
         'is_correction' => 'boolean',
@@ -217,9 +268,20 @@ class ClientMedicationAdministration extends Model
         return $this->belongsTo(User::class, 'witnessed_by');
     }
 
+    public function secondPersonConfirmation(): HasOne
+    {
+        return $this->hasOne(MedicationSecondPersonConfirmation::class, 'administration_id')
+            ->select(['id', 'administration_id', 'nominated_user_id', 'status', 'due_at']);
+    }
+
     public function correctionRequestedBy()
     {
         return $this->belongsTo(User::class, 'correction_requested_by');
+    }
+
+    public function correctionApprovedBy()
+    {
+        return $this->belongsTo(User::class, 'correction_approved_by');
     }
 
     public function reviewFlaggedBy()

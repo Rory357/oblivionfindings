@@ -1,0 +1,94 @@
+
+   FAIL  Tests\Feature\Operations\PeopleLocationsTest
+  ✓ it uses canonical consent and Site access before exposing people or counts                                 391.47s
+  ✓ it denies callers lacking telemetry access and does not grant client permission from Fleet                   0.14s
+  ✓ it never treats last contact as a fresh position or default false as observed power                          0.26s
+  ✓ it requires a deliberate source choice when two authorised trackers exist                                    0.41s
+  ✓ it keeps prior assignments and future observations out of history                                            0.31s
+  ✓ it keeps server-side selection and history empty after care assignment removal                               0.33s
+  ✓ it requires export permission and a reason then produces the vehicle-style report with an audit              0.40s
+  ✓ it fails an outage instead of returning an empty successful population                                       0.28s
+  ✓ it hides Control Room evidence without its independent read permission                                       0.30s
+  ✓ it links the original readable response and removes it when authority ends                                   0.30s
+  ✓ it counts a worker once across live sessions and removes ended sessions and their alerts                     0.30s
+  ⨯ it bounds an outing export to passenger departure and arrival instead of vehicle return                      0.30s
+  ✓ it uses observation timestamps for battery power and movement independently                                  0.26s
+  ✓ it withholds rendered report bytes when consent is withdrawn during generation                               0.27s
+  ✓ it keeps personal evidence out of Inertia browser-history props                                              0.25s
+  ✓ it separates current map access from retained history and export                                             0.33s
+  ✓ it uses exact Auckland day boundaries for both telemetry streams with dataset "23-hour spring day"           0.27s
+  ✓ it uses exact Auckland day boundaries for both telemetry streams with dataset "25-hour autumn day"           0.30s
+  ✓ it uses exact Auckland day boundaries for both telemetry streams with dataset "24-hour ordinary day"         0.29s
+  ✓ it applies an early passenger window before the 500 sample limit and describes overnight day slices          0.94s
+  ✓ it persists personal defaults with conflict protection and refuses an inaccessible site                      0.38s
+  ✓ it revalidates a batched consent after reading observations                                                  0.26s
+  ✓ it shows permitted shared boundary geometry without enabling personal monitoring                             0.31s
+  ✓ it refreshes independent alert authority and capabilities after observations                                 0.36s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "Transport p… 0.35s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "journey Sit… 0.33s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "resident re… 0.36s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "vehicle can… 0.37s
+  ⨯ it rechecks Transport scope and the selected window after reading report evidence with dataset "selected pa… 0.35s
+  ⨯ it rechecks Transport scope and the selected window after reading report evidence with dataset "unchanged a… 0.36s
+  ✓ it preserves independent day history while removing newly inaccessible journey choices with ('history')      0.30s
+  ✓ it preserves independent day history while removing newly inaccessible journey choices with ('report-previe… 0.29s
+
+   PASS  Tests\Unit\PeopleLocationsReturnUrlTest
+  ✓ it preserves supported People Locations context without opening redirects                                    0.10s
+
+   PASS  Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest
+  ✓ client location history reads canonical integration event identity                                           1.14s
+  ✓ resident tracking history reads canonical integration event identity                                         0.98s
+  ✓ portal location history reads canonical integration event identity                                           0.68s
+  ✓ client location history keeps narrow fallback for unbackfilled legacy rows                                   0.97s
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Operations\PeopleLocationsTest > it bounds an outing export to passenger departure and arri…
+  Expected response status code [200] but received 404.
+Failed asserting that 404 is identical to 200.
+
+  at tests\Feature\Operations\PeopleLocationsTest.php:179
+    175▕         ['lat' => -36.654321, 'lng' => 174.1, 'timestamp' => now()->subMinutes(10)->toISOString()],
+    176▕     ]), 'truncated' => false]);
+    177▕     $this->actingAs($actor->fresh())->postJson('/operations/people-locations/export', ['person' => 'c'.$client->id,
+    178▕         'source' => $assignment->id, 'date' => now('Pacific/Auckland')->toDateString(), 'kind' => 'outing', 'journey' => $journey->id,
+  ➜ 179▕         'format' => 'html', 'reason' => 'Review passenger journey'])->assertOk()->assertSee('-36.123456')->assertDontSee('-36.654321');
+    180▕ });
+    181▕
+    182▕ it('uses observation timestamps for battery power and movement independently', function () {
+    183▕     extract(peopleFixture());
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Operations\PeopleLocationsTest > it rechecks Transport scope and the selected window after…
+  Expected response status code [409] but received 404.
+Failed asserting that 404 is identical to 409.
+
+  at tests\Feature\Operations\PeopleLocationsTest.php:364
+    360▕     });
+    361▕     $response = $this->actingAs($actor->fresh())->getJson('/operations/people-locations/report-preview?'.http_build_query([
+    362▕         'person' => 'c'.$client->id, 'source' => $assignment->id,
+    363▕         'date' => now('Pacific/Auckland')->toDateString(), 'journey' => $journey->id,
+  ➜ 364▕     ]))->assertStatus($status);
+    365▕     if ($status === 200) {
+    366▕         $response->assertJsonPath('journey.id', $journey->id)->assertJsonCount(1, 'journeys')
+    367▕             ->assertJsonPath('window.from', $journey->departed_at->toISOString())
+    368▕             ->assertJsonPath('window.to', $journey->arrived_at->toISOString());
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\Operations\PeopleLocationsTest > it rechecks Transport scope and the selected window after…
+  Expected response status code [200] but received 404.
+Failed asserting that 404 is identical to 200.
+
+  at tests\Feature\Operations\PeopleLocationsTest.php:364
+    360▕     });
+    361▕     $response = $this->actingAs($actor->fresh())->getJson('/operations/people-locations/report-preview?'.http_build_query([
+    362▕         'person' => 'c'.$client->id, 'source' => $assignment->id,
+    363▕         'date' => now('Pacific/Auckland')->toDateString(), 'journey' => $journey->id,
+  ➜ 364▕     ]))->assertStatus($status);
+    365▕     if ($status === 200) {
+    366▕         $response->assertJsonPath('journey.id', $journey->id)->assertJsonCount(1, 'journeys')
+    367▕             ->assertJsonPath('window.from', $journey->departed_at->toISOString())
+    368▕             ->assertJsonPath('window.to', $journey->arrived_at->toISOString());
+
+
+  Tests:    3 failed, 34 passed (220 assertions)
+  Duration: 405.96s

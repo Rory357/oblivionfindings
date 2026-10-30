@@ -39,6 +39,12 @@ beforeEach(function () {
         }
     }
 
+    $allSites = Permission::query()->where('key', 'hr.employees.viewAllSites')->firstOrFail();
+    $this->manager->permissionOverrides()->syncWithoutDetaching([
+        $allSites->id => ['allowed' => false],
+    ]);
+    expect($this->manager->fresh()->canDo('hr.employees.viewAllSites'))->toBeFalse();
+
     $this->subject = User::factory()->create([
         'role' => 'support_worker',
         'approved_at' => now(),

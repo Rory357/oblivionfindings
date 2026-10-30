@@ -1,0 +1,3 @@
+UTC: six Month DST scenarios passed
+Pacific/Auckland: six Month DST scenarios passed
+PASS: real Month drag UI from/onto both Auckland DST changes, explicit repeated occurrence and skipped-time rejection in UTC/Auckland; no source saves

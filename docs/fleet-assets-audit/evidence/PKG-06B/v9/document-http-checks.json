@@ -1,0 +1,115 @@
+[
+  {
+    "file": "transfer-hoist-manual.pdf",
+    "download": false,
+    "status": 200,
+    "mime": "application/pdf",
+    "disposition": "inline; filename=\"transfer-hoist-manual.pdf\"",
+    "sameBytes": true
+  },
+  {
+    "file": "transfer-hoist-manual.pdf",
+    "download": true,
+    "status": 200,
+    "mime": "application/pdf",
+    "disposition": "attachment; filename=\"transfer-hoist-manual.pdf\"",
+    "sameBytes": true
+  },
+  {
+    "file": "warranty-104.pdf",
+    "download": false,
+    "status": 200,
+    "mime": "application/pdf",
+    "disposition": "inline; filename=\"warranty-104.pdf\"",
+    "sameBytes": true
+  },
+  {
+    "file": "warranty-104.pdf",
+    "download": true,
+    "status": 200,
+    "mime": "application/pdf",
+    "disposition": "attachment; filename=\"warranty-104.pdf\"",
+    "sameBytes": true
+  },
+  {
+    "file": "transfer-hoist-manual-v2.pdf",
+    "download": false,
+    "status": 200,
+    "mime": "application/pdf",
+    "disposition": "inline; filename=\"transfer-hoist-manual-v2.pdf\"",
+    "sameBytes": true
+  },
+  {
+    "file": "transfer-hoist-manual-v2.pdf",
+    "download": true,
+    "status": 200,
+    "mime": "application/pdf",
+    "disposition": "attachment; filename=\"transfer-hoist-manual-v2.pdf\"",
+    "sameBytes": true
+  },
+  {
+    "file": "brake-assessment.jpg",
+    "download": false,
+    "status": 200,
+    "mime": "image/jpeg",
+    "disposition": "inline; filename=\"brake-assessment.jpg\"",
+    "sameBytes": true
+  },
+  {
+    "file": "brake-assessment.jpg",
+    "download": true,
+    "status": 200,
+    "mime": "image/jpeg",
+    "disposition": "attachment; filename=\"brake-assessment.jpg\"",
+    "sameBytes": true
+  },
+  {
+    "path": "files/service-report.pdf",
+    "status": 404,
+    "actual": 404,
+    "passed": true,
+    "length": null
+  },
+  {
+    "path": "files/calibration.pdf",
+    "status": 404,
+    "actual": 404,
+    "passed": true,
+    "length": null
+  },
+  {
+    "path": "files/%2e%2e%2fprofile.tsx",
+    "status": 404,
+    "actual": 404,
+    "passed": true,
+    "length": null
+  },
+  {
+    "path": "files/warranty-104.pdf",
+    "headers": {
+      "Range": "bytes=0-7"
+    },
+    "status": 206,
+    "actual": 206,
+    "passed": true,
+    "length": "8"
+  },
+  {
+    "path": "files/warranty-104.pdf",
+    "headers": {
+      "Range": "bytes=9999999-"
+    },
+    "status": 416,
+    "actual": 416,
+    "passed": true,
+    "length": null
+  },
+  {
+    "path": "files/warranty-104.pdf",
+    "method": "HEAD",
+    "status": 200,
+    "actual": 200,
+    "passed": true,
+    "length": "42374"
+  }
+]

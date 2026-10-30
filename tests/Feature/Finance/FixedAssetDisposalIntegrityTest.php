@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     Carbon::setTestNow('2026-08-20 12:00:00');
@@ -281,6 +282,7 @@ it('dispatches JournalPosted once, and only once the disposal has committed', fu
 });
 
 it('serializes independent MySQL workers onto one disposal occurrence', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

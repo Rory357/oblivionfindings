@@ -7,7 +7,10 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Services\Medication\DoseSlots\DoseSlotProjection;
+use App\Services\Medication\DoseSlots\ScheduledDoseStates;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\SecondPersonConfirmationPayload;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 
@@ -49,6 +52,7 @@ class GuidedRoundService
      *     requires_blood_glucose: bool,
      *     requires_pulse: bool,
      *     scheduled_for: string,
+     *     dose_state: string,
      *     administration: array|null,
      * }>
      */
@@ -92,18 +96,18 @@ class GuidedRoundService
             );
         }
 
+        // The round's doses are the dose-slot projection's (P01 C6j): every
+        // scheduled dose of the round's people due on the round's day inside
+        // its own window — its time ± window_minutes — with the state Meds
+        // today shows. (The round's day, as the recording guard requires.)
+        // The orders are the ones Meds today lists: verified, or with a change
+        // waiting for the order check.
         $medicationQuery = ClientMedication::query()
-            ->active()
+            ->where(fn ($orders) => $orders->active()->orWhere(fn ($waiting) => $waiting->awaitingVerification()))
             ->when($allowedClientIds !== null, fn ($query) => $query->whereIn('client_id', $allowedClientIds))
             ->when(! $includeControlled, fn ($query) => $query->where('controlled_drug', false))
             ->where(function ($q) {
                 $q->where('is_prn', false)->orWhereNull('is_prn');
-            })
-            ->where(function ($q) use ($date) {
-                $q->whereNull('start_date')->orWhereDate('start_date', '<=', $date);
-            })
-            ->where(function ($q) use ($date) {
-                $q->whereNull('end_date')->orWhereDate('end_date', '>=', $date);
             })
             ->whereHas('client', function ($q) use ($round) {
                 if ($round->site_id) {
@@ -121,12 +125,22 @@ class GuidedRoundService
             // reuse that pre-lock snapshot after a concurrent verification.
             $medicationQuery->lockForUpdate();
         }
-        $medications = $medicationQuery->get();
+        $medications = $medicationQuery->get()->keyBy('id');
+        $states = app(ScheduledDoseStates::class);
+        // With the words for an Away dose, as this reader may read them (C7).
+        $doses = $states->withAwayReasons($states->dosesOn($medications, $date, now()), auth()->user());
 
+        // A dose's record wherever it was made — in this round, another, or
+        // Meds today — so a dose already recorded is never offered again.
+        // This round's own record first when there are two.
         $administrationQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
-            ->where('medication_round_id', $round->id)
-            ->whereIn('client_medication_id', $medications->modelKeys());
+            ->whereIn('client_medication_id', $medications->keys()->all())
+            ->whereIn('status', ScheduledDoseStates::RECORDED_STATUSES)
+            ->whereBetween('scheduled_for', [
+                $windowStart->copy()->utc()->subMinute(),
+                $windowEnd->copy()->utc()->addMinute(),
+            ]);
         $this->governanceScope->scopeCanonicalClientMedicationRows(
             $administrationQuery,
             $round->site_id ? [(int) $round->site_id] : null,
@@ -139,30 +153,47 @@ class GuidedRoundService
             $administrationQuery->lockForUpdate();
         }
 
-        $administrations = $administrationQuery
-            ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
-            ->get()
-            ->keyBy(function (ClientMedicationAdministration $administration) {
-                $rawScheduledFor = $administration->getRawOriginal('scheduled_for');
-                $scheduledKey = $rawScheduledFor
-                    ? Carbon::parse((string) $rawScheduledFor, 'UTC')->format('Y-m-d H:i')
-                    : '';
-
-                return $administration->client_medication_id.':'.$scheduledKey;
-            });
+        $records = $administrationQuery
+            ->with(['administeredBy:id,name', 'witnessedBy:id,name', SecondPersonConfirmationPayload::RELATION])
+            ->orderBy('id')
+            ->get();
+        // A refusal that was offered again (P01 re-offer) is history: the
+        // re-offer is the slot's current record, wherever it was made.
+        $reofferedIds = $records->pluck('reoffer_of_id')->filter()->map(fn ($id): int => (int) $id)->all();
+        $administrations = $records
+            ->reject(fn (ClientMedicationAdministration $administration): bool => in_array((int) $administration->id, $reofferedIds, true)
+                || ($administration->is_correction && in_array((int) $administration->corrected_of_id, $reofferedIds, true)))
+            ->sortBy(fn (ClientMedicationAdministration $administration): int => (int) $administration->medication_round_id === (int) $round->id ? 0 : 1)
+            ->unique(fn (ClientMedicationAdministration $administration): string => $this->recordKey($administration))
+            ->keyBy(fn (ClientMedicationAdministration $administration): string => $this->recordKey($administration));
 
         $items = new Collection;
 
-        foreach ($medications as $med) {
-            foreach ($this->scheduleService->scheduledTimesForDate($med, $date) as $scheduled) {
+        foreach ($doses as $orderId => $orderDoses) {
+            $med = $medications->get($orderId);
+            foreach ($orderDoses as $dose) {
+                $scheduled = $dose['due_at'];
                 if (! $scheduled->between($windowStart, $windowEnd, true)) {
                     continue;
                 }
 
-                $key = $med->id.':'.$scheduled->copy()->utc()->format('Y-m-d H:i');
-                $admin = $administrations->get($key);
+                $admin = $administrations->get($med->id.':'.$scheduled->copy()->utc()->format('Y-m-d H:i'));
+                // An order waiting for its check can't be recorded against
+                // until it is checked, whatever its dose's own state; a dose
+                // due while the person is away (C7) is away either way.
+                $doseState = ScheduledDoseStates::listStatus($dose);
+                if (! $med->isAdministrable() && $doseState !== DoseSlotProjection::STATE_AWAY) {
+                    $doseState = DoseSlotProjection::STATE_PENDING_CHECK;
+                }
 
-                $items->push($this->formatItem($med, $scheduled, $admin));
+                $items->push($this->formatItem(
+                    $med,
+                    $scheduled,
+                    $admin,
+                    $doseState,
+                    $doseState === DoseSlotProjection::STATE_AWAY ? $dose['away_reason'] : null,
+                    $doseState === DoseSlotProjection::STATE_AWAY ? ($dose['away']['source'] ?? null) : null,
+                ));
             }
         }
 
@@ -235,11 +266,12 @@ class GuidedRoundService
      */
     public function summarise(array $items): array
     {
-        $total = count($items);
         $given = 0;
         $refused = 0;
         $held = 0;
         $pending = 0;
+        $waiting = 0;
+        $away = 0;
         $nextIndex = null;
 
         foreach ($items as $idx => $item) {
@@ -250,6 +282,14 @@ class GuidedRoundService
                 $refused++;
             } elseif ($status === 'withheld' || $status === 'missed') {
                 $held++;
+            } elseif (($item['dose_state'] ?? null) === DoseSlotProjection::STATE_PENDING_CHECK) {
+                // Waiting for the order check: shown, not recordable until
+                // the order is checked — Meds today and the overdue alerts
+                // chase it once checked.
+                $waiting++;
+            } elseif (($item['dose_state'] ?? null) === DoseSlotProjection::STATE_AWAY) {
+                // Away (C7): not owed here while the person is away.
+                $away++;
             } else {
                 $pending++;
                 if ($nextIndex === null) {
@@ -258,7 +298,13 @@ class GuidedRoundService
             }
         }
 
-        $completed = $total - $pending;
+        // The doses owed in the round (Main, 3 Oct): one waiting for the
+        // order check, or due while the person is away, isn't — it is left out
+        // of the total and the percent and counted on its own, so a round
+        // with only those left is 100% recorded. The rounds board's
+        // roundCounts() uses the same rule.
+        $total = count($items) - $waiting - $away;
+        $completed = $given + $refused + $held;
 
         return [
             'total' => $total,
@@ -268,15 +314,18 @@ class GuidedRoundService
             'refused' => $refused,
             'held' => $held,
             'next_index' => $nextIndex,
-            'percent' => $total > 0 ? (int) round(($completed / $total) * 100) : 0,
+            'percent' => $total > 0 ? (int) round(($completed / $total) * 100) : ($waiting + $away > 0 ? 100 : 0),
+            'waiting' => $waiting,
+            'away' => $away,
         ];
     }
 
     /**
      * Flatten the round's doses into "cells" for the Resident × Round chart and
      * the per-round audit timeline. Reuses items() (one schedule pipeline) and
-     * hoists the administration outcome onto each cell — status defaults to
-     * "due" for an un-actioned dose.
+     * hoists the administration outcome onto each cell. An un-actioned dose is
+     * "due", "overdue" once its window has ended, or "pending_check" while
+     * its order's change waits for the order check — as Meds today shows it.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -303,8 +352,16 @@ class GuidedRoundService
                 'requires_blood_glucose' => $it['requires_blood_glucose'],
                 'requires_pulse' => $it['requires_pulse'],
                 'scheduled_for' => $it['scheduled_for'],
-                'status' => $admin['status'] ?? 'due',
+                'status' => $admin['status'] ?? match ($it['dose_state'] ?? null) {
+                    'overdue', DoseSlotProjection::STATE_PENDING_CHECK, DoseSlotProjection::STATE_AWAY => $it['dose_state'],
+                    default => 'due',
+                },
+                'away_reason' => $admin === null ? ($it['away_reason'] ?? null) : null,
                 'witnessed_by' => $admin['witnessed_by'] ?? null,
+                'second_person_kind' => $admin['second_person_kind'] ?? null,
+                'second_person_status' => $admin['second_person_status'] ?? null,
+                'witness_method' => $admin['witness_method'] ?? null,
+                'second_person_confirmation' => $admin['second_person_confirmation'] ?? null,
                 'blood_glucose_level' => $admin['blood_glucose_level'] ?? null,
                 'pulse_bpm' => $admin['pulse_bpm'] ?? null,
                 'reason' => $admin['reason'] ?? null,
@@ -371,9 +428,19 @@ class GuidedRoundService
         Carbon $windowStart,
         Carbon $windowEnd,
     ): array {
+        // The round's own records, and — as while it was open (C6j) — the
+        // doses in its window recorded outside any round before it was
+        // completed (from Meds today, say).
         $query = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
-            ->where('medication_round_id', $round->id)
+            ->where(function ($records) use ($round) {
+                $records->where('medication_round_id', $round->id)
+                    ->orWhere(function ($unlinked) use ($round) {
+                        $unlinked->whereNull('medication_round_id')
+                            ->whereIn('status', ScheduledDoseStates::RECORDED_STATUSES)
+                            ->when($round->completed_at !== null, fn ($before) => $before->where('created_at', '<=', $round->completed_at));
+                    });
+            })
             ->whereBetween('scheduled_for', [
                 $windowStart->copy()->utc(),
                 $windowEnd->copy()->utc(),
@@ -398,6 +465,7 @@ class GuidedRoundService
                 'medication.client.site:id,name',
                 'administeredBy:id,name',
                 'witnessedBy:id,name',
+                SecondPersonConfirmationPayload::RELATION,
             ])
             ->get()
             ->map(function (ClientMedicationAdministration $administration): ?array {
@@ -425,11 +493,29 @@ class GuidedRoundService
             ->all();
     }
 
-    /** @return array<string, mixed> */
+    /** A record's dose: its order and scheduled minute (UTC). */
+    private function recordKey(ClientMedicationAdministration $administration): string
+    {
+        $rawScheduledFor = $administration->getRawOriginal('scheduled_for');
+
+        return $administration->client_medication_id.':'.($rawScheduledFor
+            ? Carbon::parse((string) $rawScheduledFor, 'UTC')->format('Y-m-d H:i')
+            : '');
+    }
+
+    /**
+     * @param  string|null  $doseState  the dose's list status (ScheduledDoseStates::listStatus) when it has no record
+     * @param  string|null  $awayReason  why the person is away, when the dose is away (C7)
+     * @param  string|null  $awaySource  the away record's kind (DoseAwaySources::RESPITE or LEAVE)
+     * @return array<string, mixed>
+     */
     private function formatItem(
         ClientMedication $medication,
         Carbon $scheduled,
         ?ClientMedicationAdministration $administration,
+        ?string $doseState = null,
+        ?string $awayReason = null,
+        ?string $awaySource = null,
     ): array {
         $client = $medication->client;
         $clientName = $client
@@ -450,12 +536,18 @@ class GuidedRoundService
             'site_name' => $client?->site?->name,
             'is_controlled' => (bool) $medication->controlled_drug,
             'is_high_risk' => (bool) $medication->high_risk,
-            'requires_witness' => (bool) ($medication->witness_required || $medication->controlled_drug),
+            'requires_witness' => $medication->requiresWitness(),
             // TODO(G4): promote the existing name-derived safety prompts to
             // explicit medication fields with matching server enforcement.
             'requires_blood_glucose' => $this->requiresBloodGlucose($medication),
             'requires_pulse' => $this->requiresPulse($medication),
             'scheduled_for' => $scheduled->toIso8601String(),
+            // given/refused/withheld/missed once recorded; else due, upcoming,
+            // overdue, pending_check (Waiting for the order check) or away.
+            'dose_state' => $administration?->status ?? $doseState ?? 'due',
+            'away_reason' => $administration === null ? $awayReason : null,
+            // respite or leave: what staff can do if the person is back.
+            'away_source' => $administration === null ? $awaySource : null,
             'administration' => $administration ? [
                 'id' => $administration->id,
                 'status' => $administration->status,
@@ -464,6 +556,7 @@ class GuidedRoundService
                 'administered_at' => $administration->administered_at?->toIso8601String(),
                 'administered_by' => $administration->administeredBy?->name,
                 'witnessed_by' => $administration->witnessedBy?->name,
+                ...app(SecondPersonConfirmationPayload::class)->forAdministration($administration),
                 'blood_glucose_level' => $administration->blood_glucose_level !== null
                     ? (float) $administration->blood_glucose_level
                     : null,

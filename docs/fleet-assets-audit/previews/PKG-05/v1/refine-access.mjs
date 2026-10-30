@@ -1,0 +1,15 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url)),f=path.join(here,'app.tsx');let c=fs.readFileSync(f,'utf8');
+const r=(a,b)=>{if(!c.includes(a))throw Error('Missing '+a);c=c.replaceAll(a,b)};
+r('meters={<div className="flex flex-wrap gap-2">','meters={<div className="flex w-full flex-wrap gap-2">');
+r("main.current?.focus(),50)","main.current?.focus({preventScroll:true}),50)");
+r("const open=(kind:string)=>{if(modal", "const open=(kind:string)=>{if(limited&&kind==='request'){setSource('Request transport · client permission required');setModal('source');return}if(modal");
+r(":'Transport for Alex'",":limited?'Transport context':'Transport for Alex'");
+r("success={success?successContent:undefined}", "success={success&&wizardKinds.includes(modal)?successContent:undefined}");
+r("if(modal==='handover'){if(!incoming)","if(modal==='handover'){if(!receiptSaved){setError('Record the observed return receipt before this handover. No receipt or accepted custody can be inferred from the booking.');return}if(!incoming)");
+r("value=\"RC-311 · CHK-441\"","value={receiptSaved?'RC-311 · CHK-441':'Return receipt not recorded'}");
+r("<Fact label=\"Evidence\">RC-311 · CHK-441 · BK-208</Fact>","<Fact label=\"Evidence\">{receiptSaved?'RC-311 · CHK-441 · BK-208':'No return receipt recorded'}</Fact>");
+r("const actionLabel=stage==='requested'?", "const actionLabel=stage==='requested'?");
+fs.writeFileSync(f,c);console.log('Applied preview privacy, source evidence and full-width meter fixes.');

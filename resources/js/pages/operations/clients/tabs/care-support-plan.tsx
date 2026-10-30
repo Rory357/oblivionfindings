@@ -6,9 +6,11 @@
  * reviews, sign-offs and the PDF export are handled here against the care-plan
  * endpoints. */
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -18,6 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { Textarea } from '@/components/ui/textarea';
 import { CarePlanDomains } from '@/pages/operations/clients/tabs/care-plan-domains';
 import { router } from '@inertiajs/react';
@@ -54,6 +57,10 @@ type SignOff = {
     method?: string | null;
     acknowledgement?: string | null;
     recorder?: { id: number; name: string } | null;
+    gate_satisfying?: boolean;
+    attestation_state?: string | null;
+    revoked_at?: string | null;
+    superseded_at?: string | null;
 };
 
 type PlanGoal = {
@@ -247,6 +254,10 @@ export function CareSupportPlanTab({
         : null;
 
     const signOffs = plan?.sign_offs ?? [];
+    const hasEligibleAgreement = signOffs.some(
+        (item) =>
+            item.gate_satisfying && !item.revoked_at && !item.superseded_at,
+    );
     const linkedAgreement = funding.service_agreement_id
         ? agreements.find((a) => a.id === Number(funding.service_agreement_id))
         : null;
@@ -298,6 +309,10 @@ export function CareSupportPlanTab({
         agreed_on: '',
         method: '',
         acknowledgement: '',
+        attestation_state: 'recorded_proxy',
+        evidence_type: 'witness_statement',
+        evidence_reference: '',
+        witness_declaration: false,
     };
     const [signForm, setSignForm] = useState(emptySignOff);
     const [signOpen, setSignOpen] = useState(false);
@@ -308,23 +323,58 @@ export function CareSupportPlanTab({
 
     const addSignOff = () => {
         if (!plan) return;
-        if (!signForm.party_name.trim() || !signForm.agreed_on) {
+        const witnessed = signForm.attestation_state === 'witnessed';
+        if (
+            (!witnessed && !signForm.party_name.trim()) ||
+            !signForm.agreed_on
+        ) {
             toast.error('A name and date are required.');
             return;
         }
+        if (
+            witnessed &&
+            (!signForm.evidence_reference.trim() ||
+                !signForm.witness_declaration)
+        ) {
+            toast.error(
+                'Record the evidence reference and confirm that you witnessed this person’s agreement.',
+            );
+            return;
+        }
         setSignBusy(true);
-        router.post(`/operations/care-plans/${plan.id}/sign-offs`, signForm, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setSignForm(emptySignOff);
-                setSignOpen(false);
+        const {
+            witness_declaration,
+            evidence_type,
+            evidence_reference,
+            ...record
+        } = signForm;
+        router.post(
+            `/operations/care-plans/${plan.id}/sign-offs`,
+            {
+                ...record,
+                ...(witnessed
+                    ? {
+                          party_role: 'client',
+                          signer_client_id: client.id,
+                          witness_declaration,
+                          evidence_type,
+                          evidence_reference,
+                      }
+                    : {}),
             },
-            onError: (errs) => {
-                const first = Object.values(errs ?? {})[0];
-                if (first) toast.error(String(first));
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setSignForm(emptySignOff);
+                    setSignOpen(false);
+                },
+                onError: (errs) => {
+                    const first = Object.values(errs ?? {})[0];
+                    if (first) toast.error(String(first));
+                },
+                onFinish: () => setSignBusy(false),
             },
-            onFinish: () => setSignBusy(false),
-        });
+        );
     };
     const removeSignOff = (id: number) => {
         if (!plan) return;
@@ -444,10 +494,11 @@ export function CareSupportPlanTab({
                                 Update the plan, then complete the review to
                                 activate it and archive the current version.
                             </p>
-                            {signOffs.length === 0 ? (
+                            {!hasEligibleAgreement ? (
                                 <p className="mt-1 text-xs font-medium text-status-warning">
-                                    Record at least one new sign-off on this
-                                    review before completing it.
+                                    Record current eligible agreement evidence
+                                    on this review before completing it. A
+                                    recorded note alone is not enough.
                                 </p>
                             ) : null}
                         </div>
@@ -464,7 +515,7 @@ export function CareSupportPlanTab({
                                 <Button
                                     size="sm"
                                     onClick={() => setCompleting((v) => !v)}
-                                    disabled={signOffs.length === 0}
+                                    disabled={!hasEligibleAgreement}
                                     data-test="careplan-complete-review"
                                 >
                                     <CheckCircle2 className="mr-1.5 h-4 w-4" />{' '}
@@ -521,7 +572,7 @@ export function CareSupportPlanTab({
                     {canEdit ? (
                         <Button
                             size="sm"
-                            className="bg-status-warning text-primary-foreground hover:bg-status-warning/90"
+                            variant="outline"
                             onClick={startReview}
                         >
                             Start review
@@ -837,13 +888,56 @@ export function CareSupportPlanTab({
                 <CardContent className="space-y-3">
                     {signOpen ? (
                         <div className="space-y-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="care-agreement-kind">
+                                    Agreement record
+                                </Label>
+                                <Select
+                                    value={signForm.attestation_state}
+                                    onValueChange={(value) =>
+                                        setSignForm((current) => ({
+                                            ...current,
+                                            attestation_state: value,
+                                            party_role:
+                                                value === 'witnessed'
+                                                    ? 'client'
+                                                    : current.party_role,
+                                            witness_declaration: false,
+                                        }))
+                                    }
+                                >
+                                    <SelectTrigger id="care-agreement-kind">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="recorded_proxy">
+                                            Record a note of agreement
+                                        </SelectItem>
+                                        <SelectItem value="witnessed">
+                                            I witnessed this person agree
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-subtle">
+                                    {signForm.attestation_state === 'witnessed'
+                                        ? 'Record agreement by the person on this profile to the current care-plan version. Authority and evidence are checked when saved.'
+                                        : 'This preserves a reported agreement. It does not satisfy care-plan approval or service-start checks.'}
+                                </p>
+                            </div>
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">
+                                    <Label
+                                        htmlFor="care-sign-party"
+                                        className="text-xs"
+                                    >
                                         Who agreed *
                                     </Label>
                                     <Select
                                         value={signForm.party_role}
+                                        disabled={
+                                            signForm.attestation_state ===
+                                            'witnessed'
+                                        }
                                         onValueChange={(v) =>
                                             setSignForm((p) => ({
                                                 ...p,
@@ -851,7 +945,7 @@ export function CareSupportPlanTab({
                                             }))
                                         }
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="care-sign-party">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -867,9 +961,25 @@ export function CareSupportPlanTab({
                                     </Select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">Name *</Label>
+                                    <Label
+                                        htmlFor="care-sign-name"
+                                        className="text-xs"
+                                    >
+                                        Name *
+                                    </Label>
                                     <Input
-                                        value={signForm.party_name}
+                                        id="care-sign-name"
+                                        disabled={
+                                            signForm.attestation_state ===
+                                            'witnessed'
+                                        }
+                                        value={
+                                            signForm.attestation_state ===
+                                            'witnessed'
+                                                ? (client.first_name ??
+                                                  'Person on this profile')
+                                                : signForm.party_name
+                                        }
                                         onChange={(e) =>
                                             setSignForm((p) => ({
                                                 ...p,
@@ -880,11 +990,24 @@ export function CareSupportPlanTab({
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">
+                                    <Label
+                                        htmlFor="care-sign-relationship"
+                                        className="text-xs"
+                                    >
                                         Relationship
                                     </Label>
                                     <Input
-                                        value={signForm.relationship}
+                                        id="care-sign-relationship"
+                                        disabled={
+                                            signForm.attestation_state ===
+                                            'witnessed'
+                                        }
+                                        value={
+                                            signForm.attestation_state ===
+                                            'witnessed'
+                                                ? 'Self'
+                                                : signForm.relationship
+                                        }
                                         onChange={(e) =>
                                             setSignForm((p) => ({
                                                 ...p,
@@ -895,22 +1018,31 @@ export function CareSupportPlanTab({
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">
+                                    <Label
+                                        htmlFor="care-agreed-on"
+                                        className="text-xs"
+                                    >
                                         Agreed on *
                                     </Label>
-                                    <Input
-                                        type="date"
+                                    <DatePicker
+                                        id="care-agreed-on"
+                                        label="Agreed on"
                                         value={signForm.agreed_on}
-                                        onChange={(e) =>
+                                        onChange={(value) =>
                                             setSignForm((p) => ({
                                                 ...p,
-                                                agreed_on: e.target.value,
+                                                agreed_on: value,
                                             }))
                                         }
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-xs">Method</Label>
+                                    <Label
+                                        htmlFor="care-sign-method"
+                                        className="text-xs"
+                                    >
+                                        Method
+                                    </Label>
                                     <Select
                                         value={signForm.method || undefined}
                                         onValueChange={(v) =>
@@ -920,7 +1052,7 @@ export function CareSupportPlanTab({
                                             }))
                                         }
                                     >
-                                        <SelectTrigger>
+                                        <SelectTrigger id="care-sign-method">
                                             <SelectValue placeholder="How" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -936,10 +1068,14 @@ export function CareSupportPlanTab({
                                     </Select>
                                 </div>
                                 <div className="space-y-1.5 sm:col-span-2">
-                                    <Label className="text-xs">
+                                    <Label
+                                        htmlFor="care-sign-acknowledgement"
+                                        className="text-xs"
+                                    >
                                         Acknowledgement
                                     </Label>
                                     <Textarea
+                                        id="care-sign-acknowledgement"
                                         value={signForm.acknowledgement}
                                         rows={2}
                                         onChange={(e) =>
@@ -952,6 +1088,82 @@ export function CareSupportPlanTab({
                                     />
                                 </div>
                             </div>
+                            {signForm.attestation_state === 'witnessed' && (
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="care-evidence-type">
+                                            Evidence type
+                                        </Label>
+                                        <Select
+                                            value={signForm.evidence_type}
+                                            onValueChange={(value) =>
+                                                setSignForm((current) => ({
+                                                    ...current,
+                                                    evidence_type: value,
+                                                }))
+                                            }
+                                        >
+                                            <SelectTrigger id="care-evidence-type">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="witness_statement">
+                                                    Witness statement
+                                                </SelectItem>
+                                                <SelectItem value="signed_document">
+                                                    Signed document
+                                                </SelectItem>
+                                                <SelectItem value="recording_reference">
+                                                    Recording reference
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="care-evidence-reference">
+                                            Evidence reference *
+                                        </Label>
+                                        <Input
+                                            id="care-evidence-reference"
+                                            value={signForm.evidence_reference}
+                                            maxLength={255}
+                                            onChange={(event) =>
+                                                setSignForm((current) => ({
+                                                    ...current,
+                                                    evidence_reference:
+                                                        event.target.value,
+                                                }))
+                                            }
+                                        />
+                                        <p className="text-subtle">
+                                            Identify the stored statement,
+                                            signed document or recording for
+                                            this exact plan. A reference does
+                                            not upload a file.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <Checkbox
+                                            id="care-witness-declaration"
+                                            checked={
+                                                signForm.witness_declaration
+                                            }
+                                            onCheckedChange={(checked) =>
+                                                setSignForm((current) => ({
+                                                    ...current,
+                                                    witness_declaration:
+                                                        checked === true,
+                                                }))
+                                            }
+                                        />
+                                        <Label htmlFor="care-witness-declaration">
+                                            I identified this person and
+                                            personally witnessed their agreement
+                                            to this care-plan version.
+                                        </Label>
+                                    </div>
+                                </div>
+                            )}
                             <div className="flex justify-end gap-2">
                                 <Button
                                     variant="ghost"
@@ -984,14 +1196,31 @@ export function CareSupportPlanTab({
                                     key={s.id}
                                     className="flex items-start gap-3 rounded-lg border p-3"
                                 >
-                                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-success-bg text-status-success">
-                                        <CheckCircle2 className="h-4 w-4" />
+                                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                        <MessageSquare className="h-4 w-4" />
                                     </span>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex flex-wrap items-center gap-2">
                                             <span className="text-sm font-semibold">
                                                 {s.party_name}
                                             </span>
+                                            <StatusBadge
+                                                variant={
+                                                    s.gate_satisfying &&
+                                                    !s.revoked_at &&
+                                                    !s.superseded_at
+                                                        ? 'success'
+                                                        : 'neutral'
+                                                }
+                                            >
+                                                {s.revoked_at
+                                                    ? 'Revoked'
+                                                    : s.superseded_at
+                                                      ? 'Superseded'
+                                                      : s.gate_satisfying
+                                                        ? 'Eligible agreement'
+                                                        : 'Recorded note only'}
+                                            </StatusBadge>
                                             <Badge
                                                 variant="outline"
                                                 className="text-[10px] capitalize"

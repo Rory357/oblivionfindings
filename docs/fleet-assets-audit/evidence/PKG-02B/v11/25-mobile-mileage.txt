@@ -1,0 +1,218 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Service & compliance" [selected]:
+      - generic: Service & compliance
+    - button "More views (6)":
+      - generic: More
+    - button "Find a section":
+  - tablist "Vehicle sections":
+    - tab "Evidence & due dates":
+      - text: Evidence & due dates
+    - tab "Service schedules":
+      - text: Service schedules
+    - tab "Reminders":
+      - text: Reminders
+    - tab "Service history":
+      - text: Service history
+    - tab "Mileage" [selected]:
+      - text: Mileage
+  - tabpanel:
+    - generic: DISTANCE & EVIDENCE
+    - heading "Mileage history" [level=2]
+    - paragraph: Dashboard readings, their sources and the service distance they inform.
+    - button "Add reading":
+      - text: Add reading
+    - generic: GV500CG · DISTANCE FEED
+    - heading "Connect mileage to service planning" [level=3]
+    - generic: Cross-check
+    - generic: Dashboard record
+    - strong: 82,460 km
+    - generic: Retained original observation
+    - generic: Tracker estimate
+    - strong: 82,472 km
+    - generic: 22 Sep 2026 · 9:28 am · sample
+    - generic: Difference since dashboard record
+    - strong: +12 km
+    - generic: May include travel since observation
+    - paragraph: Planning uses the recorded dashboard reading. Tracker distance is an estimate; verify the dashboard and source documents. WoF and registration dates come from their own evidence.
+    - button "Cross-check & configure"
+    - generic: CURRENT RECORDED ODOMETER
+    - strong: 82,460 km
+    - paragraph: 21 Sep 2026 · 08:10 AM · Pacific/Auckland
+    - generic: Recorded observation
+    - generic: 3 records
+    - strong: +42 km
+    - generic: Since previous reading
+    - generic: NEXT DISTANCE TRIGGER
+    - heading "Routine service" [level=3]
+    - strong: 2,540 km
+    - generic: Due at 85,000 km · 24 Sept 2026
+    - button "View service schedule":
+      - text: View service schedule
+    - textbox "Search mileage readings":
+      - /placeholder: Reading, person or source…
+    - combobox "Mileage history filter":
+      - option "All readings" [selected]
+      - option "Corrections"
+      - option "With evidence"
+    - group "Mileage readings layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - generic "Mileage readings":
+      - generic: Mileage readings
+      - generic: 3 records shown
+      - table:
+        - row "82,460 km ODO-DEMO-03 Observed 21 Sep 2026 · 08:10 AM · Pacific/Auckland Source / recorded by CHK-0182 · manual reading Alex Morgan 0 evidence files Status Current View details Actions for 82,460 km":
+          - cell "82,460 km ODO-DEMO-03":
+            - generic: 82,460 km
+            - generic: ODO-DEMO-03
+          - cell "Observed 21 Sep 2026 · 08:10 AM · Pacific/Auckland":
+            - generic: Observed
+            - generic: 21 Sep 2026 · 08:10 AM · Pacific/Auckland
+          - cell "Source / recorded by CHK-0182 · manual reading Alex Morgan 0 evidence files":
+            - generic: Source / recorded by
+            - strong: CHK-0182 · manual reading
+            - generic: Alex Morgan
+            - generic: 0 evidence files
+          - cell "Status Current View details":
+            - generic: Status
+            - generic: Current
+            - button "View details"
+          - cell "Actions for 82,460 km":
+            - button "Actions for 82,460 km":
+        - row "82,418 km ODO-DEMO-02 Observed 20 Sep 2026 · 05:10 PM · Pacific/Auckland Source / recorded by Return condition record Jamie Taylor 0 evidence files Status Recorded View details Actions for 82,418 km":
+          - cell "82,418 km ODO-DEMO-02":
+            - generic: 82,418 km
+            - generic: ODO-DEMO-02
+          - cell "Observed 20 Sep 2026 · 05:10 PM · Pacific/Auckland":
+            - generic: Observed
+            - generic: 20 Sep 2026 · 05:10 PM · Pacific/Auckland
+          - cell "Source / recorded by Return condition record Jamie Taylor 0 evidence files":
+            - generic: Source / recorded by
+            - strong: Return condition record
+            - generic: Jamie Taylor
+            - generic: 0 evidence files
+          - cell "Status Recorded View details":
+            - generic: Status
+            - generic: Recorded
+            - button "View details"
+          - cell "Actions for 82,418 km":
+            - button "Actions for 82,418 km":
+        - row "74,800 km ODO-DEMO-01 Observed 24 Mar 2026 · 11:00 AM · Pacific/Auckland Source / recorded by WO-0188 Workshop report 0 evidence files Status Recorded View details Actions for 74,800 km":
+          - cell "74,800 km ODO-DEMO-01":
+            - generic: 74,800 km
+            - generic: ODO-DEMO-01
+          - cell "Observed 24 Mar 2026 · 11:00 AM · Pacific/Auckland":
+            - generic: Observed
+            - generic: 24 Mar 2026 · 11:00 AM · Pacific/Auckland
+          - cell "Source / recorded by WO-0188 Workshop report 0 evidence files":
+            - generic: Source / recorded by
+            - strong: WO-0188
+            - generic: Workshop report
+            - generic: 0 evidence files
+          - cell "Status Recorded View details":
+            - generic: Status
+            - generic: Recorded
+            - button "View details"
+          - cell "Actions for 74,800 km":
+            - button "Actions for 74,800 km":
+    - complementary:
+      - generic: READING PROGRESSION
+      - heading "Recorded distance" [level=3]
+      - img "Odometer readings from 74,800 to 82,460 kilometres"
+      - generic: 24 Mar 2026
+      - generic: 21 Sept 2026
+      - paragraph: Observations in time order. Corrections replace the plotted original; this is not a GPS route or a daily-distance estimate.
+      - paragraph: Original observations stay intact. Every correction requires a reason.
+      - button "Remind me to check mileage":
+        - text: Remind me to check mileage
+      - button "Open trip history":
+        - text: Open trip history
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

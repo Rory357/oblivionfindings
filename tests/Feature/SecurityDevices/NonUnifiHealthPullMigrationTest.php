@@ -40,6 +40,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
     public function test_unadvertised_provider_health_is_not_executed_or_recorded_as_success(): void
     {
         $site = $this->mappedSite('hikvision');
+        Queue::fake(); // Observe unsupported provider work after the mapped Site fixture.
         $registry = \Mockery::mock(IntegrationAdapterRegistry::class);
         $registry->shouldReceive('hasCapability')
             ->times(3)
@@ -238,6 +239,7 @@ class NonUnifiHealthPullMigrationTest extends TestCase
             'status' => IntegrationProviderConnection::STATUS_CONNECTED,
             'requires_credential_replacement' => false,
         ]);
+        Queue::fake(); // Observe provider scheduling after the mapped Site fixture.
 
         (new ScheduleProviderCapabilities)->handle(app(IntegrationAdapterRegistry::class));
 

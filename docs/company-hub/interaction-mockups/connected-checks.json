@@ -1,0 +1,480 @@
+{
+  "errors": [],
+  "layouts": [
+    {
+      "id": 1,
+      "theme": "light",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 2,
+      "theme": "light",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 3,
+      "theme": "light",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 4,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 5,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 6,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 7,
+      "theme": "light",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 8,
+      "theme": "light",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 9,
+      "theme": "light",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 10,
+      "theme": "light",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 11,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 12,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 13,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 14,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 15,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 16,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 17,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 18,
+      "theme": "light",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 19,
+      "theme": "light",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 20,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 21,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 22,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 23,
+      "theme": "light",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 24,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 25,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 26,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 27,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 28,
+      "theme": "light",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 29,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 30,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 31,
+      "theme": "light",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 32,
+      "theme": "light",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 33,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 34,
+      "theme": "light",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 35,
+      "theme": "light",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 36,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 37,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 44,
+      "theme": "light",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 1,
+      "theme": "dark",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 2,
+      "theme": "dark",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 3,
+      "theme": "dark",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 4,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 5,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 6,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 7,
+      "theme": "dark",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 8,
+      "theme": "dark",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 9,
+      "theme": "dark",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 10,
+      "theme": "dark",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 11,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 12,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 13,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 14,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 15,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 16,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 17,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 18,
+      "theme": "dark",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 19,
+      "theme": "dark",
+      "scrollWidth": 618,
+      "clientWidth": 618
+    },
+    {
+      "id": 20,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 21,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 22,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 23,
+      "theme": "dark",
+      "scrollWidth": 609,
+      "clientWidth": 609
+    },
+    {
+      "id": 24,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 25,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 26,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 27,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 28,
+      "theme": "dark",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 29,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 30,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 31,
+      "theme": "dark",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 32,
+      "theme": "dark",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 33,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 34,
+      "theme": "dark",
+      "scrollWidth": 934,
+      "clientWidth": 934
+    },
+    {
+      "id": 35,
+      "theme": "dark",
+      "scrollWidth": 928,
+      "clientWidth": 928
+    },
+    {
+      "id": 36,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 37,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    },
+    {
+      "id": 44,
+      "theme": "dark",
+      "scrollWidth": 924,
+      "clientWidth": 924
+    }
+  ],
+  "fixtures": {
+    "people": 18,
+    "resources": 8,
+    "stories": 8,
+    "events": 4
+  },
+  "verified": [
+    "news query, layout, scroll and focus restored",
+    "primary navigation remembers browse state",
+    "resource filters and checklist progress through nested profile",
+    "directory search and team restoration",
+    "independent event booking and waitlist",
+    "home acknowledgement and saved/registered state",
+    "edited event dates, full availability and cancellation in home and discovery",
+    "purposeful icon usage",
+    "staff reading pages and free tab order",
+    "37 original journeys plus event browser in both themes at 1024px"
+  ],
+  "scope": "Fictional local mockup only"
+}

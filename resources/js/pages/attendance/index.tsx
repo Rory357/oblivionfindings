@@ -1,16 +1,22 @@
-/* Attendance — rostering-treatment hero (live eyebrow, badges/stats, actions
- * in the hero, footer week stepper + staff filter), tabbed working surface
- * (Sessions / On the clock / Handovers) on the shared rostering TabStrip, and
+import { StatusBadge } from '@/components/ui/status-badge';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
+/* Attendance — shared page header and connected Sessions / On the clock / Handovers views, with
  * right-click context menus on every list row. Clock workflows are multi-step
- * wizards on the shared wizard shell; the Handover wizard and ReasonDialog are
- * the existing shared components, not duplicates. */
+ * wizards on the shared wizard shell; manager session closure uses the shared
+ * attendance command feedback and recovery controls. */
 import { AddClientDialog } from '@/components/clients/add-client-dialog';
-import { PageHero, type PageHeroBadge } from '@/components/page';
+import {
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+} from '@/components/page';
 import PageShell from '@/components/page-shell';
-import { ReasonDialog } from '@/components/reason-dialog';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import {
     ShiftContextMenu,
-    TabStrip,
     WeekPicker,
     addDaysWP,
     startOfWeek,
@@ -22,6 +28,7 @@ import {
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
     Select,
     SelectContent,
@@ -36,14 +43,17 @@ import {
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
 import {
-    WORKER_TIMEZONE,
-    formatDate,
+    formatDateOnly,
     formatDateTime,
+    formatDateTimeInZone,
     formatTime,
+    toDateInput,
 } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { AttendanceBreakFeedback } from '@/components/attendance-break-feedback';
+import { useAttendanceBreak } from '@/hooks/use-attendance-break';
 import {
     AlertTriangle,
     ArrowLeftRight,
@@ -51,7 +61,6 @@ import {
     CalendarRange,
     Check,
     CheckCircle2,
-    ChevronDown,
     ChevronLeft,
     ChevronRight,
     Coffee,
@@ -69,8 +78,9 @@ import {
     Users,
     Wrench,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { openHoursInPeriod } from './components/period-hours';
 
 import { HandoverDetailDialog } from '@/pages/operations/handovers/components/handover-detail-dialog';
 import { HandoverWizard } from '@/pages/operations/handovers/components/handover-wizard';
@@ -82,6 +92,7 @@ import {
 
 import { ClockInWizard } from './components/clock-in-wizard';
 import { ClockOutWizard } from './components/clock-out-wizard';
+import { EndSessionDialog } from './components/end-session-dialog';
 import { FixClockOutWizard } from './components/fix-clock-out-wizard';
 import {
     STALE_MS,
@@ -103,7 +114,40 @@ type AttendanceHandover = Handover & {
 
 type Props = {
     sessions: Session[];
+    sessionPagination?: {
+        current_page: number;
+        last_page: number;
+        total: number;
+        links: { url: string | null; label: string; active: boolean }[];
+    };
     totalSessions: number;
+    summary: {
+        user_id: number;
+        sessions_total: number;
+        closed_sessions: number;
+        open_sessions: number;
+        closed_hours: number;
+        on_clock_now_total: number | null;
+        stale_on_clock_total: number | null;
+    };
+    evidence: {
+        period_start: string;
+        period_end_exclusive: string;
+        timezone: string;
+        checked_at: string;
+        today: string;
+        today_period_start: string;
+        today_period_end_exclusive: string;
+    };
+    lists: Record<
+        'sessions' | 'onClockNow' | 'handovers',
+        {
+            total: number | null;
+            shown: number;
+            limit: number;
+            truncated: boolean;
+        }
+    >;
     openSession: OpenSession | null;
     activeShift: {
         id: number;
@@ -124,9 +168,12 @@ type Props = {
     canCreateHandovers: boolean;
     currentUser: { id: number; name: string };
     catalogue?: Catalogue;
+    handoverCommandProtocol?: 1 | null;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Home', href: '/dashboard' },
+    { title: 'Workforce', href: '/attendance' },
     { title: 'Attendance', href: '/attendance' },
 ];
 
@@ -190,7 +237,7 @@ function StatusPill({
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold',
                 variant === 'success'
                     ? 'border-status-success/25 bg-status-success-bg text-status-success'
                     : 'border-status-warning/25 bg-status-warning-bg text-status-warning',
@@ -278,7 +325,7 @@ function SessionsCard({
                                                     status={
                                                         session.timesheet_status
                                                     }
-                                                    className="text-[10px]"
+                                                    className="text-xs"
                                                 />
                                             ) : null}
                                         </Link>
@@ -365,7 +412,7 @@ function SessionsCard({
                                                         status={
                                                             session.timesheet_status
                                                         }
-                                                        className="text-[10px]"
+                                                        className="text-xs"
                                                     />
                                                 ) : null}
                                             </Link>
@@ -403,12 +450,14 @@ function OnClockBoard({
     now,
     onView,
     onEnd,
+    blocksSession,
     onContext,
 }: {
     rows: OnClockRow[];
     now: Date;
     onView: (userId: number) => void;
     onEnd: (row: OnClockRow) => void;
+    blocksSession: (sessionId: number) => boolean;
     onContext: (e: React.MouseEvent, row: OnClockRow) => void;
 }) {
     const staleCount = rows.filter((r) => r.is_stale).length;
@@ -489,6 +538,7 @@ function OnClockBoard({
                                                 'border-status-critical/30 text-status-critical hover:bg-status-critical-bg',
                                         )}
                                         onClick={() => onEnd(s)}
+                                        disabled={blocksSession(s.id)}
                                     >
                                         End session
                                     </Button>
@@ -656,7 +706,7 @@ function HandoversList({
                                                 </span>
                                             ) : null}
                                         </div>
-                                        <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+                                        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
                                             {h.handover_notes}
                                         </p>
                                         {h.medications_due.length ||
@@ -666,7 +716,7 @@ function HandoversList({
                                                     (m, i) => (
                                                         <span
                                                             key={`m${i}`}
-                                                            className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-1 text-[11px] font-semibold text-status-critical-foreground"
+                                                            className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-1 text-xs font-semibold text-status-critical-foreground"
                                                         >
                                                             <Pill className="h-3 w-3" />
                                                             {m}
@@ -676,7 +726,7 @@ function HandoversList({
                                                 {tasks.map((t, i) => (
                                                     <span
                                                         key={`t${i}`}
-                                                        className="inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-1 text-[11px] font-semibold text-accent-foreground"
+                                                        className="inline-flex items-center gap-1 rounded-full bg-primary-fill/10 px-2.5 py-1 text-xs font-semibold text-primary"
                                                     >
                                                         <ListChecks className="h-3 w-3" />
                                                         {t}
@@ -714,9 +764,17 @@ function HandoversList({
 
 /* ─────────────────────────── The page ─────────────────────────── */
 
-export default function AttendanceIndex({
+export default function AttendanceIndex(props: Props) {
+    return <AttendanceBody key={props.currentUser.id} {...props} />;
+}
+
+function AttendanceBody({
     sessions,
     totalSessions,
+    sessionPagination,
+    summary,
+    evidence,
+    lists,
     openSession,
     eligibleShifts,
     staff,
@@ -730,9 +788,10 @@ export default function AttendanceIndex({
     canCreateHandovers,
     currentUser,
     catalogue,
+    handoverCommandProtocol = null,
 }: Props) {
     const { auth } = usePage<SharedData>().props;
-    const firstName = (auth?.user?.name ?? '').split(' ')[0] || 'there';
+    const [checkedHandoverCommands] = useState(() => handoverCommandProtocol === 1);
 
     const [now, setNow] = useState(() => new Date());
     const [tab, setTab] = useState('sessions');
@@ -744,6 +803,12 @@ export default function AttendanceIndex({
     const [clockOutOpen, setClockOutOpen] = useState(false);
     const [fixSessions, setFixSessions] = useState<FixCandidate[] | null>(null);
     const [handoverOpen, setHandoverOpen] = useState(false);
+    const handoverLaunch = useRef({ active: true, generation: 0 });
+    useInsertionEffect(() => () => {
+        handoverLaunch.current.active = false;
+        ++handoverLaunch.current.generation;
+    }, []);
+    const [submitHandoverOnly, setSubmitHandoverOnly] = useState(false);
     const [editingHandover, setEditingHandover] = useState<Handover | null>(
         null,
     );
@@ -776,14 +841,15 @@ export default function AttendanceIndex({
         () =>
             filters.week
                 ? startOfWeek(parseYmd(filters.week))
-                : startOfWeek(new Date()),
-        [filters.week],
+                : startOfWeek(parseYmd(toDateInput(now))),
+        [filters.week, now],
     );
     const isCurrentWeek =
-        weekStartDate.getTime() === startOfWeek(new Date()).getTime();
+        weekStartDate.getTime() ===
+        startOfWeek(parseYmd(toDateInput(now))).getTime();
 
     const visitParams = (weekStart: Date, userId: number | null) => ({
-        ...(toYMD(weekStart) !== toYMD(startOfWeek(new Date()))
+        ...(toYMD(weekStart) !== toYMD(startOfWeek(parseYmd(toDateInput(now))))
             ? { week: toYMD(weekStart) }
             : {}),
         ...(canManageAny && userId ? { user_id: userId } : {}),
@@ -794,7 +860,23 @@ export default function AttendanceIndex({
             preserveState: true,
             preserveScroll: true,
             replace: true,
-            only: ['sessions', 'filters'],
+            only: [
+                'sessions',
+                'sessionPagination',
+                'filters',
+                'summary',
+                'evidence',
+                'lists',
+                'weekHours',
+                'todayHours',
+                'openSession',
+                'onClockNow',
+                'handovers',
+                'eligibleShifts',
+                'canManageAny',
+                'canClock',
+                'canCreateHandovers',
+            ],
         });
     };
 
@@ -808,6 +890,31 @@ export default function AttendanceIndex({
 
     /* ── live derived state ── */
     const onBreak = !!openSession?.on_break;
+    const breakCommand = useAttendanceBreak(
+        {
+            actorId: auth?.user?.id ?? null,
+            sessionId: openSession?.id ?? null,
+            shiftId: openSession?.shift_id ?? null,
+            canAct: canClock && (!selectedUserId || selectedUserId === auth?.user?.id),
+            onBreak,
+        },
+        (raw) => {
+            if (!raw || typeof raw !== 'object') return null;
+            const fresh = raw as Props & { auth?: SharedData['auth'] };
+            if (typeof fresh.openSession?.on_break !== 'boolean') return null;
+            if (!(fresh.openSession.shift_id === null ||
+                (Number.isSafeInteger(fresh.openSession.shift_id) && fresh.openSession.shift_id > 0)))
+                return null;
+            return {
+                actorId: fresh.auth?.user?.id ?? null,
+                sessionId: fresh.openSession?.id ?? null,
+                shiftId: fresh.openSession?.shift_id ?? null,
+                canAct: fresh.canClock === true &&
+                    (!fresh.filters?.user_id || fresh.filters.user_id === fresh.auth?.user?.id),
+                onBreak: fresh.openSession?.on_break === true,
+            };
+        },
+    );
     const trackedBreakM = useMemo(() => {
         if (!openSession) return 0;
         return openSession.breaks.reduce(
@@ -836,7 +943,27 @@ export default function AttendanceIndex({
           )
         : 0;
     const ownStale = !!openSession && openElapsedMs > STALE_MS;
-    const liveExtraH = openSession ? openElapsedMs / 3_600_000 : 0;
+    const todayOpenHours = openHoursInPeriod(
+        openSession,
+        evidence?.today_period_start,
+        evidence?.today_period_end_exclusive,
+        now,
+    );
+    const weekOpenHours = openHoursInPeriod(
+        openSession,
+        evidence?.period_start,
+        evidence?.period_end_exclusive,
+        now,
+    );
+    const selectedPeriod = `${formatDateOnly(toYMD(weekStartDate))} → ${formatDateOnly(toYMD(addDaysWP(weekStartDate, 6)))}`;
+    const activeList =
+        lists?.[
+            tab === 'onclock'
+                ? 'onClockNow'
+                : tab === 'handovers'
+                  ? 'handovers'
+                  : 'sessions'
+        ];
 
     const eligible = openSession ? [] : eligibleShifts;
     const staleRows = onClockNow.filter((r) => r.is_stale);
@@ -872,33 +999,16 @@ export default function AttendanceIndex({
           ? [ownFixCandidate]
           : [];
 
-    /* ── actions (success toasts come from the global FlashToaster) ── */
-    const startBreak = () => {
-        if (!openSession) return;
-        router.post(
-            '/attendance/break/start',
-            { session_id: openSession.id },
-            {
-                preserveScroll: true,
-                onError: (errs) =>
-                    toast.error(errs.break ?? 'Could not start the break.'),
-            },
-        );
+    const openFixSessions = (candidates: FixCandidate[]) => {
+        const available = candidates.filter((candidate) => !breakCommand.blocksSession(candidate.id));
+        if (available.length) setFixSessions(available);
     };
-
-    const endBreak = () => {
-        if (!openSession) return;
-        router.post(
-            '/attendance/break/end',
-            { session_id: openSession.id },
-            {
-                preserveScroll: true,
-                onError: (errs) =>
-                    toast.error(errs.break ?? 'Could not end the break.'),
-            },
-        );
+    const openEndSession = (session: OnClockRow) => {
+        if (!breakCommand.blocksSession(session.id)) setEndTarget(session);
     };
+    const availableFixCandidates = fixCandidates.filter((candidate) => !breakCommand.blocksSession(candidate.id));
 
+    /* ── actions ── */
     const acknowledgeHandover = (h: AttendanceHandover) => {
         router.patch(
             `/attendance/handover/${h.id}/acknowledge`,
@@ -913,10 +1023,13 @@ export default function AttendanceIndex({
         );
     };
 
-    const openHandoverWizard = (editing: Handover | null = null) => {
+    const openHandoverWizard = (editing: Handover | null = null, submitOnly = false) => {
         if (!editing && !canCreateHandovers) return;
         setDetailId(null);
+        const generation = ++handoverLaunch.current.generation;
         const launch = () => {
+            if (!handoverLaunch.current.active || handoverLaunch.current.generation !== generation) return;
+            setSubmitHandoverOnly(submitOnly);
             setEditingHandover(editing);
             setHandoverOpen(true);
         };
@@ -928,6 +1041,9 @@ export default function AttendanceIndex({
     };
 
     const detailHandover = handovers.find((h) => h.id === detailId) ?? null;
+    const currentEditingHandover = editingHandover
+        ? handovers.find((h) => h.id === editingHandover.id) ?? null
+        : null;
 
     /* ── context menus (ShiftContextMenu host) ── */
     const openCtx = (
@@ -983,8 +1099,9 @@ export default function AttendanceIndex({
                 : {
                       icon: <Wrench className="h-3.5 w-3.5" />,
                       label: 'Correct times…',
-                      onClick: () =>
-                          setFixSessions([
+                      sub: breakCommand.blocksSession(s.id) ? 'Check your break result first' : undefined,
+                      onClick: breakCommand.blocksSession(s.id) ? undefined : () =>
+                          openFixSessions([
                               {
                                   id: s.id,
                                   user_name: viewedStaff?.name ?? 'You',
@@ -1022,8 +1139,9 @@ export default function AttendanceIndex({
                 {
                     icon: <Wrench className="h-3.5 w-3.5" />,
                     label: 'Correct clock-out…',
-                    onClick: () =>
-                        setFixSessions([
+                    sub: breakCommand.blocksSession(s.id) ? 'Check your break result first' : undefined,
+                    onClick: breakCommand.blocksSession(s.id) ? undefined : () =>
+                        openFixSessions([
                             {
                                 id: s.id,
                                 user_name: s.user_name ?? `User #${s.user_id}`,
@@ -1041,7 +1159,8 @@ export default function AttendanceIndex({
                     icon: <LogOut className="h-3.5 w-3.5" />,
                     label: 'End session…',
                     tone: 'critical',
-                    onClick: () => setEndTarget(s),
+                    sub: breakCommand.blocksSession(s.id) ? 'Check your break result first' : undefined,
+                    onClick: breakCommand.blocksSession(s.id) ? undefined : () => openEndSession(s),
                 },
             ],
         );
@@ -1067,7 +1186,7 @@ export default function AttendanceIndex({
                 : []),
             {
                 icon: <ArrowLeftRight className="h-3.5 w-3.5" />,
-                label: 'Open in Shift Handovers',
+                label: 'Open in Handovers',
                 onClick: () => {
                     const day =
                         h.outgoing_shift?.starts_at ?? h.created_at ?? null;
@@ -1080,14 +1199,13 @@ export default function AttendanceIndex({
         ]);
 
     /* ── hero content ── */
-    const heroDate = now.toLocaleDateString('en-NZ', {
-        timeZone: WORKER_TIMEZONE,
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-    });
-
-    const heroBadges: PageHeroBadge[] = [
+    const heroBadges: {
+        icon?: typeof Timer;
+        label: string;
+        tone?: 'default' | 'success' | 'warning' | 'critical' | 'info';
+        dot?: boolean;
+        onClick?: () => void;
+    }[] = [
         openSession
             ? {
                   icon: CheckCircle2,
@@ -1119,7 +1237,9 @@ export default function AttendanceIndex({
                       icon: AlertTriangle,
                       label: 'Open 16h+ — likely missed clock-out',
                       tone: 'warning' as const,
-                      onClick: () => setClockOutOpen(true),
+                      onClick: breakCommand.blocked ? undefined : () => {
+                          if (!breakCommand.isBlocked()) setClockOutOpen(true);
+                      },
                   },
               ]
             : []),
@@ -1136,7 +1256,7 @@ export default function AttendanceIndex({
             ? [
                   {
                       icon: Link2,
-                      label: `Synced to timesheet #${openSession.timesheet_id}`,
+                      label: `Linked timesheet #${openSession.timesheet_id}`,
                       tone: 'default' as const,
                   },
               ]
@@ -1147,7 +1267,7 @@ export default function AttendanceIndex({
                       icon: AlertTriangle,
                       label: `${staleRows.length} likely missed clock-out${staleRows.length === 1 ? '' : 's'}`,
                       tone: 'warning' as const,
-                      onClick: () => setFixSessions(fixCandidates),
+                      onClick: availableFixCandidates.length ? () => openFixSessions(availableFixCandidates) : undefined,
                   },
               ]
             : []),
@@ -1168,7 +1288,7 @@ export default function AttendanceIndex({
             label: 'Sessions',
             icon: Timer,
             tone: 'primary',
-            badge: sessions.length,
+            badge: summary?.sessions_total ?? sessions.length,
         },
         ...(canManageAny
             ? [
@@ -1179,7 +1299,7 @@ export default function AttendanceIndex({
                       tone: (staleRows.length > 0
                           ? 'warning'
                           : 'success') as RosterTabItem['tone'],
-                      badge: onClockNow.length,
+                      badge: summary?.on_clock_now_total ?? onClockNow.length,
                   },
               ]
             : []),
@@ -1196,260 +1316,350 @@ export default function AttendanceIndex({
     const nextLab = weekLabel(addDaysWP(weekStartDate, 7));
     const curLab = weekLabel(weekStartDate);
 
+    const headerPrimaryAction =
+        viewedStaff || !canClock ? null : openSession ? (
+            <PageHeaderPrimaryButton
+                icon={LogOut}
+                onClick={() => {
+                    if (!breakCommand.isBlocked()) setClockOutOpen(true);
+                }}
+                disabled={breakCommand.blocked}
+                data-test="attendance-clock-out"
+            >
+                Clock out
+            </PageHeaderPrimaryButton>
+        ) : (
+            <PageHeaderPrimaryButton
+                icon={LogIn}
+                onClick={() => {
+                    if (!breakCommand.isBlocked()) setClockInOpen(true);
+                }}
+                disabled={breakCommand.blocked}
+                data-test="attendance-clock-in"
+            >
+                Clock in
+            </PageHeaderPrimaryButton>
+        );
+    const headerSecondaryActions =
+        viewedStaff || !canClock ? null : (
+            <>
+                {openSession ? (
+                    <>
+                        <PageHeaderGlassButton
+                            onClick={breakCommand.submit}
+                            disabled={breakCommand.blocked}
+                            data-test={
+                                onBreak
+                                    ? 'attendance-end-break'
+                                    : 'attendance-start-break'
+                            }
+                        >
+                            <Coffee className="mr-1 h-4 w-4" />
+                            {breakCommand.pending ? 'Saving break…' : onBreak ? 'End break' : 'Start break'}
+                        </PageHeaderGlassButton>
+                        {canCreateHandovers ? (
+                            <PageHeaderGlassButton
+                                onClick={() => openHandoverWizard()}
+                                data-test="attendance-handover"
+                            >
+                                <ArrowLeftRight className="mr-1 h-4 w-4" />
+                                Handover
+                            </PageHeaderGlassButton>
+                        ) : null}
+                    </>
+                ) : null}
+                <PageHeaderGlassButton
+                    aria-label="Fix a missed clock-out"
+                    title={
+                        availableFixCandidates.length
+                            ? 'Fix a missed clock-out'
+                            : 'No open sessions to correct'
+                    }
+                    disabled={!availableFixCandidates.length}
+                    onClick={() => openFixSessions(availableFixCandidates)}
+                    data-test="attendance-fix-clock-out"
+                >
+                    <Wrench className="h-4 w-4" />
+                </PageHeaderGlassButton>
+            </>
+        );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Attendance" />
 
             <PageShell>
-                <PageHero
-                    category="ops"
+                <WorkforcePageHeader
+                    variant="profile"
                     icon={Timer}
                     title={
-                        <span>
-                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden="true"
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
-                                </span>
-                                Live attendance · synced to timesheets
-                            </span>
-                            <span className="block">
-                                <span className="font-normal text-primary-foreground/80">
-                                    {viewedStaff
-                                        ? `${viewedStaff.name}'s attendance —`
-                                        : `Kia ora ${firstName}, your attendance —`}
-                                </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                                    {heroDate}
-                                </span>
-                            </span>
-                        </span>
+                        viewedStaff
+                            ? `${viewedStaff.name} · Attendance`
+                            : 'My attendance'
                     }
-                    description={
-                        openSession ? (
-                            <span>
-                                Clocked in since{' '}
-                                {formatTime(openSession.clock_in_at)}
-                                {openSession.shift_id
-                                    ? ` on shift #${openSession.shift_id}`
-                                    : ''}
-                                . {(todayHours + liveExtraH).toFixed(1)}h logged
-                                today across {totalSessions} session
-                                {totalSessions === 1 ? '' : 's'} on record.
-                            </span>
-                        ) : (
-                            <span>
-                                Not on the clock. {todayHours.toFixed(1)}h
-                                logged today, {eligible.length} eligible shift
-                                {eligible.length === 1 ? '' : 's'} in the
-                                clock-in window, and {totalSessions} session
-                                {totalSessions === 1 ? '' : 's'} on record.
-                            </span>
-                        )
-                    }
-                    meta={[
-                        { icon: CalendarDays, label: formatDate(now) },
-                        {
-                            icon: Timer,
-                            label: `${totalSessions} session${totalSessions === 1 ? '' : 's'} on record`,
-                        },
-                        { icon: Link2, label: 'Sessions sync to timesheets' },
-                    ]}
-                    badges={heroBadges}
-                    stats={[
-                        {
-                            label: 'Today',
-                            value: `${(todayHours + liveExtraH).toFixed(1)}h`,
-                        },
-                        {
-                            label: 'This week',
-                            value: `${(weekHours + liveExtraH).toFixed(1)}h`,
-                        },
-                        {
-                            label: 'On the clock',
-                            value: openSession ? 'Yes' : 'No',
-                            tone: openSession ? 'success' : undefined,
-                        },
-                        {
-                            label: 'Eligible',
-                            value: eligible.length,
-                            tone: eligible.length > 0 ? 'info' : undefined,
-                        },
-                    ]}
+                    subline={`${selectedPeriod} · Clock sessions, breaks and recorded timesheet links`}
                     actions={
-                        viewedStaff || !canClock ? null : (
-                            <>
-                                {openSession ? (
-                                    <>
-                                        <Button
-                                            size="sm"
-                                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                            onClick={() =>
-                                                setClockOutOpen(true)
-                                            }
-                                            data-test="attendance-clock-out"
-                                        >
-                                            <LogOut className="mr-1 h-4 w-4" />
-                                            Clock out
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                            onClick={
-                                                onBreak ? endBreak : startBreak
-                                            }
-                                            data-test={
-                                                onBreak
-                                                    ? 'attendance-end-break'
-                                                    : 'attendance-start-break'
-                                            }
-                                        >
-                                            <Coffee className="mr-1 h-4 w-4" />
-                                            {onBreak
-                                                ? 'End break'
-                                                : 'Start break'}
-                                        </Button>
-                                        {canCreateHandovers ? (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                                onClick={() =>
-                                                    openHandoverWizard()
-                                                }
-                                                data-test="attendance-handover"
-                                            >
-                                                <ArrowLeftRight className="mr-1 h-4 w-4" />
-                                                Handover
-                                            </Button>
-                                        ) : null}
-                                    </>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                        onClick={() => setClockInOpen(true)}
-                                        data-test="attendance-clock-in"
-                                    >
-                                        <LogIn className="mr-1 h-4 w-4" />
-                                        Clock in
-                                    </Button>
-                                )}
-                                <Button
-                                    size="icon"
-                                    variant="outline"
-                                    aria-label="Fix a missed clock-out"
-                                    title={
-                                        fixCandidates.length
-                                            ? 'Fix a missed clock-out'
-                                            : 'No open sessions to correct'
-                                    }
-                                    disabled={!fixCandidates.length}
-                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                    onClick={() =>
-                                        setFixSessions(fixCandidates)
-                                    }
-                                    data-test="attendance-fix-clock-out"
-                                >
-                                    <Wrench className="h-4 w-4" />
-                                </Button>
-                            </>
-                        )
+                        <>
+                            {headerPrimaryAction}
+                            {headerSecondaryActions}
+                        </>
                     }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                    mobilePrimaryAction={headerPrimaryAction}
+                    mobileSecondaryActions={headerSecondaryActions}
+                    mobileSummary={selectedPeriod}
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Hours today"
+                                onClick={() => setTab('sessions')}
+                                ariaLabel="View attendance sessions"
+                            >
+                                <PageHeaderMeterBig>
+                                    {todayHours.toFixed(1)} hr
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Closed sessions starting{' '}
+                                    {formatDateOnly(
+                                        evidence?.today ?? toDateInput(now),
+                                    )}
+                                    {openSession
+                                        ? todayOpenHours === null
+                                            ? ' · Open time needs review'
+                                            : ` · ${todayOpenHours.toFixed(1)} hr open estimate`
+                                        : ''}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Selected week"
+                                onClick={() => setTab('sessions')}
+                                ariaLabel="View weekly sessions"
+                            >
+                                <PageHeaderMeterBig>
+                                    {weekHours.toFixed(1)} hr
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Closed sessions by clock-in date
+                                    {openSession
+                                        ? weekOpenHours === null
+                                            ? ' · Open time needs review'
+                                            : ` · ${weekOpenHours.toFixed(1)} hr open estimate`
+                                        : ''}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Clock status"
+                                onClick={() => setTab('sessions')}
+                                ariaLabel="View clock session"
+                            >
+                                <PageHeaderMeterBig>
+                                    {openSession
+                                        ? onBreak
+                                            ? 'On break'
+                                            : 'Clocked in'
+                                        : 'Not clocked in'}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {openSession
+                                        ? `Since ${formatTime(openSession.clock_in_at)}`
+                                        : 'No open session recorded'}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Clock-in choices"
+                                onClick={() => {
+                                    if (
+                                        !viewedStaff &&
+                                        canClock &&
+                                        !openSession &&
+                                        !breakCommand.isBlocked()
+                                    )
+                                        setClockInOpen(true);
+                                    else setTab('sessions');
+                                }}
+                                ariaLabel="Review shifts in the clock-in window"
+                            >
+                                <PageHeaderMeterBig>
+                                    {eligible.length}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Current clock-in choices
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    details={
+                        <div className="flex w-full flex-wrap gap-2">
+                            {heroBadges.map((badge, index) =>
+                                badge.onClick ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        key={index}
+                                        onClick={badge.onClick}
+                                    >
+                                        {badge.icon && (
+                                            <badge.icon className="size-4" />
+                                        )}
+                                        {badge.label}
+                                    </Button>
+                                ) : (
+                                    <StatusBadge
+                                        key={index}
+                                        variant={
+                                            badge.tone === 'default'
+                                                ? 'neutral'
+                                                : (badge.tone ?? 'neutral')
+                                        }
+                                    >
+                                        {badge.label}
+                                    </StatusBadge>
+                                ),
+                            )}
+                        </div>
+                    }
+                    filters={
+                        <div className="flex w-full flex-wrap items-center justify-end gap-1.5">
                             <div className="flex flex-wrap items-center gap-1.5">
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                <PageHeaderFilterButton
+                                    icon={ChevronLeft}
                                     onClick={() =>
                                         goWeek(addDaysWP(weekStartDate, -7))
                                     }
-                                >
-                                    <ChevronLeft className="h-3.5 w-3.5" />
-                                    {prevLab}
-                                </button>
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
+                                    aria-label="Previous week"
+                                />
+                                <PageHeaderFilterButton
                                     ref={weekBtnRef}
-                                    type="button"
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-primary-foreground hover:bg-primary-foreground/30"
-                                    onClick={() => setPickerOpen((v) => !v)}
+                                    icon={CalendarRange}
+                                    onClick={() => setPickerOpen(!pickerOpen)}
                                     aria-haspopup="dialog"
                                     aria-expanded={pickerOpen}
                                 >
-                                    <CalendarRange className="h-3.5 w-3.5" />
-                                    {curLab} · {weekCompactRange(weekStartDate)}
+                                    {curLab} · {weekCompactRange(weekStartDate)}{' '}
+                                    {weekStartDate.getFullYear()}
                                     {isCurrentWeek ? ' · this week' : ''}
-                                    <ChevronDown className="h-3 w-3" />
-                                </button>
-                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
-                                <button
-                                    type="button"
-                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                </PageHeaderFilterButton>
+                                <PageHeaderFilterButton
+                                    icon={ChevronRight}
                                     onClick={() =>
                                         goWeek(addDaysWP(weekStartDate, 7))
                                     }
-                                >
-                                    {nextLab}
-                                    <ChevronRight className="h-3.5 w-3.5" />
-                                </button>
+                                    aria-label="Next week"
+                                />
                             </div>
                             {canManageAny ? (
-                                <div className="flex items-center justify-end gap-2">
-                                    <Select
-                                        value={
-                                            viewedStaff
-                                                ? String(viewedStaff.id)
-                                                : ANY
-                                        }
-                                        onValueChange={(v) =>
-                                            viewStaff(
-                                                v === ANY ? null : Number(v),
-                                            )
-                                        }
+                                <Select
+                                    value={
+                                        viewedStaff
+                                            ? String(viewedStaff.id)
+                                            : ANY
+                                    }
+                                    onValueChange={(value) =>
+                                        viewStaff(
+                                            value === ANY
+                                                ? null
+                                                : Number(value),
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger
+                                        aria-label="Whose sessions"
+                                        className="h-[23px] w-48 rounded-[8px] border-band-foreground/20 bg-band-foreground/10 px-2 py-0 text-sm text-band-foreground"
                                     >
-                                        <SelectTrigger className="h-8 w-48 border-primary-foreground/30 bg-primary-foreground/10 text-xs text-primary-foreground shadow-none hover:bg-primary-foreground/20 [&_[data-slot=select-value]]:text-primary-foreground">
-                                            <SelectValue placeholder="My sessions" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={ANY}>
-                                                My sessions
+                                        <SelectValue placeholder="My sessions" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>
+                                            My sessions
+                                        </SelectItem>
+                                        {staff.map((member) => (
+                                            <SelectItem
+                                                key={member.id}
+                                                value={String(member.id)}
+                                            >
+                                                {member.name}
                                             </SelectItem>
-                                            {staff.map((member) => (
-                                                <SelectItem
-                                                    key={member.id}
-                                                    value={String(member.id)}
-                                                >
-                                                    {member.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             ) : null}
                         </div>
                     }
+                    rail={
+                        <PageHeaderRail
+                            items={tabItems.map((item) => ({
+                                key: item.id,
+                                label: item.label,
+                                icon: item.icon,
+                                badge: item.badge,
+                            }))}
+                            value={tab}
+                            onSelect={setTab}
+                            ariaLabel="Attendance views"
+                        />
+                    }
                 />
 
-                {/* Tabbed working surface — rostering TabStrip contract. */}
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    ariaLabel="Attendance views"
-                    items={tabItems}
-                />
+                <AttendanceBreakFeedback command={breakCommand} checkHref="/attendance" />
+                <div className="text-caption flex flex-wrap items-center justify-between gap-2 text-muted-foreground">
+                    <p>
+                        {tab === 'sessions'
+                            ? `${selectedPeriod} · ${totalSessions} recorded sessions across all dates`
+                            : tab === 'onclock'
+                              ? 'Current open sessions at permitted sites'
+                              : 'Recorded handovers for this person across all dates'}
+                        {evidence
+                            ? ` · Updated ${formatDateTimeInZone(evidence.checked_at, evidence.timezone)}`
+                            : ''}
+                    </p>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.reload()}
+                    >
+                        Refresh records
+                    </Button>
+                    {openSession && tab === 'sessions' ? (
+                        <p className="w-full">
+                            Open estimate today (
+                            {formatDateOnly(
+                                evidence?.today ?? toDateInput(now),
+                            )}
+                            ):{' '}
+                            {todayOpenHours === null
+                                ? 'needs review'
+                                : `${todayOpenHours.toFixed(1)} hr`}{' '}
+                            · Selected week:{' '}
+                            {weekOpenHours === null
+                                ? 'needs review'
+                                : `${weekOpenHours.toFixed(1)} hr`}
+                            . Estimates cover only time inside each period,
+                            excluding recorded breaks. Closed hours keep the
+                            session’s clock-in date.
+                        </p>
+                    ) : null}
+                    {activeList?.truncated ? (
+                        <p role="status" className="w-full text-status-warning">
+                            {activeList.shown} of {activeList.total} records
+                            loaded. The totals include all permitted records;
+                            {tab === 'sessions'
+                                ? 'Use the page controls to review more.'
+                                : `Only the most recent ${activeList.limit} records appear here.`}
+                        </p>
+                    ) : null}
+                </div>
 
+                {tab === 'sessions' && sessionPagination ? (
+                    <LaravelPagination
+                        links={sessionPagination.links}
+                        lastPage={sessionPagination.last_page}
+                        className="flex-wrap"
+                    />
+                ) : null}
                 {tab === 'sessions' ? (
                     <SessionsCard
                         sessions={sessions}
                         weekLabelText={curLab}
-                        weekRangeText={`${weekCompactRange(weekStartDate)}${viewedStaff ? ` · ${viewedStaff.name}` : ''}`}
+                        weekRangeText={`${selectedPeriod}${viewedStaff ? ` · ${viewedStaff.name}` : ''}`}
                         onContext={sessionCtx}
                     />
                 ) : null}
@@ -1462,7 +1672,8 @@ export default function AttendanceIndex({
                             viewStaff(userId);
                             setTab('sessions');
                         }}
-                        onEnd={setEndTarget}
+                        onEnd={openEndSession}
+                        blocksSession={breakCommand.blocksSession}
                         onContext={onClockCtx}
                     />
                 ) : null}
@@ -1483,59 +1694,64 @@ export default function AttendanceIndex({
 
             {/* ── workflows (wizards + dialogs) ── */}
             <ClockInWizard
+                timezone={evidence?.timezone}
                 open={clockInOpen}
                 onClose={() => setClockInOpen(false)}
                 shifts={eligible}
             />
             <ClockOutWizard
+                timezone={evidence?.timezone}
                 open={clockOutOpen}
                 onClose={() => setClockOutOpen(false)}
                 session={openSession}
             />
             <FixClockOutWizard
+                timezone={evidence?.timezone}
                 open={fixSessions !== null}
                 onClose={() => setFixSessions(null)}
                 sessions={fixSessions ?? []}
             />
 
-            {/* Full handover record — the same detail pop-up as Shift Handovers. */}
+            {/* Full handover record — the same detail pop-up as Handovers. */}
             <HandoverDetailDialog
                 handover={detailHandover}
                 open={detailId != null}
                 onOpenChange={(open) => !open && setDetailId(null)}
                 onEdit={(h) => openHandoverWizard(h)}
-                onSubmit={(h) =>
-                    router.patch(
-                        `/operations/handovers/${h.id}/submit`,
-                        {},
-                        {
-                            preserveScroll: true,
-                            onSuccess: () => setDetailId(null),
-                        },
-                    )
-                }
+                onSubmit={(h) => {
+                    if (checkedHandoverCommands) { openHandoverWizard(h, true); return; }
+                    router.patch(`/operations/handovers/${h.id}/submit`, {}, {
+                        preserveScroll: true, onSuccess: () => setDetailId(null),
+                    });
+                }}
                 onAcknowledge={(h) => {
                     setDetailId(null);
                     acknowledgeHandover(h as AttendanceHandover);
                 }}
             />
 
-            {handoverOpen && catalogue ? (
+            {catalogue ? (
                 <HandoverWizard
+                    checkedCommands={checkedHandoverCommands}
+                    timeZone={evidence.timezone}
+                    submitOnly={submitHandoverOnly}
                     open={handoverOpen}
                     onOpenChange={(open) => {
                         if (!open) {
+                            ++handoverLaunch.current.generation;
                             setHandoverOpen(false);
                             setEditingHandover(null);
                         }
                     }}
-                    editing={editingHandover}
+                    editing={currentEditingHandover}
+                    editingUnavailable={editingHandover !== null && currentEditingHandover === null}
                     catalogue={catalogue}
                     currentUser={currentUser}
                     preselectClientId={
                         pendingClientId ?? openSession?.client_id ?? null
                     }
                     onAddClient={() => setAddClientOpen(true)}
+                    addClientActive={addClientOpen}
                     onSubmitted={() => {
                         setTab('handovers');
                         router.reload({ only: ['handovers'] });
@@ -1571,35 +1787,16 @@ export default function AttendanceIndex({
                 />
             ) : null}
 
-            <ReasonDialog
+            <EndSessionDialog
                 open={endTarget !== null}
-                onClose={() => setEndTarget(null)}
-                title={
-                    endTarget?.user_name
-                        ? `End ${endTarget.user_name}'s session?`
-                        : 'End this session?'
+                session={endTarget}
+                currentSession={
+                    onClockNow.find((row) => row.id === endTarget?.id) ?? null
                 }
-                description="This closes the open attendance session, ends any running break, and syncs a draft timesheet. The reason is recorded in the audit log."
-                label="Reason"
-                placeholder="e.g. Missed clock-out on Monday"
-                confirmLabel="End session"
-                onConfirm={(reason, done) => {
-                    if (!endTarget) return;
-                    router.post(
-                        `/attendance/sessions/${endTarget.id}/end`,
-                        { reason },
-                        {
-                            preserveScroll: true,
-                            onSuccess: () => setEndTarget(null),
-                            onError: (errs) =>
-                                toast.error(
-                                    errs.end_session ??
-                                        'Could not end the session.',
-                                ),
-                            onFinish: done,
-                        },
-                    );
-                }}
+                viewerId={auth?.user?.id ?? null}
+                canManage={canManageAny}
+                timezone={evidence?.timezone}
+                onClose={() => setEndTarget(null)}
             />
 
             {/* right-click menu host */}

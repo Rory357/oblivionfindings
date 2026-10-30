@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-09-27 Pacific/Auckland",
+  "environment": "Isolated synthetic database; normal authentication; compiled production assets",
+  "compiled_app_asset": "/build/assets/app-BJOOmhvi.js",
+  "scenarios": [
+    "Search and Cards/List, URL search/view retention, source selection",
+    "Marker hover/focus evidence, person right-click, Shift+F10, equivalent kebab actions",
+    "Original Control Room PL-PREVIEW-01 dialog and return to selected workspace",
+    "Client Location Day & outing reports entry to current passenger journey",
+    "Day PDF and outing PDF through actual UI; controller equivalents visually inspected",
+    "Six charts, accessible Data tables, power/movement gaps, exact low-battery cohort and Back",
+    "Shared NZ date calendar, future-date validation",
+    "Final card active-response count with latest compiled bundle",
+    "Light and dark inspection; original System preference restored"
+  ],
+  "layout": "No horizontal document overflow at actual CSS widths 1280 and 1440; additional 1024 and 1152 checks. Temporary viewport reset. Browser zoom not separately certified.",
+  "privacy_checks": "Dedicated frontend tests cover remount/Back revalidation, hidden-document clearing, failed revalidation, and aborted/late responses.",
+  "limitations": [
+    "Main technical review, package integration and deployment-scale profiling remain",
+    "Some local preview requests were slow under local database/bootstrap load; this is not load certification",
+    "One transient missing-manifest page during Vite rebuild recovered after build completion",
+    "PKG-07 boundary handoff must be validated as its canonical package lands"
+  ],
+  "proof_files": [
+    "people-cards.png",
+    "analytics.png",
+    "analytics-light.png",
+    "map-context-menu.png",
+    "day-report.png",
+    "outing-report.png"
+  ],
+  "visual_alignment": {
+    "reference": "frozen OPS-PL01-v5",
+    "css_widths_and_themes": [
+      "1440 light",
+      "1440 dark",
+      "1280 light"
+    ],
+    "checked": [
+      "priority low-battery action opens exactly Noah at 12%",
+      "Cards/List search Maia and source-health columns",
+      "all six charts and percentage Data view",
+      "calculation dialog opens and closes",
+      "history gap shading with disconnected line",
+      "Day / outing report reaches reason-required export dialog",
+      "original report and Control Room menu actions retained"
+    ],
+    "console_errors": [],
+    "screenshots": [
+      "v5-reference-1440-light.png",
+      "v5-reference-1440-dark.png",
+      "v5-people-1440-dark.png",
+      "aligned-analytics-1440-light.png",
+      "aligned-analytics-1440-dark.png",
+      "aligned-people-1440-dark.png",
+      "aligned-list-1440-dark.png",
+      "aligned-analytics-1280-light.png",
+      "aligned-history-1280-light.png"
+    ],
+    "limitations": "Actual permitted records, canonical active-response feed and shared application shell differ from synthetic fixtures; this is layout alignment, not pixel-identical fixture replication."
+  }
+}

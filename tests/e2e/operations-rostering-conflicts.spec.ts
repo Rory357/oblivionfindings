@@ -52,7 +52,11 @@ test.describe('operations rostering — conflicts page', () => {
         );
 
         await expect(
-            page.getByRole('heading', { name: /conflicts need you/i }),
+            page.getByRole('heading', {
+                name: 'Conflict queue',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
         await expectNoBlockingAxeViolations(page);
 

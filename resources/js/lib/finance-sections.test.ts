@@ -49,6 +49,7 @@ describe('Finance hubs', () => {
                 '/finance/vendors',
                 '/finance/credit-notes',
                 '/finance/payment-runs',
+                '/finance/vehicle-reviews',
                 '/finance/invoices',
                 '/finance/quotes',
                 '/finance/recurring-charges',

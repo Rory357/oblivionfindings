@@ -34,7 +34,7 @@ export function titleCase(s: string): string {
 }
 
 const ENTITY_TONE = [
-    'bg-primary text-primary-foreground',
+    'bg-primary-fill text-primary-fill-foreground',
     'bg-status-info text-primary-foreground',
     'bg-status-success text-primary-foreground',
     'bg-status-critical text-primary-foreground',

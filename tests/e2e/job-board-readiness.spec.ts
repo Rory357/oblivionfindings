@@ -23,7 +23,11 @@ test.describe('job board readiness', () => {
         await page.waitForLoadState('domcontentloaded');
 
         await expect(
-            page.getByRole('heading', { name: /shifts ready to claim/i }),
+            page.getByRole('heading', {
+                name: 'Job Board',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
         await expect(page.getByTestId('job-board-card').first()).toBeVisible();
         const eligibility = page.getByTestId('viewer-eligibility').first();
@@ -73,11 +77,17 @@ test.describe('job board readiness', () => {
 
         await expect(page.getByTestId('job-board-skill-filter')).toBeVisible();
         await page.getByTestId('job-board-skill-filter').click();
-        await page.getByRole('option', { name: 'NZSL' }).click();
+        await page
+            .getByRole('dialog')
+            .getByRole('button', { name: 'NZSL', exact: true })
+            .click();
         await expect(page).toHaveURL(/skill=NZSL/);
 
         await page.getByTestId('job-board-date-filter').click();
-        await page.getByRole('option', { name: 'Next 7 Days' }).click();
+        await page
+            .getByRole('dialog')
+            .getByRole('button', { name: 'Next 7 days', exact: true })
+            .click();
         await expect(page).toHaveURL(/date_range=next_7_days/);
 
         const firstCard = page.getByTestId('job-board-card').first();

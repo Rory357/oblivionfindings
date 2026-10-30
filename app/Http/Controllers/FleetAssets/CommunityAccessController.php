@@ -7,13 +7,27 @@ use App\Models\FleetOuting;
 use App\Models\FleetOutingResident;
 use App\Models\FleetResidentTransport;
 use App\Models\Site;
+use App\Services\Fleet\ResidentTransportJourneyScope;
+use App\Services\UserSiteAccessService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class CommunityAccessController extends Controller
 {
+    /**
+     * FA-T01: every outing, resident row, weekly count and CSV covers the
+     * viewer's approved Sites only. `fleet.manage` is the explicit all-Sites
+     * authority, as in the sibling Fleet report controllers.
+     */
+    private const SITE_BYPASS_PERMISSIONS = ['fleet.manage'];
+
+    public function __construct(
+        private readonly UserSiteAccessService $siteAccess,
+        private readonly ResidentTransportJourneyScope $journeyScope,
+    ) {}
+
     public function index(Request $request)
     {
         $days = (int) ($request->input('days', 30));
@@ -29,12 +43,14 @@ class CommunityAccessController extends Controller
         $totalOutings = 0;
         $totalHours = 0;
 
-        // Gather outing data per resident
+        // Gather outing data per resident — visible outings, visible residents
+        // only, by the same outing rule as the Outings register.
         if ($hasOutings && $hasOutingResidents) {
-            $outingResidents = FleetOutingResident::query()
-                ->whereHas('outing', function ($q) use ($since) {
-                    $q->where('created_at', '>=', $since);
-                })
+            $user = $request->user();
+            $outingResidents = $this->journeyScope
+                ->applyOutingResidentScope(FleetOutingResident::query(), $user)
+                ->whereHas('outing', fn (Builder $outing) => $this->journeyScope->applyOutingScope($outing, $user)
+                    ->where('created_at', '>=', $since))
                 ->with([
                     'outing:id,planned_departure,planned_return,actual_departure,actual_return,status',
                     'client:id,first_name,last_name,site_id',
@@ -102,7 +118,7 @@ class CommunityAccessController extends Controller
                 $weekStart = $weekStart->copy()->addDays(7);
             }
 
-            $weeklyCounts = FleetOuting::query()
+            $weeklyCounts = $this->journeyScope->applyOutingScope(FleetOuting::query(), $user)
                 ->where('created_at', '>=', $since)
                 ->selectRaw('FLOOR(DATEDIFF(created_at, ?) / 7) as week_index, COUNT(*) as cnt', [$since->toDateString()])
                 ->groupBy('week_index')
@@ -116,11 +132,12 @@ class CommunityAccessController extends Controller
             }
         }
 
-        // Transport trip counts per resident
+        // Transport trip counts per resident — the same resident-journey
+        // boundary as the Transport register.
         if ($hasTransports) {
-            $transportCounts = FleetResidentTransport::query()
+            $transportCounts = $this->journeyScope
+                ->applyTransportScope(FleetResidentTransport::query(), $request->user())
                 ->where('created_at', '>=', $since)
-                ->whereNotNull('resident_id')
                 ->selectRaw('resident_id, COUNT(*) as cnt')
                 ->groupBy('resident_id')
                 ->pluck('cnt', 'resident_id')
@@ -145,10 +162,14 @@ class CommunityAccessController extends Controller
             }
         }
 
-        // Resolve house names
+        // Resolve house names — approved Sites only
         $siteIds = collect($byResident)->pluck('site_id')->filter()->unique()->values()->all();
         if (!empty($siteIds)) {
-            $siteNames = Site::whereIn('id', $siteIds)->pluck('name', 'id')->toArray();
+            $siteNames = $this->siteAccess
+                ->applySiteScope(Site::query(), $request->user(), self::SITE_BYPASS_PERMISSIONS)
+                ->whereIn('id', $siteIds)
+                ->pluck('name', 'id')
+                ->toArray();
             foreach ($byResident as &$r) {
                 if ($r['site_id'] && isset($siteNames[$r['site_id']])) {
                     $r['house'] = $siteNames[$r['site_id']];

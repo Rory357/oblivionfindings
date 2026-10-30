@@ -45,7 +45,7 @@ if (is_string($encodedSigningKeys) && $encodedSigningKeys !== '') {
 
 return [
     'credentials' => [
-        'driver' => env('MONITORING_CREDENTIAL_DRIVER', 'unavailable'),
+        'driver' => env('MONITORING_CREDENTIAL_DRIVER', 'database'),
         'lease_ttl_seconds' => (int) env('MONITORING_CREDENTIAL_LEASE_TTL_SECONDS', 60),
         'vault' => [
             'url' => env('MONITORING_VAULT_URL'),
@@ -61,6 +61,11 @@ return [
         'topology_dependency_minimum_confidence' => 0.85,
     ],
     'collector' => [
+        'installation' => [
+            'server_url' => env('MONITORING_COLLECTOR_SERVER_URL'),
+            'tls_public_key_pin' => env('MONITORING_COLLECTOR_TLS_PUBLIC_KEY_PIN'),
+            'enrolment_minutes' => 15,
+        ],
         'signing_secret_key' => env('MONITORING_COLLECTOR_SIGNING_SECRET_KEY'),
         'trusted_proxy_cidrs' => array_values(array_filter(array_map(
             'trim',

@@ -36,14 +36,23 @@ test('all route permission middleware keys are seeded for production', function 
     expect(array_values(array_diff($routePermissions, $definedPermissions)))->toBe([]);
 });
 
-test('admin receives every seeded permission after production permission seeders run', function () {
+test('admin receives every permission except the restricted independent authority', function () {
     foreach (productionPermissionSeeders() as $seeder) {
         $this->seed($seeder);
     }
 
-    $admin = Role::query()->where('name', 'admin')->firstOrFail();
+    $restricted = RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY;
+    $adminKeys = Role::query()->where('name', 'admin')->firstOrFail()->permissions()->pluck('key')->all();
+    $complianceLeadKeys = Role::query()->where('name', 'compliance_lead')->firstOrFail()->permissions()->pluck('key')->all();
+    $grantable = Permission::query()->whereNotIn('key', $restricted)->pluck('key')->all();
 
-    expect($admin->permissions()->count())->toBe(Permission::query()->count());
+    expect(Permission::query()->whereIn('key', $restricted)->count())->toBe(count($restricted))
+        ->and(array_values(array_diff($grantable, $adminKeys)))->toBe([])
+        ->and(array_values(array_intersect($restricted, $adminKeys)))->toBe([])
+        ->and($complianceLeadKeys)->toContain(
+            'healthSafety.closureExceptions.approve',
+            'safeguarding.declassification.approve',
+        );
 });
 
 test('payslip routes use dedicated payslip permissions', function () {

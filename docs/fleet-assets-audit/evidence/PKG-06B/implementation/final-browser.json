@@ -1,0 +1,28 @@
+{
+  "source": "8821 real Laravel/Inertia synthetic preview",
+  "runtimeCommit": "42aed581844b94bc6c807591b35d81fb8c4581dd",
+  "bundle": "app-6O9LjipA.js",
+  "registerUrl": "http://127.0.0.1:8905/fleet-assets/assets?page=1&site_id=&view=labels&workflow_status=",
+  "registerSelection": 3,
+  "newSharedBatches": [
+    7,
+    8
+  ],
+  "historyPreservedBeforeBrowserWrites": 3,
+  "downloadFallback": {
+    "visible": true,
+    "href": "/fleet-assets/asset-register/labels/7/pdf",
+    "savedViaBrowserFileApi": "asset-labels-7 (1).pdf"
+  },
+  "automaticDownloadLimitation": "IAB automatic blob downloads produced no file; direct page navigation to attachment returned ERR_BLOCKED_BY_CLIENT. Supported browser file-download API saved PDFs/ZIP successfully.",
+  "profileCalendar": {
+    "viewport": 390,
+    "left": 16,
+    "right": 374,
+    "top": 99,
+    "bottom": 584.5
+  },
+  "customPdfPreview": "Three pages, company Branding logo, shared file viewer",
+  "consoleErrors": [],
+  "viewportOverrideReset": true
+}

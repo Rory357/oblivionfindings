@@ -15,6 +15,7 @@ use App\Models\ClientGeofenceRuleVersion;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\AuthorizationEvidenceLockService;
+use App\Services\Fleet\BoundaryService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -31,11 +32,16 @@ class ClientLocationZoneDraftService
             ->where('status', 'draft')->orderByDesc('updated_at')->get();
         $versions = ClientGeofenceRuleVersion::query()->whereIn('rule_id', $rules->modelKeys())->orderByDesc('revision')->get()->groupBy('rule_id');
         $zones = $rules->map(fn ($rule) => $this->present($rule, $versions[$rule->id]->firstWhere('revision', $rule->current_revision), $fingerprint));
-        $boundaries = $this->access->eligibleBoundaries($client, (int) $assignment->custody_site_id)->orderBy('name')->get()
+        // Keep currently linked sources available for draft comparison; search the rest on demand.
+        $sourceIds = $versions->flatten(1)->pluck('canonical_geofence_id')->filter()->unique();
+        $initialIds = $this->access->eligibleBoundaries($client, (int) $assignment->custody_site_id)->orderBy('name')->orderBy('id')->limit(20)->pluck('id');
+        $sourceIds = $sourceIds->merge($initialIds)->unique();
+        $boundaries = $this->access->eligibleBoundaries($client, (int) $assignment->custody_site_id)->whereKey($sourceIds)->orderBy('name')->get()
             ->map(fn ($geometry) => ['id' => $geometry->id, 'name' => $geometry->name, 'geometry' => $this->geometry($geometry), 'hash' => $this->geometryHash($geometry)]);
         $this->access->recheck($actor, $client, $fingerprint);
 
-        return ['zones' => $zones, 'boundaries' => $boundaries, 'access_fingerprint' => $fingerprint, 'checked_at' => now()->toISOString()];
+        return ['zones' => $zones, 'boundaries' => $boundaries, 'access_fingerprint' => $fingerprint, 'checked_at' => now()->toISOString(),
+            'can_use_shared_builder' => $actor->fresh()->canDo('fleet.viewAny') || $actor->fresh()->canDo('assets.geofences.manage')];
     }
 
     public function save(User $actor, Client $client, array $data, ?int $ruleId = null): array
@@ -88,6 +94,7 @@ class ClientLocationZoneDraftService
                 'classification' => $data['classification'], 'geometry_source' => $data['geometry_source'],
                 'geometry_proposal' => $geometry, 'canonical_geofence_id' => $canonical?->id,
                 'canonical_geometry_hash' => $canonical ? $this->geometryHash($canonical) : null,
+                'canonical_boundary_snapshot' => $canonical ? app(BoundaryService::class)->snapshot($canonical) : null,
                 'schedule_proposal' => $data['schedule'], 'response_proposal' => $data['response_proposal'] ?? null,
                 'actor_id' => $actor->id, 'assignment_id' => $assignment->id, 'consent_id' => $assignment->consent_id,
                 'access_fingerprint' => $data['access_fingerprint'], 'operation_key' => $key, 'payload_hash' => $hash, 'created_at' => now(),
@@ -108,6 +115,7 @@ class ClientLocationZoneDraftService
             'purpose' => $version->purpose, 'classification' => $version->classification, 'geometry_source' => $version->geometry_source,
             'geometry' => $version->geometry_proposal, 'canonical_geofence_id' => $version->canonical_geofence_id,
             'canonical_geometry_hash' => $version->canonical_geometry_hash, 'schedule' => $version->schedule_proposal,
+            'canonical_boundary_snapshot' => $version->canonical_boundary_snapshot,
             'response_proposal' => $version->response_proposal, 'saved_at' => $version->created_at->toISOString(),
             'monitoring' => $monitor ? ['id' => $monitor->id, 'status' => $monitor->ended_at ? 'paused' : 'active',
                 'authority_current' => $fingerprint !== null && hash_equals($monitor->access_fingerprint, $fingerprint),

@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 function grantClientFundIntegrityPermissions(User $user, array $permissionKeys): void
 {
@@ -447,6 +448,7 @@ it('never creates a non-zero opening balance without a matching transaction', fu
 });
 
 it('serializes simultaneous fund movements without losing either balance update', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 
@@ -568,6 +570,7 @@ it('serializes simultaneous fund movements without losing either balance update'
 });
 
 it('serializes simultaneous debit approvals so available balance cannot be overdrawn', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

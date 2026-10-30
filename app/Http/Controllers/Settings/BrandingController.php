@@ -4,29 +4,13 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Models\AppSetting;
+use App\Support\Branding\BrandHeroPhoto;
+use App\Support\BrandThemeTokens;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class BrandingController extends Controller
 {
-    /**
-     * Allowed CSS variables that admins can override.
-     */
-    private array $allowedVars = [
-        '--primary', '--primary-foreground',
-        '--secondary', '--secondary-foreground',
-        '--accent', '--accent-foreground',
-        '--background', '--foreground',
-        '--card', '--card-foreground',
-        '--popover', '--popover-foreground',
-        '--border', '--input', '--ring',
-        '--sidebar', '--sidebar-foreground',
-        '--sidebar-primary', '--sidebar-primary-foreground',
-        '--sidebar-accent', '--sidebar-accent-foreground',
-        '--sidebar-border', '--sidebar-ring',
-        '--radius',
-    ];
-
     public function edit(Request $request)
     {
         $user = $request->user();
@@ -38,7 +22,11 @@ class BrandingController extends Controller
         $brandingTagline = AppSetting::query()->where('key', 'branding.tagline')->value('value');
         $brandingReportSubtitle = AppSetting::query()->where('key', 'branding.report_subtitle')->value('value');
         $logoPath = AppSetting::query()->where('key', 'branding.logo_path')->value('value');
+        $logoDarkPath = AppSetting::query()->where('key', 'branding.logo_dark_path')->value('value');
         $faviconPath = AppSetting::query()->where('key', 'branding.favicon_path')->value('value');
+        // The website and sign-in photo (public home hero and both sign-in pages).
+        $heroPhotoPath = AppSetting::query()->where('key', BrandHeroPhoto::PATH_SETTING)->value('value');
+        $heroAlt = AppSetting::query()->where('key', BrandHeroPhoto::ALT_SETTING)->value('value');
 
         // Email & Report branding
         $emailHeaderColour = AppSetting::query()->where('key', 'branding.email_header_colour')->value('value');
@@ -56,17 +44,20 @@ class BrandingController extends Controller
             ->toArray();
 
         return inertia('settings/branding', [
-            'allowedVars' => $this->allowedVars,
+            'allowedVars' => BrandThemeTokens::ALLOWED,
             'theme' => [
-                'light' => is_array($themeLight) ? $themeLight : [],
-                'dark' => is_array($themeDark) ? $themeDark : [],
+                'light' => BrandThemeTokens::filter($themeLight),
+                'dark' => BrandThemeTokens::filter($themeDark),
             ],
             'branding' => [
                 'name' => is_string($brandingName) ? $brandingName : null,
                 'tagline' => is_string($brandingTagline) ? $brandingTagline : null,
                 'report_subtitle' => is_string($brandingReportSubtitle) ? $brandingReportSubtitle : null,
                 'logoUrl' => $logoPath ? Storage::disk('public')->url($logoPath) : null,
+                'logoDarkUrl' => $logoDarkPath ? Storage::disk('public')->url($logoDarkPath) : null,
                 'faviconUrl' => $faviconPath ? Storage::disk('public')->url($faviconPath) : null,
+                'heroUrl' => BrandHeroPhoto::url($heroPhotoPath),
+                'hero_alt' => is_string($heroAlt) ? $heroAlt : null,
                 'email_header_colour' => is_string($emailHeaderColour) ? $emailHeaderColour : null,
                 'email_footer_text' => is_string($emailFooterText) ? $emailFooterText : null,
                 'report_logo_position' => is_string($reportLogoPosition) ? $reportLogoPosition : 'left',
@@ -95,6 +86,7 @@ class BrandingController extends Controller
             'branding.report_logo_position' => ['nullable', 'string', 'in:left,centre,right'],
             'branding.report_font' => ['nullable', 'string', 'in:default,serif,sans-serif'],
             'branding.report_include_company_details' => ['nullable', 'boolean'],
+            'branding.hero_alt' => ['nullable', 'string', 'max:200'],
 
             'theme' => ['nullable', 'array'],
             'theme.light' => ['nullable', 'array'],
@@ -102,12 +94,28 @@ class BrandingController extends Controller
 
             'logo' => ['nullable', 'file', 'image', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
+            'logo_dark' => ['nullable', 'file', 'image', 'max:2048'],
+            'remove_logo_dark' => ['nullable', 'boolean'],
             'favicon' => ['nullable', 'file', 'image', 'max:512'],
             'remove_favicon' => ['nullable', 'boolean'],
+            // The website and sign-in photo: re-encoded (metadata stripped) by BrandHeroPhoto.
+            'hero_photo' => BrandHeroPhoto::rules(),
+            'remove_hero_photo' => ['nullable', 'boolean'],
+        ], [
+            'hero_photo.dimensions' => 'Choose a photo at least '.BrandHeroPhoto::MIN_WIDTH.' × '.BrandHeroPhoto::MIN_HEIGHT.' pixels, so it stays sharp on large screens.',
+            'hero_photo.max' => 'Choose a photo up to '.(BrandHeroPhoto::MAX_KILOBYTES / 1024).' MB.',
+            'hero_photo.mimes' => 'Choose a JPG, PNG or WebP photo.',
+            'hero_photo.image' => 'Choose a JPG, PNG or WebP photo.',
         ]);
 
+        // Re-encode the photo first: an unreadable file stops the save before anything changes.
+        $heroPhotos = app(BrandHeroPhoto::class);
+        $newHeroPath = $request->hasFile('hero_photo')
+            ? $heroPhotos->store($request->file('hero_photo')->getRealPath())
+            : null;
+
         // Save branding text fields
-        $textFields = ['name', 'tagline', 'report_subtitle', 'email_header_colour', 'email_footer_text', 'report_logo_position', 'report_font'];
+        $textFields = ['name', 'tagline', 'report_subtitle', 'email_header_colour', 'email_footer_text', 'report_logo_position', 'report_font', 'hero_alt'];
         foreach ($textFields as $field) {
             $value = trim((string) data_get($data, "branding.{$field}", ''));
             $dbKey = "branding.{$field}";
@@ -131,26 +139,8 @@ class BrandingController extends Controller
         $light = (array) data_get($data, 'theme.light', []);
         $dark = (array) data_get($data, 'theme.dark', []);
 
-        $filter = function (array $vars) {
-            $out = [];
-            foreach ($vars as $k => $v) {
-                if (!is_string($k) || !in_array($k, $this->allowedVars, true)) {
-                    continue;
-                }
-                if (!is_string($v)) {
-                    continue;
-                }
-                $val = trim($v);
-                if ($val === '') {
-                    continue;
-                }
-                $out[$k] = $val;
-            }
-            return $out;
-        };
-
-        $lightFiltered = $filter($light);
-        $darkFiltered = $filter($dark);
+        $lightFiltered = BrandThemeTokens::filter($light);
+        $darkFiltered = BrandThemeTokens::filter($dark);
 
         if (count($lightFiltered) === 0) {
             AppSetting::query()->where('key', 'theme.light')->delete();
@@ -183,6 +173,24 @@ class BrandingController extends Controller
             AppSetting::updateOrCreate(['key' => 'branding.logo_path'], ['value' => $path]);
         }
 
+        // Logo for dark backgrounds (sign-in brand half, dark mode) upload / removal
+        $removeLogoDark = (bool) ($data['remove_logo_dark'] ?? false);
+        $existingLogoDarkPath = AppSetting::query()->where('key', 'branding.logo_dark_path')->value('value');
+
+        if ($removeLogoDark && $existingLogoDarkPath) {
+            Storage::disk('public')->delete($existingLogoDarkPath);
+            AppSetting::query()->where('key', 'branding.logo_dark_path')->delete();
+        }
+
+        if ($request->hasFile('logo_dark')) {
+            if ($existingLogoDarkPath) {
+                Storage::disk('public')->delete($existingLogoDarkPath);
+            }
+
+            $path = $request->file('logo_dark')->store('branding', 'public');
+            AppSetting::updateOrCreate(['key' => 'branding.logo_dark_path'], ['value' => $path]);
+        }
+
         // Favicon upload / removal
         $removeFavicon = (bool) ($data['remove_favicon'] ?? false);
         $existingFaviconPath = AppSetting::query()->where('key', 'branding.favicon_path')->value('value');
@@ -198,6 +206,13 @@ class BrandingController extends Controller
             }
             $path = $request->file('favicon')->store('branding', 'public');
             AppSetting::updateOrCreate(['key' => 'branding.favicon_path'], ['value' => $path]);
+        }
+
+        // Website and sign-in photo upload / removal (removal also clears its description).
+        if ($newHeroPath !== null) {
+            $heroPhotos->makeCurrent($newHeroPath);
+        } elseif ((bool) ($data['remove_hero_photo'] ?? false)) {
+            $heroPhotos->remove();
         }
 
         return redirect()->back()->with('success', 'Branding updated.');

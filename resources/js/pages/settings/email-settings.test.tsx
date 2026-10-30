@@ -198,6 +198,28 @@ describe('email settings delivery recovery', () => {
         ).toBeDisabled();
     });
 
+    it('shows the saved provider when IT support delivery is disabled', () => {
+        page.props = settings({
+            settings: {
+                ...settings().settings,
+                provider: 'microsoft',
+                support_enabled: false,
+            },
+        });
+        render(<EmailSettings />);
+        expect(
+            screen.getByRole('button', {
+                name: /Configured provider: Microsoft 365/,
+            }),
+        ).toBeInTheDocument();
+        expect(screen.queryByText('Server default')).not.toBeInTheDocument();
+        openTesting();
+        expect(
+            screen.getByRole('button', { name: 'Send test to me' }),
+        ).toBeDisabled();
+        expect(axios.post).not.toHaveBeenCalled();
+    });
+
     it('blocks delivery tests after a failed saved-settings read', async () => {
         vi.mocked(axios.get).mockRejectedValue(error(500));
         render(<EmailSettings />);

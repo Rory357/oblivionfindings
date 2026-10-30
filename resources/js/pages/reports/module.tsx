@@ -13,6 +13,8 @@ type Props = {
         label: string;
         description: string;
         route: string;
+        export_route: string | null;
+        export_label: string;
         columns: Record<string, string>;
     };
     filters: {
@@ -77,12 +79,17 @@ export default function ModuleReport({
     };
 
     const exportCsv = () => {
+        if (!module.export_route) return;
+        if (module.export_label === 'Print & exports') {
+            router.visit(module.export_route);
+            return;
+        }
         const params = new URLSearchParams();
         Object.entries(filters).forEach(([key, value]) => {
             if (value === null || value === '') return;
             params.set(key, String(value));
         });
-        window.location.href = `/reports/modules/${module.key}/export?${params.toString()}`;
+        window.location.href = `${module.export_route}?${params.toString()}`;
     };
 
     const columns = Object.entries(module.columns);
@@ -157,8 +164,8 @@ export default function ModuleReport({
                         </div>
 
                         <div className="flex items-end gap-2 md:col-span-5">
-                            <Button variant="outline" onClick={exportCsv}>
-                                Export CSV
+                            <Button variant="outline" onClick={exportCsv} disabled={!module.export_route}>
+                                {module.export_label}
                             </Button>
                             <Button
                                 variant="ghost"

@@ -12,16 +12,18 @@ import {
     prepareControlledStockCountReplayState,
 } from './_stock-dialogs';
 import {
-    buildCdRegisterRequest,
-    CD_REGISTER_ENTRY_TYPES,
-} from './components/cd-register-modal';
+    buildSyringeDriverRequest,
+    syringeDriverRequiresWitness,
+} from './components/mar-governance-dialogs';
 import {
     addMedicationStockQuantities,
     buildControlledPharmacyDeliveryRequest,
+    buildPharmacyDeliveryRequest,
     controlledPharmacyDeliveryPath,
     genericStockMedications,
     medicationStockQuantitiesEqual,
     pharmacyOrderAdvanceAction,
+    pharmacyOrderAdvancePath,
     stockItemQuantityDestination,
     subtractMedicationStockQuantities,
 } from './medication-stock-governance';
@@ -58,36 +60,6 @@ describe('controlled medication request contracts', () => {
         expect(controlledDrugSnapshotFromSelection('ordinary')).toBe(false);
         expect(controlledDrugSnapshotFromSelection('controlled')).toBe(true);
         expect(controlledDrugSnapshotFromSelection('')).toBeNull();
-    });
-
-    it('binds a register movement to the canonical medication and preserves decimal strings and witness credential', () => {
-        expect(
-            buildCdRegisterRequest({
-                clientId: '7',
-                clientMedicationId: '41',
-                medicationName: 'Morphine sulfate',
-                entryType: 'administration',
-                quantity: '0.50',
-                unit: 'tablets',
-                onHandBefore: '10.00',
-                onHandAfter: '9.50',
-                witnessedBy: '19',
-                witnessCredential: 'witness-secret',
-                batch: '',
-                expiry: '',
-                notes: '',
-                uuid: '2af245d6-fbb2-4b9b-8936-7a995847af2e',
-            }),
-        ).toMatchObject({
-            client_id: 7,
-            client_medication_id: 41,
-            medication_name: 'Morphine sulfate',
-            quantity: '0.50',
-            on_hand_before: '10.00',
-            on_hand_after: '9.50',
-            witnessed_by: 19,
-            witness_credential: 'witness-secret',
-        });
     });
 
     it('binds a controlled count to the canonical medication without converting precise balances through a number', () => {
@@ -179,12 +151,6 @@ describe('controlled medication request contracts', () => {
         });
     });
 
-    it('does not offer balance checks through the register-entry endpoint', () => {
-        expect(
-            CD_REGISTER_ENTRY_TYPES.map((entryType) => entryType.value),
-        ).not.toContain('balance_check');
-    });
-
     it('suppresses controlled selections from generic receive and dashboard stock movement flows', () => {
         const medications = [
             { id: 41, controlled: true },
@@ -218,12 +184,53 @@ describe('controlled medication request contracts', () => {
                 status: 'confirmed',
             }),
         ).toBe('advance');
+        // An ordinary dispensed order is received through a delivery step
+        // that records what actually arrived (EM-10), not a one-click advance.
         expect(
             pharmacyOrderAdvanceAction({
                 controlled: false,
                 status: 'dispensed',
             }),
+        ).toBe('delivery');
+        expect(
+            pharmacyOrderAdvanceAction({
+                controlled: false,
+                status: 'confirmed',
+            }),
         ).toBe('advance');
+    });
+
+    it('delivers an ordinary order with the counted quantity and never blanks batch or expiry', () => {
+        expect(pharmacyOrderAdvancePath(73)).toBe(
+            '/emar/stock/pharmacy-orders/73/advance',
+        );
+        expect(
+            buildPharmacyDeliveryRequest({
+                quantityReceived: ' 26 ',
+                batchNumber: ' B-2291 ',
+                batchExpiry: '2027-03-31',
+                deliveryNotes: '',
+                uuid: 'delivery-v4',
+            }),
+        ).toEqual({
+            expected_status: 'dispensed',
+            quantity_received: '26',
+            batch_number: 'B-2291',
+            batch_expiry: '2027-03-31',
+            delivery_notes: null,
+            client_request_uuid: 'delivery-v4',
+        });
+        // Blank label fields are sent as null, which the server treats as
+        // "keep what is recorded", never as a clear.
+        expect(
+            buildPharmacyDeliveryRequest({
+                quantityReceived: '26',
+                batchNumber: '  ',
+                batchExpiry: '',
+                deliveryNotes: '',
+                uuid: 'delivery-v4',
+            }),
+        ).toMatchObject({ batch_number: null, batch_expiry: null });
     });
 
     it('posts a precise witnessed controlled delivery to the exact order command', () => {
@@ -261,6 +268,76 @@ describe('controlled medication request contracts', () => {
         expect(medicationStockQuantitiesEqual('0.3', '0.30')).toBe(true);
         expect(
             medicationStockQuantitiesEqual('0.30000000000000004', '0.30'),
+        ).toBe(false);
+    });
+
+    it('starts a syringe driver from the charted medicine id the server requires', () => {
+        const form = {
+            commenced_at: '2026-09-30T10:00',
+            rate: '2',
+            rate_unit: 'mL/hr',
+            site_of_insertion: 'Left upper arm',
+            notes: '',
+            contents: [{ client_medication_id: '41', dose: '10', unit: 'mg' }],
+            witnessed_by: '',
+            witness_credential: '',
+        };
+        const request = buildSyringeDriverRequest(form);
+
+        expect(request.contents).toEqual([
+            { client_medication_id: 41, dose: '10', unit: 'mg' },
+        ]);
+        expect(request.contents[0]).not.toHaveProperty('name');
+        expect(request.witnessed_by).toBeNull();
+        expect(
+            buildSyringeDriverRequest({ ...form, witnessed_by: '19' })
+                .witnessed_by,
+        ).toBe(19);
+    });
+
+    it('uses the server-resolved syringe driver witness policy and falls back to the explicit order requirement', () => {
+        const medicine = {
+            id: 41,
+            name: 'Midazolam',
+            dosage: '5 mg',
+            controlled_drug: false,
+            witness_required: false,
+        };
+
+        expect(syringeDriverRequiresWitness(undefined)).toBe(false);
+        expect(syringeDriverRequiresWitness(medicine)).toBe(false);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+            }),
+        ).toBe(false);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+                requires_witness: true,
+            }),
+        ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                requires_witness: true,
+            }),
+        ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                witness_required: true,
+            }),
+        ).toBe(true);
+        expect(
+            syringeDriverRequiresWitness({
+                ...medicine,
+                controlled_drug: true,
+                witness_required: true,
+                requires_witness: false,
+            }),
         ).toBe(false);
     });
 });

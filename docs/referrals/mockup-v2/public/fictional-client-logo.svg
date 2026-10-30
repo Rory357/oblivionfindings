@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 48" role="img" aria-label="Kōwhai Living (fictional client)">
+  <!-- Fictional client logo for the brand-slot mockup only. -->
+  <circle cx="24" cy="24" r="18" fill="#1F6F5C"/>
+  <path d="M24 12c5 4 7 9 0 22c-7-13-5-18 0-22z" fill="#F2C94C"/>
+  <text x="50" y="31" font-family="Georgia, serif" font-size="21" fill="#1F2A2E">Kōwhai Living</text>
+</svg>

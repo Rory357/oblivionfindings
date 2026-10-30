@@ -1,0 +1,204 @@
+- generic [ref=f56e2]:
+  - generic [ref=f56e3]:
+    - strong [ref=f56e4]: DESIGN PREVIEW · PKG-05 v2
+    - generic [ref=f56e5]: Synthetic records · changes stay in this browser until reload
+    - generic [ref=f56e6]:
+      - generic [ref=f56e7]:
+        - text: View as
+        - combobox "Preview role" [ref=f56e8]:
+          - option "Ava Thompson · Requester"
+          - option "Mia Chen · Transport allocator" [selected]
+          - option "Rory Williams · Booking approver"
+          - option "Nia Patel · Assigned driver"
+          - option "Sara Wilson · Assigned escort"
+          - option "Ben Carter · Receiving worker"
+      - button "Preview scenarios" [ref=f56e9] [cursor=pointer]
+  - generic [ref=f56e10]:
+    - generic [ref=f56e11]:
+      - text: oblivion
+      - generic [ref=f56e13]: findings
+    - generic [ref=f56e14]: Fleet & Assets
+    - generic [ref=f56e15]:
+      - generic [ref=f56e19]: Mia Chen
+      - generic [ref=f56e20]: MC
+  - generic [ref=f56e21]:
+    - complementary [ref=f56e22]:
+      - button "My Day" [ref=f56e23] [cursor=pointer]
+      - button "Sites" [ref=f56e28] [cursor=pointer]
+      - button "Clients" [ref=f56e34] [cursor=pointer]
+      - generic [ref=f56e42]: Fleet & Assets
+      - button "Overview" [ref=f56e43] [cursor=pointer]
+      - button "Fleet" [ref=f56e50] [cursor=pointer]
+      - button "Transport" [ref=f56e56] [cursor=pointer]
+      - button "Assets" [ref=f56e62] [cursor=pointer]
+      - button "Maintenance" [ref=f56e67] [cursor=pointer]
+      - button "Maps & boundaries" [ref=f56e71] [cursor=pointer]
+      - button "Reports" [ref=f56e76] [cursor=pointer]
+      - button "Settings" [ref=f56e81] [cursor=pointer]
+    - main [ref=f56e86]:
+      - generic [ref=f56e87]:
+        - button "Fleet & Assets" [ref=f56e88] [cursor=pointer]
+        - generic [ref=f56e89]: /
+        - button "Transport" [ref=f56e90] [cursor=pointer]
+      - generic [ref=f56e91]:
+        - generic [ref=f56e93]:
+          - generic [ref=f56e94]:
+            - generic [ref=f56e95]:
+              - generic [ref=f56e102]:
+                - heading "Transport" [level=1] [ref=f56e104]
+                - paragraph [ref=f56e105]: Demand, decisions, journeys and returns · one operating organisation
+              - generic [ref=f56e106]:
+                - button "My Day" [ref=f56e107] [cursor=pointer]
+                - button "Request transport" [ref=f56e108] [cursor=pointer]
+            - generic [ref=f56e111]:
+              - button "View upcoming departures" [ref=f56e112] [cursor=pointer]:
+                - generic [ref=f56e116]: Upcoming departures
+                - generic [ref=f56e118]: "1"
+                - generic [ref=f56e119]: Confirmed bookings
+              - button "View unallocated requests" [ref=f56e120] [cursor=pointer]:
+                - generic [ref=f56e124]: Unallocated requests
+                - generic [ref=f56e126]: "3"
+                - generic [ref=f56e127]: Assessment or resources needed
+              - button "View pending decisions" [ref=f56e128] [cursor=pointer]:
+                - generic [ref=f56e132]: Pending decisions
+                - generic [ref=f56e134]: "1"
+                - generic [ref=f56e135]: Fleet booking approval
+              - button "View active journeys" [ref=f56e136] [cursor=pointer]:
+                - generic [ref=f56e140]: Active journeys
+                - generic [ref=f56e142]: "2"
+                - generic [ref=f56e143]: In progress or completion due
+              - button "View overdue returns" [ref=f56e144] [cursor=pointer]:
+                - generic [ref=f56e148]: Overdue returns
+                - generic [ref=f56e150]: "1"
+                - generic [ref=f56e151]: Expected return has passed
+              - button "View open exceptions" [ref=f56e152] [cursor=pointer]:
+                - generic [ref=f56e156]: Open exceptions
+                - generic [ref=f56e158]: "1"
+                - generic [ref=f56e159]: Named owner required
+            - generic [ref=f56e161]:
+              - generic [ref=f56e162]:
+                - text: Site
+                - combobox "Site filter" [ref=f56e163]:
+                  - option "All permitted sites" [selected]
+                  - option "Aurora House"
+                  - option "Kōwhai House"
+              - generic [ref=f56e164]:
+                - text: Date
+                - combobox "Date filter" [ref=f56e165]:
+                  - option "Mon 28 September" [selected]
+                  - option "Tue 29 September"
+                  - option "All dates"
+              - generic [ref=f56e166]: Pacific/Auckland · Example time 10:35 am
+          - tablist "Views" [ref=f56e168]:
+            - tab "Overview" [selected] [ref=f56e169] [cursor=pointer]
+            - tab "Requests & approvals" [ref=f56e176] [cursor=pointer]
+            - tab "Planner" [ref=f56e181] [cursor=pointer]
+            - tab "Journeys" [ref=f56e185] [cursor=pointer]
+            - tab "Returns & handovers" [ref=f56e191] [cursor=pointer]
+            - button "Find a view" [ref=f56e196] [cursor=pointer]:
+              - generic [ref=f56e200]: Find
+        - generic [ref=f56e201]:
+          - generic [ref=f56e202]:
+            - generic [ref=f56e203]:
+              - heading "Transport today" [level=2] [ref=f56e204]
+              - paragraph [ref=f56e205]: 9 permitted requests · one view of demand, travel and returns
+            - generic [ref=f56e206]:
+              - button "Site view" [ref=f56e207] [cursor=pointer]
+              - button "Outings" [ref=f56e208] [cursor=pointer]
+          - generic [ref=f56e209]:
+            - generic [ref=f56e210]:
+              - generic [ref=f56e211]:
+                - heading "Needs a decision" [level=2] [ref=f56e212]
+                - button "All requests" [ref=f56e215] [cursor=pointer]
+              - generic [ref=f56e218]:
+                - button "Alex Morgan Needs assessment · Mia Chen Assess transport need · needed by 11:30 AM" [ref=f56e219] [cursor=pointer]:
+                  - generic [ref=f56e224]:
+                    - strong [ref=f56e225]: Alex Morgan
+                    - generic [ref=f56e226]: Needs assessment · Mia Chen
+                    - emphasis [ref=f56e227]: Assess transport need · needed by 11:30 AM
+                - button "Jordan Lee Needs information · Eli Thompson Provide missing information · needed by 12:00 PM" [ref=f56e230] [cursor=pointer]:
+                  - generic [ref=f56e235]:
+                    - strong [ref=f56e236]: Jordan Lee
+                    - generic [ref=f56e237]: Needs information · Eli Thompson
+                    - emphasis [ref=f56e238]: Provide missing information · needed by 12:00 PM
+                - button "Taylor Green Awaiting booking approval · Authorised booking approver Review booking decision · needed by 10:45 AM" [ref=f56e241] [cursor=pointer]:
+                  - generic [ref=f56e246]:
+                    - strong [ref=f56e247]: Taylor Green
+                    - generic [ref=f56e248]: Awaiting booking approval · Authorised booking approver
+                    - emphasis [ref=f56e249]: Review booking decision · needed by 10:45 AM
+                - button "Elliot White Awaiting allocation · Mia Chen Choose suitable resources · needed by 01:00 PM" [ref=f56e252] [cursor=pointer]:
+                  - generic [ref=f56e257]:
+                    - strong [ref=f56e258]: Elliot White
+                    - generic [ref=f56e259]: Awaiting allocation · Mia Chen
+                    - emphasis [ref=f56e260]: Choose suitable resources · needed by 01:00 PM
+            - generic [ref=f56e263]:
+              - generic [ref=f56e264]:
+                - heading "Departures & journeys" [level=2] [ref=f56e265]
+                - button "All journeys" [ref=f56e270] [cursor=pointer]
+              - generic [ref=f56e273]:
+                - button "11:00 AM Morgan Smith Aurora House → Harbour community centre Preparing to depart" [ref=f56e274] [cursor=pointer]:
+                  - generic [ref=f56e275]: 11:00 AM
+                  - generic [ref=f56e276]:
+                    - strong [ref=f56e277]: Morgan Smith
+                    - generic [ref=f56e278]: Aurora House → Harbour community centre
+                    - emphasis [ref=f56e279]: Preparing to depart
+                - button "09:02 AM Sam Wilson Aurora House → Harbour community centre In progress" [ref=f56e282] [cursor=pointer]:
+                  - generic [ref=f56e283]: 09:02 AM
+                  - generic [ref=f56e284]:
+                    - strong [ref=f56e285]: Sam Wilson
+                    - generic [ref=f56e286]: Aurora House → Harbour community centre
+                    - emphasis [ref=f56e287]: In progress
+                - button "08:00 AM Charlie Brown Aurora House → Harbour community centre Returned · completion due" [ref=f56e290] [cursor=pointer]:
+                  - generic [ref=f56e291]: 08:00 AM
+                  - generic [ref=f56e292]:
+                    - strong [ref=f56e293]: Charlie Brown
+                    - generic [ref=f56e294]: Aurora House → Harbour community centre
+                    - emphasis [ref=f56e295]: Returned · completion due
+          - generic [ref=f56e298]:
+            - generic [ref=f56e299]:
+              - heading "Returns that need attention" [level=2] [ref=f56e300]
+              - button "All returns" [ref=f56e304] [cursor=pointer]
+            - table [ref=f56e309]:
+              - row [ref=f56e310]:
+                - columnheader "Return / passenger" [ref=f56e311]
+                - columnheader "Window / site" [ref=f56e312]
+                - columnheader "Current status" [ref=f56e313]
+                - columnheader "Next owner" [ref=f56e314]
+                - columnheader "Next action" [ref=f56e315]
+                - columnheader "Actions"
+              - row [ref=f56e316] [cursor=pointer]:
+                - cell "Sam Wilson TR-1046 · Community appointment" [ref=f56e317]:
+                  - generic [ref=f56e322]:
+                    - generic [ref=f56e323]: Sam Wilson
+                    - generic [ref=f56e325]: TR-1046 · Community appointment
+                - cell "09:00 AM–10:00 AM Aurora House" [ref=f56e326]:
+                  - generic [ref=f56e327]:
+                    - strong [ref=f56e328]: 09:00 AM–10:00 AM
+                    - generic [ref=f56e329]: Aurora House
+                - cell "Overdue" [ref=f56e330]
+                - cell "MC Mia Chen" [ref=f56e332]:
+                  - generic [ref=f56e333]:
+                    - generic [ref=f56e334]: MC
+                    - generic [ref=f56e335]: Mia Chen
+                - cell "Record actual return" [ref=f56e336]
+                - cell [ref=f56e340]:
+                  - button "Actions for Sam Wilson" [ref=f56e342]
+              - row [ref=f56e347] [cursor=pointer]:
+                - cell "Casey Jones TR-1048 · Community appointment" [ref=f56e348]:
+                  - generic [ref=f56e353]:
+                    - generic [ref=f56e354]: Casey Jones
+                    - generic [ref=f56e356]: TR-1048 · Community appointment
+                - cell "07:00 AM–08:30 AM Aurora House" [ref=f56e357]:
+                  - generic [ref=f56e358]:
+                    - strong [ref=f56e359]: 07:00 AM–08:30 AM
+                    - generic [ref=f56e360]: Aurora House
+                - cell "Handover disputed" [ref=f56e361]
+                - cell "MC Mia Chen" [ref=f56e363]:
+                  - generic [ref=f56e364]:
+                    - generic [ref=f56e365]: MC
+                    - generic [ref=f56e366]: Mia Chen
+                - cell "Review outstanding items" [ref=f56e367]
+                - cell [ref=f56e371]:
+                  - button "Actions for Casey Jones" [ref=f56e373]
+          - paragraph [ref=f56e382]: Counts use the selected site and date across your permitted queue. Record history and source decisions remain separate.
+        - generic [ref=f56e383]: PKG-05 v2 · desktop design candidate · example date 28 September 2026 · no operational changes

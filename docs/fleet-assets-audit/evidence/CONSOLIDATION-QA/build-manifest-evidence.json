@@ -1,0 +1,121 @@
+{
+  "frontendSource": "f3fd2f77657c7fe09022ff69562e8c3487c9668b",
+  "note": "Subsequent map fix changes PHP controller and route middleware only; JS/TS/CSS and route URI/method/name remain unchanged.",
+  "manifestSha256": "d79912bb00537fb61b8e6fb5611c049946307f5cae0a1db7d6998f606d6152cb",
+  "bundles": [
+    {
+      "entry": "resources/js/app.tsx",
+      "file": "assets/app-khc5tsDn.js",
+      "sha256": "87825ac974d5864819ce701ca3db22f3fd3eb6a06c977925061ff0a93591732f",
+      "bytes": 536268
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_map-tools.tsx",
+      "file": "assets/_map-tools-lHkPjfqO.js",
+      "sha256": "2f63cf3b1b7543495b6a7a5e4a00f0e1f4e296aed7f74fd95e5504978c40d1d9",
+      "bytes": 6270
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_maps.tsx",
+      "file": "assets/_maps-9sQs4zId.js",
+      "sha256": "83ba24001a6183238b9497ffef3b7b947567396213c155635e5cc8c4ad9638ca",
+      "bytes": 11994
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_notifications.tsx",
+      "file": "assets/_notifications-CBINpVoM.js",
+      "sha256": "5b57e9e939a6b28f94712ab01b6439f61da088872c882adbc879c2940467e6c7",
+      "bytes": 17225
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_owners.tsx",
+      "file": "assets/_owners-BIhwmFAd.js",
+      "sha256": "0c092fb879eb75475dc73342af9c1eb44783436979e77d5bc6fce7bc9ce3c0c5",
+      "bytes": 16879
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/settings/_ui.tsx",
+      "file": "assets/_ui-WZ7ykXrD.js",
+      "sha256": "bd9d74ea9768a52c446ab9223779118840a0d3a9e7187e407094591a51c2da9d",
+      "bytes": 3150
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/alerts-config.tsx",
+      "file": "assets/alerts-config-C0KHRT-X.js",
+      "sha256": "6943677ccc52e55b69289c952074bca44306e696b6c4de0dd117a24cbcda5e66",
+      "bytes": 12025
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/calendar-range.tsx",
+      "file": "assets/calendar-range-BAWl-4gj.js",
+      "sha256": "e76b36f6b57441f1e7c260725138c879609296008e24310ebaff83a237a036d7",
+      "bytes": 4879
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/fleet-calendar.tsx",
+      "file": "assets/fleet-calendar-DTGrzeje.js",
+      "sha256": "f7075b11c18a780effbe84ff16bb4cd38965987a1abb695c8f73ab88aaba12e9",
+      "bytes": 17554
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/fleet-header.tsx",
+      "file": "assets/fleet-header-CLrylHiE.js",
+      "sha256": "28d03901bb4e41fb8b5c6846167b43bf0279aec8245c92dad530cbddb7c5fcf1",
+      "bytes": 2548
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/fleet-map.tsx",
+      "file": "assets/fleet-map-D4W8sD1K.js",
+      "sha256": "a62c82f50c51991b05051c8c4a15d5252cdb4c7baca8a2d124954290e1aa4d8e",
+      "bytes": 20582
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+      "file": "assets/index-CaKLevsD.js",
+      "sha256": "aaa1ea561a8bf0626f00aab69c5c23619b6c799804e63e27d4c4a141455eab12",
+      "bytes": 23835
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "file": "assets/show-uZCAvl6j.js",
+      "sha256": "4c678c8df5cd332e3d4c8ee7d0d27959437b019a50b78235eefe33552072064c",
+      "bytes": 756946
+    },
+    {
+      "entry": "resources/js/pages/fleet-assets/vehicles/vehicle-technology-projection.tsx",
+      "file": "assets/vehicle-technology-projection-BzraQN3x.js",
+      "sha256": "23c170a08c8b7830b97d784f0f84f23330026ccb41e84c78ce9516571efcb250",
+      "bytes": 10097
+    },
+    {
+      "entry": "resources/js/pages/operations/people-locations/index.tsx",
+      "file": "assets/index-A9-05GSF.js",
+      "sha256": "76cb707740476ad61c6a0a46a6011fa20146420b66e3c305bc74f34c1f28552d",
+      "bytes": 89146
+    },
+    {
+      "entry": "resources/js/pages/reporting/_dialogs.tsx",
+      "file": "assets/_dialogs-slw_LTGo.js",
+      "sha256": "68fbc799b20984686c9ff8808a29d92c8a183719cd36ad0ec95e82f282937f8b",
+      "bytes": 1516
+    },
+    {
+      "entry": "resources/js/pages/reporting/studio-controls.tsx",
+      "file": "assets/studio-controls-D51FWf3m.js",
+      "sha256": "4b9eee8bad62dbba34f465de51f1bab8a107db29cbc58deacfa461f9e684232e",
+      "bytes": 11705
+    },
+    {
+      "entry": "resources/js/pages/reporting/studio-library.tsx",
+      "file": "assets/studio-library-BB-m4HkH.js",
+      "sha256": "19314bc912b8a9c6fc98621a41f2f0de28dbf288622ee7e0d5a41c5b0e0c7359",
+      "bytes": 6553
+    },
+    {
+      "entry": "resources/js/pages/reporting/workspace.tsx",
+      "file": "assets/workspace-CYMxrVpa.js",
+      "sha256": "41cc2188b4da442f6685080ecffb3a9b4df0c81de55a56135d54978491498509",
+      "bytes": 55370
+    }
+  ]
+}

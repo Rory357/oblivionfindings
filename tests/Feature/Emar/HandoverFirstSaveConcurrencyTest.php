@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 class HandoverFirstSaveConcurrencyTest extends TestCase
@@ -29,6 +30,7 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
 
     public function test_two_mysql_first_saves_converge_to_one_handover_cd_verification_and_timeline(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
         $this->seed(RbacSeeder::class);
@@ -69,6 +71,7 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
             'expiry_date' => now()->addYear()->toDateString(),
             'assessor_declared_at' => now()->subMonth(),
             'staff_acknowledged_at' => now()->subMonth(),
+            'controlled_drugs' => true,
             'can_witness_controlled' => true,
         ]);
         $outgoingShift = Shift::factory()->create([
@@ -98,6 +101,8 @@ class HandoverFirstSaveConcurrencyTest extends TestCase
         $medication = ClientMedication::factory()->create([
             'client_id' => $client->id,
             'controlled_drug' => true,
+            'nz_controlled_class' => 'B',
+            'controlled_class_source' => 'Synthetic reviewed test configuration',
             'active' => true,
             'state' => 'active',
             'approval_status' => 'verified',
@@ -238,7 +243,7 @@ $result = $app->make(App\Services\ShiftHandoverService::class)->save($shift, $ac
     'cd_verification_input' => [
         'result' => 'verified',
         'witness_id' => $witness->id,
-        'witness_credential' => 'password',
+        'witness_credential' => Database\Factories\UserFactory::TEST_WITNESS_PIN,
         'notes' => 'Concurrent count matched.',
     ],
     'submit' => false,

@@ -16,9 +16,15 @@ use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
-use App\Services\Emar\MarOmissionService;
+use App\Services\Medication\DoseSlots\DoseOmissions;
+use App\Services\Medication\DoseSlots\DoseSlotReaderScope;
+use App\Services\Medication\MarLinkService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationExportAudit;
+use App\Services\Medication\Reporting\MedicationReportAccess;
+use App\Services\Medication\Reviews\MedicationReviewReader;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -28,8 +34,9 @@ class AuditLogController extends Controller
         private MedicationGovernanceScopeService $governanceScope,
     ) {}
 
-    public function index(Request $request, MarOmissionService $omissions)
+    public function index(Request $request, DoseOmissions $omissions)
     {
+        $request->validate(['client_id' => ['nullable', 'integer', 'min:1'], 'site_id' => ['nullable', 'integer', 'min:1'], 'date_from' => ['nullable', 'date_format:Y-m-d'], 'date_to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:date_from']]);
         $user = $request->user();
         abort_unless($user, 403);
         $canViewControlled = $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY);
@@ -43,11 +50,9 @@ class AuditLogController extends Controller
             $clientId,
         );
         $readerSiteIds = $siteFilter !== null ? [$siteFilter] : $accessibleSiteIds;
-        $allowedClientIds = Client::query()
-            ->whereIn('site_id', $readerSiteIds)
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        $reportAccess = app(MedicationReportAccess::class);
+        $reportAccess->siteIds($user, $siteFilter, $clientId);
+        $allowedClientIds = $reportAccess->clientIds($user, $readerSiteIds);
         $dateFrom = $request->query('date_from');
         $dateTo = $request->query('date_to');
         $eventTypes = $request->query('event_types', []);
@@ -84,6 +89,7 @@ class AuditLogController extends Controller
                     if ($this->withinDateRange($ts, $dateFrom, $dateTo)) {
                         $events->push([
                             'id' => 'med_start_'.$med->id,
+                            'client_medication_id' => $med->id,
                             'event_type' => 'medication_started',
                             'timestamp' => $ts->toIso8601String(),
                             'description' => "{$med->name} {$med->dosage} started for {$clientName}",
@@ -103,6 +109,7 @@ class AuditLogController extends Controller
                     if ($this->withinDateRange($ts, $dateFrom, $dateTo)) {
                         $events->push([
                             'id' => 'med_cease_'.$med->id,
+                            'client_medication_id' => $med->id,
                             'event_type' => 'medication_ceased',
                             'timestamp' => $ts->toIso8601String(),
                             'description' => "{$med->name} ceased for {$clientName}",
@@ -181,13 +188,13 @@ class AuditLogController extends Controller
             if ($dateFrom) {
                 $adminQuery->whereRaw(
                     "({$adminEventTimestampSql}) >= ?",
-                    [Carbon::parse($dateFrom)->startOfDay()],
+                    [Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc()],
                 );
             }
             if ($dateTo) {
                 $adminQuery->whereRaw(
                     "({$adminEventTimestampSql}) <= ?",
-                    [Carbon::parse($dateTo)->endOfDay()],
+                    [Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc()],
                 );
             }
 
@@ -264,6 +271,8 @@ class AuditLogController extends Controller
                     'witness' => $admin->witnessedBy->name ?? null,
                     'client_id' => $admin->client_id,
                     'client_name' => $clientName,
+                    'client_medication_id' => $admin->client_medication_id,
+                    'source_date' => ($admin->scheduled_for ?? $admin->administered_at ?? $timestamp)->copy()->timezone('Pacific/Auckland')->toDateString(),
                     'details' => [
                         'medication' => $medName,
                         'dose' => $admin->dose_given,
@@ -298,10 +307,10 @@ class AuditLogController extends Controller
                 $orderQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $orderQuery->where('created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $orderQuery->where('created_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $orderQuery->where('created_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $orderQuery->where('created_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($orderQuery->get() as $order) {
@@ -329,9 +338,9 @@ class AuditLogController extends Controller
         if (empty($eventTypes) || in_array('review_completed', $eventTypes)) {
             $reviewQuery = MedicationReview::query()
                 ->whereIn('client_id', $allowedClientIds)
-                ->with(['client:id,first_name,last_name', 'reviewer:id,name'])
+                ->with(['client:id,first_name,last_name', 'reviewer:id,name', 'completedBy:id,name'])
                 ->whereNotNull('completed_date')
-                ->select('id', 'client_id', 'review_type', 'completed_date', 'reviewer_name', 'reviewer_user_id', 'clinical_summary');
+                ->select('id', 'client_id', 'review_type', 'status', 'completed_date', 'happened_at', 'completed_by', 'reviewer_name', 'reviewer_user_id', 'clinical_summary');
 
             if ($clientId) {
                 $reviewQuery->where('client_id', $clientId);
@@ -345,19 +354,20 @@ class AuditLogController extends Controller
 
             foreach ($reviewQuery->get() as $review) {
                 $clientName = $review->client ? trim($review->client->first_name.' '.$review->client->last_name) : 'Unknown';
-                $reviewerName = $review->reviewer->name ?? $review->reviewer_name ?? null;
+                $reviewerName = $review->completedBy?->name ?? $review->reviewer?->name ?? $review->reviewer_name;
+                $mayReadSummary = app(MedicationReviewReader::class)->canReadSource($review, $user);
 
                 $events->push([
                     'id' => 'review_'.$review->id,
                     'event_type' => 'review_completed',
-                    'timestamp' => Carbon::parse($review->completed_date)->toIso8601String(),
+                    'timestamp' => $review->happened_at?->toIso8601String() ?? Carbon::parse($review->completed_date)->toIso8601String(),
                     'description' => "Medication review ({$review->review_type}) completed for {$clientName}",
                     'performed_by' => $reviewerName,
                     'client_id' => $review->client_id,
                     'client_name' => $clientName,
                     'details' => [
                         'review_type' => $review->review_type,
-                        'summary' => $review->clinical_summary,
+                        'summary' => $mayReadSummary ? $review->clinical_summary : null,
                     ],
                 ]);
             }
@@ -370,7 +380,7 @@ class AuditLogController extends Controller
                 $readerSiteIds,
             )
                 ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name'])
-                ->select('id', 'client_id', 'medication_name', 'quantity', 'unit', 'reason', 'disposal_method', 'destroyed_by', 'destroyed_at');
+                ->select('id', 'client_id', 'client_medication_id', 'is_controlled_drug', 'medication_name', 'quantity', 'unit', 'reason', 'disposal_method', 'destroyed_by', 'destroyed_at');
             $destructionTable = $destructionQuery->getModel()->getTable();
             $destructionQuery->where(function (Builder $row) use ($destructionTable): void {
                 $row->whereNull($destructionTable.'.site_id')
@@ -390,10 +400,10 @@ class AuditLogController extends Controller
                 $destructionQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $destructionQuery->where('destroyed_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $destructionQuery->where('destroyed_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $destructionQuery->where('destroyed_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $destructionQuery->where('destroyed_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($destructionQuery->get() as $dest) {
@@ -402,6 +412,8 @@ class AuditLogController extends Controller
 
                 $events->push([
                     'id' => 'dest_'.$dest->id,
+                    'client_medication_id' => $dest->client_medication_id,
+                    'controlled' => (bool) $dest->is_controlled_drug,
                     'event_type' => 'destruction',
                     'timestamp' => $dest->destroyed_at?->toIso8601String() ?? $dest->created_at->toIso8601String(),
                     'description' => "{$dest->medication_name} ({$dest->quantity} {$dest->unit}) destroyed for {$clientName}",
@@ -440,10 +452,10 @@ class AuditLogController extends Controller
                 $versionQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $versionQuery->where('created_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $versionQuery->where('created_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $versionQuery->where('created_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $versionQuery->where('created_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             $versions = $versionQuery->get();
@@ -480,6 +492,7 @@ class AuditLogController extends Controller
 
                 $events->push([
                     'id' => 'ver_'.$ver->id,
+                    'client_medication_id' => $ver->client_medication_id,
                     'event_type' => 'medication_changed',
                     'timestamp' => $ver->created_at->toIso8601String(),
                     'description' => "{$ver->name} {$ver->dosage} changed (v{$ver->version_number}) for {$clientName}",
@@ -511,10 +524,10 @@ class AuditLogController extends Controller
                 $cdQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $cdQuery->where('recorded_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $cdQuery->where('recorded_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $cdQuery->where('recorded_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $cdQuery->where('recorded_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             // The CD register uses two naming conventions across its write paths
@@ -560,6 +573,7 @@ class AuditLogController extends Controller
 
                 $events->push([
                     'id' => 'cd_'.$entry->id,
+                    'client_medication_id' => $entry->client_medication_id,
                     'event_type' => $eventType,
                     'timestamp' => ($entry->recorded_at ?? $entry->created_at ?? now())->toIso8601String(),
                     'description' => $descMap[$eventType] ?? "Controlled drug {$medName} ({$qty}) — {$clientName}",
@@ -596,10 +610,10 @@ class AuditLogController extends Controller
                 $errorQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $errorQuery->where('reported_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $errorQuery->where('reported_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $errorQuery->where('reported_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $errorQuery->where('reported_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($errorQuery->get() as $error) {
@@ -641,10 +655,10 @@ class AuditLogController extends Controller
                 $stockQuery->where('client_id', $clientId);
             }
             if ($dateFrom) {
-                $stockQuery->where('delivered_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+                $stockQuery->where('delivered_at', '>=', Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc());
             }
             if ($dateTo) {
-                $stockQuery->where('delivered_at', '<=', Carbon::parse($dateTo)->endOfDay());
+                $stockQuery->where('delivered_at', '<=', Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc());
             }
 
             foreach ($stockQuery->get() as $order) {
@@ -669,19 +683,22 @@ class AuditLogController extends Controller
             }
         }
 
-        // 10. Omissions — scheduled doses never recorded (real "blank MAR slot"
-        //     detection over a bounded recent window; reuses MarScheduleService).
+        // 10. Omissions — doses whose window ended with nothing recorded, over
+        //     the whole period, from the dose-slot projection (C6g).
+        $omissionsNotice = null;
         if (empty($eventTypes) || in_array('omission', $eventTypes)) {
-            $omissionClientIds = $clientId !== null ? [$clientId] : $allowedClientIds;
-            foreach ($omissionClientIds as $omissionClientId) {
-                foreach ($omissions->omissionsForRange(
-                    $dateFrom ? Carbon::parse($dateFrom) : null,
-                    $dateTo ? Carbon::parse($dateTo) : null,
-                    $omissionClientId,
-                    $canViewControlled,
-                ) as $omission) {
-                    $events->push($omission);
-                }
+            $found = $omissions->forPeriod(
+                DoseSlotReaderScope::forAuthorisedClients(
+                    $user,
+                    $clientId !== null ? array_values(array_intersect([$clientId], $allowedClientIds)) : $allowedClientIds,
+                ),
+                $dateFrom,
+                $dateTo,
+                CarbonImmutable::now(),
+            );
+            $omissionsNotice = $found['notice'];
+            foreach ($found['events'] as $omission) {
+                $events->push($omission);
             }
         }
 
@@ -712,7 +729,7 @@ class AuditLogController extends Controller
             'destruction' => 'Stock', 'stock_received' => 'Stock', 'medication_error' => 'Errors',
         ];
 
-        $events = $events->map(function (array $e) use ($categoryOf, $sourceOf, $clientSite, $siteNames) {
+        $events = $events->map(function (array $e) use ($categoryOf, $sourceOf, $clientSite, $siteNames, $user) {
             $type = $e['event_type'];
             $siteId = $e['client_id'] ? ($clientSite[$e['client_id']] ?? null) : null;
 
@@ -734,7 +751,7 @@ class AuditLogController extends Controller
                 $flags[] = 'no_reason';
             }
 
-            return array_merge($e, [
+            return array_merge($e, $this->sourceLink($e, $user, $siteId), [
                 'category' => $categoryOf[$type] ?? 'clinical',
                 'source' => $sourceOf[$type] ?? 'MAR',
                 'site_id' => $siteId,
@@ -779,7 +796,7 @@ class AuditLogController extends Controller
         $events = $sorted->take(800)->values();
 
         $clients = Client::query()
-            ->whereIn('site_id', $readerSiteIds)
+            ->whereIn('id', $allowedClientIds)
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name'])
             ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)]);
@@ -810,7 +827,88 @@ class AuditLogController extends Controller
                 'date_to' => $dateTo,
                 'event_types' => $eventTypes,
             ],
+            // A period starting before the dose-slot projection's days:
+            // omissions are "Not available before …" (C6g).
+            'omissions_notice' => $omissionsNotice,
+            'history_notice' => $stats['total'] > 800 ? 'Showing the latest 800 historical records. Choose a shorter period to see the remaining records.' : null,
+            'can_export_history' => $user->canDo('medications.audit.export'),
+            'export_purposes' => MedicationExportAudit::PURPOSES,
         ]);
+    }
+
+    /** Links are released only when the destination can open this same person. */
+    private function sourceLink(array $event, User $actor, ?int $siteId): array
+    {
+        $empty = ['source_href' => null, 'source_label' => null];
+        $clientId = (int) ($event['client_id'] ?? 0);
+        if (! $actor->canDo('medications.view') || ! $clientId || ! app(MarLinkService::class)->canOpen($actor, $clientId)) {
+            return $empty;
+        }
+        $day = $event['source_date'] ?? CarbonImmutable::parse($event['timestamp'])->timezone('Pacific/Auckland')->toDateString();
+        $params = array_filter(['site_id' => $siteId, 'client_id' => $clientId], fn ($value) => $value !== null);
+        $type = $event['event_type'];
+        $id = (int) substr($event['id'], strrpos($event['id'], '_') + 1);
+        if (str_starts_with($event['id'], 'admin_')) {
+            $path = '/emar/mar';
+            $params += ['date' => $day, 'tab' => 'history', 'dose_id' => $id];
+            $label = 'Open dose record';
+        } elseif ($type === 'prescriber_order') {
+            $path = '/emar/prescriptions/legacy';
+            $params += ['prescriber_order_id' => $id];
+            $label = 'Open prescriber order';
+        } elseif ($type === 'destruction') {
+            $controlled = (bool) ($event['controlled'] ?? false);
+            if ($controlled ? ! $actor->canDo('medications.controlled.view')
+                : (! $actor->canDo('medications.stock.update') && ! $actor->canDo('medications.controlled.view'))) {
+                return $empty;
+            }
+            $path = $controlled ? '/emar/controlled' : '/emar/destructions';
+            $params += ['date' => $day, 'destruction_id' => $id];
+            if ($controlled) {
+                $params['view'] = 'destructions';
+            }
+            if ($event['client_medication_id'] ?? null) {
+                $params['client_medication_id'] = $event['client_medication_id'];
+            }
+            $label = 'Open disposal record';
+        } elseif (str_starts_with($type, 'cd_')) {
+            if (! $actor->canDo('medications.controlled.view')) {
+                return $empty;
+            }
+            $path = '/emar/controlled';
+            $params += ['date' => $day, 'entry_id' => $id, 'client_medication_id' => $event['client_medication_id']];
+            $label = 'Open register entry';
+        } elseif ($type === 'review_completed') {
+            $path = '/emar/reviews';
+            $params += ['review' => $id, 'view' => 'recorded'];
+            $label = 'Open review';
+        } elseif ($type === 'stock_received') {
+            if (! $actor->canDo('medications.stock.update')) {
+                return $empty;
+            }
+            $path = '/emar/stock';
+            $params += ['view' => 'orders', 'pharmacy_order_id' => $id];
+            $label = 'Open delivery receipt';
+        } elseif ($type === 'medication_error') {
+            $path = '/emar/errors';
+            $params += ['error' => $id];
+            $label = 'Open medication error';
+        } elseif ($type === 'omission') {
+            $path = '/emar/mar';
+            $params += ['date' => $day, 'tab' => 'chart', 'focus_medication_id' => $event['client_medication_id'] ?? null];
+            $label = 'Open due dose';
+        } elseif (in_array($type, ['medication_started', 'medication_ceased', 'medication_changed'], true)) {
+            $path = '/emar/mar';
+            $params += ['date' => $day, 'tab' => 'medicines', 'medication_id' => $event['client_medication_id']];
+            if ($type === 'medication_ceased') {
+                $params['view'] = 'stopped';
+            }
+            $label = 'Open medication record';
+        } else {
+            return $empty;
+        }
+
+        return ['source_href' => $path.'?'.http_build_query($params), 'source_label' => $label];
     }
 
     private function withinDateRange($timestamp, ?string $dateFrom, ?string $dateTo): bool
@@ -821,10 +919,10 @@ class AuditLogController extends Controller
 
         $ts = $timestamp instanceof Carbon ? $timestamp : Carbon::parse($timestamp);
 
-        if ($dateFrom && $ts->lt(Carbon::parse($dateFrom)->startOfDay())) {
+        if ($dateFrom && $ts->lt(Carbon::parse($dateFrom, 'Pacific/Auckland')->startOfDay()->utc())) {
             return false;
         }
-        if ($dateTo && $ts->gt(Carbon::parse($dateTo)->endOfDay())) {
+        if ($dateTo && $ts->gt(Carbon::parse($dateTo, 'Pacific/Auckland')->endOfDay()->utc())) {
             return false;
         }
 

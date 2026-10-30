@@ -1,0 +1,192 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance" [selected]:
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Evidence & due dates":
+      - text: Evidence & due dates
+    - tab "Service schedules" [active] [selected]:
+      - text: Service schedules
+    - tab "Reminders":
+      - text: Reminders
+    - tab "Service history":
+      - text: Service history
+    - tab "Mileage":
+      - text: Mileage
+  - tabpanel:
+    - generic: PLANNED MAINTENANCE
+    - heading "Service schedules" [level=2]
+    - group "Service schedules layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - button "Add schedule"
+    - generic "Service schedules":
+      - generic: Service schedules
+      - generic: 2 records shown
+      - table:
+        - row "Record Next due / remaining Interval & responsibility Evidence & actions Actions":
+          - columnheader "Record"
+          - columnheader "Next due / remaining"
+          - columnheader "Interval & responsibility"
+          - columnheader "Evidence & actions"
+          - columnheader "Actions"
+        - row "Routine service SCH-DEMO-07 24 Sept 2026 Scheduled 2,540 km remaining 75.09803921568627 Due at 85,000 km · recorded odometer 6 months or 10,000 km Kōwhai House Coordinator Last service 24 Mar 2026 Plan service Upload evidence 0 supporting files Actions for Routine service":
+          - cell "Routine service SCH-DEMO-07":
+            - generic: Routine service
+            - generic: SCH-DEMO-07
+          - cell "24 Sept 2026 Scheduled 2,540 km remaining 75.09803921568627 Due at 85,000 km · recorded odometer":
+            - strong: 24 Sept 2026
+            - generic: Scheduled
+            - generic: 2,540 km remaining
+            - progressbar "Routine service distance interval used"
+            - generic: Due at 85,000 km · recorded odometer
+          - cell "6 months or 10,000 km Kōwhai House Coordinator Last service 24 Mar 2026":
+            - strong: 6 months or 10,000 km
+            - generic: Kōwhai House Coordinator
+            - generic: Last service 24 Mar 2026
+          - cell "Plan service Upload evidence 0 supporting files":
+            - button "Plan service"
+            - button "Upload evidence":
+              - text: Upload evidence
+            - generic: 0 supporting files
+          - cell "Actions for Routine service":
+            - button "Actions for Routine service":
+        - row "Passenger lift service SCH-DEMO-08 13 Nov 2026 Scheduled 52 days remaining 6 months Equipment Coordinator Last service 13 May 2026 Plan service Upload evidence 0 supporting files Actions for Passenger lift service":
+          - cell "Passenger lift service SCH-DEMO-08":
+            - generic: Passenger lift service
+            - generic: SCH-DEMO-08
+          - cell "13 Nov 2026 Scheduled 52 days remaining":
+            - strong: 13 Nov 2026
+            - generic: Scheduled
+            - generic: 52 days remaining
+          - cell "6 months Equipment Coordinator Last service 13 May 2026":
+            - strong: 6 months
+            - generic: Equipment Coordinator
+            - generic: Last service 13 May 2026
+          - cell "Plan service Upload evidence 0 supporting files":
+            - button "Plan service"
+            - button "Upload evidence":
+              - text: Upload evidence
+            - generic: 0 supporting files
+          - cell "Actions for Passenger lift service":
+            - button "Actions for Passenger lift service":
+    - paragraph: The first reached date or distance trigger needs action. Intervals and reminder lead times are synthetic examples.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

@@ -50,7 +50,8 @@ class EvidenceLibrary extends Model
 
     public function isExpiring(int $days = 30): bool
     {
-        return $this->valid_until && $this->valid_until->diffInDays(now()) <= $days;
+        // Not diffInDays(now()) <= $days: Carbon 3 signs it, so every future date passed.
+        return $this->valid_until && $this->valid_until->between(now(), now()->addDays($days));
     }
 
     public function scopeValid($query)

@@ -1,0 +1,684 @@
+{
+  "generated": "2026-09-29",
+  "note": "Source inventory, not exhaustive browser acceptance. Controller route candidates are not a one-to-one view mapping. Some files are retained fallbacks or redirects.",
+  "fleetRouteCount": 285,
+  "titledPages": 50,
+  "legacyPages": 31,
+  "pages": [
+    {
+      "file": "resources/js/pages/fleet-assets/alerts/index.tsx",
+      "view": "fleet-assets/alerts/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/AlertController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/alerts",
+        "fleet-assets/alerts/{alert}/snapshot"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/assets/index.tsx",
+      "view": "fleet-assets/assets/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/AssetController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/asset-register/rooms",
+        "fleet-assets/assets",
+        "fleet-assets/assets/create",
+        "fleet-assets/assets/{asset}",
+        "fleet-assets/assets/{asset}/edit"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/assets/labels.tsx",
+      "view": "fleet-assets/assets/labels",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/AssetLabelController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/asset-register/labels",
+        "fleet-assets/asset-register/labels/workspace",
+        "fleet-assets/asset-register/labels/{batch}/{format}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/assets/show.tsx",
+      "view": "fleet-assets/assets/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/AssetController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/asset-register/rooms",
+        "fleet-assets/assets",
+        "fleet-assets/assets/create",
+        "fleet-assets/assets/{asset}",
+        "fleet-assets/assets/{asset}/edit"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/bookings/index.tsx",
+      "view": "fleet-assets/bookings/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleBookingController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/bookings",
+        "fleet-assets/bookings/create",
+        "fleet-assets/bookings/{booking}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/bookings/show.tsx",
+      "view": "fleet-assets/bookings/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleBookingController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/bookings",
+        "fleet-assets/bookings/create",
+        "fleet-assets/bookings/{booking}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/compliance/index.tsx",
+      "view": "fleet-assets/compliance/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ComplianceController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/compliance",
+        "fleet-assets/compliance/vehicles/{asset}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/daily-check.tsx",
+      "view": "fleet-assets/daily-check",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/DailyCheckController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/daily-check"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/dashboard.tsx",
+      "view": "fleet-assets/dashboard",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/DashboardController.php"
+      ],
+      "candidateControllerGetRoutes": []
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/devices/index.tsx",
+      "view": "fleet-assets/devices/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/DeviceController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/devices",
+        "fleet-assets/devices/consent",
+        "fleet-assets/devices/options/search",
+        "fleet-assets/devices/{device}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/drivers/index.tsx",
+      "view": "fleet-assets/drivers/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/DriverController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/drivers",
+        "fleet-assets/drivers/{user}",
+        "fleet-assets/drivers/{user}/scorecard"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/drivers/show.tsx",
+      "view": "fleet-assets/drivers/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/DriverController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/drivers",
+        "fleet-assets/drivers/{user}",
+        "fleet-assets/drivers/{user}/scorecard"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/fuel/index.tsx",
+      "view": "fleet-assets/fuel/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/fuel",
+        "fleet-assets/trips",
+        "fleet-assets/vehicles",
+        "fleet-assets/vehicles/{asset}",
+        "fleet-assets/vehicles/{asset}/alerts-config"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/geofences/index.tsx",
+      "view": "fleet-assets/geofences/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/GeofenceController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/geofences",
+        "fleet-assets/geofences/catalogue",
+        "fleet-assets/geofences/create",
+        "fleet-assets/geofences/events",
+        "fleet-assets/geofences/handoffs/{token}",
+        "fleet-assets/geofences/resources",
+        "fleet-assets/geofences/rules",
+        "fleet-assets/geofences/sites",
+        "fleet-assets/geofences/summary",
+        "fleet-assets/geofences/{geofence}",
+        "fleet-assets/geofences/{geofence}/edit",
+        "fleet-assets/geofences/{geofence}/history",
+        "fleet-assets/geofences/{geofence}/history/export",
+        "fleet-assets/geofences/{geofence}/rule-history",
+        "fleet-assets/geofences/{geofence}/versions/{revision}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/handovers/index.tsx",
+      "view": "fleet-assets/handovers/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/HandoverController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/handovers",
+        "fleet-assets/handovers/create",
+        "fleet-assets/handovers/{handover}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/handovers/show.tsx",
+      "view": "fleet-assets/handovers/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/HandoverController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/handovers",
+        "fleet-assets/handovers/create",
+        "fleet-assets/handovers/{handover}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/incidents/index.tsx",
+      "view": "fleet-assets/incidents/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/IncidentController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/incidents",
+        "fleet-assets/incidents/create",
+        "fleet-assets/incidents/options/search",
+        "fleet-assets/incidents/{incident}",
+        "fleet-assets/incidents/{incident}/attachments/{attachment}/download"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/inspections/index.tsx",
+      "view": "fleet-assets/inspections/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/InspectionController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/inspections",
+        "fleet-assets/inspections/create",
+        "fleet-assets/inspections/{run}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/inspections/show.tsx",
+      "view": "fleet-assets/inspections/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/InspectionController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/inspections",
+        "fleet-assets/inspections/create",
+        "fleet-assets/inspections/{run}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/keys/index.tsx",
+      "view": "fleet-assets/keys/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/KeyController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/keys"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/checklists/index.tsx",
+      "view": "fleet-assets/maintenance/checklists/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ChecklistController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/maintenance/checklists",
+        "fleet-assets/maintenance/checklists/run",
+        "fleet-assets/maintenance/checklists/runs/{run}/evidence/{question}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/checklists/run.tsx",
+      "view": "fleet-assets/maintenance/checklists/run",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ChecklistController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/maintenance/checklists",
+        "fleet-assets/maintenance/checklists/run",
+        "fleet-assets/maintenance/checklists/runs/{run}/evidence/{question}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/dashboard.tsx",
+      "view": "fleet-assets/maintenance/dashboard",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/MaintenanceDashboardController.php"
+      ],
+      "candidateControllerGetRoutes": []
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/schedules/index.tsx",
+      "view": "fleet-assets/maintenance/schedules/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ServiceScheduleController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/maintenance/schedules"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/work-orders/index.tsx",
+      "view": "fleet-assets/maintenance/work-orders/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/WorkOrderController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/maintenance/work-orders",
+        "fleet-assets/maintenance/work-orders/create",
+        "fleet-assets/maintenance/work-orders/options/search",
+        "fleet-assets/maintenance/work-orders/{workOrder}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/work-orders/report.tsx",
+      "view": "fleet-assets/maintenance/work-orders/report",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/WorkOrderController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/maintenance/work-orders",
+        "fleet-assets/maintenance/work-orders/create",
+        "fleet-assets/maintenance/work-orders/options/search",
+        "fleet-assets/maintenance/work-orders/{workOrder}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "view": "fleet-assets/maintenance/work-orders/show",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/WorkOrderController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/maintenance/work-orders",
+        "fleet-assets/maintenance/work-orders/create",
+        "fleet-assets/maintenance/work-orders/options/search",
+        "fleet-assets/maintenance/work-orders/{workOrder}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/map.tsx",
+      "view": "fleet-assets/map",
+      "header": "legacy-compact",
+      "controllerFiles": [],
+      "candidateControllerGetRoutes": []
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/mileage/index.tsx",
+      "view": "fleet-assets/mileage/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/MileageController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/mileage",
+        "fleet-assets/mileage/create",
+        "fleet-assets/mileage/export"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/outings/index.tsx",
+      "view": "fleet-assets/outings/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/OutingController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/outings",
+        "fleet-assets/outings/create",
+        "fleet-assets/outings/{outing}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/outings/show.tsx",
+      "view": "fleet-assets/outings/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/OutingController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/outings",
+        "fleet-assets/outings/create",
+        "fleet-assets/outings/{outing}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/reports/by-house.tsx",
+      "view": "fleet-assets/reports/by-house",
+      "header": "standard-report-wrapper",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ReportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/reports/by-house",
+        "fleet-assets/reports/export",
+        "fleet-assets/reports/operating-summary",
+        "fleet-assets/reports/reimbursement",
+        "fleet-assets/reports/reimbursement/data"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/reports/community-access.tsx",
+      "view": "fleet-assets/reports/community-access",
+      "header": "standard-report-wrapper",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/CommunityAccessController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/reports/community-access"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/reports/cost-allocation.tsx",
+      "view": "fleet-assets/reports/cost-allocation",
+      "header": "standard-report-wrapper",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/CostAllocationController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/reports/cost-allocation"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/reports/index.tsx",
+      "view": "fleet-assets/reports/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ReportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/reports/by-house",
+        "fleet-assets/reports/export",
+        "fleet-assets/reports/operating-summary",
+        "fleet-assets/reports/reimbursement",
+        "fleet-assets/reports/reimbursement/data"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/reports/reimbursement.tsx",
+      "view": "fleet-assets/reports/reimbursement",
+      "header": "standard-report-wrapper",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ReportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/reports/by-house",
+        "fleet-assets/reports/export",
+        "fleet-assets/reports/operating-summary",
+        "fleet-assets/reports/reimbursement",
+        "fleet-assets/reports/reimbursement/data"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/resident-tracking/history.tsx",
+      "view": "fleet-assets/resident-tracking/history",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/resident-tracking",
+        "fleet-assets/resident-tracking/assign",
+        "fleet-assets/resident-tracking/history/{client}",
+        "fleet-assets/resident-tracking/history/{client}/privacy-status"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/resident-tracking/index.tsx",
+      "view": "fleet-assets/resident-tracking/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ResidentTrackingController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/resident-tracking",
+        "fleet-assets/resident-tracking/assign",
+        "fleet-assets/resident-tracking/history/{client}",
+        "fleet-assets/resident-tracking/history/{client}/privacy-status"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/settings/index.tsx",
+      "view": "fleet-assets/settings/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/WorkspaceSettingsController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/settings",
+        "fleet-assets/settings/history",
+        "fleet-assets/settings/maps",
+        "fleet-assets/settings/notifications",
+        "fleet-assets/settings/tracking-devices"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/index.tsx",
+      "view": "fleet-assets/transports/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ResidentTransportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/transports",
+        "fleet-assets/transports/create",
+        "fleet-assets/transports/medications",
+        "fleet-assets/transports/{transport}",
+        "fleet-assets/transports/{transport}/pre-check"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/medications.tsx",
+      "view": "fleet-assets/transports/medications",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ResidentTransportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/transports",
+        "fleet-assets/transports/create",
+        "fleet-assets/transports/medications",
+        "fleet-assets/transports/{transport}",
+        "fleet-assets/transports/{transport}/pre-check"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/pre-check.tsx",
+      "view": "fleet-assets/transports/pre-check",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ResidentTransportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/transports",
+        "fleet-assets/transports/create",
+        "fleet-assets/transports/medications",
+        "fleet-assets/transports/{transport}",
+        "fleet-assets/transports/{transport}/pre-check"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/record.tsx",
+      "view": "fleet-assets/transports/record",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/TransportWorkspaceController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/transports/requests/{transportRequest}",
+        "fleet-assets/transports/workspace/export",
+        "fleet-assets/transports/workspace/options",
+        "fleet-assets/transports/{view}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/show.tsx",
+      "view": "fleet-assets/transports/show",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/ResidentTransportController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/transports",
+        "fleet-assets/transports/create",
+        "fleet-assets/transports/medications",
+        "fleet-assets/transports/{transport}",
+        "fleet-assets/transports/{transport}/pre-check"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/transports/workspace.tsx",
+      "view": "fleet-assets/transports/workspace",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/TransportWorkspaceController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/transports/requests/{transportRequest}",
+        "fleet-assets/transports/workspace/export",
+        "fleet-assets/transports/workspace/options",
+        "fleet-assets/transports/{view}"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/trips/index.tsx",
+      "view": "fleet-assets/trips/index",
+      "header": "legacy-full",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/fuel",
+        "fleet-assets/trips",
+        "fleet-assets/vehicles",
+        "fleet-assets/vehicles/{asset}",
+        "fleet-assets/vehicles/{asset}/alerts-config"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/trips/playback.tsx",
+      "view": "fleet-assets/trips/playback",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/Fleet/FleetTripController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/trips/{trip}/playback",
+        "fleet-assets/trips/{trip}/playback/data"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/vehicles/alerts-config.tsx",
+      "view": "fleet-assets/vehicles/alerts-config",
+      "header": "legacy-compact",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/fuel",
+        "fleet-assets/trips",
+        "fleet-assets/vehicles",
+        "fleet-assets/vehicles/{asset}",
+        "fleet-assets/vehicles/{asset}/alerts-config"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+      "view": "fleet-assets/vehicles/index",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/fuel",
+        "fleet-assets/trips",
+        "fleet-assets/vehicles",
+        "fleet-assets/vehicles/{asset}",
+        "fleet-assets/vehicles/{asset}/alerts-config"
+      ]
+    },
+    {
+      "file": "resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "view": "fleet-assets/vehicles/show",
+      "header": "standard",
+      "controllerFiles": [
+        "app/Http/Controllers/FleetAssets/VehicleController.php"
+      ],
+      "candidateControllerGetRoutes": [
+        "fleet-assets/fuel",
+        "fleet-assets/trips",
+        "fleet-assets/vehicles",
+        "fleet-assets/vehicles/{asset}",
+        "fleet-assets/vehicles/{asset}/alerts-config"
+      ]
+    }
+  ]
+}

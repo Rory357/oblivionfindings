@@ -3,8 +3,10 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientMedication;
+use App\Models\MedicationOrderRevision;
 use App\Models\Permission;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -12,6 +14,8 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class MedicationControlledOrderMutationAuthorizationTest extends TestCase
@@ -27,6 +31,7 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         parent::setUp();
 
         $this->seed(RbacSeeder::class);
+        Storage::fake('local');
         $this->site = Site::factory()->create([
             'is_active' => true,
             'archived' => false,
@@ -73,6 +78,8 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
                     'controlled_drug' => true,
                 ])
                 ->assertNotFound();
+            $this->assertDatabaseMissing('client_medications', ['name' => $createdName]);
+            $this->actingAs($actor)->post('/emar/orders', $this->entryInput($createdName, true))->assertNotFound();
             $this->assertDatabaseMissing('client_medications', ['name' => $createdName]);
 
             foreach ([
@@ -167,20 +174,16 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
             'medications.controlled.record',
         ]);
         $creator = User::factory()->create(['approved_at' => now()]);
+        $enterer = $this->makeSiteActor(['medications.view', 'medications.orders.manage', 'medications.controlled.view', 'medications.controlled.record']);
 
         $this->actingAs($actor)
-            ->post(route('emar.medications.store'), [
-                'client_id' => $this->client->id,
-                'medication_name' => 'Authorised controlled creation',
-                'dose' => '5 mg',
-                'frequency' => 'Once daily',
-                'controlled_drug' => true,
-            ])
-            ->assertRedirect();
+            ->post('/emar/orders', $this->entryInput('Authorised controlled creation', true))
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('client_medications', [
             'client_id' => $this->client->id,
             'name' => 'Authorised controlled creation',
             'controlled_drug' => true,
+            'approval_status' => 'pending_verification',
         ]);
 
         foreach ([
@@ -189,19 +192,16 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         ] as $routeIndex => $routeName) {
             $profileCreatedName = 'Authorised profile controlled creation '.$routeIndex;
 
+            // EA-023 (Lane C3): the profile answers through P04 and writes nothing.
             $this->actingAs($actor)
-                ->post(route($routeName, $this->client), [
+                ->postJson(route($routeName, $this->client), [
                     'name' => $profileCreatedName,
                     'dosage' => '5 mg',
                     'frequency' => 'Once daily',
                     'controlled_drug' => true,
                 ])
-                ->assertRedirect();
-            $this->assertDatabaseHas('client_medications', [
-                'client_id' => $this->client->id,
-                'name' => $profileCreatedName,
-                'controlled_drug' => true,
-            ]);
+                ->assertStatus(409);
+            $this->assertDatabaseMissing('client_medications', ['name' => $profileCreatedName]);
         }
 
         foreach ([
@@ -215,34 +215,40 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
             $updatedName = 'Authorised profile controlled update '.$routeIndex;
 
             $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $profileUpdateTarget]), [
+                ->putJson(route($routeName, [$this->client, $profileUpdateTarget]), [
                     'name' => $updatedName,
                 ])
-                ->assertRedirect();
-            $this->assertSame($updatedName, $profileUpdateTarget->fresh()->name);
+                ->assertStatus(409);
+            $this->assertSame('Controlled profile update target '.$routeIndex, $profileUpdateTarget->fresh()->name);
         }
 
         $updateTarget = $this->controlledMedication(['created_by' => $creator->id]);
-        $this->actingAs($actor)
-            ->put(route('emar.medications.update', $updateTarget), [
-                'medication_name' => 'Authorised controlled update',
-            ])
-            ->assertRedirect();
-        $this->assertSame('Authorised controlled update', $updateTarget->fresh()->name);
+        $input = $this->entryInput($updateTarget->name, true, $updateTarget);
+        $input['prescription']['dosage'] = '10 mg';
+        $this->actingAs($enterer)->post('/emar/orders', $input)->assertRedirect()->assertSessionHasNoErrors();
+        $change = MedicationOrderRevision::latest('id')->firstOrFail();
+        $this->assertSame('5 mg', $updateTarget->fresh()->dosage);
+        $this->assertSame('pending', $change->status);
+        $this->actingAs($actor)->post('/emar/order-revisions/'.$change->id.'/check', $this->checkInput())->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('10 mg', $updateTarget->fresh()->dosage);
 
         $verifyTarget = $this->controlledMedication(['created_by' => $creator->id]);
+        $this->actingAs($enterer)->post('/emar/orders', $this->entryInput($verifyTarget->name, true, $verifyTarget))->assertRedirect()->assertSessionHasNoErrors();
+        $verifyRevision = MedicationOrderRevision::latest('id')->firstOrFail();
         $this->actingAs($actor)
-            ->post(route('emar.medications.verify', $verifyTarget))
-            ->assertRedirect();
+            ->post('/emar/order-revisions/'.$verifyRevision->id.'/check', $this->checkInput())
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('verified', $verifyTarget->fresh()->approval_status);
         $this->assertSame($actor->id, (int) $verifyTarget->fresh()->verified_by);
 
         $rejectTarget = $this->controlledMedication(['created_by' => $creator->id]);
+        $this->actingAs($enterer)->post('/emar/orders', $this->entryInput($rejectTarget->name, true, $rejectTarget))->assertRedirect()->assertSessionHasNoErrors();
+        $rejectRevision = MedicationOrderRevision::latest('id')->firstOrFail();
         $this->actingAs($actor)
-            ->post(route('emar.medications.reject', $rejectTarget), [
-                'rejection_reason' => 'The controlled order does not match the signed chart.',
+            ->post('/emar/order-revisions/'.$rejectRevision->id.'/send-back', [
+                'reason' => 'The controlled order does not match the signed chart.',
             ])
-            ->assertRedirect();
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('rejected', $rejectTarget->fresh()->approval_status);
 
         foreach ([
@@ -272,7 +278,7 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         }
     }
 
-    public function test_profile_routes_preserve_ordinary_mutations_without_controlled_capabilities(): void
+    public function test_profile_routes_send_ordinary_orders_to_p04_without_controlled_capabilities(): void
     {
         $actor = $this->makeSiteActor([
             'clients.update',
@@ -281,14 +287,8 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         ]);
 
         $this->actingAs($actor)
-            ->post(route('emar.medications.store'), [
-                'client_id' => $this->client->id,
-                'medication_name' => 'Ordinary eMAR medication',
-                'dose' => '10 mg',
-                'frequency' => 'Once daily',
-                'controlled_drug' => false,
-            ])
-            ->assertRedirect();
+            ->post('/emar/orders', $this->entryInput('Ordinary eMAR medication', false))
+            ->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('client_medications', [
             'client_id' => $this->client->id,
             'name' => 'Ordinary eMAR medication',
@@ -301,12 +301,22 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
             'witness_required' => false,
             'created_by' => $actor->id,
         ]);
+        $versionCount = $ordinaryEmarMedication->versions()->count();
+        $auditCount = AuditLog::count();
         $this->actingAs($actor)
-            ->put(route('emar.medications.update', $ordinaryEmarMedication), [
+            ->putJson(route('emar.medications.update', $ordinaryEmarMedication), [
                 'medication_name' => 'Ordinary eMAR medication updated',
             ])
-            ->assertRedirect();
-        $this->assertSame('Ordinary eMAR medication updated', $ordinaryEmarMedication->fresh()->name);
+            ->assertStatus(409);
+        $this->assertSame('Ordinary eMAR update target', $ordinaryEmarMedication->fresh()->name);
+        $this->assertSame($versionCount, $ordinaryEmarMedication->versions()->count());
+        $this->assertSame($auditCount, AuditLog::count());
+        $input = $this->entryInput($ordinaryEmarMedication->name, false, $ordinaryEmarMedication);
+        $input['prescription']['dosage'] = '10 mg';
+        $this->actingAs($actor)->post('/emar/orders', $input)->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame('10 mg', MedicationOrderRevision::latest('id')->firstOrFail()->version->dosage);
+        $this->assertSame('5 mg', $ordinaryEmarMedication->fresh()->dosage);
+        $this->assertSame('pending_verification', $ordinaryEmarMedication->fresh()->approval_status);
 
         foreach ([
             'clients.medical.medications.store',
@@ -314,19 +324,16 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
         ] as $routeIndex => $routeName) {
             $createdName = 'Ordinary profile medication '.$routeIndex;
 
+            // EA-023 (Lane C3): the profile answers through P04 and writes nothing.
             $this->actingAs($actor)
-                ->post(route($routeName, $this->client), [
+                ->postJson(route($routeName, $this->client), [
                     'name' => $createdName,
                     'dosage' => '10 mg',
                     'frequency' => 'Once daily',
                     'controlled_drug' => false,
                 ])
-                ->assertRedirect();
-            $this->assertDatabaseHas('client_medications', [
-                'client_id' => $this->client->id,
-                'name' => $createdName,
-                'controlled_drug' => false,
-            ]);
+                ->assertStatus(409);
+            $this->assertDatabaseMissing('client_medications', ['name' => $createdName]);
         }
 
         foreach ([
@@ -342,12 +349,54 @@ class MedicationControlledOrderMutationAuthorizationTest extends TestCase
             $updatedName = 'Ordinary profile medication updated '.$routeIndex;
 
             $this->actingAs($actor)
-                ->put(route($routeName, [$this->client, $ordinaryMedication]), [
+                ->putJson(route($routeName, [$this->client, $ordinaryMedication]), [
                     'name' => $updatedName,
                 ])
-                ->assertRedirect();
-            $this->assertSame($updatedName, $ordinaryMedication->fresh()->name);
+                ->assertStatus(409);
+            $this->assertSame('Ordinary profile update target '.$routeIndex, $ordinaryMedication->fresh()->name);
         }
+    }
+
+    private function checkInput(): array
+    {
+        return [
+            'source_matches' => true,
+            'dose_route_times_checked' => true,
+            'allergies_interactions_checked' => true,
+        ];
+    }
+
+    private function entryInput(string $name, bool $controlled, ?ClientMedication $medication = null): array
+    {
+        $medication?->refresh();
+
+        return [
+            'client_id' => $this->client->id,
+            'medication_id' => $medication?->id,
+            'expected_version' => $medication?->version,
+            'request_key' => 'controlled-order-'.bin2hex(random_bytes(8)),
+            'change_reason' => 'Prescriber source instruction.',
+            'source' => [
+                'type' => 'written',
+                'prescriber' => 'Dr Test',
+                'received_at' => now()->subMinute()->toIso8601String(),
+                'description' => 'Signed source.',
+            ],
+            'source_file' => UploadedFile::fake()->create('prescription.pdf', 1, 'application/pdf'),
+            'prescription' => [
+                'name' => $name,
+                'dosage' => '5 mg',
+                'frequency' => 'Once daily',
+                'dose_times' => ['10:00'],
+                'is_prn' => false,
+                'route' => 'oral',
+                'indication' => 'Indication from source.',
+                'start_date' => now('Pacific/Auckland')->toDateString(),
+                'controlled_drug' => $controlled,
+                'high_risk' => false,
+                'witness_required' => $controlled,
+            ],
+        ];
     }
 
     /** @param array<int, string> $permissions */

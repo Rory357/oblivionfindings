@@ -86,7 +86,7 @@ export function FilterChip({
             className={cn(
                 'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition-colors',
                 active
-                    ? 'border-transparent bg-primary text-primary-foreground'
+                    ? 'border-transparent bg-primary-fill text-primary-fill-foreground'
                     : 'border-border bg-card text-muted-foreground hover:bg-muted',
             )}
         >

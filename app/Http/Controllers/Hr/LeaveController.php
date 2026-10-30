@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrLeaveAccessService;
 use App\Domain\Hr\Services\HrWebhookService;
+use App\Domain\Hr\Services\LeaveReviewReceipt;
 use App\Domain\Hr\Services\LeaveService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\StoreLeaveRequestFormRequest;
@@ -560,7 +561,7 @@ class LeaveController extends Controller
         $data['created_by'] = $user->id;
 
         try {
-            $leaveRequest = $this->leaveService->submitRequest($requestUser, $data);
+            $leaveRequest = $this->leaveService->submitRequest($requestUser, $data, $user);
             $this->webhookService->publishApplicationEvent('leave.request.submitted', [
                 'leave_request_id' => $leaveRequest->id,
                 'user_id' => $leaveRequest->user_id,
@@ -583,13 +584,18 @@ class LeaveController extends Controller
 
     public function approve(Request $request, HrLeaveRequest $leaveRequest)
     {
+        $receipts = app(LeaveReviewReceipt::class);
+        $modern = $receipts->begin($request, 'approve', (int) $leaveRequest->getKey());
+
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
         $leaveRequest = $this->access->currentRequest($user, $leaveRequest);
 
         $validated = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
+            ...($modern ? ['request_id' => ['required', 'uuid']] : []),
         ]);
+        $receipts->capture($request, $leaveRequest, $validated);
 
         try {
             $approved = $this->leaveService->approveRequest(
@@ -597,6 +603,8 @@ class LeaveController extends Controller
                 $user,
                 $validated['review_notes'] ?? null,
             );
+
+            $receipts->committed($request, $approved);
 
             $this->webhookService->publishApplicationEvent('leave.request.approved', [
                 'leave_request_id' => $approved->id,
@@ -620,13 +628,18 @@ class LeaveController extends Controller
 
     public function decline(Request $request, HrLeaveRequest $leaveRequest)
     {
+        $receipts = app(LeaveReviewReceipt::class);
+        $modern = $receipts->begin($request, 'decline', (int) $leaveRequest->getKey());
+
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
         $leaveRequest = $this->access->currentRequest($user, $leaveRequest);
 
         $validated = $request->validate([
             'review_notes' => ['required', 'string', 'max:2000'],
+            ...($modern ? ['request_id' => ['required', 'uuid']] : []),
         ]);
+        $receipts->capture($request, $leaveRequest, $validated);
 
         try {
             $declined = $this->leaveService->declineRequest(
@@ -634,6 +647,8 @@ class LeaveController extends Controller
                 $user,
                 $validated['review_notes'],
             );
+
+            $receipts->committed($request, $declined);
 
             $this->webhookService->publishApplicationEvent('leave.request.declined', [
                 'leave_request_id' => $declined->id,
@@ -773,6 +788,8 @@ class LeaveController extends Controller
                     'leave_request' => 'Only pending requests can have SLA due updated.',
                 ]);
             }
+
+            $this->access->lockCurrentReviewActor($user, $locked);
 
             $locked->update([
                 'approval_due_at' => now()->addHours((int) $validated['hours']),

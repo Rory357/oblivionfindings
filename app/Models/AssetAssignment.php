@@ -16,11 +16,15 @@ class AssetAssignment extends Model
         'assignee_id',
         'purpose',
         'assigned_at',
+        'receipt_confirmed_at',
+        'receipt_confirmed_by_user_id',
+        'receipt_note',
         'released_at',
     ];
 
     protected $casts = [
         'assigned_at' => 'datetime',
+        'receipt_confirmed_at' => 'datetime',
         'released_at' => 'datetime',
     ];
 

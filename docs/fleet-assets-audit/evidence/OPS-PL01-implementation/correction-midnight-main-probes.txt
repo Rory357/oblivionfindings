@@ -1,0 +1,18 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\people-locations-implementation\oblivionfindings\phpunit.xml
+
+.F                                                                  2 / 2 (100%)
+
+Time: 06:30.408, Memory: 110.00 MB
+
+There was 1 failure:
+
+1) OPSPL01MainBoundaryTest::test_transport_permission_revoked_during_report_read_withholds_journey
+Failed asserting that true is false.
+
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\OPSPL01MainBoundaryTest.php:88
+
+FAILURES!
+Tests: 2, Assertions: 7, Failures: 1.

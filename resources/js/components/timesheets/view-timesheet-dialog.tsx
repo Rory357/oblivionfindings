@@ -3,7 +3,6 @@
  * computed avatar hues, white glyphs on solid status dots — the established
  * avatar/timeline idiom). All status colours are semantic tokens, per
  * design_styles/DESIGN_TOKENS.md. */
-import { ReasonDialog } from '@/components/reason-dialog';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,10 +37,22 @@ import {
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
+import {
+    TimesheetActionDialog,
+    type TimesheetReviewAction,
+} from './timesheet-action-dialog';
 
 export type ViewTimesheetRow = {
     id: number;
+    client_id?: number | null;
+    user_id?: number;
+    shift_id?: number | null;
     can_mutate?: boolean;
+    can_update?: boolean;
+    can_submit?: boolean;
+    can_resubmit?: boolean;
+    can_reject?: boolean;
+    can_return?: boolean;
     can_approve?: boolean;
     can_edit?: boolean;
     attendance_session_id?: number | null;
@@ -125,7 +136,7 @@ function SectionTitle({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex items-center gap-2 text-[11.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+        <div className="flex items-center gap-2 text-sm font-semibold tracking-wider text-muted-foreground uppercase">
             <Icon className="h-3.5 w-3.5" />
             {children}
         </div>
@@ -145,7 +156,7 @@ function KV({
 }) {
     return (
         <div className="rounded-lg border border-border bg-muted/30 px-2.5 py-2">
-            <div className="inline-flex items-center gap-1.5 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+            <div className="inline-flex items-center gap-1.5 text-xs font-semibold tracking-wider text-muted-foreground uppercase">
                 {Icon ? <Icon className="h-3 w-3" /> : null}
                 {label}
             </div>
@@ -153,7 +164,7 @@ function KV({
                 {value}
             </div>
             {sub ? (
-                <div className="text-[11px] text-muted-foreground">{sub}</div>
+                <div className="text-xs text-muted-foreground">{sub}</div>
             ) : null}
         </div>
     );
@@ -171,17 +182,17 @@ function Person({
     return (
         <div className="mt-2 flex items-center gap-2.5">
             <div
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[12px] font-semibold text-white"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-sm font-semibold text-white"
                 style={{ background: `oklch(0.55 0.14 ${hueFor(name)})` }}
             >
                 {initials(name)}
             </div>
             <div className="min-w-0">
-                <div className="text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                <div className="text-xs tracking-wider text-muted-foreground uppercase">
                     {label}
                 </div>
-                <div className="truncate text-[13px] font-semibold">{name}</div>
-                <div className="truncate text-[11.5px] text-muted-foreground">
+                <div className="truncate text-sm font-semibold">{name}</div>
+                <div className="truncate text-sm text-muted-foreground">
                     {role}
                 </div>
             </div>
@@ -194,19 +205,38 @@ export default function ViewTimesheetDialog({
     timesheet,
     onOpenChange,
     canApprove = false,
+    canSubmit,
+    writeCoordination,
+    additionalContent,
+    onReviewAction,
 }: {
     open: boolean;
     timesheet: ViewTimesheetRow | null;
     onOpenChange: (open: boolean) => void;
     canApprove?: boolean;
+    canSubmit?: boolean;
+    writeCoordination?: Parameters<
+        typeof TimesheetActionDialog
+    >[0]['writeCoordination'];
+    additionalContent?: React.ReactNode;
+    onReviewAction?: (
+        row: ViewTimesheetRow,
+        action: TimesheetReviewAction,
+    ) => void;
 }) {
-    const [busy, setBusy] = useState(false);
-    const [reasonAction, setReasonAction] = useState<
-        'reject' | 'return' | null
-    >(null);
+    const [reasonAction, setReasonAction] =
+        useState<TimesheetReviewAction | null>(null);
 
     if (!timesheet) return null;
     const t = timesheet;
+    const requestReview = (action: TimesheetReviewAction) => {
+        if (onReviewAction) onReviewAction(t, action);
+        else setReasonAction(action);
+    };
+    const maySubmit =
+        (canSubmit ?? Boolean(t.can_submit ?? t.can_mutate)) &&
+        ['draft', 'returned'].includes(t.status);
+    const mayReview = canApprove && t.status === 'submitted';
     const hours = (t.total_hours ?? t.hours ?? 0) as number;
     const tagPills: string[] = [];
     if (t.sleepover) tagPills.push('Sleepover');
@@ -219,15 +249,6 @@ export default function ViewTimesheetDialog({
         0,
     );
 
-    function call(method: 'post', url: string, data: Record<string, any> = {}) {
-        setBusy(true);
-        router[method](url, data, {
-            preserveScroll: true,
-            onFinish: () => setBusy(false),
-            onSuccess: () => onOpenChange(false),
-        });
-    }
-
     const shiftCtxName =
         typeof t.shift?.service_context === 'string'
             ? t.shift?.service_context
@@ -238,8 +259,8 @@ export default function ViewTimesheetDialog({
             <DialogContent
                 className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0"
                 style={{
-                    maxWidth: 'min(94vw, 920px)',
-                    width: 'min(94vw, 920px)',
+                    maxWidth: 'min(92vw, 900px)',
+                    width: 'min(92vw, 900px)',
                 }}
             >
                 {/* Read-only detail header — icon tile + title + status, per
@@ -254,7 +275,7 @@ export default function ViewTimesheetDialog({
                                 Timesheet #{t.id}
                                 <TimesheetStatusBadge status={t.status} />
                             </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-[12.5px] text-muted-foreground">
+                            <DialogDescription className="mt-0.5 text-sm text-muted-foreground">
                                 {t.staff?.name ?? 'Staff'} →{' '}
                                 {t.client
                                     ? `${t.client.first_name} ${t.client.last_name}`
@@ -271,11 +292,11 @@ export default function ViewTimesheetDialog({
                             <div className="flex items-start gap-2 text-status-critical">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <div className="min-w-0">
-                                    <div className="text-[12.5px] font-semibold">
+                                    <div className="text-sm font-semibold">
                                         Returned to {t.staff?.name ?? 'staff'}{' '}
                                         for changes
                                     </div>
-                                    <div className="mt-0.5 text-[12px]">
+                                    <div className="mt-0.5 text-sm">
                                         {t.returned_notes}
                                     </div>
                                 </div>
@@ -315,9 +336,9 @@ export default function ViewTimesheetDialog({
                                         icon={Car}
                                     />
                                 </div>
-                                <div className="mt-3 flex items-center justify-between rounded-lg bg-status-info-bg px-3 py-2.5 text-[12.5px]">
+                                <div className="mt-3 flex items-center justify-between rounded-lg bg-status-info-bg px-3 py-2.5 text-sm">
                                     <span className="font-medium">
-                                        Billable hours
+                                        Recorded hours
                                     </span>
                                     <span className="text-base font-bold text-primary tabular-nums">
                                         {hours.toFixed(2)}h
@@ -328,7 +349,7 @@ export default function ViewTimesheetDialog({
                                         {tagPills.map((p) => (
                                             <span
                                                 key={p}
-                                                className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10.5px] font-semibold text-indigo-700 dark:border-indigo-900/40 dark:bg-indigo-950/30 dark:text-indigo-200"
+                                                className="rounded-full border border-status-info/30 bg-status-info-bg px-2 py-0.5 text-xs font-semibold text-status-info"
                                             >
                                                 {p}
                                             </span>
@@ -345,7 +366,7 @@ export default function ViewTimesheetDialog({
                                         <SectionTitle icon={ClipboardList}>
                                             Activity items
                                         </SectionTitle>
-                                        <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                                        <span className="text-sm text-muted-foreground tabular-nums">
                                             {t.activity_items.length} item
                                             {t.activity_items.length === 1
                                                 ? ''
@@ -358,10 +379,10 @@ export default function ViewTimesheetDialog({
                                                 key={idx}
                                                 className="flex items-center gap-2 rounded-lg border border-border bg-card p-2"
                                             >
-                                                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
+                                                <span className="grid h-5 w-5 place-items-center rounded-full bg-primary-fill text-xs font-semibold text-primary-fill-foreground">
                                                     {idx + 1}
                                                 </span>
-                                                <span className="text-[12.5px]">
+                                                <span className="text-sm">
                                                     {it}
                                                 </span>
                                             </li>
@@ -374,13 +395,13 @@ export default function ViewTimesheetDialog({
                                         <SectionTitle icon={ClipboardList}>
                                             Tasks pulled from shift
                                         </SectionTitle>
-                                        <span className="text-[11.5px] text-muted-foreground tabular-nums">
+                                        <span className="text-sm text-muted-foreground tabular-nums">
                                             {t.tasks_completed ?? 0} /{' '}
                                             {t.tasks_total ?? 0} completed
                                         </span>
                                     </div>
                                     {(t.tasks_total ?? 0) === 0 ? (
-                                        <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-3 text-center text-[12px] text-muted-foreground">
+                                        <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-3 text-center text-sm text-muted-foreground">
                                             No tasks were attached to the linked
                                             shift.
                                         </div>
@@ -422,6 +443,7 @@ export default function ViewTimesheetDialog({
                                     </SectionTitle>
                                     <div className="mt-3 space-y-2">
                                         {allocations.map((a) => {
+                                            const hasClient = a.client_id > 0;
                                             const aHours =
                                                 a.hours ??
                                                 (a.minutes
@@ -439,27 +461,35 @@ export default function ViewTimesheetDialog({
                                                     : 100;
                                             return (
                                                 <div key={a.client_id}>
-                                                    <div className="flex items-center justify-between text-[12.5px]">
-                                                        <span className="truncate font-medium">
-                                                            {a.client_name ??
-                                                                `Client #${a.client_id}`}
+                                                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                                        <span className="font-medium">
+                                                            {hasClient
+                                                                ? (a.client_name ??
+                                                                  `Client #${a.client_id}`)
+                                                                : 'Not allocated to an individual client'}
                                                         </span>
                                                         <span className="text-muted-foreground tabular-nums">
                                                             {aHours.toFixed(2)}h
-                                                            · {pct}%
+                                                            {hasClient
+                                                                ? ` · ${pct}%`
+                                                                : ''}
                                                         </span>
                                                     </div>
-                                                    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-                                                        <div
-                                                            className="h-full rounded-full bg-primary"
-                                                            style={{
-                                                                width:
-                                                                    pct + '%',
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    {a.allocation_method ? (
-                                                        <div className="mt-0.5 text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                                                    {hasClient && (
+                                                        <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                                                            <div
+                                                                className="h-full rounded-full bg-primary"
+                                                                style={{
+                                                                    width:
+                                                                        pct +
+                                                                        '%',
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {hasClient &&
+                                                    a.allocation_method ? (
+                                                        <div className="mt-0.5 text-xs tracking-wider text-muted-foreground uppercase">
                                                             {
                                                                 a.allocation_method
                                                             }
@@ -477,17 +507,17 @@ export default function ViewTimesheetDialog({
                                     Staff notes
                                 </SectionTitle>
                                 {t.notes ? (
-                                    <div className="mt-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2.5 text-[13px] leading-relaxed">
+                                    <div className="mt-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2.5 text-sm leading-relaxed">
                                         <p className="whitespace-pre-line">
                                             {t.notes}
                                         </p>
-                                        <div className="mt-2 text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                                        <div className="mt-2 text-xs tracking-wider text-muted-foreground uppercase">
                                             Logged by {t.staff?.name ?? 'staff'}{' '}
                                             on {fmtDate(t.work_date)}
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-3 text-center text-[12px] text-muted-foreground">
+                                    <div className="mt-3 rounded-lg border border-dashed border-border px-3 py-3 text-center text-sm text-muted-foreground">
                                         No notes left by{' '}
                                         {t.staff?.name ?? 'staff'} for this
                                         timesheet.
@@ -524,17 +554,17 @@ export default function ViewTimesheetDialog({
                                     <SectionTitle icon={Briefcase}>
                                         Linked shift
                                     </SectionTitle>
-                                    <div className="mt-2 rounded-lg border border-primary/30 bg-status-info-bg p-3 text-[12.5px]">
+                                    <div className="mt-2 rounded-lg border border-primary/30 bg-status-info-bg p-3 text-sm">
                                         <div className="font-semibold">
                                             Shift #{t.shift.id}
                                         </div>
                                         {t.shift.location ? (
-                                            <div className="mt-0.5 inline-flex items-center gap-1 text-[11.5px] text-muted-foreground">
+                                            <div className="mt-0.5 inline-flex items-center gap-1 text-sm text-muted-foreground">
                                                 <MapPin className="h-3 w-3" />
                                                 {t.shift.location}
                                             </div>
                                         ) : null}
-                                        <div className="mt-0.5 text-[11.5px] text-muted-foreground capitalize">
+                                        <div className="mt-0.5 text-sm text-muted-foreground capitalize">
                                             {(
                                                 t.shift.shift_type ?? 'standard'
                                             ).replace('_', ' ')}{' '}
@@ -546,7 +576,7 @@ export default function ViewTimesheetDialog({
                                                     `/operations/shifts/${t.shift!.id}`,
                                                 )
                                             }
-                                            className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-[11.5px] font-medium text-primary hover:bg-background/80"
+                                            className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 text-sm font-medium text-primary hover:bg-background/80"
                                         >
                                             <Link2 className="h-3 w-3" /> Open
                                             shift
@@ -562,7 +592,7 @@ export default function ViewTimesheetDialog({
                                     </SectionTitle>
                                     <div className="mt-3 space-y-2">
                                         {t.exported_to_payroll_at ? (
-                                            <div className="flex items-center justify-between rounded-lg border border-status-success/30 bg-status-success-bg px-3 py-2 text-[12.5px]">
+                                            <div className="flex items-center justify-between rounded-lg border border-status-success/30 bg-status-success-bg px-3 py-2 text-sm">
                                                 <span className="font-medium text-status-success">
                                                     Exported
                                                 </span>
@@ -575,10 +605,10 @@ export default function ViewTimesheetDialog({
                                         ) : null}
                                         {t.payroll_reference ? (
                                             <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-                                                <div className="text-[10.5px] tracking-wider text-muted-foreground uppercase">
+                                                <div className="text-xs tracking-wider text-muted-foreground uppercase">
                                                     Reference
                                                 </div>
-                                                <div className="mt-0.5 text-[12px] font-medium break-all">
+                                                <div className="mt-0.5 text-sm font-medium break-all">
                                                     {t.payroll_reference}
                                                 </div>
                                             </div>
@@ -596,10 +626,10 @@ export default function ViewTimesheetDialog({
                                         <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-muted-foreground text-white shadow">
                                             <Pencil className="h-2.5 w-2.5" />
                                         </span>
-                                        <div className="text-[12.5px] font-semibold">
+                                        <div className="text-sm font-semibold">
                                             Timesheet drafted
                                         </div>
-                                        <div className="text-[11px] text-muted-foreground">
+                                        <div className="text-xs text-muted-foreground">
                                             {t.staff?.name ?? 'Staff'} ·{' '}
                                             {fmtDate(t.work_date)}
                                         </div>
@@ -609,10 +639,10 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-warning text-white shadow">
                                                 <Send className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">
+                                            <div className="text-sm font-semibold">
                                                 Submitted for approval
                                             </div>
-                                            <div className="text-[11px] text-muted-foreground">
+                                            <div className="text-xs text-muted-foreground">
                                                 {t.staff?.name ?? 'Staff'} ·{' '}
                                                 {formatDateTime(t.submitted_at)}
                                             </div>
@@ -623,11 +653,11 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-critical text-white shadow">
                                                 <RotateCcw className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">
+                                            <div className="text-sm font-semibold">
                                                 Returned for changes
                                             </div>
                                             {t.returned_notes ? (
-                                                <div className="mt-1 rounded-md bg-status-critical-bg px-2 py-1 text-[11.5px] text-status-critical">
+                                                <div className="mt-1 rounded-md bg-status-critical-bg px-2 py-1 text-sm text-status-critical">
                                                     {t.returned_notes}
                                                 </div>
                                             ) : null}
@@ -638,10 +668,10 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-success text-white shadow">
                                                 <CheckCircle2 className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">
+                                            <div className="text-sm font-semibold">
                                                 Approved
                                             </div>
-                                            <div className="text-[11px] text-muted-foreground">
+                                            <div className="text-xs text-muted-foreground">
                                                 {formatDateTime(t.approved_at)}
                                             </div>
                                         </li>
@@ -651,10 +681,10 @@ export default function ViewTimesheetDialog({
                                             <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-muted-foreground text-white shadow">
                                                 <MessageSquareWarning className="h-2.5 w-2.5" />
                                             </span>
-                                            <div className="text-[12.5px] font-semibold">
+                                            <div className="text-sm font-semibold">
                                                 Archived
                                             </div>
-                                            <div className="text-[11px] text-muted-foreground">
+                                            <div className="text-xs text-muted-foreground">
                                                 {t.archived_reason ??
                                                     'Archived from row menu'}
                                             </div>
@@ -664,9 +694,14 @@ export default function ViewTimesheetDialog({
                             </section>
                         </aside>
                     </div>
+                    {additionalContent ? (
+                        <div className="border-t border-border bg-background p-4">
+                            {additionalContent}
+                        </div>
+                    ) : null}
                 </div>
 
-                <footer className="shrink-0 border-t border-border bg-background p-3.5">
+                <footer className="shrink-0 border-t border-border bg-background p-3.5 [&_button]:min-h-[44px]">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                             <Button
@@ -682,16 +717,14 @@ export default function ViewTimesheetDialog({
                             </Button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                            {canApprove && t.status === 'submitted' ? (
+                            {mayReview ? (
                                 <>
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                        onClick={() =>
-                                            setReasonAction('reject')
-                                        }
-                                        disabled={busy}
+                                        onClick={() => requestReview('reject')}
+                                        disabled={reasonAction !== null}
                                     >
                                         <XCircle className="h-4 w-4" /> Reject
                                     </Button>
@@ -699,43 +732,29 @@ export default function ViewTimesheetDialog({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
-                                        onClick={() =>
-                                            setReasonAction('return')
-                                        }
-                                        disabled={busy}
+                                        onClick={() => requestReview('return')}
+                                        disabled={reasonAction !== null}
                                     >
                                         <RotateCcw className="h-4 w-4" /> Return
                                         for changes
                                     </Button>
                                     <Button
                                         size="sm"
-                                        className="gap-1.5 bg-status-success text-white hover:bg-status-success/90"
-                                        onClick={() =>
-                                            call(
-                                                'post',
-                                                `/operations/timesheets/${t.id}/approve`,
-                                                {},
-                                            )
-                                        }
-                                        disabled={busy}
+                                        className="gap-1.5"
+                                        onClick={() => requestReview('approve')}
+                                        disabled={reasonAction !== null}
                                     >
                                         <CheckCircle2 className="h-4 w-4" />{' '}
                                         Approve
                                     </Button>
                                 </>
                             ) : null}
-                            {t.status === 'draft' ? (
+                            {maySubmit ? (
                                 <Button
                                     size="sm"
                                     className="gap-1.5"
-                                    onClick={() =>
-                                        call(
-                                            'post',
-                                            `/operations/timesheets/${t.id}/submit`,
-                                            {},
-                                        )
-                                    }
-                                    disabled={busy}
+                                    onClick={() => requestReview('submit')}
+                                    disabled={reasonAction !== null}
                                 >
                                     <Send className="h-4 w-4" /> Submit for
                                     approval
@@ -752,43 +771,25 @@ export default function ViewTimesheetDialog({
                 </footer>
             </DialogContent>
 
-            <ReasonDialog
-                open={reasonAction !== null}
-                onClose={() => setReasonAction(null)}
-                title={
-                    reasonAction === 'reject'
-                        ? 'Reject timesheet?'
-                        : 'Return for changes?'
-                }
-                description={
-                    reasonAction === 'reject'
-                        ? 'The staff member will see this timesheet as rejected, with your reason.'
-                        : 'The timesheet goes back to the staff member to fix and resubmit.'
-                }
-                label={
-                    reasonAction === 'reject'
-                        ? 'Reason for rejection'
-                        : 'What needs changing?'
-                }
-                confirmLabel={
-                    reasonAction === 'reject'
-                        ? 'Reject timesheet'
-                        : 'Return to staff'
-                }
-                destructive={reasonAction === 'reject'}
-                onConfirm={(reason) => {
-                    if (reasonAction === 'reject') {
-                        call('post', `/operations/timesheets/${t.id}/reject`, {
-                            decision_notes: reason,
-                        });
-                    } else {
-                        call('post', `/operations/timesheets/${t.id}/return`, {
-                            returned_notes: reason,
-                        });
+            {reasonAction && (
+                <TimesheetActionDialog
+                    open
+                    action={reasonAction}
+                    record={t}
+                    writeCoordination={writeCoordination}
+                    canAct={
+                        reasonAction === 'submit'
+                            ? maySubmit
+                            : mayReview &&
+                              (reasonAction === 'reject'
+                                  ? t.can_reject !== false
+                                  : reasonAction === 'return'
+                                    ? t.can_return !== false
+                                    : t.can_approve !== false)
                     }
-                    setReasonAction(null);
-                }}
-            />
+                    onOpenChange={(next) => !next && setReasonAction(null)}
+                />
+            )}
         </Dialog>
     );
 }

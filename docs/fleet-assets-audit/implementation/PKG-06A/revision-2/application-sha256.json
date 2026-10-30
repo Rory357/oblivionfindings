@@ -1,0 +1,154 @@
+[
+  {
+    "SHA256": "b21012ff5420d04cbb9abd6872eefd09297337c4ad03db72e13fce51b5d7d1be",
+    "Path": "app/Http/Controllers/FleetAssets/AssetController.php"
+  },
+  {
+    "SHA256": "bc1d6cadfc68e8026d15c7690cbae02e9f8f1748be182fdf38e68d556168445e",
+    "Path": "app/Http/Controllers/FleetAssets/AssetImportController.php"
+  },
+  {
+    "SHA256": "868e94b8361213008e916ef806657cd3ab2c5357ec43fa1e411e7c9be5c47509",
+    "Path": "app/Http/Controllers/FleetAssets/AssetLabelController.php"
+  },
+  {
+    "SHA256": "872153a8202c5e7aac820f0d7f5b39b26b99930fe5b111ebcef4eace7e1ea465",
+    "Path": "app/Http/Controllers/FleetAssets/AssetStocktakeController.php"
+  },
+  {
+    "SHA256": "2e5df7ca4db6bf1f9596179cbb8fa37d4c0df4d08b7ba12d9d0b8de6e1374e13",
+    "Path": "app/Models/AssetImportBatch.php"
+  },
+  {
+    "SHA256": "5524376c3cd18fb8830d6a0238d3b499426bada6a3803b21ba6119782d03e1f5",
+    "Path": "app/Models/AssetLabelBatch.php"
+  },
+  {
+    "SHA256": "4c22a66c7e7a4383e96c206dc22f6ca56014e84db274e5778d7d17afbcdc6312",
+    "Path": "app/Models/AssetStocktake.php"
+  },
+  {
+    "SHA256": "dce49c4b34e10ca4243e0ffc2fde690107d064e6db3b1a52bc0880879aec178c",
+    "Path": "app/Services/Assets/AssetLabelExporter.php"
+  },
+  {
+    "SHA256": "0251c7ebd59b928af0736db24bab863c57d96dd9f24967edf4015e51821e2896",
+    "Path": "app/Services/Assets/AssetStocktakeExporter.php"
+  },
+  {
+    "SHA256": "603aa05a64fa69f7fb70f2dcf4cbf1efad680be7d63b5f0575939c226cb88791",
+    "Path": "app/Services/Assets/AssetStocktakeService.php"
+  },
+  {
+    "SHA256": "9e331b36bb19728059b76221bb333d06abea27092b82ff90d336591bf66f12cc",
+    "Path": "app/Services/Assets/BrandedWorkbook.php"
+  },
+  {
+    "SHA256": "e571265546844f965e521abd669f493ad22f2c1e768112c2d5e89d6455d81934",
+    "Path": "app/Services/Fleet/VehicleTripReportExporter.php"
+  },
+  {
+    "SHA256": "4bc849d23c8cbaa4c512e6af988ca0f8ebbd5c9efb94ec5585930dc959b91b91",
+    "Path": "app/Support/SchemaCache.php"
+  },
+  {
+    "SHA256": "97875612d3afa1b72568069428efc97fc9edb1d8143063f656f55f15a7ac1619",
+    "Path": "database/migrations/2026_09_27_120000_create_asset_register_workflows.php"
+  },
+  {
+    "SHA256": "24aac3211d604e7b0649e6f106e49c8d14d0936f6ce314372015eb48403a57df",
+    "Path": "database/migrations/2026_09_27_140000_retain_stocktake_history_asset_references.php"
+  },
+  {
+    "SHA256": "4cbc44316e01c453c1eaaeb82a6c9f3ff2c94a95860bda77be22e342984818df",
+    "Path": "package-lock.json"
+  },
+  {
+    "SHA256": "501863b6796e3730dc558f05f3624132aa45902f209bb2cb77208937c639e8d6",
+    "Path": "package.json"
+  },
+  {
+    "SHA256": "652a7a09ee73c47efb815184595546ebc3c30cc6a38d8c59f71d56fddc9583cc",
+    "Path": "resources/js/components/wizard/shell.tsx"
+  },
+  {
+    "SHA256": "42cb20bf515b7d633bfe8982e054a705f64c0034272db6e15ccba32996cdbd02",
+    "Path": "resources/js/pages/fleet-assets/assets/components/asset-wizard-dialog.tsx"
+  },
+  {
+    "SHA256": "d5e633410044a3e1bdfff52a855ecffed763062385660c3422f763b61e7edbe7",
+    "Path": "resources/js/pages/fleet-assets/assets/index.tsx"
+  },
+  {
+    "SHA256": "396a895fb320a9aab7f21ab03b38374eb30b9746b363ab97c476599311ee9e99",
+    "Path": "resources/js/pages/fleet-assets/assets/register/api.test.ts"
+  },
+  {
+    "SHA256": "b068836adb14e8f922eff2734a0679ae19658b578b4374c6a9de37444ec03379",
+    "Path": "resources/js/pages/fleet-assets/assets/register/api.ts"
+  },
+  {
+    "SHA256": "d35aef452a42bdc303ffd78f3592dcca2bdf9b5c5d31fdae9a24b604ad77650d",
+    "Path": "resources/js/pages/fleet-assets/assets/register/controls.tsx"
+  },
+  {
+    "SHA256": "1a9e2fc4dca84600e66db8e7571da4a0d326436890d506e92001714d6da42867",
+    "Path": "resources/js/pages/fleet-assets/assets/register/imports.tsx"
+  },
+  {
+    "SHA256": "c27b17e3b18b8869ef2fb413e48c7b43b3c3beecf548c38380b1c36334891e58",
+    "Path": "resources/js/pages/fleet-assets/assets/register/labels.tsx"
+  },
+  {
+    "SHA256": "531e19e186135cfa3ea57f974be4ed897603f327c1e740e8e48324d5c5c3cf79",
+    "Path": "resources/js/pages/fleet-assets/assets/register/location-navigator.tsx"
+  },
+  {
+    "SHA256": "a58e50bdc7fd5fab116067e5e2cb857f4ae13f246d1ce5b57fa379a3115cdb43",
+    "Path": "resources/js/pages/fleet-assets/assets/register/qr-reader.tsx"
+  },
+  {
+    "SHA256": "7a5937c8f267aab08fe70de676099006e6d9f2d29a4a615ab0ddcf9a5662d354",
+    "Path": "resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx"
+  },
+  {
+    "SHA256": "eb932f02af460b6cfc1506208542e9fa9865a93f556511d6aa7ed4b7f466751c",
+    "Path": "resources/js/pages/fleet-assets/assets/register/stocktake-modal.tsx"
+  },
+  {
+    "SHA256": "e07534655a6363e36e00859141a83425e53b158f7989623a636bffd863e65221",
+    "Path": "resources/js/pages/fleet-assets/assets/register/stocktakes.test.tsx"
+  },
+  {
+    "SHA256": "5da0d4c998624463ee8e2e9319e425f77fdec6c27183d5bc31c0035ea5d39410",
+    "Path": "resources/js/pages/fleet-assets/assets/register/stocktakes.tsx"
+  },
+  {
+    "SHA256": "0291e29cf55885cceccf5a99ad8b0f7e63fbb623b720dd5c0034a334750e6ef7",
+    "Path": "resources/js/pages/fleet-assets/assets/register/workspace.css"
+  },
+  {
+    "SHA256": "014f651588b55b785e4d4b1736637618cd00af705b8603fd7c6e614f96741a40",
+    "Path": "resources/views/pdf/asset-labels.blade.php"
+  },
+  {
+    "SHA256": "7cefc556a944b5a35c528518ec064c9a8a18ba57cda5b1edf7f88747875a09de",
+    "Path": "resources/views/pdf/asset-stocktake.blade.php"
+  },
+  {
+    "SHA256": "66c1db4b22233ebd4979d93716ce2f63fa7200acd4178d6fe207229e581d81d2",
+    "Path": "routes/fleet-assets.php"
+  },
+  {
+    "SHA256": "64f16c31f7f30f93d8a5337c1b18a8bd6c31f530fef03233e96d3fb9d9340672",
+    "Path": "tests/Feature/FleetAssets/AssetRegisterWorkflowTest.php"
+  },
+  {
+    "SHA256": "d7f7ebda45e25b660c9b8165a7176d78cf0765156b0dce335469f7694898ba12",
+    "Path": "tests/TestCase.php"
+  },
+  {
+    "SHA256": "de1b43b5ae45ca0da0a11ce727a818caa12654e35d5bcbb660408fd94da868f2",
+    "Path": "tests/Unit/Support/SchemaCacheScopeTest.php"
+  }
+]

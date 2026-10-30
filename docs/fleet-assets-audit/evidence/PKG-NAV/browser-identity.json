@@ -1,0 +1,19 @@
+{
+  "url": "http://127.0.0.1:8876/fleet-assets/vehicles?fixture_role=admin",
+  "browser": "Chrome extension",
+  "tabId": "1051445353",
+  "worktree": "C:/Users/steph/.codex/worktrees/475b/oblivionfindings",
+  "measurement": {
+    "devicePixelRatio": 1.25,
+    "height": 1000,
+    "overflow": false,
+    "width": 1440
+  },
+  "narrowMeasurement": {
+    "devicePixelRatio": 1.25,
+    "height": 900,
+    "overflow": false,
+    "width": 1280
+  },
+  "console": []
+}

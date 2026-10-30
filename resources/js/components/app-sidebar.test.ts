@@ -7,7 +7,220 @@ import {
     isSubItemActive,
 } from './app-sidebar';
 
+describe('app sidebar referral destinations', () => {
+    it('selects Reports separately while retaining intake and calendar navigation', () => {
+        for (const url of [
+            '/operations/referrals/reports?view=overview',
+            '/operations/referrals/reports/',
+        ]) {
+            expect(isSubItemActive(url, '/operations/referrals')).toBe(false);
+            expect(isSubItemActive(url, '/operations/referrals/reports')).toBe(
+                true,
+            );
+        }
+        for (const url of [
+            '/operations/referrals',
+            '/operations/referrals/calendar',
+            '/operations/referrals/01M56KN8AKKP86VRZ8TKNXD5WY',
+        ]) {
+            expect(isSubItemActive(url, '/operations/referrals')).toBe(true);
+            expect(isSubItemActive(url, '/operations/referrals/reports')).toBe(
+                false,
+            );
+        }
+    });
+});
+
 describe('app sidebar workforce navigation', () => {
+    it('keeps Rostering lit on the pages its header opens and Handovers lit on Shift notes', () => {
+        for (const url of [
+            '/operations/rostering/conflicts?week=2026-11-09',
+            '/operations/rostering/conflicts/',
+            '/operations/rostering/conflicts/review/42',
+            '/operations/rostering?tab=availability',
+            '/operations/rostering/templates',
+            '/operations/rostering/conflicts-history',
+            '/operations/shifts',
+            '/operations/shifts/42',
+            '/operations/qualifications?site_id=3',
+            '/operations/qualifications/check/17',
+            '/operations/availability?week=2026-10-12',
+        ]) {
+            expect(isSubItemActive(url, '/operations/rostering')).toBe(true);
+            expect(isSubItemActive(url, '/operations/handovers')).toBe(false);
+        }
+        for (const url of [
+            '/operations/handovers?week=2026-10-12',
+            '/operations/shift-notes',
+            '/operations/shift-notes?site_id=3&week=2026-10-12',
+        ]) {
+            expect(isSubItemActive(url, '/operations/handovers')).toBe(true);
+            expect(isSubItemActive(url, '/operations/rostering')).toBe(false);
+        }
+        expect(
+            isSubItemActive(
+                '/operations/shifts-archive',
+                '/operations/rostering',
+            ),
+        ).toBe(false);
+    });
+
+    it('shows the six Workforce destinations in their agreed order', () => {
+        const sidebar = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true, manageAny: true },
+                job_board: { viewAny: true },
+                rostering: { viewAny: true },
+                timesheets: { viewAny: true },
+            },
+        }).filter((item) => item.group === 'Workforce');
+
+        expect(sidebar.map((item) => item.label)).toEqual([
+            'Rostering',
+            'Available shifts',
+            'Attendance',
+            'Timesheets',
+            'Handovers',
+            'Settings',
+        ]);
+    });
+
+    it('keeps direct entries for shift and availability readers without Rostering', () => {
+        const shiftReader = buildNavSearchCatalog({
+            can: { shifts: { viewAny: true } },
+        }).filter((item) => item.group === 'Workforce');
+        expect(shiftReader.map((item) => item.label)).toEqual([
+            'Shifts',
+            'Available shifts',
+            'Handovers',
+            'Shift notes',
+        ]);
+
+        const availabilityEditor = buildNavSearchCatalog({
+            can: { staff: { availabilityUpdateSelf: true } },
+        }).filter((item) => item.group === 'Workforce');
+        expect(availabilityEditor.map((item) => item.label)).toEqual([
+            'Availability',
+        ]);
+    });
+
+    it('finds renamed and header-only Workforce pages in command search', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true, manageAny: true },
+                job_board: { viewAny: true },
+                rostering: { viewAny: true },
+            },
+        });
+        expect(
+            catalog.find((item) => item.href === '/operations/job-board'),
+        ).toMatchObject({
+            label: 'Available shifts',
+            keywords: expect.arrayContaining(['job board']),
+        });
+        for (const [label, href, group] of [
+            ['Shifts', '/operations/shifts', 'Rostering'],
+            ['Conflict queue', '/operations/rostering/conflicts', 'Rostering'],
+            ['Qualifications', '/operations/qualifications', 'Rostering'],
+            ['Shift notes', '/operations/shift-notes', 'Handovers'],
+        ]) {
+            expect(catalog.filter((item) => item.href === href)).toEqual([
+                expect.objectContaining({ label, group, section: 'Workforce' }),
+            ]);
+        }
+    });
+
+    it.each([
+        ['/operations/workforce-settings', '/operations/workforce-settings'],
+        [
+            '/operations/workforce-settings/?tab=safety',
+            '/operations/workforce-settings',
+        ],
+        [
+            '/operations/availability?week=2026-10-12',
+            '/operations/availability',
+        ],
+        ['/operations/rostering?tab=availability', '/operations/rostering'],
+        ['/operations/shifts/42', '/operations/shifts'],
+        ['/attendance', '/attendance'],
+    ])('keeps %s out of the Operations dashboard match', (url, href) => {
+        expect(isSubItemActive(url, '/operations')).toBe(false);
+        expect(isSubItemActive(url, href)).toBe(true);
+        expect(
+            isIconActive(
+                url,
+                { id: 'operations', subPanel: true } as any,
+                [
+                    {
+                        label: 'Overview',
+                        items: [{ title: 'Dashboard', href: '/operations' }],
+                    },
+                ] as any,
+            ),
+        ).toBe(false);
+        expect(
+            isIconActive(
+                url,
+                { id: 'workforce', subPanel: true } as any,
+                [
+                    {
+                        label: 'Workforce',
+                        items: [{ title: 'Current page', href }],
+                    },
+                ] as any,
+            ),
+        ).toBe(true);
+    });
+
+    it.each([
+        '/operations',
+        '/operations/clients/42',
+        '/operations/workforce-settings-history',
+    ])(
+        'preserves Operations matching for %s outside Workforce route boundaries',
+        (url) => expect(isSubItemActive(url, '/operations')).toBe(true),
+    );
+
+    it.each(['viewAny', 'availabilityUpdateSelf', 'availabilityUpdateAny'])(
+        'keeps %s discoverable without granting roster navigation',
+        (permission) => {
+            const catalog = buildNavSearchCatalog({
+                can: { staff: { [permission]: true } },
+            }).filter((item) => item.section === 'Workforce');
+            expect(catalog.map((item) => item.href)).toEqual([
+                '/operations/availability',
+            ]);
+        },
+    );
+
+    it.each([
+        {},
+        { viewAny: true },
+        { availabilityUpdateSelf: true },
+        { availabilityUpdateAny: true },
+    ])(
+        'uses the roster availability tab when roster access is present with staff grants %j',
+        (staff) => {
+            const catalog = buildNavSearchCatalog({
+                can: { rostering: { viewAny: true }, staff },
+            }).filter((item) => item.section === 'Workforce');
+            expect(
+                catalog.some((item) => item.href === '/operations/rostering'),
+            ).toBe(true);
+            expect(
+                catalog.some(
+                    (item) => item.href === '/operations/availability',
+                ),
+            ).toBe(false);
+            expect(
+                catalog.find((item) => item.label === 'Availability'),
+            ).toMatchObject({
+                href: '/operations/rostering?tab=availability',
+                group: 'Rostering',
+            });
+        },
+    );
+
     it('keeps IT destinations in the app sidebar without duplicating tabs or device navigation', () => {
         const catalog = buildNavSearchCatalog({
             can: { it: { view: true, request: true, manage: true } },
@@ -46,7 +259,7 @@ describe('app sidebar workforce navigation', () => {
         },
     );
 
-    it('uses the grouped Security & Devices contract in application search', () => {
+    it('uses the simplified five-item Security & Devices contract in application search', () => {
         const catalog = buildNavSearchCatalog({
             can: {
                 securityDevices: {
@@ -64,28 +277,22 @@ describe('app sidebar workforce navigation', () => {
         }).filter((item) => item.section === 'Security & Devices');
 
         expect([...new Set(catalog.map((item) => item.group))]).toEqual([
-            'Overview',
-            'Workspaces',
-            'Operations',
-            'Setup',
+            'Security & Devices',
         ]);
         expect(catalog.map((item) => item.label)).toEqual([
-            'Estate overview',
+            'Overview',
+            'Devices',
             'Sites',
-            'All devices',
-            'Network & IT',
-            'Security',
-            'Healthcare',
-            'Tracking',
-            'Facilities & IoT',
-            'Monitoring',
-            'Maintenance',
-            'Discovery & collectors',
-            'Integrations',
-            'Settings & audit',
+            'Alerts & upkeep',
+            'Setup',
         ]);
         expect(catalog.map((item) => item.label)).not.toEqual(
             expect.arrayContaining([
+                'Network & IT',
+                'Security',
+                'Healthcare',
+                'Tracking',
+                'Facilities & IoT',
                 'Tracking Devices',
                 'Smart IoT & Healthcare',
                 'IT Infrastructure',
@@ -170,17 +377,18 @@ describe('app sidebar workforce navigation', () => {
             },
         });
 
-        const workforceLabels = [
-            'Shifts',
-            'Job Board',
-            'Rostering',
-            'Availability',
-            'Handovers',
-            'Shift Notes',
-            'Timesheets',
-            'Attendance',
-            'Conflict Queue',
-        ];
+        const workforceGroups: Record<string, string> = {
+            Rostering: 'Workforce',
+            'Available shifts': 'Workforce',
+            Attendance: 'Workforce',
+            Timesheets: 'Workforce',
+            Handovers: 'Workforce',
+            Shifts: 'Rostering',
+            Availability: 'Rostering',
+            'Conflict queue': 'Rostering',
+            'Shift notes': 'Handovers',
+        };
+        const workforceLabels = Object.keys(workforceGroups);
 
         expect(
             workforceLabels.map((label) =>
@@ -191,7 +399,7 @@ describe('app sidebar workforce navigation', () => {
                 expect.objectContaining({
                     label,
                     section: 'Workforce',
-                    group: 'Workforce',
+                    group: workforceGroups[label],
                 }),
             ),
         );
@@ -211,12 +419,12 @@ describe('app sidebar workforce navigation', () => {
             href: '/operations/handovers',
         });
         expect(
-            catalog.find((item) => item.label === 'Shift Notes'),
+            catalog.find((item) => item.label === 'Shift notes'),
         ).toMatchObject({
             href: '/operations/shift-notes',
         });
         expect(
-            catalog.find((item) => item.label === 'Conflict Queue'),
+            catalog.find((item) => item.label === 'Conflict queue'),
         ).toMatchObject({
             href: '/operations/rostering/conflicts',
         });
@@ -238,6 +446,18 @@ describe('app sidebar workforce navigation', () => {
             can: {
                 shifts: { viewAny: true },
                 rostering: { viewAny: true },
+                timesheets: { viewAssigned: true },
+            },
+        });
+
+        expect(catalog.map((item) => item.section)).toContain('Workforce');
+        expect(catalog.map((item) => item.section)).not.toContain('Operations');
+    });
+
+    it('keeps Operations absent for workforce readers without roster access', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                shifts: { viewAny: true },
                 timesheets: { viewAssigned: true },
             },
         });
@@ -520,7 +740,112 @@ describe('finance sidebar highlighting', () => {
     });
 
     it('lights no finance hub outside the module', () => {
-        expect(HUBS.filter((href) => isSubItemActive('/governance/meetings', href))).toEqual([]);
-        expect(HUBS.filter((href) => isSubItemActive('/dashboard', href))).toEqual([]);
+        expect(
+            HUBS.filter((href) =>
+                isSubItemActive('/governance/meetings', href),
+            ),
+        ).toEqual([]);
+        expect(
+            HUBS.filter((href) => isSubItemActive('/dashboard', href)),
+        ).toEqual([]);
+    });
+});
+
+it('shows a single Workforce settings entry only with roster access', () => {
+    expect(
+        buildNavSearchCatalog({ can: { rostering: { viewAny: true } } }).filter(
+            (item) => item.href === '/operations/workforce-settings',
+        ),
+    ).toHaveLength(1);
+    expect(
+        buildNavSearchCatalog({
+            can: { staff: { availabilityUpdateSelf: true } },
+        }).some((item) => item.href === '/operations/workforce-settings'),
+    ).toBe(false);
+});
+
+it.each([
+    [{ rostering: { viewAny: true } }, true],
+    [{ qualifications: { viewAny: true } }, false],
+    [
+        {
+            rostering: { viewAny: true },
+            qualifications: { viewAny: true },
+        },
+        true,
+    ],
+    [{}, false],
+])(
+    'matches Qualifications navigation to its installed roster read gate for %j',
+    (can, visible) => {
+        const qualifications = buildNavSearchCatalog({ can }).filter(
+            (item) => item.href === '/operations/qualifications',
+        );
+        expect(qualifications).toHaveLength(visible ? 1 : 0);
+        if (visible) {
+            expect(qualifications[0]).toMatchObject({
+                label: 'Qualifications',
+                section: 'Workforce',
+            });
+        }
+    },
+);
+
+describe('app sidebar Security & Devices navigation', () => {
+    const securityItem = { id: 'security-devices', subPanel: true } as any;
+    const securityGroups = [
+        {
+            label: 'Estate',
+            items: [
+                { title: 'Estate overview', href: '/security-devices' },
+                { title: 'All devices', href: '/security-devices/devices' },
+                { title: 'Monitoring', href: '/security-devices/monitoring' },
+            ],
+        },
+    ] as any;
+    const itItem = { id: 'it', subPanel: true } as any;
+    const itGroups = [
+        {
+            label: 'Support',
+            items: [
+                { title: 'Tickets', href: '/it' },
+                { title: 'Remote support', href: '/it/remote-support' },
+            ],
+        },
+    ] as any;
+
+    it('lights Estate overview only on itself, not on every module page', () => {
+        expect(isSubItemActive('/security-devices', '/security-devices')).toBe(
+            true,
+        );
+        for (const url of [
+            '/security-devices/devices',
+            '/security-devices/devices/12',
+            '/security-devices/monitoring?view=findings',
+        ]) {
+            expect(isSubItemActive(url, '/security-devices')).toBe(false);
+            expect(isIconActive(url, securityItem, securityGroups)).toBe(true);
+        }
+        expect(
+            isSubItemActive(
+                '/security-devices/devices/12',
+                '/security-devices/devices',
+            ),
+        ).toBe(true);
+    });
+
+    it('keeps Approved scripts under IT & Support › Remote support', () => {
+        for (const url of [
+            '/security-devices/scripts',
+            '/security-devices/scripts?status=published',
+        ]) {
+            expect(isSubItemActive(url, '/it/remote-support')).toBe(true);
+            expect(isSubItemActive(url, '/security-devices')).toBe(false);
+            expect(isSubItemActive(url, '/security-devices/devices')).toBe(
+                false,
+            );
+            expect(isIconActive(url, itItem, itGroups)).toBe(true);
+            expect(isIconActive(url, securityItem, securityGroups)).toBe(false);
+        }
     });
 });

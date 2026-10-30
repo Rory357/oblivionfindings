@@ -2,7 +2,6 @@
 
 namespace App\Services\Tasks\Providers;
 
-use App\Models\Client;
 use App\Models\ShiftTask;
 use App\Models\User;
 use App\Services\Tasks\Contracts\HasModelClass;
@@ -11,7 +10,6 @@ use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
 use App\Services\UserSiteAccessService;
-use Illuminate\Support\Facades\Gate;
 
 class ShiftTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
@@ -43,8 +41,7 @@ class ShiftTaskProvider implements HasModelClass, SiteScopedTaskProvider, TaskPr
         if (! $this->canView($user)) {
             return [];
         }
-        $clients = Client::query()->tap(fn ($query) => app(UserSiteAccessService::class)->applyClientScope($query, $user, ['clinical.accessAllSites', 'sites.viewAll']))
-            ->get()->filter(fn (Client $client) => Gate::forUser($user)->allows('view', $client))->modelKeys();
+        $clients = app(UserSiteAccessService::class)->viewableClientIds($user, ['clinical.accessAllSites', 'sites.viewAll']);
         $query = ShiftTask::query()
             ->where(fn ($visible) => $visible
                 ->where('task_scope', 'site')

@@ -1,3 +1,5 @@
+import { DatePicker } from '@/components/fleet-assets/maintenance/date-picker';
+import { TimePicker } from '@/components/fleet-assets/maintenance/time-picker';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,8 +12,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import type { DatesSetArg, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -64,19 +66,19 @@ const viewOptions: { key: ViewKey; label: string }[] = [
 const categories = [
     {
         dot: 'bg-status-info',
-        label: 'Support Visits',
+        label: 'Support visits',
         icon: CalendarDays,
         bg: 'bg-status-info-bg',
     },
     {
         dot: 'bg-primary',
-        label: 'Respite Stays',
+        label: 'Respite stays',
         icon: Home,
-        bg: 'bg-primary/10 dark:bg-primary/40',
+        bg: 'bg-primary/10',
     },
     {
         dot: 'bg-status-success',
-        label: 'Family Visits',
+        label: 'Family visits',
         icon: Users,
         bg: 'bg-status-success-bg',
     },
@@ -90,13 +92,13 @@ const categories = [
         dot: 'bg-primary',
         label: 'Specialist',
         icon: Heart,
-        bg: 'bg-primary/10 dark:bg-primary/40',
+        bg: 'bg-primary/10',
     },
     {
         dot: 'bg-status-critical',
         label: 'Therapy',
         icon: Heart,
-        bg: 'bg-status-critical-bg dark:bg-status-critical-bg',
+        bg: 'bg-status-critical-bg',
     },
     {
         dot: 'bg-status-info',
@@ -110,8 +112,8 @@ const visitTypeLabels: Record<
     string,
     { label: string; icon: typeof Calendar }
 > = {
-    in_person: { label: 'In Person', icon: Users },
-    video_call: { label: 'Video Call', icon: Video },
+    in_person: { label: 'In person', icon: Users },
+    video_call: { label: 'Video call', icon: Video },
     outing: { label: 'Outing', icon: MapPin },
 };
 
@@ -128,33 +130,33 @@ const calendarStyles = `
 .fc table, .fc th, .fc td { border: none !important; }
 .fc .fc-col-header { margin-bottom: 0.25rem; }
 .fc .fc-col-header-cell { padding: 0.75rem 0; }
-.fc .fc-col-header-cell-cushion { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none !important; padding: 0.5rem 1rem; border-radius: 1rem; font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--muted-foreground) / 0.6); }
-.fc .fc-day-today .fc-col-header-cell-cushion { background: hsl(var(--primary)); color: white !important; border-radius: 1rem; font-weight: 700; }
-.fc .fc-timegrid-axis-cushion, .fc .fc-timegrid-slot-label-cushion { font-size: 0.7rem; font-weight: 500; color: hsl(var(--muted-foreground) / 0.45); padding-right: 0.75rem; }
+.fc .fc-col-header-cell-cushion { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none !important; padding: 0.5rem 1rem; border-radius: 1rem; font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
+.fc .fc-day-today .fc-col-header-cell-cushion { background: var(--primary); color: var(--primary-foreground) !important; border-radius: 1rem; font-weight: 700; }
+.fc .fc-timegrid-axis-cushion, .fc .fc-timegrid-slot-label-cushion { font-size: 0.7rem; font-weight: 500; color: var(--muted-foreground); padding-right: 0.75rem; }
 .fc .fc-timegrid-slot { height: 3.5em; }
-.fc .fc-timegrid-slot-lane { border-top: 1px dotted rgba(139, 92, 246, 0.12) !important; }
-.fc .fc-timegrid-col { border-right: 1px dotted rgba(139, 92, 246, 0.1) !important; }
+.fc .fc-timegrid-slot-lane { border-top: 1px dotted var(--border) !important; }
+.fc .fc-timegrid-col { border-right: 1px dotted var(--border) !important; }
 .fc .fc-timegrid-col:last-child { border-right: none !important; }
 .fc .fc-timegrid-divider, .fc .fc-timegrid-axis, .fc .fc-timegrid-body { border: none !important; }
 .fc .fc-timegrid-slots td, .fc .fc-timegrid-slot-label { border: none !important; }
 .fc .fc-event, .fc .fc-event-mirror { border: none !important; border-radius: 0.625rem !important; cursor: pointer; transition: all 0.15s ease; }
-.fc .fc-event:hover { transform: scale(1.01); z-index: 10 !important; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.fc .fc-event:hover { transform: scale(1.01); z-index: 10 !important; box-shadow: 0 4px 16px color-mix(in oklab, var(--foreground) 10%, transparent); }
 .fc .fc-timegrid-event { border-radius: 0.625rem !important; margin: 1px 2px; }
 .fc .fc-timegrid-event .fc-event-main { padding: 0.375rem 0.5rem; }
 .fc .fc-daygrid-event { border-radius: 0.5rem !important; padding: 2px 8px; margin: 1px 3px; }
 .fc .fc-daygrid-body { border: none !important; }
-.fc .fc-now-indicator-line { border-color: #ef4444 !important; border-width: 2px !important; }
-.fc .fc-day-today { background: hsl(var(--primary) / 0.02) !important; }
+.fc .fc-now-indicator-line { border-color: var(--status-critical) !important; border-width: 2px !important; }
+.fc .fc-day-today { background: color-mix(in oklab, var(--primary) 4%, transparent) !important; }
 .fc .fc-daygrid-day-number { font-weight: 700; font-size: 0.9rem; padding: 0.5rem; }
-.fc .fc-day-today .fc-daygrid-day-number { background: hsl(var(--primary)); color: white; border-radius: 9999px; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; margin: 0.25rem; }
-.fc .fc-daygrid-day { border-right: 1px dotted rgba(139,92,246,0.1) !important; border-bottom: 1px dotted rgba(139,92,246,0.1) !important; }
-.fc .fc-list { border: 1px solid hsl(var(--border) / 0.2) !important; border-radius: 1rem; overflow: hidden; }
-.fc .fc-list-event:hover td { background-color: hsl(var(--accent)); }
-.fc .fc-list-day-cushion { background: hsl(var(--muted) / 0.15); font-weight: 600; }
-.calendar-context-menu { position: fixed; z-index: 50; min-width: 180px; background: hsl(var(--card)); border: 1px solid hsl(var(--border)); border-radius: 0.75rem; box-shadow: 0 8px 30px rgba(0,0,0,0.12); padding: 0.375rem; }
-.calendar-context-menu button { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; transition: background 0.1s; text-align: left; border: none; background: none; cursor: pointer; color: hsl(var(--foreground)); }
-.calendar-context-menu button:hover { background: hsl(var(--accent)); }
-.calendar-context-menu hr { margin: 0.25rem 0; border-color: hsl(var(--border)); }
+.fc .fc-day-today .fc-daygrid-day-number { background: var(--primary); color: var(--primary-foreground); border-radius: 9999px; width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; margin: 0.25rem; }
+.fc .fc-daygrid-day { border-right: 1px dotted var(--border) !important; border-bottom: 1px dotted var(--border) !important; }
+.fc .fc-list { border: 1px solid var(--border) !important; border-radius: 1rem; overflow: hidden; }
+.fc .fc-list-event:hover td { background-color: var(--accent); }
+.fc .fc-list-day-cushion { background: var(--muted); font-weight: 600; }
+.calendar-context-menu { position: fixed; z-index: 50; min-width: 180px; background: var(--card); border: 1px solid var(--border); border-radius: 0.75rem; box-shadow: 0 8px 30px color-mix(in oklab, var(--foreground) 12%, transparent); padding: 0.375rem; }
+.calendar-context-menu button { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; transition: background 0.1s; text-align: left; border: none; background: none; cursor: pointer; color: var(--foreground); }
+.calendar-context-menu button:hover { background: var(--accent); }
+.calendar-context-menu hr { margin: 0.25rem 0; border-color: var(--border); }
 `;
 
 function renderEventContent(eventInfo: {
@@ -275,6 +277,14 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
 
     const submitVisit = (e: React.FormEvent) => {
         e.preventDefault();
+        // The calendar picker has no `min`; keep the old "today or later" rule.
+        if (
+            form.data.requested_date &&
+            form.data.requested_date < new Date().toISOString().split('T')[0]
+        ) {
+            form.setError('requested_date', 'Choose today or a later date.');
+            return;
+        }
         form.post(`/portal/clients/${client.id}/visit-requests`, {
             preserveScroll: true,
             onSuccess: () => {
@@ -368,7 +378,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         <Card>
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center justify-between text-sm font-semibold">
-                                    Your Visits
+                                    Your visits
                                     {pendingCount > 0 && (
                                         <span className="rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
                                             {pendingCount} pending
@@ -440,13 +450,18 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                             className="mt-1 w-full gap-1.5"
                                         >
                                             <CalendarPlus className="h-3.5 w-3.5" />
-                                            Request a Visit
+                                            Request a visit
                                         </Button>
                                     </DialogTrigger>
-                                    <DialogContent className="sm:max-w-md">
+                                    <DialogContent
+                                        style={{
+                                            maxWidth: 'min(92vw, 720px)',
+                                            width: 'min(92vw, 720px)',
+                                        }}
+                                    >
                                         <DialogHeader>
                                             <DialogTitle>
-                                                Request a Visit
+                                                Request a visit
                                             </DialogTitle>
                                             <DialogDescription>
                                                 Submit a visit request to see{' '}
@@ -458,61 +473,80 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                             className="space-y-4"
                                         >
                                             <div>
-                                                <Label>Date *</Label>
-                                                <Input
-                                                    type="date"
+                                                <Label htmlFor="calendar-visit-date">
+                                                    Date *
+                                                </Label>
+                                                <DatePicker
+                                                    id="calendar-visit-date"
+                                                    label="Visit date"
                                                     value={
                                                         form.data.requested_date
                                                     }
-                                                    onChange={(e) =>
+                                                    onChange={(value) =>
                                                         form.setData(
                                                             'requested_date',
-                                                            e.target.value,
+                                                            value,
                                                         )
                                                     }
-                                                    min={
-                                                        new Date()
-                                                            .toISOString()
-                                                            .split('T')[0]
+                                                    invalid={
+                                                        !!form.errors
+                                                            .requested_date
                                                     }
+                                                    compact
                                                 />
+                                                {form.errors.requested_date && (
+                                                    <p className="mt-1 text-xs text-status-critical">
+                                                        {
+                                                            form.errors
+                                                                .requested_date
+                                                        }
+                                                    </p>
+                                                )}
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
-                                                    <Label>From</Label>
-                                                    <Input
-                                                        type="time"
+                                                    <Label htmlFor="calendar-visit-start">
+                                                        From
+                                                    </Label>
+                                                    <TimePicker
+                                                        id="calendar-visit-start"
+                                                        label="Preferred start time"
                                                         value={
                                                             form.data
                                                                 .preferred_time_start
                                                         }
-                                                        onChange={(e) =>
+                                                        onChange={(value) =>
                                                             form.setData(
                                                                 'preferred_time_start',
-                                                                e.target.value,
+                                                                value,
                                                             )
                                                         }
+                                                        compact
                                                     />
                                                 </div>
                                                 <div>
-                                                    <Label>To</Label>
-                                                    <Input
-                                                        type="time"
+                                                    <Label htmlFor="calendar-visit-end">
+                                                        To
+                                                    </Label>
+                                                    <TimePicker
+                                                        id="calendar-visit-end"
+                                                        label="Preferred end time"
                                                         value={
                                                             form.data
                                                                 .preferred_time_end
                                                         }
-                                                        onChange={(e) =>
+                                                        onChange={(value) =>
                                                             form.setData(
                                                                 'preferred_time_end',
-                                                                e.target.value,
+                                                                value,
                                                             )
                                                         }
+                                                        compact
                                                     />
                                                 </div>
                                             </div>
                                             <div>
-                                                <Label>Visit Type *</Label>
+                                                <Label>Visit type *</Label>
                                                 <div className="mt-2 grid grid-cols-3 gap-2">
                                                     {(
                                                         [
@@ -556,8 +590,8 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                             </div>
                                             <div>
                                                 <Label>Notes</Label>
-                                                <textarea
-                                                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                <Textarea
+                                                    className="mt-1"
                                                     rows={3}
                                                     value={form.data.notes}
                                                     onChange={(e) =>
@@ -587,7 +621,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                                             .requested_date
                                                     }
                                                 >
-                                                    Submit Request
+                                                    Submit request
                                                 </Button>
                                             </div>
                                         </form>
@@ -641,7 +675,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                                     onClick={() => setBookingOpen(true)}
                                 >
                                     <CalendarPlus className="h-3.5 w-3.5" />
-                                    Request Visit
+                                    Request visit
                                 </Button>
                                 <div className="inline-flex items-center gap-1 rounded-full border bg-muted/20 p-1">
                                     {viewOptions.map((v) => (
@@ -850,7 +884,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                             }}
                         >
                             <CalendarPlus className="h-4 w-4 text-status-success" />
-                            <span>Request a Visit</span>
+                            <span>Request a visit</span>
                         </Button>
                         <hr />
                         <Button

@@ -35,6 +35,11 @@ final readonly class CommandExecutionRoute
         );
     }
 
+    public static function endpoint(): self
+    {
+        return new self('endpoint', true, 'An authenticated installed native agent will claim this approved attempt before execution.');
+    }
+
     public static function unavailable(string $reason): self
     {
         return new self('unavailable', false, $reason);

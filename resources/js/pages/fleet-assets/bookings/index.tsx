@@ -1,5 +1,13 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -14,12 +22,7 @@ import { formatDate as formatWorkerDate, toDateInput } from '@/lib/datetime';
 import { formatDate as formatDateStr } from '@/lib/fleet-utils';
 import {
     FleetAttentionStrip,
-    FleetHeroAction,
     fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
 } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -110,12 +113,12 @@ function statusVariant(
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    pending: '#eab308',
-    approved: '#3b82f6',
-    checked_out: '#22c55e',
-    returned: '#9ca3af',
-    rejected: '#ef4444',
-    cancelled: '#d1d5db',
+    pending: 'var(--status-warning)',
+    approved: 'var(--status-info)',
+    checked_out: 'var(--status-success)',
+    returned: 'var(--muted-foreground)',
+    rejected: 'var(--status-critical)',
+    cancelled: 'var(--muted-foreground)',
 };
 
 function getMonday(d: Date): Date {
@@ -202,8 +205,8 @@ function BookingCalendar({
 
     return (
         <div className="space-y-3">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button
                         variant="outline"
                         size="sm"
@@ -239,7 +242,12 @@ function BookingCalendar({
                     {formatShortDay(addDays(weekStart, 6))}
                 </span>
             </div>
-            <div className="overflow-hidden rounded-lg border">
+            <div
+                className="overflow-x-auto rounded-lg border"
+                role="region"
+                aria-label="Vehicle booking calendar"
+                tabIndex={0}
+            >
                 <div className="min-w-[700px]">
                     <div className="grid grid-cols-[180px_repeat(7,1fr)] border-b bg-muted/30">
                         <div className="border-r px-3 py-2 text-xs font-medium text-muted-foreground">
@@ -282,7 +290,7 @@ function BookingCalendar({
                                         ) => {
                                             const color =
                                                 STATUS_COLORS[booking.status] ??
-                                                '#6b7280';
+                                                'var(--muted-foreground)';
                                             return (
                                                 <Link
                                                     key={booking.id}
@@ -429,95 +437,115 @@ export default function BookingsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Bookings', href: '/fleet-assets/bookings' },
             ]}
         >
             <Head title="Vehicle Bookings" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={CalendarClock} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Vehicle bookings · live
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Vehicle Bookings
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Manage vehicle booking requests and
-                                availability.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings?status=pending"
+                <PageHeader
+                    wrapTitle
+                    title="Vehicle Bookings"
+                    icon={CalendarClock}
+                    subline={
+                        'Manage vehicle booking requests and availability.'
+                    }
+                    actions={
+                        <>
+                            <PageHeaderPrimaryButton
+                                icon={Plus}
+                                onClick={() => setWizardOpen(true)}
+                            >
+                                Book vehicle
+                            </PageHeaderPrimaryButton>
+                            <PageHeaderGlassButton
+                                icon={Download}
+                                onClick={() =>
+                                    window.location.assign(
+                                        '/fleet-assets/bookings?export=csv',
+                                    )
+                                }
+                            >
+                                Export CSV
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Pending approval"
-                                value={fmt(heroStats.pending)}
-                                caption="awaiting a decision"
+                                href={'/fleet-assets/bookings?status=pending'}
                                 tone={
                                     heroStats.pending > 0
                                         ? 'warning'
                                         : 'success'
                                 }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings?status=approved"
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.pending)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    awaiting a decision
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Approved upcoming"
-                                value={fmt(heroStats.approved_upcoming)}
-                                caption="ready to check out"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings?status=checked_out"
+                                href={'/fleet-assets/bookings?status=approved'}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.approved_upcoming)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    ready to check out
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Checked out now"
-                                value={fmt(heroStats.checked_out)}
-                                caption="vehicles on the road"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/bookings?overdue=1"
+                                href={
+                                    '/fleet-assets/bookings?status=checked_out'
+                                }
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.checked_out)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    vehicles on the road
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Overdue returns"
-                                value={fmt(heroStats.overdue)}
-                                caption="past their end time"
+                                href={'/fleet-assets/bookings?overdue=1'}
                                 tone={
                                     heroStats.overdue > 0
                                         ? 'critical'
                                         : 'success'
                                 }
-                            />
-                        </div>
-                    </div>
-
-                    {/* Org-wide escalations — same band as the fleet dashboard; the
-                        overdue chip drills into this page's overdue filter. */}
-                    <FleetAttentionStrip
-                        overdueReturns={heroStats.overdue ?? 0}
-                        outingsPastReturn={heroStats.outings_past_return ?? 0}
-                        criticalAlerts={heroStats.critical_alerts ?? 0}
-                        hrefs={{ overdue: '/fleet-assets/bookings?overdue=1' }}
-                    />
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        {/* eslint-disable-next-line no-restricted-syntax -- on-dark hero quick action (FleetHeroAction chrome) opening the modal, not a nav link. */}
-                        <button
-                            type="button"
-                            onClick={() => setWizardOpen(true)}
-                            className="inline-flex h-[34px] items-center gap-2 rounded-lg bg-primary-foreground px-3.5 text-[12.5px] font-extrabold text-primary shadow-sm transition-colors hover:bg-primary-foreground/90 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                        >
-                            <Plus className="h-[15px] w-[15px]" />
-                            Book vehicle
-                        </button>
-                        <FleetHeroAction
-                            href="/fleet-assets/bookings?export=csv"
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(heroStats.overdue)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    past their end time
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    filters={
+                        <FleetAttentionStrip
+                            overdueReturns={heroStats.overdue ?? 0}
+                            outingsPastReturn={
+                                heroStats.outings_past_return ?? 0
+                            }
+                            criticalAlerts={heroStats.critical_alerts ?? 0}
+                            hrefs={{
+                                overdue: '/fleet-assets/bookings?overdue=1',
+                            }}
+                        />
+                    }
+                />
 
                 {/* View Toggle + Filters */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -656,10 +684,26 @@ export default function BookingsIndex({
                             ) : (
                                 <FleetEmptyState
                                     icon={Calendar}
-                                    title="No bookings yet"
-                                    description="Create a booking to reserve a vehicle for a trip or task."
-                                    actionLabel="Book Vehicle"
-                                    onAction={() => setWizardOpen(true)}
+                                    title={
+                                        filters.status || filters.overdue
+                                            ? 'No bookings in this view'
+                                            : 'No bookings yet'
+                                    }
+                                    description={
+                                        filters.status || filters.overdue
+                                            ? 'Choose another status to see bookings.'
+                                            : 'Create a booking to reserve a vehicle for a trip or task.'
+                                    }
+                                    actionLabel={
+                                        filters.status || filters.overdue
+                                            ? undefined
+                                            : 'Book Vehicle'
+                                    }
+                                    onAction={
+                                        filters.status || filters.overdue
+                                            ? undefined
+                                            : () => setWizardOpen(true)
+                                    }
                                 />
                             )}
                         </div>

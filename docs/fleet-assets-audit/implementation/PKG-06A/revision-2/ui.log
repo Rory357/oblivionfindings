@@ -1,0 +1,46 @@
+
+ RUN  v4.1.5 <worktree>
+
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > shows the worker date and time across daylight saving and UTC date boundaries 15ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > rejects a sign-in page returned in place of an exported report 2ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > sends register commands to the mounted route with CSRF protection 8ms
+ ✓ resources/js/pages/fleet-assets/assets/register/api.test.ts > preserves canonical inventory routes and reports a lost session 1ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > keeps unfinished-count guidance accurate when the review has no differences yet 295ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktakes.test.tsx > closes a linked count before refreshing the hub, so reload does not reopen it 284ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktakes.test.tsx > clears count rows while loading site coverage and retains the selected section on a matching hero filter 112ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > keeps an unsuccessful answer pending and retries the same command identity 104ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > resolves a QR before recording a found answer and never finishes automatically 66ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > requires explicit confirmation for a QR outside the checklist 97ms
+ ✓ resources/js/pages/fleet-assets/assets/register/stocktake-modal.test.tsx > stocktake server recovery and scan workflow > opens a completed count read-only and handles a revoked export without changing it 36ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > discovers permitted analytics for 'report only' without assuming Fleet operational access 314ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > discovers permitted analytics for 'reports and assigned assets' without assuming Fleet operational access 100ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > discovers permitted analytics for 'reports and asset management' without assuming Fleet operational access 110ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > does not turn unrelated reporting authority into Fleet access: {"reports":{"viewAny":true}} 29ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > does not turn unrelated reporting authority into Fleet access: {} 13ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > renders eight primary links and selects Fleet on a filtered nested vehicle URL 63ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/trips/12/playback?site_id=7 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/transports/12/pre-check in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/handovers/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/assets/12?tab=documents in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/maintenance/checklists/runs/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/inspections/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/daily-check in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/resident-tracking/history/12?tab=wandering in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/devices/12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/geofences?edit=12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/mileage?status=pending in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/reports/cost-allocation in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/incidents?incident=12 in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps /fleet-assets/settings/notifications in its workspace without selecting the hub root 0ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > does not hijack other modules or similarly prefixed paths 1ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps connected transport sources discoverable in the dedicated workspace 59ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > preserves query and hash on the current operating register and provides the return to Vehicles 53ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > retains assigned inventory and daily checks without denied administrative links 38ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > uses permitted landings for asset managers with no Fleet permission 48ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > requires telemetry permission for the specialist tracking path while retaining device pairing 18ms
+ ✓ resources/js/components/fleet-assets/fleet-workspace-navigation.test.tsx > Fleet workspace navigation > keeps relocated tools searchable but gives no Fleet entry to staff without Fleet or asset access 12ms
+
+ Test Files  4 passed (4)
+      Tests  38 passed (38)
+   Start at  17:29:50
+   Duration  15.95s (transform 1.11s, setup 581ms, import 40.10s, tests 1.89s, environment 4.42s)

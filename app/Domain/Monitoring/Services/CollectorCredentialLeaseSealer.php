@@ -27,9 +27,10 @@ final class CollectorCredentialLeaseSealer
         string $protocol,
         string $target,
         CredentialLease $lease,
+        ?int $siteId = null,
     ): array {
         $collectorId = (string) $collector->collector_uuid;
-        $siteId = (int) $collector->site_id;
+        $siteId ??= (int) $collector->site_id;
         $expiresAt = $lease->expiresAt->utc();
         $material = null;
         $plaintext = null;

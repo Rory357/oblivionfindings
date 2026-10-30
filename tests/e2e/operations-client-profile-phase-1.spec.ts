@@ -76,6 +76,11 @@ if (\\App\\Models\\Client::withTrashed()->whereIn('id', $ids)->exists()) {
 }
 
 test.describe('operations client profile phase 1', () => {
+    // These journeys include fixture bootstraps, full profile navigations and
+    // persisted writes. Allow the complete flow to finish before afterEach
+    // deletes its records; individual assertion limits remain unchanged.
+    test.describe.configure({ timeout: 90_000 });
+
     test.afterEach(() => {
         cleanupClientProfilePhaseOneFixtures();
     });
@@ -132,10 +137,13 @@ test.describe('operations client profile phase 1', () => {
         );
         expect(new URL(page.url()).searchParams.get('record')).toBe('99');
         expect(new URL(page.url()).searchParams.get('source')).toBe('legacy');
-        await expect(page.getByTestId('client-group-plans')).toHaveAttribute(
-            'aria-pressed',
-            'true',
-        );
+        await expect(
+            page.getByRole('tab', {
+                name: 'Plans & goals',
+                exact: true,
+                includeHidden: true,
+            }),
+        ).toHaveAttribute('aria-selected', 'true');
         await expect(page.getByTestId('client-tab-care_plans')).toHaveAttribute(
             'aria-selected',
             'true',
@@ -310,7 +318,14 @@ $author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->first
         await page
             .getByTestId('daily-note-body')
             .fill('Updated detail ready for the next worker.');
+        const saveDraftResponse = page.waitForResponse(
+            (response) =>
+                /\/operations\/clients\/\d+\/daily-notes\/\d+$/.test(
+                    new URL(response.url()).pathname,
+                ) && response.request().method() === 'PUT',
+        );
         await page.getByRole('button', { name: 'Save Draft' }).click();
+        expect((await saveDraftResponse).status()).toBe(303);
         await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
         await expect(
             page.getByText('Updated pool visit').first(),
@@ -324,8 +339,24 @@ $author = \\App\\Models\\User::query()->where('email', 'admin@demo.test')->first
         await expect(
             page.getByRole('alertdialog', { name: 'Discard draft?' }),
         ).toBeVisible();
-        await page.getByRole('button', { name: 'Discard draft' }).click();
+        const discardResponse = page.waitForResponse(
+            (response) =>
+                /\/operations\/clients\/\d+\/daily-notes\/\d+$/.test(
+                    new URL(response.url()).pathname,
+                ) && response.request().method() === 'DELETE',
+        );
+        await page
+            .getByRole('alertdialog', { name: 'Discard draft?' })
+            .getByRole('button', { name: 'Discard draft' })
+            .click();
+        expect((await discardResponse).status()).toBe(303);
         await expect(page.getByTestId('client-daily-note-dialog')).toBeHidden();
+        await expect(
+            page.getByRole('button', { name: 'Resume draft' }),
+        ).toHaveCount(0);
+        await page.reload();
+        await expect(page.getByTestId('client-daily-notes-tab')).toBeVisible();
+        await expect(page.getByText('Updated pool visit')).toHaveCount(0);
         await expect(
             page.getByRole('button', { name: 'Resume draft' }),
         ).toHaveCount(0);

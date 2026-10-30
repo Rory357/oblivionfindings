@@ -1,0 +1,95 @@
+{
+  "implementationDiagnostics": [],
+  "sharedDiagnosticsNotChanged": [
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/checklists/run-modal.tsx",
+      "line": 66,
+      "code": 2353,
+      "message": "Object literal may only specify known properties, and 'preserveState' does not exist in type 'ReloadOptions<{ run: number; }>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/checklists/template-builder.tsx",
+      "line": 191,
+      "code": 2353,
+      "message": "Object literal may only specify known properties, and 'preserveState' does not exist in type 'ReloadOptions<{ template: number; }>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/clients/add-client-dialog.tsx",
+      "line": 876,
+      "code": 7006,
+      "message": "Parameter 'page' implicitly has an 'any' type."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/page/page-header.tsx",
+      "line": 160,
+      "code": 2322,
+      "message": "Type '{ children: string; dusk: string | undefined; className: string; }' is not assignable to type 'DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>'.\n  Property 'dusk' does not exist on type 'DetailedHTMLProps<HTMLAttributes<HTMLHeadingElement>, HTMLHeadingElement>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/pull-to-refresh.tsx",
+      "line": 38,
+      "code": 2561,
+      "message": "Object literal may only specify known properties, but 'preserveScroll' does not exist in type 'ReloadOptions<RequestPayload>'. Did you mean to write 'preserveUrl'?"
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/rostering/edit-availability-dialog.tsx",
+      "line": 98,
+      "code": 2561,
+      "message": "Object literal may only specify known properties, but 'preserveScroll' does not exist in type 'ReloadOptions<RequestPayload>'. Did you mean to write 'preserveUrl'?"
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/components/security-devices/add-device-dialog.tsx",
+      "line": 429,
+      "code": 7006,
+      "message": "Parameter 'serverErrors' implicitly has an 'any' type."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/show.tsx",
+      "line": 470,
+      "code": 2353,
+      "message": "Object literal may only specify known properties, and 'preserveState' does not exist in type 'ReloadOptions<RequestPayload>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/clients.tsx",
+      "line": 103,
+      "code": 2353,
+      "message": "Object literal may only specify known properties, and 'preserveState' does not exist in type 'ReloadOptions<RequestPayload>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/contacts.tsx",
+      "line": 35,
+      "code": 2353,
+      "message": "Object literal may only specify known properties, and 'preserveState' does not exist in type 'ReloadOptions<RequestPayload>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/overview.tsx",
+      "line": 403,
+      "code": 2353,
+      "message": "Object literal may only specify known properties, and 'preserveState' does not exist in type 'ReloadOptions<RequestPayload>'."
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/shift-coverage.tsx",
+      "line": 185,
+      "code": 2561,
+      "message": "Object literal may only specify known properties, but 'preserveScroll' does not exist in type 'ReloadOptions<RequestPayload>'. Did you mean to write 'preserveUrl'?"
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/shift-coverage.tsx",
+      "line": 669,
+      "code": 2561,
+      "message": "Object literal may only specify known properties, but 'preserveScroll' does not exist in type 'ReloadOptions<RequestPayload>'. Did you mean to write 'preserveUrl'?"
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/staff-requirements.tsx",
+      "line": 128,
+      "code": 2561,
+      "message": "Object literal may only specify known properties, but 'preserveScroll' does not exist in type 'ReloadOptions<RequestPayload>'. Did you mean to write 'preserveUrl'?"
+    },
+    {
+      "file": "C:/Users/steph/.codex/worktrees/806c/oblivionfindings/resources/js/pages/sites/tabs/staff-requirements.tsx",
+      "line": 418,
+      "code": 2561,
+      "message": "Object literal may only specify known properties, but 'preserveScroll' does not exist in type 'ReloadOptions<RequestPayload>'. Did you mean to write 'preserveUrl'?"
+    }
+  ]
+}

@@ -51,6 +51,7 @@ type ShellProps = {
     children: ReactNode;
     showNavigation?: boolean;
     showSummary?: boolean;
+    showFreshness?: boolean;
 };
 
 type SummaryItem = {
@@ -89,20 +90,14 @@ export function WorkspaceSummary({
             label: 'Need attention',
             value: summary.attention,
             icon: TriangleAlert,
-            tone:
-                summary.attention > 0
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : undefined,
+            tone: summary.attention > 0 ? 'text-status-warning' : undefined,
         },
         { label: 'Monitored', value: summary.monitored, icon: MonitorCheck },
         {
             label: 'Unmonitored',
             value: summary.unmonitored,
             icon: MonitorOff,
-            tone:
-                summary.unmonitored > 0
-                    ? 'text-amber-700 dark:text-amber-300'
-                    : undefined,
+            tone: summary.unmonitored > 0 ? 'text-status-warning' : undefined,
         },
     ];
 
@@ -119,7 +114,7 @@ export function WorkspaceSummary({
                                     {item.label}
                                 </p>
                                 <p
-                                    className={`mt-1 text-2xl font-bold ${item.tone ?? ''}`}
+                                    className={`text-page-title mt-1 tabular-nums ${item.tone ?? ''}`}
                                 >
                                     {item.value}
                                 </p>
@@ -145,12 +140,12 @@ export function WorkspaceFreshness({
         current: {
             icon: RadioTower,
             label: 'Current',
-            className: 'text-emerald-700 dark:text-emerald-300',
+            className: 'bg-status-success-bg text-status-success-foreground',
         },
         stale: {
             icon: TriangleAlert,
             label: 'Stale',
-            className: 'text-amber-700 dark:text-amber-300',
+            className: 'bg-status-warning-bg text-status-warning-foreground',
         },
         unknown: {
             icon: CircleHelp,
@@ -224,10 +219,10 @@ export function SecurityDevicesWorkspaceTabs({
                                 className={`frontline-focus inline-flex min-h-11 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                                     onDark
                                         ? active
-                                            ? 'border-primary-foreground bg-primary-foreground text-primary shadow-sm'
+                                            ? 'border-primary-foreground bg-primary-foreground text-primary-strong shadow-sm'
                                             : 'border-primary-foreground/25 bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20 hover:text-primary-foreground'
                                         : active
-                                          ? 'border-primary bg-primary text-primary-foreground'
+                                          ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                           : 'border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
                                 }`}
                             >
@@ -263,6 +258,7 @@ export function SecurityDevicesWorkspaceShell({
     children,
     showNavigation = true,
     showSummary = true,
+    showFreshness = true,
 }: ShellProps) {
     const activeTab =
         workspace.tabs.find((tab) => tab.key === workspace.activeTab) ??
@@ -273,7 +269,7 @@ export function SecurityDevicesWorkspaceShell({
             : `${activeTab.description.replace(/\.$/, '')} is not configured for this workspace yet.`;
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-5">
             {showNavigation ? (
                 <SecurityDevicesWorkspaceTabs
                     workspace={workspace}
@@ -284,7 +280,9 @@ export function SecurityDevicesWorkspaceShell({
             {showSummary ? (
                 <WorkspaceSummary summary={workspace.summary} />
             ) : null}
-            <WorkspaceFreshness freshness={workspace.freshness} />
+            {showFreshness ? (
+                <WorkspaceFreshness freshness={workspace.freshness} />
+            ) : null}
 
             {workspace.activeTabState === 'available' ? (
                 children
@@ -296,7 +294,7 @@ export function SecurityDevicesWorkspaceShell({
                                 ? 'Permission required'
                                 : 'Capability not configured'}
                         </Badge>
-                        <h2 className="text-lg font-semibold">
+                        <h2 className="text-section-title">
                             {activeTab.label}
                         </h2>
                         <p className="max-w-2xl text-sm text-muted-foreground">
@@ -305,7 +303,7 @@ export function SecurityDevicesWorkspaceShell({
                         <p className="text-xs text-muted-foreground">
                             {activeTab.state === 'restricted'
                                 ? 'No restricted event details or counts are shown.'
-                                : 'No metrics or controls are shown until a canonical data source is available.'}
+                                : 'No metrics or controls are shown until a supported data source is available.'}
                         </p>
                     </CardContent>
                 </Card>

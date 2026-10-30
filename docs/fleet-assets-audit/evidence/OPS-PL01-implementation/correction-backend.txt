@@ -1,0 +1,46 @@
+
+   PASS  Tests\Feature\Operations\PeopleLocationsTest
+  ✓ it uses canonical consent and Site access before exposing people or counts                                 387.41s
+  ✓ it denies callers lacking telemetry access and does not grant client permission from Fleet                   0.12s
+  ✓ it never treats last contact as a fresh position or default false as observed power                          0.25s
+  ✓ it requires a deliberate source choice when two authorised trackers exist                                    0.40s
+  ✓ it keeps prior assignments and future observations out of history                                            0.31s
+  ✓ it keeps server-side selection and history empty after care assignment removal                               0.34s
+  ✓ it requires export permission and a reason then produces the vehicle-style report with an audit              0.39s
+  ✓ it fails an outage instead of returning an empty successful population                                       0.26s
+  ✓ it hides Control Room evidence without its independent read permission                                       0.25s
+  ✓ it links the original readable response and removes it when authority ends                                   0.30s
+  ✓ it counts a worker once across live sessions and removes ended sessions and their alerts                     0.29s
+  ✓ it bounds an outing export to passenger departure and arrival instead of vehicle return                      0.34s
+  ✓ it uses observation timestamps for battery power and movement independently                                  0.27s
+  ✓ it withholds rendered report bytes when consent is withdrawn during generation                               0.29s
+  ✓ it keeps personal evidence out of Inertia browser-history props                                              0.32s
+  ✓ it separates current map access from retained history and export                                             0.43s
+  ✓ it uses exact Auckland day boundaries for both telemetry streams with dataset "23-hour spring day"           0.29s
+  ✓ it uses exact Auckland day boundaries for both telemetry streams with dataset "25-hour autumn day"           0.43s
+  ✓ it uses exact Auckland day boundaries for both telemetry streams with dataset "24-hour ordinary day"         0.29s
+  ✓ it applies an early passenger window before the 500 sample limit and describes overnight day slices          0.89s
+  ✓ it persists personal defaults with conflict protection and refuses an inaccessible site                      0.40s
+  ✓ it revalidates a batched consent after reading observations                                                  0.26s
+  ✓ it shows permitted shared boundary geometry without enabling personal monitoring                             0.31s
+  ✓ it refreshes independent alert authority and capabilities after observations                                 0.27s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "Transport p… 0.35s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "journey Sit… 0.35s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "resident re… 0.35s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "vehicle can… 0.41s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "selected pa… 0.36s
+  ✓ it rechecks Transport scope and the selected window after reading report evidence with dataset "unchanged a… 0.35s
+  ✓ it preserves independent day history while removing newly inaccessible journey choices with ('history')      0.29s
+  ✓ it preserves independent day history while removing newly inaccessible journey choices with ('report-previe… 0.27s
+
+   PASS  Tests\Unit\PeopleLocationsReturnUrlTest
+  ✓ it preserves supported People Locations context without opening redirects                                    0.02s
+
+   PASS  Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest
+  ✓ client location history reads canonical integration event identity                                           1.07s
+  ✓ resident tracking history reads canonical integration event identity                                         0.91s
+  ✓ portal location history reads canonical integration event identity                                           0.66s
+  ✓ client location history keeps narrow fallback for unbackfilled legacy rows                                   0.97s
+
+  Tests:    37 passed (228 assertions)
+  Duration: 401.76s

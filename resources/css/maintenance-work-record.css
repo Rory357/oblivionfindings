@@ -7,3 +7,9 @@
 .maintenance-work-record .work-next-action [data-slot="card-header"] { background: var(--card); border: 0; padding-bottom: 0; }
 .maintenance-work-record .work-next-action [data-slot="card-title"] { color: var(--primary); font-size: 12px; font-weight: 500; }
 .maintenance-work-record .work-next-action [data-slot="card-content"] { padding-top: 14px; }
+
+/* Keep the cost workspace's actions comfortable on touch screens. */
+@media (max-width: 767px) {
+    .pkg03-cost-workspace button,
+    .pkg03-cost-workspace a[data-slot="button"] { min-height: 44px; }
+}

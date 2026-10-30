@@ -294,7 +294,11 @@ class UnifiOperationalBridgeMigrationTest extends TestCase
         $shadow->refresh();
         $assignment = $device->assignments()->active()->first();
 
-        $this->assertSame('Core Switch', $device->name);
+        // Name is locally canonical (DeviceFieldOwnershipService, 78715282d):
+        // an existing device keeps its local name and the provider's name is
+        // kept as observed evidence.
+        $this->assertSame('Old Switch', $device->name);
+        $this->assertSame('Core Switch', data_get($device->provider_observed_state, 'name.value'));
         $this->assertNotNull($assignment);
         $this->assertSame('room', $assignment->assignable_type);
         $this->assertSame($room->id, $assignment->assignable_id);

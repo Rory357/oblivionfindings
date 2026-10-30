@@ -1,0 +1,26 @@
+
+   PASS  Tests\Feature\SettingsControllerTest
+  ✓ branding edit requires authentication                                                                      245.79s
+  ✓ branding update requires authentication                                                                      0.57s
+  ✓ branding edit denied for support worker                                                                      0.80s
+  ✓ branding update denied for support worker                                                                    0.62s
+  ✓ branding edit renders for admin                                                                              0.83s
+  ✓ branding update saves name                                                                                   0.78s
+  ✓ branding update clears name when blank                                                                       0.79s
+  ✓ branding update saves theme css variables                                                                    0.79s
+  ✓ branding update filters disallowed css variables                                                             0.78s
+  ✓ branding omits invalid values on save and when reading legacy rows                                           0.82s
+  ✓ branding render omits legacy injection and preserves personal accent                                         0.81s
+  ✓ branding update uploads logo                                                                                 0.81s
+  ✓ branding update removes logo                                                                                 0.79s
+  ✓ branding update rejects oversized logo                                                                       0.78s
+  ✓ branding update rejects non image logo                                                                       0.80s
+  ✓ branding update validates name max length                                                                    0.82s
+  ✓ provider manager cannot access branding                                                                      0.75s
+  ✓ branding theme clears when all values empty                                                                  0.81s
+
+   PASS  Tests\Feature\Operations\PeopleLocationsTest
+  ✓ it renders organisation brand tokens for both themes without literal template text                           0.30s
+
+  Tests:    19 passed (85 assertions)
+  Duration: 259.52s

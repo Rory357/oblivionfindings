@@ -1,0 +1,105 @@
+{
+  "scope": "Synthetic custody model only",
+  "results": [
+    {
+      "name": "K01 Historical return keeps newer vehicle key holder",
+      "pass": true
+    },
+    {
+      "name": "K02 Older journey cannot overwrite newer key event",
+      "pass": true
+    },
+    {
+      "name": "K03 Wrong role cannot plan custody",
+      "pass": true
+    },
+    {
+      "name": "K04 Stale plan cannot save",
+      "pass": true
+    },
+    {
+      "name": "K05 Unapproved site point rejected",
+      "pass": true
+    },
+    {
+      "name": "K06 Reception is not secure return storage",
+      "pass": true
+    },
+    {
+      "name": "K07 Delivery requires named worker",
+      "pass": true
+    },
+    {
+      "name": "K08 Delivery requires arrangement",
+      "pass": true
+    },
+    {
+      "name": "K09 Plan does not move keys",
+      "pass": true
+    },
+    {
+      "name": "K10 Identical plan retry replays",
+      "pass": true
+    },
+    {
+      "name": "K11 Changed plan retry rejected",
+      "pass": true
+    },
+    {
+      "name": "K12 Actual giver must be current holder",
+      "pass": true
+    },
+    {
+      "name": "K13 Checkout records actual driver custody",
+      "pass": true
+    },
+    {
+      "name": "K14 Collected key plan cannot be rewritten",
+      "pass": true
+    },
+    {
+      "name": "K15 Receipt is with worker and not safe",
+      "pass": true
+    },
+    {
+      "name": "K16 Retrying return cannot duplicate key events",
+      "pass": true
+    },
+    {
+      "name": "K17 Unconfigured staff cannot record storage",
+      "pass": true
+    },
+    {
+      "name": "K18 Driver cannot attest receiving-worker storage",
+      "pass": true
+    },
+    {
+      "name": "K19 Changed vehicle custody invalidates storage form",
+      "pass": true
+    },
+    {
+      "name": "K20 Physical placement must be explicit",
+      "pass": true
+    },
+    {
+      "name": "K21 Storage cannot predate receipt",
+      "pass": true
+    },
+    {
+      "name": "K22 Handover point cannot masquerade as secure storage",
+      "pass": true
+    },
+    {
+      "name": "K23 Separate storage observation preserves receipt",
+      "pass": true
+    },
+    {
+      "name": "K24 Unconfigured physical later receipt denied",
+      "pass": true
+    },
+    {
+      "name": "K25 Denied direct object cannot change plan",
+      "pass": true
+    }
+  ]
+}

@@ -15,6 +15,9 @@ class ServiceAgreement extends Model
     protected $fillable = [
         'client_id',
         'source_quote_id',
+        // Set only by the referral proposal handover (ReferralServiceAgreements).
+        'source_referral_id',
+        'source_referral_proposal_id',
         'title',
         'reference_number',
         'status',

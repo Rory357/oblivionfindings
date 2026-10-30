@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\Permission;
@@ -17,6 +18,7 @@ use Carbon\Carbon;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -34,20 +36,82 @@ class RoundsPagePayloadTest extends TestCase
         parent::tearDown();
     }
 
+    #[DataProvider('newZealandDayBoundaries')]
+    public function test_rounds_default_to_the_new_zealand_day_and_preserve_explicit_dates(string $utcNow, string $localDate): void
+    {
+        Carbon::setTestNow(Carbon::parse($utcNow, 'UTC'));
+        $this->seed(RbacSeeder::class);
+        $utcDate = now()->toDateString();
+        $this->assertNotSame($utcDate, $localDate);
+        $site = Site::factory()->create(['is_active' => true]);
+        $foreignSite = Site::factory()->create(['is_active' => true]);
+        $reader = $this->makeSiteUser($site, ['medications.view']);
+        $localRound = $this->makeRound($site, ['name' => 'NZ day round', 'round_date' => $localDate]);
+        $priorRound = $this->makeRound($site, ['name' => 'Prior day round', 'round_date' => $utcDate]);
+        $foreignRound = $this->makeRound($foreignSite, ['name' => 'Concealed foreign round', 'round_date' => $localDate]);
+        $records = [$localRound, $priorRound, $foreignRound];
+        $before = array_map(fn (MedicationRound $round) => $round->refresh()->getRawOriginal(), $records);
+
+        foreach ([[], ['date' => '']] as $query) {
+            $this->actingAs($reader)->get(route('emar.rounds', $query))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->component('emar/Rounds')
+                    ->where('date', $localDate)
+                    ->has('rounds', 1)
+                    ->where('rounds.0.id', $localRound->id)
+                    ->where('rounds.0.round_date', $localDate)
+                    ->has('sites', 1)
+                    ->where('sites.0.id', $site->id)
+                );
+        }
+
+        $this->actingAs($reader)->get(route('emar.rounds', ['date' => $utcDate, 'site_id' => $site->id]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('date', $utcDate)
+                ->where('selected_site_id', $site->id)
+                ->has('rounds', 1)
+                ->where('rounds.0.id', $priorRound->id)
+                ->where('rounds.0.round_date', $utcDate)
+            );
+        $this->assertSame($before, array_map(fn (MedicationRound $round) => $round->refresh()->getRawOriginal(), $records));
+    }
+
+    public static function newZealandDayBoundaries(): array
+    {
+        return [
+            'standard_time' => ['2026-05-03 12:01:00', '2026-05-04'],
+            'daylight_saving_time' => ['2026-10-04 11:01:00', '2026-10-05'],
+        ];
+    }
+
     public function test_exact_record_worker_uses_read_only_get_and_explicit_idempotent_start(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
         $user = $this->makeSiteUser($site, ['medications.administer.record']);
+        // "Med-competent" is the competency policy's decision, not the permission.
+        MedicationCompetencyAssessment::query()->create([
+            'user_id' => $user->id,
+            'assessor_id' => User::factory()->create(['approved_at' => now()])->id,
+            'assessment_type' => 'annual',
+            'status' => 'passed',
+            'assessment_date' => now()->subMonth()->toDateString(),
+            'expiry_date' => now()->addYear()->toDateString(),
+            'assessor_declared_at' => now()->subMonth(),
+            'staff_acknowledged_at' => now()->subMonth()->addMinute(),
+            'can_administer_unsupervised' => true,
+        ]);
         $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
         $this->activeShift($user, $client);
         $round = $this->makeRound($site, [
             'assigned_to' => $user->id,
             'status' => 'pending',
         ]);
-        $target = route('emar.rounds', ['date' => '2026-05-04', 'guided' => $round->id]);
+        $target = route('meds.today', ['view' => 'rounds', 'round' => $round->id, 'date' => '2026-05-04']);
 
         $this->assertFalse($user->canDo('medications.view'));
         $this->actingAs($user)
@@ -59,7 +123,7 @@ class RoundsPagePayloadTest extends TestCase
             ->get($target)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('emar/Rounds')
+                ->component('meds/today/index')
                 ->where('guidedRound.round.id', $round->id)
                 ->where('guidedRound.round.status', 'pending')
                 ->where('guidedRound.can_start', true)
@@ -69,7 +133,7 @@ class RoundsPagePayloadTest extends TestCase
         $this->assertSame('pending', $round->fresh()->status);
 
         $this->actingAs($user)
-            ->post(route('meds.round.start', $round))
+            ->post(route('meds.round.start', $round), ['return_to' => 'meds-today'])
             ->assertRedirect($target);
 
         $started = $round->fresh();
@@ -79,7 +143,7 @@ class RoundsPagePayloadTest extends TestCase
         $startedAt = $started->started_at->toIso8601String();
 
         $this->actingAs($user)
-            ->post(route('meds.round.start', $round))
+            ->post(route('meds.round.start', $round), ['return_to' => 'meds-today'])
             ->assertRedirect($target);
         $this->assertSame($startedAt, $round->fresh()->started_at?->toIso8601String());
 
@@ -95,7 +159,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_assigned_record_worker_sees_only_current_work_scope_clients_in_round_projection(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -167,7 +231,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_guided_round_direct_objects_deny_foreign_unassigned_and_off_shift_workers(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -209,7 +273,7 @@ class RoundsPagePayloadTest extends TestCase
 
     public function test_exact_reader_can_review_only_approved_site_completed_rounds_without_mutation(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
@@ -243,107 +307,33 @@ class RoundsPagePayloadTest extends TestCase
         $this->assertSame('completed', $foreign->fresh()->status);
     }
 
-    public function test_template_payload_reconciles_site_and_active_service_context_without_leaking_names(): void
+    /**
+     * Round templates moved to Medication › Settings › Rounds & timing (eMAR
+     * P11); their visibility rules are pinned in RoundTemplateSettingsTest.
+     */
+    public function test_rounds_page_no_longer_sends_round_templates_or_their_staff(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);
-        $foreignSite = Site::factory()->create(['is_active' => true]);
-        $reader = $this->makeSiteUser($site, ['medications.view']);
-        $applicationWideReader = $this->makeSiteUser($site, [
-            'medications.view',
-            'clinical.accessAllSites',
-        ]);
-        $foreignStaff = User::factory()->create(['name' => 'HIDDEN foreign template staff']);
-        $localContext = ServiceContext::factory()->create([
-            'site_id' => $site->id,
-            'is_active' => true,
-        ]);
-        $foreignContext = ServiceContext::factory()->create([
-            'site_id' => $foreignSite->id,
-            'is_active' => true,
-        ]);
-        $applicationWideContext = ServiceContext::factory()->create([
-            'site_id' => null,
-            'is_active' => true,
-        ]);
-        $inactiveContext = ServiceContext::factory()->create([
-            'site_id' => $site->id,
-            'is_active' => false,
-        ]);
+        $manager = $this->makeSiteUser($site, ['medications.view', 'medications.orders.manage']);
+        $this->makeTemplate('Local template', $site);
 
-        $visibleTemplates = collect([
-            $this->makeTemplate('Visible local template', $site),
-            $this->makeTemplate('Visible local application-context template', $site, $applicationWideContext),
-            $this->makeTemplate('Visible local matching-context template', $site, $localContext),
-            $this->makeTemplate('Visible context-derived template', null, $localContext),
-        ]);
-        $legacyForeignAssigneeTemplate = $visibleTemplates->first();
-        $legacyForeignAssigneeTemplate
-            ->forceFill(['default_assigned_to' => $foreignStaff->id])
-            ->save();
-        $applicationWideTemplates = collect([
-            $this->makeTemplate('Application-wide no-context template'),
-            $this->makeTemplate('Application-wide context template', null, $applicationWideContext),
-        ]);
-        collect([
-            $this->makeTemplate('HIDDEN foreign Site template', $foreignSite),
-            $this->makeTemplate('HIDDEN foreign context-derived template', null, $foreignContext),
-            $this->makeTemplate('HIDDEN conflicting context template', $site, $foreignContext),
-            $this->makeTemplate('HIDDEN inactive concrete context template', $site, $inactiveContext),
-            $this->makeTemplate('HIDDEN inactive context-derived template', null, $inactiveContext),
-        ])->each(function (MedicationRoundTemplate $template) use ($foreignStaff): void {
-            $template->forceFill(['default_assigned_to' => $foreignStaff->id])->save();
-        });
-
-        $response = $this->actingAs($reader)
+        $response = $this->actingAs($manager)
             ->get(route('emar.rounds', ['date' => '2026-05-04']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('templates', function ($templates) use ($visibleTemplates, $legacyForeignAssigneeTemplate): bool {
-                    $actualIds = collect($templates)
-                        ->pluck('id')
-                        ->map(fn ($id): int => (int) $id)
-                        ->sort()
-                        ->values()
-                        ->all();
-                    $expectedIds = $visibleTemplates
-                        ->pluck('id')
-                        ->map(fn ($id): int => (int) $id)
-                        ->sort()
-                        ->values()
-                        ->all();
-
-                    $legacyRow = collect($templates)->firstWhere('id', $legacyForeignAssigneeTemplate->id);
-
-                    return $actualIds === $expectedIds
-                        && data_get($legacyRow, 'default_assigned_to') === null
-                        && data_get($legacyRow, 'default_staff') === null;
-                }));
-
-        $this->assertStringNotContainsString('HIDDEN', $response->getContent());
-        $this->assertStringNotContainsString('Application-wide no-context template', $response->getContent());
-        $this->assertStringNotContainsString('Application-wide context template', $response->getContent());
-
-        $this->actingAs($applicationWideReader)
-            ->get(route('emar.rounds', ['date' => '2026-05-04']))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->where('templates', function ($templates) use ($applicationWideTemplates): bool {
-                    $templateIds = collect($templates)
-                        ->pluck('id')
-                        ->map(fn ($id): int => (int) $id);
-
-                    return $applicationWideTemplates->pluck('id')->every(
-                        fn ($id): bool => $templateIds->contains((int) $id),
-                    );
-                }));
+                ->missing('templates')
+                ->missing('staff')
+                ->where('can_manage', true)
+                ->where('can_read_templates', true));
+        $this->assertStringNotContainsString('Local template', $response->getContent());
     }
 
     public function test_worker_board_lists_only_assigned_rounds_at_approved_sites(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-05-04 08:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
 
         $site = Site::factory()->create(['is_active' => true]);

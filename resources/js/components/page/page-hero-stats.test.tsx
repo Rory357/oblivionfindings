@@ -40,7 +40,9 @@ describe('PageHeroStats', () => {
             />,
         );
 
-        expect(screen.getByText('4')).toHaveClass('text-status-warning');
-        expect(screen.getByText('1/3')).toHaveClass('text-status-critical');
+        // The band-safe tones (app.css) — the plain status tokens are tuned
+        // for cards and fail on the dark hero band.
+        expect(screen.getByText('4')).toHaveClass('page-hero-tone-warning');
+        expect(screen.getByText('1/3')).toHaveClass('page-hero-tone-critical');
     });
 });

@@ -3,8 +3,10 @@
 namespace App\Domain\SecurityDevices\Presenters;
 
 use App\Domain\It\Services\ItWorkAccessService;
+use App\Domain\Monitoring\Discovery\Models\DiscoveryScope;
 use App\Domain\Monitoring\Enums\MonitorState;
 use App\Domain\Monitoring\Models\MonitoringCollector;
+use App\Domain\Monitoring\Services\MonitoringCollectorAvailabilityService;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
@@ -15,6 +17,7 @@ use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Domain\SecurityDevices\Models\DeviceRelationship;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
+use App\Domain\SecurityDevices\Services\SiteTopologyMapService;
 use App\Models\ControlRoomAlert;
 use App\Models\ItTicket;
 use App\Models\Site;
@@ -22,6 +25,7 @@ use App\Models\SiteContact;
 use App\Models\SiteRoom;
 use App\Models\User;
 use App\Services\ControlRoom\ControlRoomAlertAccessService;
+use App\Services\System\ServerReadinessService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
@@ -76,7 +80,7 @@ class EstateOperationsPresenter
             return [
                 'status' => $status->value,
                 'label' => $status->label(),
-                'count' => $devices->filter(fn (Device $device) => $device->health_status?->value === $status->value)->count(),
+                'count' => $devices->filter(fn (Device $device) => $device->rollupHealthStatus() === $status)->count(),
             ];
         });
 
@@ -95,7 +99,7 @@ class EstateOperationsPresenter
                 'domain' => $device->domain,
                 'category' => $device->category,
                 'status' => $device->status?->value,
-                'health_status' => $device->health_status?->value,
+                'health_status' => $device->effectiveHealthState(),
                 'last_seen_at' => $device->last_seen_at?->toIso8601String(),
                 'battery_level' => $device->battery_level,
             ])
@@ -135,7 +139,11 @@ class EstateOperationsPresenter
             $groupQuery->whereHas('devices', fn ($query) => $query->whereIn('devices.id', $deviceIds));
         }
 
+        $operations = $this->estateOperations($context);
+
         return [
+            'actor_id' => $viewer->id,
+            'as_of' => $context['asOf']->toISOString(),
             'stats' => $stats,
             'domainSummary' => $domainSummary,
             'healthSummary' => $healthSummary,
@@ -143,7 +151,8 @@ class EstateOperationsPresenter
             'recentEvents' => $recentEvents,
             'overdueMaintenance' => $overdueMaintenance,
             'groupCount' => $groupQuery->count(),
-            'operations' => $this->estateOperations($context),
+            'operations' => $operations,
+            'first_run_checklist' => $this->firstRunChecklist($viewer, $context, $stats, $operations),
             'can' => [
                 'create' => $viewer->canDo('securityDevices.devices.create'),
                 'export' => $viewer->canDo('securityDevices.reports.view'),
@@ -151,6 +160,122 @@ class EstateOperationsPresenter
                 'view_events' => $context['canViewEvents'],
                 'view_maintenance' => $context['canViewMaintenance'],
             ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  $stats
+     * @param  array<string, mixed>  $operations
+     * @return array{
+     *   completed: int,
+     *   total: int,
+     *   all_complete: bool,
+     *   steps: list<array{
+     *     key: string,
+     *     title: string,
+     *     summary: string,
+     *     done: bool,
+     *     href: ?string,
+     *     action_label: ?string
+     *   }>
+     * }
+     */
+    private function firstRunChecklist(User $viewer, array $context, array $stats, array $operations): array
+    {
+        $canManageSettings = $viewer->canDo('settings.access.manage');
+        $readiness = app(ServerReadinessService::class)->checklistSummary();
+        $serverReady = (bool) $readiness['ready'];
+
+        $siteCount = $context['sites']->count();
+        $hasSites = $siteCount > 0;
+
+        $deviceCount = (int) ($stats['totalDevices'] ?? 0);
+        $hasDevices = $context['canViewDevices'] && $deviceCount > 0;
+        $canViewDiscovery = $viewer->canDo('securityDevices.viewAny')
+            && $viewer->canDo('securityDevices.integrations.view');
+
+        $monitoredCount = (int) ($operations['coverage']['monitored_devices'] ?? 0);
+        $hasMonitoring = $context['canViewEvents'] && $monitoredCount > 0;
+
+        $steps = [
+            [
+                'key' => 'server_readiness',
+                'title' => 'Check server readiness',
+                'summary' => match (true) {
+                    $serverReady => 'All server checks are passing.',
+                    $canManageSettings && $readiness['passed_count'] !== null => sprintf(
+                        '%d of %d server checks passing — open Server readiness for plain fixes.',
+                        $readiness['passed_count'],
+                        $readiness['total_count'],
+                    ),
+                    $canManageSettings => 'Open Server readiness to check background workers, keys, and ping access.',
+                    default => 'Ask an administrator to check Settings › Server readiness.',
+                },
+                'done' => $serverReady,
+                'href' => $canManageSettings ? '/settings/server-readiness' : null,
+                'action_label' => $canManageSettings ? 'Open Server readiness' : null,
+            ],
+            [
+                'key' => 'sites',
+                'title' => 'Confirm your Sites',
+                'summary' => $hasSites
+                    ? ($siteCount === 1
+                        ? '1 active Site is ready for devices.'
+                        : sprintf('%d active Sites are ready for devices.', $siteCount))
+                    : 'Add at least one active Site before placing devices.',
+                'done' => $hasSites,
+                'href' => $context['canViewDevices'] ? '/security-devices/sites' : null,
+                'action_label' => $context['canViewDevices'] ? 'View Sites' : null,
+            ],
+            [
+                'key' => 'devices',
+                'title' => 'Add or discover devices',
+                'summary' => match (true) {
+                    ! $context['canViewDevices'] => 'Device access is required to view or register devices.',
+                    $hasDevices => $deviceCount === 1
+                        ? '1 device is registered.'
+                        : sprintf('%d devices are registered.', $deviceCount),
+                    default => 'Register a device manually or scan a network from Setup.',
+                },
+                'done' => $hasDevices,
+                'href' => match (true) {
+                    $hasDevices && $context['canViewDevices'] => '/security-devices/devices',
+                    $canViewDiscovery => '/security-devices/discovery',
+                    $context['canViewDevices'] => '/security-devices/devices',
+                    default => null,
+                },
+                'action_label' => match (true) {
+                    $hasDevices && $context['canViewDevices'] => 'Open Devices',
+                    $canViewDiscovery => 'Open Setup',
+                    $context['canViewDevices'] => 'Open Devices',
+                    default => null,
+                },
+            ],
+            [
+                'key' => 'monitoring',
+                'title' => 'Turn on device checks',
+                'summary' => match (true) {
+                    ! $context['canViewEvents'] => 'Monitoring access is required to view or manage device checks.',
+                    $hasMonitoring => $monitoredCount === 1
+                        ? '1 device has an active check.'
+                        : sprintf('%d devices have active checks.', $monitoredCount),
+                    default => 'Assign checks so Oblivion can watch device reachability and alert you when something goes offline.',
+                },
+                'done' => $hasMonitoring,
+                'href' => $context['canViewEvents'] ? '/security-devices/monitoring' : null,
+                'action_label' => $context['canViewEvents'] ? 'Open Alerts & upkeep' : null,
+            ],
+        ];
+
+        $completed = collect($steps)->where('done', true)->count();
+        $total = count($steps);
+
+        return [
+            'completed' => $completed,
+            'total' => $total,
+            'all_complete' => $completed === $total,
+            'steps' => $steps,
         ];
     }
 
@@ -229,6 +354,11 @@ class EstateOperationsPresenter
                 'name' => $monitor->name,
                 'kind' => $monitor->kind?->value,
                 'state' => $monitor->current_state?->value,
+                'collector_id' => $monitor->collector_id === null ? null : (int) $monitor->collector_id,
+                'collector_name' => $monitor->collector?->name,
+                'runs_from' => $monitor->collector_id === null
+                    ? 'Runs from: server'
+                    : 'Runs from: hub '.($monitor->collector?->name ?? '#'.$monitor->collector_id),
                 'last_observation_at' => $monitor->last_observation_at?->toIso8601String(),
             ]))
             ->values();
@@ -273,6 +403,13 @@ class EstateOperationsPresenter
             ])
             ->values();
 
+        $canManageCollectors = $viewer->canDo('securityDevices.integrations.manage');
+        $deviceRows = $devices
+            ->map(fn (Device $device) => $this->deviceRow($device, $context['canViewEvents']))
+            ->values();
+        $topologyTree = app(SiteTopologyMapService::class)
+            ->buildSiteTree($site, $devices, $deviceRows, $relationships);
+
         return [
             'site' => [
                 'id' => $site->id,
@@ -283,9 +420,7 @@ class EstateOperationsPresenter
                 'is_active' => (bool) $site->is_active,
             ],
             'summary' => $summary,
-            'devices' => $devices
-                ->map(fn (Device $device) => $this->deviceRow($device, $context['canViewEvents']))
-                ->values(),
+            'devices' => $deviceRows,
             'wan' => [
                 'known' => $wanDevices->isNotEmpty(),
                 'label' => $wanDevices->isNotEmpty()
@@ -295,8 +430,11 @@ class EstateOperationsPresenter
             ],
             'topology' => [
                 'device_count' => $devices->count(),
-                'edge_count' => $relationships->count(),
-                'is_complete' => $devices->count() > 0 && $relationships->count() >= max(0, $devices->count() - 1),
+                'edge_count' => max(
+                    $relationships->count(),
+                    max(0, (int) ($topologyTree['mapped_count'] ?? 0) - count($topologyTree['roots'] ?? [])),
+                ),
+                'is_complete' => $devices->count() > 0 && count($topologyTree['unplaced'] ?? []) === 0 && count($topologyTree['roots'] ?? []) > 0,
                 'edges' => $relationships->map(fn (DeviceRelationship $relationship) => [
                     'id' => $relationship->id,
                     'parent_device_id' => $relationship->parent_device_id,
@@ -306,6 +444,7 @@ class EstateOperationsPresenter
                     'type' => $relationship->relationship_type?->value,
                     'port' => $relationship->port,
                 ])->values(),
+                'tree' => $topologyTree,
             ],
             'deviceGroups' => $groups,
             'monitoring' => [
@@ -329,9 +468,20 @@ class EstateOperationsPresenter
             'maintenance' => $context['canViewMaintenance'] ? $maintenance : collect(),
             'collectors' => $context['canViewEvents']
                 ? $this->collectorsForSite($context, (int) $site->id)
-                    ->map(fn (MonitoringCollector $collector) => $this->collectorRow($collector))
+                    ->map(fn (MonitoringCollector $collector) => $this->collectorRow($collector, (int) $site->id, $context, $canManageCollectors))
                     ->values()
                 : collect(),
+            'hub_wizard' => $canManageCollectors ? [
+                'options_url' => '/security-devices/discovery/collectors/hub-wizard/options',
+                'issue_url' => '/security-devices/discovery/collectors/hub-wizard/issue',
+                'sites' => $context['allAccessibleSites']
+                    ->map(fn (Site $accessibleSite): array => [
+                        'id' => (int) $accessibleSite->id,
+                        'name' => $accessibleSite->name,
+                    ])
+                    ->values()
+                    ->all(),
+            ] : null,
             'changes' => $this->recentChanges($context, (int) $site->id),
             'contacts' => SiteContact::query()
                 ->where('site_id', $site->id)
@@ -351,6 +501,7 @@ class EstateOperationsPresenter
                 'view_control_room' => $context['canControlRoom'],
                 'view_it_work' => $context['canIt'],
                 'view_site_profile' => Gate::forUser($viewer)->allows('view', $site),
+                'manage_collectors' => $canManageCollectors,
                 'export' => $viewer->canDo('securityDevices.reports.view'),
             ],
         ];
@@ -511,6 +662,7 @@ class EstateOperationsPresenter
     /** @return array<string, mixed> */
     private function context(User $viewer, ?array $onlySiteIds = null): array
     {
+        $asOf = now();
         $canIt = $viewer->canDo('it.view');
         $canViewModule = $viewer->canDo('securityDevices.viewAny');
         $canViewDevices = $canViewModule && $viewer->canDo('securityDevices.devices.view');
@@ -519,20 +671,25 @@ class EstateOperationsPresenter
             $viewer->canDo('securityDevices.maintenance.view')
             || $viewer->canDo('securityDevices.maintenance.manage')
         );
-        $siteIds = $this->access->accessibleSiteIds($viewer);
+        $allAccessibleSiteIds = $this->access->accessibleSiteIds($viewer);
+        $canViewAllSites = $this->access->canViewAllSites($viewer);
+        $siteIds = $allAccessibleSiteIds;
         if ($onlySiteIds !== null) {
             $siteIds = array_values(array_intersect($siteIds, $onlySiteIds));
         }
 
-        $sites = $siteIds === []
+        $allAccessibleSites = $allAccessibleSiteIds === []
             ? collect()
             : Site::query()
-                ->whereIn('id', $siteIds)
+                ->whereIn('id', $allAccessibleSiteIds)
                 ->where('is_active', true)
                 ->where('archived', false)
                 ->whereNull('archived_at')
                 ->orderBy('name')
                 ->get();
+        $sites = $onlySiteIds === null
+            ? $allAccessibleSites
+            : $allAccessibleSites->filter(fn (Site $accessibleSite): bool => in_array((int) $accessibleSite->id, $siteIds, true))->values();
 
         $devices = ! $canViewDevices
             ? collect()
@@ -540,8 +697,17 @@ class EstateOperationsPresenter
                 ->with([
                     'assignments' => fn ($query) => $query->active(),
                     'monitors' => fn ($query) => $canViewEvents
-                        ? $query->where('is_enabled', true)
+                        ? $query->where('is_enabled', true)->with('collector:id,name')
                         : $query->whereRaw('1 = 0'),
+                ])
+                ->withCount([
+                    'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
+                    'monitors as failing_monitors_count' => fn ($monitor) => $monitor
+                        ->where('is_enabled', true)
+                        ->whereIn('current_state', ['failed', 'degraded']),
+                    'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
+                        ->where('is_enabled', true)
+                        ->whereIn('current_state', ['unknown', 'stale', 'pending']),
                 ])
                 ->get();
         $deviceIds = $devices->pluck('id');
@@ -549,11 +715,11 @@ class EstateOperationsPresenter
 
         $activeEvents = ! $canViewEvents || $deviceIds->isEmpty()
             ? collect()
-            : DeviceEvent::query()
+            : $this->access->applyTemporalEventCustodyScope(DeviceEvent::query(), $viewer)
                 ->with('device:id,name')
                 ->whereIn('device_id', $deviceIds)
                 ->whereIn('severity', ['critical', 'warning'])
-                ->where('occurred_at', '>=', now()->subHours(self::ACTIVE_EVENT_WINDOW_HOURS))
+                ->whereBetween('occurred_at', [$asOf->copy()->subHours(self::ACTIVE_EVENT_WINDOW_HOURS), $asOf])
                 ->get();
 
         $maintenance = ! $canViewMaintenance || $deviceIds->isEmpty()
@@ -567,8 +733,26 @@ class EstateOperationsPresenter
         $collectors = ! $canViewEvents || $siteIds === []
             ? collect()
             : MonitoringCollector::query()
-                ->whereIn('site_id', $siteIds)
-                ->get();
+                ->with('site:id,name')
+                ->orderBy('name')
+                ->get()
+                ->filter(fn (MonitoringCollector $collector): bool => array_intersect($collector->authorisedSiteIds(), $siteIds) !== [])
+                ->values();
+        $collectorMonitorCounts = $devices
+            ->flatMap->monitors
+            ->whereNotNull('collector_id')
+            ->countBy('collector_id');
+        $collectorScopeCounts = $collectors->isEmpty()
+            ? collect()
+            : DiscoveryScope::query()
+                ->whereIn('collector_id', $collectors->pluck('id'))
+                ->where('status', 'active')
+                ->when(! $canViewAllSites, fn ($query) => $allAccessibleSiteIds === []
+                    ? $query->whereRaw('1 = 0')
+                    : $query->whereIn('site_id', $allAccessibleSiteIds))
+                ->selectRaw('collector_id, COUNT(*) as aggregate')
+                ->groupBy('collector_id')
+                ->pluck('aggregate', 'collector_id');
 
         $ticketQuery = ItTicket::query()
             ->whereIn('status', ItTicket::OPEN_STATUSES)
@@ -592,12 +776,18 @@ class EstateOperationsPresenter
         $readableAlertIds = $this->controlRoomAccess->readableIds($alerts, $viewer);
 
         return compact(
+            'asOf',
             'sites',
+            'allAccessibleSites',
+            'allAccessibleSiteIds',
+            'canViewAllSites',
             'devices',
             'deviceSiteMap',
             'activeEvents',
             'maintenance',
             'collectors',
+            'collectorMonitorCounts',
+            'collectorScopeCounts',
             'tickets',
             'alerts',
             'readableAlertIds',
@@ -704,7 +894,10 @@ class EstateOperationsPresenter
     /** @param array<string, mixed> $context @return Collection<int, MonitoringCollector> */
     private function collectorsForSite(array $context, int $siteId): Collection
     {
-        return $context['collectors']->where('site_id', $siteId)->values();
+        return $context['collectors']
+            ->filter(fn (MonitoringCollector $collector): bool => (int) $collector->site_id === $siteId
+                || in_array($siteId, $collector->coveredSiteIds(), true))
+            ->values();
     }
 
     /** @param array<string, mixed> $context @return Collection<int, ItTicket> */
@@ -764,24 +957,48 @@ class EstateOperationsPresenter
             ];
         }
 
-        $stale = $collectors->contains(fn (MonitoringCollector $collector) => $collector->status !== 'online'
-            || $collector->last_seen_at === null
-            || $collector->last_seen_at->lt(now()->subMinutes(5)));
+        $availability = app(MonitoringCollectorAvailabilityService::class);
+        $stale = $collectors->contains(fn (MonitoringCollector $collector): bool => $availability->state($collector) !== MonitoringCollectorAvailabilityService::AVAILABLE);
+        $lastSeen = $collectors
+            ->map(fn (MonitoringCollector $collector) => $availability->lastHeartbeat($collector))
+            ->filter()
+            ->sortDesc()
+            ->first();
 
         return [
             'state' => $stale ? 'stale' : 'online',
             'label' => $stale ? 'Collector needs attention' : 'Collector online',
             'count' => $collectors->count(),
-            'last_seen_at' => $collectors->max('last_seen_at')?->toIso8601String(),
+            'last_seen_at' => $lastSeen?->toIso8601String(),
         ];
     }
 
-    /** @return array<string, mixed> */
-    private function collectorRow(MonitoringCollector $collector): array
-    {
-        $stale = $collector->status !== 'online'
-            || $collector->last_seen_at === null
-            || $collector->last_seen_at->lt(now()->subMinutes(5));
+    /**
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function collectorRow(
+        MonitoringCollector $collector,
+        int $siteId,
+        array $context,
+        bool $canManageCollectors,
+    ): array {
+        $availability = app(MonitoringCollectorAvailabilityService::class);
+        $freshness = $availability->state($collector);
+        $lastHeartbeat = $availability->lastHeartbeat($collector);
+        $stale = $freshness !== MonitoringCollectorAvailabilityService::AVAILABLE;
+        $canViewHomeSite = (bool) $context['canViewAllSites']
+            || in_array((int) $collector->site_id, $context['allAccessibleSiteIds'], true);
+        $sitesById = $context['allAccessibleSites']->keyBy('id');
+        $coveredSites = collect($collector->coveredSiteIds())
+            ->map(fn (int $coveredId) => $sitesById->get($coveredId))
+            ->filter()
+            ->map(fn (Site $covered): array => [
+                'id' => (int) $covered->id,
+                'name' => $covered->name,
+                'href' => "/security-devices/sites/{$covered->id}",
+            ])
+            ->values();
 
         return [
             'id' => $collector->id,
@@ -789,7 +1006,24 @@ class EstateOperationsPresenter
             'name' => $collector->name,
             'status' => $collector->status,
             'state' => $stale ? 'stale' : 'online',
-            'last_seen_at' => $collector->last_seen_at?->toIso8601String(),
+            'freshness_state' => $freshness,
+            'software_version' => $collector->softwareVersion(),
+            'last_seen_at' => $lastHeartbeat?->toIso8601String(),
+            'last_heartbeat_at' => $collector->last_heartbeat_at?->toIso8601String(),
+            'revoked_at' => $collector->revoked_at?->toIso8601String(),
+            'is_home_site' => (int) $collector->site_id === $siteId,
+            'home_site' => $canViewHomeSite && $collector->site ? [
+                'id' => (int) $collector->site->id,
+                'name' => $collector->site->name,
+                'href' => "/security-devices/sites/{$collector->site->id}",
+            ] : null,
+            'monitor_load' => (int) ($context['collectorMonitorCounts']->get($collector->id) ?? 0),
+            'scope_load' => (int) ($context['collectorScopeCounts']->get($collector->id) ?? 0),
+            'covered_site_ids' => $coveredSites->pluck('id')->values()->all(),
+            'covered_sites' => $coveredSites->all(),
+            'update_url' => $canManageCollectors && $canViewHomeSite && $collector->revoked_at === null
+                ? "/security-devices/discovery/collectors/{$collector->id}"
+                : null,
         ];
     }
 
@@ -817,7 +1051,7 @@ class EstateOperationsPresenter
             'manufacturer' => $device->manufacturer,
             'model' => $device->model,
             'status' => $device->status?->value,
-            'health_status' => $device->health_status?->value,
+            'health_status' => $device->effectiveHealthState(),
             'provider' => $device->provider,
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             'last_changed_at' => $device->updated_at?->toIso8601String(),

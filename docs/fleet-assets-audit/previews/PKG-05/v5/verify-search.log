@@ -1,0 +1,32 @@
+### Result
+{"results":[{"name":"Q search RC-310","pass":true},{"name":"Q search OFV-014","pass":true},{"name":"Q search KEY-014","pass":true},{"name":"Q search Ben Carter","pass":true},{"name":"Q search office","pass":true},{"name":"Q search not-found","pass":true},{"name":"Q filtered export scope","pass":true},{"name":"Q real PDF download","pass":true},{"name":"Q quick view keeps queue route","pass":true},{"name":"Q historical receipt shows newer global holder","pass":true},{"name":"Q history filter matches event","pass":true},{"name":"Q full record retains return context","pass":true},{"name":"Q banner history search opens filtered history","pass":true},{"name":"Q journey explicitly links two vehicle legs","pass":true},{"name":"Q vehicle source is searchable","pass":true},{"name":"Q passenger access does not grant vehicle source","pass":true},{"name":"Q calendar shares five Fleet booking entries","pass":true}],"errors":[]}
+### Ran Playwright code
+```js
+await (async(page)=>{
+ const root='C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v5/',results=[],errors=[];
+ const check=(name,pass)=>{results.push({name,pass:!!pass});if(!pass)throw Error(name)},row=name=>page.getByRole('row').filter({hasText:name}),role=v=>page.getByRole('combobox',{name:'Preview role',exact:true}).selectOption(v);
+ const go=async path=>{await page.goto('http://127.0.0.1:4399/#/fleet-assets/transports/'+path);await page.waitForTimeout(100)};
+ page.setDefaultTimeout(7000);page.on('pageerror',e=>errors.push(e.message));await page.bringToFront();await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:1440,height:1000});await go('returns?site=all&day=2026-09-28');await page.reload();await row('Casey Jones').waitFor();
+ const search=page.getByRole('searchbox',{name:'Search vehicle, receipt, key or person'});
+ for(const [q,count] of [['RC-310',1],['OFV-014',3],['KEY-014',3],['Ben Carter',3],['office',3],['not-found',0]]){await search.fill(q);check('Q search '+q,await page.getByRole('row').count()===count+(count?1:0));}
+ await search.fill('RC-310');await page.getByRole('button',{name:'Export PDF',exact:true}).click();check('Q filtered export scope',(await page.getByRole('dialog',{name:'Export PDF',exact:true}).innerText()).includes('1 matching record'));
+ const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download PDF',exact:true}).click();const file=await download;await file.saveAs(root+'qa-filtered-returns.pdf');check('Q real PDF download',file.suggestedFilename()==='returns-handovers.pdf');await page.getByRole('dialog',{name:'Export PDF',exact:true}).getByRole('button',{name:'Close',exact:true}).first().click();
+ await row('Casey Jones').click();await page.getByRole('dialog',{name:'Casey Jones · quick view',exact:true}).waitFor();check('Q quick view keeps queue route',page.url().includes('/returns?')&&!(page.url().includes('TR-1048')));await page.screenshot({path:root+'review-return-quick.png',fullPage:true});
+ await page.getByRole('button',{name:'Keys & site',exact:false}).click();check('Q historical receipt shows newer global holder',(await page.getByRole('dialog').innerText()).includes('Nia Patel')&&(await page.getByRole('dialog').innerText()).includes('from another linked journey'));await page.screenshot({path:root+'review-key-custody.png',fullPage:true});
+ await page.getByRole('button',{name:'History',exact:false}).click();await page.getByRole('textbox',{name:'Search record history',exact:true}).fill('dispute');check('Q history filter matches event',await page.locator('.history-entry').count()===1);await page.getByRole('button',{name:'Open full record',exact:false}).click();await page.getByRole('heading',{name:'Casey Jones · return',exact:true}).waitFor();check('Q full record retains return context',page.url().includes('TR-1048')&&page.url().includes('from=returns'));
+ await go('journeys/J-609?from=journeys');await page.getByRole('heading',{name:'Charlie Brown · journey',exact:true}).waitFor();await page.getByRole('searchbox',{name:'Search record history',exact:true}).fill('departed');check('Q banner history search opens filtered history',await page.locator('#record-history[open] .history-entry').count()===1);await page.getByRole('button',{name:'Export history PDF',exact:true}).click();const hdl=page.waitForEvent('download');await page.getByRole('button',{name:'Download PDF',exact:true}).click();await(await hdl).saveAs(root+'qa-filtered-history.pdf');await page.getByRole('dialog',{name:'Export PDF',exact:true}).getByRole('button',{name:'Close',exact:true}).first().click();
+ await page.getByRole('button',{name:'Open vehicle trip history',exact:true}).click();check('Q journey explicitly links two vehicle legs',await page.locator('.vehicle-trip-list>div').count()===2);await page.getByRole('textbox',{name:'Search vehicle trip history',exact:true}).fill('VT-902');check('Q vehicle source is searchable',await page.locator('.vehicle-trip-list>div').count()===1);await page.screenshot({path:root+'review-vehicle-history.png',fullPage:true});await page.getByRole('dialog',{name:'Vehicle trip history',exact:true}).getByRole('button',{name:'Return to record',exact:false}).click();
+ await role('requester');await page.getByRole('button',{name:'Open vehicle trip history',exact:true}).click();check('Q passenger access does not grant vehicle source',await page.getByText('Vehicle trip history needs separate access',{exact:true}).isVisible()&&await page.locator('.vehicle-trip-list').count()===0);
+ await go('planner');await page.reload();await page.getByRole('button',{name:'View transport calendar',exact:true}).click();await page.getByRole('heading',{name:'Transport schedule',exact:true}).waitFor();check('Q calendar shares five Fleet booking entries',await page.locator('.calendar-surface').getByText('Charlie Brown', {exact:false}).count()>0);await page.screenshot({path:root+'review-calendar-week.png',fullPage:true});
+ return {results,errors};
+}
+)(page);
+```
+### Page
+- Page URL: http://127.0.0.1:4399/#/fleet-assets/transports/calendar?site=all&day=2026-09-28
+- Page Title: Transport · PKG-05 v5 design preview
+### Events
+- Downloading file returns-handovers.pdf ...
+- Downloaded file returns-handovers.pdf to "..\v1\.playwright-cli\returns-handovers.pdf"
+- Downloading file charlie-brown-transport-history.pdf ...
+- Downloaded file charlie-brown-transport-history.pdf to "..\v1\.playwright-cli\charlie-brown-transport-history.pdf"

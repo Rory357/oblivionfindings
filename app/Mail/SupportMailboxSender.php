@@ -15,7 +15,7 @@ final class SupportMailboxSender
 
     private readonly string $scopeHash;
 
-    public function __construct(ItMailboxConnection $connection)
+    public function __construct(ItMailboxConnection $connection, private readonly bool $currentRead = false)
     {
         $this->id = (int) $connection->getKey();
         $this->version = $connection->configuration_version;
@@ -24,7 +24,7 @@ final class SupportMailboxSender
 
     public function resolve(SentMessage $message, string $provider): ItMailboxConnection
     {
-        $connection = ItMailboxConnection::query()->useWritePdo()->find($this->id);
+        $connection = ItMailboxConnection::query()->useWritePdo()->when($this->currentRead, fn ($query) => $query->lockForUpdate())->find($this->id);
         if (! $connection || ! $connection->isConnected() || $connection->provider !== $provider
             || $connection->configuration_version !== $this->version
             || ! hash_equals($this->scopeHash, $connection->mailboxScopeHash())) {

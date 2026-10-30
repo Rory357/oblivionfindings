@@ -1,0 +1,11 @@
+PKG-05 v3 · exact design review candidate
+Frozen: 2026-09-26T21:52:26.920Z
+URL: http://127.0.0.1:4397/#/fleet-assets/transports/journeys/J-609?from=journeys
+Runtime SHA-256: 4688d76f86ffedd26e8794043668fdf1f93b7582fc87b3ad4207007d83df425d
+File-set SHA-256: a7ed4892f989bc0763bdde17c10d5be8a2b64c73fe7a9153b47c5828ee1704f5
+Manifest SHA-256: ca3d72407c57d892083bfac40c421f05600326efebf77099552e97c853f27a98
+Files: 57
+Screenshots: 18
+77 browser assertions; 34 synthetic domain assertions; zero TypeScript errors.
+Prior 175 frozen files preserved. Actual browser zoom unverified.
+No application implementation or operational effects. Preserve this version.

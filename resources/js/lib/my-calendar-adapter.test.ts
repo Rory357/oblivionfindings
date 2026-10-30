@@ -8,17 +8,15 @@ describe('My Calendar data adapter', () => {
     it('keeps a failed source explicit even when the remaining feed is empty', async () => {
         vi.stubGlobal(
             'fetch',
-            vi
-                .fn()
-                .mockResolvedValue({
-                    ok: true,
-                    json: async () => [],
-                    headers: new Headers({
-                        'X-Calendar-Unavailable': JSON.stringify({
-                            medication_round: 'unavailable',
-                        }),
+            vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => [],
+                headers: new Headers({
+                    'X-Calendar-Unavailable': JSON.stringify({
+                        medication_round: 'unavailable',
                     }),
                 }),
+            }),
         );
         const result = await createMyCalendarAdapter(owner).loadItems({
             start: new Date('2026-09-01'),
@@ -101,5 +99,109 @@ describe('My Calendar data adapter', () => {
         expect(fetch.mock.calls[0][0]).toMatch(/^\/my-calendar\/events\?/);
         expect(adapter.mineLink?.href).toBe('/my-day');
         expect(adapter.allowSubscriptions).toBe(false);
+    });
+});
+
+describe('Medication calendar request windows', () => {
+    const owner = { id: 7, name: 'Worker' };
+    it('loads the complete 75-day rail across NZ clock change without a rejected medication range or duplicate spanning shifts', async () => {
+        const start = new Date('2026-08-22T00:00:00+12:00');
+        const end = new Date('2026-11-05T23:00:00+13:00');
+        const shared = {
+            id: 'shift-1',
+            title: 'Spanning shift',
+            start: '2026-10-20T22:00:00+13:00',
+            end: '2026-10-21T08:00:00+13:00',
+            extendedProps: { type: 'shift', link: '/my-day?shift=1' },
+        };
+        const fetcher = vi.fn(async (url: string) => {
+            const q = new URL(url, 'http://localhost').searchParams;
+            const span =
+                Date.parse(q.get('end')!) - Date.parse(q.get('start')!);
+            return {
+                ok: true,
+                json: async () => [
+                    shared,
+                    {
+                        ...shared,
+                        id: 'med-' + q.get('start'),
+                        extendedProps: {
+                            type: 'medication_round',
+                            link: '/meds/today',
+                        },
+                    },
+                ],
+                headers: new Headers(
+                    span > 62 * 86400000
+                        ? {
+                              'X-Calendar-Unavailable':
+                                  '{"medication_round":"unavailable"}',
+                          }
+                        : {},
+                ),
+            };
+        });
+        vi.stubGlobal('fetch', fetcher);
+        const result = await createMyCalendarAdapter(owner).loadItems({
+            start,
+            end,
+        });
+        expect(result.availability).toEqual({});
+        expect(result.events).toHaveLength(3);
+        expect(
+            result.events.filter((event) => event.id === 'shift-1'),
+        ).toHaveLength(1);
+        const ranges = fetcher.mock.calls.map(
+            ([url]) => new URL(url, 'http://localhost').searchParams,
+        );
+        expect(ranges).toHaveLength(2);
+        expect(ranges[0].get('start')).toBe(start.toISOString());
+        expect(ranges[0].get('end')).toBe(ranges[1].get('start'));
+        expect(ranges[1].get('end')).toBe(end.toISOString());
+        expect(result.events[0].end).toBe(shared.end);
+    });
+    it('retains a partial-source warning from any window instead of clearing it with the final healthy response', async () => {
+        const fetcher = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => [],
+                headers: new Headers({
+                    'X-Calendar-Unavailable':
+                        '{"medication_round":"unavailable"}',
+                }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => [],
+                headers: new Headers(),
+            });
+        vi.stubGlobal('fetch', fetcher);
+        const result = await createMyCalendarAdapter(owner).loadItems({
+            start: new Date('2026-08-22'),
+            end: new Date('2026-11-05'),
+        });
+        expect(result.availability).toEqual({
+            medication_round: 'unavailable',
+        });
+    });
+    it('rejects a later failed window rather than displaying an incomplete empty-success result', async () => {
+        vi.stubGlobal(
+            'fetch',
+            vi
+                .fn()
+                .mockResolvedValueOnce({
+                    ok: true,
+                    json: async () => [],
+                    headers: new Headers(),
+                })
+                .mockResolvedValueOnce({ ok: false }),
+        );
+        await expect(
+            createMyCalendarAdapter(owner).loadItems({
+                start: new Date('2026-08-22'),
+                end: new Date('2026-11-05'),
+            }),
+        ).rejects.toThrow('Could not load your calendar.');
     });
 });

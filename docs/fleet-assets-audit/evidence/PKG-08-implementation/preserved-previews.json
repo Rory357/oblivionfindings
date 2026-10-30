@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-09-27T13:18:09.3320377Z",
+  "source": "C:\\Users\\steph\\.codex\\worktrees\\pkg08-settings-design\\oblivionfindings\\docs\\fleet-assets-audit\\previews\\PKG-08",
+  "versions": [
+    {
+      "version": "v1",
+      "checked": 70,
+      "mismatches": []
+    },
+    {
+      "version": "v2",
+      "checked": 85,
+      "mismatches": []
+    },
+    {
+      "version": "v3",
+      "checked": 46,
+      "mismatches": []
+    },
+    {
+      "version": "v4",
+      "checked": 65,
+      "mismatches": []
+    },
+    {
+      "version": "v5",
+      "checked": 75,
+      "mismatches": []
+    },
+    {
+      "version": "v6",
+      "checked": 96,
+      "mismatches": [],
+      "manifestHash": "50e3df5741943eb76cc2c2b78ccb750bb56ca9cffe58d9f022d134a78b89dfb7",
+      "bundleHash": "0851383d39dccf21d2618a4a8e9c622bc0e7fc1590960679a432531a2634a578"
+    }
+  ]
+}

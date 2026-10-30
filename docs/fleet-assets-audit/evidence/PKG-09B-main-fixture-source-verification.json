@@ -1,0 +1,9 @@
+{
+  "candidate": "50716b9cca0473ee4082e329ce6ff1347833f714",
+  "base": "926b4981b0289da08a20baca0995117fb53e413e",
+  "actualHead": "50716b9cca0473ee4082e329ce6ff1347833f714",
+  "sourceFiles": 49,
+  "mismatches": [],
+  "undeclared": [],
+  "checkedAt": "2026-09-27T23:46:16.878Z"
+}

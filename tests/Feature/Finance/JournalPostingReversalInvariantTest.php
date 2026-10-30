@@ -15,6 +15,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 beforeEach(function (): void {
     $this->actor = User::factory()->create([
@@ -286,6 +287,7 @@ it('denies an unprivileged direct id while the explicit global finance role can 
 });
 
 it('serializes two independent MySQL workers to the same single reversal', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
 

@@ -21,6 +21,7 @@ test.describe('operations rostering — publish flow', () => {
     );
 
     test('manager reviews and publishes a roster period', async ({ page }) => {
+        test.setTimeout(60_000);
         const consoleErrors = collectConsoleErrors(page);
 
         resetRosteringReadinessFixtures();
@@ -36,7 +37,11 @@ test.describe('operations rostering — publish flow', () => {
         await page.getByTestId('rostering-operations-report-link').click();
         await expect(page).toHaveURL(/\/operations\/reports\/shifts/);
         await expect(
-            page.getByRole('heading', { name: /Shift Operations Reports/i }),
+            page.getByRole('heading', {
+                name: 'Shift operations',
+                level: 1,
+                exact: true,
+            }),
         ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);

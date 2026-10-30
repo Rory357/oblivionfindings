@@ -276,7 +276,7 @@ export function ViewToggle({
                         className={cn(
                             'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors',
                             active
-                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                 : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                         )}
                     >

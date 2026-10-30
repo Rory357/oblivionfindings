@@ -72,34 +72,10 @@ class MedicationAllergy extends Model
     /**
      * Check if a medication matches this allergy
      */
-    public function matchesMedication(string $medicationName): bool
+    public function matchesMedication(string $medicationName, ?\Illuminate\Support\Collection $classRules = null): bool
     {
-        $allergen = strtolower($this->allergen);
-        $medication = strtolower($medicationName);
-
-        // Direct match
-        if (str_contains($medication, $allergen) || str_contains($allergen, $medication)) {
-            return true;
-        }
-
-        // Common drug class matches (basic implementation)
-        $drugClasses = [
-            'penicillin' => ['amoxicillin', 'ampicillin', 'flucloxacillin', 'phenoxymethylpenicillin'],
-            'sulfa' => ['sulfamethoxazole', 'co-trimoxazole', 'sulfadiazine'],
-            'aspirin' => ['salicylate', 'acetylsalicylic acid'],
-            'nsaid' => ['ibuprofen', 'naproxen', 'diclofenac', 'celecoxib'],
-        ];
-
-        foreach ($drugClasses as $class => $drugs) {
-            if (str_contains($allergen, $class)) {
-                foreach ($drugs as $drug) {
-                    if (str_contains($medication, $drug)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
+        // EA-052 (Lane C3): the same matcher as the order check — names, the
+        // built-in classes and reviewed maintained class rules.
+        return \App\Services\Medication\AllergyMatching::match((string) $this->allergen, $medicationName, $classRules) !== null;
     }
 }

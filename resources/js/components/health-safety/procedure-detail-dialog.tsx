@@ -4,6 +4,7 @@
  * record-review / archive / restore) take over the body and post in-place. The Documents
  * section is the controlled-document library, reusing the shared AttachmentUploader.
  * Built on the Add-client modal chrome (WizardShell). Semantic tokens only. NZ-only, web-only. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
 import {
@@ -77,6 +78,8 @@ export type ProcedureActionKey =
 
 export type ProcedureFormData = {
     id?: number;
+    expected_version?: number;
+    expected_lock_version?: number;
     title: string;
     reference_number: string;
     category: string;
@@ -86,9 +89,9 @@ export type ProcedureFormData = {
     ppe_required: string[];
     hazards_addressed: string[];
     emergency_procedures: string;
-    applicable_roles: string[];
-    applicable_sites: number[];
-    related_training: number[];
+    applicable_roles: string[] | null;
+    applicable_sites: number[] | null;
+    related_training: number[] | null;
     review_date: string | null;
     review_frequency_months: number | null;
     owner_id: number | null;
@@ -866,6 +869,27 @@ function AppliesSection({ detail }: { detail: ProcedureDetail }) {
 
 function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
     const canManage = detail.can.manage;
+    const [fileToRemove, setFileToRemove] = useState<
+        ProcedureDetail['attachments'][number] | null
+    >(null);
+    const [removingFile, setRemovingFile] = useState(false);
+
+    const removeFile = () => {
+        if (!fileToRemove) return;
+        router.delete(
+            `${PROCEDURES_URL}/${detail.id}/attachments/${fileToRemove.id}`,
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onStart: () => setRemovingFile(true),
+                onFinish: () => {
+                    setRemovingFile(false);
+                    setFileToRemove(null);
+                },
+            },
+        );
+    };
+
     return (
         <div className="flex flex-col gap-4">
             <p className="text-sm text-muted-foreground">
@@ -919,15 +943,7 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
                                 <Button
                                     unstyled
                                     type="button"
-                                    onClick={() =>
-                                        router.delete(
-                                            `${PROCEDURES_URL}/${detail.id}/attachments/${a.id}`,
-                                            {
-                                                preserveScroll: true,
-                                                preserveState: true,
-                                            },
-                                        )
-                                    }
+                                    onClick={() => setFileToRemove(a)}
                                     className="shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-status-critical-bg hover:text-status-critical"
                                     title="Remove"
                                     aria-label={`Remove ${a.original_name}`}
@@ -954,6 +970,27 @@ function DocumentsSection({ detail }: { detail: ProcedureDetail }) {
                     />
                 </div>
             ) : null}
+
+            <ConfirmDialog
+                open={fileToRemove !== null}
+                onClose={() => {
+                    if (!removingFile) setFileToRemove(null);
+                }}
+                onConfirm={removeFile}
+                title="Remove this file?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            {fileToRemove?.original_name}
+                        </span>{' '}
+                        will be permanently deleted from this procedure. This
+                        cannot be undone.
+                    </>
+                }
+                confirmText="Remove file"
+                variant="destructive"
+                processing={removingFile}
+            />
         </div>
     );
 }
@@ -966,7 +1003,7 @@ function HistorySection({ detail }: { detail: ProcedureDetail }) {
         <ol className="relative ml-1 flex flex-col gap-4 border-l border-border pl-5">
             {detail.versions.map((v) => (
                 <li key={v.id} className="relative">
-                    <span className="absolute -left-[26px] grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground ring-4 ring-background">
+                    <span className="absolute -left-[26px] grid h-4 w-4 place-items-center rounded-full bg-primary-fill text-primary-fill-foreground ring-4 ring-background">
                         <span className="text-[8px] font-bold">
                             {v.version}
                         </span>
@@ -1218,10 +1255,8 @@ function ActionPane({
                         form.processing ||
                         (reviewRequired && !form.data.review_date)
                     }
-                    className={
-                        meta.tone === 'critical'
-                            ? 'bg-status-critical text-white hover:bg-status-critical/90'
-                            : undefined
+                    variant={
+                        meta.tone === 'critical' ? 'destructive' : 'default'
                     }
                 >
                     <meta.icon className="mr-1.5 h-4 w-4" /> {meta.verb}

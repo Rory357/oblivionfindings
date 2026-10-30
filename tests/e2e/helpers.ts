@@ -136,11 +136,22 @@ echo json_encode([
 }
 
 export function resetFrontlineLifecycleReadinessFixtures() {
-    runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
+    const phpBin = resolvePhpBinary() ?? 'php';
+    return execFileSync(phpBin, ['tests/Support/reset-frontline-fixture.php'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: phpRequiresShell(phpBin),
+    });
 }
 
 export function resetMedicationReadinessFixtures() {
     resetFrontlineLifecycleReadinessFixtures();
+    runArtisan([
+        'db:seed',
+        '--class=MedicationReadinessAcceptanceSeeder',
+        '--force',
+    ]);
 }
 
 export function resetJobBoardReadinessFixtures() {
@@ -355,7 +366,9 @@ export async function loginAs(
     await page.context().clearCookies();
     resetBrowserLoginThrottle(email);
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    // Staff sign-in is email first: Continue reveals the password step.
     await page.locator('#email').fill(email);
+    await page.getByTestId('login-continue').click();
     await page.locator('#password').fill(password);
     const loginButton = page.getByTestId('login-button');
     await expect(loginButton).toBeEnabled();
@@ -373,6 +386,19 @@ export async function loginAsStaff(page: Page) {
     await loginAs(page, email, password);
 }
 
+export async function reviewRosterForPublish(page: Page) {
+    await page.getByTestId('rostering-review-publish').click();
+    // CI trace: the governed POST and redirected read together exceed the
+    // ordinary 10-second element assertion window on its single PHP worker.
+    await page.waitForURL(
+        /\/operations\/rostering\/periods\/\d+\/review(?:\?|$)/,
+        {
+            timeout: 30_000,
+        },
+    );
+    await expect(page.getByTestId('publish-review-page')).toBeVisible();
+}
+
 export async function publishCurrentWeek(
     page: Page,
     target: { week: string; siteId: number } = ROSTERING_DEMO_PUBLISH_TARGET,
@@ -382,13 +408,14 @@ export async function publishCurrentWeek(
     );
 
     await expect(page.getByTestId('rostering-publish-panel')).toBeVisible();
-    await page.getByTestId('rostering-review-publish').click();
-
-    await expect(page.getByTestId('publish-review-page')).toBeVisible();
+    await reviewRosterForPublish(page);
     await expect(page.getByTestId('publish-review-confirm')).toBeEnabled();
     await page.getByTestId('publish-review-confirm').click();
 
-    await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
+    // Publishing redirects through the governed roster read on CI's single PHP worker.
+    await page.waitForURL(/\/operations\/rostering(?:\?|$)/, {
+        timeout: 30_000,
+    });
     await expect(page.getByTestId('rostering-publish-panel')).toContainText(
         /published/i,
     );

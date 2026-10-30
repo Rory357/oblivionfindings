@@ -1,0 +1,65 @@
+{
+  "reviewed_at_utc": "2026-10-12T08:42:00Z",
+  "reviewer": "coordinator",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "receipt": "docs/control-room-audit-2026-10-11/accepted-note-source-increment-r29.json",
+  "receipt_sha256": "B00C2EE2A2E2C73998B6D9B346D9D95FE4B36488889264D5CB7D6532DFD59B6E",
+  "status": "BOUNDED_ACCEPTED_NOTE_SOURCE_REVIEWED; HANDOVER_PRIVACY_HOLD_FOR_ADJACENT_READ_PATHS; RUNTIME_UNRUN",
+  "verified_hashes": { "product": 14, "evidence": 9, "historical_before": 10, "differences": [] },
+  "independently_reproduced_file_comparisons": {
+    "acceptance_command_span_unchanged": true,
+    "handover_service_only_two_saved_note_fields_changed": true,
+    "prepared_validator_outside_notes_method_unchanged": true,
+    "automatic_resolution_span_unchanged": true
+  },
+  "bounded_source_read": [
+    "Nullable unexecuted origin migration, model cast and complete operator-origin and accepted-note projection services",
+    "Shift-note writer, lifecycle note tuple/final persisted checks, saved-note capture and validator",
+    "Accepted and prepared controller branches, current note mappings, governance snapshot projection and canonical alert scope",
+    "Complete accepted-history component, relevant prepared/draft note renderers and component regression assertions",
+    "Persisted history-note test fixtures/providers/cases and root-note mutation declarations"
+  ],
+  "accepted_history_source_observations": [
+    "Literal independent-operator origin captured before create/audit callbacks and persisted note tuple checked; no historical backfill",
+    "Saved note must agree with persisted note, original Site/person/actor/classification/text digest and creation audit, plus current alert scope",
+    "Unknown/source-owned/reassociated/conflicting notes withheld separately from independently readable accepted transfer",
+    "One verified unique list drives accepted Notes count/body; both saved collections filtered; raw origin and note_alert_ids removed"
+  ],
+  "findings": [
+    {
+      "id": "CR-HANDOVER-NOTES-03",
+      "priority": 1,
+      "status": "OPEN_ASSIGNED_TO_CONTROL_ROOM",
+      "title": "Prepared and active-duty note paths still bypass original-context admission",
+      "evidence": [
+        "app/Http/Controllers/ControlRoom/ControlRoomHandoverController.php:64 prepared branch only removes operator_origin; saved text remains",
+        "app/Services/ControlRoom/ControlRoomGovernanceReadService.php forSnapshotViewer shapes alerts, not note collections",
+        "resources/js/pages/control-room/shifts/handover.tsx:857 prepared branch renders saved pinned/followup content",
+        "ControlRoomHandoverController notes() and ControlRoomShiftController.php:84 return current note text based on current alert scope alone"
+      ],
+      "trigger": "Prepare a note for original Site/person A, then rebind the same operational alert to currently readable B, or withdraw private-source access while operational alert remains readable. Pre-acceptance and active-duty routes can still return the old note text/IDs.",
+      "action": "Reuse one independent-note/original-context admission across accepted, prepared and active-duty projections; source-owned admission stays canonical H&S. Preserve unrelated permitted work and existing acceptance guards; review command-side original-context validation. Do not infer legacy provenance.",
+      "acceptance": "Actual persisted draft/prepare/GET and active-duty GET reassociation/private-withdrawal cases, safe independent positives, transport/body/count parity and no GET writes. These are not yet executed."
+    }
+  ],
+  "coordination": {
+    "control_room": "Sent one bounded review with finding, impact, minimal action and acceptance check; no source edits by parent.",
+    "health_safety": "Sent one canonical saved-copy admission API request: immutable source family/record/version and original copy ownership plus current viewer/read context to safe DTO or unavailable; retain same-text source-writer invalidation. H&S owns policy; CR owns operator provenance/model/migration. Shared changes require proposal rather than overwrite.",
+    "workforce": "Unchanged; no message or restart."
+  },
+  "saved_runtime_evidence": {
+    "component_result_sha256": "52B2D4BD0D47E9410BAAC12760B4F52E52B56D0838D8C55F27A56D4C9F1C321C",
+    "component_started": false,
+    "component_exit_and_counts": null,
+    "component_after_reads_complete": true,
+    "syntax_result_sha256": "90328D4C9B3B82C85DE40A32C50B349075E16603861400F38D0C636F849A9856",
+    "syntax_children_started": 0,
+    "syntax_files_checked": 0,
+    "syntax_after_reads_complete": true,
+    "native_history_prospective_cases": 38,
+    "native_history_executed": false,
+    "finite_frontend_cases_authored": 31,
+    "runtime_pass_claim": false
+  },
+  "limitations": "Read-only bounded review, not full source closure or a runtime/privacy/design certificate. No migration, application integration, test/build/DB/process/provider/live-record or Git action. Rory, six destinations and full workflow/browser acceptance remain open."
+}

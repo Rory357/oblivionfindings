@@ -97,6 +97,7 @@ export function PrnNearLimitDialog({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="PRN near-limit detail"

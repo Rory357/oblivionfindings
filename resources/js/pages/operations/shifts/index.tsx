@@ -1,3 +1,4 @@
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -19,7 +20,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ListCaption } from '@/components/lists';
 import {
-    PageHeader,
     PageHeaderFilterButton,
     PageHeaderFilterSelect,
     PageHeaderMeterBig,
@@ -35,6 +35,7 @@ import {
 } from '@/components/page';
 import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
 import AppLayout from '@/layouts/app-layout';
+import { index as rosteringIndex } from '@/routes/operations/rostering';
 import {
     cancel as cancelShift,
     complete as completeShift,
@@ -577,16 +578,31 @@ export default function ShiftsIndex({
                 {stats.in_progress} in progress
             </PageHeaderStatusChip>
         ) : (
-            <PageHeaderStatusChip variant="success">
-                Fully covered
+            <PageHeaderStatusChip variant="neutral">
+                {stats.total === 0 ? 'No shifts' : 'Shift overview'}
             </PageHeaderStatusChip>
         );
 
     const singleStatus =
         heroStatusFilter.length === 1 ? heroStatusFilter[0] : 'all';
 
+    const headerPrimaryAction = canCreate ? (
+        <PageHeaderPrimaryButton icon={UserPlus} onClick={() => openCreate()}>
+            Add shift
+        </PageHeaderPrimaryButton>
+    ) : null;
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={q}
+                onChange={setQ}
+                placeholder={`Search ${shiftPlural.toLowerCase()}…`}
+            />
+        </>
+    );
+
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             icon={Calendar}
             title={shiftPlural}
             titleChip={titleChip}
@@ -595,21 +611,13 @@ export default function ShiftsIndex({
             } · ${stats.staff} staff · ${stats.hours}h scheduled`}
             actions={
                 <>
-                    <PageHeaderSearch
-                        value={q}
-                        onChange={setQ}
-                        placeholder={`Search ${shiftPlural.toLowerCase()}…`}
-                    />
-                    {canCreate ? (
-                        <PageHeaderPrimaryButton
-                            icon={UserPlus}
-                            onClick={() => openCreate()}
-                        >
-                            Add shift
-                        </PageHeaderPrimaryButton>
-                    ) : null}
+                    {headerSecondaryActions}
+                    {headerPrimaryAction}
                 </>
             }
+            mobilePrimaryAction={headerPrimaryAction}
+            mobileSecondaryActions={headerSecondaryActions}
+            mobileSummary={weekLabel(filters.from, filters.to)}
             meters={
                 <>
                     <PageHeaderMeterBlock
@@ -705,7 +713,7 @@ export default function ShiftsIndex({
                         value={heroSiteIds}
                         onChange={(next) => handleHeroFilter('site_ids', next)}
                         onDark
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <MultiEntityFilter
                         label="Staff"
@@ -715,7 +723,7 @@ export default function ShiftsIndex({
                         value={heroUserIds}
                         onChange={(next) => handleHeroFilter('user_ids', next)}
                         onDark
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <MultiEntityFilter
                         label="Client"
@@ -727,7 +735,7 @@ export default function ShiftsIndex({
                             handleHeroFilter('client_ids', next)
                         }
                         onDark
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <PageHeaderViewToggle
                         value={viewMode}
@@ -759,7 +767,12 @@ export default function ShiftsIndex({
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                ...(auth?.can?.rostering?.viewAny
+                    ? [
+                          { title: 'Workforce', href: rosteringIndex.url() },
+                          { title: 'Rostering', href: rosteringIndex.url() },
+                      ]
+                    : [{ title: 'Workforce', href: shiftsIndex.url() }]),
                 { title: shiftPlural, href: shiftsIndex.url() },
             ]}
         >

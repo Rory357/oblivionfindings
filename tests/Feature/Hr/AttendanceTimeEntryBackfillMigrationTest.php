@@ -11,10 +11,12 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Tests\Support\CommittedFixtureCleanup;
 
 uses(RefreshDatabase::class);
 
 test('unique migration fails closed without changing duplicate ledger or linked evidence', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $site = Site::factory()->create([
         'is_active' => true,
         'archived' => false,

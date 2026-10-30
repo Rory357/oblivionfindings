@@ -7,6 +7,7 @@ import {
 } from '@/components/security-devices/permission-destinations';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { ReviewRow } from '@/components/wizard/shell';
 import { formatDate, formatDateTime } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -96,6 +97,8 @@ type HealthcareDevice = {
         flow: { state: string; label: string; description: string };
     };
     monitoring: { state: string; enabledCount: number };
+    monitoringHref?: string | null;
+    maintenanceHref?: string | null;
     maintenance: {
         nextServiceDue: string | null;
         openCount: number;
@@ -151,6 +154,7 @@ export type HealthcareWorkspaceData = {
         label: string;
         description: string;
         restricted: boolean;
+        flowFilter?: { key: string; label: string } | null;
         inventoryTotal: number;
         inventoryShown: number;
         inventoryTruncated: boolean;
@@ -171,11 +175,12 @@ function plural(value: number, singular: string, pluralLabel?: string): string {
 }
 
 function Metric({ children }: { children: ReactNode }) {
-    return (
-        <div className="rounded-xl border border-border bg-muted/30 px-3 py-2 text-sm font-semibold">
-            {children}
-        </div>
-    );
+    const fact =
+        typeof children === 'string' ? children.match(/^(\d+)\s+(.+)$/) : null;
+    const label = fact
+        ? fact[2].replace(/^./, (character) => character.toUpperCase())
+        : 'Equipment';
+    return <ReviewRow label={label} value={fact ? fact[1] : children} />;
 }
 
 function Boundary({ data }: { data: HealthcareWorkspaceData['boundary'] }) {
@@ -239,7 +244,7 @@ function HealthcareOverview({ data }: { data: HealthcareWorkspaceData }) {
                     </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="space-y-0">
                         <Metric>{plural(inventory.total, 'device')}</Metric>
                         <Metric>
                             {plural(
@@ -520,6 +525,29 @@ function HealthcareDeviceCard({ device }: { device: HealthcareDevice }) {
                 </div>
             ) : null}
 
+            {device.maintenanceHref || device.monitoringHref ? (
+                <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs">
+                    {device.maintenanceHref ? (
+                        <Link
+                            href={device.maintenanceHref}
+                            className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 font-medium text-primary hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <Wrench className="h-3.5 w-3.5" />
+                            Open maintenance
+                        </Link>
+                    ) : null}
+                    {device.monitoringHref ? (
+                        <Link
+                            href={device.monitoringHref}
+                            className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border px-3 font-medium text-primary hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        >
+                            <Activity className="h-3.5 w-3.5" />
+                            Configure monitoring
+                        </Link>
+                    ) : null}
+                </div>
+            ) : null}
+
             {device.itTickets.length > 0 ? (
                 <div className="space-y-1.5 border-t border-border pt-3">
                     <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -573,7 +601,13 @@ function DeviceGrid({ devices }: { devices: HealthcareDevice[] }) {
     );
 }
 
-function FlowGroups({ groups }: { groups: FlowGroup[] }) {
+function FlowGroups({
+    groups,
+    activeFlow,
+}: {
+    groups: FlowGroup[];
+    activeFlow?: string | null;
+}) {
     return (
         <section
             aria-labelledby="healthcare-flow-heading"
@@ -593,22 +627,46 @@ function FlowGroups({ groups }: { groups: FlowGroup[] }) {
                 </p>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {groups.map((group) => (
-                    <article
-                        key={group.state}
-                        className="rounded-xl border border-border bg-card p-4"
-                    >
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h3 className="font-semibold">{group.label}</h3>
-                                <p className="mt-1 text-sm text-muted-foreground">
-                                    {group.description}
-                                </p>
+                {groups.map((group) => {
+                    const isSelected = activeFlow === group.state;
+                    const filterHref = isSelected
+                        ? '/security-devices/healthcare?tab=data-flow'
+                        : `/security-devices/healthcare?tab=data-flow&flow=${encodeURIComponent(group.state)}`;
+
+                    return (
+                        <article
+                            key={group.state}
+                            className={`rounded-xl border bg-card p-4 ${
+                                isSelected
+                                    ? 'border-primary/60'
+                                    : 'border-border'
+                            }`}
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 className="font-semibold">
+                                        {group.label}
+                                    </h3>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                        {group.description}
+                                    </p>
+                                </div>
+                                <Badge variant="outline">{group.count}</Badge>
                             </div>
-                            <Badge variant="outline">{group.count}</Badge>
-                        </div>
-                    </article>
-                ))}
+                            <div className="mt-3">
+                                <Link
+                                    href={filterHref}
+                                    className="inline-flex min-h-10 items-center gap-1 rounded-md px-2 text-xs font-medium text-primary hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                    {isSelected
+                                        ? 'Clear filter'
+                                        : `Filter ${group.label.toLowerCase()} devices`}
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                </Link>
+                            </div>
+                        </article>
+                    );
+                })}
             </div>
         </section>
     );
@@ -629,7 +687,7 @@ function MaintenanceRecords({
                     id="healthcare-maintenance-heading"
                     className="text-lg font-semibold"
                 >
-                    Canonical calibration & maintenance
+                    Calibration & maintenance
                 </h2>
                 <p className="text-sm text-muted-foreground">
                     These records come from the device maintenance history;
@@ -693,8 +751,7 @@ function MaintenanceRecords({
                 <Card>
                     <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
                         <Wrench className="h-5 w-5" />
-                        No canonical calibration or maintenance records are
-                        available.
+                        No calibration or maintenance records are available.
                     </CardContent>
                 </Card>
             )}
@@ -740,7 +797,10 @@ export function HealthcareWorkspacePanels({
                         <HealthcareOverview data={data} />
                     ) : null}
                     {tab === 'data-flow' ? (
-                        <FlowGroups groups={data.activeTab.flowGroups} />
+                        <FlowGroups
+                            groups={data.activeTab.flowGroups}
+                            activeFlow={data.activeTab.flowFilter?.key}
+                        />
                     ) : null}
                     {tab === 'calibration-maintenance' ? (
                         <MaintenanceRecords
@@ -757,6 +817,27 @@ export function HealthcareWorkspacePanels({
                             className="space-y-3"
                             aria-labelledby="healthcare-devices-heading"
                         >
+                            {data.activeTab.flowFilter ? (
+                                <Card>
+                                    <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                                        <p>
+                                            Filtered to:{' '}
+                                            <span className="font-semibold">
+                                                {
+                                                    data.activeTab.flowFilter
+                                                        .label
+                                                }
+                                            </span>
+                                        </p>
+                                        <Link
+                                            href={`/security-devices/healthcare?tab=${encodeURIComponent(tab)}`}
+                                            className="inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-primary hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                        >
+                                            Clear flow filter
+                                        </Link>
+                                    </CardContent>
+                                </Card>
+                            ) : null}
                             <div>
                                 <h2
                                     id="healthcare-devices-heading"

@@ -1,0 +1,304 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Trip history" [selected]:
+      - generic: Trip history
+    - button "More views (3)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Vehicle trips" [selected]:
+      - text: Vehicle trips
+  - tabpanel:
+    - group "Trip filters":
+      - text: Search trips
+      - textbox "Search trips":
+        - /placeholder: Driver, route or reference…
+      - text: Dates
+      - combobox "Trip date filter":
+        - option "All recorded dates" [selected]
+        - option "Custom date range"
+        - option "22 Sept 2026"
+        - option "21 Sept 2026"
+        - option "20 Sept 2026"
+      - generic: Driver
+      - combobox "Driver":
+        - generic: All drivers
+      - text: Event type
+      - combobox "Trip type filter":
+        - option "All types" [selected]
+        - option "Overspeed"
+        - option "Vehicle faults"
+        - option "Partial coverage"
+      - button "Reset filters"
+      - button "Export PDF / Excel"
+    - text: 3 trips
+    - text: 16.9 km estimated
+    - text: 55 min recorded
+    - text: 4 driving events
+    - generic: Historical · synthetic
+    - group "Select vehicle trip":
+      - button "22 Sept 2026 · 9:00 am Partial trail Kōwhai House Community centre Unassigned 15 min · TRIP-DEMO-13":
+        - generic: 22 Sept 2026 · 9:00 am
+        - generic: Partial trail
+        - strong:
+          - text: Kōwhai House
+          - text: Community centre
+        - text: Unassigned
+        - generic: 15 min · TRIP-DEMO-13
+      - button "21 Sept 2026 · 8:00 am 2.4 km Kōwhai House Community pickup area Jamie Taylor 12 min · TRIP-DEMO-12" [pressed]:
+        - generic: 21 Sept 2026 · 8:00 am
+        - generic: 2.4 km
+        - strong:
+          - text: Kōwhai House
+          - text: Community pickup area
+        - text: Jamie Taylor
+        - generic: 12 min · TRIP-DEMO-12
+    - button "Previous trips" [disabled]
+    - generic: Page 1 of 2
+    - button "Next trips"
+    - generic: TRIP-DEMO-12
+    - heading "Recorded journey" [level=3]
+    - generic: Point 1 of 5
+    - strong: Kōwhai House · Wellington
+    - generic: Recorded point 1 · -41.28380, 174.77430
+    - generic: Demo location
+    - button:
+    - button:
+    - button:
+    - button:
+    - button "Point 1":
+      - generic: Point 1
+    - button "A":
+      - generic: A
+    - button "B":
+      - generic: B
+    - button "Zoom in": +
+    - button "Zoom out": −
+    - link "Leaflet":
+      - /url: https://leafletjs.com
+      - text: Leaflet
+    - text: "| ©"
+    - link "OpenStreetMap":
+      - /url: https://www.openstreetmap.org/copyright
+    - text: contributors
+    - generic: Recorded samples · illustrative route
+    - button "Play samples"
+    - combobox "Replay speed":
+      - option "1×" [selected]
+      - option "2×"
+    - generic: 8:00 am
+    - button "Previous recorded point" [disabled]:
+    - text: Recorded point
+    - slider "Journey recorded point": "0"
+    - button "Next recorded point":
+    - strong: 0 km/h
+    - generic: A
+    - strong: Kōwhai House
+    - generic: 8:00 am · virtual ignition on
+    - generic: B
+    - strong: Community pickup area
+    - generic: 8:12 am · virtual ignition off
+    - text: "82"
+    - generic: /100
+    - generic: TRIP BEHAVIOUR
+    - heading "Review driving events" [level=3]
+    - paragraph: 98% sample coverage · illustrative scoring
+    - generic: Distance
+    - strong: 2.4 km
+    - generic: Duration
+    - strong: 12 min
+    - generic: Maximum speed
+    - strong: 68 km/h
+    - generic: Idle time
+    - strong: 4 min
+    - generic: Braking
+    - strong: "1"
+    - generic: Overspeed episodes
+    - strong: "1"
+    - generic: Over trigger
+    - strong: 42 sec
+    - generic: Acceleration
+    - strong: "1"
+    - button "Confirm driver / handover"
+    - heading "Speed through the trip" [level=3]
+    - text: Recorded samples · km/h
+    - 'img "Recorded speed samples: 0, 30, 68, 18, 0 kilometres per hour"':
+      - generic: Departure
+      - generic: Trigger 55 km/h
+      - generic: Arrival
+    - generic "Speed source & threshold"
+    - strong: Jamie Taylor
+    - generic: Recorded assignment · actual driver unconfirmed
+    - button "Source":
+      - text: Source
+    - region "Journey timeline":
+      - heading "Journey timeline 5" [level=3]
+      - group "Timeline view":
+        - button "List view" [pressed]:
+          - text: List
+        - button "Card view":
+          - text: Card
+        - button "Table view":
+          - text: Table
+      - combobox "Trip event filter":
+        - option "All events" [selected]
+        - option "Driving"
+        - option "Vehicle faults"
+      - list "Journey events":
+        - button "Show Ignition on on map" [pressed]:
+          - generic: 8:00 am
+          - strong: Ignition on
+          - generic: Kōwhai House · Wellington
+          - text: Point 1
+        - button "Show Harsh braking on map":
+          - generic: 8:04 am
+          - strong: Harsh braking
+          - generic: Thorndon · Molesworth Street area
+          - text: Point 2
+        - button "Show Harsh acceleration on map":
+          - generic: 8:06 am
+          - strong: Harsh acceleration
+          - generic: Pipitea · Bunny Street area
+          - text: Point 3
+        - button "Show Overspeed threshold on map":
+          - generic: 8:07 am
+          - strong: Overspeed threshold
+          - generic: Pipitea · Bunny Street area
+          - text: Point 3
+        - button "Show Ignition off on map":
+          - generic: 8:12 am
+          - strong: Ignition off
+          - generic: Community pickup · Lambton Quay area
+          - text: Point 5
+      - strong: Ignition on · Point 1
+      - paragraph: Virtual ignition · departure
+      - text: "-41.28380, 174.77430"
+      - paragraph: Select an event to locate it on the map. Locations are synthetic examples.
+    - generic: ACT ON THE EVIDENCE
+    - heading "Review the overspeed event" [level=3]
+    - paragraph: Keep the trip, sensor event and response together. A fault goes to Control Room for assessment before a Maintenance decision.
+    - button "Create coaching follow-up":
+      - text: Create coaching follow-up
+    - paragraph: 68 km/h peak; 42 seconds above 55 km/h trigger (fleet threshold 50 + tolerance 5). Rule SPEED-DEMO-v1; minimum 15 seconds. Road speed limit unverified; one continuous episode, synthetic source evidence.
+    - button "Preview overspeed → Control Room":
+      - text: Preview overspeed → Control Room
+    - generic "Score, coverage and distance"
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Synthetic alert updated. No external notification sent.
+  - button "Undo"
+  - button "Dismiss"
+- dialog:
+  - button "Maintenance":
+    - generic: Maintenance
+  - button "Map":
+    - generic: Map
+  - button "Calendar":
+    - generic: Calendar

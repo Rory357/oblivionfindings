@@ -1,0 +1,232 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance" [selected]:
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Evidence & due dates":
+      - text: Evidence & due dates
+    - tab "Service schedules":
+      - text: Service schedules
+    - tab "Reminders" [active] [selected]:
+      - text: Reminders
+    - tab "Service history":
+      - text: Service history
+    - tab "Mileage":
+      - text: Mileage
+  - tabpanel:
+    - generic: TIMELY FOLLOW-UP
+    - heading "Reminders" [level=2]
+    - paragraph: One place for vehicle follow-ups and obligation reminders.
+    - button "Open calendar":
+      - text: Open calendar
+    - button "Add reminder":
+      - text: Add reminder
+    - strong: "0"
+    - generic: Open follow-ups
+    - strong: "4"
+    - generic: Linked obligations
+    - strong: "1"
+    - generic: Delivery needs attention
+    - heading "Vehicle follow-ups" [level=3]
+    - text: Dates appear on the vehicle calendar without blocking bookings.
+    - textbox "Search reminders":
+      - /placeholder: Title, owner or source…
+    - combobox "Reminder filter":
+      - option "All reminders" [selected]
+      - option "Scheduled"
+      - option "Completed"
+      - option "Paused"
+    - group "Reminders layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - generic "Vehicle follow-ups":
+      - generic: Vehicle follow-ups
+      - generic: 0 records shown
+      - heading "No follow-ups yet" [level=3]
+      - paragraph: Add a mileage check, document follow-up or workshop call with an owner and due date.
+      - button "Create reminder"
+    - generic: FROM SERVICE & COMPLIANCE
+    - heading "Obligation reminders" [level=3]
+    - generic: 1 delivery failed
+    - generic "Obligation reminders":
+      - generic: Obligation reminders
+      - generic: 4 records shown
+      - table:
+        - row "Record Due / owner Delivery status Next action Actions":
+          - columnheader "Record"
+          - columnheader "Due / owner"
+          - columnheader "Delivery status"
+          - columnheader "Next action"
+          - columnheader "Actions"
+        - row "Routine service SCH-DEMO-07 24 Sept 2026 Kōwhai House Coordinator Delivery failed Retry delivery Actions for Routine service":
+          - cell "Routine service SCH-DEMO-07":
+            - generic: Routine service
+            - generic: SCH-DEMO-07
+          - cell "24 Sept 2026 Kōwhai House Coordinator":
+            - strong: 24 Sept 2026
+            - generic: Kōwhai House Coordinator
+          - cell "Delivery failed":
+            - generic: Delivery failed
+          - cell "Retry delivery":
+            - button "Retry delivery"
+          - cell "Actions for Routine service":
+            - button "Actions for Routine service":
+        - row "Passenger lift service SCH-DEMO-08 13 Nov 2026 Equipment Coordinator Scheduled Acknowledge Actions for Passenger lift service":
+          - cell "Passenger lift service SCH-DEMO-08":
+            - generic: Passenger lift service
+            - generic: SCH-DEMO-08
+          - cell "13 Nov 2026 Equipment Coordinator":
+            - strong: 13 Nov 2026
+            - generic: Equipment Coordinator
+          - cell "Scheduled":
+            - generic: Scheduled
+          - cell "Acknowledge":
+            - button "Acknowledge"
+          - cell "Actions for Passenger lift service":
+            - button "Actions for Passenger lift service":
+        - row "WoF WOF-DEMO-14 9 Apr 2027 Kōwhai House Coordinator Scheduled Acknowledge Actions for WoF":
+          - cell "WoF WOF-DEMO-14":
+            - generic: WoF
+            - generic: WOF-DEMO-14
+          - cell "9 Apr 2027 Kōwhai House Coordinator":
+            - strong: 9 Apr 2027
+            - generic: Kōwhai House Coordinator
+          - cell "Scheduled":
+            - generic: Scheduled
+          - cell "Acknowledge":
+            - button "Acknowledge"
+          - cell "Actions for WoF":
+            - button "Actions for WoF":
+        - row "Registration REG-DEMO-14 8 Oct 2026 Kōwhai House Coordinator Scheduled Acknowledge Actions for Registration":
+          - cell "Registration REG-DEMO-14":
+            - generic: Registration
+            - generic: REG-DEMO-14
+          - cell "8 Oct 2026 Kōwhai House Coordinator":
+            - strong: 8 Oct 2026
+            - generic: Kōwhai House Coordinator
+          - cell "Scheduled":
+            - generic: Scheduled
+          - cell "Acknowledge":
+            - button "Acknowledge"
+          - cell "Actions for Registration":
+            - button "Actions for Registration":
+    - paragraph: Acknowledgement does not complete the service or compliance obligation. Reminder delivery is demonstrated locally; production tasks and notification delivery remain source-owned.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Evidence retained with its owning record.
+  - button "Undo"
+  - button "Dismiss"

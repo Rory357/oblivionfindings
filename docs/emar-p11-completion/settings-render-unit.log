@@ -1,0 +1,2 @@
+[heavy-lock] next in line; waiting for: eMAR-Main-consolidated-backend 32600 1791029502 246225613
+Cancelled the still-queued P11 bash wrapper (PID 41224) at Main request. Descendants were bash only; no test child had launched. No renderer tests executed. Main active backend owner was untouched.

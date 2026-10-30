@@ -203,7 +203,7 @@ final class BulkDeviceCommandPresenter
                                     ? $profileOptions->mapWithKeys(fn ($profile): array => [
                                         (string) $profile->id => $profile->name.' · v'.$profile->version,
                                     ])->all()
-                                    : [],
+                                    : ($schema['option_labels'] ?? []),
                             ];
                         })->values()->all(),
                 ];

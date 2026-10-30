@@ -1,0 +1,19 @@
+{
+  "approval": {
+    "approvedAt": "2026-09-28T05:18:34.052124+00:00",
+    "amendment": "A8",
+    "master": "C:\\Users\\steph\\Downloads\\oblivion-findings-fleet-assets-complete-astra-prompt-v10.md",
+    "beforeSha256": "5a887fa690a9556ea1da37a0b026be9f8c7afa93983b643c45caf5d3dcab899f",
+    "afterSha256": "6874acf1b3c27a20323a9675fb29239fe8aad91e39268c4b269ad8d4d40f0678",
+    "backup": "C:\\Users\\steph\\.codex\\visualizations\\2026\\09\\19\\01a0b8c5-186f-7681-83fc-40229d94ef87\\publication-20260928\\revision10-through-a7-original.md",
+    "userReply": "yes please",
+    "scope": "Main executes remaining already-approved non-force Git main pushes; Designers retain integration and verification"
+  },
+  "versionLabel": {
+    "scope": "Align amendment index/version label with already-approved A8; no amendment body or requirement changes",
+    "beforeSha256": "6874acf1b3c27a20323a9675fb29239fe8aad91e39268c4b269ad8d4d40f0678",
+    "afterSha256": "b2ec6cab1d0047a2b1dfc724e37b2a356beb356093b9cc0934f4352ca1748114",
+    "backup": "C:\\Users\\steph\\.codex\\visualizations\\2026\\09\\19\\01a0b8c5-186f-7681-83fc-40229d94ef87\\publication-20260928\\revision10-a8-before-version-label-alignment.md"
+  },
+  "currentMasterSha256": "b2ec6cab1d0047a2b1dfc724e37b2a356beb356093b9cc0934f4352ca1748114"
+}

@@ -1,0 +1,52 @@
+{
+  "reviewedAtUtc": "2026-10-12T12:23:00Z",
+  "clientDate": "2026-10-13 Pacific/Auckland",
+  "candidate": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings",
+  "liveResponse": {
+    "finding": "CR-LIVE-SHELL-01",
+    "status": "SOURCE_CLOSED_ONLY",
+    "indexSha256": "FDBAA5FFED04523BB42D45DC9FFA24CFFED89F6F307A763DB0BCC24A06F60C59",
+    "baselineSha256": "9F0607BB292E58DAAE99801DD47A9E45B85E9F84DF99DF20BEC330C7A93F2411",
+    "parentChecked": "Full two-hunk diff read. Independently rebuilt expected complete file using only wrapper, Home breadcrumb, Live response label/title and removal of contentClassName override. Whole-file equality after CRLF-to-LF normalization; permanent record-opening callback retained.",
+    "appLayoutUnchanged": "B3AE69A88BE80942F50142C1ABE25766DC611CA051773CA744E59FEADFF7D2C3",
+    "sidebarLayoutUnchanged": "2172203CDF46B64134655A6A1196C0921EA0F3D2BA836EEDF605F96D695C9E06",
+    "limits": "Not MAIN-integrated. Browser single-gutter geometry, narrow/zoom/keyboard/overflow/navigation/draft checks and full hero/meters/workflow/Rory acceptance remain open. H&S retains shared index ownership."
+  },
+  "incidentCommandCheckpoint": {
+    "report": "docs/health-safety-audit-2026-10-07/INCIDENT-COMMAND-RECOVERY-2026-10-13.md",
+    "reportSha256": "1FB3C17223A802ED833981A538490DA97DDC3A8B7EDA11DE55C0156D707BB927",
+    "receiptSha256": "EAC3C3EE6E57DDA08EB688F9CFB6D290D2A5E1D24FA35221443B67B265BAE163",
+    "pinsChecked": 7,
+    "currentlyMatching": 3,
+    "changedDuringOngoingOwnedWork": [
+      {"path": "resources/js/components/incidents/incident-detail-dialog.tsx", "current": "F5D9094A423592B0A8C51B7ED229E08292BABAA11490F93207CA502553C5E0DF"},
+      {"path": "resources/js/components/incidents/incident-detail-dialog.test.tsx", "current": "D3353C004BEBE5B42BDFF2C9BD2CD113EA004BF9C367E9CA2434E9C69B9AF4E2"},
+      {"path": "resources/js/components/incidents/incident-record-action-dialog.tsx", "current": "05934F4E2148D8BB68F2025643998A6C9E930D467200BEDCB2D6406E5E25FBA0"},
+      {"path": "resources/js/components/incidents/incident-record-action-dialog.test.tsx", "current": "28C7E6B18BF550295B497856AA1259183449AC334FCF6B87FBB924F371D5B357"}
+    ],
+    "checks": "Receipt reports syntax/transpile and formatting passes on its historical seven files. Not reapplied to four changed files; semantic typing and behavioural tests unrun. No competing parent review of active Journey/Site/draft work."
+  },
+  "savedCopyHandoff": {
+    "report": "docs/health-safety-audit-2026-10-07/INCIDENT-SAVED-COPY-LIVE-CONSUMER-HANDOFF-2026-10-13.md",
+    "reportSha256": "E895A0AED7726CA5C87D6309C9E402E66220B8CEDD7CCE56021E894A8CC13A65",
+    "receipt": "docs/health-safety-audit-2026-10-07/incident-saved-copy-live-consumer-source-2026-10-13.json",
+    "receiptSha256": "6DD34066D2A78FE7BC9E2014EAFC0A8907C69917FD0D4B2EB9024D5F74C0D106",
+    "serviceSha256": "6D1FC1DBAD573618E6859DEF61B4D9E9AC396B3C4F9A3F3A31F355FB35E4B846",
+    "testSha256": "7DD7F84E80457159965F4F41B720CDCB2175886D14B511D0CC564C80603180FF",
+    "parentPinsChecked": 21,
+    "pinDrift": 0,
+    "parentSourceRead": "consumeProjectedCopy, retained protected proof, canonical source conjunction, authorization equality and original-lifetime guard; actual destination SELECT/full notes equality/nested EXISTS test structure. This is bounded source-contract review, not full service/dependency/security proof.",
+    "nativeDeclarations": 44,
+    "nativeStatus": "UNRUN",
+    "receiptSyntax": "Two standalone PHP syntax commands recorded exit0; no bootstrap/runtime acceptance.",
+    "composition": "Concrete next task sent to CR: review delivered API and prepare minimal pinned consumer/export/writer delta. H&S keeps canonical helper ownership. No whole-checkout transplant or predicate fork.",
+    "contractLimits": "Only prospective exact incident-field copies. Actual destination authority/original target and origin acceptance remain CR-owned. Protected predicate and same reads must constrain the actual SELECT before notes hydration; compare full bytes before CSV truncation/encoding. Composite/operator provenance and same-text writer invalidation remain separate. No legacy backfill or blanket H&S prerequisite for unrelated operational alerts. Preserve independently permitted rows/counts when copy text is unavailable."
+  },
+  "threadState": {
+    "controlRoom": {"cursor": "a8154e4a-be4a-449b-a690-548c53e7eaf3:52", "status": "ACTIVE", "turn": "01a13010-8ae9-77e2-9157-bd656c475637"},
+    "workforce": {"cursor": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:58", "status": "IDLE_UNCHANGED_NOT_COMPLETE"},
+    "healthSafety": {"cursor": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:67", "status": "ACTIVE", "turn": "01a12ff9-590d-76e1-b319-f0af6d8518b3"}
+  },
+  "actions": "One consolidated message to each affected authorised owner. No Workforce restart or duplicate prompt. No parent tests/build/database/browser/process probes, application edits, Git mutations, live/provider actions or infrastructure changes.",
+  "overall": "INCOMPLETE"
+}

@@ -1,36 +1,39 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderViewToggle,
+} from '@/components/page';
+import { MaintenanceCompletionReview } from '@/components/security-devices/maintenance-completion-review';
+import {
+    MaintenanceHealthDeviceRecords,
+    MaintenanceHealthWorkRecords,
+} from '@/components/security-devices/maintenance-health-records';
+import { maintenanceLabel } from '@/components/security-devices/maintenance-records';
+import { SecurityDevicesSectionTabs } from '@/components/security-devices/security-devices-section-tabs';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
-import { EmptySearch, EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import {
-    AlertTriangle,
-    Battery,
-    BatteryLow,
-    Calendar,
-    Check,
-    MonitorOff,
-    Search,
-    Wrench,
-    Zap,
-} from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { LayoutGrid, List, RefreshCw, Search, Wrench } from 'lucide-react';
 import { useState } from 'react';
+import { type Paginated } from './devices/shared';
+import type { MaintenanceRow } from './maintenance';
 
-import { type Paginated, FilterSelect, StatCard } from './devices/shared';
+type CurrentPermissions = {
+    securityDevices?: {
+        maintenanceView?: boolean;
+        maintenanceManage?: boolean;
+        devicesView?: boolean;
+    };
+};
 
-// ── Types ─────────────────────────────────────────────────────────
-
-type MaintenanceRecord = {
+export type MaintenanceRecord = {
     id: number;
     device_id: number;
     device_name: string | null;
@@ -46,8 +49,7 @@ type MaintenanceRecord = {
     notes: string | null;
     is_overdue: boolean;
 };
-
-type AttentionDevice = {
+export type AttentionDevice = {
     id: number;
     name: string;
     device_uid: string;
@@ -58,17 +60,18 @@ type AttentionDevice = {
     battery_level: number | null;
     last_seen_at: string | null;
 };
-
-type LowBatteryDevice = {
+export type LowBatteryDevice = {
     id: number;
     name: string;
     device_uid: string;
     battery_level: number | null;
     battery_updated_at: string | null;
 };
-
-type Props = {
+export type MaintenanceHealthProps = {
+    actor_id: number;
     pageMeta?: { title: string; description: string; href: string };
+    /** Shown beside recorded costs: Finance owns the money record. */
+    financeNote?: string;
     stats: {
         overdue: number;
         upcoming: number;
@@ -83,523 +86,443 @@ type Props = {
     filters: Record<string, string>;
     can: { manage: boolean };
 };
-
-// ── Helpers ───────────────────────────────────────────────────────
-
-function statusBadgeVariant(
-    status: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (status) {
-        case 'completed':
-            return 'default';
-        case 'in_progress':
-            return 'outline';
-        case 'cancelled':
-            return 'secondary';
-        default:
-            return 'outline';
-    }
+type Tab = 'work' | 'attention' | 'battery';
+export default function MaintenanceHealth(props: MaintenanceHealthProps) {
+    const { auth } = usePage<{
+        auth?: { user?: { id: number } | null; can?: CurrentPermissions };
+    }>().props;
+    // Partial actor metadata cannot establish ownership of retained private data.
+    const [sourceActor] = useState(props.actor_id);
+    const [view, setView] = useState<'cards' | 'table'>('cards');
+    const [tab, setTab] = useState<Tab>('work');
+    const visible = Boolean(
+        auth?.user?.id &&
+        sourceActor === props.actor_id &&
+        props.actor_id === auth.user.id &&
+        auth.can?.securityDevices?.maintenanceView === true,
+    );
+    return (
+        <MaintenanceHealthBody
+            key={JSON.stringify([auth, props])}
+            data={props}
+            actor={auth?.user?.id ?? 0}
+            visible={visible}
+            manage={
+                visible &&
+                props.can.manage &&
+                auth?.can?.securityDevices?.maintenanceManage === true
+            }
+            profiles={auth?.can?.securityDevices?.devicesView === true}
+            tab={tab}
+            setTab={setTab}
+            view={view}
+            setView={setView}
+        />
+    );
 }
-
-function healthVariant(
-    h: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (h) {
-        case 'healthy':
-            return 'default';
-        case 'warning':
-            return 'outline';
-        case 'critical':
-            return 'destructive';
-        default:
-            return 'secondary';
-    }
-}
-
-function deviceStatusVariant(
-    s: string,
-): 'default' | 'secondary' | 'destructive' | 'outline' {
-    switch (s) {
-        case 'active':
-            return 'default';
-        case 'offline':
-        case 'decommissioned':
-            return 'secondary';
-        case 'degraded':
-            return 'outline';
-        default:
-            return 'outline';
-    }
-}
-
-function formatDate(iso: string | null): string {
-    if (!iso) return '-';
-    return new Date(iso).toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-}
-
-function formatTimeSince(iso: string | null): string {
-    if (!iso) return 'Never';
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    return `${days}d ago`;
-}
-
-// ── Component ─────────────────────────────────────────────────────
-
-export default function MaintenanceHealth({
-    pageMeta,
-    stats,
-    records,
-    attentionDevices,
-    lowBatteryDevices,
-    filters,
-    can,
-}: Props) {
-    const [search, setSearch] = useState(filters.search ?? '');
-    const pageTitle = pageMeta?.title ?? 'Maintenance & Health';
-    const pageDescription =
-        pageMeta?.description ??
-        'Device maintenance scheduling, health monitoring, and operational attention tracking.';
-    const pageUrl = pageMeta?.href ?? '/security-devices/maintenance-health';
-
-    const applyFilters = (newFilters: Record<string, string>) => {
+function MaintenanceHealthBody({
+    data,
+    actor,
+    visible: receivedVisible,
+    manage,
+    profiles,
+    tab,
+    setTab,
+    view,
+    setView,
+}: {
+    data: MaintenanceHealthProps;
+    actor: number;
+    visible: boolean;
+    manage: boolean;
+    profiles: boolean;
+    tab: Tab;
+    setTab: (tab: Tab) => void;
+    view: 'cards' | 'table';
+    setView: (view: 'cards' | 'table') => void;
+}) {
+    const [denied, setDenied] = useState(false),
+        [search, setSearch] = useState(
+            receivedVisible ? (data.filters.search ?? '') : '',
+        ),
+        [review, setReview] = useState<MaintenanceRecord | null>(null);
+    const visible = receivedVisible && !denied;
+    const pageUrl =
+        data.pageMeta?.href === '/security-devices/maintenance'
+            ? '/security-devices/maintenance'
+            : '/security-devices/maintenance-health';
+    const get = (changes: Record<string, string>) =>
+        visible &&
         router.get(
             pageUrl,
-            { ...filters, ...newFilters, page: '1' },
-            { preserveState: true },
+            { ...data.filters, ...changes, page: '1' },
+            { preserveState: true, preserveScroll: true },
         );
+    const refresh = () => {
+        if (!visible)
+            return router.get(
+                pageUrl,
+                {},
+                {
+                    preserveState: false,
+                    preserveScroll: true,
+                },
+            );
+        return router.reload({
+            only: [
+                'actor_id',
+                'stats',
+                'records',
+                'attentionDevices',
+                'lowBatteryDevices',
+                'filters',
+                'can',
+                'financeNote',
+                'auth',
+            ],
+            onSuccess: (page) => {
+                const props = page.props as {
+                    actor_id?: number;
+                    auth?: {
+                        user?: { id?: number };
+                        can?: CurrentPermissions;
+                    };
+                };
+                if (
+                    page.component === 'security-devices/maintenance-health' &&
+                    props.actor_id === actor &&
+                    props.auth?.user?.id === actor &&
+                    props.auth.can?.securityDevices?.maintenanceView === true
+                )
+                    setDenied(false);
+            },
+        });
     };
-
-    const clearFilters = () => {
-        router.get(pageUrl, {}, { preserveState: true });
-        setSearch('');
-    };
-
-    const hasActiveFilters = Object.values(filters).some(
-        (v) => v && v !== 'all',
+    const filtered = Object.values(data.filters).some(
+        (value) => value && value !== 'all',
     );
-    const totalAttention =
-        stats.offline + stats.degraded + stats.critical + stats.lowBattery;
-
+    const meters: Array<{
+        label: string;
+        value: number;
+        caption: string;
+        tab: Tab;
+    }> = [
+        {
+            label: 'Overdue',
+            value: data.stats.overdue,
+            caption: 'Scheduled work past its date',
+            tab: 'work',
+        },
+        {
+            label: 'Upcoming',
+            value: data.stats.upcoming,
+            caption: 'Work due within 14 days',
+            tab: 'work',
+        },
+        {
+            label: 'Offline',
+            value: data.stats.offline,
+            caption: 'Devices recorded offline',
+            tab: 'attention',
+        },
+        {
+            label: 'Degraded',
+            value: data.stats.degraded,
+            caption: 'Devices recorded degraded',
+            tab: 'attention',
+        },
+        {
+            label: 'Low battery',
+            value: data.stats.lowBattery,
+            caption: 'Devices with battery below 20%',
+            tab: 'battery',
+        },
+        {
+            label: 'Critical health',
+            value: data.stats.critical,
+            caption: 'Devices recorded critical',
+            tab: 'attention',
+        },
+    ];
+    const options = (values: string[], label: string) => [
+        { value: 'all', label },
+        ...values.map((value) => ({ value, label: maintenanceLabel(value) })),
+    ];
+    const reviewRow: MaintenanceRow | null = review
+        ? {
+              id: review.id,
+              type: review.type,
+              status: review.status,
+              schedule_state: review.is_overdue ? 'overdue' : review.status,
+              description: review.description,
+              scheduled_for: review.scheduled_for,
+              completed_at: review.completed_at,
+              performed_by: review.performed_by,
+              vendor_reference: review.vendor_reference,
+              device: {
+                  id: review.device_id,
+                  name: review.device_name || `Device #${review.device_id}`,
+                  href: `/security-devices/devices/${review.device_id}`,
+                  domain: null,
+                  category: null,
+              },
+              site: null,
+          }
+        : null;
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
-                { title: pageTitle, href: pageUrl },
+                { title: 'Maintenance & health', href: pageUrl },
             ]}
         >
-            <Head title={`${pageTitle} - Security & Devices`} />
-
-            <PageShell>
-                <PageHero
+            <Head title="Maintenance & health - Security & Devices" />
+            <div className="space-y-5">
+                <PageHeader
                     icon={Wrench}
-                    title={pageTitle}
-                    description={pageDescription}
-                    stats={[
-                        { label: 'Overdue', value: stats.overdue },
-                        { label: 'Upcoming', value: stats.upcoming },
-                        { label: 'Attention', value: totalAttention },
-                        { label: 'Critical', value: stats.critical },
-                    ]}
-                />
-
-                {/* ── Stats row ─────────────────────────────── */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <StatCard
-                        label="Overdue"
-                        value={stats.overdue}
-                        icon={AlertTriangle}
-                        variant={stats.overdue > 0 ? 'warning' : 'default'}
-                    />
-                    <StatCard
-                        label="Upcoming (14d)"
-                        value={stats.upcoming}
-                        icon={Calendar}
-                    />
-                    <StatCard
-                        label="Offline"
-                        value={stats.offline}
-                        icon={MonitorOff}
-                        variant={stats.offline > 0 ? 'warning' : 'default'}
-                    />
-                    <StatCard
-                        label="Degraded"
-                        value={stats.degraded}
-                        icon={Zap}
-                        variant={stats.degraded > 0 ? 'warning' : 'default'}
-                    />
-                    <StatCard
-                        label="Low Battery"
-                        value={stats.lowBattery}
-                        icon={BatteryLow}
-                        variant={stats.lowBattery > 0 ? 'warning' : 'default'}
-                    />
-                    <StatCard
-                        label="Critical Health"
-                        value={stats.critical}
-                        icon={AlertTriangle}
-                        variant={stats.critical > 0 ? 'warning' : 'default'}
-                    />
-                </div>
-
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-                    {/* ── Left: Maintenance records ────────────── */}
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h2 className="text-lg font-semibold">
-                                Maintenance Records
-                            </h2>
-                        </div>
-
-                        {/* Filters */}
-                        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                            <div className="relative flex-1 sm:max-w-xs">
-                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search description, device, vendor ref..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    onKeyDown={(e) =>
-                                        e.key === 'Enter' &&
-                                        applyFilters({ search })
-                                    }
-                                    className="pl-9"
-                                />
-                            </div>
-                            <FilterSelect
-                                value={filters.status}
-                                onChange={(v) => applyFilters({ status: v })}
-                                placeholder="Status"
-                                options={[
-                                    { value: 'scheduled', label: 'Scheduled' },
-                                    {
-                                        value: 'in_progress',
-                                        label: 'In Progress',
-                                    },
-                                    { value: 'completed', label: 'Completed' },
-                                    { value: 'cancelled', label: 'Cancelled' },
-                                ]}
-                            />
-                            <FilterSelect
-                                value={filters.type}
-                                onChange={(v) => applyFilters({ type: v })}
-                                placeholder="Type"
-                                options={[
-                                    {
-                                        value: 'scheduled_service',
-                                        label: 'Scheduled Service',
-                                    },
-                                    { value: 'repair', label: 'Repair' },
-                                    {
-                                        value: 'firmware_update',
-                                        label: 'Firmware Update',
-                                    },
-                                    {
-                                        value: 'inspection',
-                                        label: 'Inspection',
-                                    },
-                                    {
-                                        value: 'replacement',
-                                        label: 'Replacement',
-                                    },
-                                    {
-                                        value: 'calibration',
-                                        label: 'Calibration',
-                                    },
-                                    {
-                                        value: 'connectivity_check',
-                                        label: 'Connectivity Check',
-                                    },
-                                    {
-                                        value: 'battery_replacement',
-                                        label: 'Battery Replacement',
-                                    },
-                                ]}
-                            />
-                            {hasActiveFilters && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={clearFilters}
-                                >
-                                    Clear
-                                </Button>
-                            )}
-                        </div>
-
-                        {/* Records list */}
-                        {records.data.length > 0 ? (
-                            <div className="space-y-2">
-                                {records.data.map((r) => (
-                                    <div
-                                        key={r.id}
-                                        className={`rounded-lg border p-4 text-sm ${r.is_overdue ? 'border-status-warning/30 bg-status-warning-bg' : ''}`}
+                    title="Maintenance & health"
+                    subline="Device work, recorded health and battery readings across your permitted Sites"
+                    mobileSummary={
+                        visible
+                            ? `${data.stats.overdue} overdue work record${data.stats.overdue === 1 ? '' : 's'} · ${data.stats.critical} critical device${data.stats.critical === 1 ? '' : 's'}`
+                            : 'Maintenance records restricted'
+                    }
+                    actions={
+                        <>
+                            {visible && tab === 'work' ? (
+                                <>
+                                    <PageHeaderSearch
+                                        ariaLabel="Search maintenance work"
+                                        placeholder="Search work, device or reference…"
+                                        value={search}
+                                        onChange={setSearch}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter')
+                                                get({ search });
+                                        }}
+                                    />
+                                    <PageHeaderGlassButton
+                                        onClick={() => get({ search })}
                                     >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="font-medium">
-                                                        {r.type.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
-                                                    </span>
-                                                    <Badge
-                                                        variant={statusBadgeVariant(
-                                                            r.status,
-                                                        )}
-                                                        className="text-[10px]"
-                                                    >
-                                                        {r.status.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
-                                                    </Badge>
-                                                    {r.is_overdue && (
-                                                        <Badge
-                                                            variant="destructive"
-                                                            className="text-[10px]"
-                                                        >
-                                                            Overdue
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                                    {r.description}
-                                                </p>
-                                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                                                    {r.device_name && (
-                                                        <Link
-                                                            href={`/security-devices/devices/${r.device_id}`}
-                                                            className="text-primary hover:underline"
-                                                        >
-                                                            {r.device_name} (
-                                                            {r.device_uid})
-                                                        </Link>
-                                                    )}
-                                                    {r.scheduled_for && (
-                                                        <span>
-                                                            Due:{' '}
-                                                            {formatDate(
-                                                                r.scheduled_for,
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                    {r.completed_at && (
-                                                        <span>
-                                                            Completed:{' '}
-                                                            {formatDate(
-                                                                r.completed_at,
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                    {r.performed_by && (
-                                                        <span>
-                                                            By: {r.performed_by}
-                                                        </span>
-                                                    )}
-                                                    {r.vendor_reference && (
-                                                        <span>
-                                                            Ref:{' '}
-                                                            {r.vendor_reference}
-                                                        </span>
-                                                    )}
-                                                    {r.cost && (
-                                                        <span>
-                                                            Cost: ${r.cost}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {can.manage &&
-                                                r.status === 'scheduled' && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            router.post(
-                                                                `/security-devices/maintenance/${r.id}/complete`,
-                                                                {},
-                                                                {
-                                                                    preserveScroll: true,
-                                                                },
-                                                            )
-                                                        }
-                                                    >
-                                                        <Check className="mr-1 h-3 w-3" />{' '}
-                                                        Complete
-                                                    </Button>
-                                                )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : hasActiveFilters ? (
-                            <EmptySearch
-                                onClear={clearFilters}
-                                title="No matching maintenance records"
+                                        <Search className="size-4" />
+                                        Search
+                                    </PageHeaderGlassButton>
+                                </>
+                            ) : null}
+                            <PageHeaderGlassButton onClick={refresh}>
+                                <RefreshCw className="size-4" />
+                                Refresh
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={meters.map((meter) => (
+                        <PageHeaderMeterBlock
+                            key={meter.label}
+                            label={meter.label}
+                            onClick={() => visible && setTab(meter.tab)}
+                            ariaLabel={
+                                meter.tab === 'work'
+                                    ? 'Open maintenance work'
+                                    : meter.tab === 'attention'
+                                      ? 'Open health attention'
+                                      : 'Open low battery devices'
+                            }
+                        >
+                            <PageHeaderMeterBig>
+                                {visible ? meter.value : 'Restricted'}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                {visible
+                                    ? meter.caption
+                                    : 'Maintenance permission required'}
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    ))}
+                    filters={
+                        <>
+                            {visible && tab === 'work' ? (
+                                <>
+                                    <PageHeaderFilterSelect
+                                        label="Status"
+                                        value={data.filters.status || 'all'}
+                                        options={options(
+                                            [
+                                                'scheduled',
+                                                'in_progress',
+                                                'completed',
+                                                'cancelled',
+                                            ],
+                                            'All statuses',
+                                        )}
+                                        onChange={(value) =>
+                                            get({ status: value })
+                                        }
+                                    />
+                                    <PageHeaderFilterSelect
+                                        label="Work type"
+                                        value={data.filters.type || 'all'}
+                                        options={options(
+                                            [
+                                                'scheduled_service',
+                                                'repair',
+                                                'firmware_update',
+                                                'inspection',
+                                                'replacement',
+                                                'calibration',
+                                                'connectivity_check',
+                                                'battery_replacement',
+                                            ],
+                                            'All work types',
+                                        )}
+                                        onChange={(value) =>
+                                            get({ type: value })
+                                        }
+                                    />
+                                    {filtered ? (
+                                        <PageHeaderFilterButton
+                                            onClick={() => {
+                                                setSearch('');
+                                                if (visible)
+                                                    router.get(
+                                                        pageUrl,
+                                                        {},
+                                                        { preserveState: true },
+                                                    );
+                                            }}
+                                        >
+                                            Clear work filters
+                                        </PageHeaderFilterButton>
+                                    ) : null}
+                                </>
+                            ) : null}
+                            <PageHeaderViewToggle
+                                value={view}
+                                onChange={setView}
+                                options={[
+                                    {
+                                        value: 'cards',
+                                        label: 'Cards',
+                                        icon: LayoutGrid,
+                                    },
+                                    {
+                                        value: 'table',
+                                        label: 'Table',
+                                        icon: List,
+                                    },
+                                ]}
                             />
-                        ) : (
-                            <EmptyState
-                                icon={Wrench}
-                                title="No maintenance records"
-                                description="Maintenance records will appear here when created from device detail pages."
-                                variant="compact"
-                            />
-                        )}
-
-                        {/* Pagination */}
-                        {(records.meta.last_page ?? 1) > 1 && (
-                            <div className="flex items-center justify-center gap-1">
-                                {records.links.map((link, i) => (
+                        </>
+                    }
+                    rail={
+                        <PageHeaderRail
+                            items={[
+                                { key: 'work', label: 'Maintenance work' },
+                                { key: 'attention', label: 'Health attention' },
+                                { key: 'battery', label: 'Low battery' },
+                            ]}
+                            value={tab}
+                            onSelect={(key) => visible && setTab(key)}
+                            ariaLabel="Maintenance and health views"
+                        />
+                    }
+                />
+                {visible ? (
+                    <SecurityDevicesSectionTabs
+                        section="alerts-upkeep"
+                        activeTab="maintenance-health"
+                    />
+                ) : null}
+                {!visible ? (
+                    <p
+                        role="status"
+                        className="rounded-xl border bg-card p-5 text-sm"
+                    >
+                        Maintenance records are restricted. Refresh after your
+                        access has been restored.
+                    </p>
+                ) : tab === 'work' ? (
+                    <>
+                        <MaintenanceHealthWorkRecords
+                            rows={data.records.data}
+                            total={
+                                data.records.meta.total ??
+                                data.records.data.length
+                            }
+                            view={view}
+                            profiles={profiles}
+                            canManage={manage}
+                            onComplete={setReview}
+                            filtered={filtered}
+                            financeNote={data.financeNote}
+                        />
+                        {(data.records.meta.last_page ?? 1) > 1 ? (
+                            <nav
+                                aria-label="Maintenance pages"
+                                className="flex flex-wrap justify-center gap-2"
+                            >
+                                {data.records.links.map((link, index) => (
                                     <Button
-                                        key={i}
+                                        key={index}
                                         variant={
                                             link.active ? 'default' : 'outline'
                                         }
-                                        size="sm"
                                         disabled={!link.url}
+                                        aria-current={
+                                            link.active ? 'page' : undefined
+                                        }
                                         onClick={() =>
                                             link.url &&
                                             router.get(
                                                 link.url,
                                                 {},
-                                                { preserveState: true },
+                                                {
+                                                    preserveState: true,
+                                                    preserveScroll: true,
+                                                },
                                             )
                                         }
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
+                                    >
+                                        {index === 0
+                                            ? 'Previous'
+                                            : index ===
+                                                data.records.links.length - 1
+                                              ? 'Next'
+                                              : link.label.replace(
+                                                    /<[^>]*>/g,
+                                                    '',
+                                                )}
+                                    </Button>
                                 ))}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ── Right: Health attention sidebar ──────── */}
-                    <div className="space-y-6">
-                        {/* Devices needing attention */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <AlertTriangle className="h-4 w-4 text-status-warning" />{' '}
-                                    Devices Needing Attention
-                                </CardTitle>
-                                <CardDescription>
-                                    {totalAttention} device
-                                    {totalAttention !== 1 ? 's' : ''} require
-                                    attention
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                {attentionDevices.length > 0 ? (
-                                    <div className="max-h-80 space-y-2 overflow-y-auto">
-                                        {attentionDevices.map((d) => (
-                                            <Link
-                                                key={d.id}
-                                                href={`/security-devices/devices/${d.id}`}
-                                                className="flex items-center justify-between rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
-                                            >
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="truncate font-medium">
-                                                        {d.name}
-                                                    </p>
-                                                    <p className="text-[10px] text-muted-foreground">
-                                                        {d.category.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}{' '}
-                                                        | Seen:{' '}
-                                                        {formatTimeSince(
-                                                            d.last_seen_at,
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <div className="flex shrink-0 flex-col items-end gap-1">
-                                                    <Badge
-                                                        variant={deviceStatusVariant(
-                                                            d.status,
-                                                        )}
-                                                        className="text-[10px]"
-                                                    >
-                                                        {d.status}
-                                                    </Badge>
-                                                    <Badge
-                                                        variant={healthVariant(
-                                                            d.health_status,
-                                                        )}
-                                                        className="text-[10px]"
-                                                    >
-                                                        {d.health_status}
-                                                    </Badge>
-                                                </div>
-                                            </Link>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground italic">
-                                        All devices healthy.
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Low battery devices */}
-                        {lowBatteryDevices.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <BatteryLow className="h-4 w-4 text-status-warning" />{' '}
-                                        Low Battery
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {lowBatteryDevices.length} device
-                                        {lowBatteryDevices.length !== 1
-                                            ? 's'
-                                            : ''}{' '}
-                                        below 20%
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-2">
-                                        {lowBatteryDevices.map((d) => (
-                                            <Link
-                                                key={d.id}
-                                                href={`/security-devices/devices/${d.id}`}
-                                                className="flex items-center justify-between rounded-md border p-3 text-sm transition-colors hover:bg-muted/50"
-                                            >
-                                                <div>
-                                                    <p className="font-medium">
-                                                        {d.name}
-                                                    </p>
-                                                    <p className="font-mono text-[10px] text-muted-foreground">
-                                                        {d.device_uid}
-                                                    </p>
-                                                </div>
-                                                <div className="flex items-center gap-1 text-status-warning dark:text-status-warning">
-                                                    <Battery className="h-4 w-4" />
-                                                    <span className="text-sm font-semibold">
-                                                        {d.battery_level}%
-                                                    </span>
-                                                </div>
-                                            </Link>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-                </div>
-            </PageShell>
+                            </nav>
+                        ) : null}
+                    </>
+                ) : (
+                    <MaintenanceHealthDeviceRecords
+                        rows={
+                            tab === 'attention'
+                                ? data.attentionDevices
+                                : data.lowBatteryDevices
+                        }
+                        mode={tab}
+                        view={view}
+                        profiles={profiles}
+                    />
+                )}
+            </div>
+            {visible && manage && reviewRow ? (
+                <MaintenanceCompletionReview
+                    row={reviewRow}
+                    actor={actor}
+                    expectedComponent="security-devices/maintenance-health"
+                    onClose={() => setReview(null)}
+                    onAuthorityDenied={() => {
+                        setDenied(true);
+                        setReview(null);
+                        setSearch('');
+                    }}
+                />
+            ) : null}
         </AppLayout>
     );
 }

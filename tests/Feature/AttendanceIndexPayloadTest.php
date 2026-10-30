@@ -330,13 +330,17 @@ test('eligible shifts for a viewed worker are limited to the viewers accessible 
         ->and($eligibleIds)->not->toContain($foreignShift->id);
 });
 
-test('week hours sum the viewed user sessions for the current week only', function () {
-    // 3h closed session yesterday-ish (within this week guaranteed by using today).
+test('week hours sum the viewed user sessions for the current week only', function (string $requestAtUtc) {
+    $this->travelTo(Carbon::parse($requestAtUtc, 'UTC'));
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
+    $weekStartUtc = Carbon::now($tz)->startOfWeek(Carbon::MONDAY)->utc();
+
+    // The request is Monday in NZ but Sunday in UTC, after this 8–11am NZ session.
     HrAttendanceSession::query()->create([
         'tenant_id' => null,
         'user_id' => $this->worker->id,
-        'clock_in_at' => now()->startOfDay()->addHours(8),
-        'clock_out_at' => now()->startOfDay()->addHours(11),
+        'clock_in_at' => $weekStartUtc->copy()->addHours(8),
+        'clock_out_at' => $weekStartUtc->copy()->addHours(11),
         'break_minutes' => 0,
         'status' => 'closed',
         'source' => 'manual',
@@ -346,19 +350,33 @@ test('week hours sum the viewed user sessions for the current week only', functi
     HrAttendanceSession::query()->create([
         'tenant_id' => null,
         'user_id' => $this->worker->id,
-        'clock_in_at' => now()->subWeeks(2),
-        'clock_out_at' => now()->subWeeks(2)->addHours(5),
+        'clock_in_at' => $weekStartUtc->copy()->subWeeks(2)->addHours(6),
+        'clock_out_at' => $weekStartUtc->copy()->subWeeks(2)->addHours(11),
         'break_minutes' => 0,
         'status' => 'closed',
         'source' => 'manual',
         'created_by' => $this->worker->id,
+    ]);
+    // Another current same-Site staff member's 5h session must not count.
+    HrAttendanceSession::query()->create([
+        'tenant_id' => null,
+        'user_id' => $this->manager->id,
+        'clock_in_at' => $weekStartUtc->copy()->addHours(6),
+        'clock_out_at' => $weekStartUtc->copy()->addHours(11),
+        'break_minutes' => 0,
+        'status' => 'closed',
+        'source' => 'manual',
+        'created_by' => $this->manager->id,
     ]);
 
     $response = $this->actingAs($this->worker)->get('/attendance');
 
     $response->assertOk();
     expect((float) $response->viewData('page')['props']['weekHours'])->toBe(3.0);
-});
+})->with([
+    'NZ daylight time Monday' => ['2026-10-04 23:30:00'],
+    'NZ standard time Monday' => ['2026-08-30 23:30:00'],
+]);
 
 test('today and week KPIs use worker-local midnight and Monday converted to UTC', function () {
     $tz = config('app.worker_timezone', 'Pacific/Auckland');

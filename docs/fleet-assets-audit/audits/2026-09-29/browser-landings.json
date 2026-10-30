@@ -1,0 +1,103 @@
+[
+  {
+    "page": "Overview",
+    "url": "http://127.0.0.1:8787/fleet-assets",
+    "headings": [
+      "Fleet & Assets",
+      "Vehicles & assets on the map",
+      "Needs attention",
+      "Coming up",
+      "Vehicle availability",
+      "Bookings this week",
+      "Asset receipt"
+    ],
+    "error": false
+  },
+  {
+    "page": "Fleet",
+    "url": "http://127.0.0.1:8787/fleet-assets/vehicles",
+    "headings": [
+      "Fleet",
+      "Vehicle register"
+    ],
+    "error": false
+  },
+  {
+    "page": "Transport",
+    "url": "http://127.0.0.1:8787/fleet-assets/transports/overview",
+    "headings": [
+      "Overview",
+      "Transport at a glance",
+      "No transport matches this view"
+    ],
+    "error": false
+  },
+  {
+    "page": "Assets",
+    "url": "http://127.0.0.1:8787/fleet-assets/assets",
+    "headings": [
+      "Assets",
+      "Inventory across your sites"
+    ],
+    "error": false
+  },
+  {
+    "page": "Maintenance",
+    "url": "http://127.0.0.1:8787/fleet-assets/maintenance/work-orders",
+    "headings": [
+      "Maintenance",
+      "Work queue",
+      "No work in this view"
+    ],
+    "error": false
+  },
+  {
+    "page": "Maps & boundaries",
+    "url": "http://127.0.0.1:8787/fleet-assets/geofences?tab=map",
+    "headings": [
+      "Maps & boundaries",
+      "Every area. Every permitted record.",
+      "Map layers",
+      "Vehicles & assets"
+    ],
+    "error": false
+  },
+  {
+    "page": "Reports",
+    "url": "http://127.0.0.1:8787/fleet-assets/reports",
+    "headings": [
+      "Reports",
+      "Build a clearer picture of your fleet.",
+      "Ready-made reports",
+      "Demand & delivery",
+      "Disruption & readiness",
+      "Use & custody",
+      "Costs & replacement",
+      "Start from a template",
+      "Booking versus recorded use",
+      "Maintenance and waiting work",
+      "Costs per resource and kilometre",
+      "Demand and suitability",
+      "Resource data quality",
+      "Due obligations",
+      "Borrowing and custody",
+      "Stocktake exceptions",
+      "Maintenance restriction duration",
+      "Finance invoices and payment stages",
+      "Recent and scheduled runs",
+      "Saved reports",
+      "No saved reports yet"
+    ],
+    "error": false
+  },
+  {
+    "page": "Settings",
+    "url": "http://127.0.0.1:8787/fleet-assets/settings/notifications",
+    "headings": [
+      "Settings",
+      "Notification preferences",
+      "Optional notifications"
+    ],
+    "error": false
+  }
+]

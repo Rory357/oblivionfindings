@@ -14,15 +14,18 @@ import {
     Syringe,
 } from 'lucide-react';
 
+// Mirrors EmarController::getClientInrRecords.
 export type InrRecord = {
     id: number;
+    /** Null = no medicine linked; still shown, labelled (NF-23). */
+    client_medication_id: number | null;
     medication_name?: string | null;
     inr_value: string | number;
     tested_on?: string | null;
     next_test_date?: string | null;
-    target_range_min?: string | number | null;
-    target_range_max?: string | number | null;
-    medication_dose?: string | null;
+    target_range_low?: string | number | null;
+    target_range_high?: string | number | null;
+    dose_mg?: string | number | null;
     disabled_at?: string | null;
 };
 
@@ -181,20 +184,26 @@ export default function ClinicalRail({
                             </div>
                         </div>
                         <div className="flex flex-col gap-1 border-l pl-4 text-xs">
-                            {(latestInr.target_range_min ||
-                                latestInr.target_range_max) && (
-                                <span>
-                                    Target {latestInr.target_range_min}–
-                                    {latestInr.target_range_max}
+                            {latestInr.client_medication_id === null && (
+                                <span className="text-muted-foreground">
+                                    No medicine linked
                                 </span>
                             )}
+                            {latestInr.target_range_low != null &&
+                                latestInr.target_range_high != null && (
+                                    <span>
+                                        Target{' '}
+                                        {Number(latestInr.target_range_low)}–
+                                        {Number(latestInr.target_range_high)}
+                                    </span>
+                                )}
                             {latestInr.next_test_date && (
                                 <span className="text-status-critical">
                                     Next test {latestInr.next_test_date}
                                 </span>
                             )}
-                            {latestInr.medication_dose && (
-                                <span>Dose {latestInr.medication_dose}</span>
+                            {latestInr.dose_mg != null && (
+                                <span>Dose {Number(latestInr.dose_mg)} mg</span>
                             )}
                         </div>
                     </div>

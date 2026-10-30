@@ -133,6 +133,65 @@ const managedAccessControl: AccessControlWorkspaceData = {
 };
 
 describe('SecurityWorkspacePanels', () => {
+    it('retains recorder navigation metadata and removes the destination when its server grant is withdrawn', () => {
+        const recorder: SecurityWorkspaceData['activeTab']['devices'][number] =
+            {
+                id: 42,
+                name: 'Aurora recorder',
+                category: 'cctv',
+                subcategory: 'nvr',
+                provider: 'hikvision',
+                status: 'active',
+                health: 'unknown',
+                lastSeenAt: null,
+                deviceHref: '/security-devices/devices/42',
+                site: null,
+                assignment: null,
+                monitoring: { state: 'unmonitored', count: 0 },
+                observed: {},
+                maintenance: null,
+                live_href: null,
+                setup_href: '/security-devices/devices/42/live/source',
+                setup_kind: 'recorder',
+                reference_href: null,
+            };
+        const data = {
+            ...base,
+            activeTab: {
+                ...base.activeTab,
+                key: 'cctv',
+                label: 'CCTV',
+                devices: [recorder],
+                inventoryTotal: 1,
+                inventoryShown: 1,
+            },
+        };
+        const { rerender } = render(<SecurityWorkspacePanels data={data} />);
+        expect(
+            screen.getByRole('link', { name: 'Recorder information' }),
+        ).toHaveAttribute('href', '/security-devices/devices/42/live/source');
+        expect(
+            screen.queryByRole('link', { name: 'Camera setup' }),
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('link', { name: 'Live view' }),
+        ).not.toBeInTheDocument();
+        rerender(
+            <SecurityWorkspacePanels
+                data={{
+                    ...data,
+                    activeTab: {
+                        ...data.activeTab,
+                        devices: [{ ...recorder, setup_href: null }],
+                    },
+                }}
+            />,
+        );
+        expect(
+            screen.queryByRole('link', { name: 'Recorder information' }),
+        ).not.toBeInTheDocument();
+    });
+
     it('previews exact active-credential impact and keeps provider execution truthful for schedule changes', () => {
         render(<AccessControlWorkspace data={managedAccessControl} />);
 
@@ -326,9 +385,9 @@ describe('SecurityWorkspacePanels', () => {
         expect(
             screen.getByRole('heading', { name: 'Security at a glance' }),
         ).toBeInTheDocument();
-        expect(screen.getByText('3 CCTV')).toBeInTheDocument();
-        expect(screen.getByText('2 alarms')).toBeInTheDocument();
-        expect(screen.getByText('2 access control')).toBeInTheDocument();
+        expectFact('CCTV', '3');
+        expectFact('Alarms', '2');
+        expectFact('Access control', '2');
         expect(
             screen.getByText('2 devices need attention'),
         ).toBeInTheDocument();
@@ -393,9 +452,12 @@ describe('SecurityWorkspacePanels', () => {
                                             '2026-07-21T00:00:00.000Z',
                                     },
                                 },
+                                live_href: '/security-devices/devices/11/live',
+                                setup_href:
+                                    '/security-devices/devices/11/live/source',
                                 media: {
                                     state: 'available',
-                                    href: '/security-devices/devices/11/media',
+                                    href: '/security-devices/devices/11/live',
                                 },
                             },
                         ],
@@ -414,8 +476,11 @@ describe('SecurityWorkspacePanels', () => {
         ).toBeInTheDocument();
         expect(within(device).getByText('Lens inspection')).toBeInTheDocument();
         expect(
-            within(device).getByRole('link', { name: 'Open authorised media' }),
-        ).toHaveAttribute('href', '/security-devices/devices/11/media');
+            within(device).getByRole('link', { name: 'Live view' }),
+        ).toHaveAttribute('href', '/security-devices/devices/11/live');
+        expect(
+            within(device).getByRole('link', { name: 'Camera setup' }),
+        ).toHaveAttribute('href', '/security-devices/devices/11/live/source');
         expect(
             within(device).queryByRole('button', {
                 name: /unlock|arm|restart/i,
@@ -869,4 +934,65 @@ describe('SecurityWorkspacePanels', () => {
             screen.queryByText('Credential lifecycle'),
         ).not.toBeInTheDocument();
     });
+
+    it('renders offline status filter banner, filtered devices on overview, and CCTV source readiness badge', () => {
+        render(
+            <SecurityWorkspacePanels
+                data={{
+                    ...base,
+                    activeTab: {
+                        ...base.activeTab,
+                        key: 'overview',
+                        label: 'Overview',
+                        statusFilter: {
+                            key: 'offline',
+                            label: 'Offline security devices',
+                        },
+                        devices: [
+                            {
+                                id: 55,
+                                name: 'Gate Dome Camera',
+                                category: 'cctv',
+                                subcategory: 'dome_camera',
+                                provider: 'unifi',
+                                status: 'offline',
+                                health: 'critical',
+                                lastSeenAt: '2026-07-19T03:00:00.000Z',
+                                deviceHref: '/security-devices/devices/55',
+                                site: {
+                                    id: 9,
+                                    name: 'Harbour House',
+                                    href: '/security-devices/sites/9',
+                                },
+                                assignment: null,
+                                monitoring: { state: 'configured', count: 1 },
+                                observed: {},
+                                maintenance: null,
+                                cctvSource: {
+                                    state: 'verified',
+                                    label: 'Live source verified',
+                                },
+                            },
+                        ],
+                    },
+                }}
+            />,
+        );
+
+        expect(screen.getByText(/Filtered to:/)).toBeInTheDocument();
+        expect(
+            screen.getByRole('link', { name: 'Clear status filter' }),
+        ).toHaveAttribute('href', '/security-devices/security?tab=overview');
+        expect(
+            screen.getByRole('link', { name: 'Gate Dome Camera' }),
+        ).toBeInTheDocument();
+        expect(screen.getByText('Live source verified')).toBeInTheDocument();
+    });
 });
+
+function expectFact(label: string, value: string) {
+    const labelElement = screen.getByText(label, { exact: true });
+    expect(
+        within(labelElement.parentElement!).getByText(value, { exact: true }),
+    ).toBeInTheDocument();
+}

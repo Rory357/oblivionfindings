@@ -1,0 +1,185 @@
+/*
+ * Vehicle profile Overview › Finance, ported from the approved PKG-02B v13
+ * design (record-workspaces.tsx FinanceStudio and FinanceRecordDialog, with
+ * their rules in studio.css). Scoped to .vehicle-studio; the record dialog
+ * carries the class itself because it renders in a portal. Tokens only.
+ */
+
+.vehicle-studio .record-workspace > * {
+    min-width: 0;
+}
+.vehicle-studio .record-workspace h2 {
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+}
+.vehicle-studio .record-workspace h3,
+.vehicle-studio.finance-record-dialog h3 {
+    font-size: 15px;
+    font-weight: 650;
+}
+.vehicle-studio .record-workspace .studio-section-heading p {
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .record-workspace .studio-card > h3 {
+    margin-bottom: 10px;
+}
+
+/* Fixed asset, cost centre and review queue tiles. */
+.vehicle-studio .record-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+.vehicle-studio .record-summary-grid .studio-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-direction: column;
+    padding: 16px;
+}
+.vehicle-studio .record-summary-grid svg {
+    color: var(--primary);
+}
+.vehicle-studio .record-summary-grid span {
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .record-summary-grid small {
+    display: block;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+
+/* Record and request detail. */
+.vehicle-studio .finance-detail-hero {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.vehicle-studio .finance-detail-hero > div {
+    flex: 1;
+    min-width: 0;
+}
+.vehicle-studio .finance-detail-hero h3 {
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .finance-detail-hero small {
+    display: block;
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-top: 2px;
+}
+.vehicle-studio .finance-detail-hero > svg {
+    flex-shrink: 0;
+    color: var(--primary);
+}
+.vehicle-studio .facts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px 28px;
+    padding: 6px 0;
+}
+.vehicle-studio .facts-grid dt {
+    font-size: 11px;
+    color: var(--muted-foreground);
+    margin-bottom: 5px;
+}
+.vehicle-studio .facts-grid dd {
+    font-size: 13px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .finance-request-note {
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+.vehicle-studio .compact-timeline > div {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    font-size: 12px;
+}
+.vehicle-studio .compact-timeline > div + div {
+    border-top: 1px solid var(--border);
+}
+.vehicle-studio .compact-timeline > div > svg {
+    flex-shrink: 0;
+    color: var(--muted-foreground);
+}
+.vehicle-studio .record-flow {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0;
+}
+.vehicle-studio .record-flow span {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    font-size: 11px;
+    padding: 10px;
+    border-radius: 8px;
+    background: var(--muted);
+}
+.vehicle-studio .attachment-list {
+    display: grid;
+    gap: 10px;
+}
+.vehicle-studio .attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 12px;
+}
+.vehicle-studio a.attachment-item:hover {
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+.vehicle-studio a.attachment-item:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+.vehicle-studio .attachment-item > svg {
+    flex-shrink: 0;
+    color: var(--primary);
+}
+.vehicle-studio .attachment-item > div {
+    min-width: 0;
+    flex: 1;
+}
+.vehicle-studio .attachment-item strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.vehicle-studio .attachment-item small {
+    display: block;
+    font-size: 10px;
+    color: var(--muted-foreground);
+    margin-top: 5px;
+}
+
+@media (max-width: 1000px) {
+    .vehicle-studio .record-flow {
+        flex-wrap: wrap;
+    }
+}
+@media (max-width: 760px) {
+    .vehicle-studio .facts-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 640px) {
+    .vehicle-studio .record-summary-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

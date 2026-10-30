@@ -5,12 +5,17 @@ namespace App\Models;
 use App\Domain\Clinical\Models\ClientMealRestriction;
 use App\Domain\Clinical\Models\ClientMealRestrictionDiscrepancy;
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Referrals\Services\ReferralActivationGuard;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\AuditLogger;
+use App\Services\Clients\ClientIdentityWrites;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class Client extends Model
 {
@@ -94,13 +99,80 @@ class Client extends Model
         'suppress_med_admin_alerts' => 'boolean',
         'med_alerts_suppressed_at' => 'datetime',
         'chart_review_interval_months' => 'integer',
+        'medication_review_interval_months' => 'integer',
         'next_chart_review_date' => 'date',
         'phone' => 'encrypted',
         'email' => 'encrypted',
+        'contact_preferences' => 'encrypted:array',
         'nhi_number' => 'encrypted',
     ];
 
     protected $appends = ['profile_photo_url', 'avatar', 'full_name'];
+
+    // Keep contact values out of generic plaintext snapshots; retain changed-field audit events below.
+    protected $auditExcludedAttributes = ['phone', 'email', 'contact_preferences'];
+
+    protected $hidden = ['contact_preferences'];
+
+    public function save(array $options = [])
+    {
+        if ($this->isDirty('status') && strtolower(trim((string) $this->status)) === 'active') {
+            $this->status = 'active';
+        }
+        if (! $this->exists) {
+            // Omitted status keeps the established default unless the organisation requires a
+            // commencement review for everyone. Referral conversion sets onboarding explicitly.
+            $strict = ReferralActivationGuard::requiredForEveryone();
+            $this->status ??= $strict ? 'onboarding' : 'active';
+            if ($strict && ($this->status === 'active' || $this->service_start_date !== null)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Create this person in onboarding, then use the separate service-commencement review to start support.',
+                    ...($this->service_start_date !== null ? ['service_start_date' => 'The actual start date must be recorded by the service-commencement review.'] : []),
+                ]);
+            }
+        }
+        $serviceFields = ['status', 'service_context_id', 'site_id', 'service_start_date'];
+        if ($this->exists && $this->isDirty($serviceFields)) {
+            // If identity also changes, take its mutex before the person row, as conversion does.
+            return $this->saveIdentity($options, fn () => DB::transaction(function () use ($options, $serviceFields) {
+                $current = static::query()->lockForUpdate()->findOrFail($this->id);
+                foreach ($serviceFields as $field) {
+                    $latest = $field === 'service_start_date' ? $current->getOriginal($field)?->toDateString() : $current->getRawOriginal($field);
+                    $original = $field === 'service_start_date' ? $this->getOriginal($field)?->toDateString() : $this->getRawOriginal($field);
+                    if ((string) $latest !== (string) $original) {
+                        throw ValidationException::withMessages([
+                            'status' => 'This person’s service details changed while you were editing. Refresh the profile and review the current status, site and service before saving.',
+                        ]);
+                    }
+                }
+                // Only a NEW activation (into active) or recording a start date is a commencement
+                // decision. Moving an already-active person between sites or services is not.
+                $activating = $this->status === 'active' && strtolower(trim((string) $current->getRawOriginal('status'))) !== 'active';
+                $dating = $this->isDirty('service_start_date');
+                $guard = app(ReferralActivationGuard::class);
+                if (($activating || $dating) && $guard->governsActivation($current)) {
+                    if ($dating) {
+                        $guard->assertStartDatePermitted($this);
+                    }
+                    $guard->assertPermitted($this);
+                }
+
+                return parent::save($options);
+            }));
+        }
+
+        return $this->saveIdentity($options);
+    }
+
+    private function saveIdentity(array $options, ?callable $write = null)
+    {
+        $write ??= fn () => parent::save($options);
+        if (! $this->exists || $this->isDirty(['first_name', 'last_name', 'date_of_birth', 'nhi_number', 'nhi_hash'])) {
+            return app(ClientIdentityWrites::class)->save($this, $write);
+        }
+
+        return $write();
+    }
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
@@ -272,6 +344,11 @@ class Client extends Model
         return $this->hasOne(ClientSupportPlan::class);
     }
 
+    public function carePlans()
+    {
+        return $this->hasMany(CarePlan::class);
+    }
+
     public function assessments()
     {
         return $this->hasMany(ClientAssessment::class);
@@ -371,6 +448,12 @@ class Client extends Model
 
     protected static function booted(): void
     {
+        static::updated(function (Client $client) {
+            $fields = array_values(array_intersect(['phone', 'email', 'contact_preferences'], array_keys($client->getChanges())));
+            if ($fields !== []) {
+                AuditLogger::log('client.contact_fields_changed', $client, ['fields' => $fields]);
+            }
+        });
         static::saving(function (Client $client) {
             $raw = $client->nhi_number;
             if ($raw) {
@@ -387,7 +470,7 @@ class Client extends Model
 
     public function onboardingWorkflow()
     {
-        return $this->hasOne(ClientOnboardingWorkflow::class, 'client_id')->latest();
+        return $this->hasOne(ClientOnboardingWorkflow::class, 'client_id')->where('scope', 'person')->latest();
     }
 
     public function onboardingWorkflows()

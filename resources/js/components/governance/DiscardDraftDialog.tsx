@@ -21,6 +21,7 @@ export function DiscardDraftDialog({
     onDiscard,
     description,
     mode = 'edit',
+    frontline = false,
 }: {
     open: boolean;
     onKeepEditing: () => void;
@@ -28,12 +29,16 @@ export function DiscardDraftDialog({
     description: string;
     /** `create` while adding a new record; `edit` (default) for changes to an existing one. */
     mode?: 'create' | 'edit';
+    frontline?: boolean;
 }) {
     const isCreate = mode === 'create';
 
     return (
         <Dialog open={open} onOpenChange={(next) => !next && onKeepEditing()}>
-            <DialogContent style={{ maxWidth: 'min(92vw, 480px)' }}>
+            <DialogContent
+                className={frontline ? 'frontline-dialog' : undefined}
+                style={{ maxWidth: 'min(92vw, 480px)' }}
+            >
                 <DialogHeader>
                     <DialogTitle>
                         {isCreate

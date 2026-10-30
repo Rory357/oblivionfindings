@@ -104,6 +104,15 @@ Solid chip fills use the deep (light-theme) tone values in both themes so the
 white icon always passes contrast; tinted backgrounds/text use the theme-aware
 tone tokens. No raw hex anywhere.
 
+**Contrast correction, 2026-10-05:** active teal, green, amber and rose text
+and count text use their matching `*-foreground` shade, while the background,
+chip and underline retain the positional hue above. The original tone text
+fell below 4.5:1 over the grey page plus the compounded tab/count tints.
+`--tone-teal-foreground` supplies the teal pair; the other three reuse the
+existing status foreground tokens. This preserves Rule 2's colour cycle and
+12%/18% treatments. Use explicit pixel dimensions for the 40px tab, 22px chip,
+14px icon and 2px underline; rem-based substitutes shrink at the 14px root size.
+
 ## Interaction between rules
 
 The two tiers must contrast, not compete: tier 1 is the loud "you are here"

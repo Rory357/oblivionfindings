@@ -1,6 +1,8 @@
 <?php
 
 use App\Domain\It\ItModuleNavigation;
+use App\Models\ItProvisioningRequest;
+use App\Models\ItProvisioningWorkflow;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
@@ -15,7 +17,9 @@ function itNavigationActor(array $permissions): User
         $role->permissions()->syncWithoutDetaching([$permission->id]);
     }
 
-    return $actor;
+    ensureCanonicalHrStaffProfile($actor);
+
+    return $actor->fresh();
 }
 
 test('dedicated IT workspaces render directly and legacy links retain query context', function () {
@@ -58,3 +62,30 @@ test('an IT agent has one canonical knowledge, reports and work destination', fu
     expect($items->where('href', '/it?tab=knowledge'))->toHaveCount(0);
     $this->actingAs(itNavigationActor([]))->get('/it/knowledge')->assertForbidden();
 });
+
+test('provisioning denies non-current IT readers without changing workflows or requests', function (string $state) {
+    $actor = itNavigationActor(['it.view']);
+    if ($state === 'unapproved') {
+        $actor->forceFill(['approved_at' => null])->save();
+    } else {
+        $actor->hrEmployeeProfile()->update($state === 'inactive'
+            ? ['is_active' => false]
+            : ['end_date' => now(config('app.worker_timezone'))->subDay()->toDateString()]);
+    }
+    $requests = ItProvisioningRequest::query()->count();
+    $workflows = ItProvisioningWorkflow::query()->count();
+
+    expect($actor->fresh()->canDo('it.view'))->toBeTrue();
+    $response = $this->actingAs($actor->fresh())->get('/it/provisioning?status=failed');
+    if ($state === 'unapproved') {
+        $response->assertRedirect(route('login'))->assertSessionHasErrors([
+            'email' => 'Your account access has been revoked. Contact your administrator if this is unexpected.',
+        ]);
+        $this->assertGuest();
+    } else {
+        $response->assertForbidden();
+    }
+
+    expect(ItProvisioningRequest::query()->count())->toBe($requests);
+    expect(ItProvisioningWorkflow::query()->count())->toBe($workflows);
+})->with(['inactive', 'ended', 'unapproved']);

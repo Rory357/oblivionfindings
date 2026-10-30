@@ -56,6 +56,7 @@ export function zoneMonitoringLabel(zone: ZoneDraft): string {
         : 'Monitoring · outside scheduled hours';
 }
 export type ZoneEnvelope = {
+    can_use_shared_builder?: boolean;
     zones: ZoneDraft[];
     boundaries: Boundary[];
     access_fingerprint: string;

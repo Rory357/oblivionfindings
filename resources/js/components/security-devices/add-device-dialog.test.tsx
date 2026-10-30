@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -18,6 +18,11 @@ const options = {
     },
     domains: [{ value: 'security', label: 'Security' }],
     statuses: [{ value: 'active', label: 'Active' }],
+    sites: [
+        { id: 1, name: 'Harbour House' },
+        { id: 2, name: 'Kauri Cottage' },
+    ],
+    can_assign: true,
 };
 
 function AddDeviceDialogLauncher() {
@@ -247,5 +252,172 @@ describe('AddDeviceDialog', () => {
             screen.getByRole('textbox', { name: /Override reason/ }),
         ).toBeVisible();
         expect(screen.getByLabelText(/Override expires/)).toBeVisible();
+    });
+    it('keeps an edited registration until the user confirms discard', async () => {
+        const onClose = vi.fn();
+        render(<AddDeviceDialog open onClose={onClose} />);
+        await screen.findByText('What are we registering?');
+        fireEvent.change(screen.getByRole('textbox', { name: /Device name/ }), {
+            target: { value: 'Unsaved synthetic device' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alertdialog')).toBeVisible();
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep reviewing' }));
+        expect(
+            screen.getByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Unsaved synthetic device');
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Discard draft' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+    it('treats the loaded edit record as clean and guards later edits', async () => {
+        vi.mocked(fetch).mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 42,
+                    name: 'Loaded synthetic camera',
+                    domain: 'security',
+                    category: 'cctv',
+                    status: 'active',
+                },
+            }),
+        } as Response);
+        const onClose = vi.fn();
+        const view = render(
+            <EditDeviceDialog open onClose={onClose} deviceId={42} />,
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Loaded synthetic camera'),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        view.unmount();
+        onClose.mockClear();
+        render(<EditDeviceDialog open onClose={onClose} deviceId={42} />);
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Loaded synthetic camera'),
+        );
+        fireEvent.change(screen.getByRole('textbox', { name: /Device name/ }), {
+            target: { value: 'Edited synthetic camera' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(screen.getByRole('alertdialog')).toBeVisible();
+        expect(onClose).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: 'Keep reviewing' }));
+        expect(
+            screen.getByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Edited synthetic camera');
+    });
+    it('clears the previous edit record when a different canonical device is opened', async () => {
+        let resolveNext: (value: Response) => void = () => {};
+        vi.mocked(fetch)
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({
+                    ...options,
+                    device: {
+                        id: 42,
+                        name: 'Previous synthetic camera',
+                        domain: 'security',
+                        category: 'cctv',
+                        status: 'active',
+                    },
+                }),
+            } as Response)
+            .mockImplementationOnce(
+                () =>
+                    new Promise<Response>((resolve) => {
+                        resolveNext = resolve;
+                    }),
+            );
+        const onClose = vi.fn();
+        const view = render(
+            <EditDeviceDialog open onClose={onClose} deviceId={42} />,
+        );
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Previous synthetic camera'),
+        );
+        view.rerender(
+            <EditDeviceDialog open onClose={onClose} deviceId={43} />,
+        );
+        expect(
+            screen.queryByDisplayValue('Previous synthetic camera'),
+        ).not.toBeInTheDocument();
+        resolveNext({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 43,
+                    name: 'Current synthetic camera',
+                    domain: 'security',
+                    category: 'cctv',
+                    status: 'active',
+                },
+            }),
+        } as Response);
+        await waitFor(() =>
+            expect(
+                screen.getByRole('textbox', { name: /Device name/ }),
+            ).toHaveValue('Current synthetic camera'),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('offers a searchable Site picker and IP/hostname field on the first step and prefills them on edit', async () => {
+        const createView = render(<AddDeviceDialog open onClose={vi.fn()} />);
+        expect(
+            await screen.findByText('What are we registering?'),
+        ).toBeVisible();
+
+        const siteCombobox = screen.getByRole('combobox', { name: 'Site' });
+        expect(siteCombobox).toHaveTextContent('Unassigned (no Site)');
+        const ipInput = screen.getByRole('textbox', {
+            name: 'IP address or hostname',
+        });
+        expect(ipInput).toHaveValue('');
+
+        fireEvent.change(ipInput, { target: { value: '172.16.0.1' } });
+        expect(ipInput).toHaveValue('172.16.0.1');
+        createView.unmount();
+
+        vi.mocked(fetch).mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                ...options,
+                device: {
+                    id: 95,
+                    name: 'Harbour gateway',
+                    domain: 'security',
+                    category: 'cctv',
+                    status: 'active',
+                    site_id: 1,
+                    ip_address: '172.16.0.1',
+                },
+            }),
+        } as Response);
+
+        render(<EditDeviceDialog open onClose={vi.fn()} deviceId={95} />);
+        expect(
+            await screen.findByRole('textbox', { name: /Device name/ }),
+        ).toHaveValue('Harbour gateway');
+        expect(screen.getByRole('combobox', { name: 'Site' })).toHaveTextContent(
+            'Harbour House',
+        );
+        expect(
+            screen.getByRole('textbox', { name: 'IP address or hostname' }),
+        ).toHaveValue('172.16.0.1');
     });
 });

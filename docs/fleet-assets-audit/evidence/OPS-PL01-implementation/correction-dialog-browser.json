@@ -1,0 +1,1229 @@
+{
+  "normalSizeChecks": [
+    {
+      "label": "normal-1280-picker-settled",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-0",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Cancel"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-1",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Generate report"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-2",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Close"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-3",
+      "active": {
+        "insideDialog": true,
+        "label": "Report",
+        "tag": "BUTTON",
+        "text": "Passenger outing \u00b7 selected day"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-4",
+      "active": {
+        "insideDialog": true,
+        "label": "Format",
+        "tag": "BUTTON",
+        "text": "PDF \u00b7 vehicle report style"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-5",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-6",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "TEXTAREA",
+        "text": "Synthetic authorised care review. Check the selected passenger journey, source w"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-nested-escape",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-calculation",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Close"
+      },
+      "controls": [
+        {
+          "text": "Close",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 297.3500061035156,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 211.3249969482422
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    }
+  ],
+  "observations": [
+    {
+      "label": "normal-1440-filled-picker-keyboard-selection",
+      "active": {
+        "insideDialog": true,
+        "label": "Search passenger journey",
+        "tag": "INPUT",
+        "text": ""
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 360,
+          "y": 188.99375915527344
+        },
+        {
+          "clientWidth": 675,
+          "height": 79.15068817138672,
+          "scrollWidth": 675,
+          "width": 674.3820190429688,
+          "x": 381.6000061035156,
+          "y": 416
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 1000,
+        "width": 1440
+      }
+    },
+    {
+      "label": "normal-1280-resize-filled",
+      "active": {
+        "insideDialog": true,
+        "label": "Search passenger journey",
+        "tag": "INPUT",
+        "text": ""
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        },
+        {
+          "clientWidth": 675,
+          "height": 76.63728332519531,
+          "scrollWidth": 675,
+          "width": 652.9675903320312,
+          "x": 301.6000061035156,
+          "y": 276
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-0",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Cancel"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        },
+        {
+          "clientWidth": 675,
+          "height": 75.89373016357422,
+          "scrollWidth": 675,
+          "width": 646.6322631835938,
+          "x": 301.6000061035156,
+          "y": 276
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-1",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Generate report"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        },
+        {
+          "clientWidth": 675,
+          "height": 75.6474380493164,
+          "scrollWidth": 675,
+          "width": 644.5338134765625,
+          "x": 301.6000061035156,
+          "y": 276
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-2",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Close"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        },
+        {
+          "clientWidth": 675,
+          "height": 75.50032043457031,
+          "scrollWidth": 675,
+          "width": 643.2803955078125,
+          "x": 301.6000061035156,
+          "y": 276.8000183105469
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-3",
+      "active": {
+        "insideDialog": true,
+        "label": "Search passenger journey",
+        "tag": "INPUT",
+        "text": ""
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        },
+        {
+          "clientWidth": 675,
+          "height": 75.4302749633789,
+          "scrollWidth": 675,
+          "width": 642.6835327148438,
+          "x": 301.6000061035156,
+          "y": 276.8000183105469
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-4",
+      "active": {
+        "insideDialog": false,
+        "label": null,
+        "tag": "BODY",
+        "text": "Skip to main contentMonMonday28 Sept28 September 2026Toggle menuOblivion Carebli"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-5",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-6",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "TEXTAREA",
+        "text": "Synthetic authorised care review. Check the selected passenger journey, source w"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-7",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Cancel"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-tab-8",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Generate report"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-picker-settled",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-0",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Cancel"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-1",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Generate report"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-2",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Close"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-3",
+      "active": {
+        "insideDialog": true,
+        "label": "Report",
+        "tag": "BUTTON",
+        "text": "Passenger outing \u00b7 selected day"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-4",
+      "active": {
+        "insideDialog": true,
+        "label": "Format",
+        "tag": "BUTTON",
+        "text": "PDF \u00b7 vehicle report style"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-5",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-settled-tab-6",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "TEXTAREA",
+        "text": "Synthetic authorised care review. Check the selected passenger journey, source w"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-nested-escape",
+      "active": {
+        "insideDialog": true,
+        "label": "Passenger journey",
+        "tag": "BUTTON",
+        "text": "Journey 1 \u00b7 Library"
+      },
+      "controls": [
+        {
+          "text": "Cancel",
+          "visible": true
+        },
+        {
+          "text": "Generate report",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 622.0125122070312,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 48.993751525878906
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    },
+    {
+      "label": "normal-1280-calculation",
+      "active": {
+        "insideDialog": true,
+        "label": null,
+        "tag": "BUTTON",
+        "text": "Close"
+      },
+      "controls": [
+        {
+          "text": "Close",
+          "visible": true
+        },
+        {
+          "text": "Close",
+          "visible": true
+        }
+      ],
+      "dialog": [
+        {
+          "clientWidth": 718,
+          "height": 297.3500061035156,
+          "scrollWidth": 718,
+          "width": 720,
+          "x": 280,
+          "y": 211.3249969482422
+        }
+      ],
+      "viewport": {
+        "dpr": 1.25,
+        "height": 720,
+        "width": 1280
+      }
+    }
+  ],
+  "actual125PercentZoom": "Pending user action. Native Chrome control approval timed out; Chrome settings navigation was rejected by browser URL policy. No bypass was attempted. A user request to manually set 125% remains pending.",
+  "devicePixelRatio": "1.25 is the baseline display ratio and is not evidence of 125% page zoom.",
+  "escape": "Nested Escape retained the report and focused the journey trigger; outer Escape restored Export outing. Calculation Escape restored How these numbers work.",
+  "viewportOverridesRestored": true,
+  "screenshotLimitation": "Resized capture pixels had display-scaling artifacts; DOM geometry and focus checks are reported separately."
+}

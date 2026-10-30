@@ -488,7 +488,7 @@ export default function SiteComplianceIndex({
                     </PageHeaderStatusChip>
                 )
             }
-            subline="Site compliance \u00b7 certifications, checks and regulatory requirements"
+            subline="Site compliance · certifications, checks and regulatory requirements"
             actions={
                 <>
                     <PageHeaderSearch
@@ -1409,10 +1409,7 @@ export default function SiteComplianceIndex({
                             >
                                 Cancel
                             </Button>
-                            <Button
-                                className="bg-status-success hover:bg-status-success"
-                                onClick={handleCompleteCheck}
-                            >
+                            <Button onClick={handleCompleteCheck}>
                                 <CheckCircle2 className="mr-1 h-4 w-4" />
                                 Complete Check
                             </Button>

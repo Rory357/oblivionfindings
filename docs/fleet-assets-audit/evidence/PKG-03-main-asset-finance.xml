@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PKG03MainAssetFinanceReviewTest" file="C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG03MainAssetFinanceReviewTest.php" tests="4" assertions="107" errors="0" failures="0" skipped="0" time="278.629017">
+    <testcase name="test_asset_finance_requests_reuse_the_finance_queue_and_duplicate_boundary" file="C:\Users\steph\.codex\worktrees\dcf0\oblivionfindings\tests\Feature\FleetAssets\Pkg06bAssetProfileTest.php" line="189" class="PKG03MainAssetFinanceReviewTest" classname="PKG03MainAssetFinanceReviewTest" assertions="8" time="275.981930"/>
+    <testcase name="test_asset_finance_outcomes_retain_source_notices_without_an_unsupported_correction_state" file="C:\Users\steph\.codex\worktrees\dcf0\oblivionfindings\tests\Feature\FleetAssets\Pkg06bAssetProfileTest.php" line="205" class="PKG03MainAssetFinanceReviewTest" classname="PKG03MainAssetFinanceReviewTest" assertions="9" time="0.761639"/>
+    <testcase name="test_asset_finance_outcome_notice_rechecks_current_source_access" file="C:\Users\steph\.codex\worktrees\dcf0\oblivionfindings\tests\Feature\FleetAssets\Pkg06bAssetProfileTest.php" line="229" class="PKG03MainAssetFinanceReviewTest" classname="PKG03MainAssetFinanceReviewTest" assertions="1" time="0.658671"/>
+    <testcase name="test_asset_visibility_does_not_expand_finance_review_scope_or_replacement_details" file="C:\Users\steph\.codex\worktrees\dcf0\oblivionfindings\tests\Feature\FleetAssets\Pkg06bAssetProfileTest.php" line="438" class="PKG03MainAssetFinanceReviewTest" classname="PKG03MainAssetFinanceReviewTest" assertions="89" time="1.226777"/>
+  </testsuite>
+</testsuites>

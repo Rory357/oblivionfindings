@@ -7,6 +7,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class UpdateEmployeeProfileRequest extends FormRequest
@@ -18,6 +19,11 @@ class UpdateEmployeeProfileRequest extends FormRequest
             if (is_string($team) || $team === null) {
                 $this->merge(['team' => HrEmployeeProfile::normalizeTeam($team)]);
             }
+        }
+        // Same normalisation as "Add employee". An empty field arrives as null
+        // (ConvertEmptyStringsToNull) and means no work email.
+        if (is_string($this->input('work_email'))) {
+            $this->merge(['work_email' => Str::lower(trim($this->input('work_email')))]);
         }
 
         $viewer = $this->user();

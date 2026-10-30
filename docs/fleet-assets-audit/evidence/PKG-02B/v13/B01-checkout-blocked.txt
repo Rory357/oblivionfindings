@@ -1,0 +1,315 @@
+- strong: PKG-02B · v13
+- generic: Synthetic design · nothing is sent
+- text: Scenario
+- combobox
+- text: Recovery
+- combobox
+- button: Dark theme
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - generic: Tue, 22 September
+  - button: Report incident
+  - button:
+  - button:
+  - generic: AM
+- complementary:
+  - navigation:
+    - button:
+      - generic: Home
+    - button:
+      - generic: My day
+    - button:
+      - generic: Clients
+    - button:
+      - generic: Sites
+    - generic: Fleet & assets
+    - button:
+      - generic: Overview
+    - button:
+      - generic: Vehicles
+    - button:
+      - generic: Bookings
+    - button:
+      - generic: Maintenance
+    - button:
+      - generic: Assets
+    - button:
+      - generic: Reports
+    - button:
+      - generic: Settings
+  - button:
+- main:
+  - navigation:
+    - button: Home
+    - generic: ›
+    - button: Fleet & assets
+    - generic: ›
+    - button: Vehicles
+    - generic: ›
+    - generic: Kōwhai van
+  - button:
+  - heading [level=1]: Vehicle calendar
+  - generic: Kōwhai van
+  - paragraph: KWH014 · VH-014 · Pacific/Auckland
+  - button: Request booking
+  - searchbox
+  - generic: /
+  - button:
+    - text: Vehicle profile
+  - button "View this period in the agenda":
+    - generic: Viewing
+    - generic: 5 entries
+    - generic: "22"
+    - strong: September
+    - generic: "2026"
+    - generic: Tuesday, 22 September 2026
+  - button:
+    - generic: Vehicle use
+    - generic: Needs assessment
+    - generic: Booking and checkout still need assessment
+  - button:
+    - generic: Next appointment
+    - generic: 24 Sept
+    - generic: Routine service · Internal plan
+  - button:
+    - generic: Due reminder
+    - generic: 8 Oct
+    - generic: Registration · does not reserve a day
+  - button:
+  - button: Today
+  - button:
+  - button:
+    - text: September 2026
+  - text: Display
+  - combobox
+  - tablist:
+    - tab [selected]:
+      - generic: Month
+    - tab:
+      - generic: Week
+    - tab:
+      - generic: Day
+    - tab:
+      - generic: Agenda
+    - tab:
+      - generic: Timeline
+    - button:
+      - generic: Find
+  - button [pressed]:
+    - text: Service appointments
+    - generic: "1"
+  - button [pressed]:
+    - text: Estimated work
+    - generic: "0"
+  - button [pressed]:
+    - text: Bookings & unavailable
+    - generic: "2"
+  - button [pressed]:
+    - text: Reminders
+    - generic: "5"
+  - button [pressed]:
+    - text: Restriction records
+    - generic: "0"
+  - button: Reset filters
+  - columnheader: Sun
+  - columnheader: Mon
+  - columnheader: Tue
+  - columnheader: Wed
+  - columnheader: Thu
+  - columnheader: Fri
+  - columnheader: Sat
+  - grid:
+    - row:
+      - gridcell:
+        - generic: "30"
+      - gridcell:
+        - generic: "31"
+      - gridcell:
+        - generic: "1"
+      - gridcell:
+        - generic: "2"
+      - gridcell:
+        - generic: "3"
+      - gridcell:
+        - generic: "4"
+      - gridcell:
+        - generic: "5"
+    - row:
+      - gridcell:
+        - generic: "6"
+      - gridcell:
+        - generic: "7"
+      - gridcell:
+        - generic: "8"
+      - gridcell:
+        - generic: "9"
+      - gridcell:
+        - generic: "10"
+      - gridcell:
+        - generic: "11"
+      - gridcell:
+        - generic: "12"
+    - row:
+      - gridcell:
+        - generic: "13"
+      - gridcell:
+        - generic: "14"
+      - gridcell:
+        - generic: "15"
+      - gridcell:
+        - generic: "16"
+      - gridcell:
+        - generic: "17"
+      - gridcell:
+        - generic: "18"
+      - gridcell:
+        - generic: "19"
+    - row:
+      - gridcell:
+        - generic: "20"
+      - gridcell:
+        - generic: "21"
+      - gridcell:
+        - generic: "22"
+        - button:
+          - generic: 10am
+          - generic: Training · Confirmed
+      - gridcell:
+        - generic: "23"
+        - button:
+          - generic: Vehicle check due · reminder
+      - gridcell:
+        - generic: "24"
+        - button:
+          - generic: Routine service due · reminder
+        - button:
+          - generic: 9am
+          - generic: Routine service · Internal plan
+      - gridcell:
+        - generic: "25"
+        - button:
+          - generic: 10am
+          - generic: Busy
+      - gridcell:
+        - generic: "26"
+    - row:
+      - gridcell:
+        - generic: "27"
+      - gridcell:
+        - generic: "28"
+      - gridcell:
+        - generic: "29"
+      - gridcell:
+        - generic: "30"
+      - gridcell:
+        - generic: "1"
+      - gridcell:
+        - generic: "2"
+      - gridcell:
+        - generic: "3"
+  - complementary:
+    - generic: Tuesday
+    - generic: "22"
+    - generic: September 2026
+    - button:
+      - text: Up next · 10am
+      - generic: Training · Confirmed
+    - generic: Today's schedule
+    - generic: 1 entry
+    - generic: Now · 9:30am
+    - button:
+      - generic: 10am
+      - generic: Training · Confirmed
+      - generic: Booking
+    - generic: Up next
+    - button:
+      - generic: Wed All day
+      - generic: Vehicle check due · reminder
+      - generic: Reminder
+    - button:
+      - generic: Thu All day
+      - generic: Routine service due · reminder
+      - generic: Reminder
+    - button:
+      - generic: Thu 9am
+      - generic: Routine service · Internal plan
+      - generic: Appointment
+    - button:
+      - generic: Fri 10am
+      - generic: Busy
+      - generic: Booking
+  - generic: Right-click a date/time for scheduling and reminders, or an entry for its actions. Select an entry to open its source. Reminders and advisory estimates do not reserve the vehicle.
+  - generic: BOOKING WORKFLOW
+  - heading [level=2]: Bookings & custody
+  - button: Add unavailable period
+  - button: Request booking
+  - strong: "1"
+  - text: Request & evidence
+  - strong: "2"
+  - text: Approval route
+  - strong: "3"
+  - text: Confirmed
+  - strong: "4"
+  - text: Keys & checkout
+  - strong: "5"
+  - text: Return & condition
+  - status:
+    - strong: Vehicle use needs review
+    - paragraph: "WoF: assessment is unresolved. Requests can be recorded; confirmation and checkout remain blocked."
+  - strong: Training
+  - generic: BOOK-DEMO-1 · 22 Sep 2026 · 10:00 AM · Pacific/Auckland → 22 Sep 2026 · 11:00 AM · Pacific/Auckland
+  - paragraph: Jamie Taylor · Approval not required · Synthetic authority example; unresolved WoF must keep request pending.
+  - generic: Confirmed
+  - button: Check out
+  - button:
+  - paragraph: Approval not required is an explicit, evidenced decision by an authorised coordinator. Restrictions and conflicts always block confirmation or checkout. Report-only staff still need coordinator verification.
+  - generic: PKG-02B v13 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: WoF evidence updated; any repair/retest remains separate.
+  - button: Undo
+  - button: Dismiss
+- dialog "Check out vehicle":
+  - heading "Check out vehicle" [level=2]
+  - paragraph: Kōwhai van · VH-014 · Synthetic walkthrough
+  - complementary:
+    - generic: Check out vehicle
+    - generic: KWH014 · Kōwhai House
+    - button "Booking record BOOK-DEMO-1 · 22 Sep 2026 · 10:00 AM · Pacific/Auckland to 22 Sep 2026 · 11:00 AM · Pacific/Auckland":
+      - generic: Booking record
+      - generic: BOOK-DEMO-1 · 22 Sep 2026 · 10:00 AM · Pacific/Auckland to 22 Sep 2026 · 11:00 AM · Pacific/Auckland
+    - button "Review Confirm the resulting record":
+      - generic: Review
+      - generic: Confirm the resulting record
+    - generic: Completeness
+    - generic: 100%
+    - progressbar "Completeness"
+  - banner:
+    - generic: Step 1 of 2 · Booking record
+    - button "Close":
+  - strong: Kōwhai van
+  - generic: VH-014 · KWH014 · Kōwhai House
+  - alert:
+    - strong: Review before continuing
+    - paragraph: "WoF: assessment is unresolved."
+  - heading "Booking record" [level=2]
+  - paragraph: BOOK-DEMO-1 · 22 Sep 2026 · 10:00 AM · Pacific/Auckland to 22 Sep 2026 · 11:00 AM · Pacific/Auckland
+  - generic: Recorded odometer
+  - spinbutton "Recorded odometer": "82460"
+  - generic: Condition
+  - combobox "Condition":
+    - option "Choose…"
+    - option "No new concern" [selected]
+    - option "Concern recorded"
+  - generic: Condition check / evidence reference
+  - textbox "Condition check / evidence reference": DEMO-B01-CHECK
+  - checkbox "Keys handed to recorded driver" [checked]
+  - text: Keys handed to recorded driver
+  - generic: Decision / custody notes
+  - textbox "Decision / custody notes": Synthetic B01 changed evidence before checkout.
+  - contentinfo:
+    - button "Cancel"
+    - button "Continue" [active]

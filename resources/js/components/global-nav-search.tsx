@@ -1,4 +1,5 @@
 import { buildNavSearchCatalog } from '@/components/app-sidebar';
+import { HubCommandResults } from '@/components/company-hub-command-search';
 import { Button } from '@/components/ui/button';
 import {
     Command,
@@ -50,6 +51,11 @@ export default function GlobalNavSearch({
     const labels = useStableValue(page.props?.labels);
     const portalClients = useStableValue(auth?.portalClients);
     const unreadMessageCount = auth?.unreadMessageCount;
+    const hubPath = (page.url ?? '').split('?')[0];
+    const hubSearch =
+        !!can?.companyHub?.view &&
+        (hubPath === '/company-hub' ||
+            /^\/company-hub\/(read|people|announcements)\//.test(hubPath));
 
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
@@ -212,19 +218,49 @@ export default function GlobalNavSearch({
 
             <DialogContent className="overflow-hidden p-0 sm:max-w-xl">
                 <DialogTitle className="sr-only">
-                    Search modules and pages
+                    {hubSearch
+                        ? 'Find your way around Company Hub'
+                        : 'Search modules and pages'}
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                    Search modules, pages and ticket numbers.
+                    {hubSearch
+                        ? 'Find company content, colleagues, services, pages and ticket numbers.'
+                        : 'Search modules, pages and ticket numbers.'}
                 </DialogDescription>
-                <Command>
+                <Command
+                    label={
+                        hubSearch
+                            ? 'Search the company'
+                            : 'Search modules and pages'
+                    }
+                >
                     <CommandInput
-                        placeholder="Search modules, pages, ticket #…"
+                        placeholder={
+                            hubSearch
+                                ? 'Search company content, people, services…'
+                                : 'Search modules, pages, ticket #…'
+                        }
+                        aria-label={
+                            hubSearch
+                                ? 'Search the company'
+                                : 'Search modules and pages'
+                        }
+                        maxLength={hubSearch ? 150 : undefined}
                         value={query}
                         onValueChange={setQuery}
                     />
                     <CommandList>
-                        <CommandEmpty>No matches found.</CommandEmpty>
+                        {hubSearch ? (
+                            <HubCommandResults
+                                key={auth?.user?.id}
+                                actorId={Number(auth?.user?.id)}
+                                query={query}
+                                open={open}
+                                onSelect={select}
+                            />
+                        ) : (
+                            <CommandEmpty>No matches found.</CommandEmpty>
+                        )}
                         {ticket && ticket.link ? (
                             <CommandGroup heading="Tickets">
                                 <CommandItem
@@ -252,6 +288,7 @@ export default function GlobalNavSearch({
                                         item.section,
                                         item.group ?? '',
                                         item.label,
+                                        ...(item.keywords ?? []),
                                     ]
                                         .filter(Boolean)
                                         .join(' ');
@@ -282,6 +319,12 @@ export default function GlobalNavSearch({
                         ))}
                     </CommandList>
                 </Command>
+                {hubSearch && (
+                    <div className="flex justify-between border-t px-4 py-2.5 text-xs text-muted-foreground">
+                        <span>↑ ↓ to move · Enter to open</span>
+                        <span>Esc to close</span>
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     );

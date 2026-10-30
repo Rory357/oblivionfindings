@@ -9,7 +9,9 @@ use App\Models\Timesheet;
 use App\Models\UserNotificationPreference;
 use App\Models\User;
 use App\Notifications\AppEventNotification;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -43,6 +45,11 @@ class NotificationService
 
     public const AUDITOR_ROLES = [
         'auditor',
+    ];
+
+    // The finance team (role group "finance"), e.g. drafts made from referrals that need review.
+    public const FINANCE_ROLES = [
+        'finance',
     ];
 
     /**
@@ -80,7 +87,19 @@ class NotificationService
 
         $extra = $this->applyRoutingDefaults($extra);
 
-        $recipients = $this->resolveRecipients($actor, $entity, $client, $extra);
+        $recipientScope = [
+            'recipient_scope' => $extra['data']['recipient_scope'] ?? (in_array($entityLabel, [
+                'medical profile', 'condition', 'emergency contact',
+            ], true) ? 'client_medical' : null),
+            'entity' => $entityLabel,
+            'client_id' => $client?->id ?? ($entity?->client_id ?? null),
+            'task_source' => $extra['data']['task_source'] ?? null,
+            'task_id' => $extra['data']['task_id'] ?? null,
+        ];
+        $recipients = $this->filterRecipientScope(
+            $this->resolveRecipients($actor, $entity, $client, $extra),
+            $recipientScope,
+        );
 
         // If force_delivery is enabled for this event, bypass user/role preferences.
         if (!$rule || !$rule->enabled || !$rule->force_delivery) {
@@ -111,9 +130,122 @@ class NotificationService
             ] : null,
         ], $extra['data'] ?? []);
 
+        if ($recipientScope['recipient_scope'] !== null) {
+            // Retain the same authority boundary for delayed reminders.
+            $payload['recipient_scope'] = $recipientScope['recipient_scope'];
+            $payload['client_id'] = $recipientScope['client_id'];
+        }
+
         $notification = new AppEventNotification($payload);
 
+        // A repeating reminder (an hourly or daily check about the same item)
+        // keeps ONE unread copy per person: while their copy is unread, each
+        // run refreshes it (newest text, back to the top) instead of adding
+        // another. Once they have read it, the next run sends a new one.
+        if (($extra['refresh_unread_copy'] ?? false) === true && $entity !== null) {
+            $recipients = $this->refreshUnreadCopies(
+                $recipients,
+                $notification,
+                $eventKey,
+                $entityLabel,
+                $entity,
+                // A reminder an escalation rule watches keeps its original
+                // time, so the rule's clock is never restarted.
+                keepTime: (bool) ($rule?->enabled),
+            );
+        }
+
         $recipients->each(fn(User $u) => $u->notify($notification));
+    }
+
+    /**
+     * Refresh each recipient's newest unread copy of this event about this
+     * item, and return the recipients who had none (they get a new one).
+     *
+     * @param  Collection<int, User>  $recipients
+     * @return Collection<int, User>
+     */
+    protected function refreshUnreadCopies(
+        Collection $recipients,
+        AppEventNotification $notification,
+        string $eventKey,
+        string $entityLabel,
+        Model $entity,
+        bool $keepTime,
+    ): Collection {
+        if ($recipients->isEmpty()) {
+            return $recipients;
+        }
+
+        $copies = DatabaseNotification::query()
+            ->where('notifiable_type', $recipients->first()->getMorphClass())
+            ->whereIn('notifiable_id', $recipients->map(fn (User $user) => (int) $user->getKey())->all())
+            ->whereNull('read_at')
+            ->where('type', AppEventNotification::class)
+            ->where('data->event_key', $eventKey)
+            ->where('data->entity', $entityLabel)
+            ->where('data->entity_id', $entity->getKey())
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->get()
+            ->unique(fn (DatabaseNotification $copy) => (int) $copy->notifiable_id)
+            ->keyBy(fn (DatabaseNotification $copy) => (int) $copy->notifiable_id);
+
+        return $recipients
+            ->reject(function (User $user) use ($copies, $notification, $keepTime): bool {
+                $copy = $copies->get((int) $user->getKey());
+                if ($copy === null) {
+                    return false;
+                }
+
+                $copy->forceFill(array_filter([
+                    'data' => $notification->toArray($user),
+                    'created_at' => $keepTime ? null : now(),
+                ], fn ($value) => $value !== null))->save();
+
+                return true;
+            })
+            ->values();
+    }
+
+    /** Sensitive notifications retain their owning module's current read boundary. */
+    public function filterRecipientScope(Collection $recipients, array $payload): Collection
+    {
+        $scope = $payload['recipient_scope'] ?? null;
+        if ($scope === null && in_array($payload['entity'] ?? null, [
+            'medical profile', 'condition', 'emergency contact',
+        ], true)) {
+            // Older pending notifications do not carry the explicit marker.
+            $scope = 'client_medical';
+        }
+        if ($scope === null) {
+            // Old task notices lack a stable item identity for reauthorization.
+            // Do not replay their private titles through delayed escalation.
+            if (($payload['entity'] ?? null) === 'task' && ($payload['context']['Module'] ?? null) === 'Referrals') {
+                return collect();
+            }
+            return $recipients;
+        }
+        if ($scope === 'referral_task') {
+            return app(\App\Domain\Referrals\Services\ReferralTaskNotifications::class)->recipients($recipients, $payload);
+        }
+        if ($scope !== 'client_medical' || ! is_numeric($payload['client_id'] ?? null)) {
+            return collect();
+        }
+        $client = $this->recipientScopeClient((int) $payload['client_id']);
+        if ($client === null) {
+            return collect();
+        }
+
+        return $recipients->filter(fn (User $recipient): bool =>
+            $recipient->can('view', $client) && $recipient->can('viewMedications', $client)
+        )->values();
+    }
+
+    /** Re-read ownership/site instead of retaining the writer's relationship snapshot. */
+    protected function recipientScopeClient(int $clientId): ?Client
+    {
+        return Client::query()->find($clientId);
     }
 
     protected function escalationRuleFor(string $eventKey): ?NotificationEscalationRule
@@ -321,6 +453,9 @@ class NotificationService
             'auditors' => User::query()
                 ->whereHas('roles', fn($q) => $q->whereIn('name', self::AUDITOR_ROLES))
                 ->pluck('id'),
+            'finance' => User::query()
+                ->whereHas('roles', fn($q) => $q->whereIn('name', self::FINANCE_ROLES))
+                ->pluck('id'),
             'approvers' => User::query()
                 ->where(function ($q) {
                     $q->whereHas('roles', fn($rq) => $rq->whereIn('name', self::MANAGERS_CORE_ROLES))
@@ -346,6 +481,12 @@ class NotificationService
     public function applyPreferences(Collection $recipients, string $eventKey): Collection
     {
         if ($recipients->isEmpty()) return $recipients;
+
+        // Some explicit recipient lists use a support collection. Keep the
+        // same user instances so their roles can be loaded in one query.
+        if (! $recipients instanceof EloquentCollection) {
+            $recipients = new EloquentCollection($recipients->all());
+        }
 
         // Log a warning so we can track how often channel-level preferences are bypassed.
         // Remove this once per-channel filtering is implemented in notification via() methods.

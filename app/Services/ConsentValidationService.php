@@ -29,6 +29,20 @@ class ConsentValidationService
         'Personal Tracker (Wandering Risk)',
     ];
 
+    /** Fresh bounded read graph; no authority is retained between requests. */
+    public static function currentResidentLocationConsents(array $ids): Collection
+    {
+        $consents = ClientConsent::query()->whereIn('id', $ids)->with([
+            'consentType', 'consentTypeVersion', 'sourceConsentRequest',
+            'authorityScope.nextOfKin', 'authorityScope.capacityEvidenceConsent',
+        ])->get();
+        $clients = Client::query()->whereIn('id', $consents->pluck('client_id'))->get(['id', 'site_id', 'user_id'])->keyBy('id');
+
+        return $consents->filter(fn (ClientConsent $consent): bool => in_array((string) $consent->consentType?->name, self::RESIDENT_LOCATION_CONSENT_TYPE_NAMES, true)
+            && self::evaluateEvidence($consent, $clients->get($consent->client_id),
+                $consent->consent_type_id, $consent->consentTypeVersion?->purpose)->allowed)->keyBy('id');
+    }
+
     public static function isConsumable(
         ClientConsent $consent,
         Client|int|null $client = null,
@@ -57,6 +71,13 @@ class ConsentValidationService
         $client = self::resolveClient($consent, $client);
 
         return self::evaluateEvidence($consent, $client, $expectedConsentTypeId, $expectedPurpose);
+    }
+
+    public static function isConsumableFromCurrentEvidence(CurrentConsentEvidence $evidence, Client|int $client, int $consentTypeId, ?string $purpose = null): bool
+    {
+        CurrentConsentEvidence::assertTransaction();
+
+        return self::evaluateEvidence($evidence->consent, $evidence->client($client), $consentTypeId, $purpose)->allowed;
     }
 
     public static function isValidResidentLocationConsentFromCurrentEvidence(CurrentConsentEvidence $evidence, Client|int $client): bool

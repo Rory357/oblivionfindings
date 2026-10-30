@@ -134,6 +134,9 @@ class DirectoryController extends Controller
                     'id' => $k->id,
                     'from_name' => $k->fromUser?->name ?? 'Someone',
                     'category' => $k->category,
+                    'category_label' => $k->categoryLabel(),
+                    'impact' => $k->impactKey(),
+                    'impact_label' => $k->impactLabel(),
                     'message' => $k->message,
                     'created_at' => $k->created_at?->toDateString(),
                 ]);

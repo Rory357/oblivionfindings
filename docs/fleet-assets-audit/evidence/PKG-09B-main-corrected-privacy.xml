@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PKG09BMainPrivacyReviewTest" file="C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php" tests="2" assertions="8" errors="0" failures="0" skipped="0" time="252.398268">
+    <testcase name="test_cached_journey_report_is_denied_after_trip_becomes_personal" file="C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php" line="69" class="PKG09BMainPrivacyReviewTest" classname="PKG09BMainPrivacyReviewTest" assertions="4" time="250.937169"/>
+    <testcase name="test_cached_journey_report_is_denied_after_trip_consent_is_blocked" file="C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php" line="74" class="PKG09BMainPrivacyReviewTest" classname="PKG09BMainPrivacyReviewTest" assertions="4" time="1.461100"/>
+  </testsuite>
+</testsuites>

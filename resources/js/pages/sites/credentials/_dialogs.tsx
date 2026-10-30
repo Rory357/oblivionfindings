@@ -666,7 +666,7 @@ function CredentialViewer({
         window.addEventListener('pagehide', hide);
         const off = router.on('before', hide);
         return () => {
-            epoch.current++;
+            epoch.current += 1;
             clearInterval(poll);
             if (timer.current) clearTimeout(timer.current);
             off();

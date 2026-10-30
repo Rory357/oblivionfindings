@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 final class SpendApprovalConcurrencyIsolationTest extends TestCase
@@ -40,6 +41,7 @@ final class SpendApprovalConcurrencyIsolationTest extends TestCase
 
     public function test_concurrent_approve_and_reject_serialize_to_one_decision_on_mysql(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         $connection = DB::connection();
         if ($connection->getDriverName() !== 'mysql') {
             $this->markTestSkipped('The two-process lock assertion requires MySQL.');

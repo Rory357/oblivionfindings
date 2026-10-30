@@ -7,35 +7,42 @@ import {
 } from './helpers';
 
 const destinations = [
-    ['/security-devices', 'Security & Devices estate'],
-    ['/security-devices/sites', 'Sites'],
-    ['/security-devices/devices', 'All devices'],
-    ['/security-devices/network-it', 'Network & IT'],
-    ['/security-devices/security', 'Security'],
-    ['/security-devices/healthcare', 'Healthcare'],
-    ['/security-devices/tracking', 'Tracking'],
-    ['/security-devices/facilities-iot', 'Facilities & IoT'],
-    ['/security-devices/monitoring', 'Monitoring'],
-    ['/security-devices/maintenance', 'Maintenance'],
-    ['/security-devices/discovery', 'Discovery & collectors'],
-    ['/security-devices/integrations', 'Integrations'],
-    ['/security-devices/settings', 'Settings & audit'],
+    ['/security-devices', 'Security & Devices estate', '/security-devices'],
+    ['/security-devices/devices', 'All devices', '/security-devices/devices'],
+    ['/security-devices/sites', 'Sites', '/security-devices/sites'],
+    [
+        '/security-devices/monitoring',
+        'Monitoring',
+        '/security-devices/monitoring',
+    ],
+    [
+        '/security-devices/maintenance',
+        'Maintenance',
+        '/security-devices/monitoring',
+    ],
+    [
+        '/security-devices/discovery',
+        'Discovery & collectors',
+        '/security-devices/discovery',
+    ],
+    [
+        '/security-devices/integrations',
+        'Integrations',
+        '/security-devices/discovery',
+    ],
+    [
+        '/security-devices/settings',
+        'Settings & audit',
+        '/security-devices/discovery',
+    ],
 ] as const;
 
-const groupedNavigation = [
-    ['Overview', ['Estate overview', 'Sites', 'All devices']],
-    [
-        'Workspaces',
-        [
-            'Network & IT',
-            'Security',
-            'Healthcare',
-            'Tracking',
-            'Facilities & IoT',
-        ],
-    ],
-    ['Operations', ['Monitoring', 'Maintenance']],
-    ['Setup', ['Discovery & collectors', 'Integrations', 'Settings & audit']],
+const sidebarItems = [
+    'Overview',
+    'Devices',
+    'Sites',
+    'Alerts & upkeep',
+    'Setup',
 ] as const;
 
 async function expectNoPageOverflow(page: Page) {
@@ -47,27 +54,26 @@ async function expectNoPageOverflow(page: Page) {
     expect(widths.scroll).toBeLessThanOrEqual(widths.client);
 }
 
-async function expectGroupedNavigation(page: Page) {
+async function expectInlineNavigation(page: Page, activeHref: string) {
     const navigation = page.getByRole('group', {
         name: 'Security & Devices navigation',
     });
     await expect(navigation).toBeVisible();
 
-    for (const [group, items] of groupedNavigation) {
+    for (const item of sidebarItems) {
         await expect(
-            navigation.getByText(group, { exact: true }),
+            navigation.getByRole('link', { name: item, exact: true }),
         ).toBeVisible();
-
-        for (const item of items) {
-            await expect(
-                navigation.getByRole('link', { name: item, exact: true }),
-            ).toBeVisible();
-        }
     }
+    await expect(navigation.getByRole('link')).toHaveText([...sidebarItems]);
+    await expect(navigation.locator(`a[href="${activeHref}"]`)).toHaveAttribute(
+        'aria-current',
+        'page',
+    );
 }
 
-test.describe('Security & Devices grouped navigation', () => {
-    test('keeps grouped navigation inline inside the primary sidebar across every destination', async ({
+test.describe('Security & Devices inline navigation', () => {
+    test('keeps the five destinations ordered in the primary sidebar with the current hub marked', async ({
         page,
     }) => {
         test.setTimeout(150_000);
@@ -75,12 +81,12 @@ test.describe('Security & Devices grouped navigation', () => {
 
         await loginAsStaff(page);
 
-        for (const [route, title] of destinations) {
+        for (const [route, title, activeHref] of destinations) {
             await page.goto(route);
             await expect(
                 page.getByRole('heading', { name: title, level: 1 }),
             ).toBeVisible();
-            await expectGroupedNavigation(page);
+            await expectInlineNavigation(page, activeHref);
             await expectNoPageOverflow(page);
         }
 

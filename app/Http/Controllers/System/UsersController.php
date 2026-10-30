@@ -16,6 +16,7 @@ use App\Services\UserSiteAccessService;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -275,7 +276,8 @@ class UsersController extends Controller
                     'last_name' => $data['client']['last_name'] ?? '',
                     'date_of_birth' => $data['client']['date_of_birth'] ?? null,
                     'email' => $data['email'],
-                    'status' => 'active',
+                    // Established portal behaviour, unless the organisation requires a commencement review for everyone.
+                    'status' => \App\Domain\Referrals\Services\ReferralActivationGuard::requiredForEveryone() ? 'onboarding' : 'active',
                 ]);
             } else {
                 NextOfKin::create([
@@ -391,9 +393,12 @@ class UsersController extends Controller
             ->values();
         $emailChanged = DB::transaction(function () use ($actorId, $data, $profileId, $roleIds, $targetId): bool {
             [$lockedActor, $lockedTarget] = $this->lockSystemUserMutation($actorId, $targetId, $roleIds->all());
-            $lockedProfile = $profileId
-                ? $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId)
-                : null;
+            // Re-check Site access to the staff record under lock. This screen
+            // has no work-email field, and the sign-in email can be personal,
+            // so work_email is left for HR to set on the employee profile.
+            if ($profileId) {
+                $this->lockedAccessibleEmployeeProfileOrFail($lockedTarget, $lockedActor, (int) $profileId);
+            }
             $lockedTarget->fill([
                 'name' => $data['name'] ?? $lockedTarget->name,
                 'email' => $data['email'] ?? $lockedTarget->email,
@@ -403,13 +408,6 @@ class UsersController extends Controller
                 $lockedTarget->email_verified_at = null;
             }
             $lockedTarget->save();
-
-            if ($lockedProfile && array_key_exists('email', $data)) {
-                $lockedProfile->forceFill([
-                    'work_email' => $lockedTarget->email,
-                    'updated_by' => $lockedActor->id,
-                ])->save();
-            }
 
             if (isset($data['role_ids'])) {
                 $lockedTarget->roles()->sync($roleIds->all());
@@ -471,7 +469,15 @@ class UsersController extends Controller
             AuditLogger::log('user.deleted', $lockedTarget, [
                 'deleted_by' => $lockedActor->id,
             ]);
-            $lockedTarget->delete();
+            try {
+                $lockedTarget->delete();
+            } catch (QueryException $exception) {
+                // Care communication (Chat messages, calls, callbacks) references its author and must be retained.
+                throw_unless(($exception->errorInfo[1] ?? null) === 1451, $exception);
+                throw ValidationException::withMessages([
+                    'user' => 'This account is linked to retained care communication records, so it cannot be deleted. Remove their portal access instead.',
+                ]);
+            }
         });
 
         return redirect()->route('system.users.index')

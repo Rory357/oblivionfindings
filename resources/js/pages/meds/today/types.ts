@@ -1,11 +1,17 @@
+import type { SecondPersonEvidence } from '@/lib/medication-second-person';
+import type { MyEligibilityData } from '@/pages/emar/eligibility/_my-eligibility';
 /* Shared types for the worker-facing Meds Today board (`/meds/today`).
  * Shapes mirror the Inertia props served by Emar/WorkerMedsController. */
+import type { WitnessPinStatus } from '@/lib/witness-pin';
 
 export interface RoundInfo {
     id: number;
     name: string;
     status: 'pending' | 'in_progress' | 'completed' | string;
     scheduled_time: string | null;
+    scheduled_at: string | null;
+    /** Exact scoped schedule-row identities from the canonical round. */
+    dose_keys: string[];
     total: number;
     completed: number;
     percent: number;
@@ -23,7 +29,19 @@ export type DoseStatus =
     | 'given'
     | 'refused'
     | 'withheld'
-    | 'missed';
+    | 'missed'
+    /** Waiting for the order check: the order's change awaits verification. */
+    | 'pending_check'
+    /** Away (checked in at respite at another Site): shown with its reason, never due or overdue. */
+    | 'away';
+
+/**
+ * A dose waiting for the order check is shown but never overdue, and can't
+ * be recorded until the order is checked (the server refuses it too).
+ */
+export function awaitsOrderCheck(row: { status: DoseStatus }): boolean {
+    return row.status === 'pending_check';
+}
 
 export interface RecordedInfo {
     id: number;
@@ -35,6 +53,44 @@ export interface RecordedInfo {
     reason: string | null;
     reason_label: string | null;
     notes: string | null;
+    /** P01 recording contract facts (Meds today state lines). */
+    dose_given?: string | null;
+    amount_mode?: 'as_ordered' | 'less' | 'more' | null;
+    late_reason?: string | null;
+    second_person_kind?: 'witness' | 'rule' | 'cosigner' | 'amount' | null;
+    second_person_status?:
+        | 'verified'
+        | 'not_confirmed'
+        | 'not_verified'
+        | 'disputed'
+        | 'expired'
+        | null;
+    witness_method?: string | null;
+    second_person_confirmation?: import('@/lib/medication-second-person').SecondPersonEvidence['second_person_confirmation'];
+    reoffer_of_id?: number | null;
+    review_reason_key?: string | null;
+}
+
+/**
+ * What recording a dose needs and allows for this worker, as row keys
+ * (DoseRecordingRequirements::forBoard) — the same answer the dialog reads.
+ */
+export interface BoardRequirements {
+    block_all: string | null;
+    block_given: string | null;
+    competency:
+        | 'current'
+        | 'expired'
+        | 'not_current'
+        | 'restricted'
+        | 'cosigner'
+        | 'area'
+        | null;
+    second_person: 'witness' | 'rule' | 'cosigner' | null;
+    witness_available: boolean;
+    allergy_match: boolean;
+    not_simple: string[];
+    window: 'notdue' | 'due' | 'late' | null;
 }
 
 export interface ScheduleRow {
@@ -48,11 +104,91 @@ export interface ScheduleRow {
     is_controlled: boolean;
     requires_witness: boolean;
     scheduled_for: string;
+    /** Canonical projection state; list status also includes the due-soon horizon. */
+    state?: string;
+    due_soon?: boolean;
     time: string;
     round_label: string;
     status: DoseStatus;
+    /** Why the person is away, e.g. "Respite at another house (since Mon 15 Jun, 7:00 am)"; set when status is away. */
+    away_reason?: string | null;
     recorded: RecordedInfo | null;
-    mar_url: string;
+    /** Null when this worker may not open the resident's MAR (not assigned, no clocked-in covering shift). */
+    mar_url: string | null;
+    /** The dose's own window (P01 C3 state lines). */
+    window_opens_at?: string;
+    window_ends_at?: string;
+    /** Open doses only: what recording needs and allows for this worker. */
+    req?: BoardRequirements | null;
+    /** A refused dose's open follow-up (from refusal_follow_ups). */
+    follow_up?: { owner: string | null; due_time: string | null } | null;
+    /** EA-043: yesterday's dose, still due or late with nothing recorded. */
+    from_yesterday?: boolean;
+}
+
+/** An open refusal follow-up (P01: owned by whoever recorded the refusal). */
+export interface RefusalFollowUp {
+    id: number;
+    refusal_id: number;
+    client_id: number;
+    preferred: string;
+    medication_id: number;
+    medication_name: string | null;
+    is_controlled: boolean;
+    scheduled_for: string | null;
+    refused_time: string | null;
+    due_at: string | null;
+    due_time: string | null;
+    overdue: boolean;
+    owner: string | null;
+    escalated: boolean;
+}
+
+/** Meds today › Activity: one recorded dose (server-paginated, 10 a page). */
+export interface ActivityRow {
+    id: number;
+    client_id: number;
+    preferred: string;
+    surname: string | null;
+    photo_url: string | null;
+    at: string;
+    time: string;
+    day: string | null;
+    medication_name: string | null;
+    is_controlled: boolean;
+    status: string;
+    outcome: string;
+    by: string | null;
+    detail: string | null;
+}
+
+export interface ActivityPage {
+    data: ActivityRow[];
+    links: { url: string | null; label: string; active: boolean }[];
+    current_page: number;
+    last_page: number;
+    total: number;
+}
+
+/** An as-needed dose recorded today (Meds today › As-needed). */
+export interface PrnRecorded extends SecondPersonEvidence {
+    id: number;
+    client_id: number;
+    medication_name: string | null;
+    status: string;
+    time: string | null;
+    dose_given: string | null;
+    reason: string | null;
+    by: string | null;
+    check_at: string | null;
+    effect_recorded: boolean;
+}
+
+export interface OnCallContact {
+    configured: boolean;
+    name: string | null;
+    phone: string | null;
+    warning: string | null;
 }
 
 export interface ClientInfo {
@@ -64,7 +200,24 @@ export interface ClientInfo {
     age: number | null;
     site_id: number | null;
     site_name: string | null;
+    /** Medication allergy register + health profile allergy labels. */
     allergies: string[];
+    /**
+     * Whether `allergies` could be read. An empty list is "none recorded",
+     * never a confirmed "no known allergies".
+     */
+    allergy_status?: 'recorded' | 'none_recorded' | 'unavailable';
+}
+
+/**
+ * The organisation's restricted-competency rule as it applies to the signed-in
+ * worker (NF-03). Null/absent when no rule applies. The server enforces it
+ * when a dose is signed; this only shows the reason up front.
+ */
+export interface CompetencyNotice {
+    requires_cosigner: boolean;
+    blocked: boolean;
+    message: string;
 }
 
 export interface SiteInfo {
@@ -127,7 +280,15 @@ export interface PrnFollowUp {
     dose_given: string | null;
     given_at: string | null;
     given_time: string | null;
+    /** When to check whether it helped: the time the recorder chose (P01). */
+    check_due_at?: string | null;
     check_at: string | null;
+    by?: string | null;
+    given_label?: string | null;
+    effect_check_due_at?: string | null;
+    overdue?: boolean;
+    owner_id?: number | null;
+    owner_name?: string | null;
 }
 
 export interface StockAlert {
@@ -151,6 +312,8 @@ export interface ActivityItem {
 export interface WitnessOption {
     id: number;
     name: string;
+    /** PIN-1: people without a usable witness PIN are listed but can't be chosen. */
+    witness_pin?: WitnessPinStatus;
 }
 
 export interface NotGivenReasonOption {
@@ -159,7 +322,21 @@ export interface NotGivenReasonOption {
     requires_detail: boolean;
 }
 
+export interface SecondPersonFollowUp {
+    id: number;
+    client_id: number;
+    client_name: string;
+    medication_name: string;
+    due_at: string;
+    status: 'pending' | 'expired';
+    followup_url: string;
+}
+
 export interface MedsTodayProps {
+    second_person_confirmations?: SecondPersonFollowUp[];
+    guidedRound?: import('@/components/emar/rounds/types').GuidedRound | null;
+    /** P11: the worker's own medication eligibility (the "My eligibility" meter). */
+    my_eligibility?: MyEligibilityData | null;
     today: string;
     date: string;
     date_label: string;
@@ -178,6 +355,9 @@ export interface MedsTodayProps {
     rounds: RoundInfo[];
     schedule: ScheduleRow[];
     clients: ClientInfo[];
+    /** Current person scope; options retain all people this viewer may select. */
+    selected_client_id?: number | null;
+    person_options?: ClientInfo[];
     sites: SiteInfo[];
     prn_medications: PrnMedication[];
     prn_follow_ups: PrnFollowUp[];
@@ -193,16 +373,49 @@ export interface MedsTodayProps {
         med_competent: boolean;
         controlled_record: boolean;
         cd_witness: boolean;
+        competency_notice?: CompetencyNotice | null;
+        /** PIN-1: the viewer's own witness PIN status (prompt to set one). */
+        witness_pin?: WitnessPinStatus;
     };
     board_can: {
+        export_round?: boolean;
         view_emar: boolean;
         view_audit: boolean;
         record_administration: boolean;
         record_controlled: boolean;
         view_controlled: boolean;
         manage_stock: boolean;
+        /** Approved P06 Q5: medications.stock.receive or stock.update. */
+        receive_stock?: boolean;
     };
     has_shift_context: boolean;
+    /** People on the worker's shift whose medicines show once they're clocked in to it. */
+    people_after_clock_in?: number;
+    /** Controlled doses this day not listed for this reader (EM-12). */
+    hidden_controlled_doses?: number;
+    /** …and how many of those are overdue (counted by the badge). */
+    hidden_controlled_overdue?: number;
+    concealed_schedule?: {
+        total: number;
+        overdue: number;
+        due_now?: number;
+        open?: number;
+        waiting?: number;
+        due_so_far?: number;
+        recorded_so_far?: number;
+    };
+    /** P01 C3 (approved Meds today). */
+    clocked_in?: boolean;
+    house_label?: string | null;
+    on_call?: OnCallContact | null;
+    /** Due or late doses of people you may open who aren't on your shift. */
+    off_shift?: ScheduleRow[];
+    refusal_follow_ups?: RefusalFollowUp[];
+    prn_recorded_today?: PrnRecorded[];
+    activity_page?: ActivityPage;
+    board_extra_can?: { report_error: boolean; view_handovers: boolean };
+    /** People whose medication record (MAR) this worker may open. */
+    mar_client_ids?: number[];
 }
 
 /** Stable per-client hue for avatar chips (golden-angle spread). */

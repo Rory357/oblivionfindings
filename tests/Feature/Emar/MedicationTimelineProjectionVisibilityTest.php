@@ -430,8 +430,11 @@ class MedicationTimelineProjectionVisibilityTest extends TestCase
         ]);
         $ordinaryMedication = $this->medication($client, 'Ordinary timeline medicine');
         $controlledMedication = $this->medication($client, 'Controlled timeline medicine', true);
-        $unverifiedMedication = $this->medication($client, 'Unverified timeline medicine');
-        $unverifiedMedication->forceFill(['approval_status' => 'pending_verification'])->saveQuietly();
+        // Entered unverified (never verified): it owes no doses. A verified
+        // order whose change waits for the check shows its doses as Waiting
+        // for the order check (C6i), which a quiet flip of a verified order
+        // would leave the dose slots unaware of.
+        $unverifiedMedication = $this->medication($client, 'Unverified timeline medicine', approvalStatus: 'pending_verification');
         $supersededMedication = $this->medication($client, 'Superseded timeline medicine');
         $supersededMedication->forceFill(['superseded_by' => $ordinaryMedication->id])->saveQuietly();
         $foreignMedication = $this->medication($foreignClient, 'Foreign timeline medicine', true);
@@ -647,7 +650,7 @@ class MedicationTimelineProjectionVisibilityTest extends TestCase
             ->sole();
     }
 
-    private function medication(Client $client, string $name, bool $controlled = false): ClientMedication
+    private function medication(Client $client, string $name, bool $controlled = false, string $approvalStatus = 'verified'): ClientMedication
     {
         return ClientMedication::factory()->create([
             'client_id' => $client->id,
@@ -655,7 +658,7 @@ class MedicationTimelineProjectionVisibilityTest extends TestCase
             'controlled_drug' => $controlled,
             'active' => true,
             'state' => 'active',
-            'approval_status' => 'verified',
+            'approval_status' => $approvalStatus,
             'is_prn' => false,
             'dose_times' => ['09:00'],
             'frequency' => '09:00',

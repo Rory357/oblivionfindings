@@ -1,0 +1,682 @@
+.hub-recognition-board {
+    width: 100%;
+    max-width: 1180px;
+    margin-inline: auto;
+}
+.hub-recognition-composer {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+}
+.hub-recognition-composer-icon {
+    display: grid;
+    place-items: center;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    color: var(--primary-text);
+    background: color-mix(in oklch, var(--primary) 10%, var(--card));
+}
+.hub-recognition-composer-prompt {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    border-radius: 10px;
+    padding: 8px;
+}
+.hub-recognition-composer-prompt:hover,
+.hub-recognition-comment-prompt:hover {
+    background: var(--muted);
+}
+.hub-recognition-composer-prompt strong {
+    display: block;
+    font-size: 15px;
+}
+.hub-recognition-composer-prompt span {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-author-avatar {
+    width: 38px;
+    height: 38px;
+    flex-shrink: 0;
+}
+.hub-recognition-author p {
+    font-size: 13px;
+}
+.hub-recognition-author p > span {
+    font-weight: 400;
+    color: var(--muted-foreground);
+}
+.hub-recognition-impact {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    color: var(--primary-text);
+    font-size: 12px;
+    font-weight: 500;
+}
+.hub-recognition-social-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 20px 12px;
+    color: var(--muted-foreground);
+    font-size: 12px;
+}
+.hub-recognition-social-summary > span:first-child {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.hub-recognition-social-summary svg {
+    color: var(--primary-text);
+}
+.hub-recognition-reply-preview {
+    margin: 4px 20px 12px;
+    padding: 10px 14px;
+    border-radius: 4px 14px 14px;
+    background: var(--muted);
+    font-size: 12px;
+}
+.hub-recognition-reply-preview p {
+    margin-top: 3px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.hub-recognition-comment-prompt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: calc(100% - 40px);
+    margin: 0 20px 16px;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    text-align: left;
+    color: var(--muted-foreground);
+    font-size: 12px;
+}
+.hub-recognition-composer-prompt:focus-visible,
+.hub-recognition-comment-prompt:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .hub-recognition-reaction svg {
+        transition: transform 160ms ease;
+    }
+    .hub-recognition-reaction[aria-pressed='true'] svg {
+        transform: scale(1.15);
+    }
+}
+.hub-recognition-intro {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    margin: 0 0 18px;
+}
+.hub-recognition-eyebrow {
+    margin-bottom: 8px;
+    font-size: 10px;
+    font-weight: 650;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--primary-text);
+}
+.hub-recognition-intro h2 {
+    font-size: clamp(22px, 1.8vw, 29px);
+    line-height: 1.2;
+    font-weight: 650;
+    letter-spacing: -0.035em;
+}
+.hub-recognition-intro h2 + p {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-intro-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.hub-recognition-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 290px;
+    gap: 22px;
+    align-items: start;
+}
+.hub-recognition-feed,
+.hub-recognition-sidebar {
+    min-width: 0;
+    display: grid;
+    gap: 18px;
+}
+.hub-recognition-tools {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    background: var(--card);
+}
+.hub-recognition-feed-heading {
+    display: contents;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.hub-recognition-feed-heading h3 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+.hub-recognition-feed-heading span[role='status'] {
+    display: block;
+    font-size: 11px;
+    margin-top: 4px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-search {
+    position: relative;
+    flex: 1;
+    min-width: 180px;
+    order: -1;
+}
+.hub-recognition-search > svg {
+    position: absolute;
+    z-index: 1;
+    top: 13px;
+    left: 14px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-search input {
+    height: 42px;
+    border-radius: 9px;
+    padding-left: 40px;
+    background: color-mix(in oklch, var(--muted) 45%, var(--card));
+    box-shadow: none;
+}
+.hub-recognition-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    width: 100%;
+}
+.hub-recognition-filters .hub-browse-select {
+    flex: 1 1 130px;
+    min-width: 0;
+    max-width: 260px;
+}
+.hub-recognition-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+}
+.hub-recognition-card {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+    box-shadow: 0 2px 3px color-mix(in oklch, var(--foreground) 2%, transparent);
+    text-align: left;
+}
+.hub-recognition-card-heading {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 18px 20px 12px;
+    color: var(--foreground);
+    font-size: 12px;
+    font-weight: 600;
+}
+.hub-recognition-mark {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: color-mix(in oklch, var(--primary) 9%, transparent);
+}
+.hub-recognition-mark svg {
+    width: 19px;
+    height: 19px;
+}
+.hub-recognition-card-heading time {
+    display: block;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--muted-foreground);
+}
+.hub-recognition-card-body {
+    padding: 4px 20px 16px;
+}
+.hub-recognition-person {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 13px;
+}
+.hub-recognition-person .hub-recognition-avatar {
+    width: 48px;
+    height: 48px;
+}
+.hub-recognition-avatar > span {
+    background: color-mix(in oklch, var(--primary) 9%, var(--card));
+    color: var(--primary-text);
+    font-size: 15px;
+    font-weight: 600;
+}
+.hub-recognition-person h3 {
+    font-size: 21px;
+    font-weight: 650;
+    letter-spacing: -0.025em;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+.hub-recognition-person p {
+    margin-top: 3px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-value {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid color-mix(in oklch, var(--primary) 15%, var(--border));
+    border-radius: 999px;
+    padding: 4px 10px;
+    color: var(--primary-text);
+    background: color-mix(in oklch, var(--primary) 4%, var(--card));
+    font-size: 11px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+.hub-recognition-person > .hub-recognition-value {
+    margin-left: auto;
+}
+.hub-recognition-message {
+    margin: 16px 0 0;
+    font-size: 16px;
+    line-height: 1.65;
+    letter-spacing: -0.012em;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.hub-recognition-sender {
+    font-size: 12px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-sender strong {
+    color: var(--foreground);
+    font-weight: 500;
+}
+.hub-recognition-card-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    border-top: 1px solid color-mix(in oklch, var(--border) 75%, transparent);
+    padding: 8px 12px;
+    background: var(--card);
+}
+.hub-recognition-reactions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.hub-recognition-card .hub-recognition-reaction {
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 0 11px;
+    background: var(--card);
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-reaction svg {
+    color: var(--primary-text);
+}
+.hub-recognition-card .hub-recognition-reaction[aria-pressed='true'] {
+    color: var(--primary-text);
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+    background: color-mix(in oklch, var(--primary) 9%, var(--card));
+}
+.hub-recognition-card .hub-recognition-reaction:hover:not(:disabled) {
+    color: var(--primary-text);
+    border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
+}
+.hub-recognition-reaction-count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 650;
+}
+.hub-recognition-conversation-trigger {
+    margin-left: auto;
+    font-size: 12px;
+}
+.hub-recognition-card .hub-recognition-conversation-trigger:hover,
+.hub-recognition-card
+    .hub-recognition-conversation-trigger[aria-expanded='true'] {
+    color: var(--primary-text);
+    background: color-mix(in oklch, var(--primary) 9%, var(--card));
+}
+.hub-recognition-editor-action {
+    margin-left: auto;
+}
+.hub-recognition-editor-action button {
+    color: var(--muted-foreground);
+    font-size: 11px;
+}
+.hub-recognition-conversation {
+    padding: 16px 24px 22px;
+    border-top: 1px solid var(--border);
+    background: color-mix(in oklch, var(--muted) 22%, var(--card));
+}
+.hub-recognition-conversation[hidden] {
+    display: none;
+}
+.hub-recognition-conversation-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 10px;
+}
+.hub-recognition-conversation-heading h4 {
+    font-size: 13px;
+    font-weight: 600;
+}
+.hub-recognition-reply-form {
+    display: grid;
+    gap: 10px;
+}
+.hub-recognition-reply-form .hub-recognition-reply-input {
+    min-height: 42px;
+    background: var(--card);
+    padding: 12px 14px;
+    font-size: 13px;
+    box-shadow: none;
+}
+.hub-recognition-reply-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.hub-recognition-card-compact {
+    border: 0;
+    border-radius: 12px;
+    box-shadow: none;
+    background: color-mix(in oklch, var(--primary) 3%, var(--card));
+}
+.hub-recognition-card-compact .hub-recognition-card-heading {
+    padding: 16px 18px 13px;
+}
+.hub-recognition-card-compact .hub-recognition-card-body {
+    padding: 2px 18px 18px;
+}
+.hub-recognition-card-compact .hub-recognition-person h3 {
+    font-size: 18px;
+}
+.hub-recognition-card-compact .hub-recognition-person .hub-recognition-avatar {
+    width: 40px;
+    height: 40px;
+}
+.hub-recognition-card-compact .hub-recognition-message {
+    font-size: 14px;
+    margin-block: 16px;
+}
+.hub-recognition-card-compact .hub-recognition-card-actions {
+    padding: 12px;
+    background: transparent;
+}
+.hub-recognition-feed-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 4px 12px 12px;
+    font-size: 11px;
+    color: var(--muted-foreground);
+}
+.hub-recognition-invitation,
+.hub-recognition-spotlight {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+}
+.hub-recognition-invitation-image,
+.hub-recognition-photo {
+    position: relative;
+    height: 190px;
+    background: var(--muted);
+}
+.hub-recognition-invitation-image::after,
+.hub-recognition-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 30%, rgb(26 14 48 / 80%));
+}
+.hub-recognition-invitation-image img,
+.hub-recognition-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 42%;
+}
+.hub-recognition-invitation-image > span,
+.hub-recognition-photo > span {
+    position: absolute;
+    z-index: 1;
+    left: 22px;
+    right: 18px;
+    bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+}
+.hub-recognition-invitation-copy,
+.hub-recognition-quote {
+    padding: 23px;
+}
+.hub-recognition-invitation h3,
+.hub-recognition-quote h3 {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.3;
+    letter-spacing: -0.03em;
+    overflow-wrap: anywhere;
+}
+.hub-recognition-quote h3 {
+    margin: 10px 0 14px;
+}
+.hub-recognition-invitation-copy p {
+    margin: 12px 0 20px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+    line-height: 1.8;
+}
+.hub-recognition-invitation-copy > button {
+    width: 100%;
+    min-height: 40px;
+}
+.hub-recognition-quote blockquote {
+    margin-bottom: 16px;
+    font-size: 15px;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.hub-recognition-text-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 18px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--primary-text);
+}
+.hub-recognition-text-link:hover {
+    text-decoration: underline;
+}
+.hub-recognition-editor-note {
+    padding: 6px 4px 18px;
+    border-bottom: 1px solid var(--border);
+}
+.hub-recognition-editor-note > div {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.hub-recognition-editor-note h3 {
+    font-size: 13px;
+    font-weight: 600;
+}
+.hub-recognition-editor-note > div > span {
+    margin-left: auto;
+    color: var(--muted-foreground);
+    font-size: 10px;
+}
+.hub-recognition-editor-note p {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--muted-foreground);
+}
+.hub-recognition-connections {
+    display: grid;
+    gap: 4px;
+    padding-inline: 4px;
+}
+.hub-recognition-connections a,
+.hub-recognition-connections a > span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.hub-recognition-connections a {
+    justify-content: space-between;
+    gap: 12px;
+    border-radius: 6px;
+    padding: 10px 3px;
+    font-size: 12px;
+}
+.hub-recognition-connections a:hover {
+    color: var(--primary-text);
+}
+.hub-recognition-connections svg {
+    color: var(--muted-foreground);
+}
+.hub-recognition-error {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--destructive);
+}
+.hub-recognition-empty {
+    display: grid;
+    justify-items: center;
+    gap: 14px;
+    padding: 48px 32px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--card);
+    text-align: center;
+}
+.hub-recognition-empty-icon {
+    display: grid;
+    place-items: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 20px;
+    color: var(--primary-text);
+    background: color-mix(in oklch, var(--primary) 8%, var(--card));
+}
+.hub-recognition-empty h3 {
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+.hub-recognition-empty p {
+    max-width: 360px;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--muted-foreground);
+}
+
+.hub-social-thread {
+    padding: 8px 0;
+}
+.hub-social-thread-child {
+    padding-top: 10px;
+}
+.hub-social-comment {
+    border-radius: 0 14px 14px;
+    background: color-mix(in oklch, var(--muted) 65%, var(--card));
+    padding: 10px 13px;
+}
+.hub-social-composer {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+}
+.hub-social-composer:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px color-mix(in oklch, var(--primary) 12%, transparent);
+}
+.hub-social-pictures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin-top: 10px;
+    overflow: hidden;
+    border-radius: 12px;
+}
+.hub-social-pictures a {
+    display: block;
+    background: var(--muted);
+}
+.hub-social-pictures img {
+    width: 100%;
+    height: 220px;
+    object-fit: cover;
+}
+.hub-social-picture-single {
+    grid-template-columns: minmax(0, 1fr);
+}
+.hub-social-picture-single img {
+    height: auto;
+    max-height: 420px;
+    object-fit: contain;
+}

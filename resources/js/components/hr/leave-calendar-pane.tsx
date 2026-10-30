@@ -289,7 +289,7 @@ export function LeaveCalendarPane({
                             className={cn(
                                 'rounded-[7px] px-3.5 py-1.5 text-xs font-bold capitalize transition-colors',
                                 view === v
-                                    ? 'bg-primary text-primary-foreground'
+                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                     : 'text-muted-foreground hover:bg-muted',
                             )}
                         >
@@ -591,7 +591,7 @@ function MonthPicker({
                                 className={cn(
                                     'rounded-md py-1.5 text-xs font-bold transition-colors',
                                     isSel
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                         : 'hover:bg-muted',
                                 )}
                             >
@@ -652,7 +652,7 @@ function SiteChip({
             className={cn(
                 'rounded-[7px] px-2.5 py-1.5 text-xs font-semibold transition-colors',
                 active
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-primary-fill text-primary-fill-foreground'
                     : 'text-muted-foreground hover:bg-muted',
             )}
         >

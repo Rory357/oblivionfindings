@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\SecurityDevices;
 
+use App\Domain\Monitoring\Enums\MonitorState;
+use App\Domain\Monitoring\Models\Monitor;
+use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
 use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
@@ -10,10 +13,13 @@ use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Models\DeviceMaintenanceRecord;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Site;
 use App\Models\User;
+use App\Services\System\ServerReadinessService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
 class DashboardControllerTest extends TestCase
@@ -67,6 +73,8 @@ class DashboardControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('security-devices/dashboard')
+                ->where('actor_id', $this->admin->id)
+                ->has('as_of')
                 ->has('stats')
                 ->has('domainSummary')
                 ->has('healthSummary')
@@ -220,7 +228,20 @@ class DashboardControllerTest extends TestCase
 
     public function test_health_summary_counts(): void
     {
-        Device::factory()->count(2)->create(['health_status' => HealthStatus::Healthy]);
+        $profile = MonitoringProfile::factory()->create();
+        $healthyDevices = Device::factory()->count(2)->create(['health_status' => HealthStatus::Healthy]);
+        foreach ($healthyDevices as $healthyDevice) {
+            Monitor::factory()->create([
+                'device_id' => $healthyDevice->id,
+                'profile_id' => $profile->id,
+                'current_state' => MonitorState::Healthy,
+                'is_enabled' => true,
+                'last_observation_at' => now(),
+            ]);
+        }
+
+        // Unmonitored device with stored "healthy" must never count as healthy without evidence.
+        Device::factory()->create(['health_status' => HealthStatus::Healthy]);
         Device::factory()->create(['health_status' => HealthStatus::Critical]);
 
         $response = $this->actingAs($this->admin)->get('/security-devices');
@@ -229,6 +250,7 @@ class DashboardControllerTest extends TestCase
             $summary = collect($page->toArray()['props']['healthSummary']);
             $this->assertEquals(2, $summary->firstWhere('status', 'healthy')['count']);
             $this->assertEquals(1, $summary->firstWhere('status', 'critical')['count']);
+            $this->assertEquals(1, $summary->firstWhere('status', 'unknown')['count']);
         });
     }
 
@@ -362,5 +384,66 @@ class DashboardControllerTest extends TestCase
                 collect($props['overdueMaintenance'])->pluck('description')->all(),
             );
         });
+    }
+
+    public function test_estate_findings_use_an_inclusive_past_window_and_exclude_future_signals(): void
+    {
+        $this->travelTo(now()->startOfSecond());
+        $device = Device::factory()->create();
+        foreach (['window_start' => now()->subHours(24), 'window_end' => now(), 'too_old' => now()->subHours(24)->subSecond(), 'future' => now()->addSecond()] as $type => $at) {
+            DeviceEvent::create(['device_id' => $device->id, 'event_type' => $type, 'severity' => 'critical', 'source' => 'test', 'occurred_at' => $at]);
+        }
+        $this->actingAs($this->admin)->get('/security-devices')->assertOk()->assertInertia(fn ($page) => $page
+            ->where('actor_id', $this->admin->id)->where('as_of', now()->toISOString())->where('stats.criticalEvents24h', 2)->has('recentEvents', 2)
+            ->where('recentEvents.0.event_type', 'window_end')->where('recentEvents.1.event_type', 'window_start')->where('operations.summary.active_findings', 2));
+    }
+
+    public function test_first_run_checklist_reflects_real_setup_state_without_fake_completion(): void
+    {
+        Cache::forget(ServerReadinessService::CHECKLIST_CACHE_KEY);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('first_run_checklist.total', 4)
+                ->where('first_run_checklist.completed', 0)
+                ->where('first_run_checklist.all_complete', false)
+                ->where('first_run_checklist.steps.0.key', 'server_readiness')
+                ->where('first_run_checklist.steps.0.done', false)
+                ->where('first_run_checklist.steps.0.href', '/settings/server-readiness')
+                ->where('first_run_checklist.steps.1.key', 'sites')
+                ->where('first_run_checklist.steps.1.done', false)
+                ->where('first_run_checklist.steps.2.key', 'devices')
+                ->where('first_run_checklist.steps.2.done', false)
+                ->where('first_run_checklist.steps.3.key', 'monitoring')
+                ->where('first_run_checklist.steps.3.done', false)
+            );
+
+        Cache::put(ServerReadinessService::CHECKLIST_CACHE_KEY, [
+            'overall_status' => 'pass',
+            'passed_count' => 7,
+            'failed_count' => 0,
+            'total_count' => 7,
+            'checked_at' => now()->utc()->toIso8601String(),
+        ], 60);
+
+        Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+        $profile = MonitoringProfile::factory()->create();
+        $device = Device::factory()->create();
+        Monitor::factory()->create([
+            'device_id' => $device->id,
+            'profile_id' => $profile->id,
+            'is_enabled' => true,
+            'current_state' => MonitorState::Healthy,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('first_run_checklist.completed', 4)
+                ->where('first_run_checklist.all_complete', true)
+            );
     }
 }

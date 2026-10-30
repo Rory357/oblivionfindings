@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Domain\Governance\Models\SpendApproval;
 use App\Models\Concerns\AuditableChanges;
+use App\Models\Site;
 use App\Models\User;
 use Database\Factories\Finance\FinBillFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -60,6 +61,11 @@ class FinBill extends Model
         'approved_at' => 'datetime',
     ];
 
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(FinVendor::class, 'vendor_id');
@@ -85,6 +91,11 @@ class FinBill extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(FinBillLine::class, 'bill_id');
+    }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(FinBillDocument::class, 'bill_id');
     }
 
     public function approvedBy(): BelongsTo

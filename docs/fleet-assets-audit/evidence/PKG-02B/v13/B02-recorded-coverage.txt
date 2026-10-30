@@ -1,0 +1,224 @@
+- strong: PKG-02B · v13
+- generic: Synthetic design · nothing is sent
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction"
+  - option "Ready · current example evidence" [selected]
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - generic: Tue, 22 September
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Needs assessment
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Passed
+    - generic: CHK-DEMO-0183 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: View work
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview":
+      - generic: Overview
+    - tab "Service & compliance" [selected]:
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - tab "Trip history":
+      - generic: Trip history
+    - button "More views (1)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Evidence & due dates" [selected]:
+      - text: Evidence & due dates
+    - tab "Service schedules":
+      - text: Service schedules
+    - tab "Reminders":
+      - text: Reminders
+    - tab "Service history":
+      - text: Service history
+    - tab "Mileage":
+      - text: Mileage
+  - tabpanel:
+    - generic: EVIDENCE & OBLIGATIONS
+    - heading "Service & compliance" [level=2]
+    - group "Compliance requirements layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - button "Service schedules":
+      - text: Service schedules
+    - generic "Compliance requirements":
+      - generic: Compliance requirements
+      - generic: 4 records shown
+      - table:
+        - row "Record Recorded status Next due / coverage Owner & evidence Actions":
+          - columnheader "Record"
+          - columnheader "Recorded status"
+          - columnheader "Next due / coverage"
+          - columnheader "Owner & evidence"
+          - columnheader "Actions"
+        - row "WoF WOF-DEMO-14 Passed Applicable 9 Apr 2027 Update dates & evidence Kōwhai House Coordinator 0 files · add evidence Actions for WoF":
+          - cell "WoF WOF-DEMO-14":
+            - generic: WoF
+            - generic: WOF-DEMO-14
+          - cell "Passed Applicable":
+            - generic: Passed
+            - generic: Applicable
+          - cell "9 Apr 2027 Update dates & evidence":
+            - strong: 9 Apr 2027
+            - button "Update dates & evidence"
+          - cell "Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for WoF":
+            - button "Actions for WoF":
+        - row "Registration REG-DEMO-14 Recorded Applicable 8 Oct 2026 Update dates & evidence Kōwhai House Coordinator 0 files · add evidence Actions for Registration":
+          - cell "Registration REG-DEMO-14":
+            - generic: Registration
+            - generic: REG-DEMO-14
+          - cell "Recorded Applicable":
+            - generic: Recorded
+            - generic: Applicable
+          - cell "8 Oct 2026 Update dates & evidence":
+            - strong: 8 Oct 2026
+            - button "Update dates & evidence"
+          - cell "Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for Registration":
+            - button "Actions for Registration":
+        - row "RUC RUC-DEMO-14 Recorded Applicable 80,000 km – 82,000 km Recorded odometer exceeds licence end Update dates & evidence Kōwhai House Coordinator 0 files · add evidence Actions for RUC":
+          - cell "RUC RUC-DEMO-14":
+            - generic: RUC
+            - generic: RUC-DEMO-14
+          - cell "Recorded Applicable":
+            - generic: Recorded
+            - generic: Applicable
+          - cell "80,000 km – 82,000 km Recorded odometer exceeds licence end Update dates & evidence":
+            - strong: 80,000 km – 82,000 km
+            - generic: Recorded odometer exceeds licence end
+            - button "Update dates & evidence" [active]
+          - cell "Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for RUC":
+            - button "Actions for RUC":
+        - row "CoF COF-DEMO-14 Not applicable Not applicable Not recorded Update dates & evidence Kōwhai House Coordinator 0 files · add evidence Actions for CoF":
+          - cell "CoF COF-DEMO-14":
+            - generic: CoF
+            - generic: COF-DEMO-14
+          - cell "Not applicable Not applicable":
+            - generic: Not applicable
+            - generic: Not applicable
+          - cell "Not recorded Update dates & evidence":
+            - strong: Not recorded
+            - button "Update dates & evidence"
+          - cell "Kōwhai House Coordinator 0 files · add evidence":
+            - generic: Kōwhai House Coordinator
+            - button "0 files · add evidence":
+              - text: 0 files · add evidence
+          - cell "Actions for CoF":
+            - button "Actions for CoF":
+    - text: Reminders have their own owner and delivery history.
+    - button "Review reminders":
+      - text: Review reminders
+  - generic: PKG-02B v13 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: RUC evidence updated; any repair/retest remains separate.
+  - button "Undo"
+  - button "Dismiss"

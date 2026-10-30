@@ -29,6 +29,9 @@ class MaintenanceOperationsPresenter
         'battery_replacement',
     ];
 
+    /** Shown wherever maintenance costs appear; Finance owns the money record. */
+    public const FINANCE_NOTE = 'Costs shown in legacy maintenance history are informational. Finance remains the authoritative financial record.';
+
     public function __construct(
         private readonly SecurityDevicesAccessService $access,
     ) {}
@@ -64,6 +67,7 @@ class MaintenanceOperationsPresenter
         $dueSoon = now()->addDays(14)->endOfDay();
 
         return [
+            'actor_id' => (int) $viewer->id,
             'tabs' => [
                 ['key' => 'overview', 'label' => 'Overview'],
                 ['key' => 'due', 'label' => 'Due & overdue'],
@@ -77,7 +81,7 @@ class MaintenanceOperationsPresenter
             'boundary' => [
                 'title' => 'One operational maintenance record',
                 'description' => 'Servicing, inspection, calibration, repair, battery, connectivity, firmware, and approved configuration work stay attached to the canonical device and site.',
-                'finance_note' => 'Costs shown in legacy maintenance history are informational. Finance remains the authoritative financial record.',
+                'finance_note' => self::FINANCE_NOTE,
             ],
             'summary' => [
                 'total' => $records->count(),

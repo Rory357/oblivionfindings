@@ -35,9 +35,10 @@ import { EntityKebab, type MenuItem } from './entity-menu';
 
 type IconType = ComponentType<{ className?: string }>;
 
-export type EntityMeridian = 'critical' | 'warning' | 'success';
+export type EntityMeridian = 'critical' | 'warning' | 'success' | 'neutral';
 
 const MERIDIAN: Record<EntityMeridian, string> = {
+    neutral: 'bg-muted-foreground',
     critical: 'bg-status-critical',
     warning: 'bg-status-warning',
     success: 'bg-status-success',
@@ -102,6 +103,8 @@ export interface EntityCardProps {
     selected?: boolean;
     onToggleSelect?: () => void;
     className?: string;
+    /** Touch and focus treatment for worker-facing action menus. */
+    frontline?: boolean;
 }
 
 export function EntityCard({
@@ -127,6 +130,7 @@ export function EntityCard({
     selected = false,
     onToggleSelect,
     className,
+    frontline = false,
 }: EntityCardProps) {
     selected = selection?.checked ?? selected;
     const activate = () => (selectMode ? onToggleSelect?.() : onOpen?.());
@@ -180,7 +184,7 @@ export function EntityCard({
                             className={cn(
                                 'mt-0.5 flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-[7px] border transition-colors',
                                 selected
-                                    ? 'border-primary bg-primary text-primary-foreground'
+                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                     : 'border-input bg-card text-transparent',
                             )}
                         >
@@ -221,6 +225,7 @@ export function EntityCard({
                     {!selectMode ? (
                         <EntityKebab
                             actions={actions}
+                            frontline={frontline}
                             label={`Actions for ${name}`}
                             className="-mt-0.5 -mr-1"
                         />
@@ -315,7 +320,7 @@ export function EntityCardGrid({
     return (
         <div
             className={cn(
-                'grid [grid-template-columns:repeat(auto-fill,minmax(330px,1fr))] gap-5 [&>*]:h-full',
+                'grid [grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr))] gap-5 [&>*]:h-full',
                 className,
             )}
         >

@@ -1,0 +1,16 @@
+{
+    "schema": 1,
+    "file": "osm-8a40e14d71fd3c952264.sqlite",
+    "label": "New Zealand",
+    "date": "2026-09-23",
+    "source_sha256": "8a40e14d71fd3c9522646117209d0ea403cba10fc549ab3e77b09fa84b581ad4",
+    "srs_id": 100000,
+    "features": {
+        "roads": 852534,
+        "places": 5784,
+        "water_a": 61455
+    },
+    "attribution": "\u00a9 OpenStreetMap contributors \u00b7 ODbL \u00b7 openstreetmap.org\/copyright",
+    "source": "Geofabrik OpenStreetMap extract",
+    "seconds": 7.526887893676758
+}

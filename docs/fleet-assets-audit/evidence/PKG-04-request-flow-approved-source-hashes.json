@@ -1,0 +1,30 @@
+[
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-request.test.tsx",
+    "sha256": "7892C8731E31B80A539008E0B65E5481D7AD75945925648F2855183DB4F9D118"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-vehicle-picker.tsx",
+    "sha256": "32F4D3F5BE0BA8E167E308DBC63787E2A06AA5DAA4AA29731EEE95C8B551110B"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-wizard.css",
+    "sha256": "ED6C1C23B67540DDF1796DB12B36FF97A46F8F63AB728C6917DDFBAB2FA6DA8D"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/booking-wizard.tsx",
+    "sha256": "FF642775F845548D399C66AF6B122C4A9BFF0EE94A954C851BC1F276972BCDAB"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/evidence-upload.ts",
+    "sha256": "7AFB5C144A69376B4F54A8C3F861DC328E2D73E44D4ED2CCC18DA101D8F76D6E"
+  },
+  {
+    "path": "resources/js/components/fleet-assets/vehicle-workspace/studio.css",
+    "sha256": "C94AF1BC9D962CA63D46A0DBAF1AE97E6C7475C3C09C59EF4EF0F8AA57A0DDFC"
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/vehicles/index.tsx",
+    "sha256": "CDC9858CD6C7F644981BAED658EDA19BF2C2FFFAC1DFFF368D99B307D339DB5E"
+  }
+]

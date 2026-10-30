@@ -14,6 +14,41 @@ export type NotificationModuleGroup = NotificationModule & {
 };
 
 export const NOTIFICATION_META: Record<string, NotificationMeta> = {
+    'service_agreements.referral_draft_created': {
+        name: 'Draft agreement from a referral',
+        description:
+            'When a draft service agreement is made from a referral’s approved proposal and needs review. Sent to Finance.',
+    },
+    'chat.call.missed': {
+        name: 'Missed Chat calls',
+        description:
+            'Calls you were invited to but did not answer. Quiet time and conversation mute still apply. Opening a notice does not call anyone.',
+    },
+    'chat.family.assigned': {
+        name: 'Family work assigned to you',
+        description:
+            'New ownership or handover of an unresolved family conversation. Quiet time and conversation mute still apply; notices contain no care details.',
+    },
+    'chat.message.received': {
+        name: 'New Chat messages',
+        description:
+            'New messages in conversations you can access. Muted or already-read messages do not create a notice.',
+    },
+    'chat.mentioned': {
+        name: 'Mentions in Chat',
+        description:
+            'When someone mentions you in a conversation you can access. Conversation mute and quiet time still apply.',
+    },
+    'chat.family.reply': {
+        name: 'Replies from the care team',
+        description:
+            'Replies in your approved family conversations. Notices keep client names and message content private.',
+    },
+    'hr.calendar.reminder': {
+        name: 'Company event reminders',
+        description:
+            'Reminders selected by an event organiser. Quiet time and email summaries apply; expired reminders are skipped. Email summaries run at 8 am New Zealand time (Monday for weekly). Push is not used.',
+    },
     'timesheets.created': {
         name: 'Timesheet Created',
         description: 'When a new timesheet is created',
@@ -82,9 +117,30 @@ export const NOTIFICATION_META: Record<string, NotificationMeta> = {
         name: 'Shift Task Due',
         description: 'When a time-specific shift task is due now',
     },
+    'medications.witness_pin_reminder': {
+        name: 'Witness PIN Reminder',
+        description:
+            'When a lead asks you to set your witness PIN — always in the app; push if you turn it on',
+    },
 };
 
 export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
+    chat: {
+        label: 'Chat',
+        colour: 'violet',
+        keys: [
+            'chat.message.received',
+            'chat.mentioned',
+            'chat.family.reply',
+            'chat.family.assigned',
+            'chat.call.missed',
+        ],
+    },
+    company: {
+        label: 'Company Hub',
+        colour: 'violet',
+        keys: ['hr.calendar.reminder'],
+    },
     operations: {
         label: 'Operations',
         colour: 'violet',
@@ -97,10 +153,20 @@ export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
             'timesheets.returned',
         ],
     },
+    agreements: {
+        label: 'Service agreements',
+        colour: 'violet',
+        keys: ['service_agreements.referral_draft_created'],
+    },
     rostering: {
         label: 'Rostering',
         colour: 'violet',
         keys: ['shift_task_due'],
+    },
+    medication: {
+        label: 'Medication',
+        colour: 'violet',
+        keys: ['medications.witness_pin_reminder'],
     },
     incidents: {
         label: 'Incidents & Safety',
@@ -125,6 +191,10 @@ export const NOTIFICATION_MODULES: Record<string, NotificationModule> = {
         ],
     },
 };
+
+export function isChatNotificationKey(key: string): boolean {
+    return NOTIFICATION_MODULES.chat.keys.includes(key);
+}
 
 export function friendlyNotificationName(key: string): string {
     return (

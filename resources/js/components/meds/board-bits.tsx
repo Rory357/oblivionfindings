@@ -4,13 +4,15 @@
  * eMAR page redesigns reuse one idiom. */
 import { avatarHueStyle } from '@/components/rostering/avatar-hue';
 import { Badge } from '@/components/ui/badge';
+import { InfoCard } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
-import { MapPin } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 
 import {
     clientHue,
     clientInitials,
     type ClientInfo,
+    type CompetencyNotice,
     type DoseStatus,
 } from '@/pages/meds/today/types';
 
@@ -59,19 +61,66 @@ export const DOSE_STATUS_META: Record<
         tagColor: 'var(--muted-foreground)',
     },
     missed: {
-        label: 'Missed',
+        label: 'Missed (recorded)',
         pillClass:
             'border-status-critical/30 bg-status-critical-bg text-status-critical',
         tagBg: 'var(--status-critical-bg)',
         tagColor: 'var(--status-critical)',
     },
+    pending_check: {
+        label: 'Waiting for the order check',
+        pillClass: 'border-status-info/30 bg-status-info-bg text-status-info',
+        tagBg: 'var(--status-info-bg)',
+        tagColor: 'var(--status-info)',
+    },
+    away: {
+        label: 'Away',
+        pillClass: 'border-status-info/30 bg-status-info-bg text-status-info',
+        tagBg: 'var(--status-info-bg)',
+        tagColor: 'var(--status-info)',
+    },
 };
+
+/**
+ * A dose status as words: "Away · Respite at another house (since Mon 15 Jun, 7:00 am)" when the
+ * person is away (the reason is always shown), else the status label.
+ */
+export function doseStatusLabel(
+    status: DoseStatus,
+    awayReason?: string | null,
+): string {
+    const label = (DOSE_STATUS_META[status] ?? DOSE_STATUS_META.upcoming)
+        .label;
+    return status === 'away' && awayReason ? `${label} · ${awayReason}` : label;
+}
+
+/**
+ * EM-12: a dose list tells a reader without controlled-medicine access how
+ * many controlled doses it leaves out, and how many of those are overdue —
+ * naming none — so it reconciles with the overdue badge, which counts them.
+ * Null when nothing is left out.
+ */
+export function hiddenControlledCaption(
+    count: number,
+    overdue = 0,
+): string | null {
+    if (count <= 0) return null;
+    const lead =
+        count === 1
+            ? '1 more controlled-medicine dose isn’t shown'
+            : `${count} more controlled-medicine doses aren’t shown`;
+    const late = overdue > 0 ? ` (${overdue} overdue)` : '';
+    return `${lead}${late} — needs controlled-medicine access.`;
+}
 
 export function StatusPill({
     status,
+    awayReason,
     className,
 }: {
     status: DoseStatus;
+    /** Shown after "Away · " when the person is away. */
+    awayReason?: string | null;
     className?: string;
 }) {
     const meta = DOSE_STATUS_META[status] ?? DOSE_STATUS_META.upcoming;
@@ -83,7 +132,7 @@ export function StatusPill({
                 className,
             )}
         >
-            {meta.label}
+            {doseStatusLabel(status, awayReason)}
         </span>
     );
 }
@@ -124,6 +173,71 @@ export function ClientAvatar({
         >
             {clientInitials(name)}
         </span>
+    );
+}
+
+/**
+ * Allergy notice for a recording wizard. Reads the medication allergy
+ * register and the health profile (server-side). An empty or unreadable
+ * record is never shown as a confirmed "no known allergies".
+ */
+export function ClientAllergyNotice({
+    client,
+    fallbackName,
+}: {
+    client: ClientInfo | null | undefined;
+    fallbackName: string;
+}) {
+    const name = client?.preferred ?? client?.name ?? fallbackName;
+
+    if (client && client.allergies.length > 0) {
+        return (
+            <InfoCard icon={AlertTriangle} tone="crit">
+                <strong>Allergies:</strong> {client.allergies.join(', ')}. Check
+                the label against the allergy list before giving.
+            </InfoCard>
+        );
+    }
+
+    if (!client || client.allergy_status === 'unavailable') {
+        return (
+            <InfoCard icon={AlertTriangle} tone="warn">
+                <strong>Allergy record couldn’t be loaded</strong> for {name}.
+                Check the health profile before giving.
+            </InfoCard>
+        );
+    }
+
+    return (
+        // Absence of a record is a safety surface: fixed amber, never the
+        // brand tint (DESIGN.md non-negotiable #6).
+        <InfoCard icon={AlertTriangle} tone="warn">
+            No allergies recorded for {name} — check the health profile before
+            giving.
+        </InfoCard>
+    );
+}
+
+/**
+ * The signed-in worker's restricted-competency rule (NF-03), shown before
+ * they sign so a server refusal is never a surprise.
+ */
+export function CompetencyRestrictionNotice({
+    notice,
+}: {
+    notice: CompetencyNotice | null | undefined;
+}) {
+    if (!notice) return null;
+
+    return (
+        <InfoCard icon={AlertTriangle} tone={notice.blocked ? 'crit' : 'warn'}>
+            <strong>
+                {notice.blocked
+                    ? 'You can’t sign doses as given.'
+                    : 'Co-signer required.'}
+            </strong>{' '}
+            {notice.message}
+        </InfoCard>
     );
 }
 

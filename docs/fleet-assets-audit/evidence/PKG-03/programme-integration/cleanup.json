@@ -1,0 +1,11 @@
+{
+  "serverStopped": true,
+  "temporaryTabClosed": true,
+  "viewportReset": true,
+  "temporaryToolsRemoved": true,
+  "noBrowserDatabaseCreated": true,
+  "testDatabaseCleanup": "Repository TestCase process exited0",
+  "sharedDependenciesPreserved": true,
+  "mainUntouched": true,
+  "verifierArchive": "visual-verifier.zip"
+}

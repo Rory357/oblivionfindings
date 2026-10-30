@@ -33,7 +33,10 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Illuminate\Support\Str;
 use Illuminate\Support\Carbon;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
+// Tests that commit fixtures for worker processes register
+// CommittedFixtureCleanup so those rows never reach later tests.
 uses(RefreshDatabase::class);
 
 test('queue and related-work search retain identity while undated work stays outside All Tasks', function () {
@@ -158,6 +161,34 @@ function pkg01StaffAt(Site $site, array $permissions = []): User
 function pkg01Site(): Site
 {
     return Site::factory()->create(['is_active' => true, 'archived' => false, 'archived_at' => null]);
+}
+
+/**
+ * PKG-02B: release to service rechecks the vehicle's recorded compliance
+ * evidence. Record a valid set up front so each release refusal in these
+ * tests is caused by the maintenance rule it exercises.
+ */
+function pkg01ReadyVehicleEvidence(Asset $asset): void
+{
+    $evidence = [
+        'registration' => ['applicable', 'recorded', 'REG-PKG01', '2027-12-31', null],
+        'wof' => ['applicable', 'passed', 'WOF-PKG01', '2027-12-31', null],
+        'cof' => ['not_applicable', 'needs_assessment', null, null, 'Light vehicle; a WoF applies instead.'],
+        'ruc' => ['not_applicable', 'needs_assessment', null, null, 'Recorded by the fleet owner.'],
+    ];
+    foreach ($evidence as $kind => [$applicability, $outcome, $reference, $expires, $basis]) {
+        $recordId = DB::table('fleet_vehicle_compliance_records')->insertGetId([
+            'asset_id' => $asset->id, 'kind' => $kind, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $versionId = DB::table('fleet_vehicle_compliance_versions')->insertGetId([
+            'record_id' => $recordId, 'version' => 1, 'applicability' => $applicability,
+            'applicability_basis' => $basis, 'outcome' => $outcome, 'evidence_reference' => $reference,
+            'expires_on' => $expires, 'request_key' => "pkg01-evidence-{$kind}",
+            'request_fingerprint' => str_repeat('e', 64), 'content_sha256' => str_repeat('e', 64),
+            'created_at' => now(),
+        ]);
+        DB::table('fleet_vehicle_compliance_records')->where('id', $recordId)->update(['current_version_id' => $versionId]);
+    }
 }
 
 test('approved configuration versions route, rule and reviewer decisions without default grants', function () {
@@ -754,12 +785,14 @@ test('triage deadlines and provider responses retain exact Auckland source times
 });
 
 test('release requires an independent category-granted reviewer, current passing retest and custody', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     Storage::fake('private');
     $site = pkg01Site();
     $manager = pkg01StaffAt($site, ['fleet.maintenance.manage']);
     $reviewer = pkg01StaffAt($site, ['fleet.maintenance.release']);
     $recipient = pkg01StaffAt($site);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    pkg01ReadyVehicleEvidence($asset);
     $order = FleetWorkOrder::create([
         'asset_id' => $asset->id, 'reported_by_user_id' => $manager->id,
         'assigned_to_user_id' => $manager->id, 'title' => 'Safety repair',
@@ -984,6 +1017,7 @@ PHP;
 });
 
 test('a completed held repair can recover a new rule and enabled committed effects deliver once', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     Storage::fake('private');
     expect(config('fleet_maintenance.effects_enabled'))->toBeFalse();
     $site = pkg01Site();
@@ -991,6 +1025,7 @@ test('a completed held repair can recover a new rule and enabled committed effec
     $reviewer = pkg01StaffAt($site, ['fleet.maintenance.release']);
     $recipient = pkg01StaffAt($site);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    pkg01ReadyVehicleEvidence($asset);
     $template = FleetChecklistTemplate::create([
         'name' => 'Synthetic automatic release retest', 'type' => 'custom',
         'items' => [['id' => 'brakes', 'label' => 'Brakes', 'required' => true]], 'is_active' => true,
@@ -1131,6 +1166,7 @@ test('a completed held repair can recover a new rule and enabled committed effec
 });
 
 test('an overlapping booking decision waits for the asset lock and sees a newly committed hold', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $site = pkg01Site();
     $manager = pkg01StaffAt($site, ['fleet.maintenance.manage']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle', 'status' => 'active']);
@@ -1284,11 +1320,16 @@ test('Designer review: actual default administrator seeding withholds safety con
 test('Designer review: authored template configures and records standalone check evidence without inventing work', function () {
     Storage::fake('private');
     $site = pkg01Site();
-    $actor = pkg01StaffAt($site, ['fleet.maintenance.manage', 'fleet.maintenance.configure', 'fleet.viewAny']);
+    $actor = pkg01StaffAt($site, ['fleet.maintenance.manage', 'fleet.maintenance.configure', 'fleet.viewAny', 'fleet.settings.manage']);
     $backup = pkg01StaffAt($site);
     $foreign = pkg01StaffAt(pkg01Site(), ['fleet.maintenance.manage', 'fleet.viewAny']);
     $reader = pkg01StaffAt($site, ['fleet.viewAny']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    // A checklist created here is offered to every vehicle: a fleet-wide setting.
+    $this->actingAs($foreign)->post('/fleet-assets/maintenance/checklists', [
+        'name' => 'Site manager template', 'items' => [['label' => 'Condition', 'type' => 'select', 'options' => ['pass', 'fail']]],
+    ])->assertForbidden();
+    expect(FleetChecklistTemplate::query()->where('name', 'Site manager template')->exists())->toBeFalse();
     $this->actingAs($actor)->post('/fleet-assets/maintenance/checklists', [
         'name' => 'Designer authored template', 'items' => [
             ['label' => 'Condition observed', 'type' => 'select', 'options' => ['pass', 'fail'], 'required' => true],
@@ -1353,14 +1394,17 @@ test('Designer review: authored template configures and records standalone check
 });
 
 test('Designer review: Outing booking waits for the asset lock and a hold leaves no partial outing', function () {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $site = pkg01Site();
     $manager = pkg01StaffAt($site, ['fleet.manage', 'fleet.outings.manage']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle', 'status' => 'active']);
     $order = FleetWorkOrder::create(['asset_id' => $asset->id, 'reported_by_user_id' => $manager->id,
         'title' => 'Outing guard', 'category' => 'vehicle', 'priority' => 'medium', 'status' => 'open']);
     pkg01DesignerPolicy($site, $manager, 'hold', ['allowed_kinds' => ['safety']]);
+    // FA-T01: an outing needs a resident from the planner's Sites.
+    $resident = \App\Models\Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
     $outingData = ['title' => 'Concurrent synthetic outing', 'destination' => 'Synthetic destination',
-        'asset_id' => $asset->id, 'planned_departure' => now()->addDay()->toDateTimeString(),
+        'asset_id' => $asset->id, 'resident_ids' => [$resident->id], 'planned_departure' => now()->addDay()->toDateTimeString(),
         'planned_return' => now()->addDay()->addHour()->toDateTimeString()];
     $prefix = sys_get_temp_dir().DIRECTORY_SEPARATOR.'pkg01-outing-'.Str::uuid();
     $ready = $prefix.'-ready'; $attempt = $prefix.'-attempt'; $barrier = $prefix.'-barrier';
@@ -1427,6 +1471,7 @@ test('Designer review: two completed jobs clear only their own holds while the a
     $manager = pkg01StaffAt($site, ['fleet.maintenance.manage']);
     $reviewer = pkg01StaffAt($site, ['fleet.maintenance.release']);
     $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
+    pkg01ReadyVehicleEvidence($asset);
     $template = FleetChecklistTemplate::create(['name' => 'Synthetic two-job retest', 'type' => 'custom',
         'items' => [['id' => 'condition', 'label' => 'Condition', 'type' => 'select', 'options' => ['pass', 'fail']]], 'is_active' => true]);
     pkg01DesignerPolicy($site, $manager, 'hold', ['allowed_kinds' => ['safety']]);
@@ -1468,6 +1513,18 @@ test('Designer review: two completed jobs clear only their own holds while the a
     expect(fn () => $service->execute($reviewer, $orders[1]->id, 'release', 3, 'designer-two-stale-release'))
         ->toThrow(ValidationException::class);
     expect($retest($orders[1], 'designer-two-current-retest')->outcome)->toBe('passed');
+    // PKG-02B: an unresolved compliance assessment keeps release to service
+    // blocked, even when the repair, retest and reviewer are all in order.
+    $wof = DB::table('fleet_vehicle_compliance_records')->where('asset_id', $asset->id)->where('kind', 'wof')->first();
+    $unresolved = DB::table('fleet_vehicle_compliance_versions')->insertGetId([
+        'record_id' => $wof->id, 'version' => 2, 'supersedes_version_id' => $wof->current_version_id,
+        'applicability' => 'applicable', 'outcome' => 'needs_assessment', 'request_key' => 'pkg01-wof-unresolved',
+        'request_fingerprint' => str_repeat('f', 64), 'content_sha256' => str_repeat('f', 64), 'created_at' => now(),
+    ]);
+    DB::table('fleet_vehicle_compliance_records')->where('id', $wof->id)->update(['current_version_id' => $unresolved]);
+    expect(fn () => $service->execute($reviewer, $orders[1]->id, 'release', 3, 'designer-two-release-unresolved-wof'))
+        ->toThrow(ValidationException::class, 'WoF: assessment is unresolved.');
+    DB::table('fleet_vehicle_compliance_records')->where('id', $wof->id)->update(['current_version_id' => $wof->current_version_id]);
     $service->execute($reviewer, $orders[1]->id, 'release', 3, 'designer-two-release-2');
     expect(DB::table('fleet_maintenance_restrictions')->where('asset_id', $asset->id)->where('state', 'active')->count())->toBe(0);
     app(MaintenanceRestrictionService::class)->assertBookable($asset->id);

@@ -11,10 +11,15 @@ use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ControlRoom\SignalProcessingService;
+use App\Services\Medication\Alerts\MedicationAlertSources;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Medication\MedicationSignalService;
+use App\Services\Medication\OverdueDoseAlerts;
 use App\Support\Medication\MedicationStockQuantity;
+use App\Support\WorkerClock;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -133,6 +138,9 @@ class MedicationAlertService
                 $alerts[] = $overdueAlert;
             }
         } else {
+            // Suppressed: none of their doses is overdue, so their open
+            // overdue alerts resolve (C6f).
+            $this->checkOverdueDoses($client);
             $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'med_admin_alerts_suppressed',
@@ -149,6 +157,10 @@ class MedicationAlertService
         if ($discrepancyAlert) {
             $alerts[] = $discrepancyAlert;
         }
+
+        // People are told — as-needed limits, reviews due, open discrepancies
+        // — as Medication Settings › Alerts & access says (P11 B2).
+        app(MedicationAlertSources::class)->forClient($client, $medications);
 
         return $alerts;
     }
@@ -214,7 +226,7 @@ class MedicationAlertService
             return null;
         }
 
-        $daysUntilDue = now()->startOfDay()->diffInDays($latest->next_test_date->copy()->startOfDay(), false);
+        $daysUntilDue = WorkerClock::daysUntil($latest->next_test_date);
         if ($daysUntilDue > 3) {
             return null;
         }
@@ -241,7 +253,7 @@ class MedicationAlertService
         $alerts = [];
 
         if ($client->next_chart_review_date) {
-            $daysUntilReview = now()->startOfDay()->diffInDays($client->next_chart_review_date->copy()->startOfDay(), false);
+            $daysUntilReview = WorkerClock::daysUntil($client->next_chart_review_date);
             if ($daysUntilReview <= 7) {
                 $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                     $client->id,
@@ -254,19 +266,20 @@ class MedicationAlertService
             }
         }
 
+        $reviewWindowEnd = WorkerClock::today()->addDays(7)->toDateString();
         $review = MedicationReview::query()
             ->where('client_id', $client->id)
             ->whereIn('status', ['scheduled', 'overdue'])
-            ->where(function ($query) {
-                $query->whereDate('scheduled_date', '<=', now()->addDays(7)->toDateString())
-                    ->orWhereDate('next_review_date', '<=', now()->addDays(7)->toDateString());
+            ->where(function ($query) use ($reviewWindowEnd) {
+                $query->whereDate('scheduled_date', '<=', $reviewWindowEnd)
+                    ->orWhereDate('next_review_date', '<=', $reviewWindowEnd);
             })
             ->orderByRaw('COALESCE(next_review_date, scheduled_date) asc')
             ->first();
 
         if ($review) {
             $dueDate = $review->next_review_date ?? $review->scheduled_date;
-            $daysUntilReview = now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false);
+            $daysUntilReview = WorkerClock::daysUntil($dueDate);
             $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'medication_review_due',
@@ -308,10 +321,10 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_PRN_OVER_LIMIT,
                 $client->id,
                 'critical',
-                "{$medication->name}: PRN limit reached ({$count}/{$maxPerDay})",
+                "{$medication->unrestrictedName()}: PRN limit reached ({$count}/{$maxPerDay})",
                 [
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
+                    'medication_name' => $medication->unrestrictedName(),
                     'prn_count_24h' => $count,
                     'max_per_day' => $maxPerDay,
                     'controlled_drug' => $medication->controlled_drug,
@@ -354,7 +367,7 @@ class MedicationAlertService
                 $client->id,
                 'expired',
                 'critical',
-                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->name}: Medication ended on {$medication->end_date->format('d/m/Y')}",
                 $medication->id
             );
 
@@ -363,10 +376,10 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_EXPIRED,
                 $client->id,
                 'high',
-                "{$medication->name}: Medication expired on {$medication->end_date->format('d/m/Y')}",
+                "{$medication->unrestrictedName()}: Medication ended on {$medication->end_date->format('d/m/Y')}",
                 [
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
+                    'medication_name' => $medication->unrestrictedName(),
                     'expiry_date' => $medication->end_date->toDateString(),
                     'controlled_drug' => $medication->controlled_drug,
                     'high_risk' => $medication->high_risk,
@@ -379,12 +392,15 @@ class MedicationAlertService
 
         if ($medication->isExpiringSoon(7)) {
             // Expiring soon is dashboard-only — NOT operational
-            $daysRemaining = $medication->end_date->diffInDays(now());
+            $daysRemaining = $medication->daysUntilEnd();
+            $expires = $daysRemaining === 0
+                ? 'Expires today'
+                : "Expires in {$daysRemaining} ".Str::plural('day', $daysRemaining);
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'expiring_soon',
                 'warning',
-                "{$medication->name}: Expires in {$daysRemaining} days ({$medication->end_date->format('d/m/Y')})",
+                "{$medication->name}: {$expires} ({$medication->end_date->format('d/m/Y')})",
                 $medication->id
             );
 
@@ -402,11 +418,11 @@ class MedicationAlertService
     {
         $stock = $medication->stock;
 
-        if (! $stock || $stock->on_hand === null) {
+        if (! $stock || $stock->usableQuantity() === null) {
             return null;
         }
 
-        if (MedicationStockQuantity::equals($stock->on_hand, 0)) {
+        if (MedicationStockQuantity::equals($stock->usableQuantity(), 0)) {
             $alert = MedicationDashboardAlert::createOrUpdateAlert(
                 $client->id,
                 'stock_low',
@@ -420,10 +436,10 @@ class MedicationAlertService
                 MedicationSignalService::TYPE_STOCK_OUT,
                 $client->id,
                 'high',
-                "{$medication->name}: OUT OF STOCK — client cannot receive scheduled doses",
+                "{$medication->unrestrictedName()}: OUT OF STOCK — client cannot receive scheduled doses",
                 [
                     'client_medication_id' => $medication->id,
-                    'medication_name' => $medication->name,
+                    'medication_name' => $medication->unrestrictedName(),
                     'controlled_drug' => $medication->controlled_drug,
                     'high_risk' => $medication->high_risk,
                     'site_id' => $client->site_id,
@@ -439,7 +455,7 @@ class MedicationAlertService
                 $client->id,
                 'stock_low',
                 'warning',
-                "{$medication->name}: Low stock ({$stock->on_hand} {$stock->unit} remaining)",
+                "{$medication->name}: Low stock ({$stock->available_on_hand} {$stock->unit} remaining)",
                 $medication->id
             );
 
@@ -451,73 +467,15 @@ class MedicationAlertService
 
     /**
      * Check for overdue doses → always operational.
+     *
+     * C6f: the doses the overdue job, Meds today, My Day and the badge call
+     * overdue — the dose-slot projection's window has ended with nothing
+     * recorded (EM-02 (1): on the New Zealand clock) — raised as one signal
+     * per dose, and the person's alerts for doses no longer overdue resolved.
      */
     private function checkOverdueDoses(Client $client): ?array
     {
-        $now = now();
-        $cutoff = $now->copy()->subHours(3);
-
-        $medications = $client->medications()
-            ->active()
-            ->where('is_prn', false)
-            ->get();
-
-        $overdueCount = 0;
-        $overdueMeds = [];
-
-        foreach ($medications as $medication) {
-            $doseTimes = $medication->dose_times ?? [];
-
-            foreach ($doseTimes as $time) {
-                $scheduledTime = $now->copy()->setTimeFromTimeString($time);
-
-                if ($scheduledTime->isPast() && $scheduledTime->greaterThan($cutoff)) {
-                    $recorded = ClientMedicationAdministration::query()
-                        ->effectiveClinicalEvidence()
-                        ->where('client_medication_id', $medication->id)
-                        ->whereBetween('scheduled_for', [
-                            $scheduledTime->copy()->subMinute(),
-                            $scheduledTime->copy()->addMinute(),
-                        ])
-                        ->exists();
-
-                    if (! $recorded) {
-                        $overdueCount++;
-                        $overdueMeds[] = $medication->name;
-                    }
-                }
-            }
-        }
-
-        if ($overdueCount > 0) {
-            $message = "{$overdueCount} overdue dose(s): ".implode(', ', array_unique($overdueMeds));
-
-            // Dashboard alert (UI compat)
-            $alert = MedicationDashboardAlert::createOrUpdateAlert(
-                $client->id,
-                'overdue',
-                'critical',
-                $message,
-                null
-            );
-
-            // Operational signal → Control Room
-            $this->signalService->emit(
-                MedicationSignalService::TYPE_OVERDUE,
-                $client->id,
-                'high',
-                $message,
-                [
-                    'overdue_count' => $overdueCount,
-                    'medication_names' => array_unique($overdueMeds),
-                    'site_id' => $client->site_id,
-                ],
-            );
-
-            return $alert->toArray();
-        }
-
-        return null;
+        return app(OverdueDoseAlerts::class)->syncClient($client, now());
     }
 
     /**
@@ -550,18 +508,25 @@ class MedicationAlertService
             $openDiscrepancies->first()->client_medication_id
         );
 
-        // Operational signal → Control Room
+        // Operational signal → Control Room. The medicine names stay on the
+        // controlled-only dashboard alert above (EM-12).
         $this->signalService->emit(
             MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
             $client->id,
             'critical',
-            "Controlled drug discrepancy: {$medNames}. Review required.",
+            "Controlled drug discrepancy: {$openDiscrepancies->count()} open. Review required.",
             [
                 'client_medication_id' => $openDiscrepancies->first()->client_medication_id,
-                'medication_names' => $medNames,
                 'discrepancy_count' => $openDiscrepancies->count(),
                 'discrepancy_ids' => $openDiscrepancies->pluck('id')->toArray(),
                 'site_id' => $client->site_id,
+                // One open alert per person while they have an open
+                // discrepancy; each check refreshes its count and ids.
+                SignalProcessingService::CONDITION_KEY => SignalProcessingService::conditionKey(
+                    MedicationSignalService::TYPE_CONTROLLED_DISCREPANCY,
+                    'client',
+                    $client->id,
+                ),
             ],
         );
 
@@ -576,11 +541,17 @@ class MedicationAlertService
      * @param  array<int, int>|null  $siteIds  Null is reserved for internal
      *                                         unscoped callers; an explicit empty array must return zero rows.
      */
+    /**
+     * @param  array<int, int>|null  $readableClientIds  The people the reader may
+     *                                                    open (EA-107); null = no person rule (internal use).
+     */
     public function getGlobalDashboardWidgets(
         ?int $clientId = null,
         ?array $siteIds = null,
         bool $canViewControlled = false,
+        ?array $readableClientIds = null,
     ): array {
+        $this->readableClientIds = $readableClientIds;
         $widgets = [
             'overdue_meds' => $this->getOverdueMedsWidget($clientId, $siteIds, $canViewControlled),
             'prn_near_limits' => $this->getPrnNearLimitsWidget($clientId, $siteIds, $canViewControlled),
@@ -592,8 +563,23 @@ class MedicationAlertService
         if ($canViewControlled) {
             $widgets['controlled_discrepancies'] = $this->getControlledDiscrepanciesWidget($clientId, $siteIds);
         }
+        $this->readableClientIds = null;
 
         return $widgets;
+    }
+
+    /** @var array<int, int>|null The person rule for one widget build (EA-107). */
+    private ?array $readableClientIds = null;
+
+    /** One person when asked; otherwise only people the reader may open. */
+    private function narrowToClients($query, ?int $clientId): void
+    {
+        if ($clientId) {
+            $query->where('client_id', $clientId);
+        }
+        if ($this->readableClientIds !== null) {
+            $query->whereIn('client_id', $this->readableClientIds === [] ? [0] : $this->readableClientIds);
+        }
     }
 
     /** @param array<int, int>|null $siteIds */
@@ -612,9 +598,7 @@ class MedicationAlertService
         }
         $query->with('client:id,first_name,last_name');
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $alerts = $query->orderByDesc('created_at')->limit(10)->get();
 
@@ -648,9 +632,7 @@ class MedicationAlertService
         }
         $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $alerts = $query->orderByDesc('severity')->orderByDesc('created_at')->limit(10)->get();
 
@@ -679,9 +661,7 @@ class MedicationAlertService
         }
         $query->with(['client:id,first_name,last_name', 'medication:id,name']);
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $discrepancies = $query->orderByDesc('reported_at')->limit(10)->get();
 
@@ -714,13 +694,11 @@ class MedicationAlertService
             ))
             ->when(! $canViewControlled, fn ($query) => $query->where('controlled_drug', false))
             ->whereNotNull('end_date')
-            ->where('end_date', '<=', now()->addDays(14))
-            ->where('end_date', '>=', now())
+            ->where('end_date', '<=', WorkerClock::today()->addDays(14)->toDateString())
+            ->where('end_date', '>=', WorkerClock::today()->toDateString())
             ->with('client:id,first_name,last_name');
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $medications = $query->orderBy('end_date')->limit(10)->get();
 
@@ -734,7 +712,7 @@ class MedicationAlertService
                 'client_id' => $m->client_id,
                 'medication' => $m->name,
                 'expiry_date' => $m->end_date?->toDateString(),
-                'days_remaining' => $m->end_date?->diffInDays(now()),
+                'days_remaining' => $m->daysUntilEnd(),
             ])->toArray(),
         ];
     }
@@ -754,9 +732,7 @@ class MedicationAlertService
             ->where('high_risk', true)
             ->with('client:id,first_name,last_name');
 
-        if ($clientId) {
-            $query->where('client_id', $clientId);
-        }
+        $this->narrowToClients($query, $clientId);
 
         $medications = $query->orderByDesc('created_at')->limit(10)->get();
 
@@ -781,8 +757,11 @@ class MedicationAlertService
         ?array $siteIds = null,
         bool $canViewControlled = false,
     ): array {
-        $today = now()->startOfDay();
-        $tomorrow = $today->copy()->addDay();
+        // EA-202 (Lane C7): the NZ day — today's calendar date for orders, and
+        // its UTC window for dose times (not 13:00–13:00 NZDT).
+        $nzToday = \App\Support\WorkerClock::today();
+        $today = $nzToday->toDateString();
+        [$dayStart, $dayEnd] = [$nzToday->utc(), $nzToday->endOfDay()->utc()];
 
         $scheduledQuery = ClientMedication::active()
             ->when($siteIds !== null, fn ($query) => $query->whereHas(
@@ -798,9 +777,7 @@ class MedicationAlertService
                 $q->whereNull('end_date')->orWhere('end_date', '>=', $today);
             });
 
-        if ($clientId) {
-            $scheduledQuery->where('client_id', $clientId);
-        }
+        $this->narrowToClients($scheduledQuery, $clientId);
 
         $scheduledMeds = $scheduledQuery->get();
         $totalScheduled = 0;
@@ -812,7 +789,7 @@ class MedicationAlertService
             ->effectiveClinicalEvidence()
             ->where('status', 'given')
             ->whereNotNull('scheduled_for')
-            ->whereBetween('scheduled_for', [$today, $tomorrow])
+            ->whereBetween('scheduled_for', [$dayStart, $dayEnd])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
@@ -824,16 +801,14 @@ class MedicationAlertService
             $this->governanceScope->scopeWithoutControlledMedicationRows($completedQuery);
         }
 
-        if ($clientId) {
-            $completedQuery->where('client_id', $clientId);
-        }
+        $this->narrowToClients($completedQuery, $clientId);
 
         $completed = $completedQuery->distinct(['client_medication_id', 'scheduled_for'])->count();
 
         $refusedQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
             ->where('status', 'refused')
-            ->whereBetween('scheduled_for', [$today, $tomorrow])
+            ->whereBetween('scheduled_for', [$dayStart, $dayEnd])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
@@ -848,7 +823,7 @@ class MedicationAlertService
         $missedQuery = ClientMedicationAdministration::query()
             ->effectiveClinicalEvidence()
             ->where('status', 'missed')
-            ->whereBetween('scheduled_for', [$today, $tomorrow])
+            ->whereBetween('scheduled_for', [$dayStart, $dayEnd])
             ->whereHas('medication', function ($q) {
                 $q->active()->where('is_prn', false);
             });
@@ -860,10 +835,8 @@ class MedicationAlertService
             $this->governanceScope->scopeWithoutControlledMedicationRows($missedQuery);
         }
 
-        if ($clientId) {
-            $refusedQuery->where('client_id', $clientId);
-            $missedQuery->where('client_id', $clientId);
-        }
+        $this->narrowToClients($refusedQuery, $clientId);
+        $this->narrowToClients($missedQuery, $clientId);
 
         $refused = $refusedQuery->count();
         $missed = $missedQuery->count();

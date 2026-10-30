@@ -85,6 +85,15 @@ class MaintenanceHealthController extends Controller
         $attentionDevices = $this->access->visibleDevices($user)
             ->needingAttention()
             ->with(['assignments' => fn ($q) => $q->active()])
+            ->withCount([
+                'monitors as enabled_monitors_count' => fn ($monitor) => $monitor->where('is_enabled', true),
+                'monitors as failing_monitors_count' => fn ($monitor) => $monitor
+                    ->where('is_enabled', true)
+                    ->whereIn('current_state', ['failed', 'degraded']),
+                'monitors as uncertain_monitors_count' => fn ($monitor) => $monitor
+                    ->where('is_enabled', true)
+                    ->whereIn('current_state', ['unknown', 'stale', 'pending']),
+            ])
             ->orderByRaw("FIELD(health_status, 'critical', 'warning', 'unknown', 'healthy')")
             ->limit(20)
             ->get()
@@ -95,7 +104,7 @@ class MaintenanceHealthController extends Controller
                 'domain' => $d->domain,
                 'category' => $d->category,
                 'status' => $d->status?->value,
-                'health_status' => $d->health_status?->value,
+                'health_status' => $d->effectiveHealthState(),
                 'battery_level' => $d->battery_level,
                 'last_seen_at' => $d->last_seen_at?->toISOString(),
             ]);
@@ -117,17 +126,13 @@ class MaintenanceHealthController extends Controller
             ]);
 
         return Inertia::render('security-devices/maintenance-health', [
-            'pageMeta' => $request->routeIs('security-devices.maintenance')
-                ? [
-                    'title' => 'Maintenance',
-                    'description' => 'Device servicing, calibration, repair, and health-related work across the estate.',
-                    'href' => '/security-devices/maintenance',
-                ]
-                : [
-                    'title' => 'Maintenance & Health',
-                    'description' => 'Device maintenance scheduling, health monitoring, and operational attention tracking.',
-                    'href' => '/security-devices/maintenance-health',
-                ],
+            'actor_id' => $user->id,
+            'pageMeta' => [
+                'title' => 'Maintenance & health',
+                'description' => 'Device maintenance scheduling, health monitoring, and operational attention tracking.',
+                'href' => '/security-devices/maintenance-health',
+            ],
+            'financeNote' => MaintenanceOperationsPresenter::FINANCE_NOTE,
             'stats' => $stats,
             'records' => [
                 'data' => $records->getCollection()->map(fn (DeviceMaintenanceRecord $r) => [

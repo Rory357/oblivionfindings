@@ -32,6 +32,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.devices.assign', 'description' => 'Assign, reassign, or release devices', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.groups.manage', 'description' => 'Manage device groups', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.events.view', 'description' => 'View device events and alerts', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.cctv.recordingReferences.view', 'description' => 'Read authorised immutable CCTV recording references, without footage or preservation authority', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.cctv.recordingReferences.create', 'description' => 'Create bounded CCTV recording references separately from live viewing', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.cctv.media.view', 'description' => 'Open authorised CCTV media links', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.accessControl.view', 'description' => 'View physical access credentials, schedules, and history', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.accessControl.manage', 'description' => 'Manage provider-backed physical access credential requests and schedules', 'group' => 'security_devices', 'module' => 'Security & Devices'],
@@ -46,6 +48,23 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             ['key' => 'securityDevices.commands.manage', 'description' => 'Run standard state-changing device management', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.control', 'description' => 'Request safety, security, privacy, or availability-affecting controls', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.approve', 'description' => 'Independently approve or reject governed device commands', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.diagnostics', 'description' => 'Read authorised computer diagnostic snapshots', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.obli.assist', 'description' => 'Use Obli read-and-suggest investigation for authorised computers', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.remote.view', 'description' => 'Request viewing of an authorised computer with remote-support policy', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.remote.control', 'description' => 'Request mouse and keyboard control separately from viewing', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.remote.unattended', 'description' => 'Use remote support without attended consent on explicitly approved equipment', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.softwareUpload', 'description' => 'Upload immutable reviewed MSI releases', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.softwareReview', 'description' => 'Independently publish or withdraw reviewed MSI releases', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.softwarePolicyManage', 'description' => 'Configure governed machine software policy', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.softwareInstall', 'description' => 'Request approved native machine MSI installation', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.softwareUnattended', 'description' => 'Authorize unattended native machine MSI installation', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.restartPolicyManage', 'description' => 'Configure governed Windows restart policy', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.restartSchedule', 'description' => 'Request independently approved Windows restart schedules', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.restartUnattended', 'description' => 'Authorise unattended governed Windows restart schedules', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.manageActionPolicy', 'description' => 'Configure governed computer service action policy', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.serviceManage', 'description' => 'Request independently approved computer service actions', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.endpoints.serviceUnattended', 'description' => 'Authorise unattended governed computer service actions', 'group' => 'security_devices', 'module' => 'Security & Devices'],
+            ['key' => 'securityDevices.remote.managePolicy', 'description' => 'Configure remote-support access and consent policy for approved computers', 'group' => 'security_devices', 'module' => 'Security & Devices'],
             ['key' => 'securityDevices.commands.admin', 'description' => 'Administer command policy, adapters, and secret references', 'group' => 'security_devices', 'module' => 'Security & Devices'],
         ];
 
@@ -62,7 +81,7 @@ class SecurityDevicesPermissionsSeeder extends Seeder
             );
         }
 
-        $allPermIds = Permission::where('key', 'like', 'securityDevices.%')->pluck('id');
+        $allPermIds = Permission::where('key', 'like', 'securityDevices.%')->where('key', 'not like', 'securityDevices.endpoints.script%')->pluck('id');
 
         // ── 2. Admin gets everything (already via sync in RbacSeeder,
         //       but also attach here for standalone seeder use) ─────
@@ -72,7 +91,8 @@ class SecurityDevicesPermissionsSeeder extends Seeder
 
         // ── 3. Role assignments ───────────────────────────────────
 
-        $this->attachToRole('it_manager', $allPermIds->toArray());
+        // Historical reference grants are explicit; an IT role or live-view grant alone is insufficient.
+        $this->attachToRole('it_manager', Permission::where('key', 'like', 'securityDevices.%')->where('key', 'not like', 'securityDevices.endpoints.script%')->whereNotIn('key', ['securityDevices.cctv.recordingReferences.view', 'securityDevices.cctv.recordingReferences.create'])->pluck('id')->toArray());
 
         $this->attachToRole('facilities_manager', [
             'securityDevices.viewAny',

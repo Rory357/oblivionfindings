@@ -80,6 +80,7 @@ export type AlertSession = {
 
 export type Alert = {
     id: string; // canonical operational reference: cr_<id>
+    canonical_status?: string;
     session: AlertSession | null;
     type: AlertType;
     triggered_at: string | null;

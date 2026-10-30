@@ -1,0 +1,69 @@
+
+  ............................................⨯⨯⨯⨯....
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest > client location history reads canoni…
+  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+  at tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:103
+     99▕
+    100▕         $response = $this->actingAs($this->admin)
+    101▕             ->get("/operations/clients/{$this->client->id}/location/history");
+    102▕
+  ➜ 103▕         $response->assertOk()
+    104▕             ->assertJsonCount(1, 'locations')
+    105▕             ->assertJsonPath('locations.0.lat', -36.8485)
+    106▕             ->assertJsonPath('locations.0.lng', 174.7633)
+    107▕             ->assertJsonPath('locations.0.speed', 14)
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest > resident tracking history reads cano…
+  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+  at tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:130
+    126▕
+    127▕         $response = $this->actingAs($this->admin)
+    128▕             ->get("/fleet-assets/resident-tracking/history/{$this->client->id}");
+    129▕
+  ➜ 130▕         $response->assertOk();
+    131▕         $response->assertInertia(function ($page) {
+    132▕             $locations = $page->toArray()['props']['locations'];
+    133▕
+    134▕             $this->assertCount(1, $locations);
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest > portal location history reads canoni…
+  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+  at tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:161
+    157▕
+    158▕         $response = $this->actingAs($this->portalUser)
+    159▕             ->get("/portal/clients/{$this->client->id}/location/history");
+    160▕
+  ➜ 161▕         $response->assertOk()
+    162▕             ->assertJsonCount(1, 'locations')
+    163▕             ->assertJsonPath('locations.0.lat', -43.5321)
+    164▕             ->assertJsonPath('locations.0.lng', 172.6362)
+    165▕             ->assertJsonPath('locations.0.speed', 5)
+
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+   FAILED  Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest > client location history keeps narrow…
+  Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+  at tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:198
+    194▕
+    195▕         $response = $this->actingAs($this->admin)
+    196▕             ->get("/operations/clients/{$this->client->id}/location/history");
+    197▕
+  ➜ 198▕         $response->assertOk()
+    199▕             ->assertJsonCount(1, 'locations')
+    200▕             ->assertJsonPath('locations.0.lat', -37.7870)
+    201▕             ->assertJsonPath('locations.0.lng', 175.2793)
+    202▕             ->assertJsonPath('locations.0.speed', 3)
+
+
+  Tests:    4 failed, 48 passed (562 assertions)
+  Duration: 296.95s

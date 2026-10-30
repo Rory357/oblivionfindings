@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Models;
 
+use App\Domain\Hr\Enums\AttendanceHandoverOutcome;
 use App\Domain\Hr\Enums\AttendanceTimesheetSyncOutcome;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyStorageContext;
@@ -51,6 +52,8 @@ class HrAttendanceSession extends Model
 
     private AttendanceTimesheetSyncOutcome $timesheetSyncOutcome = AttendanceTimesheetSyncOutcome::None;
 
+    private ?AttendanceHandoverOutcome $handoverOutcome = null;
+
     protected static function booted(): void
     {
         static::saving(function (self $session): void {
@@ -68,6 +71,18 @@ class HrAttendanceSession extends Model
     public function timesheetSyncOutcome(): AttendanceTimesheetSyncOutcome
     {
         return $this->timesheetSyncOutcome;
+    }
+
+    public function markHandoverOutcome(?AttendanceHandoverOutcome $outcome): self
+    {
+        $this->handoverOutcome = $outcome;
+
+        return $this;
+    }
+
+    public function handoverOutcome(): ?AttendanceHandoverOutcome
+    {
+        return $this->handoverOutcome;
     }
 
     public function user(): BelongsTo

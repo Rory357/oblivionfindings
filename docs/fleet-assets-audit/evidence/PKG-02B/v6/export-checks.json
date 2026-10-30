@@ -1,0 +1,46 @@
+{
+  "pdfPages": 4,
+  "pdfTextExtracts": true,
+  "xlsxSheets": [
+    "Trips",
+    "Events",
+    "Journey maps"
+  ],
+  "embeddedImages": [
+    {
+      "name": "xl/media/logo.png",
+      "size": [
+        200,
+        200
+      ]
+    },
+    {
+      "name": "xl/media/trip-1.png",
+      "size": [
+        1000,
+        480
+      ]
+    },
+    {
+      "name": "xl/media/trip-2.png",
+      "size": [
+        1000,
+        480
+      ]
+    },
+    {
+      "name": "xl/media/trip-3.png",
+      "size": [
+        1000,
+        480
+      ]
+    }
+  ],
+  "xmlPartsWellFormed": true,
+  "typedDatesTripsAndEvents": true,
+  "distanceFormula": "=SUM(F8:F10)",
+  "distanceTotal": 16.9,
+  "durationMinutesTotal": 55,
+  "layout": "PDF all four pages rendered; Trips and Events worksheet headers rendered; workbook image anchors and embedded PNGs verified. Imported images are not painted by artifact-tool renderer. Native Excel UI not tested.",
+  "download": "Report data URLs contain valid files; IAB click produced no observable download event within 3 seconds. Saved byte-identical review examples are supplied."
+}

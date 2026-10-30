@@ -1,19 +1,35 @@
+/**
+ * Worker participation (approved H&S drawings pg-hsn-104 … 104d): one header
+ * with four number boxes, the filters and the People and participation hub
+ * on the rail, whose three views are this page's tabs (drawing D4); then
+ * representatives as people cards, committee meetings as two logs and
+ * consultations as a table. The detail dialogs and create wizards are
+ * unchanged. Every record's kebab and right-click come from one actionsFor
+ * list, so eligibility stays in one place. The viewer boundary masks the page
+ * if the signed-in account changes.
+ */
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
-    EntityFilter,
+    EntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import {
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageLayout,
+} from '@/components/page';
+import {
     ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-} from '@/components/ui/popover';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { AddRepresentativeWizard } from '@/components/worker-participation/add-representative-wizard';
 import { ConsultationDetailDialog } from '@/components/worker-participation/consultation-detail-dialog';
 import { MeetingDetailDialog } from '@/components/worker-participation/meeting-detail-dialog';
@@ -21,38 +37,16 @@ import { NewConsultationWizard } from '@/components/worker-participation/new-con
 import { RepresentativeDetailDialog } from '@/components/worker-participation/representative-detail-dialog';
 import { ScheduleMeetingWizard } from '@/components/worker-participation/schedule-meeting-wizard';
 import {
-    CONSULT_ORDER,
-    CONSULT_STATUS,
-    MEETING_STATUS,
-    REP_STATUS,
-    fmtDate,
     type ConsultationRow,
     type MeetingRow,
     type RepRow,
     type WpDetailAction,
 } from '@/components/worker-participation/shared';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import AppLayout from '@/layouts/app-layout';
-import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import {
-    FlagBadge,
-    RegisterTableHeader,
-    TONE_BG,
-    TONE_DOT,
-    entityTone,
-    initials,
-    titleCase,
-    type Tone,
-} from '@/pages/health-safety/components/register-row-kit';
-import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
-import { Head, router } from '@inertiajs/react';
+import { titleCase } from '@/pages/health-safety/components/register-row-kit';
+import type { SharedData } from '@/types';
+import { Head, router, usePage } from '@inertiajs/react';
 import {
     Calendar,
     CheckCircle2,
@@ -61,30 +55,30 @@ import {
     Download,
     Eye,
     FileCheck2,
-    FileText,
     GraduationCap,
-    MapPin,
     MessageSquare,
-    MousePointer2,
+    MoreHorizontal,
     Pencil,
     Plus,
-    Search,
-    ShieldCheck,
     Slash,
     Upload,
-    UserCog,
     UserPlus,
-    Users,
-    Wrench,
-    X,
     XCircle,
 } from 'lucide-react';
+import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { participationMenu } from './participation-cards';
 import {
-    useState,
-    type ComponentType,
-    type MouseEvent as ReactMouseEvent,
-    type ReactNode,
-} from 'react';
+    ParticipationHeader,
+    ParticipationTally,
+    type ParticipationFilters,
+    type ParticipationHero,
+} from './participation-header';
+import { ParticipationViewerBoundary } from './participation-viewer-boundary';
+import {
+    ConsultationTable,
+    MeetingLogs,
+    RepresentativeCards,
+} from './participation-views';
 
 /* ------------------------------------------------------------------ */
 /*  Types (match WorkerParticipationController@index)                  */
@@ -95,43 +89,15 @@ type Paginated<T> = {
     links: { url: string | null; label: string; active: boolean }[];
     last_page: number;
 };
-type Filters = {
-    tab: string;
-    site_id: number | null;
-    status: string | null;
-    period: string;
-    q: string | null;
-};
+type Filters = ParticipationFilters;
 
 type Props = {
+    participation_viewer_id: number;
     filters: Filters;
     tab: 'representatives' | 'meetings' | 'consultations';
     tabCounts: Record<string, number>;
     rows: Paginated<RepRow | MeetingRow | ConsultationRow>;
-    hero: {
-        clusters: {
-            participation: {
-                active_reps: number;
-                sites_without_rep: number;
-                committees: number;
-                meetings_quarter: number;
-            };
-            consultation: {
-                open: number;
-                awaiting_feedback: number;
-                overdue_actions: number;
-                minutes_outstanding: number;
-            };
-        };
-        badges: {
-            reps_coverage_pct: number;
-            sites_total: number;
-            sites_covered: number;
-            minutes_overdue: number;
-            consultations_awaiting: number;
-            training_below_minimum: number;
-        };
-    };
+    hero: ParticipationHero;
     detail: {
         kind: 'representative' | 'meeting' | 'consultation';
         data: any;
@@ -154,7 +120,20 @@ const BASE = '/health-safety/worker-participation';
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function WorkerParticipationIndex({
+export default function WorkerParticipationIndex(props: Props) {
+    const { auth } = usePage<SharedData>().props;
+    return (
+        <ParticipationViewerBoundary
+            currentActorId={auth?.user?.id}
+            sourceActorId={props.participation_viewer_id}
+            manage={props.can?.manage === true}
+        >
+            <ParticipationWorkspace {...props} />
+        </ParticipationViewerBoundary>
+    );
+}
+
+function ParticipationWorkspace({
     filters,
     tab,
     tabCounts,
@@ -167,26 +146,42 @@ export default function WorkerParticipationIndex({
     committees,
 }: Props) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [recordCtx, setRecordCtx] = useState<{
+        x: number;
+        y: number;
+        title: string;
+        items: MenuItem[];
+    } | null>(null);
     const [wizard, setWizard] = useState<
         'rep' | 'meeting' | 'consultation' | null
     >(null);
-    const [newOpen, setNewOpen] = useState(false);
     // Tracks which sub-action a detail dialog should open straight onto (right-click → action).
     const [pendingAction, setPendingAction] = useState<WpDetailAction | null>(
         null,
     );
+    // Standing a representative down and cancelling a meeting ask first (they change the record people rely on).
+    const [confirming, setConfirming] = useState<
+        | { action: 'stand_down'; id: number; name: string | null }
+        | { action: 'cancel_meeting'; id: number; name: string | null }
+        | null
+    >(null);
+    const [confirmBusy, setConfirmBusy] = useState(false);
+    const runConfirmed = () => {
+        if (!confirming) return;
+        setConfirmBusy(true);
+        const finish = { preserveScroll: true, onFinish: () => { setConfirmBusy(false); setConfirming(null); } };
+        if (confirming.action === 'stand_down') {
+            router.put(`${BASE}/representatives/${confirming.id}`, { status: 'inactive' }, finish);
+        } else {
+            router.put(`${BASE}/meetings/${confirming.id}/cancel`, {}, finish);
+        }
+    };
 
     const go = (next: Partial<Filters>) =>
         router.get(
             BASE,
             { ...filters, ...next },
             { preserveState: true, preserveScroll: true, replace: true },
-        );
-    const setTab = (id: string) =>
-        router.get(
-            BASE,
-            { ...filters, tab: id, status: null },
-            { preserveState: true, preserveScroll: true },
         );
     const openDetail = (
         param: 'representative' | 'meeting' | 'consultation',
@@ -214,36 +209,13 @@ export default function WorkerParticipationIndex({
             { tab },
             { preserveState: true, preserveScroll: true, replace: true },
         );
-    const hasFilters = !!(
-        filters.site_id ||
-        filters.status ||
-        filters.q ||
-        (filters.period && filters.period !== 'quarter')
-    );
 
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'representatives',
-            label: 'Representatives',
-            icon: Users,
-            tone: 'info',
-            badge: tabCounts.representatives || undefined,
-        },
-        {
-            id: 'meetings',
-            label: 'Committee meetings',
-            icon: Calendar,
-            tone: 'info',
-            badge: tabCounts.meetings || undefined,
-        },
-        {
-            id: 'consultations',
-            label: 'Consultations',
-            icon: MessageSquare,
-            tone: 'warning',
-            badge: tabCounts.consultations || undefined,
-        },
-    ];
+    // The three views are the People and participation hub's tabs on the header rail.
+    const TAB_LABELS: Record<Props['tab'], string> = {
+        representatives: 'Representatives',
+        meetings: 'Committee meetings',
+        consultations: 'Consultations',
+    };
 
     const PERIOD = [
         { key: 'week', label: 'This week' },
@@ -301,14 +273,10 @@ export default function WorkerParticipationIndex({
                     active
                         ? {
                               icon: <Slash className="h-3.5 w-3.5" />,
-                              label: 'Mark stood-down',
+                              label: 'No longer a representative',
                               tone: 'critical',
                               onClick: () =>
-                                  router.put(
-                                      `${BASE}/representatives/${row.id}`,
-                                      { status: 'inactive' },
-                                      { preserveScroll: true },
-                                  ),
+                                  setConfirming({ action: 'stand_down', id: row.id, name: row.user?.name ?? null }),
                           }
                         : {
                               icon: <CheckCircle2 className="h-3.5 w-3.5" />,
@@ -374,11 +342,7 @@ export default function WorkerParticipationIndex({
                         label: 'Cancel meeting',
                         tone: 'critical',
                         onClick: () =>
-                            router.put(
-                                `${BASE}/meetings/${row.id}/cancel`,
-                                {},
-                                { preserveScroll: true },
-                            ),
+                            setConfirming({ action: 'cancel_meeting', id: row.id, name: row.committee?.name ?? null }),
                     },
                 );
             }
@@ -462,18 +426,21 @@ export default function WorkerParticipationIndex({
         meta: string,
     ) => {
         e.preventDefault();
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag,
-            meta,
-            items: actionsFor(kind, row),
+        setCtx(null);
+        const bounds = e.currentTarget.getBoundingClientRect();
+        const keyboard = e.clientX === 0 && e.clientY === 0;
+        setRecordCtx({
+            x: keyboard ? bounds.left + 12 : e.clientX,
+            y: keyboard ? bounds.top + 12 : e.clientY,
+            title: `${meta || titleCase(kind)} · ${tag}`,
+            items: participationMenu(actionsFor(kind, row)),
         });
     };
 
     const openHeroCtx = (e: ReactMouseEvent) => {
         if (!can.manage) return;
         e.preventDefault();
+        setRecordCtx(null);
         setCtx({
             x: e.clientX,
             y: e.clientY,
@@ -509,390 +476,127 @@ export default function WorkerParticipationIndex({
         });
     };
 
-    const c = hero.clusters;
-    const b = hero.badges;
-    const coverageTone: Tone =
-        b.reps_coverage_pct >= 100
-            ? 'success'
-            : b.reps_coverage_pct >= 60
-              ? 'warning'
-              : 'critical';
+    const pager =
+        rows.last_page > 1 ? <LaravelPagination links={rows.links} /> : null;
+    const exportHref = `${BASE}/export${filters.site_id ? `?site_id=${filters.site_id}` : ''}`;
+    const pageActions = can.manage ? (
+        <>
+            <PageHeaderGlassButton onClick={() => setWizard('meeting')}>
+                Schedule meeting
+            </PageHeaderGlassButton>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <PageHeaderGlassButton
+                        icon={MoreHorizontal}
+                        aria-label="More participation actions"
+                    />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onSelect={() => setWizard('consultation')}>
+                        <MessageSquare className="size-4" />
+                        New consultation
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => window.open(exportHref)}>
+                        <Download className="size-4" />
+                        Export board report
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <PageHeaderPrimaryButton icon={Plus} onClick={() => setWizard('rep')}>
+                Add representative
+            </PageHeaderPrimaryButton>
+        </>
+    ) : null;
 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Health & Safety', href: '/health-safety' },
-                { title: 'Worker Participation', href: BASE },
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'People and participation', href: '/health-safety/registers?view=participation' },
+                { title: 'Worker participation', href: BASE },
             ]}
         >
-            <Head title="Worker Participation" />
-            <div className="flex flex-col gap-6 p-6">
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented
-                                label="Period"
-                                variant="pill"
-                                ariaLabel="Period"
-                                items={PERIOD}
-                                value={filters.period}
-                                onChange={(k) => go({ period: k })}
-                            />
-                            {sites.length ? (
-                                <EntityFilter
-                                    label="Site"
-                                    allLabel="All sites"
-                                    items={sites}
-                                    value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
-                                    onDark
-                                />
-                            ) : null}
-                            <HeroSegmented
-                                label="Status"
-                                variant="pill"
-                                ariaLabel="Status"
-                                items={[
-                                    { key: 'all', label: 'All' },
-                                    ...STATUS_OPTS[tab].map(([k, l]) => ({
-                                        key: k,
-                                        label: l,
-                                    })),
-                                ]}
-                                value={filters.status ?? 'all'}
-                                onChange={(k) =>
-                                    go({ status: k === 'all' ? null : k })
-                                }
-                            />
-                            <div className="relative ml-auto">
-                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                <input
-                                    type="search"
-                                    placeholder="Search register…"
-                                    defaultValue={filters.q ?? ''}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            go({
-                                                q:
-                                                    (
-                                                        e.target as HTMLInputElement
-                                                    ).value || null,
-                                            });
-                                    }}
-                                    className="w-48 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                                />
-                            </div>
-                            {hasFilters ? (
-                                // eslint-disable-next-line no-restricted-syntax -- onDark clear affordance on the hero footer
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                                >
-                                    <X className="h-3 w-3" /> Clear
-                                </button>
-                            ) : null}
-                        </div>
-                    }
-                >
+            <Head title="Worker participation" />
+            <PageLayout
+                hero={
                     <div onContextMenu={openHeroCtx}>
-                        <WorkflowRibbon current="report" />
-                        <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-                            <div className="flex items-start gap-4">
-                                <HeroMedallion icon={Users} />
-                                <div className="flex flex-col gap-1.5">
-                                    <HeroStatusPill>
-                                        Worker participation · HSWA 2015
-                                    </HeroStatusPill>
-                                    <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                        Worker Participation
-                                    </h1>
-                                    <p className="max-w-xl text-sm text-primary-foreground/70">
-                                        Elect and support H&amp;S
-                                        representatives, run committee meetings,
-                                        and consult kaimahi on work that affects
-                                        them — the HSWA 2015 participation
-                                        duties, in one register.
-                                    </p>
-                                </div>
-                            </div>
-                            {can.manage ? (
-                                <Popover
-                                    open={newOpen}
-                                    onOpenChange={setNewOpen}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />{' '}
-                                            New
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        align="end"
-                                        className="w-64 p-1.5"
-                                    >
-                                        {(
-                                            [
-                                                [
-                                                    'rep',
-                                                    UserPlus,
-                                                    'Add representative',
-                                                    'Elect or appoint a rep',
-                                                ],
-                                                [
-                                                    'meeting',
-                                                    Calendar,
-                                                    'Schedule meeting',
-                                                    'Committee meeting',
-                                                ],
-                                                [
-                                                    'consultation',
-                                                    MessageSquare,
-                                                    'New consultation',
-                                                    'Consult kaimahi on a change',
-                                                ],
-                                            ] as const
-                                        ).map(([k, Icon, t, s]) => (
-                                            // eslint-disable-next-line no-restricted-syntax -- two-line menu item (icon + title + subtitle) in the New popover
-                                            <button
-                                                key={k}
-                                                type="button"
-                                                onClick={() => {
-                                                    setNewOpen(false);
-                                                    setWizard(
-                                                        k as
-                                                            | 'rep'
-                                                            | 'meeting'
-                                                            | 'consultation',
-                                                    );
-                                                }}
-                                                className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                            >
-                                                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                                                <span>
-                                                    <span className="block text-sm font-medium">
-                                                        {t}
-                                                    </span>
-                                                    <span className="block text-xs text-muted-foreground">
-                                                        {s}
-                                                    </span>
-                                                </span>
-                                            </button>
-                                        ))}
-                                    </PopoverContent>
-                                </Popover>
-                            ) : null}
-                        </div>
-
-                        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                            <HeroCluster
-                                title="Representatives & committees"
-                                icon={Users}
-                            >
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=representatives&status=active`}
-                                    label="Active reps"
-                                    value={fmt(c.participation.active_reps)}
-                                    caption="currently serving"
-                                    tone="success"
+                        <ParticipationHeader
+                            filters={filters}
+                            hero={hero}
+                            sites={sites}
+                            periods={PERIOD}
+                            statuses={STATUS_OPTS[tab]}
+                            onFilters={go}
+                            onClear={clearFilters}
+                            actions={pageActions}
+                            rail={
+                                <SafetyWorkspaceRail
+                                    hub="participation"
+                                    current={tab}
+                                    counts={tabCounts}
+                                    // The three views share this page: switching keeps the Site, period and search.
+                                    onSelect={(id) => {
+                                        router.get(
+                                            BASE,
+                                            { ...filters, tab: id, status: null, focus: null },
+                                            { preserveState: true, preserveScroll: true },
+                                        );
+                                        return true;
+                                    }}
                                 />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=representatives`}
-                                    label="Sites w/o rep"
-                                    value={fmt(
-                                        c.participation.sites_without_rep,
-                                    )}
-                                    caption="coverage gap"
-                                    tone={
-                                        c.participation.sites_without_rep > 0
-                                            ? 'warning'
-                                            : 'success'
-                                    }
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=meetings`}
-                                    label="Committees"
-                                    value={fmt(c.participation.committees)}
-                                    caption="across all sites"
-                                    tone="neutral"
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=meetings`}
-                                    label="Meetings · qtr"
-                                    value={fmt(
-                                        c.participation.meetings_quarter,
-                                    )}
-                                    caption="this quarter"
-                                    tone="neutral"
-                                />
-                            </HeroCluster>
-                            <HeroCluster
-                                title="Consultation & actions"
-                                icon={MessageSquare}
-                            >
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=consultations&status=open`}
-                                    label="Open consults"
-                                    value={fmt(c.consultation.open)}
-                                    caption="not yet closed"
-                                    tone="warning"
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=consultations`}
-                                    label="Awaiting feedback"
-                                    value={fmt(
-                                        c.consultation.awaiting_feedback,
-                                    )}
-                                    caption="kaimahi to respond"
-                                    tone="warning"
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=meetings`}
-                                    label="Overdue actions"
-                                    value={fmt(c.consultation.overdue_actions)}
-                                    caption="from meetings"
-                                    tone={
-                                        c.consultation.overdue_actions > 0
-                                            ? 'critical'
-                                            : 'success'
-                                    }
-                                />
-                                <HeroClusterTile
-                                    href={`${BASE}?tab=meetings`}
-                                    label="Minutes out"
-                                    value={fmt(
-                                        c.consultation.minutes_outstanding,
-                                    )}
-                                    caption="to be filed"
-                                    tone={
-                                        c.consultation.minutes_outstanding > 0
-                                            ? 'warning'
-                                            : 'success'
-                                    }
-                                />
-                            </HeroCluster>
-                        </div>
-
-                        {/* WP-specific NZ compliance chip row (HeroComplianceBadges is H&S-dashboard-specific). */}
-                        <div className="mt-4 flex flex-wrap items-center gap-2">
-                            <HeroChip
-                                icon={ShieldCheck}
-                                tone={coverageTone}
-                                label={`Reps coverage · ${b.reps_coverage_pct}% (${b.sites_covered}/${b.sites_total} sites)`}
-                            />
-                            <HeroChip
-                                icon={FileText}
-                                tone={
-                                    b.minutes_overdue > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                                label={
-                                    b.minutes_overdue > 0
-                                        ? `Minutes · ${b.minutes_overdue} outstanding`
-                                        : 'Minutes · all filed'
-                                }
-                            />
-                            <HeroChip
-                                icon={MessageSquare}
-                                tone={
-                                    b.consultations_awaiting > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                                label={
-                                    b.consultations_awaiting > 0
-                                        ? `Consultations · ${b.consultations_awaiting} awaiting feedback`
-                                        : 'Consultations · up to date'
-                                }
-                            />
-                            <HeroChip
-                                icon={GraduationCap}
-                                tone={
-                                    b.training_below_minimum > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                                label={
-                                    b.training_below_minimum > 0
-                                        ? `Rep training · ${b.training_below_minimum} below 2-day min`
-                                        : 'Rep training · minimum met'
-                                }
-                            />
-                        </div>
-                    </div>
-                </HeroShell>
-
-                <TabStrip
-                    value={tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Participation views"
-                />
-
-                <Card>
-                    <CardContent className="p-0">
-                        <RegisterTableHeader
-                            icon={
-                                tab === 'representatives'
-                                    ? Users
-                                    : tab === 'meetings'
-                                      ? Calendar
-                                      : MessageSquare
                             }
-                            title={
-                                tab === 'representatives'
-                                    ? 'H&S Representatives'
-                                    : tab === 'meetings'
-                                      ? 'Committee Meetings'
-                                      : 'Worker Consultations'
-                            }
-                            subtitle={
-                                tab === 'representatives'
-                                    ? 'elected & appointed reps'
-                                    : tab === 'meetings'
-                                      ? 'scheduled & completed'
-                                      : 'feedback → outcome → close'
-                            }
-                            hint="Right-click a row for the full list of actions"
-                            hintIcon={MousePointer2}
                         />
-                        {tab === 'representatives' && (
-                            <RepTable
+                    </div>
+                }
+            >
+                <div
+                    role="tabpanel"
+                    aria-label={TAB_LABELS[tab] ?? 'Participation records'}
+                    className="grid min-w-0 gap-5"
+                >
+                    {tab === 'representatives' ? (
+                        <>
+                            <RepresentativeCards
                                 rows={rows.data as RepRow[]}
-                                onOpen={(id) =>
-                                    openDetail('representative', id)
-                                }
-                                onCtx={openRowCtx}
+                                actionsFor={actionsFor}
+                                onOpen={(id) => openDetail('representative', id)}
+                                onContext={openRowCtx}
+                                footer={pager}
                             />
-                        )}
-                        {tab === 'meetings' && (
-                            <MeetingTable
-                                rows={rows.data as MeetingRow[]}
-                                onOpen={(id) => openDetail('meeting', id)}
-                                onCtx={openRowCtx}
+                            <ParticipationTally
+                                filters={filters}
+                                hero={hero}
+                                meetingCount={tabCounts.meetings}
                             />
-                        )}
-                        {tab === 'consultations' && (
-                            <ConsultationTable
-                                rows={rows.data as ConsultationRow[]}
-                                onOpen={(id) => openDetail('consultation', id)}
-                                onCtx={openRowCtx}
-                            />
-                        )}
-                    </CardContent>
-                </Card>
-
-                {rows.last_page > 1 ? (
-                    <LaravelPagination links={rows.links} />
-                ) : null}
-            </div>
+                        </>
+                    ) : tab === 'meetings' ? (
+                        <MeetingLogs
+                            rows={rows.data as MeetingRow[]}
+                            actionsFor={actionsFor}
+                            onOpen={(id) => openDetail('meeting', id)}
+                            onContext={openRowCtx}
+                            footer={pager}
+                        />
+                    ) : (
+                        <ConsultationTable
+                            rows={rows.data as ConsultationRow[]}
+                            actionsFor={actionsFor}
+                            onOpen={(id) => openDetail('consultation', id)}
+                            footer={pager}
+                        />
+                    )}
+                </div>
+            </PageLayout>
 
             {ctx ? (
                 <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
+            ) : null}
+            {recordCtx ? (
+                <EntityContextMenu
+                    {...recordCtx}
+                    onClose={() => setRecordCtx(null)}
+                />
             ) : null}
 
             {detail?.kind === 'representative' ? (
@@ -907,6 +611,19 @@ export default function WorkerParticipationIndex({
                     initialAction={pendingAction}
                 />
             ) : null}
+            <ConfirmDialog
+                open={confirming !== null}
+                onClose={() => { if (!confirmBusy) setConfirming(null); }}
+                onConfirm={runConfirmed}
+                processing={confirmBusy}
+                variant="destructive"
+                title={confirming?.action === 'stand_down' ? 'No longer a representative?' : 'Cancel this meeting?'}
+                description={confirming?.action === 'stand_down'
+                    ? `${confirming.name ?? 'This person'} will show as no longer a health and safety representative, and their site may show as having no representative until someone else is added. You can make them active again later.`
+                    : `This ${confirming?.name ? confirming.name + ' ' : ''}meeting stays on the record as cancelled and can’t be held or edited. This can’t be undone.`}
+                confirmText={confirming?.action === 'stand_down' ? 'No longer a representative' : 'Cancel meeting'}
+                cancelText={confirming?.action === 'stand_down' ? 'Keep as representative' : 'Keep meeting'}
+            />
             {detail?.kind === 'meeting' ? (
                 <MeetingDetailDialog
                     key={detail.data.id}
@@ -957,411 +674,5 @@ export default function WorkerParticipationIndex({
                 />
             ) : null}
         </AppLayout>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Hero chip (WP-specific compliance row)                             */
-/* ------------------------------------------------------------------ */
-
-function HeroChip({
-    icon: Icon,
-    tone,
-    label,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    tone: Tone;
-    label: string;
-}) {
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- onDark hero compliance chip
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1 text-[11px] font-medium text-primary-foreground">
-            <Icon className="h-3.5 w-3.5 text-primary-foreground/80" />
-            {label}
-            <span className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[tone]}`} />
-        </span>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Tables                                                             */
-/* ------------------------------------------------------------------ */
-
-function Row({
-    children,
-    onClick,
-    onContextMenu,
-}: {
-    children: ReactNode;
-    onClick: () => void;
-    onContextMenu: (e: ReactMouseEvent) => void;
-}) {
-    return (
-        <tr
-            tabIndex={0}
-            onClick={onClick}
-            onContextMenu={onContextMenu}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onClick();
-                }
-            }}
-            className="cursor-pointer transition-colors hover:bg-muted/45 focus:bg-muted/45 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-        >
-            {children}
-        </tr>
-    );
-}
-
-const TH = ({ children }: { children: ReactNode }) => (
-    <th className="px-4 py-2.5">{children}</th>
-);
-const HeadRow = ({ cols }: { cols: string[] }) => (
-    <thead>
-        <tr className="border-b text-left text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
-            {cols.map((c) => (
-                <TH key={c}>{c}</TH>
-            ))}
-        </tr>
-    </thead>
-);
-const Pill = ({ tone, children }: { tone: Tone; children: ReactNode }) => (
-    <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${TONE_BG[tone]}`}
-    >
-        <span className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[tone]}`} />
-        {children}
-    </span>
-);
-
-function RepTable({
-    rows,
-    onOpen,
-    onCtx,
-}: {
-    rows: RepRow[];
-    onOpen: (id: number) => void;
-    onCtx: (
-        e: ReactMouseEvent,
-        kind: string,
-        row: RepRow,
-        tag: string,
-        meta: string,
-    ) => void;
-}) {
-    if (!rows.length) return <Empty icon={Users} label="No representatives" />;
-    return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <HeadRow
-                    cols={[
-                        'Representative',
-                        'Site',
-                        'Work group',
-                        'Election',
-                        'Training',
-                        'Status',
-                    ]}
-                />
-                <tbody className="divide-y">
-                    {rows.map((r) => {
-                        const name = r.user?.name ?? '—';
-                        const below = (r.training_days_completed ?? 0) < 2;
-                        return (
-                            <Row
-                                key={r.id}
-                                onClick={() => onOpen(r.id)}
-                                onContextMenu={(e) =>
-                                    onCtx(
-                                        e,
-                                        'representative',
-                                        r,
-                                        r.status.toUpperCase(),
-                                        `${name} · ${r.site?.name ?? ''}`,
-                                    )
-                                }
-                            >
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2.5">
-                                        <span
-                                            className={`flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-semibold ${entityTone(r.id)}`}
-                                        >
-                                            {initials(name)}
-                                        </span>
-                                        <span className="font-medium">
-                                            {name}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                        <MapPin className="h-3.5 w-3.5" />
-                                        {r.site?.name ?? '—'}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-muted-foreground">
-                                    {r.work_group ?? '—'}
-                                </td>
-                                <td className="px-4 py-3">
-                                    <span className="font-medium">
-                                        {titleCase(r.election_method ?? '—')}
-                                    </span>
-                                    <span className="block text-xs text-muted-foreground">
-                                        {fmtDate(r.elected_at)}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <FlagBadge
-                                        icon={GraduationCap}
-                                        tone={below ? 'warning' : 'neutral'}
-                                        title="HSWA paid training"
-                                    >
-                                        {r.training_days_completed}{' '}
-                                        {r.training_days_completed === 1
-                                            ? 'day'
-                                            : 'days'}
-                                    </FlagBadge>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <Pill
-                                        tone={REP_STATUS[r.status] ?? 'neutral'}
-                                    >
-                                        {titleCase(r.status)}
-                                    </Pill>
-                                </td>
-                            </Row>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
-    );
-}
-
-function MeetingTable({
-    rows,
-    onOpen,
-    onCtx,
-}: {
-    rows: MeetingRow[];
-    onOpen: (id: number) => void;
-    onCtx: (
-        e: ReactMouseEvent,
-        kind: string,
-        row: MeetingRow,
-        tag: string,
-        meta: string,
-    ) => void;
-}) {
-    if (!rows.length) return <Empty icon={Calendar} label="No meetings" />;
-    return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <HeadRow
-                    cols={['Committee', 'Date', 'Status', 'Attendees', 'Flags']}
-                />
-                <tbody className="divide-y">
-                    {rows.map((m) => (
-                        <Row
-                            key={m.id}
-                            onClick={() => onOpen(m.id)}
-                            onContextMenu={(e) =>
-                                onCtx(
-                                    e,
-                                    'meeting',
-                                    m,
-                                    m.status.toUpperCase(),
-                                    m.committee?.name ?? '',
-                                )
-                            }
-                        >
-                            <td className="px-4 py-3">
-                                <div className="flex items-center gap-2.5">
-                                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
-                                        <Users className="h-4 w-4" />
-                                    </span>
-                                    <span className="font-medium">
-                                        {m.committee?.name ?? '—'}
-                                    </span>
-                                </div>
-                            </td>
-                            <td className="px-4 py-3">
-                                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                    <Calendar className="h-3.5 w-3.5" />
-                                    {fmtDate(m.scheduled_at)}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3">
-                                <Pill
-                                    tone={MEETING_STATUS[m.status] ?? 'neutral'}
-                                >
-                                    {titleCase(m.status)}
-                                </Pill>
-                            </td>
-                            <td className="px-4 py-3">
-                                <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                                    <UserCog className="h-3.5 w-3.5" />
-                                    {m.attendees_count > 0
-                                        ? `${m.attendees_count} confirmed`
-                                        : '—'}
-                                </span>
-                            </td>
-                            <td className="px-4 py-3">
-                                <div className="flex flex-wrap gap-1.5">
-                                    {m.actions_due_count > 0 ? (
-                                        <FlagBadge
-                                            icon={Wrench}
-                                            tone="critical"
-                                            title="Action items due"
-                                        >
-                                            {m.actions_due_count} due
-                                        </FlagBadge>
-                                    ) : null}
-                                    {m.status === 'completed' &&
-                                    !m.minutes_document_path ? (
-                                        <FlagBadge
-                                            icon={FileText}
-                                            tone="warning"
-                                            title="Minutes outstanding"
-                                        >
-                                            No minutes
-                                        </FlagBadge>
-                                    ) : null}
-                                    {m.minutes_document_path ? (
-                                        <FlagBadge
-                                            icon={FileCheck2}
-                                            tone="success"
-                                            title="Minutes filed"
-                                        >
-                                            Minutes
-                                        </FlagBadge>
-                                    ) : null}
-                                </div>
-                            </td>
-                        </Row>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    );
-}
-
-function ConsultationTable({
-    rows,
-    onOpen,
-    onCtx,
-}: {
-    rows: ConsultationRow[];
-    onOpen: (id: number) => void;
-    onCtx: (
-        e: ReactMouseEvent,
-        kind: string,
-        row: ConsultationRow,
-        tag: string,
-        meta: string,
-    ) => void;
-}) {
-    if (!rows.length)
-        return <Empty icon={MessageSquare} label="No consultations" />;
-    return (
-        <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-                <HeadRow
-                    cols={['Topic', 'Type', 'Status', 'Progress', 'Docs']}
-                />
-                <tbody className="divide-y">
-                    {rows.map((c) => {
-                        const st =
-                            CONSULT_STATUS[c.status] ?? CONSULT_STATUS.open;
-                        const ord = CONSULT_ORDER[c.status] ?? 1;
-                        return (
-                            <Row
-                                key={c.id}
-                                onClick={() => onOpen(c.id)}
-                                onContextMenu={(e) =>
-                                    onCtx(
-                                        e,
-                                        'consultation',
-                                        c,
-                                        c.status.toUpperCase(),
-                                        c.title,
-                                    )
-                                }
-                            >
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center gap-2.5">
-                                        <span
-                                            className={`h-1.5 w-1.5 rounded-full ${TONE_DOT[st.tone]}`}
-                                        />
-                                        <span>
-                                            <span className="block max-w-sm truncate font-medium">
-                                                {c.title}
-                                            </span>
-                                            <span className="block text-xs text-muted-foreground">
-                                                {c.site?.name} ·{' '}
-                                                {fmtDate(c.consultation_date)}
-                                            </span>
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <span
-                                        className={`inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${TONE_BG.neutral}`}
-                                    >
-                                        {titleCase(c.consultation_type)}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <span
-                                        className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-medium ${TONE_BG[st.tone]}`}
-                                    >
-                                        {st.label}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center gap-1">
-                                        {[1, 2, 3, 4].map((i) => (
-                                            <span
-                                                key={i}
-                                                className={`h-1.5 w-6 rounded ${i <= ord ? TONE_DOT[st.tone] : 'bg-muted'}`}
-                                            />
-                                        ))}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex gap-2 text-muted-foreground">
-                                        <FileText
-                                            className={`h-4 w-4 ${c.document_path ? 'text-primary' : 'opacity-30'}`}
-                                        />
-                                        <FileCheck2
-                                            className={`h-4 w-4 ${c.outcome_document_path ? 'text-status-success' : 'opacity-30'}`}
-                                        />
-                                    </div>
-                                </td>
-                            </Row>
-                        );
-                    })}
-                </tbody>
-            </table>
-        </div>
-    );
-}
-
-function Empty({
-    icon: Icon,
-    label,
-}: {
-    icon: ComponentType<{ className?: string }>;
-    label: string;
-}) {
-    return (
-        <div className="px-4 py-16 text-center">
-            <Icon className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="font-medium text-muted-foreground">{label}</p>
-            <p className="mt-1 text-sm text-muted-foreground/70">
-                Nothing matches this tab and filters.
-            </p>
-        </div>
     );
 }

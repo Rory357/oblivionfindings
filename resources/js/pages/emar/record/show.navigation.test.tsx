@@ -1,0 +1,212 @@
+import type { RecordPageProps } from '@/components/emar/record/types';
+import { Button } from '@/components/ui/button';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const state = vi.hoisted(() => ({ url: '', push: vi.fn() }));
+vi.mock('@inertiajs/react', () => ({
+    Head: () => null,
+    Link: ({
+        href,
+        children,
+        ...props
+    }: {
+        href: string;
+        children: ReactNode;
+    }) => (
+        <a href={href} {...props}>
+            {children}
+        </a>
+    ),
+    usePage: () => ({ url: state.url, props: {} }),
+    router: {
+        push: (visit: { url: string }) => {
+            state.url = visit.url;
+            state.push(visit);
+        },
+    },
+}));
+vi.mock('@/layouts/app-layout', () => ({
+    default: ({ children }: { children: ReactNode }) => <main>{children}</main>,
+}));
+vi.mock('@/components/emar/record/record-dose-launch', () => ({
+    RecordDoseLaunch: ({ asNeeded }: { asNeeded?: boolean }) => (
+        <Button>{asNeeded ? 'Record as-needed dose' : 'Record a dose'}</Button>
+    ),
+}));
+vi.mock('@/components/emar/record/chart', () => ({
+    ChartViewSwitch: () => null,
+    ChartSection: ({
+        date,
+        week,
+        onChange,
+    }: {
+        date: string;
+        week: boolean;
+        onChange: (date: string, week: boolean) => void;
+    }) => (
+        <section aria-label="Chart contents">
+            {date} · {week ? 'week' : 'day'}
+            <Button onClick={() => onChange('2026-10-03', false)}>
+                Previous day
+            </Button>
+        </section>
+    ),
+}));
+vi.mock('@/components/emar/record/clinical', () => ({
+    ClinicalSection: () => <section>Clinical contents</section>,
+}));
+vi.mock('@/components/emar/record/history', () => ({
+    HistorySection: () => null,
+}));
+vi.mock('@/components/emar/record/reading', () => ({
+    MedicinesSection: () => null,
+    RecordMedicineDialog: () => null,
+}));
+vi.mock('@/components/emar/record/safety', () => ({
+    SafetySection: () => <section>Allergy contents</section>,
+}));
+vi.mock('@/components/emar/record/support', () => ({
+    CanonicalSupportSection: () => null,
+}));
+
+import PersonMedicationRecord from './show';
+
+const props: RecordPageProps = {
+    person: {
+        id: 10,
+        name: 'Ada Synthetic',
+        preferred: 'Ada',
+        initials: 'AS',
+        age: 44,
+        nhi: null,
+        status: 'Active',
+        house: 'Synthetic house',
+        service: 'Supported living',
+    },
+    meters: {
+        medicines: { count: 2, hidden: 0, as_needed: 0, to_check: 0 },
+        allergies: { status: 'none', count: 0 },
+        inr: null,
+        driver: null,
+    },
+    can: { manage_orders: false, view_controlled: false, view_audit: false },
+    as_at: '2026-10-05T10:00:00+13:00',
+};
+
+beforeEach(() => {
+    state.push.mockClear();
+    state.url = '/emar/mar?client_id=10&site_id=3&date=2026-10-04&mode=week';
+});
+
+describe('person medication record context', () => {
+    it('matches the header recording entry to the selected chart view', () => {
+        render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'As needed' }));
+        expect(
+            screen.getByRole('button', { name: 'Record as-needed dose' }),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Scheduled doses' }));
+        expect(
+            screen.getByRole('button', { name: 'Record a dose' }),
+        ).toBeInTheDocument();
+    });
+    it('retains the person, house, historical date and chart mode through Clinical and back', () => {
+        render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('tab', { name: 'Clinical' }));
+        expect(screen.getByText('Clinical contents')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('tab', { name: 'Chart' }));
+        expect(
+            screen.getByRole('region', { name: 'Chart contents' }),
+        ).toHaveTextContent('2026-10-04 · week');
+        expect(
+            Object.fromEntries(
+                new URL(state.url, 'https://example.test').searchParams,
+            ),
+        ).toEqual({
+            client_id: '10',
+            date: '2026-10-04',
+            site_id: '3',
+            mode: 'week',
+        });
+        const back = new URL(
+            screen.getByRole('link', { name: 'Back' }).getAttribute('href')!,
+            'https://example.test',
+        );
+        expect(back.searchParams.get('date')).toBe('2026-10-04');
+        expect(back.searchParams.get('site_id')).toBe('3');
+        expect(back.pathname).toBe('/meds/today');
+        // EA-108 (Lane C8): back returns to everyone in the house, not a
+        // one-person list that reopens this record.
+        expect(back.searchParams.get('client_id')).toBeNull();
+    });
+
+    it('opens allergies inside the medication record without wider profile access', () => {
+        render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'View allergies' }));
+        expect(screen.getByText('Allergy contents')).toBeInTheDocument();
+        expect(screen.getByRole('tab', { name: 'Allergies' })).toHaveAttribute(
+            'aria-selected',
+            'true',
+        );
+        const destination = new URL(state.url, 'https://example.test');
+        expect(destination.pathname).toBe('/emar/mar');
+        expect(Object.fromEntries(destination.searchParams)).toEqual({
+            client_id: '10',
+            date: '2026-10-04',
+            site_id: '3',
+            mode: 'week',
+            tab: 'allergies',
+        });
+    });
+
+    it('changes the day without losing the house or keeping week mode', () => {
+        const page = render(<PersonMedicationRecord {...props} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Previous day' }));
+        page.rerender(<PersonMedicationRecord {...props} />);
+        expect(
+            screen.getByRole('region', { name: 'Chart contents' }),
+        ).toHaveTextContent('2026-10-03 · day');
+        expect(
+            Object.fromEntries(
+                new URL(state.url, 'https://example.test').searchParams,
+            ),
+        ).toEqual({ client_id: '10', date: '2026-10-03', site_id: '3' });
+    });
+
+    it('marks a waiting prescriber request, with the way to decide it only for deciders (EA-025)', () => {
+        const page = render(<PersonMedicationRecord {...props} />);
+        expect(
+            screen.queryByText('A prescriber request is waiting'),
+        ).not.toBeInTheDocument();
+        page.rerender(
+            <PersonMedicationRecord
+                {...props}
+                prescriber_requests={{ count: 2, url: null, can_decide: false }}
+            />,
+        );
+        expect(
+            screen.getByText('2 prescriber requests are waiting'),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('link', { name: 'Open in Connected care' }),
+        ).not.toBeInTheDocument();
+        page.rerender(
+            <PersonMedicationRecord
+                {...props}
+                prescriber_requests={{
+                    count: 1,
+                    url: '/emar/connected-care?client_id=10#requests',
+                    can_decide: true,
+                }}
+            />,
+        );
+        expect(
+            screen.getByText('A prescriber request is waiting'),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('link', { name: 'Open in Connected care' }),
+        ).toHaveAttribute('href', '/emar/connected-care?client_id=10#requests');
+    });
+});

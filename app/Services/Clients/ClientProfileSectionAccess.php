@@ -144,6 +144,18 @@ class ClientProfileSectionAccess
         return $this->trackingForAssignment($user, $assigned && $this->workerEligibility->isEligible($client, $user, $reads));
     }
 
+    public function canViewTracking(User $user, Client $client): bool
+    {
+        if (! $user->canDo('assets.telemetry.view')) {
+            return false;
+        }
+        if ($user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny')) {
+            return true;
+        }
+
+        return $user->canDo('assets.viewAssigned') && $this->isAssignedCareWorker($user, $client);
+    }
+
     private function trackingForAssignment(User $user, bool $assignedCareWorker): bool
     {
         return $user->canDo('assets.telemetry.view') && ($user->canDo('fleet.viewAny') || $user->canDo('assets.viewAny')

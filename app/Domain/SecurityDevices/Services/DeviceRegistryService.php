@@ -6,6 +6,7 @@ use App\Domain\Monitoring\Services\NativeMonitoringDefinitionService;
 use App\Domain\SecurityDevices\Enums\AssignmentType;
 use App\Domain\SecurityDevices\Enums\DeviceDomain;
 use App\Domain\SecurityDevices\Enums\DeviceStatus;
+use App\Domain\SecurityDevices\Enums\HealthStatus;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Asset;
@@ -57,6 +58,7 @@ class DeviceRegistryService
 
         return DB::transaction(function () use ($attributes, $actor, $site): Device {
             $device = Device::query()->create([
+                'health_status' => HealthStatus::Unknown->value,
                 ...$attributes,
                 'created_by_user_id' => $actor->id,
             ]);
@@ -115,6 +117,7 @@ class DeviceRegistryService
         $allowed['domain'] = $domain->value;
         $allowed['category'] = $category;
         $allowed['status'] = DeviceStatus::Active->value;
+        $allowed['health_status'] = HealthStatus::Unknown->value;
         $allowed['created_by_user_id'] = $actor->id;
 
         return DB::transaction(function () use ($allowed, $site, $actor): Device {

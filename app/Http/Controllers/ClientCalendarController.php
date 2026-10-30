@@ -4,12 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientAppointment;
-use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
 use App\Services\Clients\ClientProfileSectionAccess;
+use App\Services\Medication\DoseSlots\ClientCalendarDoses;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Support\ShiftTaskSupport;
 use App\Support\WorkerClock;
@@ -21,7 +20,7 @@ class ClientCalendarController extends Controller
 {
     public function __construct(
         private readonly ClientProfileSectionAccess $sectionAccess,
-        private readonly MedicationGovernanceScopeService $medicationGovernance,
+        private readonly ClientCalendarDoses $calendarDoses,
     ) {}
 
     public function events(Request $request, Client $client)
@@ -48,8 +47,13 @@ class ClientCalendarController extends Controller
             'end' => ['nullable', 'date'],
         ]);
 
-        $start = $this->parseCalendarBoundary($boundaries['start'] ?? null, now()->startOfMonth());
-        $end = $this->parseCalendarBoundary($boundaries['end'] ?? null, now()->endOfMonth());
+        // UTC instants (a boundary keeps its offset when parsed, and the
+        // database compares UTC); the default is the NZ month.
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $start = $this->parseCalendarBoundary($boundaries['start'] ?? null, now($timezone)->startOfMonth(), $timezone)->utc();
+        $end = $this->parseCalendarBoundary($boundaries['end'] ?? null, now($timezone)->endOfMonth(), $timezone)->utc();
+        $startDate = $start->copy()->timezone($timezone)->toDateString();
+        $endDate = $end->copy()->timezone($timezone)->toDateString();
         if ($end->lt($start)) {
             throw ValidationException::withMessages([
                 'end' => 'The calendar end must be on or after the start.',
@@ -99,18 +103,19 @@ class ClientCalendarController extends Controller
         $visits = $access['portal_access']
             ? FamilyVisitRequest::where('client_id', $client->id)
                 ->where('status', 'approved')
-                ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
+                ->whereBetween('requested_date', [$startDate, $endDate])
                 ->with('user:id,name')
                 ->get()
             : collect();
 
         foreach ($visits as $v) {
-            $startTime = $v->requested_date->copy();
+            // The requested date and times are NZ wall-clock.
+            $startTime = Carbon::parse($v->requested_date->toDateString(), $timezone);
             if ($v->preferred_time_start) {
                 [$h, $m] = explode(':', $v->preferred_time_start);
                 $startTime->setTime((int) $h, (int) $m);
             }
-            $endTime = $v->requested_date->copy();
+            $endTime = $startTime->copy()->startOfDay();
             if ($v->preferred_time_end) {
                 [$h, $m] = explode(':', $v->preferred_time_end);
                 $endTime->setTime((int) $h, (int) $m);
@@ -179,12 +184,13 @@ class ClientCalendarController extends Controller
             ? FamilyNote::forClient($client->id)
                 ->withDueDate()
                 ->open()
-                ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
+                ->whereBetween('due_date', [$startDate, $endDate])
                 ->get()
             : collect();
 
         foreach ($familyNotes as $fn) {
-            $noteStart = $fn->due_date->copy();
+            // The due date and time are NZ wall-clock.
+            $noteStart = Carbon::parse($fn->due_date->toDateString(), $timezone);
             if ($fn->due_time) {
                 [$h, $m] = explode(':', $fn->due_time);
                 $noteStart->setTime((int) $h, (int) $m);
@@ -207,120 +213,11 @@ class ClientCalendarController extends Controller
             ]);
         }
 
-        // 5. Medication administrations (scheduled doses)
+        // 5. Medication: recorded doses, and the projection's scheduled doses
+        // with the states Meds today shows (C6i).
         if ($canViewMedication) {
-            $medAdminsQuery = ClientMedicationAdministration::query()
-                ->effectiveClinicalEvidence()
-                ->where('client_id', $client->id)
-                ->whereBetween('scheduled_for', [$start, $end])
-                ->with('medication:id,name,dosage,route,form');
-            $this->medicationGovernance->scopeCanonicalClientMedicationRows(
-                $medAdminsQuery,
-                [(int) $client->site_id],
-                false,
-            );
-            if (! $canViewControlledMedication) {
-                $this->medicationGovernance->scopeWithoutControlledMedicationRows($medAdminsQuery);
-            }
-            $medAdmins = $medAdminsQuery->get();
-        } else {
-            $medAdmins = collect();
-        }
-
-        foreach ($medAdmins as $ma) {
-            $medName = $ma->medication?->name ?? 'Medication';
-            $statusLabel = match ($ma->status) {
-                'given' => 'Given',
-                'refused' => 'Refused',
-                'withheld' => 'Withheld',
-                'missed' => 'Missed',
-                default => 'Scheduled',
-            };
-            $statusColor = match ($ma->status) {
-                'given' => '#10b981',
-                'refused' => '#f97316',
-                'withheld' => '#eab308',
-                'missed' => '#ef4444',
-                default => '#ec4899',
-            };
-            $events->push([
-                'id' => 'med-'.$ma->id,
-                'title' => $medName.' — '.$statusLabel,
-                'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
-                'end' => null,
-                'allDay' => false,
-                'backgroundColor' => $statusColor,
-                'borderColor' => 'transparent',
-                'extendedProps' => [
-                    'type' => 'medication',
-                    'status' => $ma->status ?? 'scheduled',
-                    'medication_name' => $medName,
-                    'dosage' => $ma->medication?->dosage,
-                    'route' => $ma->medication?->route,
-                    'notes' => $ma->notes,
-                    'administered_at' => $ma->administered_at?->toIso8601String(),
-                ],
-            ]);
-        }
-
-        // 6. Scheduled medication doses — only show ± 3 days from today to avoid clutter
-        $medStart = $start->greaterThan(now()->subDays(3)->startOfDay())
-            ? $start->copy()
-            : now()->subDays(3)->startOfDay();
-        $medEnd = $end->lessThan(now()->addDays(3)->endOfDay())
-            ? $end->copy()
-            : now()->addDays(3)->endOfDay();
-        $activeMeds = $canViewMedication
-            ? ClientMedication::where('client_id', $client->id)
-                ->whereHas('client', fn ($query) => $query->whereKey($client->id)
-                    ->where('site_id', $client->site_id))
-                ->active()
-                ->whereNull('ceased_at')
-                ->where('is_prn', false)
-                ->when(
-                    ! $canViewControlledMedication,
-                    fn ($query) => $query->where('controlled_drug', false),
-                )
-                ->get()
-            : collect();
-
-        foreach ($activeMeds as $med) {
-            $times = $this->parseFrequencyTimes($med->frequency);
-            if (empty($times)) {
-                continue;
-            }
-
-            $current = $medStart->copy();
-            while ($current->lte($medEnd)) {
-                foreach ($times as $time) {
-                    $scheduledAt = $current->copy()->setTimeFromTimeString($time);
-                    // Check if there's already an administration record for this slot
-                    $alreadyRecorded = $medAdmins->contains(function ($ma) use ($med, $scheduledAt) {
-                        return $ma->client_medication_id === $med->id
-                            && $ma->scheduled_for
-                            && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i');
-                    });
-                    if (! $alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
-                        $isPast = $scheduledAt->lt(now());
-                        $events->push([
-                            'id' => 'medsched-'.$med->id.'-'.$scheduledAt->format('YmdHi'),
-                            'title' => $med->name.($isPast ? ' — Overdue' : ' — Due'),
-                            'start' => $scheduledAt->toIso8601String(),
-                            'end' => null,
-                            'allDay' => false,
-                            'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
-                            'borderColor' => 'transparent',
-                            'extendedProps' => [
-                                'type' => 'medication',
-                                'status' => $isPast ? 'overdue' : 'scheduled',
-                                'medication_name' => $med->name,
-                                'dosage' => $med->dosage,
-                                'route' => $med->route,
-                            ],
-                        ]);
-                    }
-                }
-                $current->addDay();
+            foreach ($this->calendarDoses->events($client, $start, $end, $canViewControlledMedication) as $event) {
+                $events->push($event);
             }
         }
 
@@ -406,7 +303,8 @@ class ClientCalendarController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function parseCalendarBoundary(mixed $value, Carbon $fallback): Carbon
+    /** A boundary without an offset is NZ wall-clock. */
+    private function parseCalendarBoundary(mixed $value, Carbon $fallback, string $timezone): Carbon
     {
         if ($value instanceof Carbon) {
             return $value->copy();
@@ -418,7 +316,7 @@ class ClientCalendarController extends Controller
 
         $normalized = $this->normalizeCalendarBoundaryInput($value);
 
-        return Carbon::parse($normalized);
+        return Carbon::parse($normalized, $timezone);
     }
 
     private function normalizeCalendarBoundaryInput(mixed $value): mixed
@@ -430,33 +328,5 @@ class ClientCalendarController extends Controller
         $trimmed = trim($value);
 
         return preg_replace('/(?<=T\d{2}:\d{2}:\d{2}) (?=\d{2}:\d{2}$)/', '+', $trimmed) ?? $trimmed;
-    }
-
-    /**
-     * Parse common medication frequency strings into scheduled times.
-     */
-    private function parseFrequencyTimes(?string $frequency): array
-    {
-        if (! $frequency) {
-            return [];
-        }
-
-        $freq = strtolower(trim($frequency));
-
-        // Check for explicit times like "08:00, 20:00" or "8am, 8pm"
-        if (preg_match_all('/(\d{1,2}):(\d{2})/', $freq, $matches, PREG_SET_ORDER)) {
-            return array_map(fn ($m) => sprintf('%02d:%02d', $m[1], $m[2]), $matches);
-        }
-
-        // Common frequency keywords
-        return match (true) {
-            str_contains($freq, 'once daily'), str_contains($freq, 'od'), str_contains($freq, 'daily'), str_contains($freq, 'nocte'), str_contains($freq, 'mane') => ['08:00'],
-            str_contains($freq, 'twice daily'), str_contains($freq, 'bd'), str_contains($freq, 'bid') => ['08:00', '20:00'],
-            str_contains($freq, 'three times'), str_contains($freq, 'tds'), str_contains($freq, 'tid') => ['08:00', '14:00', '20:00'],
-            str_contains($freq, 'four times'), str_contains($freq, 'qds'), str_contains($freq, 'qid') => ['08:00', '12:00', '16:00', '20:00'],
-            str_contains($freq, 'morning') => ['08:00'],
-            str_contains($freq, 'evening'), str_contains($freq, 'night') => ['20:00'],
-            default => [],
-        };
     }
 }

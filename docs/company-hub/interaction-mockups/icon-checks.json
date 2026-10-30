@@ -1,0 +1,384 @@
+{
+  "errors": [],
+  "originalIcons": 12,
+  "screens": [
+    {
+      "id": 1,
+      "theme": "light",
+      "icons": 9
+    },
+    {
+      "id": 2,
+      "theme": "light",
+      "icons": 11
+    },
+    {
+      "id": 3,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 4,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 5,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 6,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 7,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 8,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 9,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 10,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 11,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 12,
+      "theme": "light",
+      "icons": 9
+    },
+    {
+      "id": 13,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 14,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 15,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 16,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 17,
+      "theme": "light",
+      "icons": 10
+    },
+    {
+      "id": 18,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 19,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 20,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 21,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 22,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 23,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 24,
+      "theme": "light",
+      "icons": 14
+    },
+    {
+      "id": 25,
+      "theme": "light",
+      "icons": 9
+    },
+    {
+      "id": 26,
+      "theme": "light",
+      "icons": 15
+    },
+    {
+      "id": 27,
+      "theme": "light",
+      "icons": 9
+    },
+    {
+      "id": 28,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 29,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 30,
+      "theme": "light",
+      "icons": 9
+    },
+    {
+      "id": 31,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 32,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 33,
+      "theme": "light",
+      "icons": 8
+    },
+    {
+      "id": 34,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 35,
+      "theme": "light",
+      "icons": 7
+    },
+    {
+      "id": 36,
+      "theme": "light",
+      "icons": 10
+    },
+    {
+      "id": 37,
+      "theme": "light",
+      "icons": 10
+    },
+    {
+      "id": 1,
+      "theme": "dark",
+      "icons": 9
+    },
+    {
+      "id": 2,
+      "theme": "dark",
+      "icons": 11
+    },
+    {
+      "id": 3,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 4,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 5,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 6,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 7,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 8,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 9,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 10,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 11,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 12,
+      "theme": "dark",
+      "icons": 9
+    },
+    {
+      "id": 13,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 14,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 15,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 16,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 17,
+      "theme": "dark",
+      "icons": 10
+    },
+    {
+      "id": 18,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 19,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 20,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 21,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 22,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 23,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 24,
+      "theme": "dark",
+      "icons": 14
+    },
+    {
+      "id": 25,
+      "theme": "dark",
+      "icons": 9
+    },
+    {
+      "id": 26,
+      "theme": "dark",
+      "icons": 15
+    },
+    {
+      "id": 27,
+      "theme": "dark",
+      "icons": 9
+    },
+    {
+      "id": 28,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 29,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 30,
+      "theme": "dark",
+      "icons": 9
+    },
+    {
+      "id": 31,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 32,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 33,
+      "theme": "dark",
+      "icons": 8
+    },
+    {
+      "id": 34,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 35,
+      "theme": "dark",
+      "icons": 7
+    },
+    {
+      "id": 36,
+      "theme": "dark",
+      "icons": 10
+    },
+    {
+      "id": 37,
+      "theme": "dark",
+      "icons": 10
+    }
+  ],
+  "verified": [
+    "custom recognition heading and card",
+    "all 12 family glyphs",
+    "zero generic sparkle/star glyphs across 37 journeys",
+    "hero picker label and preview",
+    "all layouts at 1024px in both themes"
+  ],
+  "scope": "Fictional local mockup only"
+}

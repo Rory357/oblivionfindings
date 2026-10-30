@@ -298,6 +298,10 @@ class HealthcareWorkspaceTest extends TestCase
 
     public function test_client_tab_is_restricted_without_client_context_permission_and_leaks_no_counts(): void
     {
+        // Team leads read the clients at their sites since 30 Oct (Stephan); this case needs a viewer without
+        // client context, so it takes that one key off the role for this test.
+        Role::query()->where('name', 'team_lead')->firstOrFail()->permissions()
+            ->detach(\App\Models\Permission::query()->where('key', 'clients.viewAny')->value('id'));
         $viewer = $this->viewerWithRole('team_lead');
         $client = Client::factory()->create();
         $device = $this->healthcareDevice('Restricted client device');
@@ -594,5 +598,44 @@ class HealthcareWorkspaceTest extends TestCase
             'assigned_at' => now(),
             'assigned_by_user_id' => $this->admin->id,
         ]);
+    }
+
+    public function test_flow_filter_and_device_quick_links_respect_evidence_and_permissions(): void
+    {
+        $unsupported = $this->healthcareDevice('Unmonitored Vital Sensor');
+        $healthy = $this->healthcareDevice('Healthy Vital Sensor', [
+            'config' => [
+                'connectivity_state' => 'connected',
+                'integration_state' => 'healthy',
+                'last_successful_delivery_at' => now()->subMinutes(2)->toIso8601String(),
+                'delivery_stale_after_minutes' => 30,
+            ],
+        ]);
+        $this->assign($unsupported, DeviceAssignment::TARGET_SITE, $this->site->id);
+        $this->assign($healthy, DeviceAssignment::TARGET_SITE, $this->site->id);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/healthcare?tab=data-flow&flow=unsupported')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($unsupported): void {
+                $activeTab = $page->toArray()['props']['healthcareWorkspace']['activeTab'];
+
+                $this->assertSame('unsupported', $activeTab['flowFilter']['key']);
+                $this->assertSame(2, $activeTab['inventoryTotal']);
+                $this->assertSame(1, $activeTab['inventoryShown']);
+                $this->assertSame(
+                    [$unsupported->id],
+                    collect($activeTab['devices'])->pluck('id')->all(),
+                );
+                $this->assertSame(
+                    "/security-devices/maintenance?device_id={$unsupported->id}",
+                    $activeTab['devices'][0]['maintenanceHref'],
+                );
+                $this->assertSame(
+                    "/security-devices/devices/{$unsupported->id}?section=monitors",
+                    $activeTab['devices'][0]['monitoringHref'],
+                );
+                $this->assertSame(2, collect($activeTab['flowGroups'])->sum('count'));
+            });
     }
 }

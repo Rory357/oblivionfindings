@@ -12,7 +12,10 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\Reporting\MedicationReportAccess;
 use App\Support\ReportCatalog;
+use App\Support\WorkerClock;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -22,6 +25,7 @@ class ReportsController extends Controller
     public function __construct(
         private readonly MedicationGovernanceScopeService $medicationScope,
         private readonly BoardPackAccessService $boardPackAccess,
+        private readonly MedicationReportAccess $medicationReports,
     ) {}
 
     public function index(Request $request)
@@ -29,25 +33,20 @@ class ReportsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('reports.viewAny'), 403);
 
-        $from7 = now()->subDays(7)->startOfDay();
-        $today = now()->startOfDay();
-        $medicationSiteIds = $this->medicationScope->reportSiteIds($user);
-        $canViewControlled = $user->canDo(
+        // EA-220 (Lane C7): the last 7 NZ days (today and the six before), and today's NZ date.
+        $from7 = WorkerClock::lastDaysStartUtc(7);
+        $today = WorkerClock::today();
+        $canReadMedication = $user->canDo('medications.reports.view')
+            && ! $this->medicationReports->financeOnly($user);
+        $medicationSiteIds = $canReadMedication ? $this->medicationReports->siteIds($user) : [];
+        $canViewControlled = $canReadMedication && $user->canDo(
             MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY,
-        );
-        $administrations = $this->medicationAdministrationQuery(
-            $user,
-            $medicationSiteIds,
         );
         $generalAuditActivity = $this->generalAuditActivityQuery($user);
 
         $kpis = [
             'openIncidents' => ClientIncident::query()
                 ->whereIn('status', ['submitted', 'reviewed'])
-                ->count(),
-            'missedMeds7d' => (clone $administrations)
-                ->where('created_at', '>=', $from7)
-                ->whereIn('status', ['missed', 'withheld', 'refused'])
                 ->count(),
             'completedShifts7d' => Shift::query()
                 ->where('starts_at', '>=', $from7)
@@ -73,6 +72,13 @@ class ReportsController extends Controller
                 ->where('created_at', '>=', $from7)
                 ->count(),
         ];
+        if ($canReadMedication) {
+            // Counted by when the dose was due (or given), not when it was entered.
+            $kpis['missedMeds7d'] = $this->medicationAdministrationQuery($user, $medicationSiteIds)
+                ->whereRaw('COALESCE(client_medication_administrations.scheduled_for, client_medication_administrations.administered_at) >= ?', [$from7])
+                ->whereIn('status', ['missed', 'withheld', 'refused'])
+                ->count();
+        }
         if ($canViewControlled) {
             $kpis['openDiscrepancies'] = $this->controlledDiscrepancyQuery(
                 $user,
@@ -81,8 +87,11 @@ class ReportsController extends Controller
         }
 
         $moduleSummaries = collect(ReportCatalog::modules())
-            ->reject(fn (array $module): bool => $this->moduleMedicationGovernance($module) === 'controlled'
-                && ! $canViewControlled)
+            ->reject(fn (array $module): bool => match ($this->moduleMedicationGovernance($module)) {
+                'administration' => ! $canReadMedication,
+                'controlled' => ! $canViewControlled,
+                default => false,
+            })
             ->map(function (array $module) use ($user, $medicationSiteIds): array {
                 $modelClass = $module['model'];
                 $model = new $modelClass;
@@ -95,11 +104,9 @@ class ReportsController extends Controller
 
                 $lastActivity = null;
                 if ($hasDateField) {
-                    $last = (clone $query)->max($dateField);
-                    $lastActivity = $last ? (string) $last : null;
+                    $lastActivity = $this->activityStamp((clone $query)->max($dateField));
                 } elseif (Schema::hasColumn($table, 'created_at')) {
-                    $last = (clone $query)->max('created_at');
-                    $lastActivity = $last ? (string) $last : null;
+                    $lastActivity = $this->activityStamp((clone $query)->max('created_at'));
                 }
 
                 return array_merge($module, [
@@ -115,21 +122,28 @@ class ReportsController extends Controller
             ->values();
 
         $combinedReports = collect(CombinedReportController::definitions())
-            ->map(function (array $definition) use ($kpis, $canViewControlled): array {
-                if (! $canViewControlled) {
-                    $definition['modules'] = collect($definition['modules'] ?? [])
-                        ->reject(fn (string $module): bool => $module === 'controlled_drug_discrepancies')
-                        ->values()
-                        ->all();
-                }
+            ->map(function (array $definition) use ($kpis, $canReadMedication, $canViewControlled): array {
+                $definition['modules'] = collect($definition['modules'] ?? [])
+                    ->reject(fn (string $module): bool => match ($module) {
+                        'medication_administrations' => ! $canReadMedication,
+                        'controlled_drug_discrepancies' => ! $canViewControlled,
+                        default => false,
+                    })
+                    ->values()
+                    ->all();
 
                 $preview = [];
                 if ($definition['key'] === 'care-quality') {
                     $preview = [
                         ['label' => 'Open incidents', 'value' => $kpis['openIncidents']],
-                        ['label' => 'Medication exceptions (7d)', 'value' => $kpis['missedMeds7d']],
                         ['label' => 'Open safeguarding', 'value' => $kpis['openSafeguarding']],
                     ];
+                    if ($canReadMedication) {
+                        array_splice($preview, 1, 0, [[
+                            'label' => 'Medication exceptions (7d)',
+                            'value' => $kpis['missedMeds7d'],
+                        ]]);
+                    }
                 } elseif ($definition['key'] === 'workforce-operations') {
                     $preview = [
                         ['label' => 'Completed shifts (7d)', 'value' => $kpis['completedShifts7d']],
@@ -160,6 +174,20 @@ class ReportsController extends Controller
     }
 
     /** @param array<int, int> $siteIds */
+    /**
+     * EA-061 (Lane C7): a stored instant is UTC — sent as ISO so the page shows
+     * NZ time; a date-only value keeps its calendar date.
+     */
+    private function activityStamp(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        $text = (string) $value;
+
+        return strlen($text) > 10 ? CarbonImmutable::parse($text, 'UTC')->toIso8601String() : $text;
+    }
+
     private function medicationAdministrationQuery(User $user, array $siteIds): Builder
     {
         $query = ClientMedicationAdministration::query()->effectiveClinicalEvidence();
@@ -168,6 +196,7 @@ class ReportsController extends Controller
             $siteIds,
             allowNullMedication: false,
         );
+        $query->whereIn('client_medication_administrations.client_id', $this->medicationReports->clientIds($user, $siteIds));
         if (! $user->canDo(MedicationGovernanceScopeService::CONTROLLED_VIEW_CAPABILITY)) {
             $this->medicationScope->scopeWithoutControlledMedicationRows($query);
         }
@@ -178,13 +207,15 @@ class ReportsController extends Controller
     /** @param array<int, int> $siteIds */
     private function controlledDiscrepancyQuery(User $user, array $siteIds): Builder
     {
-        $this->medicationScope->reportSiteIds($user, controlled: true);
+        $this->medicationReports->siteIds($user, report: 'controlled');
         $query = ClientControlledDrugDiscrepancy::query();
         $this->medicationScope->scopeCanonicalClientMedicationRows(
             $query,
             $siteIds,
             allowNullMedication: false,
         );
+
+        $query->whereIn('client_controlled_drug_discrepancies.client_id', $this->medicationReports->clientIds($user, $siteIds));
 
         return $query;
     }
@@ -200,25 +231,7 @@ class ReportsController extends Controller
 
     private function excludeMedicationAuditFamilies(Builder $query): void
     {
-        $query->where(function (Builder $nonMedication): void {
-            $nonMedication->whereNull('auditable_type')
-                ->orWhere(function (Builder $typed): void {
-                    $typed->where('auditable_type', 'not like', '%Medication%')
-                        ->where('auditable_type', 'not like', '%ControlledDrug%');
-                });
-        })->where(function (Builder $nonMedicationAction): void {
-            $nonMedicationAction->whereNull('action')
-                ->orWhere(function (Builder $action): void {
-                    $action->where('action', 'not like', 'medication%')
-                        ->where('action', 'not like', 'meds.%')
-                        ->where('action', 'not like', 'emar.%')
-                        ->where('action', 'not like', 'clientmedication%')
-                        ->where('action', 'not like', 'clientcontrolleddrug%')
-                        ->where('action', 'not like', 'controlled_drug%')
-                        ->where('action', 'not like', 'cd.%')
-                        ->where('action', 'not like', 'cd\_%');
-                });
-        });
+        $query->withoutMedicationEvidence();
     }
 
     /**

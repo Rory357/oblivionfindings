@@ -1,0 +1,7 @@
+ M app/Http/Controllers/Emar/EmarController.php
+ M config/medications.php
+ M resources/js/hooks/use-emar-breadcrumbs.ts
+ M resources/js/lib/emar-navigation.ts
+ M routes/emar.php
+?? app/Http/Controllers/Emar/PersonMedicationRecordController.php
+?? resources/js/components/emar/record/

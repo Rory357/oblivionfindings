@@ -1,0 +1,58 @@
+[
+  {
+    "file": "bulk-labels-5.pdf",
+    "pages": [
+      {
+        "page": 1,
+        "millimetres": [
+          210.0,
+          297.0
+        ],
+        "decoded_labels": 1
+      },
+      {
+        "page": 2,
+        "millimetres": [
+          210.0,
+          297.0
+        ],
+        "decoded_labels": 2
+      }
+    ]
+  },
+  {
+    "file": "bulk-labels-6.pdf",
+    "pages": [
+      {
+        "page": 1,
+        "millimetres": [
+          60.0,
+          50.0
+        ],
+        "decoded_labels": 1
+      },
+      {
+        "page": 2,
+        "millimetres": [
+          60.0,
+          50.0
+        ],
+        "decoded_labels": 1
+      },
+      {
+        "page": 3,
+        "millimetres": [
+          60.0,
+          50.0
+        ],
+        "decoded_labels": 1
+      }
+    ]
+  },
+  {
+    "archive": "asset-labels-6.zip",
+    "png_decoded": 3,
+    "svg_logo_embedded": 3,
+    "manifest_matches_pdf": true
+  }
+]

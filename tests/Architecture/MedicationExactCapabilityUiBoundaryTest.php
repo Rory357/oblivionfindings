@@ -9,8 +9,9 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
     $emarRoutes = (string) file_get_contents($root.'/routes/emar.php');
     $apiRoutes = (string) file_get_contents($root.'/routes/api_medications.php');
     $sidebar = (string) file_get_contents($root.'/resources/js/components/app-sidebar.tsx');
+    $navigation = (string) file_get_contents($root.'/resources/js/lib/emar-navigation.ts');
     $errorPage = (string) file_get_contents($root.'/resources/js/pages/emar/MedicationErrors.tsx');
-    $errorDialogs = (string) file_get_contents($root.'/resources/js/pages/emar/_error-dialogs.tsx');
+    $errorDetail = (string) file_get_contents($root.'/resources/js/pages/emar/errors/_detail.tsx');
 
     expect($emarController)
         ->toContain(
@@ -20,10 +21,13 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
             "\$user->canDo('medications.orders.manage')\n                || \$user->canDo('medications.administer.record')",
             "'manage_allergies' => (bool) \$user && \$user->canDo('clients.update')",
             "'manage_interactions' => (bool) \$user && \$user->canDo('medications.administer.correct')",
-            "\$user->canDo('medications.reports.export')\n                || \$user->canDo('reports.viewAny')",
+            "'view_reports' => (bool) \$user && \$user->canDo('medications.reports.view')",
+            "'view_audit' => (bool) \$user && \$user->canDo('medications.reports.view') && \$user->canDo('medications.audit.view')",
+            "'export_reports' => (bool) \$user && (\n                \$user->canDo('medications.reports.view')\n                && \$user->canDo('medications.reports.export')",
             "'canManageSettings' => \$can['manage_settings']",
         )
         ->not->toContain(
+            "canDo('reports.viewAny')",
             "'correct' => (bool) \$user && (\$user->canDo('medications.administer.correct') || \$user->canDo('clients.update'))",
             "&& \$user->canDo('medications.view')\n                && \$user->canDo('medications.reports.export')",
         )
@@ -33,41 +37,54 @@ it('keeps medication UI flags and authoring routes on their exact capabilities',
         ->and($errorController)
         ->toContain(
             "'record' => \$actor->canDo('medications.administer.record')",
-            "'correct' => \$actor->canDo('medications.administer.correct')",
+            "'manage' => \$actor->canDo('medications.errors.manage')",
+            "abort_unless(\$user?->canDo('medications.errors.manage'), 403);",
         )
         ->and($apiController)
-        ->toContain("abort_unless(\$user?->canDo('medications.administer.correct'), 403);")
+        // NF-09: interaction rules are governance, not a dose-correction right.
+        ->toContain("abort_unless(\$user?->canDo('medications.settings.manage'), 403);")
+        ->not->toContain("abort_unless(\$user?->canDo('medications.administer.correct'), 403);")
         ->and($emarRoutes)
         ->toContain(
             "Route::middleware('permission:medications.settings.manage')->group(function ()",
-            "Route::post('/errors/{error}/link-incident', [MedicationErrorController::class, 'linkIncident'])\n        ->middleware('permission:medications.administer.correct')",
+            "Route::middleware(['permission:medications.reports.view', 'permission:medications.reports.export'])->group(function ()",
+            "Route::post('/errors/{error}/link-incident', [MedicationErrorController::class, 'linkIncident'])\n        ->middleware('permission:medications.errors.manage')",
         )
         ->not->toContain('permission:medications.settings.manage|medications.orders.manage|clients.update')
         ->and($apiRoutes)
-        ->toContain("->middleware('permission:medications.administer.correct')\n        ->name('api.medications.interactions.store')")
+        ->toContain("->middleware('permission:medications.settings.manage')\n        ->name('api.medications.interactions.store')")
+        ->not->toContain("->middleware('permission:medications.administer.correct')\n        ->name('api.medications.interactions.store')")
         ->not->toContain('permission:medications.administer.correct|clients.update')
+        // NAV: the sidebar delegates to lib/emar-navigation.ts, whose view
+        // gates mirror the server's exact reader capabilities.
         ->and($sidebar)
+        ->toContain('const medication = emarSidebar(can);')
+        ->not->toContain('const canAdminEmar')
+        ->and($navigation)
         ->toContain(
-            'if (can?.reports?.viewAny || can?.medications?.reportsExport)',
-            "(can?.medications?.view &&\n            can?.medications?.controlledView &&\n            can?.medications?.controlledRecord)",
-            'if (can?.medications?.view && can?.medications?.controlledView)',
+            "label: 'Standard reports',\n                href: '/emar/reports',\n                icon: BarChart3,\n                visible: reportsView,",
+            'export const canOpenEmarReports = reportsView;',
+            'export const canOpenEmarAudit = all(reportsView, auditView);',
+            "label: 'Controlled register',\n                href: '/emar/controlled',\n                icon: Shield,\n                visible: all(view, controlledView),",
+            "label: 'Destructions & returns',\n                href: '/emar/destructions',\n                icon: Ban,\n                visible: all(view, any(controlledView, stockUpdate)),",
+            '(controlledView(can) && hasManagerCapability(can))',
         )
-        ->not->toContain(
-            "can?.medications?.view &&\n        (can?.reports?.viewAny || can?.medications?.reportsExport)",
-            '(can?.medications?.view && can?.medications?.controlledView) ||',
-            '(can?.medications?.view && can?.medications?.controlledRecord) ||',
-        )
+        ->not->toContain('controlledRecord(can)', 'controlledWitness(can)', 'reportsViewAny')
         ->and($errorPage)
         ->toContain(
-            'can.record ? (',
-            'can.correct && err.status',
-            'canCorrect={can.correct}',
+            'can.record && (',
+            "import { ErrorDetail } from './errors/_detail';",
+            'canManage={can.manage}',
+            'canRecord={can.record}',
         )
-        ->and($errorDialogs)
+        ->not->toContain('canCorrect={can.correct}', "from './_error-dialogs'")
+        ->and($errorDetail)
         ->toContain(
-            "canCorrect && error.status === 'reported'",
-            "canCorrect && error.status === 'resolved'",
-        );
+            'canManage && opened',
+            'opened && canRecord',
+            "start('link-incident')",
+        )
+        ->not->toContain('canCorrect');
 });
 
 it('keeps the worker witness picker exact, current, and bounded to canonical board Sites', function (): void {

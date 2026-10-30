@@ -1,0 +1,36 @@
+{
+  "date": "2026-09-27",
+  "reference": "PKG-06B v9, frozen preview at 127.0.0.1:8904",
+  "implementation": "8821, Laravel/Inertia at 127.0.0.1:8905",
+  "method": "Direct browser inspection of both pages, source comparison, responsive checks and working-control verification",
+  "corrected": [
+    "Header identity/actions, full-width meter rhythm and double page padding",
+    "Custody subtabs, origin/destination strip and two-column responsibility/exception layout",
+    "Summary attention, location, original check, documents and recent history hierarchy",
+    "Separate profile-photo, Asset details, visible QR and document panels",
+    "Document list/cards, availability search and consistent current-record counts",
+    "Finance metrics and separate source, work, review and replacement panels",
+    "Original checks/service, kit/replacement and history/retirement navigation",
+    "Header focus scrolling clipped the identity row: scoped overflow clip now prevents internal scroll"
+  ],
+  "browserChecks": [
+    "Movement history and current custody switch correctly",
+    "Scoped search filters custody sections and navigates to current custody",
+    "Original checks and service requirements show separately",
+    "Replacement history and retirement review are reachable",
+    "Document table and Cards toggle expose the same records",
+    "Original two-page PDF renders from both library and Asset details shortcuts",
+    "Visible QR opens A4/custom-label export controls",
+    "Custody wizard retains shared rail, body and footer layout",
+    "375 CSS-pixel content width inside 390x844 browser viewport: custody, documents and identity have no horizontal overflow",
+    "Desktop viewport restored and corrected preview retained"
+  ],
+  "automatedChecks": {
+    "dialogTests": "4 files, 10 tests passed after final component changes",
+    "productionBuild": "Passed in 4m 22s; development server stopped and public/hot removed; browser loaded app-DbcGuVKl.js and retained identity, Finance and custody layouts",
+    "eslint": "No errors or warnings in Asset Profile components",
+    "typescript": "No changed-file errors; six pre-existing ByRoleOptions exact errors in fleet-workspace-navigation.test.tsx",
+    "frozenV9": "42 files checked, zero hash changes"
+  },
+  "qualification": "Structural alignment, not identical screenshots: shared production shell, permissions and actual fixture records differ from the illustrative mockup. Source values were not fabricated to copy the mockup."
+}

@@ -1,0 +1,35 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/fleet-personal-reports/oblivionfindings
+
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/booking-request.test.tsx (6 tests) 334ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/record-command.test.tsx (7 tests) 38ms
+ ✓ resources/js/components/fleet-assets/vehicle-workspace/finance-studio.test.tsx (11 tests) 1379ms
+ ✓ resources/js/pages/finance/bills/Show.test.tsx (5 tests) 1620ms
+     ✓ pins reviewed values and safely retries lost response with the same identity  567ms
+     ✓ pins reviewed values and safely retries incomplete receipt with the same identity  397ms
+     ✓ pins reviewed values and safely retries wrong bill with the same identity  333ms
+ ✓ resources/js/components/fleet-assets/maintenance/cost-workspace.test.tsx (4 tests) 1121ms
+   ✓ allows correcting an estimate after its files were saved without uploading them again  818ms
+ ✓ resources/js/components/people-locations/model.test.ts (8 tests) 28ms
+ ✓ resources/js/pages/finance/vehicle-reviews/history.test.tsx (6 tests) 1122ms
+   ✓ keeps an unconfirmed decision recoverable ({})  459ms
+ ✓ resources/js/components/maps/google-map.test.tsx (1 test) 113ms
+ ✓ resources/js/pages/operations/people-locations/index.test.tsx (4 tests) 277ms
+ ✓ resources/js/components/people-locations/report-dialog.test.tsx (4 tests) 473ms
+ ✓ resources/js/components/fleet-assets/maintenance/date-picker.test.tsx (4 tests) 622ms
+ ✓ resources/js/components/fleet-assets/transport/location-field.test.tsx (3 tests) 619ms
+ ✓ resources/js/components/finance/document-preview.test.tsx (2 tests) 204ms
+ ✓ resources/js/components/finance/record-batch-wizard.test.tsx (2 tests) 417ms
+   ✓ retains successful, stale and uncertain outcomes and retries only the original uncertain command  348ms
+ ✓ resources/js/components/maps/google-sdk.test.ts (3 tests) 34ms
+ ✓ resources/js/components/assets/profile/finance-review-dialog.test.tsx (1 test) 392ms
+   ✓ reviews an asset Finance request before submitting to the canonical queue  390ms
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts (4 tests) 10ms
+ ✓ resources/js/lib/fleet-return.test.ts (2 tests) 2ms
+
+ Test Files  18 passed (18)
+      Tests  77 passed (77)
+   Start at  13:19:01
+   Duration  28.81s (transform 1.94s, setup 1.92s, import 20.13s, tests 8.80s, environment 22.81s)
+
+JSON report written to C:/Users/steph/.codex/visualizations/2026/09/27/01a0e1a8-7e5a-7b81-921c-feaf73216636/consolidation-qa/frontend-tests.json

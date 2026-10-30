@@ -1,7 +1,9 @@
+import { hiddenControlledCaption } from '@/components/meds/board-bits';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { formatDateTime, formatTime, toDateInput } from '@/lib/datetime';
+import { medsTodayHref } from '@/lib/meds-today-location';
 import {
     CalendarWorkRows,
     WorkSchedule,
@@ -33,10 +35,18 @@ interface Props {
     onAdd: (at?: number) => void;
     onOpenTask: (id: number) => void;
     onAddNote: (clientId: number) => void;
+    /** Controlled doses left off the list for this reader (EM-12). */
+    hiddenControlled?: number;
+    /** …and how many of those are overdue. */
+    hiddenControlledOverdue?: number;
 }
 
 export function DayWorkList(p: Props) {
     const groups = groupWork(p.items, p.now);
+    const hiddenNote = hiddenControlledCaption(
+        p.hiddenControlled ?? 0,
+        p.hiddenControlledOverdue ?? 0,
+    );
     const entry = (item: StreamItem): CalendarWorkEntry => {
         const done = workIsDone(item);
         const at = workDueAt(item);
@@ -45,14 +55,29 @@ export function DayWorkList(p: Props) {
         const status = done
             ? item.kind === 'task'
                 ? 'Done'
-                : { given: 'Given', refused: 'Refused', withheld: 'Withheld' }[
-                      item.data.status as 'given' | 'refused' | 'withheld'
-                  ]
+                : item.data.status === 'away'
+                  ? item.data.away_reason
+                      ? `Away · ${item.data.away_reason}`
+                      : 'Away'
+                  : {
+                        given: 'Given',
+                        refused: 'Refused',
+                        withheld: 'Withheld',
+                        missed: 'Missed (recorded)',
+                    }[
+                        item.data.status as
+                            | 'given'
+                            | 'refused'
+                            | 'withheld'
+                            | 'missed'
+                    ]
             : item.kind === 'med' && item.data.status === 'overdue'
               ? 'Overdue'
-              : at <= p.now
-                ? 'Due now'
-                : 'To do';
+              : item.kind === 'med' && item.data.status === 'pending_check'
+                ? 'Waiting for the order check'
+                : at <= p.now
+                  ? 'Due now'
+                  : 'To do';
         return {
             key: `${item.kind}-${item.data.id}`,
             at: Number.isFinite(at) ? at : null,
@@ -82,7 +107,15 @@ export function DayWorkList(p: Props) {
             status: (
                 <StatusBadge
                     variant={
-                        done ? 'success' : at <= p.now ? 'warning' : 'neutral'
+                        item.kind === 'med' && item.data.status === 'missed'
+                            ? 'critical'
+                            : item.kind === 'med' && item.data.status === 'away'
+                              ? 'info'
+                              : done
+                                ? 'success'
+                                : at <= p.now
+                                  ? 'warning'
+                                  : 'neutral'
                     }
                 >
                     {status}
@@ -92,9 +125,7 @@ export function DayWorkList(p: Props) {
             onOpen: () =>
                 item.kind === 'task'
                     ? p.onOpenTask(item.data.id)
-                    : router.visit(
-                          `/meds/today?client_id=${item.data.client_id}`,
-                      ),
+                    : router.visit(medsTodayHref(item.data.client_id)),
             detail: steps.length ? (
                 <ul className="space-y-2 pb-2">
                     {steps.map((step) => (
@@ -120,9 +151,7 @@ export function DayWorkList(p: Props) {
                     onClick: () =>
                         item.kind === 'task'
                             ? p.onOpenTask(item.data.id)
-                            : router.visit(
-                                  `/meds/today?client_id=${item.data.client_id}`,
-                              ),
+                            : router.visit(medsTodayHref(item.data.client_id)),
                 },
                 ...(item.clientId
                     ? [
@@ -238,6 +267,9 @@ export function DayWorkList(p: Props) {
                         onAddAt={p.canAdd ? p.onAdd : undefined}
                         onAddAnytime={p.canAdd ? () => p.onAdd() : undefined}
                     />
+                    {hiddenNote ? (
+                        <p className="text-caption">{hiddenNote}</p>
+                    ) : null}
                     {groups.followedUp.length > 0 && (
                         <Card
                             unstyled

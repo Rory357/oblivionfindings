@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-09-28T04:56:31.139Z",
+  "root": "C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings",
+  "base": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+  "fix": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+  "branch": "codex/pkg08-final-focus-integration",
+  "oldBranch": "codex/pkg08-settings-implementation",
+  "refs": {
+    "refs/heads/codex/fleet-consolidation-qa": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+    "refs/heads/codex/pkg08-settings-implementation": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+    "refs/heads/main": "abc70200dc232317273b028e28181af6191f87b8",
+    "refs/remotes/origin/HEAD": "a4f869fe5e07b2fc5ecb87526596077f9700a584",
+    "refs/remotes/origin/main": "a4f869fe5e07b2fc5ecb87526596077f9700a584"
+  },
+  "publicationFiles": {
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/before.json": "c4b84008d358dbb66e52c697a9f096eafdb6c96c2e2a033229313b7457b784a3",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/blocked.json": "d1a4dec5d5697626200c98622cd1752841bc75b086784af822229ae9b2017662",
+    "docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/local.json": "29a56f3ff3d4e809383994697f2c60da9e81233d163a5e9dabff654ced48cd95"
+  },
+  "status": "?? docs/fleet-assets-audit/evidence/PKG-08-implementation/publication-20260928/\n?? storage/framework/pkg08-map-regression/\n?? storage/framework/pkg08-vite/"
+}

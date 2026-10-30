@@ -1,0 +1,1520 @@
+/* Safety & oversight › Staff eligibility (eMAR P11 v5 `eligibility.tsx`).
+ * It replaces Medication › Competency. The rail is the Safety & oversight
+ * views — only Staff eligibility exists so far (P07a, P08a, P08b, P09 and P10
+ * add theirs) — and Register · Renewals · Exemptions are header filter chips
+ * (Rory: nothing below the header band).
+ *
+ * Every number comes from the server's competency decision. EA-156 (Lane
+ * C9h): the "Can witness" meter, the register's Witness column and the
+ * Witnesses & PINs view read the server's witness rule (the one P07b
+ * enforces) and who P07b accepts on shift now. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { EntityChip, PersonDisc } from '@/components/lists/entity-cells';
+import {
+    compactMenu,
+    useEntityContextMenu,
+    type MenuItem,
+} from '@/components/lists/entity-menu';
+import { EntityTable } from '@/components/lists/entity-table';
+import { ListCaption } from '@/components/lists/list-caption';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderMeterDonut,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateTime, formatTime } from '@/lib/datetime';
+import { Head, Link, router } from '@inertiajs/react';
+import {
+    ArrowUpRight,
+    ClipboardCheck,
+    ClipboardList,
+    Clock,
+    Download,
+    Eye,
+    Home,
+    KeyRound,
+    Pencil,
+    Plus,
+    RefreshCw,
+    Shield,
+    ShieldCheck,
+    Trash2,
+    User,
+    UserCheck,
+    Users,
+    XCircle,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+    AssessmentView,
+    AssessmentWizard,
+    type AssessMode,
+    type EligClient,
+} from './eligibility/_assessment';
+import {
+    EndExemption,
+    ExemptionWizard,
+    type ExemptionPerson,
+} from './eligibility/_exemptions';
+import {
+    areaRes,
+    assessMode,
+    day,
+    eligLine,
+    firstName,
+    givenAbility,
+    nextStep,
+    PIN_LABEL,
+    PIN_VARIANT,
+    STATUS_META,
+    type AreaMeta,
+    type EligExemption,
+    type EligPerson,
+    type EligPolicy,
+} from './eligibility/_model';
+import { StatusChip } from './eligibility/_parts';
+import { Note, RowMenu, Section } from './settings/_ui';
+
+/** EA-156 (Lane C9h): who from the register is on shift now at a house. */
+type OnShiftHouse = {
+    id: number;
+    name: string;
+    /** People P07b accepts as a controlled-drug witness here now. */
+    can_now: number;
+    people: {
+        id: number;
+        name: string;
+        role: string | null;
+        since: string | null;
+        until: string | null;
+        clocked_in: boolean;
+        can_now: boolean;
+        reasons: string[];
+    }[];
+};
+
+type Props = {
+    people: EligPerson[];
+    on_shift?: OnShiftHouse[];
+    exemptions: EligExemption[];
+    houses: { id: number; name: string }[];
+    policy: EligPolicy;
+    areas: AreaMeta[];
+    can: { assess: boolean; exempt: boolean; reset_pins: boolean };
+    clients: EligClient[];
+    me: { id: number; name: string };
+    loaded_at: string;
+};
+
+type View = 'register' | 'renewals' | 'exemptions' | 'witness';
+const VIEWS: [View, string][] = [
+    ['register', 'Register'],
+    ['renewals', 'Renewals'],
+    ['exemptions', 'Exemptions'],
+    ['witness', 'Witnesses & PINs'],
+];
+const STATUS_FILTERS = [
+    { value: 'all', label: 'Any status' },
+    { value: 'alone', label: 'Given competency met without a co-signer' },
+    { value: 'due', label: 'Due for renewal' },
+    { value: 'cant', label: 'Given competency not met' },
+    { value: 'restricted', label: 'Restricted' },
+    { value: 'areas', label: 'Areas not passed' },
+];
+const RULE_WORD = { block: 'Block', cosigner: 'co-signer', off: 'Off' };
+
+type Dialog =
+    | { kind: 'view'; id: number }
+    | { kind: 'assess'; id?: number; mode: AssessMode }
+    | { kind: 'exempt'; id?: number }
+    | { kind: 'end'; exemption: EligExemption }
+    | { kind: 'delete'; person: EligPerson }
+    | { kind: 'reset'; person: EligPerson };
+
+/** A CSV cell that a spreadsheet can't run as a formula. */
+const csvCell = (v: unknown) => {
+    const s = v == null ? '' : String(v);
+    const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+    return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+};
+
+const readQuery = () => new URLSearchParams(window.location.search);
+
+export default function StaffEligibility(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
+    const { people, exemptions, houses, policy, areas, can } = props;
+    const [view, setView] = useState<View>(() => {
+        const v = readQuery().get('view');
+        return v === 'renewals' || v === 'exemptions' || v === 'witness'
+            ? v
+            : 'register';
+    });
+    const [house, setHouse] = useState(() => readQuery().get('house') ?? 'all');
+    const [status, setStatus] = useState(
+        () => readQuery().get('status') ?? 'all',
+    );
+    const [role, setRole] = useState('all');
+    const [q, setQ] = useState('');
+    const [dialog, setDialog] = useState<Dialog | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    // The address keeps the sub-view and filters, so a link opens the same list.
+    useEffect(() => {
+        const p = new URLSearchParams();
+        if (view !== 'register') p.set('view', view);
+        if (house !== 'all') p.set('house', house);
+        if (view === 'register' && status !== 'all') p.set('status', status);
+        const qs = p.toString();
+        window.history.replaceState(
+            window.history.state,
+            '',
+            `${window.location.pathname}${qs ? `?${qs}` : ''}`,
+        );
+    }, [view, house, status]);
+
+    const inHouse = (id: number | null) =>
+        house === 'all' || String(id) === house;
+    // Name, role, house or assessor, as the old register searched.
+    const matches = (x: EligPerson) =>
+        !q ||
+        [x.name, x.role, x.house, x.assessment?.assessor].some((s) =>
+            (s ?? '').toLowerCase().includes(q.toLowerCase()),
+        );
+    const scoped = people.filter((x) => inHouse(x.house_id));
+    const alone = scoped.filter(
+        (x) => givenAbility(x, policy).v === 'yes' && x.st !== 'restricted',
+    );
+    const due = scoped
+        .filter((x) => x.status === 'due')
+        .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
+    const cant = scoped.filter(
+        (x) => givenAbility(x, policy).v === 'no' && x.st !== 'restricted',
+    );
+    const restricted = scoped.filter((x) => x.st === 'restricted');
+    const activeExemptions = exemptions.filter(
+        (e) => e.status === 'active' && inHouse(e.house_id),
+    );
+    // EA-156: can witness (all but being on shift), and houses where nobody
+    // on shift now can.
+    const witnesses = scoped.filter((x) => x.witness?.can);
+    const onShift = (props.on_shift ?? []).filter((h) => inHouse(h.id));
+    const noWitnessNow = onShift.filter((h) => h.can_now === 0);
+    const roles = useMemo(
+        () =>
+            [...new Set(people.map((x) => x.role).filter(Boolean) as string[])]
+                .sort()
+                .map((r) => ({ value: r, label: r })),
+        [people],
+    );
+    const go = (next: View, nextStatus?: string) => {
+        setView(next);
+        if (nextStatus !== undefined) setStatus(nextStatus);
+    };
+    const person = (id: number) => people.find((x) => x.id === id) ?? null;
+
+    const actions = (x: EligPerson): MenuItem[] =>
+        compactMenu([
+            x.assessment && {
+                label: 'View assessment',
+                icon: Eye,
+                onClick: () => setDialog({ kind: 'view', id: x.id }),
+            },
+            x.can?.assess &&
+                x.st !== 'ack' && {
+                    label:
+                        x.st === 'none'
+                            ? 'Start first assessment'
+                            : x.st === 'failed'
+                              ? 'Start remedial assessment'
+                              : 'Renew or reassess',
+                    icon: ClipboardCheck,
+                    onClick: () =>
+                        setDialog({
+                            kind: 'assess',
+                            id: x.id,
+                            mode: assessMode(x),
+                        }),
+                },
+            x.can?.assess &&
+                x.assessment && {
+                    label: 'Edit this assessment',
+                    icon: Pencil,
+                    onClick: () =>
+                        setDialog({ kind: 'assess', id: x.id, mode: 'edit' }),
+                },
+            x.can?.exempt && {
+                label: 'Grant an exemption',
+                icon: ShieldCheck,
+                onClick: () => setDialog({ kind: 'exempt', id: x.id }),
+            },
+            { separator: true },
+            {
+                label: 'View staff member',
+                icon: User,
+                onClick: () => router.visit(`/staff/${x.id}`),
+            },
+            x.can?.reset_pin && {
+                label: 'Reset witness PIN',
+                icon: RefreshCw,
+                danger: true,
+                onClick: () => setDialog({ kind: 'reset', person: x }),
+            },
+            x.can?.assess &&
+                x.assessment && {
+                    label: 'Delete this assessment',
+                    icon: Trash2,
+                    danger: true,
+                    onClick: () => setDialog({ kind: 'delete', person: x }),
+                },
+        ]);
+
+    const exportRegister = () => {
+        const head = [
+            'Person',
+            'Role',
+            'House',
+            'Status',
+            'Until',
+            'Given doses',
+            'Areas not passed',
+            'Witness PIN',
+            'Can witness',
+            'Why not',
+            'Assessed',
+            'Assessor',
+            'Type',
+            'Score',
+        ];
+        const lines = scoped.map((x) =>
+            [
+                x.name,
+                x.role,
+                x.house,
+                STATUS_META[x.status][1],
+                x.until,
+                givenAbility(x, policy).t,
+                areas
+                    .filter((a) => areaRes(x, a.key) === 'no')
+                    .map((a) => a.label)
+                    .join('; '),
+                PIN_LABEL[x.pin],
+                x.witness?.can ? 'Yes' : 'No',
+                x.witness?.reasons.join('; '),
+                x.assessment?.assessed,
+                x.assessment?.assessor,
+                x.assessment?.type_label,
+                x.assessment ? `${x.assessment.passed}/12` : '',
+            ]
+                .map(csvCell)
+                .join(','),
+        );
+        const blob = new Blob([[head.join(','), ...lines].join('\n')], {
+            type: 'text/csv;charset=utf-8;',
+        });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `staff-eligibility-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const houseNames = houses.map((h) => h.name);
+    const header = (
+        <PageHeader
+            icon={Shield}
+            title="Safety & oversight"
+            titleChip={
+                <PageHeaderStatusChip variant="neutral">
+                    {houses.length} {houses.length === 1 ? 'house' : 'houses'}
+                </PageHeaderStatusChip>
+            }
+            subline={`${houseNames.length > 3 ? `${houseNames.slice(0, 3).join(', ')} and ${houseNames.length - 3} more` : houseNames.join(' and ') || 'No houses'} · your approved houses · times in Pacific/Auckland`}
+            actions={
+                <>
+                    <PageHeaderSearch
+                        value={q}
+                        onChange={setQ}
+                        placeholder="Search staff, role or assessor"
+                    />
+                    <PageHeaderGlassButton
+                        icon={Download}
+                        onClick={exportRegister}
+                        disabled={!scoped.length}
+                    >
+                        Export register
+                    </PageHeaderGlassButton>
+                    {can.assess ? (
+                        <PageHeaderPrimaryButton
+                            icon={Plus}
+                            onClick={() =>
+                                setDialog({ kind: 'assess', mode: 'new' })
+                            }
+                        >
+                            New assessment
+                        </PageHeaderPrimaryButton>
+                    ) : null}
+                </>
+            }
+            meters={
+                <>
+                    <PageHeaderMeterBlock
+                        label="Given competency met"
+                        ariaLabel={`View ${alone.length} staff whose given competency needs no co-signer`}
+                        pressed={view === 'register' && status === 'alone'}
+                        onClick={() => go('register', 'alone')}
+                    >
+                        {scoped.length ? (
+                            <PageHeaderMeterDonut
+                                percent={(alone.length / scoped.length) * 100}
+                                caption={
+                                    <>
+                                        {alone.length} of {scoped.length}
+                                        <br />
+                                        current competency, not restricted
+                                    </>
+                                }
+                            />
+                        ) : (
+                            <>
+                                <PageHeaderMeterBig>n/a</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    Nobody records doses here
+                                </PageHeaderMeterCaption>
+                            </>
+                        )}
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Due for renewal"
+                        tone={due.length ? 'warning' : 'brand'}
+                        ariaLabel={`View ${due.length} renewals due`}
+                        pressed={view === 'renewals'}
+                        onClick={() => go('renewals')}
+                    >
+                        <PageHeaderMeterBig>{due.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {due.length
+                                ? `First: ${firstName(due[0])}, ${day(due[0].until)}`
+                                : `Nothing within ${policy.renewal_days} days`}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Given competency not met"
+                        tone={cant.length ? 'critical' : 'brand'}
+                        ariaLabel={`View ${cant.length} staff whose given competency is not met`}
+                        pressed={view === 'register' && status === 'cant'}
+                        onClick={() => go('register', 'cant')}
+                    >
+                        <PageHeaderMeterBig>{cant.length}</PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {cant.length
+                                ? 'No assessment for refused, withheld or away'
+                                : 'No competency blocks'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Restricted"
+                        tone={restricted.length ? 'warning' : 'brand'}
+                        ariaLabel={`View ${restricted.length} restricted staff`}
+                        pressed={view === 'register' && status === 'restricted'}
+                        onClick={() => go('register', 'restricted')}
+                    >
+                        <PageHeaderMeterBig>
+                            {restricted.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Rule: {RULE_WORD[policy.restricted_mode]}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Exemptions"
+                        ariaLabel={`View exemptions, ${activeExemptions.length} active`}
+                        pressed={view === 'exemptions'}
+                        onClick={() => go('exemptions')}
+                    >
+                        <PageHeaderMeterBig>
+                            {activeExemptions.length} active
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            Longest {policy.longest_exemption_days} days
+                            {policy.longest_exemption_reviewed
+                                ? ''
+                                : ' · not reviewed'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                    <PageHeaderMeterBlock
+                        label="Can witness"
+                        tone={noWitnessNow.length ? 'warning' : 'brand'}
+                        ariaLabel={`View witnesses and PINs, ${witnesses.length} of ${scoped.length} can witness`}
+                        pressed={view === 'witness'}
+                        onClick={() => go('witness')}
+                    >
+                        <PageHeaderMeterBig>
+                            {witnesses.length} of {scoped.length}
+                        </PageHeaderMeterBig>
+                        <PageHeaderMeterCaption>
+                            {/* One house is named (as P11 v5); several are
+                                counted, so the caption fits the meter. */}
+                            {noWitnessNow.length === 1
+                                ? `${noWitnessNow[0].name}: nobody on shift now`
+                                : noWitnessNow.length
+                                  ? `${noWitnessNow.length} houses: nobody on shift now`
+                                  : 'Someone on shift can witness at each house'}
+                        </PageHeaderMeterCaption>
+                    </PageHeaderMeterBlock>
+                </>
+            }
+            filters={
+                <>
+                    {VIEWS.map(([key, label]) => {
+                        const n =
+                            key === 'renewals'
+                                ? cant.length + due.length
+                                : key === 'exemptions'
+                                  ? activeExemptions.length
+                                  : 0;
+                        return (
+                            <PageHeaderFilterButton
+                                key={key}
+                                icon={
+                                    key === 'register'
+                                        ? ClipboardList
+                                        : key === 'renewals'
+                                          ? Clock
+                                          : key === 'witness'
+                                            ? KeyRound
+                                            : ShieldCheck
+                                }
+                                active={view === key}
+                                aria-pressed={view === key}
+                                onClick={() => go(key)}
+                            >
+                                {label}
+                                {n ? ` · ${n}` : ''}
+                            </PageHeaderFilterButton>
+                        );
+                    })}
+                    <PageHeaderFilterSelect
+                        icon={Home}
+                        label="All houses"
+                        value={house}
+                        onChange={setHouse}
+                        options={[
+                            { value: 'all', label: 'All houses' },
+                            ...houses.map((h) => ({
+                                value: String(h.id),
+                                label: h.name,
+                            })),
+                        ]}
+                    />
+                    {view === 'register' ? (
+                        <>
+                            <PageHeaderFilterSelect
+                                label="Any status"
+                                value={status}
+                                onChange={setStatus}
+                                options={STATUS_FILTERS}
+                            />
+                            <PageHeaderFilterSelect
+                                icon={Users}
+                                label="Any role"
+                                value={role}
+                                onChange={setRole}
+                                options={[
+                                    { value: 'all', label: 'Any role' },
+                                    ...roles,
+                                ]}
+                            />
+                        </>
+                    ) : null}
+                    <PageHeaderFilterButton
+                        icon={RefreshCw}
+                        onClick={() =>
+                            router.reload({
+                                only: [
+                                    'people',
+                                    'on_shift',
+                                    'exemptions',
+                                    'loaded_at',
+                                ],
+                            })
+                        }
+                    >
+                        Updated {formatTime(props.loaded_at)}
+                    </PageHeaderFilterButton>
+                </>
+            }
+            rail={<EmarHubRail alerts={{ eligibility: cant.length }} />}
+        />
+    );
+
+    const open = dialog?.kind === 'view' ? person(dialog.id) : null;
+    const exemptPeople: ExemptionPerson[] = people.map((x) => ({
+        id: x.id,
+        name: x.name,
+        role: x.role,
+        house_id: x.house_id,
+        house: x.house,
+        status: STATUS_META[x.status][1],
+        ok: !!x.can?.exempt,
+        why: x.exemption
+            ? 'already exempt'
+            : x.id === props.me.id
+              ? 'you can’t exempt yourself'
+              : 'has a current assessment',
+    }));
+
+    let body;
+    if (!people.length) {
+        body = (
+            <EmptyState
+                icon={UserCheck}
+                title="Nobody has been assessed yet"
+                description="No current competency assessment for given doses is recorded here yet. Refused, withheld and away have no competency assessment requirement; the usual recording checks still apply."
+                action={
+                    can.assess ? (
+                        <Button
+                            size="sm"
+                            onClick={() =>
+                                setDialog({ kind: 'assess', mode: 'new' })
+                            }
+                        >
+                            <Plus />
+                            New assessment
+                        </Button>
+                    ) : undefined
+                }
+            />
+        );
+    } else if (view === 'renewals') {
+        body = (
+            <Renewals
+                people={scoped.filter(matches)}
+                policy={policy}
+                areas={areas}
+                actions={actions}
+                onOpen={(x) =>
+                    setDialog(
+                        x.can?.assess && x.st !== 'ack'
+                            ? { kind: 'assess', id: x.id, mode: assessMode(x) }
+                            : { kind: 'view', id: x.id },
+                    )
+                }
+            />
+        );
+    } else if (view === 'witness') {
+        body = (
+            <Witnesses
+                houses={onShift}
+                people={scoped.filter(matches)}
+                checkedAt={props.loaded_at}
+                actions={actions}
+                onOpen={(x) =>
+                    x.assessment ? setDialog({ kind: 'view', id: x.id }) : null
+                }
+            />
+        );
+    } else if (view === 'exemptions') {
+        body = (
+            <Exemptions
+                list={exemptions.filter(
+                    (e) =>
+                        inHouse(e.house_id) &&
+                        (!q ||
+                            e.person.toLowerCase().includes(q.toLowerCase())),
+                )}
+                policy={policy}
+                canGrant={can.exempt}
+                onGrant={() => setDialog({ kind: 'exempt' })}
+                onView={(e) => setDialog({ kind: 'view', id: e.user_id })}
+                onEnd={(e) => setDialog({ kind: 'end', exemption: e })}
+                hasPerson={(id) => !!person(id)}
+            />
+        );
+    } else {
+        body = (
+            <Register
+                all={scoped}
+                rows={scoped.filter((x) => {
+                    if (!matches(x)) return false;
+                    if (role !== 'all' && x.role !== role) return false;
+                    const g = givenAbility(x, policy).v;
+                    return status === 'alone'
+                        ? g === 'yes' && x.st !== 'restricted'
+                        : status === 'due'
+                          ? x.status === 'due'
+                          : status === 'cant'
+                            ? g === 'no' && x.st !== 'restricted'
+                            : status === 'restricted'
+                              ? x.st === 'restricted'
+                              : status === 'areas'
+                                ? !!x.assessment &&
+                                  areas.some((a) => areaRes(x, a.key) === 'no')
+                                : true;
+                })}
+                policy={policy}
+                areas={areas}
+                actions={actions}
+                onOpen={(x) => setDialog({ kind: 'view', id: x.id })}
+                clear={() => {
+                    setQ('');
+                    setHouse('all');
+                    setStatus('all');
+                    setRole('all');
+                }}
+            />
+        );
+    }
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Staff eligibility" />
+            <div className="flex flex-col gap-5 p-6">
+                {header}
+                <Note>
+                    These are competency requirements. Recording each dose still
+                    needs permission, person and house access, and any required
+                    roster, clock-in and dose checks.
+                </Note>
+                {body}
+            </div>
+            {open ? (
+                <AssessmentView
+                    x={open}
+                    areas={areas}
+                    policy={policy}
+                    onClose={() => setDialog(null)}
+                    onAssess={
+                        open.can?.assess
+                            ? () =>
+                                  setDialog({
+                                      kind: 'assess',
+                                      id: open.id,
+                                      mode: assessMode(open),
+                                  })
+                            : undefined
+                    }
+                />
+            ) : null}
+            {dialog?.kind === 'assess' ? (
+                <AssessmentWizard
+                    people={people}
+                    clients={props.clients}
+                    areas={areas}
+                    policy={policy}
+                    assessor={props.me.name}
+                    who={dialog.id}
+                    mode={dialog.mode}
+                    onClose={() => setDialog(null)}
+                    onView={(id) => setDialog({ kind: 'view', id })}
+                />
+            ) : null}
+            {dialog?.kind === 'exempt' ? (
+                <ExemptionWizard
+                    people={exemptPeople}
+                    longestDays={policy.longest_exemption_days}
+                    limitReviewed={policy.longest_exemption_reviewed}
+                    approver={props.me.name}
+                    who={dialog.id}
+                    onClose={() => setDialog(null)}
+                />
+            ) : null}
+            {dialog?.kind === 'end' ? (
+                <EndExemption
+                    exemption={{
+                        id: dialog.exemption.id,
+                        person: dialog.exemption.person,
+                        house: dialog.exemption.house ?? '',
+                        until: dialog.exemption.until ?? '',
+                    }}
+                    onClose={() => setDialog(null)}
+                />
+            ) : null}
+            <ConfirmDialog
+                frontline
+                open={dialog?.kind === 'delete'}
+                onClose={() => setDialog(null)}
+                processing={busy}
+                onConfirm={() => {
+                    if (dialog?.kind !== 'delete' || !dialog.person.assessment)
+                        return;
+                    router.delete(
+                        `/emar/competency/${dialog.person.assessment.id}`,
+                        {
+                            preserveScroll: true,
+                            onStart: () => setBusy(true),
+                            onFinish: () => {
+                                setBusy(false);
+                                setDialog(null);
+                            },
+                        },
+                    );
+                }}
+                title={`Delete ${dialog?.kind === 'delete' ? firstName(dialog.person) : ''}’s assessment?`}
+                description="The assessment is removed from the register and their eligibility is worked out again from what’s left. This can’t be undone. Recorded in the audit log."
+                confirmText="Delete assessment"
+                variant="destructive"
+            />
+            <ConfirmDialog
+                frontline
+                open={dialog?.kind === 'reset'}
+                onClose={() => setDialog(null)}
+                processing={busy}
+                onConfirm={() => {
+                    if (dialog?.kind !== 'reset') return;
+                    router.post(
+                        `/emar/settings/witness-pins/${dialog.person.id}/reset`,
+                        {},
+                        {
+                            preserveScroll: true,
+                            onStart: () => setBusy(true),
+                            onFinish: () => {
+                                setBusy(false);
+                                setDialog(null);
+                            },
+                        },
+                    );
+                }}
+                title={`Reset ${dialog?.kind === 'reset' ? dialog.person.name : ''}’s witness PIN?`}
+                description="They won’t be able to co-sign or witness until they choose a new PIN in Settings › Witness PIN. Nobody sees the old or the new PIN. The reset is recorded in the audit log."
+                confirmText="Reset PIN"
+                variant="destructive"
+            />
+        </AppLayout>
+    );
+}
+
+const identity = (x: EligPerson) => ({
+    mark: <PersonDisc name={x.name} size={30} />,
+    name: x.name,
+    subline: [x.role, x.house].filter(Boolean).join(' · '),
+});
+
+function Register({
+    all,
+    rows,
+    policy,
+    areas,
+    actions,
+    onOpen,
+    clear,
+}: {
+    all: EligPerson[];
+    rows: EligPerson[];
+    policy: EligPolicy;
+    areas: AreaMeta[];
+    actions: (x: EligPerson) => MenuItem[];
+    onOpen: (x: EligPerson) => void;
+    clear: () => void;
+}) {
+    const menu = useEntityContextMenu<EligPerson>();
+    return (
+        <Section
+            id="reg"
+            title="Competency register"
+            caption={`${rows.length} of ${all.length} people who record doses at your houses`}
+        >
+            {rows.length ? (
+                <EntityTable<EligPerson>
+                    rows={rows}
+                    rowKey={(x) => x.id}
+                    identityLabel="Person"
+                    identityWidth="1.35fr"
+                    minWidth={1080}
+                    rowHeight="content"
+                    identity={identity}
+                    columns={[
+                        {
+                            key: 'comp',
+                            label: 'Competency',
+                            width: '1.35fr',
+                            cell: (x) => (
+                                <div className="space-y-1 py-2">
+                                    <StatusChip x={x} />
+                                    <p className="text-caption">
+                                        {eligLine(x, areas)}
+                                    </p>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'can',
+                            label: 'Competency requirements',
+                            width: '1.3fr',
+                            cell: (x) => {
+                                const g = givenAbility(x, policy);
+                                const cd = areaRes(x, 'controlled_drugs');
+                                const cdBlocked =
+                                    g.v !== 'no' &&
+                                    (x.st === 'current' ||
+                                        x.st === 'restricted') &&
+                                    policy.area_mode !== 'off' &&
+                                    (cd === 'no' ||
+                                        (cd === 'unseen' &&
+                                            policy.area_mode ===
+                                                'failed_or_not_seen'));
+                                return (
+                                    <div className="space-y-1 py-2 text-[12.5px]">
+                                        <p>
+                                            {g.v === 'no'
+                                                ? x.st === 'restricted'
+                                                    ? 'Given competency blocks signing'
+                                                    : 'Given competency not met'
+                                                : g.v === 'part'
+                                                  ? x.st === 'restricted'
+                                                      ? 'Given competency needs a co-signer'
+                                                      : 'Given competency uses an exemption'
+                                                  : 'Given competency met'}
+                                        </p>
+                                        {cdBlocked ? (
+                                            <p className="text-muted-foreground">
+                                                Not controlled doses
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                );
+                            },
+                        },
+                        {
+                            key: 'areas',
+                            label: 'Areas not passed',
+                            width: '1.4fr',
+                            cell: (x) => {
+                                if (!x.assessment)
+                                    return (
+                                        <span className="text-caption">
+                                            No assessment
+                                        </span>
+                                    );
+                                const fail = areas.filter(
+                                    (a) => areaRes(x, a.key) === 'no',
+                                );
+                                const unseen = areas.filter(
+                                    (a) => areaRes(x, a.key) === 'unseen',
+                                );
+                                return !fail.length && !unseen.length ? (
+                                    <span className="text-caption">
+                                        All 12 passed
+                                    </span>
+                                ) : (
+                                    <div className="flex flex-wrap gap-1 py-2">
+                                        {fail.map((a) => (
+                                            <StatusBadge
+                                                key={a.key}
+                                                variant="critical"
+                                                size="sm"
+                                            >
+                                                {a.label}
+                                                {a.core ? ' (core)' : ''}
+                                            </StatusBadge>
+                                        ))}
+                                        {unseen.map((a) => (
+                                            <StatusBadge
+                                                key={a.key}
+                                                variant="neutral"
+                                                size="sm"
+                                            >
+                                                {a.label} — not assessed
+                                            </StatusBadge>
+                                        ))}
+                                    </div>
+                                );
+                            },
+                        },
+                        {
+                            key: 'witness',
+                            label: 'Witness',
+                            width: '1.3fr',
+                            cell: (x) => (
+                                <div className="space-y-1 py-2">
+                                    <StatusBadge
+                                        variant={
+                                            x.witness?.can
+                                                ? 'success'
+                                                : 'neutral'
+                                        }
+                                        size="sm"
+                                    >
+                                        {x.witness?.can
+                                            ? 'Can witness'
+                                            : 'Not a witness'}
+                                    </StatusBadge>
+                                    {x.witness && !x.witness.can ? (
+                                        <p className="text-caption">
+                                            {x.witness.reasons.join(' · ')}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ),
+                        },
+                    ]}
+                    actionsFor={actions}
+                    onOpen={onOpen}
+                    onRowContextMenu={menu.open}
+                />
+            ) : (
+                <EmptyState
+                    icon={Users}
+                    title="Nobody matches"
+                    description="Clear the filters or the search."
+                    action={
+                        <Button variant="outline" size="sm" onClick={clear}>
+                            Clear filters
+                        </Button>
+                    }
+                />
+            )}
+            <RowMenu
+                ctx={menu.ctx}
+                close={menu.close}
+                icon={UserCheck}
+                title={(x) => x.name}
+                items={actions}
+            />
+            <Note>
+                “Due for renewal” starts {policy.renewal_days} days before the
+                end date. Refused, withheld and away have no competency
+                assessment requirement. The usual recording checks still apply.
+            </Note>
+        </Section>
+    );
+}
+
+/** "Clocked in 7:02 am · until 3:00 pm" (approved P11 v5 witness view). */
+const onShiftLine = (p: OnShiftHouse['people'][number]) =>
+    [
+        p.since
+            ? `${p.clocked_in ? 'Clocked in' : 'On shift from'} ${formatTime(p.since)}`
+            : 'On shift',
+        p.until ? `until ${formatTime(p.until)}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+
+/**
+ * EA-156 (Lane C9h): Witnesses & PINs (approved P11 v5). Each house's people
+ * on shift now and whether P07b accepts them as a witness now, then everyone's
+ * witness competency, PIN and shift.
+ */
+function Witnesses({
+    houses,
+    people,
+    checkedAt,
+    actions,
+    onOpen,
+}: {
+    houses: OnShiftHouse[];
+    people: EligPerson[];
+    checkedAt: string;
+    actions: (x: EligPerson) => MenuItem[];
+    onOpen: (x: EligPerson) => void;
+}) {
+    const menu = useEntityContextMenu<EligPerson>();
+    const shiftOf = new Map(
+        houses.flatMap((h) =>
+            h.people.map((p) => [p.id, { ...p, house: h.name }] as const),
+        ),
+    );
+    return (
+        <div className="space-y-5">
+            <div className="grid gap-4 lg:grid-cols-2">
+                {houses.map((h) => (
+                    <Card
+                        key={h.id}
+                        aria-label={`${h.name} · on shift now`}
+                        className="gap-3 p-4"
+                    >
+                        <ListCaption
+                            title={`${h.name} · on shift now`}
+                            right={
+                                <StatusBadge
+                                    variant={h.can_now ? 'success' : 'warning'}
+                                    size="sm"
+                                >
+                                    {h.can_now
+                                        ? `${h.can_now} can witness`
+                                        : 'Nobody can witness'}
+                                </StatusBadge>
+                            }
+                        />
+                        {h.people.length ? (
+                            <ul className="divide-y divide-border rounded-lg border border-border">
+                                {h.people.map((p) => (
+                                    <li
+                                        key={p.id}
+                                        className="flex flex-wrap items-start justify-between gap-3 px-3 py-2.5"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-medium">
+                                                {p.name}
+                                            </p>
+                                            <p className="text-caption">
+                                                {onShiftLine(p)}
+                                            </p>
+                                        </div>
+                                        <p className="text-caption max-w-[60%] text-right">
+                                            {p.can_now
+                                                ? 'Can witness'
+                                                : p.reasons.join(' · ')}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <EmptyState
+                                variant="inline"
+                                icon={Clock}
+                                title="Nobody who records doses is on shift here now."
+                            />
+                        )}
+                        <p className="text-caption">
+                            Checked against clock-ins and shifts in progress at{' '}
+                            {formatTime(checkedAt)}.
+                            {h.can_now
+                                ? ''
+                                : ' Controlled doses need a witness: without one, a manager can approve a witness override.'}
+                        </p>
+                        {h.can_now ? null : (
+                            <div>
+                                <Button variant="link" asChild>
+                                    <Link href="/emar/safety/witness-overrides">
+                                        Open witness overrides
+                                        <ArrowUpRight className="size-4" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        )}
+                    </Card>
+                ))}
+            </div>
+            <Section
+                id="witness"
+                title="Witness competency and PIN"
+                caption={`${people.length} ${people.length === 1 ? 'person' : 'people'}`}
+            >
+                <p className="text-subtle">
+                    A witness needs all four: a current assessment (not an
+                    exemption, not restricted) with the controlled drugs area
+                    passed and “can witness controlled drugs” on, a witness PIN,
+                    and being on shift at the house.
+                </p>
+                {people.length ? (
+                    <EntityTable<EligPerson>
+                        rows={people}
+                        rowKey={(x) => x.id}
+                        identityLabel="Person"
+                        identityWidth="1.3fr"
+                        minWidth={1000}
+                        rowHeight="content"
+                        identity={identity}
+                        columns={[
+                            {
+                                key: 'competency',
+                                label: 'Witness competency',
+                                width: '1.6fr',
+                                cell: (x) => {
+                                    const reasons =
+                                        x.pin === 'set'
+                                            ? (x.witness?.reasons ?? [])
+                                            : (x.witness?.reasons ?? []).slice(
+                                                  0,
+                                                  -1,
+                                              );
+                                    return (
+                                        <span className="py-2 text-[12.5px]">
+                                            {x.witness?.competency
+                                                ? 'Yes — on for this assessment'
+                                                : `No — ${reasons.join(' · ') || 'not assessed'}`}
+                                        </span>
+                                    );
+                                },
+                            },
+                            {
+                                key: 'pin',
+                                label: 'Witness PIN',
+                                width: '1fr',
+                                cell: (x) => (
+                                    <StatusBadge
+                                        variant={PIN_VARIANT[x.pin]}
+                                        size="sm"
+                                    >
+                                        {PIN_LABEL[x.pin]}
+                                        {x.pin === 'set' && x.pin_set_at
+                                            ? ` · ${day(x.pin_set_at)}`
+                                            : ''}
+                                    </StatusBadge>
+                                ),
+                            },
+                            {
+                                key: 'shift',
+                                label: 'On shift now',
+                                width: '1.2fr',
+                                cell: (x) => {
+                                    const at = shiftOf.get(x.id);
+                                    return (
+                                        <span className="text-[12.5px]">
+                                            {at
+                                                ? `${onShiftLine(at)}${houses.length > 1 ? ` · ${at.house}` : ''}`
+                                                : 'Not on shift now'}
+                                        </span>
+                                    );
+                                },
+                            },
+                            {
+                                key: 'can',
+                                label: 'Can witness',
+                                width: '0.7fr',
+                                cell: (x) => (
+                                    <StatusBadge
+                                        variant={
+                                            x.witness?.can
+                                                ? 'success'
+                                                : 'neutral'
+                                        }
+                                        size="sm"
+                                    >
+                                        {x.witness?.can ? 'Yes' : 'No'}
+                                    </StatusBadge>
+                                ),
+                            },
+                        ]}
+                        actionsFor={actions}
+                        onOpen={onOpen}
+                        onRowContextMenu={menu.open}
+                    />
+                ) : (
+                    <EmptyState
+                        icon={Users}
+                        title="Nobody matches"
+                        description="Clear the search or choose another house."
+                    />
+                )}
+                <RowMenu
+                    ctx={menu.ctx}
+                    close={menu.close}
+                    icon={UserCheck}
+                    title={(x) => x.name}
+                    items={actions}
+                />
+            </Section>
+        </div>
+    );
+}
+
+function Renewals({
+    people,
+    policy,
+    areas,
+    actions,
+    onOpen,
+}: {
+    people: EligPerson[];
+    policy: EligPolicy;
+    areas: AreaMeta[];
+    actions: (x: EligPerson) => MenuItem[];
+    onOpen: (x: EligPerson) => void;
+}) {
+    const menu = useEntityContextMenu<EligPerson>();
+    const now = people.filter(
+        (x) => givenAbility(x, policy).v === 'no' && x.st !== 'restricted',
+    );
+    const due = people
+        .filter((x) => x.status === 'due')
+        .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
+    const later = people
+        .filter((x) => x.status === 'current')
+        .sort((a, b) => (a.days ?? 0) - (b.days ?? 0));
+    const table = (list: EligPerson[]) => (
+        <EntityTable<EligPerson>
+            rows={list}
+            rowKey={(x) => x.id}
+            identityLabel="Person"
+            identityWidth="1.3fr"
+            minWidth={900}
+            rowHeight="content"
+            identity={identity}
+            columns={[
+                {
+                    key: 'st',
+                    label: 'Status',
+                    width: '1.4fr',
+                    cell: (x) => (
+                        <div className="space-y-1 py-2">
+                            <StatusChip x={x} />
+                            <p className="text-caption">{eligLine(x, areas)}</p>
+                        </div>
+                    ),
+                },
+                {
+                    key: 'roster',
+                    label: 'Rostering',
+                    width: '1.6fr',
+                    cell: (x) => (
+                        <span className="py-2 text-[12.5px]">
+                            {x.status === 'due'
+                                ? 'Rostering shows a warning the rosterer can override'
+                                : 'Rostering blocks shifts that need medication cover until this is fixed'}
+                        </span>
+                    ),
+                },
+                {
+                    key: 'next',
+                    label: 'Next step',
+                    width: '1fr',
+                    cell: (x) => (
+                        <span className="text-[12.5px]">{nextStep(x)}</span>
+                    ),
+                },
+            ]}
+            actionsFor={actions}
+            onOpen={onOpen}
+            onRowContextMenu={menu.open}
+        />
+    );
+    return (
+        <div className="space-y-5">
+            <Section
+                id="rn-now"
+                title="Given competency not met"
+                caption={`${now.length} people · competency requirements for given doses`}
+            >
+                {now.length ? (
+                    table(now)
+                ) : (
+                    <EmptyState
+                        variant="inline"
+                        icon={UserCheck}
+                        title="No competency blocks on given doses at your houses."
+                    />
+                )}
+            </Section>
+            <Section
+                id="rn-due"
+                title={`Due within ${policy.renewal_days} days`}
+                caption={`${due.length} people · still current until the end date`}
+            >
+                {due.length ? (
+                    table(due)
+                ) : (
+                    <EmptyState
+                        variant="inline"
+                        icon={Clock}
+                        title={`No renewals due within ${policy.renewal_days} days.`}
+                    />
+                )}
+            </Section>
+            <Section
+                id="rn-later"
+                title="Later"
+                caption={`${later.length} people current beyond ${policy.renewal_days} days${later[0] ? ` · next: ${later[0].name}, ${day(later[0].until)}` : ''}`}
+            >
+                <span />
+            </Section>
+            <RowMenu
+                ctx={menu.ctx}
+                close={menu.close}
+                icon={UserCheck}
+                title={(x) => x.name}
+                items={actions}
+            />
+        </div>
+    );
+}
+
+function Exemptions({
+    list,
+    policy,
+    canGrant,
+    onGrant,
+    onView,
+    onEnd,
+    hasPerson,
+}: {
+    list: EligExemption[];
+    policy: EligPolicy;
+    canGrant: boolean;
+    onGrant: () => void;
+    onView: (e: EligExemption) => void;
+    onEnd: (e: EligExemption) => void;
+    hasPerson: (id: number) => boolean;
+}) {
+    const menu = useEntityContextMenu<EligExemption>();
+    const actions = (e: EligExemption): MenuItem[] =>
+        compactMenu([
+            hasPerson(e.user_id) && {
+                label: 'View the person’s assessment',
+                icon: Eye,
+                onClick: () => onView(e),
+            },
+            e.can_end && {
+                label: 'End early',
+                icon: XCircle,
+                danger: true,
+                onClick: () => onEnd(e),
+            },
+        ]);
+    const badge: Record<EligExemption['status'], ['info' | 'neutral', string]> =
+        {
+            active: ['info', 'Active'],
+            ended: ['neutral', 'Ended'],
+            revoked: ['neutral', 'Ended early'],
+        };
+    return (
+        <Section
+            id="xl"
+            title="Exemptions"
+            caption={`${list.length} shown · longest ${policy.longest_exemption_days} days`}
+            right={
+                canGrant ? (
+                    <Button size="sm" onClick={onGrant}>
+                        <Plus />
+                        Grant an exemption
+                    </Button>
+                ) : null
+            }
+        >
+            <p className="text-subtle">
+                One house, a reason and an end date within{' '}
+                {policy.longest_exemption_days} days (
+                {policy.longest_exemption_reviewed
+                    ? 'set'
+                    : 'default — not yet reviewed'}
+                ).
+                <Button variant="link" className="ml-2" asChild>
+                    <Link href="/emar/settings#staff/exemptions">
+                        Longest exemption setting
+                        <ArrowUpRight className="size-4" />
+                    </Link>
+                </Button>
+            </p>
+            {list.length ? (
+                <EntityTable<EligExemption>
+                    rows={list}
+                    rowKey={(e) => e.id}
+                    identityLabel="Person"
+                    identityWidth="1.2fr"
+                    minWidth={1000}
+                    rowHeight="content"
+                    identity={(e) => ({
+                        mark: <PersonDisc name={e.person} size={30} />,
+                        name: e.person,
+                        subline: e.role ?? undefined,
+                    })}
+                    columns={[
+                        {
+                            key: 'where',
+                            label: 'Where',
+                            width: '0.9fr',
+                            cell: (e) => (
+                                <EntityChip icon={Home}>{e.house}</EntityChip>
+                            ),
+                        },
+                        {
+                            key: 'why',
+                            label: 'Why',
+                            width: '1.6fr',
+                            cell: (e) => (
+                                <span className="py-2 text-[12.5px]">
+                                    {e.reason}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'dates',
+                            label: 'From – until',
+                            width: '1.1fr',
+                            cell: (e) => (
+                                <span className="text-[13px]">
+                                    {day(e.from)} – {day(e.until)}
+                                </span>
+                            ),
+                        },
+                        {
+                            key: 'by',
+                            label: 'Approved by',
+                            width: '1fr',
+                            cell: (e) => (
+                                <div>
+                                    <div className="text-[13px]">
+                                        {e.by ?? '—'}
+                                    </div>
+                                    <div className="text-caption">
+                                        {e.at ? formatDateTime(e.at) : ''}
+                                    </div>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'st',
+                            label: 'Status',
+                            width: '1fr',
+                            cell: (e) => (
+                                <div className="space-y-1 py-2">
+                                    <StatusBadge
+                                        variant={badge[e.status][0]}
+                                        size="sm"
+                                    >
+                                        {badge[e.status][1]}
+                                    </StatusBadge>
+                                    {e.status === 'revoked' && e.ended_at ? (
+                                        <p className="text-caption">
+                                            Ended {formatDateTime(e.ended_at)}
+                                            {e.ended_by
+                                                ? ` by ${e.ended_by}`
+                                                : ''}
+                                            {e.end_reason
+                                                ? `: “${e.end_reason}”`
+                                                : ''}
+                                        </p>
+                                    ) : null}
+                                </div>
+                            ),
+                        },
+                    ]}
+                    actionsFor={actions}
+                    onOpen={(e) =>
+                        hasPerson(e.user_id) ? onView(e) : undefined
+                    }
+                    onRowContextMenu={menu.open}
+                    mutedFor={(e) => e.status !== 'active'}
+                />
+            ) : (
+                <EmptyState
+                    icon={ShieldCheck}
+                    title="No exemptions"
+                    description="Nobody at your houses is exempt. Exemptions show here with their end date, and end by themselves."
+                    action={
+                        canGrant ? (
+                            <Button size="sm" onClick={onGrant}>
+                                <Plus />
+                                Grant an exemption
+                            </Button>
+                        ) : undefined
+                    }
+                />
+            )}
+            <RowMenu
+                ctx={menu.ctx}
+                close={menu.close}
+                icon={ShieldCheck}
+                title={(e) => `${e.person} — exemption`}
+                items={actions}
+            />
+        </Section>
+    );
+}

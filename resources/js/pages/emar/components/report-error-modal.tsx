@@ -1,358 +1,518 @@
-/* Report medication error — BUILD-NEW Action-centre modal on the shared
- * Add-Client wizard chrome (MedsWizardDialog + wizard/primitives). Posts to
- * emar.errors.store (MedicationErrorController@store). */
-import { MedsWizardDialog, SummaryRow } from '@/components/meds/wizard-shell';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import {
-    Field,
-    InfoCard,
-    SelectInput,
-    StepHead,
-} from '@/components/wizard/primitives';
+    DateTimeField,
+    localDateTimeLabel,
+    validLocalDateTime,
+} from '@/components/fleet-assets/maintenance/date-time-field';
+import InputError from '@/components/input-error';
+import { MedsWizardDialog } from '@/components/meds/wizard-shell';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { router } from '@inertiajs/react';
-import { AlertTriangle, ClipboardList, Info, ShieldCheck } from 'lucide-react';
-import { useState } from 'react';
+import {
+    AlertTriangle,
+    Check,
+    ClipboardList,
+    MessageSquareText,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import {
+    Choices,
+    HARMS,
+    labelFor,
+    nzLocal,
+    Picker,
+    REACH,
+    reportToken,
+    TYPES,
+    type Person,
+} from '../errors/_shared';
 
-export type ClientOption = { id: number; name: string; site: string | null };
-
-const STEPS = [
-    {
-        key: 'what',
-        label: 'What happened',
-        blurb: 'Client & type',
-        icon: AlertTriangle,
-    },
-    {
-        key: 'class',
-        label: 'Classification',
-        blurb: 'Severity & factors',
-        icon: ClipboardList,
-    },
-    {
-        key: 'sign',
-        label: 'Actions & sign',
-        blurb: 'Submit report',
-        icon: ShieldCheck,
-    },
-];
-
-const ERROR_TYPES = [
-    { value: 'wrong_medication', label: 'Wrong medication' },
-    { value: 'wrong_client', label: 'Wrong client' },
-    { value: 'wrong_dose', label: 'Wrong dose' },
-    { value: 'wrong_time', label: 'Wrong time' },
-    { value: 'wrong_route', label: 'Wrong route' },
-    { value: 'omission', label: 'Omission' },
-    { value: 'unauthorised', label: 'Unauthorised' },
-    { value: 'documentation', label: 'Documentation' },
-    { value: 'other', label: 'Other' },
-];
-
-const SEVERITIES = [
-    { value: 'near_miss', label: 'Near miss' },
-    { value: 'minor', label: 'Minor' },
-    { value: 'moderate', label: 'Moderate' },
-    { value: 'major', label: 'Major' },
-    { value: 'critical', label: 'Critical' },
-];
-
-const labelOf = (opts: { value: string; label: string }[], v: string) =>
-    opts.find((o) => o.value === v)?.label ?? '—';
-
-export function ReportErrorModal({
-    open,
-    onClose,
-    clients,
-    initialClientId,
-}: {
+export type ClientOption = Person & { site: string | null };
+type ReportErrorModalProps = {
     open: boolean;
     onClose: () => void;
     clients: ClientOption[];
     initialClientId?: number | null;
-}) {
+    initialMedicationId?: number | null;
+    initialOccurredAt?: string | null;
+};
+
+export function ReportErrorModal(props: ReportErrorModalProps) {
+    // Oversight pages keep this wrapper mounted. Each explicitly opened report
+    // needs fresh context; discarded details must not reappear on the next open.
+    return props.open ? <ReportErrorForm {...props} /> : null;
+}
+
+function ReportErrorForm({
+    open,
+    onClose,
+    clients,
+    initialClientId,
+    initialMedicationId,
+    initialOccurredAt,
+}: ReportErrorModalProps) {
     const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
-    const [clientId, setClientId] = useState(
-        initialClientId ? String(initialClientId) : '',
+    const [client, setClient] = useState<number | null>(
+        initialClientId ?? null,
     );
-    const [errorType, setErrorType] = useState('');
-    const [description, setDescription] = useState('');
-    const [severity, setSeverity] = useState('');
-    const [contributing, setContributing] = useState('');
+    const [medicine, setMedicine] = useState<number | null>(
+        initialMedicationId ?? null,
+    );
+    const [medicines, setMedicines] = useState<Person[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const [retry, setRetry] = useState(0);
+    const [kind, setKind] = useState('');
+    const [initialOccurred] = useState(() =>
+        nzLocal(initialOccurredAt ?? new Date().toISOString()),
+    );
+    const [occurred, setOccurred] = useState(initialOccurred);
+    const [text, setText] = useState('');
+    const [reach, setReach] = useState('');
+    const [harm, setHarm] = useState('');
     const [immediate, setImmediate] = useState('');
-    const [createIncident, setCreateIncident] = useState('no');
-    const [reachedClient, setReachedClient] = useState('');
-    const [openDisclosure, setOpenDisclosure] = useState('na');
-
-    const reset = () => {
-        setStep(0);
-        setClientId(initialClientId ? String(initialClientId) : '');
-        setErrorType('');
-        setDescription('');
-        setSeverity('');
-        setContributing('');
-        setImmediate('');
-        setCreateIncident('no');
-        setReachedClient('');
-        setOpenDisclosure('na');
-    };
-
+    const [contributing, setContributing] = useState('');
+    const [incident, setIncident] = useState(false);
+    const [token, setToken] = useState(reportToken);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [duplicate, setDuplicate] = useState<number | null>(null);
+    const [separateReason, setSeparateReason] = useState('');
+    useEffect(() => {
+        if (!open || !client) return;
+        const controller = new AbortController();
+        setLoading(true);
+        setLoadError('');
+        setMedicines([]);
+        fetch(`/emar/errors/medicines/${client}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+        })
+            .then((r) => {
+                if (!r.ok) throw new Error();
+                return r.json();
+            })
+            .then((r: { medicines: Person[] }) => setMedicines(r.medicines))
+            .catch(() => {
+                if (!controller.signal.aborted)
+                    setLoadError(
+                        'The chart could not be loaded. Retry before reporting.',
+                    );
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
+        return () => controller.abort();
+    }, [client, open, retry]);
     const close = () => {
-        reset();
-        onClose();
+        if (!saving) onClose();
     };
-
-    const step1Ok = clientId && errorType && description.trim().length > 0;
-    const step2Ok = severity.length > 0;
-    const seriousIncidentNeedsAction =
-        createIncident === 'yes' && ['major', 'critical'].includes(severity);
-
-    const submit = () => {
+    const submit = (asAccount = false) => {
+        if (!navigator.onLine) {
+            setErrors({
+                connection:
+                    'You’re offline. Reconnect to save; your report stays here.',
+            });
+            return;
+        }
         setSaving(true);
         router.post(
             '/emar/errors',
             {
-                client_id: Number(clientId),
-                error_type: errorType,
-                severity,
-                reached_client: reachedClient || null,
-                open_disclosure: openDisclosure || null,
-                description,
+                client_id: client,
+                client_medication_id: medicine,
+                error_type: kind,
+                occurred_at: occurred,
+                reached_client: reach,
+                harm_level: reach === 'no' ? 'none' : harm,
+                description: text,
                 immediate_action: immediate || null,
                 contributing_factors: contributing || null,
-                create_incident: createIncident === 'yes',
+                report_token: token,
+                create_incident: incident,
+                duplicate_id: asAccount ? duplicate : null,
+                separate_reason: separateReason || null,
             },
             {
                 preserveScroll: true,
                 onSuccess: () => {
-                    toast.success('Medication error reported');
-                    close();
+                    toast.success(
+                        asAccount
+                            ? 'Account added'
+                            : 'Medication error reported',
+                    );
+                    setStep(0);
+                    setKind('');
+                    setText('');
+                    setReach('');
+                    setHarm('');
+                    setImmediate('');
+                    setContributing('');
+                    setIncident(false);
+                    setErrors({});
+                    setDuplicate(null);
+                    setSeparateReason('');
+                    setToken(reportToken());
+                    onClose();
                 },
-                onError: () => toast.error('Could not submit the error report'),
+                onError: (e) => {
+                    setErrors(e);
+                    setDuplicate(
+                        e.duplicate_id ? Number(e.duplicate_id) : null,
+                    );
+                },
                 onFinish: () => setSaving(false),
             },
         );
     };
-
-    const clientName =
-        clients.find((c) => String(c.id) === clientId)?.name ?? '—';
-
-    const footer = (
-        <>
-            <Button
-                variant="ghost"
-                onClick={step === 0 ? close : () => setStep((s) => s - 1)}
-                disabled={saving}
-            >
-                {step === 0 ? 'Cancel' : 'Back'}
-            </Button>
-            {step < 2 ? (
-                <Button
-                    onClick={() => setStep((s) => s + 1)}
-                    disabled={
-                        (step === 0 && !step1Ok) || (step === 1 && !step2Ok)
-                    }
-                >
-                    Continue
-                </Button>
-            ) : (
-                <Button
-                    onClick={submit}
-                    disabled={
-                        saving ||
-                        (seriousIncidentNeedsAction && !immediate.trim())
-                    }
-                >
-                    <ShieldCheck className="h-4 w-4" />
-                    {saving ? 'Submitting…' : 'Submit error report'}
-                </Button>
-            )}
-        </>
-    );
-
+    const steps = [
+        {
+            key: 'what',
+            label: 'What happened',
+            blurb: 'The person, medicine and time',
+            icon: AlertTriangle,
+        },
+        {
+            key: 'reach',
+            label: 'Reach & harm',
+            blurb: 'Two plain questions',
+            icon: ClipboardList,
+        },
+        {
+            key: 'review',
+            label: 'Review',
+            blurb: 'Check, then send',
+            icon: Check,
+        },
+    ];
+    const firstOk =
+        !!client &&
+        !!kind &&
+        !!text.trim() &&
+        validLocalDateTime(occurred) &&
+        !loading &&
+        !loadError;
+    const secondOk = !!reach && (reach === 'no' || !!harm);
+    const requiredIncident =
+        reach !== 'no' && ['moderate', 'severe', 'death'].includes(harm);
     return (
         <MedsWizardDialog
             open={open}
             onClose={close}
             title="Report a medication error"
-            description="Record a medication error or near miss for review."
+            description="Report what happened or add your account to an existing report."
             railIcon={AlertTriangle}
-            railTitle="Report med error"
-            railSubtitle="Error & near-miss log"
-            steps={STEPS}
+            railTitle="Report an error"
+            railSubtitle="Medication errors"
+            steps={steps}
             stepIndex={step}
-            onStepClick={(i) => i < step && setStep(i)}
-            footer={footer}
-        >
-            {step === 0 ? (
-                <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead
-                        icon={AlertTriangle}
-                        title="What happened"
-                        blurb="Identify the client and the kind of error."
-                    />
-                    <Field label="Client" required>
-                        <SelectInput
-                            value={clientId}
-                            onChange={setClientId}
-                            placeholder="Select client"
-                            options={clients.map((c) => ({
-                                value: String(c.id),
-                                label: c.site
-                                    ? `${c.name} · ${c.site}`
-                                    : c.name,
-                            }))}
-                        />
-                    </Field>
-                    <Field label="Error type" required>
-                        <SelectInput
-                            value={errorType}
-                            onChange={setErrorType}
-                            placeholder="Select type"
-                            options={ERROR_TYPES}
-                        />
-                    </Field>
-                    <Field label="What happened" required span>
-                        <Textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={4}
-                            placeholder="Describe the error factually — what, when, who was involved."
-                        />
-                    </Field>
-                    <InfoCard icon={Info}>
-                        An undocumented omission is itself a medication error in
-                        NZ practice. Reporting near misses helps prevent harm —
-                        this is a no-blame record.
-                    </InfoCard>
-                </div>
-            ) : step === 1 ? (
-                <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead
-                        icon={ClipboardList}
-                        title="Classification"
-                        blurb="Rate the severity and note contributing factors."
-                    />
-                    <Field label="Severity" required span>
-                        <SelectInput
-                            value={severity}
-                            onChange={setSeverity}
-                            placeholder="Select severity"
-                            options={SEVERITIES}
-                        />
-                    </Field>
-                    <Field label="Did the error reach the client?" span>
-                        <SelectInput
-                            value={reachedClient}
-                            onChange={setReachedClient}
-                            placeholder="Choose"
-                            options={[
-                                {
-                                    value: 'no',
-                                    label: 'No — intercepted (near miss territory)',
-                                },
-                                {
-                                    value: 'yes',
-                                    label: 'Yes — reached the client',
-                                },
-                                { value: 'unknown', label: 'Unknown' },
-                            ]}
-                        />
-                    </Field>
-                    <Field label="Contributing factors" span>
-                        <Textarea
-                            value={contributing}
-                            onChange={(e) => setContributing(e.target.value)}
-                            rows={3}
-                            placeholder="Workload, similar packaging, interruptions, etc. (optional)"
-                        />
-                    </Field>
-                </div>
-            ) : (
-                <div className="grid gap-5 sm:grid-cols-2">
-                    <StepHead
-                        icon={ShieldCheck}
-                        title="Actions & sign"
-                        blurb="Record what was done and submit."
-                    />
-                    <Field
-                        label="Immediate action taken"
-                        required={seriousIncidentNeedsAction}
-                        span
+            onStepClick={(i) => {
+                if (!saving && i < step) setStep(i);
+            }}
+            completeness={{
+                completed: [
+                    client,
+                    kind,
+                    text.trim(),
+                    validLocalDateTime(occurred),
+                    reach,
+                    reach === 'no' || harm,
+                ].filter(Boolean).length,
+                total: 6,
+            }}
+            formState={{
+                isDirty:
+                    client !== (initialClientId ?? null) ||
+                    medicine !== (initialMedicationId ?? null) ||
+                    occurred !== initialOccurred ||
+                    Boolean(
+                        kind ||
+                        text ||
+                        reach ||
+                        harm ||
+                        immediate ||
+                        contributing ||
+                        incident ||
+                        separateReason,
+                    ),
+                processing: saving,
+                errors: Object.fromEntries(
+                    Object.entries(errors).filter(
+                        ([key]) => key !== 'duplicate_id',
+                    ),
+                ),
+            }}
+            footer={
+                <>
+                    <Button
+                        variant="outline"
+                        disabled={saving}
+                        onClick={step ? () => setStep(step - 1) : close}
                     >
-                        <Textarea
-                            value={immediate}
-                            onChange={(e) => setImmediate(e.target.value)}
-                            rows={3}
-                            placeholder={
-                                seriousIncidentNeedsAction
-                                    ? 'Required: record the clinical or safety action actually taken.'
-                                    : 'Clinical response, who was notified, observations (optional)'
+                        {step ? 'Back' : 'Cancel'}
+                    </Button>
+                    {step < 2 ? (
+                        <Button
+                            disabled={
+                                saving || (step === 0 ? !firstOk : !secondOk)
                             }
+                            onClick={() => {
+                                setErrors({});
+                                setStep(step + 1);
+                            }}
+                        >
+                            Continue
+                        </Button>
+                    ) : (
+                        <Button
+                            disabled={
+                                saving ||
+                                (!!duplicate && !separateReason.trim())
+                            }
+                            onClick={() => submit()}
+                        >
+                            {saving
+                                ? 'Saving…'
+                                : duplicate
+                                  ? 'Send separate report'
+                                  : 'Report error'}
+                        </Button>
+                    )}
+                </>
+            }
+        >
+            <div className="flex flex-col gap-5">
+                {step === 0 ? (
+                    <>
+                        <Picker
+                            label="Person"
+                            value={client}
+                            options={clients}
+                            disabled={saving || !!initialClientId}
+                            onChange={(id) => {
+                                setClient(id);
+                                setMedicine(null);
+                                setDuplicate(null);
+                            }}
                         />
-                    </Field>
-                    <Field label="Raise an incident?">
-                        <SelectInput
-                            value={createIncident}
-                            onChange={setCreateIncident}
-                            placeholder="Choose"
-                            options={[
-                                { value: 'no', label: 'No — error log only' },
-                                {
-                                    value: 'yes',
-                                    label: 'Yes — also create an incident',
-                                },
-                            ]}
+                        <Picker
+                            label="Medicine from the chart"
+                            value={medicine}
+                            options={medicines}
+                            disabled={loading || !!loadError}
+                            onChange={setMedicine}
                         />
-                    </Field>
-                    <Field label="Family / open disclosure">
-                        <SelectInput
-                            value={openDisclosure}
-                            onChange={setOpenDisclosure}
-                            placeholder="Choose"
-                            options={[
-                                { value: 'na', label: 'Not required' },
-                                { value: 'pending', label: 'Pending' },
-                                { value: 'done', label: 'Completed' },
-                            ]}
+                        <Button
+                            variant="ghost"
+                            onClick={() => setMedicine(null)}
+                        >
+                            Not about one chart medicine
+                        </Button>
+                        <p className="text-caption">
+                            {loading
+                                ? 'Loading chart…'
+                                : 'Only medicines you may read are offered. Off-chart details can be recorded in your account.'}
+                        </p>
+                        {loadError && (
+                            <div role="alert">
+                                <p>{loadError}</p>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setRetry(retry + 1)}
+                                >
+                                    Retry chart
+                                </Button>
+                            </div>
+                        )}
+                        <DateTimeField
+                            compact
+                            id="error-occurred"
+                            label="When it happened"
+                            value={occurred}
+                            onChange={setOccurred}
+                            error={errors.occurred_at}
                         />
-                    </Field>
-                    <div className="col-span-full rounded-lg border border-border">
-                        <div className="px-4">
-                            <SummaryRow label="Client" value={clientName} />
-                            <SummaryRow
-                                label="Error type"
-                                value={labelOf(ERROR_TYPES, errorType)}
+                        <Choices
+                            label="What went wrong?"
+                            value={kind}
+                            options={TYPES}
+                            onChange={setKind}
+                        />
+                        <div>
+                            <Label htmlFor="error-account">
+                                What happened?
+                            </Label>
+                            <Textarea
+                                id="error-account"
+                                value={text}
+                                onChange={(e) => setText(e.target.value)}
+                                rows={4}
+                                maxLength={5000}
                             />
-                            <SummaryRow
-                                label="Severity"
-                                value={labelOf(SEVERITIES, severity)}
-                                tone={
-                                    ['major', 'critical'].includes(severity)
-                                        ? 'crit'
-                                        : undefined
-                                }
+                            <InputError message={errors.description} />
+                        </div>
+                    </>
+                ) : step === 1 ? (
+                    <>
+                        <Choices
+                            label="Did it reach the person?"
+                            value={reach}
+                            options={REACH}
+                            onChange={(v) => {
+                                setReach(v);
+                                if (v === 'no') setHarm('none');
+                            }}
+                        />
+                        {reach && reach !== 'no' && (
+                            <Choices
+                                label="How much harm?"
+                                value={harm}
+                                options={HARMS}
+                                onChange={setHarm}
                             />
-                            <SummaryRow
-                                label="Incident"
-                                value={
-                                    createIncident === 'yes'
-                                        ? 'Will be raised'
-                                        : 'No'
-                                }
+                        )}
+                        <div>
+                            <Label htmlFor="error-immediate">
+                                What was done straight away?
+                            </Label>
+                            <Textarea
+                                id="error-immediate"
+                                value={immediate}
+                                onChange={(e) => setImmediate(e.target.value)}
+                                maxLength={5000}
                             />
                         </div>
-                    </div>
-                    <InfoCard icon={Info}>
-                        Submitting records this to the medication error register
-                        with an audit entry.
-                    </InfoCard>
-                </div>
-            )}
+                        <div>
+                            <Label htmlFor="error-contributing">
+                                What might have contributed? (optional)
+                            </Label>
+                            <Textarea
+                                id="error-contributing"
+                                value={contributing}
+                                onChange={(e) =>
+                                    setContributing(e.target.value)
+                                }
+                                maxLength={5000}
+                            />
+                        </div>
+                        {requiredIncident ? (
+                            <p className="text-subtle">
+                                One linked incident will be raised because of
+                                the harm recorded.
+                            </p>
+                        ) : (
+                            <Label className="frontline-tap flex items-center gap-2">
+                                <Checkbox
+                                    checked={incident}
+                                    onCheckedChange={(v) =>
+                                        setIncident(v === true)
+                                    }
+                                />
+                                Also raise a linked incident
+                            </Label>
+                        )}
+                    </>
+                ) : (
+                    <>
+                        <ReviewCard
+                            icon={MessageSquareText}
+                            title="Your report"
+                            onEdit={() => setStep(0)}
+                        >
+                            <ReviewRow
+                                label="Person"
+                                value={
+                                    clients.find((c) => c.id === client)?.name
+                                }
+                            />
+                            <ReviewRow
+                                label="Medicine"
+                                value={
+                                    medicines.find((m) => m.id === medicine)
+                                        ?.name ?? 'Not about one chart medicine'
+                                }
+                            />
+                            <ReviewRow
+                                label="What went wrong"
+                                value={labelFor(TYPES, kind)}
+                            />
+                            <ReviewRow
+                                label="When"
+                                value={localDateTimeLabel(occurred)}
+                            />
+                            <p className="mt-3 text-sm break-words whitespace-pre-wrap">
+                                {text}
+                            </p>
+                        </ReviewCard>
+                        <ReviewCard
+                            icon={ClipboardList}
+                            title="Reach & harm"
+                            onEdit={() => setStep(1)}
+                        >
+                            <ReviewRow
+                                label="Reach"
+                                value={labelFor(REACH, reach)}
+                            />
+                            <ReviewRow
+                                label="Harm"
+                                value={labelFor(HARMS, harm)}
+                            />
+                            <ReviewRow
+                                label="Immediate action"
+                                value={immediate}
+                            />
+                            <ReviewRow
+                                label="Contributing factors"
+                                value={contributing}
+                            />
+                            <ReviewRow
+                                label="Linked incident"
+                                value={
+                                    incident || requiredIncident
+                                        ? 'One incident'
+                                        : 'Not requested'
+                                }
+                            />
+                        </ReviewCard>
+                        <p className="text-caption">
+                            Your account stays in the permitted error record.
+                            Incidents, Tasks and alerts receive a neutral
+                            summary.
+                        </p>
+                        {duplicate && (
+                            <ReviewCard
+                                icon={AlertTriangle}
+                                title="A report may already cover this event"
+                            >
+                                <p className="text-sm">{errors.duplicate}</p>
+                                <Button
+                                    variant="outline"
+                                    disabled={saving}
+                                    onClick={() => submit(true)}
+                                >
+                                    Add my account to that report
+                                </Button>
+                                <Label htmlFor="separate-reason">
+                                    Or, why is this a separate event?
+                                </Label>
+                                <Textarea
+                                    id="separate-reason"
+                                    value={separateReason}
+                                    onChange={(e) =>
+                                        setSeparateReason(e.target.value)
+                                    }
+                                    maxLength={1000}
+                                />
+                            </ReviewCard>
+                        )}
+                    </>
+                )}
+            </div>
         </MedsWizardDialog>
     );
 }
-
 export default ReportErrorModal;

@@ -1,0 +1,16 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings
+
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts (4 tests) 14ms
+ ✓ resources/js/components/wizard/shell-focus.test.tsx (2 tests) 349ms
+ ✓ resources/js/test/dialog-focus-return.test.tsx (5 tests) 962ms
+     ✓ returns cancel and successful completion to the activator that opened it  466ms
+ ✓ resources/js/pages/fleet-assets/settings/maps-focus.test.tsx (4 tests) 1006ms
+     ✓ returns to Configure provider after discarding the reviewed draft and closing both dialogs  426ms
+
+ Test Files  4 passed (4)
+      Tests  15 passed (15)
+   Start at  17:59:10
+   Duration  28.22s (transform 915ms, setup 6.14s, import 39.66s, tests 2.33s, environment 46.16s)
+
+JSON report written to C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings/docs/fleet-assets-audit/evidence/PKG-08-implementation/final-focus-integration/tests-final.json

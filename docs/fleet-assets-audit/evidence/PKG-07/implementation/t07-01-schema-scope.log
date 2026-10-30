@@ -1,0 +1,17 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+.                                                                   1 / 1 (100%)
+   PASS  Tests\Unit\Support\SchemaCacheScopeTest
+  ✓ it only lists the current database when discovering application tables                                       0.19s
+
+  Tests:    1 passed (3 assertions)
+  Duration: 0.54s
+
+
+
+Time: 00:00.212, Memory: 22.00 MB
+
+OK (1 test, 3 assertions)

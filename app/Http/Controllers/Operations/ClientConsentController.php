@@ -41,6 +41,10 @@ class ClientConsentController extends Controller
             ->each(function (ClientConsent $consent) use ($request, $client): void {
                 $consent->setRelation('client', $client);
                 $consent->setAttribute('is_consumable', $consent->isValid());
+                // S14: the page's Expired / Expiring soon tabs and the Withdraw
+                // button read these; same rule as the stats below.
+                $consent->setAttribute('is_expired', $consent->isExpired());
+                $consent->setAttribute('is_expiring_soon', $consent->isValid() && $consent->isExpiringSoon());
 
                 if ($consent->hasDownloadableSignedDocument()
                     && Gate::forUser($request->user())->allows('downloadEvidence', $consent)) {
@@ -65,7 +69,7 @@ class ClientConsentController extends Controller
             'withdrawn' => $consents->where('status', 'withdrawn')->count(),
         ];
 
-        $consentTypes = ConsentType::active()->orderBy('name')->get(['id', 'name', 'category', 'is_mandatory', 'requires_capacity_assessment']);
+        $consentTypes = ConsentType::active()->orderBy('name')->get(['id', 'name', 'category', 'description', 'purpose', 'version', 'is_mandatory', 'requires_capacity_assessment']);
 
         return inertia('operations/clients/consents/Index', [
             'client' => $client,

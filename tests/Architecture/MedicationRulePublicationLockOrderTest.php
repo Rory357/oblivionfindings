@@ -14,7 +14,10 @@ test('administration rule readers and writers share a stable rule-set mutex befo
             "MedicationAdminRule::query()\n            ->orderBy('id')\n            ->lockForUpdate()",
         )
         ->and($enhanced)->toContain('requirementsFor($medication, true)')
-        ->and($fleet)->toContain('requirementsFor($medication, true)');
+        ->and($fleet)->toContain(
+            'requiresAdministrationWitness($log, $medication, true)',
+            'requirementsFor($medication, $lockForUpdate)',
+        );
 
     $administration = substr(
         $scope,
@@ -28,7 +31,7 @@ test('administration rule readers and writers share a stable rule-set mutex befo
         ->and($users)->not->toBeFalse()
         ->and($rules)->toBeLessThan($users);
 
-    foreach (['public function store(', 'public function update(', 'public function destroy('] as $method) {
+    foreach (['public function store(', 'public function update(', 'public function setActive('] as $method) {
         $start = strpos($settings, $method);
         $end = strpos($settings, "\n    public function ", (int) $start + strlen($method));
         $slice = substr($settings, (int) $start, $end === false ? null : $end - (int) $start);

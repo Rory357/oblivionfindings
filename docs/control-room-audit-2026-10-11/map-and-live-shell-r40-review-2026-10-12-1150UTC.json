@@ -1,0 +1,46 @@
+{
+  "reviewedAtUtc": "2026-10-12T11:50:00Z",
+  "clientDate": "2026-10-13 Pacific/Auckland",
+  "scope": "R40 map class-only changes and UNAPPLIED shared Live response shell proposal",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "ownerReceiptSha256": "6A1BC0B0CA518F2D6F64A8827DEC83C90FDC0E2F5FCCC6B78EEBB0E768992D29",
+  "review": {
+    "reportedPinsMatched": 9,
+    "reportedPinDrift": 0,
+    "currentHsIndexMatchesProposalBase": true,
+    "mapChangedLines": [529, 591, 670, 672, 943],
+    "mapChangesAreExactlyFiveDivClasses": true,
+    "mapWholeFileIndependentlyRestoredByReversingFiveChanges": true,
+    "indexWholeFileIndependentlyRestoredByReversingWrapperBreadcrumbAndTitleChanges": true,
+    "mapDisposition": "SOURCE_ACCEPTED_FOR_BOUNDED_SPACING_CHANGE_ONLY",
+    "indexDisposition": "UNAPPLIED_CORRECTION_REQUIRED"
+  },
+  "pins": {
+    "mapBefore": "7E2A640C98BBC943A8B902CF138A52395B3832CC14C5614C7D5BA585422E04D8",
+    "mapCurrent": "A894527EAB51421C39C7193C8D21BBFF8958114C576C011FA8F528FB6534E77E",
+    "indexBeforeAndCurrentHs": "9F0607BB292E58DAAE99801DD47A9E45B85E9F84DF99DF20BEC330C7A93F2411",
+    "indexProposedAfter": "141D2F0A19F91B26B6AE205A537E486F90991A86899D7BB476F5EAE94981B2BC",
+    "indexPatch": "418DAD754D6D4D9BA0E4FD1B9649707358462D23054366F3382FA4F6CC041057",
+    "appLayoutBothCandidates": "B3AE69A88BE80942F50142C1ABE25766DC611CA051773CA744E59FEADFF7D2C3",
+    "sidebarLayoutBothCandidates": "2172203CDF46B64134655A6A1196C0921EA0F3D2BA836EEDF605F96D695C9E06",
+    "deliveryStatus": "E7246FE19E04F19EB060A36E3223DDD201998F62BC02FB7ECCA097291C90931C",
+    "deliveryStatusBeforeR40": "7E0817AB96C9185907BC1649F79A1B87C549E8F34B391BB1EFC45573FA594A99",
+    "historicalSettingsDispatch": "E556FB01462D4CDB5F8CC36EA6A11088BF97E8449FF47C5491C6381E12E95FF5"
+  },
+  "finding": {
+    "id": "CR-LIVE-SHELL-01",
+    "impact": "The proposed index removes its wrapper padding while retaining contentClassName=overflow-x-hidden. AppLayout forwards this override; app-sidebar-layout uses contentClassName ?? DEFAULT_CONTENT_CLASS, replacing w-full p-5. The result would have no canonical outer shell gutter.",
+    "evidence": "Current H&S index:193,300; proposal patch; app-layout prop forwarding; app-sidebar-layout:54,130. DESIGN:88-93,596-604,829-835 and PAGE_HEADER_STYLE_GUIDE:78-96.",
+    "action": "H&S is sole composition owner for the active index. Minimally rebase the shell/Home/Live response proposal and remove the override to restore the default shell gutter. Keep necessary overflow handling local; retain permanent-record callbacks/guards. Do not change the global layout or transplant the whole file.",
+    "acceptance": "Exactly one 20px shell gutter with normal breadcrumb top exception; correct Home trail and permanent-record navigation; retained drafts; no body overflow or clipped controls/focus at narrow widths and zoom.",
+    "status": "OPEN_ASSIGNED_TO_HS",
+    "messages": "One finding/composition message sent to H&S and one source-review/ownership response to CR. No coordinator product edits."
+  },
+  "limits": [
+    "Parent read full bounded diff/patch and independently checked whole-file equivalence; no formatter, lint, compiler, component, native, browser, database or build run.",
+    "Map behavior and map-control resize, keyboard, narrow/zoom/no-body-overflow remain unverified.",
+    "Shared Live response hero, linked meters, conditional H&S workflow and full six-destination integration/Rory acceptance remain open.",
+    "No MAIN product, Git, provider, live operational or protected-preview changes."
+  ],
+  "overall": "INCOMPLETE"
+}

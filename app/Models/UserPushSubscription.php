@@ -17,11 +17,14 @@ class UserPushSubscription extends Model
         'platform',
         'enabled',
         'last_used_at',
+        'chat_protocol_version',
+        'chat_registration_id',
     ];
 
     protected $casts = [
         'enabled' => 'boolean',
         'last_used_at' => 'datetime',
+        'chat_protocol_version' => 'integer',
     ];
 
     protected function keys(): Attribute

@@ -1,0 +1,212 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicle":
+  - heading "Vehicle calendar" [level=1]
+  - generic: Kōwhai van
+  - paragraph: KWH014 · VH-014 · Pacific/Auckland
+  - button "Request booking"
+  - searchbox "Find an entry or reference…"
+  - generic: /
+  - button "Vehicle profile":
+    - text: Vehicle profile
+  - button "View this period in the agenda":
+    - generic: Viewing
+    - generic: 0 entries
+    - generic: "22"
+    - strong: September
+    - generic: "2026"
+    - generic: Tuesday, 22 September 2026
+  - button "Review vehicle readiness":
+    - generic: Vehicle use
+    - generic: Restricted
+    - generic: Active · no release recorded
+  - button "View service appointment":
+    - generic: Next appointment
+    - generic: 24 Sept
+    - generic: Routine service · Internal plan
+  - button "View registration reminder":
+    - generic: Due reminder
+    - generic: 8 Oct
+    - generic: Registration · does not reserve a day
+  - button "Previous period":
+  - button "Today"
+  - button "Next period":
+  - button "Jump to date":
+    - text: Tuesday, 22 September 2026
+  - text: Display
+  - combobox "Calendar display density":
+    - option "Comfortable" [selected]
+    - option "Compact"
+  - tablist "Calendar views":
+    - tab "Month":
+      - generic: Month
+    - tab "Week":
+      - generic: Week
+    - tab "Day" [active] [selected]:
+      - generic: Day
+    - tab "Agenda":
+      - generic: Agenda
+    - tab "Timeline":
+      - generic: Timeline
+    - button "Find a view":
+      - generic: Find
+  - generic "Calendar sources":
+    - button "Service appointments 1" [pressed]:
+      - text: Service appointments
+      - generic: "1"
+    - button "Estimated work 0" [pressed]:
+      - text: Estimated work
+      - generic: "0"
+    - button "Bookings & unavailable 1" [pressed]:
+      - text: Bookings & unavailable
+      - generic: "1"
+    - button "Reminders 6" [pressed]:
+      - text: Reminders
+      - generic: "6"
+    - button "Restriction records 1" [pressed]:
+      - text: Restriction records
+      - generic: "1"
+    - button "Reset filters"
+  - strong: Vehicle use remains restricted
+  - generic: Since 21 September, 8:20 am · No end or authorised release recorded. Calendar gaps do not mean available.
+  - button "View restriction"
+  - generic: Tue
+  - generic: "22"
+  - heading "22 September 2026" [level=3]
+  - generic: 0 entries scheduled
+  - generic: All-day
+  - generic: 12am
+  - generic: 1am
+  - generic: 2am
+  - generic: 3am
+  - generic: 4am
+  - generic: 5am
+  - generic: 6am
+  - generic: 7am
+  - generic: 8am
+  - generic: 9am
+  - generic: 10am
+  - generic: 11am
+  - generic: 12pm
+  - generic: 1pm
+  - generic: 2pm
+  - generic: 3pm
+  - generic: 4pm
+  - generic: 5pm
+  - generic: 6pm
+  - generic: 7pm
+  - generic: 8pm
+  - generic: 9pm
+  - generic: 10pm
+  - generic: 11pm
+  - button "Create entry on Tuesday, 22 September 2026 at 12:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 1:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 2:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 3:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 4:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 5:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 6:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 7:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 8:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 9:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 10:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 11:00 am"
+  - button "Create entry on Tuesday, 22 September 2026 at 12:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 1:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 2:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 3:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 4:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 5:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 6:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 7:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 8:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 9:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 10:00 pm"
+  - button "Create entry on Tuesday, 22 September 2026 at 11:00 pm"
+  - generic: Right-click a date/time for scheduling and reminders, or an entry for its actions. Select an entry to open its source. Reminders and advisory estimates do not reserve the vehicle.
+  - generic: BOOKING WORKFLOW
+  - heading "Bookings & custody" [level=2]
+  - button "Add unavailable period"
+  - button "Request booking"
+  - strong: "1"
+  - text: Request & evidence
+  - strong: "2"
+  - text: Approval route
+  - strong: "3"
+  - text: Confirmed
+  - strong: "4"
+  - text: Keys & checkout
+  - strong: "5"
+  - text: Return & condition
+  - heading "No booking requests yet" [level=3]
+  - paragraph: Select a calendar slot or request a booking to begin.
+  - paragraph: Approval not required is an explicit, evidenced decision by an authorised coordinator. Restrictions and conflicts always block confirmation or checkout. Report-only staff still need coordinator verification.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged
+- status:
+  - generic: Reminder saved and linked to the vehicle calendar.
+  - button "Undo"
+  - button "Dismiss"

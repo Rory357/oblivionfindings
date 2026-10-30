@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { AlertTriangle, Check } from 'lucide-react';
+import { AlertTriangle, Check, XCircle } from 'lucide-react';
 import {
     cloneElement,
     Fragment,
@@ -32,9 +32,9 @@ export type IconType = ComponentType<{ className?: string }>;
 /*  Wizard chrome constants (Add Client reference contract)            */
 /* ------------------------------------------------------------------ */
 
-/** Stepper rail: fixed width sidebar with the app sidebar surface colour. */
+/** Stepper rail: fixed width light panel (not bg-sidebar, which is near-black). */
 export const WIZARD_RAIL_CLASS =
-    'hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex';
+    'hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/30 p-4 text-foreground sm:flex';
 
 /** Thin progress strip under the wizard header. */
 export const WIZARD_PROGRESS_TRACK_CLASS = 'h-[3px] shrink-0 bg-muted';
@@ -199,34 +199,50 @@ export function InfoCard({
 /* ------------------------------------------------------------------ */
 
 export function SelectInput({
+    id,
     value,
     onChange,
     placeholder,
     options,
     ariaLabel,
+    frontline = false,
+    disabled = false,
+    className,
 }: {
+    id?: string;
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
-    options: { value: string; label: string }[];
+    /** `disabled` lists an option that can't be chosen (e.g. no witness PIN set). */
+    options: { value: string; label: string; disabled?: boolean }[];
     /** Accessible name for the trigger; falls back to the placeholder so a
      *  placeholder-only (unselected) trigger is never a nameless button (axe button-name). */
     ariaLabel?: string;
+    /** Expand this control's own target on frontline forms. */
+    frontline?: boolean;
+    disabled?: boolean;
+    className?: string;
 }) {
     return (
         // Keep the empty string as a real controlled value. Converting it to
         // undefined makes Radix switch ownership mid-session and can commit a
         // highlighted option instead of the option the worker clicked.
-        <Select value={value} onValueChange={onChange}>
+        <Select value={value} onValueChange={onChange} disabled={disabled}>
             <SelectTrigger
-                className="w-full"
+                id={id}
+                className={cn('w-full', frontline && 'frontline-tap', className)}
                 aria-label={ariaLabel ?? placeholder}
             >
                 <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
                 {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
+                    <SelectItem
+                        key={o.value}
+                        value={o.value}
+                        disabled={o.disabled}
+                        className={frontline ? 'frontline-tap' : undefined}
+                    >
                         {o.label}
                     </SelectItem>
                 ))}
@@ -313,11 +329,32 @@ export function ChipMulti({
     );
 }
 
+/**
+ * Tile-picker grid (POPUP_STYLE_GUIDE "Type picker"): two columns, three once
+ * the picker ITSELF is wide enough. These are container queries on the
+ * picker's own width, not viewport breakpoints, so a narrow wizard pane, a
+ * small dialog or 200% zoom falls back by itself: one column under 24rem, two
+ * from 24rem, three from 42rem. `max` caps the columns, and two or four
+ * options stay two-up so no tile sits alone on a row. Render the grid inside
+ * an `@container` element.
+ */
+export function tilePickerGridClass(optionCount: number, max: 2 | 3 = 3) {
+    const three = max === 3 && optionCount !== 2 && optionCount !== 4;
+    return cn(
+        'grid grid-cols-1 gap-2 @sm:grid-cols-2',
+        three && '@2xl:grid-cols-3',
+    );
+}
+
 export function TilePicker({
     value,
     onChange,
     options,
-    cols = 2,
+    cols = 3,
+    labelledBy,
+    describedBy,
+    invalid = false,
+    frontline = false,
 }: {
     value: string;
     onChange: (v: string) => void;
@@ -329,70 +366,100 @@ export function TilePicker({
         accent?: string;
         /** Optional highlighted line under the description (e.g. eligibility). */
         meta?: string;
+        /** Why this tile can't be chosen right now: shown on the tile, which stays focusable and inert. */
+        disabled?: string | null;
     }[];
+    /** Most columns the picker may use when wide (default 3). */
     cols?: 2 | 3;
+    /** The visible label that names the group (its element id). */
+    labelledBy?: string;
+    describedBy?: string;
+    /** Marks every tile while the choice is missing (validation). */
+    invalid?: boolean;
+    /** 44 px frontline tap targets (eMAR recording). */
+    frontline?: boolean;
 }) {
     return (
         <div
-            className={cn(
-                'grid gap-2',
-                cols === 3
-                    ? 'grid-cols-2 sm:grid-cols-3'
-                    : 'grid-cols-1 sm:grid-cols-2',
-            )}
+            className="@container"
+            role={labelledBy ? 'group' : undefined}
+            aria-labelledby={labelledBy}
+            aria-describedby={describedBy}
         >
-            {options.map((o) => {
-                const Icon = o.icon;
-                const active = value === o.key;
-                return (
-                    <button
-                        key={o.key}
-                        type="button"
-                        aria-pressed={active}
-                        onClick={() => onChange(o.key)}
-                        className={cn(
-                            'flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left transition-all hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
-                            active
-                                ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
-                                : 'border-border',
-                        )}
-                    >
-                        {Icon ? (
-                            <span
-                                className={cn(
-                                    'mt-0.5 shrink-0 rounded-lg p-1.5',
-                                    active ? 'bg-primary/15' : 'bg-muted',
-                                )}
-                            >
-                                <Icon
+            <div className={tilePickerGridClass(options.length, cols)}>
+                {options.map((o) => {
+                    const Icon = o.icon;
+                    const active = value === o.key;
+                    return (
+                        <button
+                            key={o.key}
+                            type="button"
+                            data-tile={o.key}
+                            aria-pressed={active}
+                            aria-disabled={o.disabled ? true : undefined}
+                            aria-invalid={invalid || undefined}
+                            onClick={() => {
+                                if (!o.disabled) onChange(o.key);
+                            }}
+                            className={cn(
+                                'flex items-start gap-2.5 rounded-lg border bg-card/50 p-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                                frontline && 'frontline-tap',
+                                o.disabled
+                                    ? 'cursor-not-allowed opacity-80'
+                                    : 'hover:border-primary/50 hover:bg-card',
+                                active
+                                    ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                    : invalid
+                                      ? 'border-status-critical/60'
+                                      : 'border-border',
+                            )}
+                        >
+                            {Icon ? (
+                                <span
                                     className={cn(
-                                        'h-4 w-4',
-                                        active
-                                            ? 'text-primary'
-                                            : (o.accent ??
-                                                  'text-muted-foreground'),
+                                        'mt-0.5 shrink-0 rounded-lg p-1.5',
+                                        active ? 'bg-primary/15' : 'bg-muted',
                                     )}
-                                />
-                            </span>
-                        ) : null}
-                        <span className="min-w-0">
-                            <span className="block text-sm font-semibold">
-                                {o.label}
-                            </span>
-                            {o.description ? (
-                                <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
-                                    {o.description}
+                                >
+                                    <Icon
+                                        className={cn(
+                                            'h-4 w-4',
+                                            active
+                                                ? 'text-primary'
+                                                : (o.accent ??
+                                                      'text-muted-foreground'),
+                                        )}
+                                    />
                                 </span>
                             ) : null}
-                            {o.meta ? (
-                                <span className="mt-1 block text-[11px] font-medium text-primary">
-                                    {o.meta}
+                            <span className="min-w-0">
+                                <span className="block text-sm font-semibold">
+                                    {o.label}
                                 </span>
-                            ) : null}
-                        </span>
-                    </button>
-                );
-            })}
+                                {o.description ? (
+                                    <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                                        {o.description}
+                                    </span>
+                                ) : null}
+                                {o.meta ? (
+                                    <span className="mt-1 block text-[11px] font-medium text-primary">
+                                        {o.meta}
+                                    </span>
+                                ) : null}
+                                {o.disabled ? (
+                                    <span className="mt-1 flex items-start gap-1 text-xs font-semibold text-status-critical">
+                                        <XCircle
+                                            className="mt-0.5 size-3 shrink-0"
+                                            aria-hidden="true"
+                                        />
+                                        {o.disabled}
+                                    </span>
+                                ) : null}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }

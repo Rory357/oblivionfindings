@@ -51,7 +51,7 @@ export function ModulesGrid({
             description: 'Daily & progress notes live on each client profile',
         },
         {
-            title: 'Job board',
+            title: 'Available shifts',
             href: '/operations/job-board',
             icon: Briefcase,
             badge: {

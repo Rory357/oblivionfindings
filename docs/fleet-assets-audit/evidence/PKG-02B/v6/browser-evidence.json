@@ -1,0 +1,56 @@
+{
+  "at": "2026-09-21T23:29:54.904Z",
+  "finalBundle": "index-DzAk5RM0.js",
+  "finalReviewSince": "2026-09-21T23:23:33.328Z",
+  "errors": [],
+  "earlierWorkflowChecks": [
+    {
+      "check": "Driver confirmation and event correction",
+      "result": "Jamie confirmed for all points; dismissed overspeed score82→90; original68km/h retained"
+    },
+    {
+      "check": "Coaching lifecycle",
+      "result": "Assigned→Acknowledged→Completed, original trip and response history retained"
+    },
+    {
+      "check": "Mapped/manual speed limits and escalation",
+      "result": "Fresh mapped60; pending manual30 did not override; approved manual30 applied35 trigger; qualifying68km/h event retains LIMIT-DEMO-1; clock10min escalated CR-DEMO-410 to Operations Manager"
+    }
+  ],
+  "calendar": [
+    {
+      "view": "Week",
+      "selected": "true"
+    },
+    {
+      "view": "Day",
+      "selected": "true"
+    },
+    {
+      "view": "Agenda",
+      "selected": "true"
+    },
+    {
+      "view": "Timeline",
+      "selected": "true"
+    },
+    {
+      "view": "Month",
+      "selected": "true"
+    }
+  ],
+  "additionalChecks": [
+    "Required speed-limit evidence blocks Continue without a file",
+    "Shared speed observation date changed to 24 Sep; road limit became Unknown",
+    "Three-day PDF and XLSX generated with maps and branding",
+    "One-day export selects only 22 Sep trip; reversed and empty date ranges disable generation",
+    "Replay ends at last recorded point",
+    "Driver filter retained across Map and Trip navigation",
+    "1100px dark layout has no horizontal overflow; map 533 x 360",
+    "Calendar day right-click exposes booking menu"
+  ],
+  "limitations": [
+    "IAB download event not observed within 3 seconds; valid bytes saved directly from report link",
+    "Native Excel UI not tested; image metadata and PNG bytes verified"
+  ]
+}

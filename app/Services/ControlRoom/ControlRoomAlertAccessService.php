@@ -5,6 +5,7 @@ namespace App\Services\ControlRoom;
 use App\Exceptions\RecoverableTaskAuthorizationException;
 use App\Models\ControlRoomAlert;
 use App\Models\User;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,7 +31,7 @@ final class ControlRoomAlertAccessService
             || $user->canDo('controlRoom.alerts.manage');
     }
 
-    public function applyVisibleScope(Builder $query, User $user): Builder
+    public function applyVisibleScope(Builder $query, User $user, ?CurrentAuthorizationReads $reads = null): Builder
     {
         if (! $this->canList($user)) {
             return $query->whereRaw('1 = 0');
@@ -40,12 +41,14 @@ final class ControlRoomAlertAccessService
             $query,
             $user,
             self::BYPASS_PERMISSIONS,
+            $reads,
         );
 
-        return $this->applyControlledMedicationContentScope($query, $user);
+        // Within an H&S/governance read, the final alert query stays bound to the same current-authorization reads.
+        return $reads ? $reads->query($this->applyControlledMedicationContentScope($query, $user)) : $this->applyControlledMedicationContentScope($query, $user);
     }
 
-    public function applyReadableScope(Builder $query, User $user): Builder
+    public function applyReadableScope(Builder $query, User $user, ?CurrentAuthorizationReads $reads = null): Builder
     {
         if (! $this->canRead($user)) {
             return $query->whereRaw('1 = 0');
@@ -55,9 +58,11 @@ final class ControlRoomAlertAccessService
             $query,
             $user,
             self::BYPASS_PERMISSIONS,
+            $reads,
         );
 
-        return $this->applyControlledMedicationContentScope($query, $user);
+        // Within an H&S/governance read, the final alert query stays bound to the same current-authorization reads.
+        return $reads ? $reads->query($this->applyControlledMedicationContentScope($query, $user)) : $this->applyControlledMedicationContentScope($query, $user);
     }
 
     /**
@@ -134,6 +139,48 @@ final class ControlRoomAlertAccessService
             return true;
         }
 
+        return $this->hasMedicationProvenance($alert);
+    }
+
+    /**
+     * Any alert about a client's medicines, controlled or ordinary.
+     */
+    public function isMedicationAlert(ControlRoomAlert $alert): bool
+    {
+        return data_get($alert->context, 'normalized_data.controlled_drug') !== null
+            || $this->hasMedicationProvenance($alert);
+    }
+
+    /**
+     * Whether a role holder reached through role routing (signal rule
+     * notify_roles, queue assigned_roles, SLA breach roles) may be notified:
+     * they must be able to open the alert. An ordinary alert with no
+     * resolvable Site is outside every Site scope, so it goes to org-wide
+     * Control Room readers rather than to nobody.
+     */
+    public function canReceiveRoleRoutedNotification(ControlRoomAlert $alert, User $user): bool
+    {
+        if ($this->canView($alert, $user)) {
+            return true;
+        }
+
+        return ! $this->isMedicationAlert($alert)
+            && $this->canRead($user)
+            && $this->siteAccess->canBypass($user, self::BYPASS_PERMISSIONS)
+            && ! $this->hasEffectiveSite($alert);
+    }
+
+    private function hasEffectiveSite(ControlRoomAlert $alert): bool
+    {
+        $query = ControlRoomAlert::query()->whereKey($alert->id);
+
+        return $query
+            ->whereRaw($this->siteAccess->alertEffectiveSiteExpression($query).' IS NOT NULL')
+            ->exists();
+    }
+
+    private function hasMedicationProvenance(ControlRoomAlert $alert): bool
+    {
         return str_contains(strtolower((string) $alert->source), 'medication')
             || str_contains(strtolower((string) $alert->alert_type), 'medication')
             || str_contains(

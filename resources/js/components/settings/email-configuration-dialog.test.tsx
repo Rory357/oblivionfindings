@@ -62,13 +62,16 @@ vi.mock('@/components/wizard/shell', () => ({
     ),
     WizardSuccessPane: ({
         title,
+        blurb,
         actions,
     }: {
         title: string;
+        blurb: string;
         actions: ReactNode;
     }) => (
         <section>
             <h2>{title}</h2>
+            <p>{blurb}</p>
             {actions}
         </section>
     ),
@@ -151,6 +154,111 @@ function goToReview() {
 describe('email settings save confirmation and recovery', () => {
     beforeEach(() => vi.clearAllMocks());
 
+    it('saves an SMTP backup sender without requiring an IT support mailbox', async () => {
+        const current = {
+            ...initial,
+            connections: [],
+            settings: {
+                ...initial.settings,
+                provider: 'smtp' as const,
+                support_enabled: false,
+                support_connection_id: null,
+                support_connection_version: null,
+                from_address: '',
+            },
+        };
+        vi.mocked(axios.put).mockResolvedValue({
+            data: {
+                data: {
+                    ...current,
+                    settings: {
+                        ...current.settings,
+                        from_address: 'backups@example.test',
+                        configuration_version: 3,
+                    },
+                },
+            },
+        });
+        setup(current);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Go to Sender identity' }),
+        );
+        const sender = screen.getByLabelText(/Sender and reply address/);
+        expect(sender).not.toHaveAttribute('readonly');
+        fireEvent.change(sender, { target: { value: 'backups@example.test' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Go to Review' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Save email settings' }),
+        );
+        await screen.findByText('Email settings saved');
+        expect(axios.put).toHaveBeenCalledWith(
+            '/settings/email',
+            expect.objectContaining({
+                provider: 'smtp',
+                from_address: 'backups@example.test',
+                support_enabled: false,
+                support_connection_id: null,
+            }),
+            expect.anything(),
+        );
+    });
+
+    it('explicitly adopts a reconnected mailbox version before saving', async () => {
+        const current = {
+            ...initial,
+            connections: [{ ...connection, configuration_version: 2 }],
+        };
+        vi.mocked(axios.put).mockResolvedValue({
+            data: {
+                data: {
+                    ...current,
+                    settings: {
+                        ...current.settings,
+                        configuration_version: 3,
+                        support_connection_version: 2,
+                    },
+                },
+            },
+        });
+        setup(current);
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Go to Sender identity' }),
+        );
+        expect(
+            screen.getByText('Mailbox connection changed'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Use current mailbox' }),
+        );
+        expect(
+            screen.queryByText('Mailbox connection changed'),
+        ).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Go to Review' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Save email settings' }),
+        );
+        await screen.findByText('Email settings saved');
+        expect(axios.put).toHaveBeenCalledWith(
+            '/settings/email',
+            expect.objectContaining({
+                support_connection_id: connection.id,
+                support_connection_version: 2,
+                from_address: connection.mailbox_email,
+            }),
+            expect.anything(),
+        );
+    });
+
+    it('keeps a connected mailbox sender read-only', () => {
+        setup();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Go to Sender identity' }),
+        );
+        expect(
+            screen.getByLabelText(/Sender and reply address/),
+        ).toHaveAttribute('readonly');
+    });
+
     it('keeps rail navigation free, but routes a submit with missing required identity fields back to that step', () => {
         setup({
             ...initial,
@@ -164,13 +272,13 @@ describe('email settings save confirmation and recovery', () => {
             screen.getByText('Complete the required fields before saving.'),
         ).toBeInTheDocument();
         expect(
-            screen.getByText('Choose the support identity'),
+            screen.getByText('Choose the sender identity'),
         ).toBeInTheDocument();
         expect(screen.getByText('Enter a sender name.')).toBeInTheDocument();
         expect(axios.put).not.toHaveBeenCalled();
     });
 
-    it('does not require hidden connection or host settings while delivery is disabled', () => {
+    it('allows an incomplete draft with IT off without claiming full backup setup', () => {
         setup({
             ...initial,
             settings: {
@@ -183,11 +291,11 @@ describe('email settings save confirmation and recovery', () => {
             },
         });
         expect(
-            screen.getByText('Settings completeness: 100%'),
+            screen.getByText('Settings completeness: 67%'),
         ).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
         expect(
-            screen.getByText('Choose the support identity'),
+            screen.getByText('Choose the sender identity'),
         ).toBeInTheDocument();
         expect(
             screen.queryByText('Enter an SMTP host.'),
@@ -196,6 +304,56 @@ describe('email settings save confirmation and recovery', () => {
             screen.queryByText('Choose the approved support mailbox.'),
         ).not.toBeInTheDocument();
     });
+
+    it.each(['smtp', 'google'] as const)(
+        'reports incomplete %s backup setup before and after saving with IT off',
+        async (provider) => {
+            const current = {
+                ...initial,
+                connections: [],
+                settings: {
+                    ...initial.settings,
+                    provider,
+                    smtp_host: '',
+                    from_address: '',
+                    support_enabled: false,
+                    support_connection_id: null,
+                    support_connection_version: null,
+                },
+            };
+            vi.mocked(axios.put).mockResolvedValue({
+                data: {
+                    data: {
+                        ...current,
+                        settings: {
+                            ...current.settings,
+                            configuration_version: 3,
+                        },
+                    },
+                },
+            });
+            setup(current);
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Go to Review' }),
+            );
+            expect(
+                screen.getByText('Backup email setup incomplete'),
+            ).toBeInTheDocument();
+            expect(
+                screen.getByText(
+                    /incomplete saved settings block backup email/,
+                ),
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Save email settings' }),
+            );
+            await screen.findByText(/Saved with incomplete backup email setup/);
+            expect(
+                screen.queryByText(/provider is available/),
+            ).not.toBeInTheDocument();
+            expect(axios.put).toHaveBeenCalledTimes(1);
+        },
+    );
 
     it('announces saved only after the expected next version for the current actor', async () => {
         vi.mocked(axios.put).mockResolvedValue({ data: { data: saved(3) } });

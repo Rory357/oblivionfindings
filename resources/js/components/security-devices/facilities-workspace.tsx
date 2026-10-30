@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
+import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import { formatDate, formatDateTime, formatRelative } from '@/lib/datetime';
 import { Link } from '@inertiajs/react';
 import {
@@ -168,6 +169,7 @@ export type FacilitiesWorkspaceData = {
         label: string;
         description: string;
         inventoryTruncated: boolean;
+        attentionFilter?: { key: string; label: string } | null;
         devices: FacilityDevice[];
         environment: FacilityDevice[];
         buildingSystems: FacilityDevice[];
@@ -240,7 +242,6 @@ function State({ value, label }: { value: string | null; label?: string }) {
 }
 
 function Metric({
-    icon,
     value,
     label,
     note,
@@ -250,17 +251,19 @@ function Metric({
     label: string;
     note: string;
 }) {
+    const factLabel = label
+        .replace(/^\d+\s+/, '')
+        .replace(/^./, (character) => character.toUpperCase());
     return (
-        <Card className="min-w-0 shadow-xs">
-            <CardContent className="p-4">
-                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    {icon}
-                </div>
-                <p className="text-2xl font-semibold tabular-nums">{value}</p>
-                <p className="text-sm font-medium break-words">{label}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{note}</p>
-            </CardContent>
-        </Card>
+        <ReviewRow
+            label={factLabel}
+            value={
+                <span className="inline-flex flex-col items-end gap-0.5">
+                    <span className="tabular-nums">{value}</span>
+                    <span className="text-caption font-normal">{note}</span>
+                </span>
+            }
+        />
     );
 }
 
@@ -287,10 +290,63 @@ function Boundary({ data }: { data: FacilitiesWorkspaceData['boundary'] }) {
     );
 }
 
+function AttentionFilterBanner({
+    tabKey,
+    filter,
+}: {
+    tabKey: string;
+    filter: { key: string; label: string } | null | undefined;
+}) {
+    if (!filter) return null;
+
+    return (
+        <Card>
+            <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+                <p>
+                    Filtered to:{' '}
+                    <span className="font-semibold">{filter.label}</span>
+                </p>
+                <Link
+                    href={`/security-devices/facilities-iot?tab=${encodeURIComponent(tabKey)}`}
+                    className="frontline-focus inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium text-primary hover:underline"
+                >
+                    Clear attention filter
+                </Link>
+            </CardContent>
+        </Card>
+    );
+}
+
 function Overview({ data }: { data: FacilitiesWorkspaceData }) {
-    const { overview } = data;
+    const { overview, activeTab } = data;
     return (
         <div className="space-y-5">
+            <AttentionFilterBanner
+                tabKey="overview"
+                filter={activeTab.attentionFilter}
+            />
+            {activeTab.attentionFilter ? (
+                <section className="space-y-3">
+                    <h2 className="text-lg font-semibold">
+                        {activeTab.attentionFilter.label}
+                    </h2>
+                    {activeTab.devices.length === 0 ? (
+                        <Empty text="No facility devices match this attention filter." />
+                    ) : (
+                        <div className="grid min-w-0 gap-3 xl:grid-cols-2">
+                            {activeTab.devices.map((device) => (
+                                <article
+                                    key={device.id}
+                                    className="min-w-0 space-y-3 rounded-xl border bg-card p-4"
+                                >
+                                    <DeviceHeading device={device} />
+                                    <EvidenceDetails device={device} />
+                                </article>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            ) : null}
             <section>
                 <h2 className="text-lg font-semibold">
                     Facilities operations at a glance
@@ -299,46 +355,50 @@ function Overview({ data }: { data: FacilitiesWorkspaceData }) {
                     Technical condition, evidence freshness, site impact, and
                     required operational follow-up.
                 </p>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-                    <Metric
-                        icon={<Gauge className="h-5 w-5" />}
-                        value={overview.inventory.devices}
-                        label={`${overview.inventory.devices} facility devices`}
-                        note={`${overview.inventory.sites} authorised sites`}
-                    />
-                    <Metric
-                        icon={<Thermometer className="h-5 w-5" />}
-                        value={overview.inventory.environment}
-                        label={`${overview.inventory.environment} environmental devices`}
-                        note="Leak, gas, cold-chain, and environmental sensors"
-                    />
-                    <Metric
-                        icon={<Building2 className="h-5 w-5" />}
-                        value={overview.inventory.building_systems}
-                        label={`${overview.inventory.building_systems} building systems`}
-                        note="Mechanical, access, and safety equipment"
-                    />
-                    <Metric
-                        icon={<Zap className="h-5 w-5" />}
-                        value={overview.inventory.utilities}
-                        label={`${overview.inventory.utilities} utilities`}
-                        note="Metering and utility-service devices"
-                    />
-                    <Metric
-                        icon={<CloudCog className="h-5 w-5" />}
-                        value={overview.inventory.automations}
-                        label={`${overview.inventory.automations} automations`}
-                        note="Explicit execution evidence only"
-                    />
-                    <Metric
-                        icon={<AlertTriangle className="h-5 w-5" />}
-                        value={
-                            overview.attention.devices +
-                            overview.attention.monitoring
-                        }
-                        label="Technical attention"
-                        note={`${overview.attention.unmonitored} unmonitored · ${overview.attention.stale} stale`}
-                    />
+                <div className="grid gap-5 xl:grid-cols-2">
+                    <ReviewCard icon={Gauge} title="Equipment and coverage">
+                        <Metric
+                            icon={<Gauge className="h-5 w-5" />}
+                            value={overview.inventory.devices}
+                            label={`${overview.inventory.devices} facility devices`}
+                            note={`${overview.inventory.sites} authorised sites`}
+                        />
+                        <Metric
+                            icon={<Thermometer className="h-5 w-5" />}
+                            value={overview.inventory.environment}
+                            label={`${overview.inventory.environment} environmental devices`}
+                            note="Leak, gas, cold-chain, and environmental sensors"
+                        />
+                        <Metric
+                            icon={<Building2 className="h-5 w-5" />}
+                            value={overview.inventory.building_systems}
+                            label={`${overview.inventory.building_systems} building systems`}
+                            note="Mechanical, access, and safety equipment"
+                        />
+                    </ReviewCard>
+                    <ReviewCard icon={Zap} title="Services and attention">
+                        <Metric
+                            icon={<Zap className="h-5 w-5" />}
+                            value={overview.inventory.utilities}
+                            label={`${overview.inventory.utilities} utilities`}
+                            note="Metering and utility-service devices"
+                        />
+                        <Metric
+                            icon={<CloudCog className="h-5 w-5" />}
+                            value={overview.inventory.automations}
+                            label={`${overview.inventory.automations} automations`}
+                            note="Explicit execution evidence only"
+                        />
+                        <Metric
+                            icon={<AlertTriangle className="h-5 w-5" />}
+                            value={
+                                overview.attention.devices +
+                                overview.attention.monitoring
+                            }
+                            label="Technical attention"
+                            note={`${overview.attention.unmonitored} unmonitored · ${overview.attention.stale} stale`}
+                        />
+                    </ReviewCard>
                 </div>
             </section>
 
@@ -349,12 +409,12 @@ function Overview({ data }: { data: FacilitiesWorkspaceData }) {
                     <CardHeader>
                         <h3 className="font-semibold">Required action</h3>
                         <p className="text-sm text-muted-foreground">
-                            Evidence-backed items only.
+                            Confirmed issues only.
                         </p>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {overview.requiredActions.length === 0 ? (
-                            <Empty text="No current evidence-backed actions." />
+                            <Empty text="No current actions needed." />
                         ) : (
                             overview.requiredActions.map((action) => (
                                 <Link
@@ -585,7 +645,7 @@ function BuildingPanel({ rows, gap }: { rows: FacilityDevice[]; gap: number }) {
     return (
         <Panel
             title="Building systems and safety equipment"
-            description="Canonical device condition with maintenance kept in the shared maintenance register."
+            description="Recorded device condition with maintenance kept in the shared maintenance register."
             icon={<Building2 className="h-5 w-5" />}
         >
             {gap > 0 ? (
@@ -769,7 +829,7 @@ function AutomationsPanel({
             icon={<Settings2 className="h-5 w-5" />}
         >
             <div className="rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm">
-                Automation controls remain read-only until governed command
+                Automation controls remain read-only until approved command
                 workflows are available.
             </div>
             {gap > 0 ? (
@@ -872,7 +932,7 @@ function HistoryFilters({
             <div className="flex items-end gap-2">
                 <button
                     type="submit"
-                    className="frontline-focus min-h-11 flex-1 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+                    className="frontline-focus min-h-11 flex-1 rounded-lg bg-primary-fill px-4 text-sm font-semibold text-primary-fill-foreground"
                 >
                     Apply filters
                 </button>
@@ -927,7 +987,7 @@ function HistoryPanel({
 }) {
     return (
         <Panel
-            title="Canonical facility history"
+            title="Facility history"
             description="Filtered append-only device events and retained native observations."
             icon={<History className="h-5 w-5" />}
             action={
@@ -1079,11 +1139,14 @@ export function FacilitiesWorkspacePanels({
     return (
         <div className="space-y-5">
             <Boundary data={data.boundary} />
+            <AttentionFilterBanner
+                tabKey={activeTab.key}
+                filter={activeTab.attentionFilter}
+            />
             {activeTab.inventoryTruncated ? (
                 <Gap>
                     This workspace shows the first 100 authorised facility
-                    devices. Narrow the canonical inventory before relying on
-                    counts.
+                    devices. Filter the device list before relying on counts.
                 </Gap>
             ) : null}
             {activeTab.key === 'environment' ? (

@@ -14,7 +14,7 @@ afterEach(function (): void {
 });
 
 test('frontline lifecycle seeder binds submitted handovers to one canonical incoming shift idempotently', function () {
-    Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+    Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 
     $this->seed(RbacSeeder::class);
     $this->seed(SystemUsersSeeder::class);
@@ -83,7 +83,7 @@ test('frontline lifecycle seeder binds submitted handovers to one canonical inco
 });
 
 test('frontline lifecycle seeder upgrades only legacy Playwright incoming handover identity', function () {
-    Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+    Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 
     $this->seed(RbacSeeder::class);
     $this->seed(SystemUsersSeeder::class);

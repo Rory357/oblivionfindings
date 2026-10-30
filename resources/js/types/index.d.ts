@@ -2,6 +2,12 @@ import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 
 export interface AuthPermissions {
+    fleet?: {
+        viewAny?: boolean;
+        reportsView?: boolean;
+        driverSessionsManage?: boolean;
+        signalsView?: boolean;
+    };
     sites?: {
         viewAny?: boolean;
         create?: boolean;
@@ -34,6 +40,7 @@ export interface AuthPermissions {
         create?: boolean;
         update?: boolean;
         manageAny?: boolean;
+        overrideEligibility?: boolean;
     };
     calendar?: {
         viewAny?: boolean;
@@ -44,6 +51,18 @@ export interface AuthPermissions {
         manageRecurring?: boolean;
     };
     medications?: {
+        stockUpdate?: boolean;
+        pharmacyConnectManage?: boolean;
+        pharmacySend?: boolean;
+        externalManage?: boolean;
+        transfersManage?: boolean;
+        catalogueManage?: boolean;
+        backupsManage?: boolean;
+        /** Which connected-care features run now (eMAR pages only; D4). */
+        connected?: Record<string, boolean>;
+        reportsView?: boolean;
+        reportsExport?: boolean;
+        settingsManage?: boolean;
         view?: boolean;
         ordersManage?: boolean;
         breakGlass?: boolean;
@@ -58,6 +77,7 @@ export interface AuthPermissions {
         update?: boolean;
         submit?: boolean;
         approve?: boolean;
+        export?: boolean;
         templatesManage?: boolean;
     };
     governance?: {
@@ -96,6 +116,7 @@ export interface AuthPermissions {
     hr?: {
         recruitment?: { view?: boolean; manage?: boolean };
         employees?: { viewAny?: boolean; manage?: boolean };
+        wellbeing?: { view?: boolean; manage?: boolean };
     };
     [key: string]: unknown;
 }

@@ -35,8 +35,10 @@ test.describe('global mobile navigation accessibility', () => {
         expect(
             await page
                 .locator('#main-content')
-                .evaluate((main) =>
-                    Boolean(main.closest('[aria-hidden="true"]')),
+                .evaluate(
+                    (main) =>
+                        main.hasAttribute('inert') ||
+                        Boolean(main.closest('[aria-hidden="true"]')),
                 ),
         ).toBe(true);
         expect(
@@ -78,8 +80,16 @@ test.describe('global mobile navigation accessibility', () => {
 
         await trigger.click();
         await expect(dialog).toBeVisible();
-        await page.locator('[data-slot="sheet-overlay"]').click({
-            position: { x: 380, y: 400 },
+        const overlay = page.locator('[data-slot="sheet-overlay"]');
+        const overlayBounds = await overlay.boundingBox();
+        expect(overlayBounds).not.toBeNull();
+        // Stay on the uncovered backdrop, inside its actual edge. A stable
+        // scrollbar gutter means that edge need not equal the viewport width.
+        await overlay.click({
+            position: {
+                x: overlayBounds!.width - 10,
+                y: overlayBounds!.height / 2,
+            },
         });
         await expect(dialog).toBeHidden();
         await expect(trigger).toBeFocused();
@@ -93,8 +103,10 @@ test.describe('global mobile navigation accessibility', () => {
         expect(
             await page
                 .locator('#main-content')
-                .evaluate((main) =>
-                    Boolean(main.closest('[aria-hidden="true"]')),
+                .evaluate(
+                    (main) =>
+                        main.hasAttribute('inert') ||
+                        Boolean(main.closest('[aria-hidden="true"]')),
                 ),
         ).toBe(false);
 
@@ -131,8 +143,10 @@ test.describe('global mobile navigation accessibility', () => {
         expect(
             await page
                 .locator('#main-content')
-                .evaluate((main) =>
-                    Boolean(main.closest('[aria-hidden="true"]')),
+                .evaluate(
+                    (main) =>
+                        main.hasAttribute('inert') ||
+                        Boolean(main.closest('[aria-hidden="true"]')),
                 ),
         ).toBe(false);
 

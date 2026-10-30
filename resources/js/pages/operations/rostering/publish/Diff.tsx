@@ -270,7 +270,7 @@ export default function Diff({ period, summary, changes }: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: backHref },
                 {
                     title: t('rostering.title', 'Rostering'),
                     href: backHref,

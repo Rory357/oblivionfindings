@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\ControlRoomAlert;
 use App\Models\FleetDriverSession;
@@ -11,9 +12,12 @@ use App\Models\FleetWorkOrder;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Fleet\MaintenanceFingerprint;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -22,11 +26,20 @@ class FleetHeroRolloutContractTest extends TestCase
     use RefreshDatabase;
 
     /** @param array<int, string> $extraPermissionKeys */
-    private function makeFleetUser(array $extraPermissionKeys = []): User
+    private function makeFleetUser(array $extraPermissionKeys = [], ?Site $site = null): User
     {
         $this->seed(RbacSeeder::class);
 
         $user = User::factory()->create(['approved_at' => now()]);
+        if ($site) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => today()->subMonth(),
+            ]);
+        }
 
         foreach (array_merge(['fleet.viewAny', 'assets.viewAny'], $extraPermissionKeys) as $permissionKey) {
             $permission = Permission::query()->firstOrCreate(
@@ -57,20 +70,24 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_daily_check_and_vehicle_index_expose_live_compliance_badge_counts(): void
     {
-        // This contract verifies organisation-wide badge arithmetic. Cross-site
-        // totals are intentionally reserved for the explicit fleet manager bypass.
-        $user = $this->makeFleetUser(['fleet.manage']);
+        // This contract verifies organisation-wide badge arithmetic. Both pages
+        // count the vehicles the person may open, so cross-site totals come
+        // from central fleet oversight (fleet.vehicles.viewAllSites), which
+        // opens every vehicle without other Site access.
+        $user = $this->makeFleetUser(['fleet.manage', 'fleet.vehicles.viewAllSites']);
         $site = Site::factory()->create();
 
         Asset::factory()->vehicle()->create([
             'wof_expires_at' => now()->addDays(10),
             'registration_expires_at' => now()->addDays(12),
             'cof_expires_at' => now()->addDays(14),
+            'insurance_expires_at' => now()->addDays(20),
         ]);
         Asset::factory()->vehicle()->create([
             'wof_expires_at' => now()->subDay(),
             'registration_expires_at' => now()->subDay(),
             'cof_expires_at' => now()->subDay(),
+            'insurance_expires_at' => now()->subDay(),
         ]);
 
         ControlRoomAlert::factory()->fromFleet()->open()->critical()->create(['site_id' => $site->id]);
@@ -89,9 +106,10 @@ class FleetHeroRolloutContractTest extends TestCase
                 ->where('compliance.rego_expired', 1)
                 ->where('compliance.cof_due', 1)
                 ->where('compliance.cof_expired', 1)
-                ->where('compliance.insurance_expiring', null)
-                ->where('compliance.insurance_expired', null)
-                ->where('compliance.open_alerts', 3)
+                // The vehicle profile's insurance expiry is counted like the other dates.
+                ->where('compliance.insurance_expiring', 1)
+                ->where('compliance.insurance_expired', 1)
+                ->where('compliance.open_alerts', 2)
                 ->where('compliance.critical_alerts', 1)
             );
 
@@ -106,41 +124,51 @@ class FleetHeroRolloutContractTest extends TestCase
                 ->where('compliance.rego_expired', 1)
                 ->where('compliance.cof_due', 1)
                 ->where('compliance.cof_expired', 1)
-                ->where('compliance.insurance_expiring', null)
-                ->where('compliance.insurance_expired', null)
-                ->where('compliance.open_alerts', 3)
+                ->where('compliance.insurance_expiring', 1)
+                ->where('compliance.insurance_expired', 1)
+                ->where('compliance.open_alerts', 2)
                 ->where('compliance.critical_alerts', 1)
             );
     }
 
     public function test_overdue_work_order_filter_returns_only_active_past_due_work(): void
     {
-        $user = $this->makeFleetUser();
+        // Work-order lists and hero counts are scoped to the viewer's approved Sites.
+        $site = Site::factory()->create();
+        $user = $this->makeFleetUser([], $site);
+        $workOrders = FleetWorkOrder::factory()->state([
+            'asset_id' => Asset::factory()->vehicle()->create(['site_id' => $site->id])->id,
+        ]);
 
-        $overdueOpen = FleetWorkOrder::factory()->create([
+        $overdueOpen = $workOrders->create([
             'title' => 'Overdue open work',
             'status' => 'open',
             'due_at' => now()->subDay(),
         ]);
-        $overdueInProgress = FleetWorkOrder::factory()->create([
+        $overdueInProgress = $workOrders->create([
             'title' => 'Overdue in-progress work',
             'status' => 'in_progress',
             'due_at' => now()->subHours(2),
         ]);
-        FleetWorkOrder::factory()->create([
+        $workOrders->create([
             'status' => 'cancelled',
             'due_at' => now()->subDay(),
         ]);
-        FleetWorkOrder::factory()->create(['status' => 'open', 'due_at' => now()->addDay()]);
-        FleetWorkOrder::factory()->create(['status' => 'open', 'due_at' => null]);
-        FleetWorkOrder::factory()->create([
+        $workOrders->create(['status' => 'open', 'due_at' => now()->addDay()]);
+        $workOrders->create(['status' => 'open', 'due_at' => null]);
+        $workOrders->create([
             'status' => 'completed',
             'completed_at' => now()->subDays(5),
         ]);
-        FleetWorkOrder::factory()->count(2)->create([
+        $workOrders->count(2)->create([
             'status' => 'completed',
             'completed_at' => now()->subDays(60),
             'updated_at' => now(),
+        ]);
+        FleetWorkOrder::factory()->create([
+            'title' => 'Foreign overdue work',
+            'status' => 'open',
+            'due_at' => now()->subDay(),
         ]);
 
         $response = $this->actingAs($user)
@@ -170,15 +198,50 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_work_order_status_transitions_manage_the_completion_timestamp_and_hero_metric(): void
     {
-        $user = $this->makeFleetUser(['fleet.maintenance.manage']);
+        // PKG-01 replaced free status edits with versioned operations. Completion
+        // needs the Site's approved repair rule and an attested repair with saved
+        // evidence, and completed work stays completed until independent release.
+        Storage::fake('private');
+        $site = Site::factory()->create();
+        $user = $this->makeFleetUser(['fleet.maintenance.manage'], $site);
+        $asset = Asset::factory()->create(['site_id' => $site->id, 'category' => 'vehicle']);
         $workOrder = FleetWorkOrder::factory()->create([
+            'asset_id' => $asset->id,
             'status' => 'open',
             'completed_at' => null,
         ]);
+        $rules = ['requires_service_evidence' => true];
+        $policyId = DB::table('fleet_maintenance_policy_versions')->insertGetId([
+            'site_id' => $site->id, 'asset_category' => 'vehicle', 'rule_kind' => 'repair',
+            'version' => 1, 'rules_json' => json_encode($rules, JSON_THROW_ON_ERROR),
+            'content_sha256' => MaintenanceFingerprint::of($rules),
+            'approved_by_user_id' => $user->id, 'approved_at' => now(), 'created_at' => now(),
+        ]);
+        DB::table('fleet_maintenance_policy_assignments')->insert([
+            'site_id' => $site->id, 'asset_category' => 'vehicle', 'rule_kind' => 'repair',
+            'policy_version_id' => $policyId, 'assigned_by_user_id' => $user->id,
+            'assigned_at' => now(), 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $transition = fn (string $operation, int $version, string $key, array $payload = []) => $this->actingAs($user)
+            ->put("/fleet-assets/maintenance/work-orders/{$workOrder->id}", [
+                'operation' => $operation, 'version' => $version, 'request_key' => $key, ...$payload,
+            ]);
 
+        $transition('start', 0, 'hero-start-work')->assertStatus(302)->assertSessionHasNoErrors();
+        $this->assertNull($workOrder->fresh()->completed_at);
+
+        $transition('attest_repair', 1, 'hero-attest-repair', ['summary' => 'Replaced the worn tyre'])
+            ->assertStatus(302)->assertSessionHasNoErrors();
+        $attestationId = DB::table('fleet_maintenance_actions')->where('work_order_id', $workOrder->id)
+            ->where('action_type', 'attest_repair')->value('id');
         $this->actingAs($user)
-            ->put("/fleet-assets/maintenance/work-orders/{$workOrder->id}", ['status' => 'completed'])
-            ->assertStatus(302);
+            ->post("/fleet-assets/maintenance/work-orders/{$workOrder->id}/attachments", [
+                'parent_type' => 'action', 'parent_id' => $attestationId,
+                'request_key' => 'hero-repair-evidence', 'file' => UploadedFile::fake()->image('service.png'),
+            ])
+            ->assertStatus(302)->assertSessionHasNoErrors();
+
+        $transition('complete', 2, 'hero-complete-work')->assertStatus(302)->assertSessionHasNoErrors();
 
         $firstCompletion = $workOrder->fresh()->completed_at;
         $this->assertNotNull($firstCompletion);
@@ -188,29 +251,23 @@ class FleetHeroRolloutContractTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('stats.completed_30d', 1));
 
-        $this->actingAs($user)
-            ->put("/fleet-assets/maintenance/work-orders/{$workOrder->id}", ['status' => 'in_progress'])
-            ->assertStatus(302);
+        // Completed work cannot be restarted, and replaying the accepted
+        // completion does not restamp it.
+        $transition('start', 3, 'hero-restart-work')->assertStatus(302)->assertSessionHasErrors('status');
+        $transition('complete', 2, 'hero-complete-work')->assertStatus(302)->assertSessionHasNoErrors();
 
-        $this->assertNull($workOrder->fresh()->completed_at);
+        $this->assertTrue($workOrder->fresh()->completed_at->equalTo($firstCompletion));
 
         $this->actingAs($user)
             ->get('/fleet-assets/maintenance/work-orders')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('stats.completed_30d', 0));
-
-        $this->actingAs($user)
-            ->put("/fleet-assets/maintenance/work-orders/{$workOrder->id}", ['status' => 'completed'])
-            ->assertStatus(302);
-
-        $recompletedAt = $workOrder->fresh()->completed_at;
-        $this->assertNotNull($recompletedAt);
-        $this->assertTrue($recompletedAt->greaterThanOrEqualTo($firstCompletion));
+            ->assertInertia(fn (Assert $page) => $page->where('stats.completed_30d', 1));
     }
 
     public function test_one_year_trip_export_includes_only_trips_within_the_selected_period(): void
     {
-        $user = $this->makeFleetUser();
+        // Reports are Site-scoped; fleet.manage is the all-Sites view this contract needs.
+        $user = $this->makeFleetUser(['fleet.manage']);
         $withinYearVehicleName = 'Fleet Report Within Year Vehicle';
         $olderVehicleName = 'Fleet Report Older Than Year Vehicle';
         $recentVehicleName = 'Fleet Report Invalid Period Fallback Vehicle';
@@ -267,10 +324,19 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_trip_export_queries_rows_only_when_the_download_stream_runs(): void
     {
-        $user = $this->makeFleetUser();
+        $user = $this->makeFleetUser(['fleet.manage']);
         $vehicleName = 'Fleet Report Lazy Stream Vehicle';
         $vehicle = Asset::factory()->vehicle()->create(['name' => $vehicleName]);
         $driver = User::factory()->create(['name' => 'Fleet Report Lazy Stream Driver']);
+        // The export names drivers who are current staff the viewer can see.
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $driver->id,
+            'primary_site_id' => $vehicle->site_id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subMonth(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $startedAt = now()->subDay()->startOfHour();
         $endedAt = $startedAt->copy()->addMinutes(90);
         $driverSession = FleetDriverSession::query()->create([
@@ -327,7 +393,7 @@ class FleetHeroRolloutContractTest extends TestCase
 
     public function test_fuel_export_queries_rows_only_when_the_download_stream_runs(): void
     {
-        $user = $this->makeFleetUser();
+        $user = $this->makeFleetUser(['fleet.manage']);
         $vehicleName = 'Fleet Fuel Lazy Stream Vehicle';
         $vehicle = Asset::factory()->vehicle()->create(['name' => $vehicleName]);
         $fuelUser = User::factory()->create(['name' => 'Fleet Fuel Lazy Stream User']);
@@ -377,12 +443,13 @@ class FleetHeroRolloutContractTest extends TestCase
         );
     }
 
-    public function test_driver_detail_uses_the_desktop_fleet_hero_family(): void
+    public function test_driver_detail_uses_the_shared_page_header(): void
     {
         $driverSource = file_get_contents(resource_path('js/pages/fleet-assets/drivers/show.tsx'));
 
         $this->assertIsString($driverSource);
-        $this->assertStringContainsString('<FleetCompactHero', $driverSource);
+        $this->assertStringContainsString('<PageHeader', $driverSource);
+        $this->assertStringNotContainsString('<FleetCompactHero', $driverSource);
         $this->assertStringContainsString('data-fleet-narrow-strategy="horizontal-scroll"', $driverSource);
     }
 }

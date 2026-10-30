@@ -122,47 +122,46 @@ class AvailabilityRule implements EligibilityRuleInterface
             ];
         }
 
-        // Determine each calendar day the shift touches.
-        $segments = $this->splitIntoDaySegments($startsAt, $endsAt);
-
-        foreach ($segments as $segment) {
-            $dayOfWeek = $segment['day_of_week']; // 0=Sunday … 6=Saturday
-            $segmentStart = $segment['starts_at']; // H:i:s string
-            $segmentEnd = $segment['ends_at'];     // H:i:s string
-            $dayName = $segment['day_name'];
-
-            $daySlots = $availabilities->where('day_of_week', $dayOfWeek);
-
-            if ($daySlots->isEmpty()) {
-                return [
-                    'rule' => 'availability',
-                    'passed' => false,
-                    'severity' => 'warning',
-                    'overrideable' => true,
-                    'message' => "No availability set for {$dayName}.",
-                ];
-            }
-
-            // Check if any slot covers the segment.
-            $covered = $daySlots->contains(function (StaffAvailability $slot) use ($segmentStart, $segmentEnd) {
-                return $slot->starts_at <= $segmentStart && $slot->ends_at >= $segmentEnd;
-            });
-
-            if (! $covered) {
-                $startFormatted = Carbon::createFromFormat('H:i:s', $segmentStart)->format('g:i A');
-                $endFormatted = Carbon::createFromFormat('H:i:s', $segmentEnd)->format('g:i A');
-
-                return [
-                    'rule' => 'availability',
-                    'passed' => false,
-                    'severity' => 'warning',
-                    'overrideable' => true,
-                    'message' => "Staff not available on {$dayName} ({$startFormatted} – {$endFormatted}).",
-                ];
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $startsAt = $startsAt->copy()->setTimezone($timezone);
+        $endsAt = $endsAt->copy()->setTimezone($timezone);
+        $windows = collect();
+        // Include the preceding local day: its overnight declaration may cover
+        // a shift that begins after midnight, including Sunday/Monday wraparound.
+        for ($day = $startsAt->copy()->subDay()->startOfDay(); $day->lte($endsAt); $day = $day->copy()->addDay()) {
+            foreach ($availabilities->where('day_of_week', $day->dayOfWeek) as $slot) {
+                $startTime = substr((string) $slot->starts_at, 0, 8);
+                $endTime = substr((string) $slot->ends_at, 0, 8);
+                $nextDay = (bool) $slot->ends_next_day;
+                if ((! $nextDay && $endTime <= $startTime) || ($nextDay && $endTime > $startTime)) {
+                    continue;
+                }
+                $endDay = $nextDay ? $day->copy()->addDay() : $day;
+                $windows->push([
+                    'start' => Carbon::parse($day->toDateString().' '.$startTime, $timezone),
+                    'end' => Carbon::parse($endDay->toDateString().' '.$endTime, $timezone),
+                ]);
             }
         }
 
-        return self::pass('availability');
+        $coveredUntil = $startsAt->copy();
+        foreach ($windows->sortBy(fn (array $window) => $window['start']->getTimestamp()) as $window) {
+            if ($window['end']->lte($coveredUntil)) {
+                continue;
+            }
+            if ($window['start']->gt($coveredUntil)) {
+                break;
+            }
+            $coveredUntil = $window['end'];
+            if ($coveredUntil->gte($endsAt)) {
+                return self::pass('availability');
+            }
+        }
+
+        return [
+            'rule' => 'availability', 'passed' => false, 'severity' => 'warning', 'overrideable' => true,
+            'message' => 'Staff not available on '.$coveredUntil->format('l').' ('.$coveredUntil->format('g:i A').' – '.$endsAt->format('g:i A').').',
+        ];
     }
 
     /**

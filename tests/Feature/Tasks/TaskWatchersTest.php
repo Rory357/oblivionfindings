@@ -80,6 +80,8 @@ it('adds a task_watchers row and surfaces the item under the following filter on
         ->assertInertia(fn ($page) => $page->where('items', fn ($items) => ! $inList($items)));
 
     // Follow it.
+    // The test application survives HTTP calls; start each new request scope.
+    app()->forgetScopedInstances();
     $this->actingAs($user)
         ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
         ->assertRedirect()
@@ -92,6 +94,7 @@ it('adds a task_watchers row and surfaces the item under the following filter on
     ]);
 
     // Now it appears under ?following=1.
+    app()->forgetScopedInstances();
     $this->actingAs($user)
         ->get('/tasks?following=1')
         ->assertInertia(fn ($page) => $page
@@ -99,6 +102,7 @@ it('adds a task_watchers row and surfaces the item under the following filter on
             ->where('items', $inList));
 
     // Unfollow → row removed and it drops out of the filter again.
+    app()->forgetScopedInstances();
     $this->actingAs($user)
         ->post("/tasks/incident/{$incident->id}/watch", ['watching' => false])
         ->assertRedirect()
@@ -110,6 +114,7 @@ it('adds a task_watchers row and surfaces the item under the following filter on
         'user_id' => $user->id,
     ]);
 
+    app()->forgetScopedInstances();
     $this->actingAs($user)
         ->get('/tasks?following=1')
         ->assertInertia(fn ($page) => $page->where('items', fn ($items) => ! $inList($items)));
@@ -125,9 +130,23 @@ it('reflects the watched count in stats.watching', function () {
     $this->actingAs($user)->get('/tasks')
         ->assertInertia(fn ($page) => $page->where('stats.watching', 0));
 
-    $this->actingAs($user)->post("/tasks/incident/{$a->id}/watch", ['watching' => true]);
-    $this->actingAs($user)->post("/tasks/incident/{$b->id}/watch", ['watching' => true]);
+    app()->forgetScopedInstances();
+    $this->actingAs($user)->post("/tasks/incident/{$a->id}/watch", ['watching' => true])
+        ->assertRedirect()->assertSessionHas('success', 'Following this task.');
+    app()->forgetScopedInstances();
+    $this->actingAs($user)->post("/tasks/incident/{$b->id}/watch", ['watching' => true])
+        ->assertRedirect()->assertSessionHas('success', 'Following this task.');
 
+    expect(TaskWatcher::query()->where('user_id', $user->id)->count())->toBe(2);
+    foreach ([$a, $b] as $incident) {
+        $this->assertDatabaseHas('task_watchers', [
+            'source' => 'incident',
+            'item_id' => $incident->id,
+            'user_id' => $user->id,
+        ]);
+    }
+
+    app()->forgetScopedInstances();
     $this->actingAs($user)->get('/tasks')
         ->assertInertia(fn ($page) => $page->where('stats.watching', 2));
 });
@@ -236,7 +255,15 @@ it('allows an explicit all-site permission to watch then removes delivery after 
         'title' => 'Explicit global access lifecycle',
     ]);
 
+    // A generic reporting grant does not cross the incident's historical Site boundary.
     $this->actingAs($watcher)
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertNotFound();
+    $this->assertDatabaseMissing('task_watchers', ['source' => 'incident', 'item_id' => $incident->id, 'user_id' => $watcher->id]);
+    $globalPermission = Permission::query()->where('key', 'healthSafety.viewAllSites')->firstOrFail();
+    $watcher->permissionOverrides()->syncWithoutDetaching([$globalPermission->id => ['allowed' => true]]);
+
+    $this->actingAs($watcher->fresh())
         ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
         ->assertRedirect()
         ->assertSessionHas('success', 'Following this task.');
@@ -246,10 +273,12 @@ it('allows an explicit all-site permission to watch then removes delivery after 
         'user_id' => $watcher->id,
     ]);
 
-    $globalPermission = Permission::query()->where('key', 'reports.viewAny')->firstOrFail();
     $watcher->permissionOverrides()->syncWithoutDetaching([
         $globalPermission->id => ['allowed' => false],
     ]);
+    $this->actingAs($watcher->fresh())
+        ->post("/tasks/incident/{$incident->id}/watch", ['watching' => true])
+        ->assertNotFound();
 
     $aggregator = app(TaskAggregator::class);
     $provider = $aggregator->providerFor('incident');

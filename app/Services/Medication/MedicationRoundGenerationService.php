@@ -24,6 +24,9 @@ final class MedicationRoundGenerationService
 
     public const REASON_CREATED = 'created';
 
+    /** A dry run: this round would be created. Nothing was written. */
+    public const REASON_WOULD_CREATE = 'would_create';
+
     public const REASON_ALREADY_EXISTS = 'already_exists';
 
     public const REASON_EXISTING_ROUND_SCOPE_MISMATCH = 'existing_round_scope_mismatch';
@@ -73,6 +76,10 @@ final class MedicationRoundGenerationService
      *                                                application-wide scope; an array
      *                                                keeps a web request inside its
      *                                                already-authorized Site set.
+     * A dry run makes every check and takes the same locks, then writes
+     * nothing: a round it would create reports "created" with reason
+     * "would_create" (Settings › Create rounds for a day previews this way).
+     *
      * @return array{status: string, reason: string, template_id: int, round_id: int|null}
      */
     public function generate(
@@ -81,6 +88,7 @@ final class MedicationRoundGenerationService
         bool $generateAll = false,
         ?array $allowedSiteIds = null,
         ?User $actor = null,
+        bool $dryRun = false,
     ): array {
         $roundDate = $date instanceof CarbonInterface
             ? $date->toDateString()
@@ -121,6 +129,7 @@ final class MedicationRoundGenerationService
             $snapshot,
             $siteId,
             $actor,
+            $dryRun,
         ): array {
             if ($normalizedAllowedSiteIds !== null
                 && ! in_array($siteId, $normalizedAllowedSiteIds, true)) {
@@ -257,6 +266,15 @@ final class MedicationRoundGenerationService
                     'reason' => self::REASON_ALREADY_EXISTS,
                     'template_id' => (int) $template->id,
                     'round_id' => (int) $existingRound->id,
+                ];
+            }
+
+            if ($dryRun) {
+                return [
+                    'status' => self::STATUS_CREATED,
+                    'reason' => self::REASON_WOULD_CREATE,
+                    'template_id' => (int) $template->id,
+                    'round_id' => null,
                 ];
             }
 

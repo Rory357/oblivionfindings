@@ -5,7 +5,10 @@
  * list surfaces (components/lists/). */
 import { AssignWorkerDialog } from '@/components/assign-worker-dialog';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
-import { type ClientSafetySummary } from '@/components/client-safety-ribbon';
+import {
+    allergyReviewCaption,
+    type ClientSafetySummary,
+} from '@/components/client-safety-ribbon';
 import {
     PageHeader,
     PageHeaderFilterCheck,
@@ -56,6 +59,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
+    compactMenu,
     CounterPill,
     EmptyValue,
     EntityCard,
@@ -66,11 +70,10 @@ import {
     EntityStatusChip,
     EntityTable,
     type EntityTableColumn,
+    initialsFromName,
     ListCaption,
     type MenuItem,
     PersonCell,
-    compactMenu,
-    initialsFromName,
     useEntityContextMenu,
 } from '@/components/lists';
 import { Button } from '@/components/ui/button';
@@ -103,9 +106,9 @@ type Client = {
     address: string | null;
     site: ClientSite | null;
     key_worker: KeyWorker | null;
-    notes_week: number;
-    onboarding: Onboarding;
-    has_respite: boolean;
+    notes_week?: number;
+    onboarding?: Onboarding;
+    has_respite?: boolean;
     archived: boolean;
     mine: boolean;
     safety: ClientSafetySummary | null;
@@ -192,7 +195,7 @@ function clientSubline(c: Client): string {
 const TAB_PREDICATES: Record<TabKey, (c: Client) => boolean> = {
     all: () => true,
     'high-risk': (c) => meridianOf(c) === 'critical',
-    onboarding: (c) => c.onboarding.status !== 'complete',
+    onboarding: (c) => c.onboarding?.status === 'incomplete',
     safeguarding: (c) => !!c.safety?.safeguarding,
     inactive: (c) => c.status === 'inactive',
     archived: (c) => c.archived,
@@ -224,7 +227,7 @@ function exportClientsCsv(rows: Client[]) {
             statusOf(c).label,
             c.site?.name ?? '',
             c.key_worker?.name ?? '',
-            c.onboarding.percent,
+            c.onboarding?.percent ?? '',
             c.address ?? '',
         ]
             .map(csvCell)
@@ -270,15 +273,40 @@ function ClientMark({ c, size = 40 }: { c: Client; size?: number }) {
 /** Alert/safety chips — the fixed status pairs; honest "All clear". */
 function SafetyChips({ c }: { c: Client }) {
     const s = c.safety;
+    const allergyCaption = allergyReviewCaption(s?.allergy_record);
     if (!s?.has_any) {
         return (
-            <EntityStatusChip variant="success" icon={CheckCircle2}>
-                All clear
+            <EntityStatusChip
+                variant={
+                    allergyCaption && allergyCaption !== 'No known allergies'
+                        ? 'warning'
+                        : 'neutral'
+                }
+                icon={
+                    allergyCaption && allergyCaption !== 'No known allergies'
+                        ? AlertTriangle
+                        : CheckCircle2
+                }
+            >
+                {allergyCaption ??
+                    (s ? 'No alerts shown' : 'Safety details unavailable')}
             </EntityStatusChip>
         );
     }
     return (
         <>
+            {allergyCaption && (
+                <EntityStatusChip
+                    variant={
+                        allergyCaption === 'No known allergies'
+                            ? 'neutral'
+                            : 'warning'
+                    }
+                    icon={AlertTriangle}
+                >
+                    {allergyCaption}
+                </EntityStatusChip>
+            )}
             {s.safeguarding ? (
                 <EntityStatusChip variant="critical" icon={Shield}>
                     Safeguarding
@@ -327,7 +355,7 @@ function BulkBar({
     return (
         <div className="fixed bottom-5 left-1/2 z-40 flex max-w-[calc(100vw-40px)] -translate-x-1/2 animate-in flex-wrap items-center gap-1.5 rounded-2xl border border-border bg-popover py-2 pr-2.5 pl-4 shadow-xl duration-200 fade-in slide-in-from-bottom-2">
             <span className="inline-flex items-center gap-2 text-sm font-semibold whitespace-nowrap">
-                <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground tabular-nums">
+                <span className="rounded-full bg-primary-fill px-2 py-0.5 text-xs text-primary-fill-foreground tabular-nums">
                     {count}
                 </span>
                 selected
@@ -432,8 +460,11 @@ export default function ClientsIndex() {
             total: live.length,
             active: live.filter((c) => c.status === 'active').length,
             respite: live.filter((c) => c.has_respite).length,
-            incomplete: live.filter((c) => c.onboarding.status !== 'complete')
-                .length,
+            incomplete: live.filter(
+                (c) => c.onboarding?.status === 'incomplete',
+            ).length,
+            onboardingVisible: live.some((c) => c.onboarding !== undefined),
+            respiteVisible: live.some((c) => c.has_respite !== undefined),
             safeguarding: live.filter((c) => c.safety?.safeguarding).length,
             highRisk: live.filter((c) => meridianOf(c) === 'critical').length,
             inactive: live.filter((c) => c.status === 'inactive').length,
@@ -488,7 +519,8 @@ export default function ClientsIndex() {
             if (tab !== 'archived' && c.archived && !filters.showArchived)
                 return false;
             if (filters.mine && !c.mine) return false;
-            if (filters.type === 'permanent' && c.has_respite) return false;
+            if (filters.type === 'permanent' && c.has_respite !== false)
+                return false;
             if (filters.type === 'respite' && !c.has_respite) return false;
             if (
                 filters.siteIds.length &&
@@ -619,12 +651,16 @@ export default function ClientsIndex() {
             count: stats.highRisk,
             alert: true,
         },
-        {
-            key: 'onboarding',
-            label: 'Onboarding',
-            icon: ClipboardCheck,
-            count: stats.incomplete,
-        },
+        ...(stats.onboardingVisible
+            ? [
+                  {
+                      key: 'onboarding' as const,
+                      label: 'Onboarding',
+                      icon: ClipboardCheck,
+                      count: stats.incomplete,
+                  },
+              ]
+            : []),
         {
             key: 'safeguarding',
             label: 'Safeguarding',
@@ -665,7 +701,7 @@ export default function ClientsIndex() {
             }
             subline={`Care profiles, safety and key workers · ${stats.sites} ${
                 stats.sites === 1 ? 'home' : 'homes'
-            } · ${stats.respite} on respite`}
+            }${stats.respiteVisible ? ` · ${stats.respite} visible respite records` : ''}`}
             actions={
                 <>
                     <PageHeaderSearch
@@ -725,7 +761,7 @@ export default function ClientsIndex() {
                     ) : null}
                     <PageHeaderMeterBlock
                         label="High risk"
-                        tone={stats.highRisk > 0 ? 'critical' : 'success'}
+                        tone={stats.highRisk > 0 ? 'critical' : undefined}
                         ariaLabel={`View high-risk ${clientPlural.toLowerCase()}`}
                         onClick={() => setTab('high-risk')}
                     >
@@ -735,12 +771,12 @@ export default function ClientsIndex() {
                         <PageHeaderMeterCaption>
                             {stats.highRisk > 0
                                 ? 'safeguarding or critical risk'
-                                : 'none flagged high risk'}
+                                : 'no high-risk alerts shown'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Safeguarding"
-                        tone={stats.safeguarding > 0 ? 'critical' : 'success'}
+                        tone={stats.safeguarding > 0 ? 'critical' : undefined}
                         ariaLabel="View safeguarding flags"
                         onClick={() => setTab('safeguarding')}
                     >
@@ -750,46 +786,54 @@ export default function ClientsIndex() {
                         <PageHeaderMeterCaption>
                             {stats.safeguarding > 0
                                 ? 'flags to review'
-                                : 'no active flags'}
+                                : 'no safeguarding flags shown'}
                         </PageHeaderMeterCaption>
                     </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Onboarding"
-                        ariaLabel="View onboarding in progress"
-                        onClick={() => setTab('onboarding')}
-                    >
-                        <PageHeaderMeterBig>
-                            {stats.incomplete}
-                        </PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            profiles to finish
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
-                    <PageHeaderMeterBlock
-                        label="Respite"
-                        ariaLabel="View respite stays"
-                        onClick={() => setFilter('type', 'respite')}
-                    >
-                        <PageHeaderMeterBig>{stats.respite}</PageHeaderMeterBig>
-                        <PageHeaderMeterCaption>
-                            on respite stays
-                        </PageHeaderMeterCaption>
-                    </PageHeaderMeterBlock>
+                    {stats.onboardingVisible && (
+                        <PageHeaderMeterBlock
+                            label="Onboarding"
+                            ariaLabel="View onboarding in progress"
+                            onClick={() => setTab('onboarding')}
+                        >
+                            <PageHeaderMeterBig>
+                                {stats.incomplete}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                visible profiles to finish
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
+                    {stats.respiteVisible && (
+                        <PageHeaderMeterBlock
+                            label="Respite"
+                            ariaLabel="View respite stays"
+                            onClick={() => setFilter('type', 'respite')}
+                        >
+                            <PageHeaderMeterBig>
+                                {stats.respite}
+                            </PageHeaderMeterBig>
+                            <PageHeaderMeterCaption>
+                                visible respite records
+                            </PageHeaderMeterCaption>
+                        </PageHeaderMeterBlock>
+                    )}
                 </>
             }
             filters={
                 <>
-                    <PageHeaderFilterSelect
-                        icon={BedDouble}
-                        label="All types"
-                        value={filters.type}
-                        options={[
-                            { value: 'all', label: 'All types' },
-                            { value: 'permanent', label: 'Permanent only' },
-                            { value: 'respite', label: 'Respite only' },
-                        ]}
-                        onChange={(v) => setFilter('type', v as TypeFilter)}
-                    />
+                    {stats.respiteVisible && (
+                        <PageHeaderFilterSelect
+                            icon={BedDouble}
+                            label="All types"
+                            value={filters.type}
+                            options={[
+                                { value: 'all', label: 'All types' },
+                                { value: 'permanent', label: 'Permanent only' },
+                                { value: 'respite', label: 'Respite only' },
+                            ]}
+                            onChange={(v) => setFilter('type', v as TypeFilter)}
+                        />
+                    )}
                     <MultiEntityFilter
                         label="Home"
                         allLabel="All homes"
@@ -876,9 +920,12 @@ export default function ClientsIndex() {
                         footer={{
                             personName: c.key_worker?.name ?? null,
                             primary: c.key_worker?.name ?? 'No key worker',
-                            secondary: `Key worker · ${c.notes_week} ${
-                                c.notes_week === 1 ? 'note' : 'notes'
-                            } this week`,
+                            secondary:
+                                c.notes_week === undefined
+                                    ? 'Key worker'
+                                    : `Key worker · ${c.notes_week} ${
+                                          c.notes_week === 1 ? 'note' : 'notes'
+                                      } this week`,
                         }}
                     />
                 );
@@ -935,12 +982,16 @@ export default function ClientsIndex() {
         {
             key: 'allergies',
             label: 'Allergies',
-            width: '0.55fr',
+            width: '1fr',
             cell: (c) =>
                 (c.safety?.allergies_count ?? 0) > 0 ? (
                     <CounterPill tone="critical">
                         {c.safety?.allergies_count}
                     </CounterPill>
+                ) : allergyReviewCaption(c.safety?.allergy_record) ? (
+                    <span className="text-xs text-muted-foreground">
+                        {allergyReviewCaption(c.safety?.allergy_record)}
+                    </span>
                 ) : (
                     <EmptyValue />
                 ),
@@ -969,7 +1020,7 @@ export default function ClientsIndex() {
             label: 'Notes / wk',
             width: '0.55fr',
             cell: (c) =>
-                c.notes_week > 0 ? (
+                (c.notes_week ?? 0) > 0 ? (
                     <span className="text-muted-foreground tabular-nums">
                         {c.notes_week}
                     </span>

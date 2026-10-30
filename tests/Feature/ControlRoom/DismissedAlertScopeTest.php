@@ -5,14 +5,19 @@ namespace Tests\Feature\ControlRoom;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Asset;
+use App\Models\AssetGeofence;
 use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientConsent;
 use App\Models\ConsentType;
 use App\Models\ConsentTypeVersion;
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\Device as ControlRoomDevice;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoomAlert;
+use App\Models\FleetSignal;
+use App\Models\FleetTelemetryEvent;
 use App\Models\LocationHardware;
 use App\Models\LoneWorkerSession;
 use App\Models\Permission;
@@ -25,6 +30,7 @@ use App\Services\Integration\IntegrationContextProvider;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
@@ -153,31 +159,39 @@ class DismissedAlertScopeTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('fleet-assets/dashboard')
-                ->where('stats.active_alerts', 1)
-                ->where('stats.critical_alerts', 1)
-                ->where('stats.open_wandering_alerts', 1)
-                ->has('recent_alerts', 1)
-                ->where('recent_alerts.0.id', $open->id));
+                ->where('overview.fleet_alert_count', 1));
+
+        // The Overview's alert count is the entry to the Fleet alert queue,
+        // which now owns the live alert worklist.
+        $this->actingAs($this->admin)
+            ->get('/fleet-assets/alerts')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('fleet-assets/alerts/index')
+                ->where('hero.unresolved', 1)
+                ->where('hero.critical', 1)
+                ->where('control_room_alerts.meta.total', 1)
+                ->has('control_room_alerts.data', 1)
+                ->where('control_room_alerts.data.0.id', $open->id));
     }
 
     public function test_fleet_live_map_does_not_count_dismissed_alerts_as_open(): void
     {
-        $site = Site::factory()->create();
-        $this->makeAlert([
-            'site_id' => $site->id,
-            'status' => ControlRoomAlert::STATUS_OPEN,
-        ]);
-        $this->makeAlert([
-            'site_id' => $site->id,
-            'status' => ControlRoomAlert::STATUS_DISMISSED,
-        ]);
+        $open = $this->makeBoundaryEventAlert($this->site, ControlRoomAlert::STATUS_OPEN);
+        $this->makeBoundaryEventAlert($this->site, ControlRoomAlert::STATUS_DISMISSED);
 
+        // The legacy live map is now the Boundaries map tab. Its open-alert
+        // figure is the boundary events that still need Control Room follow-up.
         $this->actingAs($this->admin)
             ->get('/fleet-assets/map')
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
+        $this->getJson('/fleet-assets/geofences/summary')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('fleet-assets/map')
-                ->where('open_alerts', 1));
+            ->assertJsonPath('follow_up', 1);
+        $this->getJson('/fleet-assets/geofences/events?follow_up=1')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $open->fleet_signal_id);
     }
 
     public function test_resident_tracking_omits_dismissed_alerts_from_live_stats_and_wandering_worklist(): void
@@ -187,14 +201,17 @@ class DismissedAlertScopeTest extends TestCase
             'status' => 'active',
         ]);
         $this->createTrackingAssignment($client);
+        $tracker = $this->trackerProjectionId($client);
         $open = $this->makeAlert([
             'client_id' => $client->id,
+            'device_id' => $tracker,
             'source' => 'tracker',
             'alert_type' => 'wandering',
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
         $this->makeAlert([
             'client_id' => $client->id,
+            'device_id' => $tracker,
             'source' => 'tracker',
             'alert_type' => 'wandering',
             'status' => ControlRoomAlert::STATUS_DISMISSED,
@@ -275,8 +292,10 @@ class DismissedAlertScopeTest extends TestCase
             'status' => 'active',
         ]);
         $this->createTrackingAssignment($client);
+        $tracker = $this->trackerProjectionId($client);
         $open = $this->makeAlert([
             'client_id' => $client->id,
+            'device_id' => $tracker,
             'source' => 'tracker',
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
@@ -285,6 +304,7 @@ class DismissedAlertScopeTest extends TestCase
         $triageAcknowledgedAt = now()->subHour()->startOfSecond();
         $triaging = $this->makeAlert([
             'client_id' => $client->id,
+            'device_id' => $tracker,
             'source' => 'tracker',
             'status' => ControlRoomAlert::STATUS_TRIAGING,
             'acknowledged_at' => $triageAcknowledgedAt,
@@ -292,6 +312,7 @@ class DismissedAlertScopeTest extends TestCase
         ]);
         $dismissed = $this->makeAlert([
             'client_id' => $client->id,
+            'device_id' => $tracker,
             'source' => 'tracker',
             'status' => ControlRoomAlert::STATUS_DISMISSED,
         ]);
@@ -394,7 +415,15 @@ class DismissedAlertScopeTest extends TestCase
     public function test_fleet_dashboard_and_map_alert_summaries_are_limited_to_accessible_sites(): void
     {
         [$visibleSite, $hiddenSite] = [Site::factory()->create(), Site::factory()->create()];
-        $viewer = $this->siteScopedUser($visibleSite, ['fleet.viewAny']);
+        // The Overview alert count and queue need an alert-reading permission;
+        // the Boundaries map follow-up count needs Control Room alert reads.
+        $viewer = $this->siteScopedUser($visibleSite, [
+            'fleet.viewAny',
+            'assets.viewAny',
+            'assets.alerts.view',
+            'assets.telemetry.view',
+            'controlRoom.alerts.view',
+        ]);
         $visibleAlert = $this->makeAlert([
             'site_id' => $visibleSite->id,
             'source' => 'fleet',
@@ -411,16 +440,29 @@ class DismissedAlertScopeTest extends TestCase
         $this->actingAs($viewer)
             ->get('/fleet-assets')
             ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('overview.fleet_alert_count', 1));
+        $this->actingAs($viewer)
+            ->get('/fleet-assets/alerts')
+            ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('stats.active_alerts', 1)
-                ->where('stats.critical_alerts', 1)
-                ->has('recent_alerts', 1)
-                ->where('recent_alerts.0.id', $visibleAlert->id));
+                ->where('hero.unresolved', 1)
+                ->where('hero.critical', 1)
+                ->has('control_room_alerts.data', 1)
+                ->where('control_room_alerts.data.0.id', $visibleAlert->id));
+
+        $visibleBoundaryAlert = $this->makeBoundaryEventAlert($visibleSite, ControlRoomAlert::STATUS_OPEN);
+        $this->makeBoundaryEventAlert($hiddenSite, ControlRoomAlert::STATUS_OPEN);
 
         $this->actingAs($viewer)
             ->get('/fleet-assets/map')
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
+        $this->getJson('/fleet-assets/geofences/summary')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('open_alerts', 1));
+            ->assertJsonPath('follow_up', 1);
+        $this->getJson('/fleet-assets/geofences/events?follow_up=1')
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $visibleBoundaryAlert->fleet_signal_id);
     }
 
     public function test_resident_tracking_alert_summaries_are_limited_to_clients_at_accessible_sites(): void
@@ -444,6 +486,7 @@ class DismissedAlertScopeTest extends TestCase
         $visibleAlert = $this->makeAlert([
             'site_id' => $visibleSite->id,
             'client_id' => $visibleClient->id,
+            'device_id' => $this->trackerProjectionId($visibleClient),
             'source' => 'tracker',
             'alert_type' => 'wandering',
             'status' => ControlRoomAlert::STATUS_OPEN,
@@ -451,6 +494,7 @@ class DismissedAlertScopeTest extends TestCase
         $this->makeAlert([
             'site_id' => $hiddenSite->id,
             'client_id' => $hiddenClient->id,
+            'device_id' => $this->trackerProjectionId($hiddenClient),
             'source' => 'tracker',
             'alert_type' => 'wandering',
             'status' => ControlRoomAlert::STATUS_OPEN,
@@ -688,6 +732,7 @@ class DismissedAlertScopeTest extends TestCase
         $hiddenAlert = $this->makeAlert([
             'site_id' => $hiddenSite->id,
             'client_id' => $hiddenClient->id,
+            'device_id' => $this->trackerProjectionId($hiddenClient),
             'source' => 'tracker',
             'status' => ControlRoomAlert::STATUS_OPEN,
         ]);
@@ -698,17 +743,21 @@ class DismissedAlertScopeTest extends TestCase
             'clients.viewAny',
         ]);
 
+        // A resident outside the user's Sites is concealed, not just refused.
         $this->actingAs($siteViewer)
             ->post("/fleet-assets/resident-tracking/{$hiddenClient->id}/acknowledge-panic")
-            ->assertForbidden();
+            ->assertNotFound();
         $this->assertSame(ControlRoomAlert::STATUS_OPEN, $hiddenAlert->fresh()->status);
 
+        // Both the tracker and the resident need application-wide authority:
+        // clients.viewAny alone stays within the user's own Sites.
         $globalManager = $this->siteScopedUser($visibleSite, [
             'fleet.viewAny',
             'fleet.manage',
             'assets.telemetry.view',
             'clients.viewAny',
             'securityDevices.devices.viewAllSites',
+            'sites.viewAll',
         ]);
         $this->actingAs($globalManager)
             ->post("/fleet-assets/resident-tracking/{$hiddenClient->id}/acknowledge-panic")
@@ -739,15 +788,31 @@ class DismissedAlertScopeTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page->where('kpis.active_alerts', 2));
 
-        $globalFleetManager = $this->siteScopedUser($visibleSite, ['fleet.viewAny', 'fleet.manage']);
+        // Fleet entry counts cover Fleet alert sources only; fleet.manage is
+        // the application-wide bypass for them.
+        foreach ([$visibleSite, $hiddenSite] as $site) {
+            $this->makeAlert([
+                'site_id' => $site->id,
+                'source' => 'fleet',
+                'status' => ControlRoomAlert::STATUS_OPEN,
+            ]);
+        }
+        $globalFleetManager = $this->siteScopedUser($visibleSite, [
+            'fleet.viewAny',
+            'fleet.manage',
+            'assets.alerts.view',
+        ]);
         $this->actingAs($globalFleetManager)
             ->get('/fleet-assets')
             ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('stats.active_alerts', 2));
+            ->assertInertia(fn (Assert $page) => $page->where('overview.fleet_alert_count', 2));
+        $this->actingAs($globalFleetManager)
+            ->get('/fleet-assets/alerts')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->where('hero.unresolved', 2));
         $this->actingAs($globalFleetManager)
             ->get('/fleet-assets/map')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page->where('open_alerts', 2));
+            ->assertRedirect('/fleet-assets/geofences?tab=map');
     }
 
     private function makeAlert(array $overrides = []): ControlRoomAlert
@@ -838,11 +903,12 @@ class DismissedAlertScopeTest extends TestCase
 
     private function createTrackingConsent(Client $client): ClientConsent
     {
+        // Resident location is only authorised by this consent type.
         $type = ConsentType::query()->firstOrCreate(
-            ['name' => 'Fleet Tracking'],
+            ['name' => 'Personal Tracker (Wandering Risk)'],
             [
                 'category' => 'operational',
-                'description' => 'Fleet location tracking',
+                'description' => 'Resident personal location tracking',
                 'purpose' => 'Resident tracker safety',
                 'legal_basis' => 'consent',
                 'allows_withdrawal' => true,
@@ -880,7 +946,7 @@ class DismissedAlertScopeTest extends TestCase
             'legacy_location_hardware_id' => $hardware->id,
         ]);
 
-        return DeviceAssignment::query()->create([
+        $assignment = DeviceAssignment::query()->create([
             'device_id' => $device->id,
             'assignable_type' => DeviceAssignment::TARGET_CLIENT,
             'assignable_id' => $client->id,
@@ -888,6 +954,74 @@ class DismissedAlertScopeTest extends TestCase
             'assigned_at' => now(),
             'assigned_by_user_id' => $this->admin->id,
             'consent_id' => $consent->id,
+        ]);
+        // Resident tracking only trusts alerts raised through the client's
+        // current tracker, via its Control Room device projection.
+        ControlRoomDevice::query()->create([
+            'name' => 'Resident tracker projection '.$client->id,
+            'type' => ControlRoomDevice::TYPE_PERSONAL_TRACKER,
+            'site_id' => $client->site_id,
+            'client_id' => $client->id,
+            'canonical_device_id' => $device->id,
+            'status' => 'online',
+        ]);
+
+        return $assignment;
+    }
+
+    private function trackerProjectionId(Client $client): int
+    {
+        return (int) ControlRoomDevice::query()
+            ->where('client_id', $client->id)
+            ->whereNotNull('canonical_device_id')
+            ->firstOrFail()
+            ->id;
+    }
+
+    /**
+     * A boundary event on the Boundaries map, with a Control Room alert for
+     * its follow-up.
+     */
+    private function makeBoundaryEventAlert(Site $site, string $status): ControlRoomAlert
+    {
+        $vehicle = Asset::factory()->vehicle()->forSite($site)->create(['client_id' => null]);
+        $boundary = AssetGeofence::create([
+            'name' => 'Dismissed alert boundary '.Str::uuid(),
+            'site_id' => $site->id,
+            'scope' => 'site',
+            'type' => 'circle',
+            'is_active' => false,
+            'shape' => ['center' => ['lat' => -41.29, 'lng' => 174.77], 'radius_m' => 180],
+        ]);
+        $event = FleetTelemetryEvent::create([
+            'asset_id' => $vehicle->id,
+            'vendor' => 'test',
+            'vendor_message_id' => (string) Str::uuid(),
+            'occurred_at' => now()->subMinute(),
+            'received_at' => now(),
+            'latitude' => -41.29,
+            'longitude' => 174.77,
+            'event_type' => 'position',
+            'idempotency_key' => (string) Str::uuid(),
+            'consent_blocked' => false,
+        ]);
+        $signal = FleetSignal::create([
+            'asset_id' => $vehicle->id,
+            'geofence_id' => $boundary->id,
+            'source_event_id' => $event->id,
+            'signal_type' => 'geofence_enter',
+            'occurred_at' => $event->occurred_at,
+            'idempotency_key' => (string) Str::uuid(),
+            'payload' => [],
+        ]);
+
+        return $this->makeAlert([
+            'site_id' => $site->id,
+            'asset_id' => $vehicle->id,
+            'fleet_signal_id' => $signal->id,
+            'source' => 'fleet',
+            'alert_type' => 'geofence',
+            'status' => $status,
         ]);
     }
 

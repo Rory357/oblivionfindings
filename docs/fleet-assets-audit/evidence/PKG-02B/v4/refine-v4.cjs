@@ -1,0 +1,24 @@
+const fs=require('node:fs'),path=require('node:path');const base=path.resolve(__dirname,'../../../previews/PKG-02B/v4');function edit(file,fn){const p=path.join(base,file);fs.writeFileSync(p,fn(fs.readFileSync(p,'utf8').replace(/\r\n/g,'\n')));}function rep(s,a,b){if(!s.includes(a))throw Error('Missing '+a.slice(0,100));return s.replace(a,b);}
+edit('operations.tsx',s=>{
+ s=rep(s,"        const approvalBlocked =\n            hold ||", "        const approvalBlocked =\n            (scenario === 'stale' && data.readings[0]?.id === 'ODO-DEMO-03') || data.checkDue < TODAY || data.schedules.some(s=>serviceStatus(s,odo).overdue) || hold ||");
+ s=rep(s,"                    approvalRoute: 'Approval required',","                    readyReview: 'false',\n                    approvalRoute: 'Approval required',");
+ s=rep(s,"                                      f(\n                                          'files',\n                                          'Approval evidence',", "                                      f('readyReview', 'Readiness and driver authority reviewed for approval not required', 'check', false),\n                                      f(\n                                          'files',\n                                          'Approval evidence',");
+ s=rep(s,"                validate: (v) =>\n                    v.end <= v.start", "                validationSection: v=>v.end<=v.start||!!conflict(v.start,v.end,id)?0:2,\n                validate: (v) =>\n                    v.end <= v.start");
+ s=rep(s,"                            ? 'Add a reason or upload evidence for approval not required.'\n                            : '',", "                            ? 'Add a reason or upload evidence for approval not required.'\n                            : !block&&canManage&&v.approvalRoute==='Approval not required'&&v.readyReview!=='true'?'Review readiness and driver authority for the approval-not-required path.':'',");
+ s=rep(s,"                    ? hold\n                        ? 'Active restriction prevents approval or checkout.'", "                    ? (scenario==='stale'&&data.readings[0]?.id==='ODO-DEMO-03')||data.checkDue<TODAY||data.schedules.some(s=>serviceStatus(s,odo).overdue)?'Review stale readings or overdue service/check requirements before approval or checkout.':hold\n                        ? 'Active restriction prevents approval or checkout.'");
+ s=rep(s,"(fields.filter((f) =>\n                        f.type", "(fields.filter(f=>f.required).filter((f) =>\n                        f.type");
+ s=rep(s,"                        fields.length) *", "                        Math.max(1,fields.filter(f=>f.required).length)) *");
+ return s;
+});
+edit('studio.tsx',s=>{
+ s=rep(s,"    const records = m.data.works.filter(","    const records = m.data.works.slice().sort((a,b)=>(b.completed||b.cancelledAt||'').localeCompare(a.completed||a.cancelledAt||'')).filter(");
+ s=rep(s,"                                {w.completed\n                                    ? new Date(\n                                          w.completed + 'T12:00',","                                {w.completed||w.cancelledAt\n                                    ? new Date(\n                                          (w.completed||w.cancelledAt) + 'T12:00',");
+ s=rep(s,": '18 Sep'}", ": 'Undated'}");
+ s=rep(s,"                            <small>2026</small>","                            <small>{(w.completed||w.cancelledAt||'').slice(0,4)}</small>");
+ s=rep(s,'                                <dl className="schedule-facts">',`                                {!s.dueKm&&s.due&&<div className="distance-meter"><div><span>Date-based interval</span><strong>{Math.max(0,Math.round((new Date(s.due+'T12:00').getTime()-new Date('2026-09-22T12:00').getTime())/86400000))} days remaining</strong></div><progress value={s.days?Math.max(0,Math.min(100,100-(new Date(s.due+'T12:00').getTime()-new Date('2026-09-22T12:00').getTime())/86400000/s.days*100)):0} max={100} aria-label={s.name+' date interval used'}/><small>Next service by {dateLabel(s.due)}</small></div>}
+                                <dl className="schedule-facts">`);
+ return s;
+});
+edit('vehicle-calendar.tsx',s=>rep(s,'Select an entry to review its source. Use a free date/time\n                    or Request booking to start a vehicle request.', 'Right-click a date/time to request a booking, or an entry for actions. Select an entry to open its source.'));
+edit('main.tsx',s=>{let a=s.indexOf('                                title={\n                                    work'),b=s.indexOf('                                titleChip=',a);if(a<0||b<0)throw Error('header title');return s.slice(0,a)+`                                title={work?model.data.works.find(w=>w.id===work)?.title||'Maintenance work':'Kōwhai van'}
+`+s.slice(b);});

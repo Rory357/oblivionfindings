@@ -1,0 +1,328 @@
+{
+  "cases": [
+    {
+      "label": "map-default-light",
+      "inline": "--base-font-size: 14px; color-scheme: light;",
+      "paths": [
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(51.1% .262 277)",
+      "staleMarkers": [
+        "oklch(0.42 0.13 85)",
+        "oklch(0.42 0.13 85)",
+        "oklch(0.42 0.13 85)",
+        "oklch(0.42 0.13 85)"
+      ],
+      "theme": "",
+      "url": "http://127.0.0.1:8776/operations/people-locations/map?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(42% .13 85)",
+      "warningForeground": "oklch(30% .11 85)"
+    },
+    {
+      "label": "history-default-light",
+      "inline": "--base-font-size: 14px; color-scheme: light;",
+      "paths": [
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.511 0.262 277)",
+          "fill": "oklch(0.511 0.262 277)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(51.1% .262 277)",
+      "staleMarkers": [],
+      "theme": "",
+      "url": "http://127.0.0.1:8776/operations/people-locations/history?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(42% .13 85)",
+      "warningForeground": "oklch(30% .11 85)"
+    },
+    {
+      "label": "history-default-dark",
+      "inline": "--base-font-size: 14px; color-scheme: dark;",
+      "paths": [
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(65% .2 277)",
+      "staleMarkers": [],
+      "theme": "dark nprogress-busy",
+      "url": "http://127.0.0.1:8776/operations/people-locations/history?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(75% .15 85)",
+      "warningForeground": "oklch(92% .06 85)"
+    },
+    {
+      "label": "map-default-dark",
+      "inline": "--base-font-size: 14px; color-scheme: dark;",
+      "paths": [
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(65% .2 277)",
+      "staleMarkers": [
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)"
+      ],
+      "theme": "dark",
+      "url": "http://127.0.0.1:8776/operations/people-locations/map?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(75% .15 85)",
+      "warningForeground": "oklch(92% .06 85)"
+    },
+    {
+      "label": "map-alternate-light",
+      "inline": "--base-font-size: 14px; color-scheme: light;",
+      "paths": [
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(0.5 0.12 190)",
+      "staleMarkers": [
+        "oklch(0.42 0.13 85)",
+        "oklch(0.42 0.13 85)",
+        "oklch(0.42 0.13 85)",
+        "oklch(0.42 0.13 85)"
+      ],
+      "theme": "nprogress-busy",
+      "url": "http://127.0.0.1:8776/operations/people-locations/map?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(42% .13 85)",
+      "warningForeground": "oklch(30% .11 85)"
+    },
+    {
+      "label": "history-alternate-light",
+      "inline": "--base-font-size: 14px; color-scheme: light;",
+      "paths": [
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.5 0.12 190)",
+          "fill": "oklch(0.5 0.12 190)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(0.5 0.12 190)",
+      "staleMarkers": [],
+      "theme": "",
+      "url": "http://127.0.0.1:8776/operations/people-locations/history?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(42% .13 85)",
+      "warningForeground": "oklch(30% .11 85)"
+    },
+    {
+      "label": "history-alternate-dark",
+      "inline": "--base-font-size: 14px; color-scheme: dark;",
+      "paths": [
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        },
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(0.72 0.12 190)",
+      "staleMarkers": [],
+      "theme": "dark nprogress-busy",
+      "url": "http://127.0.0.1:8776/operations/people-locations/history?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(75% .15 85)",
+      "warningForeground": "oklch(92% .06 85)"
+    },
+    {
+      "label": "map-alternate-dark",
+      "inline": "--base-font-size: 14px; color-scheme: dark;",
+      "paths": [
+        {
+          "computed": "oklch(0.72 0.12 190)",
+          "fill": "oklch(0.72 0.12 190)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(0.72 0.12 190)",
+      "staleMarkers": [
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)"
+      ],
+      "theme": "dark",
+      "url": "http://127.0.0.1:8776/operations/people-locations/map?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(75% .15 85)",
+      "warningForeground": "oklch(92% .06 85)"
+    },
+    {
+      "label": "restored-original-map",
+      "inline": "--base-font-size: 14px; color-scheme: dark;",
+      "paths": [
+        {
+          "computed": "oklch(0.65 0.2 277)",
+          "fill": "oklch(0.65 0.2 277)",
+          "stroke": "var(--primary)"
+        }
+      ],
+      "primary": "oklch(65% .2 277)",
+      "staleMarkers": [
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)",
+        "oklch(0.75 0.15 85)"
+      ],
+      "theme": "dark nprogress-busy",
+      "url": "http://127.0.0.1:8776/operations/people-locations/map?date=2026-09-27&q=&selected=c1",
+      "viewport": {
+        "dpr": 1.25,
+        "height": 999,
+        "width": 2752
+      },
+      "warning": "oklch(75% .15 85)",
+      "warningForeground": "oklch(92% .06 85)"
+    }
+  ],
+  "scope": "Ordinary window only. Actual 125% browser zoom remains pending; baseline DPR is not zoom evidence."
+}

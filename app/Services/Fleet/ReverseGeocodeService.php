@@ -17,6 +17,12 @@ class ReverseGeocodeService
             return null;
         }
 
+        // Google content is requested explicitly through the map capability endpoint.
+        // The ingestion path cannot persist third-party addresses or grant personal-location sharing.
+        if (strtolower((string) config('fleet.maps.reverse_geocode_provider', 'google')) === 'google') {
+            return null;
+        }
+
         $cacheKey = $this->cacheKey($lat, $lng);
         $cached = Cache::get($cacheKey);
         if ($cached) {
@@ -69,7 +75,7 @@ class ReverseGeocodeService
         $roundedLat = round($lat, 4);
         $roundedLng = round($lng, 4);
 
-        return 'fleet:reverse_geocode:'.$roundedLat.':'.$roundedLng;
+        return 'fleet:reverse_geocode:'.hash('sha256', (string) config('fleet.maps.reverse_geocode_provider').'|'.(string) config('fleet.maps.nominatim.endpoint')).':'.$roundedLat.':'.$roundedLng;
     }
 
     protected function withinRateLimit(): bool

@@ -1,0 +1,92 @@
+{
+  "reportClick": {
+    "url": "http://127.0.0.1:8876/fleet-assets/reports/by-house",
+    "active": "page",
+    "back": "http://127.0.0.1:8876/fleet-assets/reports?fixture_role=report-only",
+    "search": "http://127.0.0.1:8876/fleet-assets/reports/by-house"
+  },
+  "reportRoleChecks": [
+    {
+      "role": "report-only",
+      "primary": [
+        {
+          "href": "/fleet-assets/reports",
+          "label": "Reports"
+        }
+      ],
+      "reportContext": 1
+    },
+    {
+      "role": "reports-assigned",
+      "primary": [
+        {
+          "href": "/fleet-assets",
+          "label": "Overview"
+        },
+        {
+          "href": "/fleet-assets/assets",
+          "label": "Assets"
+        },
+        {
+          "href": "/fleet-assets/daily-check",
+          "label": "Maintenance"
+        },
+        {
+          "href": "/fleet-assets/map",
+          "label": "Maps & boundaries"
+        },
+        {
+          "href": "/fleet-assets/reports",
+          "label": "Reports"
+        }
+      ],
+      "reportContext": 1
+    },
+    {
+      "role": "reports-assets",
+      "primary": [
+        {
+          "href": "/fleet-assets",
+          "label": "Overview"
+        },
+        {
+          "href": "/fleet-assets/bookings",
+          "label": "Fleet"
+        },
+        {
+          "href": "/fleet-assets/assets",
+          "label": "Assets"
+        },
+        {
+          "href": "/fleet-assets/maintenance/work-orders",
+          "label": "Maintenance"
+        },
+        {
+          "href": "/fleet-assets/map",
+          "label": "Maps & boundaries"
+        },
+        {
+          "href": "/fleet-assets/reports",
+          "label": "Reports"
+        },
+        {
+          "href": "/fleet-assets/settings/notifications",
+          "label": "Settings"
+        }
+      ],
+      "reportContext": 1
+    },
+    {
+      "role": "global-reports",
+      "primary": [],
+      "reportContext": 0
+    },
+    {
+      "role": "staff",
+      "primary": [],
+      "reportContext": 0
+    }
+  ],
+  "console": [],
+  "scope": "Actual changed navigation and Inertia client, synthetic auth and body; no Laravel requests or database"
+}

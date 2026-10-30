@@ -1,4 +1,5 @@
 import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
+import { WitnessPinInput } from '@/components/medications/witness-pin-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +24,12 @@ import {
     type MedicationScanVerification,
 } from '@/lib/medication-scan';
 import { cn } from '@/lib/utils';
+import {
+    WITNESS_PIN_LENGTH,
+    witnessIsSelectable,
+    witnessOptionLabel,
+    type WitnessPickerOption,
+} from '@/lib/witness-pin';
 import { router, useForm } from '@inertiajs/react';
 import {
     Activity,
@@ -86,7 +93,7 @@ type Props = {
     recent_residents?: string[];
     clients?: ClientOption[];
     client_medications?: ClientMedication[];
-    medication_witnesses?: Array<{ id: number; name: string }>;
+    medication_witnesses?: WitnessPickerOption[];
     shifts?: ShiftOption[];
     selected_shift_id?: number | null;
     auth_user: { id: number; name: string };
@@ -433,8 +440,7 @@ export function TransportWizard({
                               medication_name:
                                   m.name + (m.dosage ? ` ${m.dosage}` : ''),
                               is_controlled_drug: m.controlled_drug,
-                              witness_required:
-                                  m.witness_required || m.controlled_drug,
+                              witness_required: m.witness_required,
                               attestation_state: 'accepted' as const,
                               witnessed_by_user_id: witnessIds[m.id]
                                   ? Number(witnessIds[m.id])
@@ -466,12 +472,14 @@ export function TransportWizard({
                 const missingWitness = medications.find(
                     (m) =>
                         m.witness_required &&
-                        (!m.witnessed_by_user_id || !m.witness_credential),
+                        (!m.witnessed_by_user_id ||
+                            m.witness_credential?.length !==
+                                WITNESS_PIN_LENGTH),
                 );
                 if (missingWitness) {
                     form.setError(
                         'medications',
-                        'All controlled drugs require an eligible second checker and their password or PIN.',
+                        'All controlled drugs need an eligible second checker who types their own 6-digit witness PIN.',
                     );
                     return;
                 }
@@ -618,12 +626,12 @@ export function TransportWizard({
                                                         )
                                                     }
                                                     className={cn(
-                                                        'h-auto flex-col gap-2 rounded-xl border-2 px-4 py-5 whitespace-normal transition-all',
+                                                        'h-auto flex-col gap-2 whitespace-normal rounded-xl border-2 px-4 py-5 transition-all',
                                                         form.data
                                                             .transport_type ===
                                                             type.value
                                                             ? `${type.color} shadow-md`
-                                                            : 'border-transparent bg-muted/30 text-muted-foreground hover:border-muted-foreground/20 hover:bg-muted/60',
+                                                            : 'bg-muted/30 text-muted-foreground hover:border-muted-foreground/20 hover:bg-muted/60 border-transparent',
                                                     )}
                                                 >
                                                     <IconComp className="h-7 w-7" />
@@ -1151,8 +1159,7 @@ export function TransportWizard({
 
                                                 {/* Authenticated second checker for governed medication custody */}
                                                 {isSelected &&
-                                                    (med.witness_required ||
-                                                        med.controlled_drug) && (
+                                                    med.witness_required && (
                                                         <div className="mt-3 ml-7 space-y-3 rounded-md border p-3">
                                                             <label
                                                                 htmlFor={`transport-witness-${med.id}`}
@@ -1219,26 +1226,30 @@ export function TransportWizard({
                                                                                 value={String(
                                                                                     witness.id,
                                                                                 )}
-                                                                            >
-                                                                                {
-                                                                                    witness.name
+                                                                                disabled={
+                                                                                    !witnessIsSelectable(
+                                                                                        witness,
+                                                                                    )
                                                                                 }
+                                                                            >
+                                                                                {witnessOptionLabel(
+                                                                                    witness,
+                                                                                )}
                                                                             </SelectItem>
                                                                         ),
                                                                     )}
                                                                 </SelectContent>
                                                             </Select>
-                                                            <Input
-                                                                type="password"
-                                                                autoComplete="current-password"
-                                                                aria-label={`Second checker password or PIN for ${med.name}`}
+                                                            <WitnessPinInput
+                                                                label="Their witness PIN"
+                                                                ariaLabel={`Second checker’s witness PIN for ${med.name}`}
                                                                 value={
                                                                     witnessCredentials[
                                                                         med.id
                                                                     ] ?? ''
                                                                 }
                                                                 onChange={(
-                                                                    e,
+                                                                    value,
                                                                 ) => {
                                                                     form.clearErrors(
                                                                         'medications',
@@ -1249,20 +1260,17 @@ export function TransportWizard({
                                                                         ) => ({
                                                                             ...previous,
                                                                             [med.id]:
-                                                                                e
-                                                                                    .target
-                                                                                    .value,
+                                                                                value,
                                                                         }),
                                                                     );
                                                                 }}
-                                                                placeholder="Second checker password / PIN"
                                                             />
                                                             <p className="text-xs text-muted-foreground">
                                                                 The second
                                                                 checker must be
-                                                                present and
-                                                                enter their own
-                                                                credential.
+                                                                present and type
+                                                                their own
+                                                                witness PIN.
                                                             </p>
                                                         </div>
                                                     )}

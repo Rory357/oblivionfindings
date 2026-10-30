@@ -1,0 +1,59 @@
+{
+  "frozenVersions": [
+    {
+      "version": 1,
+      "entries": 12,
+      "mismatches": []
+    },
+    {
+      "version": 4,
+      "entries": 23,
+      "mismatches": []
+    },
+    {
+      "version": 5,
+      "entries": 35,
+      "mismatches": []
+    },
+    {
+      "version": 6,
+      "entries": 43,
+      "mismatches": []
+    },
+    {
+      "version": 7,
+      "entries": 46,
+      "mismatches": []
+    },
+    {
+      "version": 8,
+      "entries": 49,
+      "mismatches": []
+    },
+    {
+      "version": 9,
+      "entries": 54,
+      "mismatches": []
+    },
+    {
+      "version": 10,
+      "entries": 59,
+      "mismatches": []
+    },
+    {
+      "version": 11,
+      "entries": 109,
+      "mismatches": []
+    },
+    {
+      "version": 12,
+      "entries": 67,
+      "mismatches": []
+    }
+  ],
+  "readOnlyGuides": {
+    "DESIGN.md": "a9a47765ff45916319db0bf97a4c6b181955c4fa8e108363e4f2cb3b657f2e76",
+    "design_styles/POPUP_STYLE_GUIDE.md": "853541ba9a59bcb2d91350d62563c7a7af612d06429b043a6fe75a298948607b",
+    "design_styles/MAP_GEOFENCING_STYLE_GUIDE.md": "810ed32d26452b54b96b6b24ac4557bd4adae96cee8e7cdd6aa95c978a087fce"
+  }
+}

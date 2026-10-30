@@ -124,10 +124,14 @@ export function MyHrShoutoutSpotlight({
     }
 
     const other = perspective === 'given' ? current.recipient : current.giver;
-    const otherHue = hueFromId(other.id);
+    const otherHue = hueFromId(other.id ?? other.department_id ?? current.id);
     const isThanked =
         thanked.has(current.id) || current.replies.some((r) => r.you);
-    const canThanks = perspective === 'received';
+    const canReply =
+        current.can_reply ??
+        (current.recipient.type !== 'team' &&
+            (current.giver.you || current.recipient.you));
+    const canThanks = perspective === 'received' && canReply;
 
     const visibleReplies =
         expanded || current.replies.length <= 2
@@ -175,7 +179,7 @@ export function MyHrShoutoutSpotlight({
 
     function postReply(target: MyHrShoutout, body: string) {
         const text = body.trim();
-        if (!text) return;
+        if (!text || !canReply) return;
         setItems((prev) =>
             prev.map((s) =>
                 s.id === target.id
@@ -219,7 +223,7 @@ export function MyHrShoutoutSpotlight({
     }
 
     function sayThanks() {
-        if (!current) return;
+        if (!current || !canReply) return;
         setThanked((p) => new Set(p).add(current.id));
         postReply(
             current,
@@ -246,7 +250,9 @@ export function MyHrShoutoutSpotlight({
     const eyebrow =
         perspective === 'given'
             ? 'You gave a shout-out 💛'
-            : 'You got a shout-out 🎉';
+            : current.recipient.type === 'team'
+              ? `${current.recipient.name} got a shout-out 🎉`
+              : 'You got a shout-out 🎉';
     const heading =
         perspective === 'given' ? `To ${other.name}` : `From ${other.name}`;
 
@@ -369,7 +375,11 @@ export function MyHrShoutoutSpotlight({
                             'color-mix(in oklch, var(--category-hr) 26%, var(--border))',
                     }}
                 >
-                    {MY_HR_KUDOS_LABELS[current.category] ?? 'Recognition'}
+                    {current.category
+                        ? (MY_HR_KUDOS_LABELS[current.category] ??
+                          current.category_label ??
+                          'Recognition')
+                        : (current.impact_label ?? 'Thank you')}
                 </span>
 
                 <div className="ml-auto flex flex-wrap items-center gap-2.5">
@@ -419,7 +429,9 @@ export function MyHrShoutoutSpotlight({
                         💬{' '}
                         {current.replies.length > 0
                             ? `${current.replies.length} ${current.replies.length === 1 ? 'reply' : 'replies'}`
-                            : 'Reply'}
+                            : canReply
+                              ? 'Reply'
+                              : 'View replies'}
                     </button>
                     {canThanks ? (
                         <button
@@ -489,9 +501,11 @@ export function MyHrShoutoutSpotlight({
                     ) : null}
                     {current.replies.length === 0 ? (
                         <p className="mb-2.5 text-[12px] text-muted-foreground">
-                            {canThanks
-                                ? 'No replies yet — say thanks to start the conversation.'
-                                : 'No replies yet — write the first message.'}
+                            {!canReply
+                                ? 'No replies yet.'
+                                : canThanks
+                                  ? 'No replies yet — say thanks to start the conversation.'
+                                  : 'No replies yet — write the first message.'}
                         </p>
                     ) : (
                         <div className="mb-3 flex flex-col gap-2">
@@ -543,6 +557,7 @@ export function MyHrShoutoutSpotlight({
                         </span>
                         <input
                             value={draft}
+                            disabled={!canReply}
                             onChange={(e) => setDraft(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
@@ -556,8 +571,8 @@ export function MyHrShoutoutSpotlight({
                         <button
                             type="button"
                             onClick={sendDraft}
-                            disabled={!draft.trim()}
-                            className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2 text-[12px] font-bold text-primary-foreground disabled:opacity-50"
+                            disabled={!canReply || !draft.trim()}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 py-2 text-[12px] font-bold text-primary-fill-foreground disabled:opacity-50"
                         >
                             <Send className="h-3.5 w-3.5" /> Send
                         </button>

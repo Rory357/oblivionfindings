@@ -3,6 +3,10 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Services\Medication\Controlled\ControlledPolicy;
+use App\Services\Medication\DoseSlots\DoseSlotOrderSync;
+use App\Services\Medication\OverdueDoseAlerts;
+use App\Support\WorkerClock;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +20,22 @@ class ClientMedication extends Model
     use AuditableChanges;
     use HasFactory;
     use SoftDeletes;
+
+    private bool $publishingCheckedPrescription = false;
+
+    /** Only the locked P04 workflow publishes a proposed prescription. */
+    public function publishCheckedPrescription(array $payload, int $version, int $verifierId): void
+    {
+        $this->publishingCheckedPrescription = true;
+        try {
+            $this->forceFill(array_merge($payload, [
+                'version' => $version, 'approval_status' => 'verified',
+                'verified_by' => $verifierId, 'verified_at' => now(), 'rejection_reason' => null,
+            ]))->save();
+        } finally {
+            $this->publishingCheckedPrescription = false;
+        }
+    }
 
     private const VERIFICATION_SENSITIVE_FIELDS = [
         'client_id',
@@ -115,6 +135,16 @@ class ClientMedication extends Model
         'version' => 'integer',
     ];
 
+    /**
+     * Fields whose change sends the order back for verification.
+     *
+     * @return list<string>
+     */
+    public static function verificationSensitiveFields(): array
+    {
+        return self::VERIFICATION_SENSITIVE_FIELDS;
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $medication): void {
@@ -127,7 +157,13 @@ class ClientMedication extends Model
         });
 
         static::updating(function (self $medication): void {
-            if (! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
+            if ($medication->publishingCheckedPrescription || ! $medication->isDirty(self::VERIFICATION_SENSITIVE_FIELDS)) {
+                return;
+            }
+            // EA-132 (Lane C3): stopping an order sets its end date; the
+            // stopped order keeps the check and checker it was given under.
+            if ($medication->isDirty('state') && $medication->state === 'ceased'
+                && array_values(array_intersect(array_keys($medication->getDirty()), self::VERIFICATION_SENSITIVE_FIELDS)) === ['end_date']) {
                 return;
             }
 
@@ -143,7 +179,12 @@ class ClientMedication extends Model
             $wasCeased = $medication->getOriginal('state') === 'ceased'
                 || $medication->getRawOriginal('ceased_at') !== null;
 
-            if ($wasCeased && $medication->isDirty()) {
+            // A reviewed NZ register classification annotates retained stock evidence;
+            // cessation, the prescription and the legacy schedule stay immutable.
+            $classificationOnly = array_diff(array_keys($medication->getDirty()), [
+                'nz_controlled_class', 'controlled_class_reviewed_by', 'controlled_class_reviewed_at', 'controlled_class_source', 'updated_at',
+            ]) === [];
+            if ($wasCeased && $medication->isDirty() && ! $classificationOnly) {
                 throw new \LogicException('Ceased medication orders are immutable.');
             }
 
@@ -167,6 +208,20 @@ class ClientMedication extends Model
                 || $medication->ceased_by !== null) {
                 throw new \LogicException('Medication cessation evidence is only valid for ceased orders.');
             }
+        });
+
+        // P01 foundation C3: record the schedule history and regenerate the
+        // order's dose slots in the same transaction as the order change.
+        static::created(function (self $medication): void {
+            app(DoseSlotOrderSync::class)->created($medication);
+        });
+
+        static::updated(function (self $medication): void {
+            app(DoseSlotOrderSync::class)->updated($medication);
+            // C6f: an order change can mean a dose is no longer owed (ceased,
+            // waiting for the order check, a new version); once it commits,
+            // the person's overdue alerts for such doses resolve.
+            OverdueDoseAlerts::queueAfterCommit((int) $medication->client_id);
         });
 
         static::deleting(function (): never {
@@ -327,7 +382,18 @@ class ClientMedication extends Model
      */
     public function requiresWitness(): bool
     {
-        return $this->witness_required || $this->controlled_drug;
+        return app(ControlledPolicy::class)->witnessRequired($this);
+    }
+
+    /**
+     * The name to use on surfaces readable without medications.controlled.view
+     * — incidents, H&S events, Control Room signals and alerts not linked to
+     * this medicine (EM-12). A controlled medicine is never named there; its
+     * name stays on records that require controlled view.
+     */
+    public function unrestrictedName(): string
+    {
+        return $this->controlled_drug ? 'Controlled medicine' : (string) $this->name;
     }
 
     /**
@@ -425,15 +491,18 @@ class ClientMedication extends Model
     }
 
     /**
-     * Check if medication has expired
+     * Check if medication has expired. The end date is the order's last day
+     * (its doses are still scheduled), so it expires once the New Zealand
+     * date is after it
      */
     public function isExpired(): bool
     {
-        return $this->end_date && $this->end_date->isPast();
+        return $this->end_date !== null && $this->daysUntilEnd() < 0;
     }
 
     /**
-     * Check if medication is expiring soon (within 7 days)
+     * Check if medication is expiring soon: not yet expired, and ending
+     * within $days days on the New Zealand calendar
      */
     public function isExpiringSoon(int $days = 7): bool
     {
@@ -441,7 +510,20 @@ class ClientMedication extends Model
             return false;
         }
 
-        return $this->end_date->diffInDays(now(), false) <= $days && $this->end_date->isFuture();
+        return ! $this->isExpired() && $this->daysUntilEnd() <= $days;
+    }
+
+    /**
+     * Whole days from today on the New Zealand calendar to the end date:
+     * 0 on the order's last day, negative once that day has passed
+     */
+    public function daysUntilEnd(): ?int
+    {
+        if (! $this->end_date) {
+            return null;
+        }
+
+        return WorkerClock::daysUntil($this->end_date);
     }
 
     /**

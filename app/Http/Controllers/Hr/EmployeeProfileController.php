@@ -1782,6 +1782,10 @@ class EmployeeProfileController extends Controller
                 : null,
             'emergency_contacts' => $profile->emergency_contacts ?? [],
             'notes' => $profile->notes,
+            // HR-managed work contact, shown to all staff in the directory.
+            // Separate from the sign-in email below; null means none.
+            'work_email' => $profile->work_email,
+            'work_phone' => $profile->work_phone,
             'user' => [
                 'id' => $profile->user->id,
                 'name' => $profile->user->name,

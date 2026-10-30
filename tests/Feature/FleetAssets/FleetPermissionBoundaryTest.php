@@ -2,13 +2,18 @@
 
 namespace Tests\Feature\FleetAssets;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
+use App\Models\Client;
 use App\Models\FleetResidentTransport;
-use App\Models\FleetWorkOrder;
 use App\Models\Permission;
+use App\Models\Site;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class FleetPermissionBoundaryTest extends TestCase
@@ -19,7 +24,7 @@ class FleetPermissionBoundaryTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
     }
 
     public function test_read_only_fleet_user_can_view_work_orders_but_cannot_create_one(): void
@@ -72,10 +77,23 @@ class FleetPermissionBoundaryTest extends TestCase
 
     public function test_each_work_order_management_permission_can_create_work_orders(): void
     {
-        $asset = Asset::factory()->vehicle()->create();
+        // Maintenance reports are Site-scoped and route to the Site's approved
+        // Coordinator and backup.
+        $site = Site::factory()->create();
+        $asset = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
+        $coordinator = $this->makeUserWithPermissions([], $site);
+        DB::table('fleet_maintenance_site_routes')->insert([
+            'site_id' => $site->id,
+            'coordinator_user_id' => $coordinator->id,
+            'backup_user_id' => $this->makeUserWithPermissions([], $site)->id,
+            'approved_by_user_id' => $coordinator->id,
+            'approved_at' => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         foreach (['fleet.maintenance.manage', 'fleet.manage'] as $permissionKey) {
-            $user = $this->makeUserWithPermissions([$permissionKey]);
+            $user = $this->makeUserWithPermissions([$permissionKey], $site);
 
             $this->actingAs($user)
                 ->post('/fleet-assets/maintenance/work-orders', $this->workOrderPayload(
@@ -91,38 +109,53 @@ class FleetPermissionBoundaryTest extends TestCase
     public function test_each_geofence_management_permission_can_mutate_geofences(): void
     {
         foreach (['assets.geofences.manage', 'fleet.manage'] as $permissionKey) {
-            $user = $this->makeUserWithPermissions([$permissionKey]);
+            $site = Site::factory()->create();
+            $user = $this->makeUserWithPermissions([$permissionKey], $site);
             $name = "Boundary for {$permissionKey}";
+            $payload = [
+                'name' => $name, 'site_id' => $site->id, 'address' => 'Synthetic test address',
+                'geometry' => ['type' => 'circle', 'center' => ['lat' => -36.8485, 'lng' => 174.7633], 'radius_m' => 150],
+                'uses' => ['Vehicles'], 'verified' => true, 'reason' => 'Test boundary lifecycle',
+                'request_key' => (string) Str::uuid(),
+            ];
 
             $this->actingAs($user)
-                ->post('/fleet-assets/geofences', $this->geofencePayload($name))
-                ->assertRedirect();
+                ->postJson('/fleet-assets/geofences', $payload)
+                ->assertCreated();
 
             $geofence = AssetGeofence::query()->where('name', $name)->firstOrFail();
 
             $this->actingAs($user)
-                ->put("/fleet-assets/geofences/{$geofence->id}", $this->geofencePayload("Updated {$name}"))
-                ->assertRedirect();
+                ->putJson("/fleet-assets/geofences/{$geofence->id}", array_merge($payload, [
+                    'name' => "Updated {$name}", 'expected_revision' => $geofence->revision, 'request_key' => (string) Str::uuid(),
+                ]))->assertOk();
+            $this->assertSame("Updated {$name}", $geofence->fresh()->name);
 
             $this->actingAs($user)
                 ->post("/fleet-assets/geofences/{$geofence->id}/toggle")
-                ->assertRedirect();
+                ->assertConflict();
 
             $this->assertFalse($geofence->fresh()->is_active);
 
             $this->actingAs($user)
-                ->delete("/fleet-assets/geofences/{$geofence->id}")
-                ->assertRedirect();
+                ->deleteJson("/fleet-assets/geofences/{$geofence->id}", [
+                    'expected_revision' => $geofence->fresh()->revision, 'reason' => 'Test retirement',
+                ])->assertOk();
 
-            $this->assertDatabaseMissing('asset_geofences', ['id' => $geofence->id]);
+            $this->assertNotNull($geofence->fresh()->retired_at);
+            $this->assertDatabaseHas('asset_geofences', ['id' => $geofence->id]);
         }
     }
 
     public function test_fleet_viewer_can_complete_a_transport_and_record_its_pre_check(): void
     {
-        $user = $this->makeUserWithPermissions(['fleet.viewAny']);
-        $asset = Asset::factory()->vehicle()->create();
-        $transport = $this->makeTransport($asset, $user, 'Completion passenger');
+        // Resident journeys are bound to the resident's Site and a vehicle at
+        // that Site; a Fleet viewer may act on the journeys they drive there.
+        $site = Site::factory()->create();
+        $user = $this->makeUserWithPermissions(['fleet.viewAny'], $site);
+        $asset = Asset::factory()->vehicle()->create(['site_id' => $site->id]);
+        $resident = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $transport = $this->makeTransport($asset, $user, $resident);
 
         $this->actingAs($user)
             ->post("/fleet-assets/transports/{$transport->id}/complete", [
@@ -133,7 +166,7 @@ class FleetPermissionBoundaryTest extends TestCase
 
         $this->assertSame('completed', $transport->fresh()->status);
 
-        $preCheckTransport = $this->makeTransport($asset, $user, 'Pre-check passenger');
+        $preCheckTransport = $this->makeTransport($asset, $user, $resident);
 
         $this->actingAs($user)
             ->get("/fleet-assets/transports/{$preCheckTransport->id}/pre-check")
@@ -147,12 +180,26 @@ class FleetPermissionBoundaryTest extends TestCase
                 ],
             ])
             ->assertRedirect();
+
+        $this->assertDatabaseHas('fleet_transport_pre_checks', [
+            'transport_id' => $preCheckTransport->id,
+            'completed_by_user_id' => $user->id,
+        ]);
     }
 
     /** @param array<int, string> $permissionKeys */
-    private function makeUserWithPermissions(array $permissionKeys): User
+    private function makeUserWithPermissions(array $permissionKeys, ?Site $site = null): User
     {
         $user = User::factory()->create(['approved_at' => now()]);
+        if ($site) {
+            HrEmployeeProfile::factory()->create([
+                'user_id' => $user->id,
+                'primary_site_id' => $site->id,
+                'secondary_site_ids' => [],
+                'is_active' => true,
+                'start_date' => today()->subMonth(),
+            ]);
+        }
 
         foreach ($permissionKeys as $permissionKey) {
             $permission = Permission::query()->firstOrCreate(
@@ -179,6 +226,7 @@ class FleetPermissionBoundaryTest extends TestCase
             'title' => $title,
             'priority' => 'high',
             'description' => 'Rear tyre is below the safe tread threshold.',
+            'request_key' => (string) Str::uuid(),
         ];
     }
 
@@ -198,15 +246,19 @@ class FleetPermissionBoundaryTest extends TestCase
         ];
     }
 
-    private function makeTransport(Asset $asset, User $driver, string $residentName): FleetResidentTransport
+    private function makeTransport(Asset $asset, User $driver, Client $resident): FleetResidentTransport
     {
         return FleetResidentTransport::query()->create([
+            'journey_uuid' => (string) Str::uuid(),
             'asset_id' => $asset->id,
+            'site_id' => $resident->site_id,
             'driver_user_id' => $driver->id,
-            'resident_name' => $residentName,
+            'resident_id' => $resident->id,
+            'resident_name' => trim($resident->first_name.' '.$resident->last_name),
             'transport_type' => 'community',
             'departed_at' => now()->subHour(),
             'status' => 'in_progress',
+            'version' => 1,
         ]);
     }
 }

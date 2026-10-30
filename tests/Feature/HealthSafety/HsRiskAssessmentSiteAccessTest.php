@@ -10,6 +10,7 @@ use App\Models\HsRiskAssessmentAttachment;
 use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\HealthSafety\RiskAssessmentReturn;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -50,9 +51,10 @@ class HsRiskAssessmentSiteAccessTest extends TestCase
 
         $this->actingAs($viewer)
             ->get('/health-safety/risk-assessments?assessment='.$clientRisk->id)
+            ->assertRedirect(RiskAssessmentReturn::href($clientRisk->id, '/health-safety/risk-assessments'));
+        $this->get('/health-safety/risk-assessments/'.$clientRisk->id)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->has('assessments.data', 3)
                 ->where('detail.id', $clientRisk->id)
                 ->has('pickers.sites', 1)
                 ->where('pickers.sites.0.id', $localSite->id)
@@ -72,7 +74,8 @@ class HsRiskAssessmentSiteAccessTest extends TestCase
 
         $this->actingAs($viewer)
             ->get('/health-safety/risk-assessments?hs_event_id='.$otherEvent->id)
-            ->assertForbidden();
+            // An event outside the viewer's H&S read isn't found (404, as in FirstAidDerivedReportsPrivacyTest).
+            ->assertNotFound();
 
         foreach ([$foreignRisk, $standalone, $mismatched] as $hidden) {
             $this->actingAs($viewer)
@@ -194,7 +197,8 @@ class HsRiskAssessmentSiteAccessTest extends TestCase
             ->assertOk();
         $this->actingAs($manager)
             ->get("/health-safety/risk-assessments/{$foreign->id}/attachments/{$foreignAttachment->id}/download")
-            ->assertForbidden();
+            // A file on another Site's risk isn't found (404); nothing is streamed.
+            ->assertNotFound();
         $this->actingAs($manager)
             ->get("/health-safety/risk-assessments/{$local->id}/attachments/{$foreignAttachment->id}/download")
             ->assertNotFound();
@@ -219,17 +223,13 @@ class HsRiskAssessmentSiteAccessTest extends TestCase
 
         $this->actingAs($siteViewer)
             ->get('/health-safety/risk-assessments?assessment='.$standalone->id)
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('assessments.data', 0)
-                ->where('detail', null));
+            ->assertForbidden();
 
         $this->actingAs($globalManager)
             ->get('/health-safety/risk-assessments?assessment='.$standalone->id)
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->has('assessments.data', 1)
-                ->where('detail.id', $standalone->id));
+            ->assertRedirect(RiskAssessmentReturn::href($standalone->id, '/health-safety/risk-assessments'));
+        $this->get('/health-safety/risk-assessments/'.$standalone->id)
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->where('detail.id', $standalone->id));
 
         $this->actingAs($globalManager)
             ->put('/health-safety/risk-assessments/'.$standalone->id, $this->validPayload('standalone', null, ['title' => 'Global update']))

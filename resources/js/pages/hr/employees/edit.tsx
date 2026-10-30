@@ -1,3 +1,4 @@
+import InputError from '@/components/input-error';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +43,10 @@ interface Profile {
         relationship: string;
     }>;
     notes: string | null;
+    /** HR-managed work contact; null means none (never the sign-in email). */
+    work_email: string | null;
+    work_phone: string | null;
+    /** email is the sign-in address. */
     user: { id: number; name: string; email: string };
 }
 
@@ -65,6 +70,7 @@ export default function EmployeeEdit({
     workRightsStatuses,
 }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Home', href: '/dashboard' },
         { title: 'HR', href: '/hr/people' },
         { title: 'People', href: '/hr/people' },
         { title: profile.user.name, href: `/hr/people/${profile.id}` },
@@ -73,6 +79,8 @@ export default function EmployeeEdit({
     const canEditFinancial = 'hourly_rate' in profile;
 
     const form = useForm({
+        work_email: profile.work_email || '',
+        work_phone: profile.work_phone || '',
         employee_number: profile.employee_number || '',
         position_title: profile.position_title || '',
         employment_type: profile.employment_type || '',
@@ -163,15 +171,80 @@ export default function EmployeeEdit({
                                     </p>
                                 </div>
                                 <div>
-                                    <Label>Email</Label>
+                                    <Label htmlFor="sign_in_email">
+                                        Sign-in email
+                                    </Label>
                                     <Input
+                                        id="sign_in_email"
                                         value={profile.user.email}
                                         disabled
                                         className="bg-muted"
+                                        aria-describedby="sign_in_email-help"
                                     />
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Email is managed in user settings
+                                    <p
+                                        id="sign_in_email-help"
+                                        className="mt-1 text-caption"
+                                    >
+                                        Managed in user settings. Not shown in
+                                        the staff directory.
                                     </p>
+                                </div>
+                                <div>
+                                    <Label htmlFor="work_email">
+                                        Work email
+                                    </Label>
+                                    <Input
+                                        id="work_email"
+                                        type="email"
+                                        value={form.data.work_email}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'work_email',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="ana@example.co.nz"
+                                        aria-describedby="work_email-help"
+                                    />
+                                    <p
+                                        id="work_email-help"
+                                        className="mt-1 text-caption"
+                                    >
+                                        Shown to all staff in the directory.
+                                        Leave empty if they have none.
+                                    </p>
+                                    <InputError
+                                        className="mt-1"
+                                        message={form.errors.work_email}
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="work_phone">
+                                        Work phone
+                                    </Label>
+                                    <Input
+                                        id="work_phone"
+                                        value={form.data.work_phone}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'work_phone',
+                                                e.target.value,
+                                            )
+                                        }
+                                        placeholder="021 555 0000"
+                                        aria-describedby="work_phone-help"
+                                    />
+                                    <p
+                                        id="work_phone-help"
+                                        className="mt-1 text-caption"
+                                    >
+                                        Shown to all staff in the directory.
+                                        Leave empty if they have none.
+                                    </p>
+                                    <InputError
+                                        className="mt-1"
+                                        message={form.errors.work_phone}
+                                    />
                                 </div>
                                 <div>
                                     <Label htmlFor="employee_number">

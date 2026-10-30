@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="PKG07MainCorrectionTest" file="PKG07Main Correction" tests="5" assertions="95" errors="0" failures="0" skipped="0" time="324.631740">
+    <testcase name="Directory and history withhold private vehicle evidence even without a trip link" file="PKG07Main Correction::Directory and history withhold private vehicle evidence even without a trip link" class="PKG07MainCorrectionTest" classname="PKG07MainCorrectionTest" assertions="44" time="322.928217"/>
+    <testcase name="Event visibility uses its exact source and keeps unrelated permitted history" file="PKG07Main Correction::Event visibility uses its exact source and keeps unrelated permitted history" class="PKG07MainCorrectionTest" classname="PKG07MainCorrectionTest" assertions="24" time="0.636687"/>
+    <testcase name="Geofence evaluator retains the source for entry dwell and breach" file="PKG07Main Correction::Geofence evaluator retains the source for entry dwell and breach" class="PKG07MainCorrectionTest" classname="PKG07MainCorrectionTest" assertions="5" time="0.216046"/>
+    <testcase name="Asset positions require observations from the current unambiguous pairing" file="PKG07Main Correction::Asset positions require observations from the current unambiguous pairing" class="PKG07MainCorrectionTest" classname="PKG07MainCorrectionTest" assertions="13" time="0.607465"/>
+    <testcase name="Main original missing boundary removal regression" file="PKG07Main Correction::Main original missing boundary removal regression" class="PKG07MainCorrectionTest" classname="PKG07MainCorrectionTest" assertions="9" time="0.243324"/>
+  </testsuite>
+</testsuites>

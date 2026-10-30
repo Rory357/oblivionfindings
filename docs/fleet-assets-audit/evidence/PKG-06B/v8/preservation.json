@@ -1,0 +1,134 @@
+{
+  "previous": "v7",
+  "files": [
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/01-valuation.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/02-invoice.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/03-cards.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/04-request-review.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/05-finance-restricted.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/06-valuation-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/07-finance-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/08-review-dark-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/REVIEW.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/browser-results.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/build-inputs.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/final-finance-1600.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/final-finance-overview.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/final-review-1024.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/final-review-1600.png",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/preservation.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/server.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/source-references.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B/v7/typecheck.json",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/pages/PKG-06B-asset-profile-v7.md",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/app.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/app.js",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/asset-finance.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/asset-records.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/build.cjs",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/finance.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/index.html",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/modal-ui.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/modal.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/profile.css",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/profile.tsx",
+      "unchanged": true
+    },
+    {
+      "path": "docs/fleet-assets-audit/previews/PKG-06B/v7/serve.cjs",
+      "unchanged": true
+    }
+  ],
+  "unchanged": true
+}

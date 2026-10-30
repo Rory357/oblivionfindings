@@ -1,0 +1,18 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\806c\oblivionfindings\phpunit.xml
+
+..                                                                  2 / 2 (100%)
+   PASS  Tests\Feature\FleetAssets\Pkg07MapPrivacyTest
+  ✓ directory and history withhold private vehicle evidence even without a trip link                             1.31s
+  ✓ asset positions require observations from the current unambiguous pairing                                    0.79s
+
+  Tests:    2 passed (29 assertions)
+  Duration: 2.46s
+
+
+
+Time: 00:02.120, Memory: 74.00 MB
+
+OK (2 tests, 29 assertions)

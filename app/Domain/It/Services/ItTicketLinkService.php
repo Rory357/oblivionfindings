@@ -6,6 +6,7 @@ use App\Domain\It\Enums\ItTicketCommandChannel;
 use App\Domain\It\Exceptions\ItTicketCommandConflict;
 use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringWorkRouting;
+use App\Domain\Obli\ObliComputerIntakeContext;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -297,6 +298,18 @@ final class ItTicketLinkService
                 $actor->id,
             );
         });
+    }
+
+    /** Proof-scoped own-ticket intake only; ordinary human Device picker permissions remain unchanged. */
+    public function linkVerifiedLocalComputerAtIntake(ItTicket $ticket, ObliComputerIntakeContext $proof, User $actor): ItTicketLink
+    {
+        $proof->assertPendingReceipt($actor, $ticket);
+        $device = $proof->deviceForTicket($actor, $ticket);
+        [$canonicalTicket, $canonicalDevice] = $this->lockCanonicalRecords($ticket, $device);
+        $proof->deviceForTicket($actor, $canonicalTicket);
+
+        return $this->persist($canonicalTicket, $canonicalDevice, 'affected_device',
+            ['canonical_owner' => 'security_devices', 'source' => 'obli_verified_local_computer', 'proof_context_id' => $proof->contextId], $actor->id);
     }
 
     public function unlink(

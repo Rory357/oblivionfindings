@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Sites\SiteGeocodingController;
 use App\Http\Requests\Operations\StoreClientLocationZoneDraftRequest;
 use App\Models\Client;
+use App\Services\Fleet\VehicleGeofenceRules;
+use App\Services\Tracking\BoundaryHandoffService;
 use App\Services\Tracking\ClientLocationAccessService;
 use App\Services\Tracking\ClientLocationZoneDraftService;
 use App\Services\Tracking\ClientZoneMonitoringService;
@@ -13,6 +15,40 @@ use Illuminate\Http\Request;
 
 class ClientLocationZoneDraftController extends Controller
 {
+    public function boundaries(Request $request, Client $client, ClientLocationAccessService $access, ClientLocationZoneDraftService $drafts)
+    {
+        $input = $request->validate(['q' => ['nullable', 'string', 'max:120']]);
+        $assignment = $access->resolve($request->user(), $client);
+        $fingerprint = $access->fingerprint($assignment);
+        $rows = $access->eligibleBoundaries($client, $assignment->custody_site_id)
+            ->when(! empty($input['q']), fn ($q) => $q->where('name', 'like', '%'.addcslashes($input['q'], '%_\\').'%'))
+            ->orderBy('name')->orderBy('id')->limit(20)->get()->map(fn ($b) => [
+                'id' => $b->id, 'name' => $b->name, 'geometry' => VehicleGeofenceRules::fromBoundary($b),
+                'hash' => $drafts->geometryHash($b), 'geometry_version' => $b->geometry_version, 'revision' => $b->revision]);
+        $access->recheck($request->user(), $client, $fingerprint);
+
+        return response()->json(['data' => $rows])->withHeaders(ClientLocationAccessService::headers());
+    }
+
+    public function cancelBoundaryHandoff(Request $request, Client $client, string $token, BoundaryHandoffService $handoffs)
+    {
+        $handoffs->cancel($request->user(), $client, $token);
+
+        return response()->json(['cancelled' => true])->withHeaders(ClientLocationAccessService::headers());
+    }
+
+    public function startBoundaryHandoff(Request $request, Client $client, BoundaryHandoffService $handoffs)
+    {
+        $data = $request->validate(['access_fingerprint' => ['required', 'string', 'size:64']]);
+
+        return response()->json($handoffs->start($request->user(), $client, $data['access_fingerprint']))->withHeaders(ClientLocationAccessService::headers());
+    }
+
+    public function takeBoundaryHandoff(Request $request, Client $client, string $token, BoundaryHandoffService $handoffs)
+    {
+        return response()->json($handoffs->take($request->user(), $client, $token))->withHeaders(ClientLocationAccessService::headers());
+    }
+
     public function monitoring(Request $request, Client $client, int $zone, ClientZoneMonitoringService $monitoring)
     {
         $input = $request->validate([

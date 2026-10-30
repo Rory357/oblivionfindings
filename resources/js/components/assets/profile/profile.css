@@ -1,0 +1,5 @@
+/* Keep the rounded sky band clipped without creating a scroll container.
+ * Tab focus must never scroll the asset identity out of its own header. */
+.asset-profile .eh-header {
+    overflow: clip;
+}

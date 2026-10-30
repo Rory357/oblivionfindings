@@ -1,14 +1,16 @@
 <?php
 
-it('keeps UniFi and Milesight adapters and controllers behind the governed secret boundary', function () {
+it('keeps UniFi, Milesight, and Intune adapters and controllers behind the governed secret boundary', function () {
     $root = str_replace('\\', '/', dirname(__DIR__, 2));
     $adapterFiles = [
         $root.'/app/Services/Integration/Adapters/UnifiAdapter.php',
         $root.'/app/Services/Integration/Adapters/MilesightAdapter.php',
+        $root.'/app/Services/Integration/Adapters/IntuneAdapter.php',
     ];
     $controllerFiles = [
         $root.'/app/Domain/SecurityDevices/Http/Controllers/Integrations/UnifiController.php',
         $root.'/app/Domain/SecurityDevices/Http/Controllers/Integrations/MilesightController.php',
+        $root.'/app/Domain/SecurityDevices/Http/Controllers/Integrations/IntuneController.php',
     ];
 
     foreach ($adapterFiles as $file) {

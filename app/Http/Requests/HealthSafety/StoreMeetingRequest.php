@@ -19,6 +19,8 @@ class StoreMeetingRequest extends FormRequest
     {
         return [
             'scheduled_at' => ['required', 'date'],
+            'scheduled_timezone' => ['nullable', 'string', 'max:80'],
+            'scheduled_offset' => ['nullable', 'string', 'max:6'],
             'location' => ['nullable', 'string', 'max:255'],
             'agenda_items' => ['nullable', 'array'],
             'agenda_items.*' => ['string', 'max:255'],

@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- the templates/activity surfaces and the
    filter/segmented chips are custom-layout bordered panels (not Card components);
    all colours are semantic tokens. */
+import { RoundSheetExportDialog } from '@/components/emar/round-sheet-export-dialog';
 import RoundActivity from '@/components/emar/rounds/round-activity';
 import RoundActivityDialog from '@/components/emar/rounds/round-activity-dialog';
 import RoundAuditDialog from '@/components/emar/rounds/round-audit-dialog';
@@ -8,6 +9,7 @@ import RoundBoard from '@/components/emar/rounds/round-board';
 import RoundChart from '@/components/emar/rounds/round-chart';
 import RoundTimeline from '@/components/emar/rounds/round-timeline';
 import {
+    notOwedCaption,
     roundCounts,
     roundStatusMeta,
     type ActivityItem,
@@ -16,65 +18,64 @@ import {
     type RoundCell,
     type RoundStatus,
     type RoundSummary,
-    type RoundTemplate,
-    type StaffOption,
 } from '@/components/emar/rounds/types';
+import { EmarMeters } from '@/components/emar/workspace-navigation';
+import { EntityContextMenu } from '@/components/lists/entity-menu';
 import {
     addDays,
     DayPickerChip,
     toYmd,
 } from '@/components/meds/day-picker-chip';
 import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroStat,
-} from '@/components/page';
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
+import { EntityFilter, type RosterTabItem } from '@/components/rostering';
 import {
-    EntityFilter,
-    TabStrip,
-    type RosterTabItem,
-} from '@/components/rostering';
-import {
-    ShiftContextMenu,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
+import {
+    OWN_WITNESS_PIN_PROMPT,
+    OWN_WITNESS_PIN_SETTINGS_URL,
+    type WitnessPinStatus,
+} from '@/lib/witness-pin';
 import GenerateRoundsModal from '@/pages/emar/components/generate-rounds-modal';
 import GuidedRoundDialog from '@/pages/emar/components/guided-round-dialog';
-import RoundTemplateDialog from '@/pages/emar/components/round-template-dialog';
 import type {
     NotGivenReasonOption,
     WitnessOption,
 } from '@/pages/meds/today/types';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
-    Archive,
+    ArrowUpRight,
     CalendarCheck,
-    CalendarDays,
     CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    KeyRound,
     LayoutGrid,
     LayoutList,
     List,
-    Pencil,
     Pill,
-    Plus,
     Printer,
     Zap,
 } from 'lucide-react';
 import type { ComponentType, MouseEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 type Props = {
     rounds: RoundSummary[];
-    templates: RoundTemplate[];
-    staff: StaffOption[];
     date: string;
+    selected_site_id?: number | null;
     now_label: string;
     lastGenerated: string | null;
     guidedRound: GuidedRound | null;
@@ -91,34 +92,20 @@ type Props = {
         med_competent: boolean;
         controlled_record: boolean;
         cd_witness: boolean;
+        witness_pin?: WitnessPinStatus;
     };
     can_manage: boolean;
+    /** Can open Settings › Rounds & timing › Round templates (read or change). */
+    can_read_templates: boolean;
     can_export: boolean;
 };
 
 type StatusChip = 'all' | 'due' | 'flagged';
 
-function hasConcreteTemplateSite(template: RoundTemplate): boolean {
-    return (
-        Number.isInteger(template.site_id) &&
-        template.site_id !== null &&
-        template.site_id > 0
-    );
-}
-
-function templateSiteLabel(template: RoundTemplate): string {
-    if (!hasConcreteTemplateSite(template)) {
-        return 'No site assigned (legacy template)';
-    }
-
-    return template.site_name ?? 'Assigned site unavailable';
-}
-
 export default function Rounds(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         rounds,
-        templates,
-        staff,
         date,
         now_label: nowLabel,
         guidedRound,
@@ -130,20 +117,26 @@ export default function Rounds(props: Props) {
         not_given_reasons: notGivenReasons,
         board_user: signer,
         can_manage: canManage,
+        can_read_templates: canReadTemplates,
         can_export: canExport,
     } = props;
 
     const [activeTab, setActiveTab] = useState('board');
+    const [search, setSearch] = useState('');
     const [boardView, setBoardView] = useState<'cards' | 'list'>('cards');
-    const [siteFilter, setSiteFilter] = useState<number | null>(null);
+    const [siteFilter, setSiteFilter] = useState<number | null>(
+        props.selected_site_id ?? null,
+    );
+    useEffect(
+        () => setSiteFilter(props.selected_site_id ?? null),
+        [props.selected_site_id],
+    );
     const [residentFilter, setResidentFilter] = useState<number | null>(null);
     const [statusChip, setStatusChip] = useState<StatusChip>('all');
     const [expanded, setExpanded] = useState<Record<number, boolean>>({});
     const [generateOpen, setGenerateOpen] = useState(false);
-    const [templateEditing, setTemplateEditing] = useState<
-        RoundTemplate | 'new' | null
-    >(null);
     const [auditRoundId, setAuditRoundId] = useState<number | null>(null);
+    const [exportRoundId, setExportRoundId] = useState<number | null>(null);
     const [activityView, setActivityView] = useState<ActivityItem | null>(null);
     const [contextMenu, setContextMenu] = useState<ShiftCtxState | null>(null);
 
@@ -151,55 +144,27 @@ export default function Rounds(props: Props) {
 
     // ── Navigation (date + guided modal are server-driven; site/resident filters are client-side) ──
     const goDate = (next: string) =>
-        router.get('/emar/rounds', { date: next }, { preserveScroll: true });
+        router.get(
+            '/emar/rounds',
+            { date: next, site_id: siteFilter },
+            { preserveScroll: true },
+        );
     const openGuided = (roundId: number) =>
         router.get(
             '/emar/rounds',
-            { date, guided: roundId },
+            { date, site_id: siteFilter, guided: roundId },
             { preserveState: true, preserveScroll: true },
         );
     const closeGuided = () =>
         router.get(
             '/emar/rounds',
-            { date },
+            { date, site_id: siteFilter },
             { preserveState: true, preserveScroll: true },
         );
 
     const toggleExpand = (id: number) =>
         setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    const retireTemplate = (id: number) => {
-        if (
-            !window.confirm(
-                'Retire this round template? Existing rounds will be kept and no new rounds will be generated.',
-            )
-        ) {
-            return;
-        }
-
-        router.post(
-            `/emar/rounds/templates/${id}/retire`,
-            {},
-            {
-                preserveScroll: true,
-            },
-        );
-    };
-    const toggleTemplateActive = (t: RoundTemplate) => {
-        if (t.retired_at !== null) return;
-        if (!t.active && !hasConcreteTemplateSite(t)) return;
-
-        router.put(
-            `/emar/rounds/templates/${t.id}`,
-            { active: !t.active },
-            { preserveScroll: true },
-        );
-    };
-    const printRoundSheet = () =>
-        window.open(
-            `/emar/pdf/round-sheet?date=${encodeURIComponent(date)}`,
-            '_blank',
-            'noopener',
-        );
+    const printRoundSheet = (roundId: number) => setExportRoundId(roundId);
     const markComplete = (id: number) => {
         router.post(
             `/emar/rounds/${id}/complete`,
@@ -229,6 +194,15 @@ export default function Rounds(props: Props) {
                 hasFilter ? { ...r, cells: r.cells.filter(cellVisible) } : r,
             )
             .filter((r) => {
+                if (
+                    search.trim() &&
+                    ![r.name, r.site_name, r.assignee]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase()
+                        .includes(search.trim().toLowerCase())
+                )
+                    return false;
                 if (hasFilter && r.cells.length === 0) return false;
                 const counts = roundCounts(r.cells);
                 if (statusChip === 'due') return counts.due > 0;
@@ -237,7 +211,7 @@ export default function Rounds(props: Props) {
                 return true;
             });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [rounds, siteFilter, residentFilter, statusChip]);
+    }, [rounds, siteFilter, residentFilter, statusChip, search]);
 
     const filteredResidents = useMemo(
         () =>
@@ -309,7 +283,7 @@ export default function Rounds(props: Props) {
                               : inProgress
                                 ? 'Resume guided round'
                                 : 'Start guided round',
-                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded`,
+                          sub: `${original.scheduled_time} · ${c.recorded}/${c.total} recorded${notOwedCaption(c.waiting, c.away) ? ` · ${notOwedCaption(c.waiting, c.away)}` : ''}`,
                           tone: 'primary',
                           onClick: () => openGuided(original.id),
                       } satisfies ShiftCtxItem,
@@ -354,7 +328,7 @@ export default function Rounds(props: Props) {
             items.push({
                 icon: <Printer className="h-3.5 w-3.5" />,
                 label: 'Print round sheet',
-                onClick: printRoundSheet,
+                onClick: () => printRoundSheet(original.id),
             });
         if (canManage)
             items.push({
@@ -389,51 +363,22 @@ export default function Rounds(props: Props) {
             tone: 'info',
             badge: counts.totalDoses || undefined,
         },
-        {
-            id: 'templates',
-            label: 'Templates',
-            icon: LayoutList,
-            tone: 'violet',
-            badge: templates.length || undefined,
-        },
+        ...(canReadTemplates
+            ? [
+                  {
+                      id: 'templates',
+                      label: 'Templates',
+                      icon: LayoutList,
+                      tone: 'violet' as const,
+                  },
+              ]
+            : []),
         {
             id: 'activity',
             label: 'Activity',
             icon: Activity,
             tone: 'success',
             badge: activity.length || undefined,
-        },
-    ];
-
-    const heroBadges: PageHeroBadge[] = [
-        {
-            label: `${sites.length} site${sites.length === 1 ? '' : 's'} · ${residents.length} resident${residents.length === 1 ? '' : 's'}`,
-        },
-        signer.med_competent
-            ? {
-                  tone: 'success' as const,
-                  label: signer.cd_witness
-                      ? 'Med-competent · CD witness authorised'
-                      : 'Med-competent',
-              }
-            : null,
-    ].filter(Boolean) as PageHeroBadge[];
-
-    const heroStats: PageHeroStat[] = [
-        {
-            label: 'Rounds',
-            value: `${counts.doneRounds}/${counts.totalRounds}`,
-        },
-        { label: 'Given', value: `${counts.given}/${counts.totalDoses}` },
-        {
-            label: 'Due',
-            value: counts.due,
-            tone: counts.due > 0 ? 'warning' : 'neutral',
-        },
-        {
-            label: 'Flags',
-            value: counts.flags,
-            tone: counts.flags > 0 ? 'critical' : 'neutral',
         },
     ];
 
@@ -461,15 +406,11 @@ export default function Rounds(props: Props) {
               });
     };
 
-    const description = `${counts.totalDoses} scheduled dose${counts.totalDoses === 1 ? '' : 's'} across ${sites.length} site${
-        sites.length === 1 ? '' : 's'
-    } today. ${counts.given} given, ${counts.due} still to give${activeRound ? `, and the ${activeRound.name} is in progress.` : '.'}`;
-
     const onDarkChip =
         'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20';
 
     const heroFooter = (
-        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
                 <Button
                     variant="outline"
@@ -508,7 +449,13 @@ export default function Rounds(props: Props) {
                     allLabel="All sites"
                     items={sites}
                     value={siteFilter}
-                    onChange={setSiteFilter}
+                    onChange={(site_id) =>
+                        router.get(
+                            '/emar/rounds',
+                            { date, site_id },
+                            { preserveState: true, preserveScroll: true },
+                        )
+                    }
                     onDark
                     className="rounded-lg"
                 />
@@ -531,77 +478,132 @@ export default function Rounds(props: Props) {
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Medication Rounds', href: '/emar/rounds' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Medication Rounds" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    variant="hero"
-                    category="ops"
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    wrapTitle
                     brandColour={brandColour}
                     icon={Pill}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
-                                {isToday ? (
-                                    <span
-                                        aria-hidden
-                                        className="relative inline-flex h-2 w-2"
-                                    >
-                                        <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                    </span>
-                                ) : (
-                                    <CalendarDays className="h-3 w-3" />
-                                )}
-                                {isToday
-                                    ? `Live medication board · refreshed ${nowLabel}`
-                                    : 'Medication board · day view'}
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                <span className="font-normal text-primary-foreground/80">
-                                    Kia ora {signer.first_name},{' '}
-                                    {isToday
-                                        ? "today's rounds —"
-                                        : 'the rounds for —'}
-                                </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5 whitespace-nowrap">
-                                    {dayTitle}
-                                </span>
-                            </span>
-                        </span>
+                    title="Medication rounds"
+                    titleChip={
+                        <PageHeaderStatusChip
+                            variant={
+                                signer.med_competent ? 'success' : 'warning'
+                            }
+                        >
+                            {signer.med_competent
+                                ? signer.cd_witness
+                                    ? 'Medication & witness eligible'
+                                    : 'Medication eligible'
+                                : 'Check staff eligibility'}
+                        </PageHeaderStatusChip>
                     }
-                    description={description}
-                    badges={heroBadges}
-                    stats={heroStats}
+                    subline={`${dayTitle} · ${sites.length} houses · ${residents.length} people · Updated ${nowLabel}${activeRound ? ` · ${activeRound.name} in progress` : ''}`}
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Rounds',
+                                    value: `${counts.doneRounds}/${counts.totalRounds}`,
+                                    caption: 'Completed in the selected day',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('all');
+                                        setActiveTab('board');
+                                    },
+                                },
+                                {
+                                    label: 'Given',
+                                    value: `${counts.given}/${counts.totalDoses}`,
+                                    caption:
+                                        'Scheduled doses recorded as given',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('all');
+                                        setActiveTab('chart');
+                                    },
+                                },
+                                {
+                                    label: 'Due',
+                                    value: counts.due,
+                                    caption: 'Doses still due',
+                                    tone: counts.due ? 'warning' : 'brand',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('due');
+                                        setActiveTab('chart');
+                                    },
+                                },
+                                {
+                                    label: 'Flags',
+                                    value: counts.flags,
+                                    caption: 'Refused, held or missed',
+                                    tone: counts.flags ? 'critical' : 'brand',
+                                    onClick: () => {
+                                        setSearch('');
+                                        setStatusChip('flagged');
+                                        setActiveTab('chart');
+                                    },
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
+                            {(activeTab === 'board' ||
+                                activeTab === 'chart') && (
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={setSearch}
+                                    placeholder="Search round, house or staff…"
+                                    ariaLabel="Search rounds"
+                                />
+                            )}
+                            {signer.witness_pin &&
+                                signer.witness_pin !== 'set' && (
+                                    <PageHeaderGlassButton
+                                        icon={KeyRound}
+                                        asChild
+                                    >
+                                        <Link
+                                            href={OWN_WITNESS_PIN_SETTINGS_URL}
+                                        >
+                                            {
+                                                OWN_WITNESS_PIN_PROMPT[
+                                                    signer.witness_pin
+                                                ]
+                                            }
+                                        </Link>
+                                    </PageHeaderGlassButton>
+                                )}
                             {canManage && (
-                                <Button
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                <PageHeaderPrimaryButton
+                                    icon={Zap}
                                     onClick={() => setGenerateOpen(true)}
                                 >
-                                    <Zap className="h-4 w-4" />
                                     Generate rounds
-                                </Button>
-                            )}
-                            {canManage && (
-                                <Button
-                                    variant="outline"
-                                    className={onDarkChip}
-                                    onClick={() => setTemplateEditing('new')}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    New template
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             )}
                         </>
                     }
-                    footer={heroFooter}
+                    filters={heroFooter}
+                    rail={
+                        <PageHeaderRail
+                            value={activeTab}
+                            onSelect={setActiveTab}
+                            ariaLabel="Medication rounds views"
+                            items={TABS.map((tab) => ({
+                                key: tab.id,
+                                label: tab.label,
+                                icon: tab.icon,
+                                count:
+                                    typeof tab.badge === 'number'
+                                        ? tab.badge
+                                        : undefined,
+                            }))}
+                        />
+                    }
                 />
 
                 <RoundTimeline
@@ -610,13 +612,6 @@ export default function Rounds(props: Props) {
                     canRecord={signer.med_competent}
                     onOpen={openGuided}
                     onContext={openContext}
-                />
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Medication rounds views"
                 />
 
                 {activeTab === 'board' && (
@@ -665,169 +660,25 @@ export default function Rounds(props: Props) {
                     </div>
                 )}
 
-                {activeTab === 'templates' && (
-                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                        <div className="flex items-center justify-between gap-3 border-b px-4 py-3.5">
-                            <div>
-                                <div className="text-sm font-semibold">
-                                    Round templates
-                                </div>
-                                <div className="mt-0.5 text-xs text-muted-foreground">
-                                    Auto-generation runs daily at 00:05 NZT for
-                                    active templates.
-                                </div>
-                            </div>
-                            {canManage && (
-                                <Button
-                                    size="sm"
-                                    onClick={() => setTemplateEditing('new')}
-                                >
-                                    <Plus className="h-4 w-4" />
-                                    New template
-                                </Button>
-                            )}
+                {activeTab === 'templates' && canReadTemplates && (
+                    <div className="rounded-2xl border bg-card p-5 shadow-sm">
+                        <div className="text-sm font-semibold">
+                            Round templates are in Settings
                         </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b bg-muted text-left text-[11px] tracking-wide text-muted-foreground uppercase">
-                                        <th className="px-4 py-2.5">Name</th>
-                                        <th className="px-4 py-2.5">Time</th>
-                                        <th className="px-4 py-2.5">Window</th>
-                                        <th className="px-4 py-2.5">Days</th>
-                                        <th className="px-4 py-2.5">
-                                            Default staff
-                                        </th>
-                                        <th className="px-4 py-2.5">Site</th>
-                                        <th className="px-4 py-2.5 text-center">
-                                            Auto-gen
-                                        </th>
-                                        <th className="px-4 py-2.5 text-right">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {templates.length === 0 ? (
-                                        <tr>
-                                            <td
-                                                colSpan={8}
-                                                className="px-4 py-10 text-center text-muted-foreground"
-                                            >
-                                                No templates yet.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        templates.map((t) => (
-                                            <tr
-                                                key={t.id}
-                                                className="border-b last:border-b-0"
-                                            >
-                                                <td className="px-4 py-3 font-medium">
-                                                    <div className="flex items-center gap-2">
-                                                        <span>{t.name}</span>
-                                                        {t.retired_at !==
-                                                            null && (
-                                                            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold tracking-wide text-muted-foreground uppercase">
-                                                                Retired
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {t.scheduled_time}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    ±{t.window_minutes} min
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {daysLabel(t.days_of_week)}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    {t.default_staff ?? (
-                                                        <span className="text-muted-foreground">
-                                                            Unassigned
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {templateSiteLabel(t)}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    {t.retired_at !== null ? (
-                                                        <span className="text-muted-foreground">
-                                                            Retired
-                                                        </span>
-                                                    ) : canManage ? (
-                                                        <Switch
-                                                            checked={t.active}
-                                                            disabled={
-                                                                !t.active &&
-                                                                !hasConcreteTemplateSite(
-                                                                    t,
-                                                                )
-                                                            }
-                                                            title={
-                                                                !t.active &&
-                                                                !hasConcreteTemplateSite(
-                                                                    t,
-                                                                )
-                                                                    ? 'Assign a site before enabling auto-generation'
-                                                                    : undefined
-                                                            }
-                                                            onCheckedChange={() =>
-                                                                toggleTemplateActive(
-                                                                    t,
-                                                                )
-                                                            }
-                                                        />
-                                                    ) : (
-                                                        <span className="text-muted-foreground">
-                                                            {t.active
-                                                                ? 'On'
-                                                                : 'Off'}
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td className="px-4 py-3 text-right">
-                                                    {canManage &&
-                                                        t.retired_at ===
-                                                            null && (
-                                                            <div className="flex items-center justify-end gap-1">
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    onClick={() =>
-                                                                        setTemplateEditing(
-                                                                            t,
-                                                                        )
-                                                                    }
-                                                                    aria-label="Edit template"
-                                                                >
-                                                                    <Pencil className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    onClick={() =>
-                                                                        retireTemplate(
-                                                                            t.id,
-                                                                        )
-                                                                    }
-                                                                    aria-label="Retire template"
-                                                                    title="Retire template and keep existing rounds"
-                                                                >
-                                                                    <Archive className="h-4 w-4 text-muted-foreground" />
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            When each round happens at a house, who does it, and
+                            pausing or retiring a template are now in Medication
+                            › Settings › Rounds &amp; timing.
+                            {canManage
+                                ? ''
+                                : ' You can read them there; people who manage orders at a house change them.'}
+                        </p>
+                        <Button asChild size="sm" className="mt-3">
+                            <Link href="/emar/settings#rounds/templates">
+                                Open round templates
+                                <ArrowUpRight className="h-4 w-4" />
+                            </Link>
+                        </Button>
                     </div>
                 )}
 
@@ -848,12 +699,14 @@ export default function Rounds(props: Props) {
                     witnesses={witnesses}
                     notGivenReasons={notGivenReasons}
                     signer={{
+                        name: signer.name,
+                        role_label: signer.role_label,
                         med_competent: signer.med_competent,
                         controlled_record: signer.controlled_record,
                         cd_witness: signer.cd_witness,
                     }}
                     canExport={canExport}
-                    onPrint={printRoundSheet}
+                    onPrint={() => printRoundSheet(guidedRound.round.id)}
                     onClose={closeGuided}
                 />
             )}
@@ -871,7 +724,7 @@ export default function Rounds(props: Props) {
                               }
                             : undefined
                     }
-                    onPrint={printRoundSheet}
+                    onPrint={() => printRoundSheet(auditRound.id)}
                 />
             )}
 
@@ -890,21 +743,29 @@ export default function Rounds(props: Props) {
                 />
             )}
 
-            {templateEditing !== null && (
-                <RoundTemplateDialog
-                    template={
-                        templateEditing === 'new' ? null : templateEditing
-                    }
-                    staff={staff}
-                    sites={sites}
-                    onClose={() => setTemplateEditing(null)}
+            {contextMenu && (
+                <EntityContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    title={contextMenu.meta}
+                    items={contextMenu.items.map((item) =>
+                        item.sep
+                            ? { separator: true }
+                            : {
+                                  label: item.label,
+                                  icon: () => <>{item.icon}</>,
+                                  danger: item.tone === 'critical',
+                                  onClick: item.onClick,
+                              },
+                    )}
+                    onClose={() => setContextMenu(null)}
                 />
             )}
-
-            {contextMenu && (
-                <ShiftContextMenu
-                    ctx={contextMenu}
-                    onClose={() => setContextMenu(null)}
+            {exportRoundId && (
+                <RoundSheetExportDialog
+                    key={exportRoundId}
+                    roundId={exportRoundId}
+                    onClose={() => setExportRoundId(null)}
                 />
             )}
         </AppLayout>
@@ -932,7 +793,7 @@ function StatusChips({
                     variant="ghost"
                     className={
                         value === c.id
-                            ? 'h-7 bg-primary-foreground text-primary hover:bg-primary-foreground'
+                            ? 'h-7 bg-primary-foreground text-primary-strong hover:bg-primary-foreground'
                             : 'h-7 text-primary-foreground hover:bg-primary-foreground/15'
                     }
                     onClick={() => onChange(c.id)}

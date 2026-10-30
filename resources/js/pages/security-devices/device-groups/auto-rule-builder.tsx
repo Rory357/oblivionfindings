@@ -1,10 +1,13 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MultiSelectCombobox } from '@/components/ui/multi-select-combobox';
 import {
     Select,
     SelectContent,
+    SelectGroup,
     SelectItem,
+    SelectLabel,
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
@@ -12,7 +15,11 @@ import { Switch } from '@/components/ui/switch';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
 import { AlertCircle, CheckCircle2, Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import {
+    autoRuleValueOptions,
+    type AutoRuleValueOption,
+} from './auto-rule-values';
 
 export type AutoRuleField =
     | 'domain'
@@ -62,6 +69,13 @@ const operators: Array<{ value: AutoRuleOperator; label: string }> = [
     { value: 'in', label: 'Is one of' },
 ];
 
+export const autoRuleFieldLabel = (value: AutoRuleField) =>
+    fields.find((field) => field.value === value)?.label ?? value;
+export const autoRuleOperatorLabel = (value: AutoRuleOperator) =>
+    operators
+        .find((operator) => operator.value === value)
+        ?.label.toLowerCase() ?? value;
+
 const initialCondition = (): AutoRuleCondition => ({
     field: 'domain',
     op: 'equals',
@@ -98,6 +112,147 @@ export function normaliseAutoRules(rules: AutoRules | null): AutoRules | null {
     };
 }
 
+const valueList = (value: string | string[]) =>
+    Array.isArray(value)
+        ? value
+        : value
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean);
+
+/** Keeps the chosen values when the comparison changes between one and many. */
+function valueForOperator(
+    condition: AutoRuleCondition,
+    op: AutoRuleOperator,
+): string | string[] {
+    if (!autoRuleValueOptions(condition.field))
+        return Array.isArray(condition.value)
+            ? condition.value.join(', ')
+            : condition.value;
+    const list = valueList(condition.value);
+    return op === 'in' ? list : (list[0] ?? '');
+}
+
+/** Saved values that are no longer offered stay visible so they can be replaced. */
+function withSavedValues(
+    options: AutoRuleValueOption[],
+    values: string[],
+): AutoRuleValueOption[] {
+    const extra = values
+        .filter((value) => !options.some((option) => option.value === value))
+        .map((value) => ({
+            value,
+            label: `${value} (not a current value)`,
+            group: 'Saved values',
+        }));
+    return [...extra, ...options];
+}
+
+function ConditionValue({
+    index,
+    condition,
+    disabled,
+    onChange,
+}: {
+    index: number;
+    condition: AutoRuleCondition;
+    disabled: boolean;
+    onChange: (value: string | string[]) => void;
+}) {
+    const id = `auto-rule-value-${index}`;
+    const known = autoRuleValueOptions(condition.field);
+    const labelClass = 'mb-1.5 block text-sm font-medium';
+    if (!known)
+        return (
+            <div>
+                <label htmlFor={id} className={labelClass}>
+                    Value
+                </label>
+                <Input
+                    disabled={disabled}
+                    id={id}
+                    aria-label="Value"
+                    aria-describedby={`${id}-help`}
+                    value={
+                        Array.isArray(condition.value)
+                            ? condition.value.join(', ')
+                            : condition.value
+                    }
+                    onChange={(event) => onChange(event.target.value)}
+                    placeholder={
+                        condition.op === 'in' ? 'unifi, hikvision' : 'unifi'
+                    }
+                />
+                <p
+                    id={`${id}-help`}
+                    className="mt-1 text-xs text-muted-foreground"
+                >
+                    Matches the provider name exactly as it shows on the device.
+                    {condition.op === 'in'
+                        ? ' Separate multiple values with commas.'
+                        : ''}
+                </p>
+            </div>
+        );
+    if (condition.op === 'in') {
+        const selected = valueList(condition.value);
+        return (
+            <div role="group" aria-labelledby={`${id}-label`}>
+                <p id={`${id}-label`} className={labelClass}>
+                    Value
+                </p>
+                <MultiSelectCombobox
+                    disabled={disabled}
+                    options={withSavedValues(known, selected)}
+                    selected={selected}
+                    onChange={onChange}
+                    placeholder="Choose one or more values"
+                />
+            </div>
+        );
+    }
+    const single = valueList(condition.value)[0] ?? '';
+    const options = withSavedValues(known, single ? [single] : []);
+    const groups = Array.from(
+        new Set(options.map((option) => option.group ?? '')),
+    );
+    return (
+        <div>
+            <label htmlFor={id} className={labelClass}>
+                Value
+            </label>
+            <Select
+                disabled={disabled}
+                value={single || undefined}
+                onValueChange={onChange}
+            >
+                <SelectTrigger id={id} aria-label="Value">
+                    <SelectValue placeholder="Choose a value" />
+                </SelectTrigger>
+                <SelectContent>
+                    {groups.map((group) => (
+                        <SelectGroup key={group || 'values'}>
+                            {group ? <SelectLabel>{group}</SelectLabel> : null}
+                            {options
+                                .filter(
+                                    (option) => (option.group ?? '') === group,
+                                )
+                                .map((option) => (
+                                    <SelectItem
+                                        key={option.value}
+                                        value={option.value}
+                                    >
+                                        {option.label}
+                                    </SelectItem>
+                                ))}
+                        </SelectGroup>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}
+
 function previewErrorMessage(error: unknown): string {
     if (axios.isAxiosError(error)) {
         const errors = error.response?.data?.errors;
@@ -121,15 +276,29 @@ function previewErrorMessage(error: unknown): string {
 export function AutoRuleBuilder({
     value,
     onChange,
+    disabled = false,
 }: {
     value: AutoRules | null;
     onChange: (rules: AutoRules | null) => void;
+    disabled?: boolean;
 }) {
+    const active = useRef<AbortController | null>(null);
+    const mounted = useRef(true);
+    useEffect(() => {
+        mounted.current = true;
+        return () => {
+            mounted.current = false;
+            active.current?.abort();
+        };
+    }, []);
     const [preview, setPreview] = useState<PreviewResult | null>(null);
     const [previewError, setPreviewError] = useState<string | null>(null);
     const [previewing, setPreviewing] = useState(false);
 
     const changeRules = (rules: AutoRules | null) => {
+        if (disabled) return;
+        active.current?.abort();
+        setPreviewing(false);
         setPreview(null);
         setPreviewError(null);
         onChange(rules);
@@ -147,6 +316,7 @@ export function AutoRuleBuilder({
     };
 
     const previewMatches = async () => {
+        if (disabled || previewing) return;
         const rules = normaliseAutoRules(value);
         if (
             !rules ||
@@ -159,19 +329,29 @@ export function AutoRuleBuilder({
             return;
         }
 
+        const call = new AbortController();
+        active.current?.abort();
+        active.current = call;
         setPreviewing(true);
         setPreviewError(null);
         try {
             const response = await axios.post<PreviewResult>(
                 '/security-devices/device-groups/auto-rules/preview',
                 { auto_rules: rules },
+                {
+                    signal: call.signal,
+                    headers: { Accept: 'application/json' },
+                    timeout: 30000,
+                },
             );
-            setPreview(response.data);
+            if (mounted.current && !call.signal.aborted)
+                setPreview(response.data);
         } catch (error) {
+            if (!mounted.current || call.signal.aborted) return;
             setPreview(null);
             setPreviewError(previewErrorMessage(error));
         } finally {
-            setPreviewing(false);
+            if (mounted.current && !call.signal.aborted) setPreviewing(false);
         }
     };
 
@@ -191,6 +371,7 @@ export function AutoRuleBuilder({
                     </p>
                 </div>
                 <Switch
+                    disabled={disabled}
                     id="automatic-membership"
                     aria-label="Automatic membership"
                     checked={value !== null}
@@ -223,6 +404,7 @@ export function AutoRuleBuilder({
                             A device must match
                         </label>
                         <Select
+                            disabled={disabled}
                             value={value.match}
                             onValueChange={(match: 'all' | 'any') =>
                                 changeRules({ ...value, match })
@@ -256,9 +438,18 @@ export function AutoRuleBuilder({
                                         Field
                                     </label>
                                     <Select
+                                        disabled={disabled}
                                         value={condition.field}
                                         onValueChange={(field: AutoRuleField) =>
-                                            updateCondition(index, { field })
+                                            // A value chosen for one field is
+                                            // never a value of another.
+                                            updateCondition(index, {
+                                                field,
+                                                value:
+                                                    field === condition.field
+                                                        ? condition.value
+                                                        : '',
+                                            })
                                         }
                                     >
                                         <SelectTrigger
@@ -287,9 +478,16 @@ export function AutoRuleBuilder({
                                         Comparison
                                     </label>
                                     <Select
+                                        disabled={disabled}
                                         value={condition.op}
                                         onValueChange={(op: AutoRuleOperator) =>
-                                            updateCondition(index, { op })
+                                            updateCondition(index, {
+                                                op,
+                                                value: valueForOperator(
+                                                    condition,
+                                                    op,
+                                                ),
+                                            })
                                         }
                                     >
                                         <SelectTrigger
@@ -310,39 +508,14 @@ export function AutoRuleBuilder({
                                     </Select>
                                 </div>
 
-                                <div>
-                                    <label
-                                        htmlFor={`auto-rule-value-${index}`}
-                                        className="mb-1.5 block text-sm font-medium"
-                                    >
-                                        Value
-                                    </label>
-                                    <Input
-                                        id={`auto-rule-value-${index}`}
-                                        aria-label="Value"
-                                        value={
-                                            Array.isArray(condition.value)
-                                                ? condition.value.join(', ')
-                                                : condition.value
-                                        }
-                                        onChange={(event) =>
-                                            updateCondition(index, {
-                                                value: event.target.value,
-                                            })
-                                        }
-                                        placeholder={
-                                            condition.op === 'in'
-                                                ? 'camera, nvr, door controller'
-                                                : 'Enter an exact value'
-                                        }
-                                    />
-                                    {condition.op === 'in' && (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Separate multiple values with
-                                            commas.
-                                        </p>
-                                    )}
-                                </div>
+                                <ConditionValue
+                                    index={index}
+                                    condition={condition}
+                                    disabled={disabled}
+                                    onChange={(next) =>
+                                        updateCondition(index, { value: next })
+                                    }
+                                />
 
                                 <div className="flex items-end">
                                     <Button
@@ -351,7 +524,10 @@ export function AutoRuleBuilder({
                                         size="icon"
                                         className="min-h-11 min-w-11 text-muted-foreground hover:text-destructive"
                                         aria-label={`Remove condition ${index + 1}`}
-                                        disabled={value.conditions.length === 1}
+                                        disabled={
+                                            disabled ||
+                                            value.conditions.length === 1
+                                        }
                                         onClick={() =>
                                             changeRules({
                                                 ...value,
@@ -375,7 +551,7 @@ export function AutoRuleBuilder({
                         <Button
                             type="button"
                             variant="outline"
-                            disabled={value.conditions.length >= 8}
+                            disabled={disabled || value.conditions.length >= 8}
                             onClick={() =>
                                 changeRules({
                                     ...value,
@@ -395,7 +571,7 @@ export function AutoRuleBuilder({
                         <Button
                             type="button"
                             onClick={previewMatches}
-                            disabled={previewing}
+                            disabled={disabled || previewing}
                         >
                             {previewing ? 'Checking…' : 'Preview matches'}
                         </Button>
@@ -425,7 +601,7 @@ export function AutoRuleBuilder({
                                             <li key={device.id}>
                                                 <Link
                                                     href={`/security-devices/devices/${device.id}`}
-                                                    className="frontline-focus rounded-sm text-primary hover:underline"
+                                                    className="frontline-focus rounded-sm text-primary underline underline-offset-2"
                                                 >
                                                     {device.name}
                                                 </Link>{' '}

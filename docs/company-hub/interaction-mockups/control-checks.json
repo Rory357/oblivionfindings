@@ -1,0 +1,24 @@
+{
+  "errors": [],
+  "nativeSelects": 0,
+  "placement": {
+    "left": 104,
+    "top": 500.671875,
+    "right": 535,
+    "bottom": 723.71875,
+    "width": 1024,
+    "height": 900,
+    "side": "above"
+  },
+  "verified": [
+    "role keyboard selection and Escape focus restoration",
+    "impact radio arrows and message count",
+    "search people by role, clear no-match and select",
+    "draft text survives selection",
+    "Tab dismisses menu and advances",
+    "light/dark controls",
+    "1024px menu bounds and designer width change",
+    "37 family entries without native selects"
+  ],
+  "scope": "Fictional local preview only"
+}

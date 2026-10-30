@@ -1,9 +1,16 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import {
+    catalogue,
+    release,
+} from '@/pages/security-devices/software/software-fixtures';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import axios from 'axios';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DeviceProfile } from '@/pages/security-devices/devices/device-profile';
 import { DeviceManagementSection } from '@/pages/security-devices/devices/device-profile-sections';
+
+vi.mock('axios', () => ({ default: { get: vi.fn() } }));
 
 const inertia = vi.hoisted(() => ({
     post: vi.fn(),
@@ -59,6 +66,33 @@ const action = {
             min: 5,
             max: 60,
             options: [],
+        },
+    ],
+};
+
+const serviceAction: DeviceProfile['management']['actions'][number] = {
+    ...action,
+    key: 'endpoint.service.manage',
+    label: 'Manage Windows service',
+    domain: 'network_it',
+    executionMode: 'endpoint_runtime',
+    allowsBreakGlass: false,
+    parameters: [
+        {
+            name: 'service_name',
+            label: 'Service',
+            type: 'string',
+            min: null,
+            max: null,
+            options: ['Spooler'],
+        },
+        {
+            name: 'operation',
+            label: 'Operation',
+            type: 'string',
+            min: null,
+            max: null,
+            options: ['restart'],
         },
     ],
 };
@@ -160,6 +194,222 @@ function profile(
 }
 
 describe('Device Management section', () => {
+    it('requires an explicit approved-software choice even when a URL supplies a package UUID', async () => {
+        const softwareAction = {
+            ...serviceAction,
+            key: 'endpoint.software.install',
+            label: 'Install approved software',
+            parameters: [
+                {
+                    name: 'package_uuid',
+                    label: 'Software release',
+                    type: 'string' as const,
+                    min: null,
+                    max: null,
+                    options: [],
+                },
+            ],
+        };
+        vi.mocked(axios.get).mockResolvedValue({ data: catalogue(42) });
+        window.history.replaceState(
+            {},
+            '',
+            '/security-devices/devices/42?action=endpoint.software.install&command_package_uuid=' +
+                release().uuid,
+        );
+        render(
+            <DeviceManagementSection
+                deviceId={42}
+                profile={profile({
+                    actorId: 9001,
+                    actions: [softwareAction],
+                    stepUpCurrent: true,
+                })}
+            />,
+        );
+        await screen.findByRole('button', { name: 'Choose' });
+        expect(
+            screen.queryByLabelText('Software release'),
+        ).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Operational reason'), {
+            target: { value: 'Install the verified viewer on this computer.' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I understand this impact/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Create request' }));
+        expect(inertia.post).not.toHaveBeenCalled();
+        expect(
+            screen.getByText(
+                /Choose an approved software release before requesting/,
+            ),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Choose' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Create request' }));
+        expect(inertia.post).toHaveBeenCalledWith(
+            '/security-devices/devices/42/commands',
+            expect.objectContaining({
+                capability: 'endpoint.software.install',
+                expected_actor_id: 9001,
+                parameters: { package_uuid: release().uuid },
+                impact_acknowledged: true,
+            }),
+            expect.anything(),
+        );
+        const first = inertia.post.mock.calls[0];
+        act(() => first[2].onFinish());
+        expect(screen.getByRole('button', { name: 'Selected' })).toBeDisabled();
+        expect(
+            screen.getByRole('textbox', { name: 'Search approved software' }),
+        ).toBeDisabled();
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Retry same request' }),
+        );
+        expect(inertia.post.mock.calls[1][1]).toEqual(first[1]);
+    });
+    it('does not send a software request without the current actor', async () => {
+        const softwareAction = {
+            ...serviceAction,
+            key: 'endpoint.software.install',
+            label: 'Install approved software',
+            parameters: [
+                {
+                    name: 'package_uuid',
+                    label: 'Software release',
+                    type: 'string' as const,
+                    min: null,
+                    max: null,
+                    options: [],
+                },
+            ],
+        };
+        render(
+            <DeviceManagementSection
+                deviceId={42}
+                profile={profile({
+                    actions: [softwareAction],
+                    stepUpCurrent: true,
+                })}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Request action' }));
+        await screen.findByText(/Approved software could not be loaded/);
+        fireEvent.change(screen.getByLabelText('Operational reason'), {
+            target: { value: 'Install the verified viewer on this computer.' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I understand this impact/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Create request' }));
+        expect(inertia.post).not.toHaveBeenCalled();
+        expect(
+            screen.getByText(/Your account could not be confirmed/),
+        ).toBeInTheDocument();
+    });
+
+    it('retains an immutable command when its acknowledgement is lost', () => {
+        render(
+            <DeviceManagementSection
+                deviceId={42}
+                profile={profile({
+                    actorId: 9001,
+                    actions: [serviceAction],
+                    stepUpCurrent: true,
+                })}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Request action' }));
+        fireEvent.change(screen.getByLabelText('Operational reason'), {
+            target: { value: 'Restore the approved service for staff.' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I understand this impact/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Create request' }));
+        const first = inertia.post.mock.calls[0];
+        act(() => first[2].onFinish());
+        expect(screen.getByLabelText('Operational reason')).toBeDisabled();
+        expect(
+            screen.getByText(/No confirmation was received/),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Request action' }));
+        fireEvent.click(
+            screen.getByRole('button', { name: 'Retry same request' }),
+        );
+        const second = inertia.post.mock.calls[1];
+        expect(second[0]).toBe(first[0]);
+        expect(second[1]).toEqual(first[1]);
+        expect(second[1].expected_actor_id).toBe(9001);
+        expect(second[1].parameters).toEqual({
+            service_name: 'Spooler',
+            operation: 'restart',
+        });
+        act(() => {
+            second[2].onSuccess();
+            second[2].onFinish();
+        });
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('requires a confirmed actor before requesting a native service action', () => {
+        render(
+            <DeviceManagementSection
+                deviceId={42}
+                profile={profile({
+                    actions: [serviceAction],
+                    stepUpCurrent: true,
+                })}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Request action' }));
+        fireEvent.change(screen.getByLabelText('Operational reason'), {
+            target: { value: 'Restore printing for this computer.' },
+        });
+        fireEvent.click(
+            screen.getByRole('checkbox', { name: /I understand this impact/ }),
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Create request' }));
+        expect(inertia.post).not.toHaveBeenCalled();
+        expect(
+            screen.getByText(/Your account could not be confirmed/),
+        ).toBeInTheDocument();
+    });
+
+    it('clears a native request draft when the signed-in actor changes', () => {
+        const { rerender } = render(
+            <DeviceManagementSection
+                deviceId={42}
+                profile={profile({
+                    actorId: 9001,
+                    actions: [serviceAction],
+                    stepUpCurrent: true,
+                })}
+            />,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Request action' }));
+        fireEvent.change(screen.getByLabelText('Operational reason'), {
+            target: { value: 'Private purpose from the previous technician.' },
+        });
+        rerender(
+            <DeviceManagementSection
+                deviceId={42}
+                profile={profile({
+                    actorId: 9002,
+                    actions: [serviceAction],
+                    stepUpCurrent: true,
+                })}
+            />,
+        );
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(
+            screen.queryByDisplayValue(
+                'Private purpose from the previous technician.',
+            ),
+        ).not.toBeInTheDocument();
+        expect(inertia.post).not.toHaveBeenCalled();
+    });
+
     beforeEach(() => {
         inertia.post.mockReset();
         window.history.replaceState({}, '', '/security-devices/devices/42');
@@ -419,7 +669,7 @@ describe('Device Management section', () => {
     it('shows exact governance requirements and never enables an unsupported provider action', () => {
         render(<DeviceManagementSection profile={profile()} deviceId={42} />);
 
-        expect(screen.getByText('Governed actions')).toBeInTheDocument();
+        expect(screen.getByText('Device actions')).toBeInTheDocument();
         expect(screen.getAllByText('Independent approval')).toHaveLength(2);
         expect(screen.getAllByText('Fresh-state reconciliation')).toHaveLength(
             2,
@@ -949,5 +1199,85 @@ describe('Device Management section', () => {
         expect(
             screen.queryByRole('button', { name: /execution queue/i }),
         ).not.toBeInTheDocument();
+    });
+});
+
+describe('Native scheduled restart request', () => {
+    it('submits strict UTC for the reviewed NZ time and preserves an unknown request', () => {
+        const clock = vi
+            .spyOn(Date, 'now')
+            .mockReturnValue(Date.parse('2026-10-08T00:00:00Z'));
+        try {
+            const restartAction = {
+                ...serviceAction,
+                key: 'endpoint.computer.restart',
+                label: 'Schedule computer restart',
+                parameters: [
+                    {
+                        name: 'execute_at',
+                        label: 'Restart time',
+                        type: 'date_time' as const,
+                        min: null,
+                        max: null,
+                        options: [],
+                    },
+                    {
+                        name: 'warning_seconds',
+                        label: 'Warning seconds',
+                        type: 'integer' as const,
+                        min: 60,
+                        max: 3600,
+                        options: [],
+                    },
+                ],
+            };
+            render(
+                <DeviceManagementSection
+                    deviceId={42}
+                    profile={profile({
+                        actorId: 9001,
+                        actions: [restartAction],
+                        stepUpCurrent: true,
+                    })}
+                />,
+            );
+            expect(
+                screen.getByText(/Ends 5 seconds after the scheduled time/),
+            ).toBeInTheDocument();
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Request action' }),
+            );
+            fireEvent.change(
+                screen.getByLabelText('Scheduled restart (New Zealand time)'),
+                { target: { value: '2026-10-08T16:00' } },
+            );
+            fireEvent.change(screen.getByLabelText('Operational reason'), {
+                target: {
+                    value: 'Restart after staff save their current work.',
+                },
+            });
+            fireEvent.click(
+                screen.getByRole('checkbox', {
+                    name: /I understand this impact/,
+                }),
+            );
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Create request' }),
+            );
+            const first = inertia.post.mock.calls[0];
+            expect(first[1].parameters).toEqual({
+                execute_at: '2026-10-08T03:00:00Z',
+                warning_seconds: 60,
+            });
+            act(() => first[2].onFinish());
+            clock.mockReturnValue(Date.parse('2026-10-09T00:00:00Z'));
+            fireEvent.click(
+                screen.getByRole('button', { name: 'Retry same request' }),
+            );
+            expect(inertia.post.mock.calls[1][1]).toEqual(first[1]);
+            expect(first[1].expected_actor_id).toBe(9001);
+        } finally {
+            clock.mockRestore();
+        }
     });
 });

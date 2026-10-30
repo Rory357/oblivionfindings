@@ -1,0 +1,20 @@
+#hub-interactions .hi-hub-glyph{display:inline-block;flex-shrink:0;vertical-align:middle;width:18px;height:18px;overflow:visible}
+#hub-interactions .hi-rec-cover>.hi-hub-glyph{width:38px;height:38px;stroke-width:1.55;opacity:1}
+#hub-interactions .hi-title-glyph{display:inline-flex;vertical-align:middle;margin-right:10px;color:var(--hi-accent)}
+#hub-interactions .hi-title-glyph .hi-hub-glyph{width:27px;height:27px;stroke-width:1.8}
+#hub-interactions .hi-icon-family-window{max-width:1110px}
+#hub-interactions .hi-icon-intro{display:flex;align-items:center;gap:24px;padding:0 0 24px;margin-bottom:15px;border-bottom:1px solid var(--hi-line)}
+#hub-interactions .hi-icon-signature{display:grid;place-items:center;width:96px;height:96px;flex-shrink:0;background:var(--hi-soft);border-radius:26px;color:var(--hi-accent)}
+#hub-interactions .hi-icon-signature .hi-hub-glyph{width:64px;height:64px;stroke-width:1.4}
+#hub-interactions .hi-icon-intro h3{font-size:22px;letter-spacing:-.4px;margin:8px 0}
+#hub-interactions .hi-icon-intro p{font-size:13px;color:var(--hi-muted);line-height:1.6}
+#hub-interactions .hi-icon-family{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0 24px}
+#hub-interactions .hi-icon-specimen{display:flex;flex-direction:column;align-items:start;text-align:left;padding:22px 8px 17px;border:0;border-bottom:1px solid var(--hi-line);background:transparent;border-radius:5px;color:var(--hi-ink);min-width:0;gap:7px}
+#hub-interactions .hi-icon-specimen:hover{background:var(--hi-subtle)}
+#hub-interactions .hi-icon-drawing{color:var(--hi-accent);display:block;margin-bottom:10px}
+#hub-interactions .hi-icon-drawing .hi-hub-glyph{width:37px;height:37px}
+#hub-interactions .hi-icon-specimen b{font-size:13px;font-weight:600}
+#hub-interactions .hi-icon-specimen small{font-size:11px;line-height:1.6;color:var(--hi-muted);min-height:35px}
+#hub-interactions .hi-icon-at-size{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--hi-muted);margin-top:6px}
+#hub-interactions .hi-icon-at-size>svg:last-child{width:13px;height:13px;margin-left:2px}
+@media(max-width:1120px){#hub-interactions .hi-icon-family{gap:0 18px}#hub-interactions .hi-icon-intro{padding-bottom:17px;gap:18px}#hub-interactions .hi-icon-signature{width:75px;height:75px;border-radius:22px}#hub-interactions .hi-icon-signature .hi-hub-glyph{width:50px;height:50px}#hub-interactions .hi-icon-specimen{padding:17px 5px}#hub-interactions .hi-icon-drawing .hi-hub-glyph{width:32px;height:32px}}

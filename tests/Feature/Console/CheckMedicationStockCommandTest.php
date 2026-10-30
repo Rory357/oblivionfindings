@@ -81,7 +81,8 @@ class CheckMedicationStockCommandTest extends TestCase
             'severity' => 'critical',
             'status' => 'active',
         ]);
-        $this->assertNotNull($fractionalStock->fresh()->last_reorder_alert_at);
-        $this->assertNotNull($zeroStock->fresh()->last_reorder_alert_at);
+        // The low-stock notification in emar:send-alerts owns this timestamp.
+        $this->assertNull($fractionalStock->fresh()->last_reorder_alert_at);
+        $this->assertNull($zeroStock->fresh()->last_reorder_alert_at);
     }
 }

@@ -1,0 +1,99 @@
+{
+  "checked_at_utc": "2026-10-12T03:17:03Z",
+  "scope": "Hourly coordination; saved results and bounded source inspection only",
+  "approved_scope_sha256": "0B8491C2F56D602BD8991E3FB224CCABF68AB5C5F12D871ECE1D63E4BE41C69C",
+  "targets": [
+    {
+      "name": "Control Room — Sol 6.1 implementation",
+      "threadId": "01a12a29-0449-7150-ba1e-0a66a970110e",
+      "cursor": "a8154e4a-be4a-449b-a690-548c53e7eaf3:32",
+      "status": "idle",
+      "note": "Same historical R23 turn; no new completion or integration; no restart prompt"
+    },
+    {
+      "name": "Workforce and Rostering audit",
+      "threadId": "01a108fc-c419-7861-a22e-e5d4b7f26fd1",
+      "cursor": "e0c8a0b2-b660-47e3-befc-dcedd2dd9dbe:32",
+      "status": "active",
+      "turnId": "01a12e0b-9a93-7f73-a1ed-0458089f979d"
+    },
+    {
+      "name": "Audit health and safety UX",
+      "threadId": "01a11476-f5fc-72b2-b6d4-ba7e1188f514",
+      "cursor": "397c65f1-5741-4ae3-8949-b22ac31e1a7e:50",
+      "status": "active",
+      "turnId": "01a12dd6-5ddf-7d11-8601-7418204c9512"
+    }
+  ],
+  "workforce": {
+    "actual_run": {
+      "path": "test-results/timesheet-retention-actual-r7d-20261012/result.json",
+      "sha256": "E7FB573126EB5ED990996E4CC908B42C311769AD39170CDAC39970DF98C203B9",
+      "state": "HELD_OR_FAILED",
+      "started": true,
+      "exit_code": 1,
+      "total": 95,
+      "passed": 94,
+      "failed": 1,
+      "pending": 0,
+      "vitest_json_counts_matched": true,
+      "failure": "keeps the real decision reason and sends nothing when action permission disappears during hashing",
+      "finding": "Expected specific no-request-sent explanation was replaced by the generic changed-view explanation.",
+      "after_read_complete": true,
+      "own_child_exit_confirmed": true,
+      "output_streams_closed": true,
+      "product_applied": false
+    },
+    "repair": {
+      "manifest": "test-results/workforce-timesheet-review-retention-proposal-r3-20261012/manifest.json",
+      "sha256": "EA4BF4716105DC945DCC6FE8F706B141AE8730224EAF63D88EBA945D52DCF05F",
+      "status": "UNAPPLIED_UNRUN_NO_SEND_MESSAGE_REPAIR",
+      "only_changed_proposed_image": "proposed/resources/js/components/timesheets/use-timesheet-command.ts",
+      "bounded_review": "Compared R2/R3 file hashes and hook source. Existing rejected result.message is retained when noSendProven and context changes; generic fallback remains. Other proposed images, including test files, hash-identical to R2.",
+      "runtime_acceptance": false
+    },
+    "rerun": {
+      "path": "test-results/timesheet-retention-actual-r8a-20261012/result.json",
+      "sha256": "82E090BC6A334349B221A4AB4D2AE62DF4492C087C772966FA777AFC51A9548D",
+      "started": false,
+      "exit_code": null,
+      "counts": null,
+      "reason": "Current per-job resource/heavy-peer admission held",
+      "after_read_complete": true,
+      "own_child_exit_confirmed": true,
+      "output_streams_closed": false,
+      "product_applied": false
+    }
+  },
+  "health_safety": {
+    "registry": {
+      "path": "C:/Users/steph/.codex/worktrees/health-safety-workspace/oblivionfindings/app/Services/Tasks/TaskAggregator.php",
+      "sha256": "2D56CA7EE1E8B709846BA0F346CBBC1FBD13E72C20D46DCB4A04392978EA47D3",
+      "declared_base_reconstructed_sha256": "4D3C7D4032D82DE3252CCA8C8CAA903698E559C95BAD100FC88A4B4769718124",
+      "proof": "Removing exactly one two-line provider/comment insertion reconstructed the declared base in memory.",
+      "approval": "Owner reports automatic approval of this narrower alternative; earlier broad permission-vector rejection remains historical and is not overridden.",
+      "state": "Applied in isolated H&S workspace only"
+    },
+    "provider": {
+      "path": "app/Services/Tasks/Providers/ChemicalExposureFollowupProvider.php",
+      "sha256": "57B4AB9864F38EAFFFD7AA232FF02A7681997D65C98B1C5883C2EFD6B756A691",
+      "review": "Requires hazards.view AND hr.wellbeing.view; canonical source taskRows; contextual/site-scoped provider, no generic completion/assignment interface; conceal denied/missing only."
+    },
+    "source_task_service": {
+      "path": "app/Services/HealthSafety/ChemicalExposureFollowupDestinationService.php",
+      "sha256": "4B8DA12916915E7B175D63E79B9D6E97C20CAB3260A49E3276551D4607052959",
+      "review": "Actual final task query includes foreign retained version and receipt denial for followup child OR exposure root. Historical child-only patch is not the current composed source.",
+      "limits": "No whole task/notification/privacy acceptance; syntax success is owner-reported only. Combined five-consumer CR/exposure notification proposal still pending."
+    }
+  },
+  "coordination": {
+    "owner_messages_sent": 0,
+    "new_user_question": false,
+    "shared_file_owners_changed": false,
+    "application_edits_by_parent": false,
+    "tests_or_probes_run_by_parent": false,
+    "next_gate": "Measured R3 rerun; H&S combined notification/source contract and full private workflow evidence; then minimal owner-coordinated integration and Rory/workflow verification.",
+    "all_scopes_complete": false,
+    "heartbeat": "ACTIVE"
+  }
+}

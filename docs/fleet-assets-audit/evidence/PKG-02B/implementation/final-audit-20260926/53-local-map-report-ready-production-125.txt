@@ -1,0 +1,379 @@
+- link:
+  - /url: "#main-content"
+  - text: Skip to main content
+- banner:
+  - generic: Saturday
+  - generic: 26 September 2026
+  - link:
+    - /url: /dashboard
+    - generic: Oblivion Care
+    - generic: blivionCare
+  - button:
+    - generic: Search or jump to…
+    - generic: Ctrl
+    - text: K
+  - link:
+    - /url: /incidents/create
+    - text: Report incident
+  - link:
+    - /url: /attendance
+    - text: Clock in/out
+  - button:
+  - link:
+    - /url: /operations/messages
+  - button:
+    - generic: "1"
+  - button:
+  - button:
+- navigation:
+  - link:
+    - /url: /my-day
+    - generic: My Day
+  - link:
+    - /url: /dashboard
+    - generic: Overview
+  - link:
+    - /url: /my-calendar
+    - generic: My Calendar
+  - link:
+    - /url: /tasks
+    - generic: All Tasks
+    - generic: 9+
+  - button:
+    - generic: Sites & Locations
+  - button:
+    - generic: Operations
+  - button:
+    - generic: Workforce
+  - button:
+    - generic: eMAR
+  - link:
+    - /url: /health-clinical
+    - generic: Health & Clinical
+  - button:
+    - generic: Health & Safety
+  - button [expanded]:
+    - generic: Fleet & Assets
+  - link:
+    - /url: /fleet-assets
+    - generic: Overview
+  - link:
+    - /url: /fleet-assets/vehicles
+    - generic: Fleet
+  - link:
+    - /url: /fleet-assets/assets
+    - generic: Assets
+  - link:
+    - /url: /fleet-assets/maintenance/work-orders
+    - generic: Maintenance
+  - link:
+    - /url: /fleet-assets/map
+    - generic: Maps & boundaries
+  - link:
+    - /url: /fleet-assets/reports
+    - generic: Reports
+  - link:
+    - /url: /fleet-assets/settings/notifications
+    - generic: Settings
+  - button:
+    - generic: IT & Support
+  - button:
+    - generic: HR
+  - button:
+    - generic: Governance
+  - button:
+    - generic: Finance
+  - button:
+    - generic: Reporting
+  - button:
+    - generic: Security & Devices
+  - button:
+    - generic: Control Room
+  - link:
+    - /url: /settings
+    - generic: Settings
+- button [expanded]:
+- main:
+  - navigation:
+    - list:
+      - link:
+        - /url: /dashboard
+        - text: Home
+      - link:
+        - /url: /fleet-assets
+        - text: Fleet & Assets
+      - link:
+        - /url: /fleet-assets/vehicles
+        - text: Vehicles
+      - link [disabled]: Playwright community van
+  - navigation:
+    - link:
+      - /url: /fleet-assets/vehicles
+      - text: Vehicles
+    - link:
+      - /url: /fleet-assets/bookings
+      - text: Bookings
+    - button:
+      - text: Transport
+    - button:
+      - text: Operating records
+    - button:
+      - text: People & custody
+  - link:
+    - /url: /fleet-assets/vehicles
+  - button:
+  - heading [level=1]: Playwright community van
+  - generic: Needs assessment
+  - paragraph:
+    - generic: PW-TRACK-VEH · QA Main Site
+    - generic: Toyota Hiace ZX · Diesel
+  - button:
+    - generic: Find in this vehicle…
+    - generic: /
+  - button:
+    - text: Calendar
+  - button:
+    - text: Start check
+  - button: Report a problem
+  - button:
+    - generic: Odometer
+    - generic: 48,262 km
+    - generic: Wed 23 Sept, 9:35 pm · Dashboard reading
+  - button:
+    - generic: Next service
+    - generic: 50,000 km
+    - generic: Routine service
+  - button:
+    - generic: Last check
+    - generic: Needs assessment
+    - generic: CHK-1 · Pre-trip van check
+  - button:
+    - generic: Maintenance
+    - generic: View work
+    - generic: Original issues and work
+  - generic: As at Sat 26 Sept, 11:33 pm · Pacific/Auckland
+  - button:
+    - text: Reminders & follow-up
+  - tablist:
+    - tab:
+      - generic: Overview
+    - tab:
+      - generic: Service & compliance
+    - tab:
+      - generic: Checks & inspections
+    - tab:
+      - generic: Maintenance
+    - tab:
+      - generic: Map
+    - tab [selected]:
+      - generic: Trip history
+    - tab:
+      - generic: Calendar
+    - button:
+      - generic: Find
+      - generic: /
+  - tablist:
+    - tab [selected]:
+      - text: Vehicle trips
+  - tabpanel "Vehicle trips":
+    - text: Search trips
+    - textbox:
+      - /placeholder: Driver, route or reference…
+    - text: Dates
+    - combobox
+    - generic: Driver
+    - combobox:
+      - generic: Unassigned
+    - text: Event type
+    - combobox
+    - button: Reset filters
+    - button: Export PDF / Excel
+    - text: 2 trips
+    - text: 13.8 km estimated
+    - text: 27 min recorded
+    - text: 2 driving events
+    - button [pressed]:
+      - generic: 24 Sep 2026 · 12:02 am
+      - generic: 9.6 km
+      - strong:
+        - text: QA Main Site
+        - generic: to
+        - text: Hospital outpatients, Grafton
+      - text: Unassigned
+      - generic: "12 min · Trip #3"
+    - button:
+      - generic: 23 Sep 2026 · 9:38 pm
+      - generic: 4.2 km
+      - strong:
+        - text: QA Main Site
+        - generic: to
+        - text: Queen Street, Auckland Central
+      - text: Unassigned
+      - generic: "15 min · Trip #2"
+    - button [disabled]: Previous trips
+    - generic: Page 1 of 1
+    - button [disabled]: Next trips
+    - region "Recorded journey":
+      - generic: "Trip #3"
+      - heading [level=3]: Recorded journey
+      - generic: Point 1 of 26
+      - strong: Recorded position
+      - generic: Recorded point 1 · -36.86000, 174.75000 · 12:02 am
+      - generic: Coordinates only
+      - button:
+        - generic: Point 1
+      - button:
+        - generic: ▶
+      - button:
+        - generic: ▶
+      - button:
+        - generic: ▶
+      - button:
+        - generic: ▶
+      - button:
+        - generic: ▶
+      - button:
+        - generic: A
+      - button:
+        - generic: B
+      - button: +
+      - button: −
+      - link:
+        - /url: https://leafletjs.com
+        - text: Leaflet
+      - text: "| ©"
+      - link:
+        - /url: https://www.openstreetmap.org/copyright
+        - text: OpenStreetMap
+      - text: contributors
+      - generic: Recorded positions · lines between them are not verified roads
+      - button: Play samples
+      - combobox
+      - generic: 12:02 am
+      - button [disabled]:
+      - text: Recorded point
+      - slider: "0"
+      - button:
+      - strong: 0 km/h
+      - generic: A
+      - strong: QA Main Site
+      - generic: 12:02 am · started when the vehicle moved
+      - generic: B
+      - strong: Hospital outpatients, Grafton
+      - generic: 12:14 am · stopped for 5 min
+    - region:
+      - text: "91"
+      - generic: /100
+      - generic: Trip behaviour
+      - heading [level=3]: Review driving events
+      - paragraph: 100% sample coverage · scored with the fleet settings
+    - region:
+      - generic: Distance
+      - strong: 9.6 km
+      - generic: Duration
+      - strong: 12 min
+      - generic: Maximum speed
+      - strong: 110 km/h
+      - generic: Idle time
+      - strong: 0 min
+      - generic: Braking
+      - strong: "1"
+      - generic: Overspeed episodes
+      - strong: "1"
+      - generic: Over threshold
+      - strong: 90 sec
+      - generic: Acceleration
+      - strong: "0"
+      - paragraph: 20.8 driving events per 100 km
+    - button: Confirm driver / handover
+    - region:
+      - heading [level=3]: Speed through the trip
+      - text: Recorded samples · km/h
+      - generic: Speed source & threshold
+    - region:
+      - strong: Unassigned
+      - generic: Driver confirmation needed
+      - button:
+        - text: Source
+    - region:
+      - heading [level=3]: Journey timeline 2
+      - button:
+        - text: List
+      - button:
+        - text: Card
+      - button [pressed]:
+        - text: Table
+      - combobox
+      - table:
+        - caption: Journey events, locations and map points
+        - rowgroup:
+          - row:
+            - columnheader: Time
+            - columnheader: Event
+            - columnheader: Location
+            - columnheader: Map
+        - rowgroup:
+          - row:
+            - cell: 12:07 am
+            - cell:
+              - strong: Over fleet speed threshold
+            - cell: Recorded position
+            - cell:
+              - button:
+                - text: "11"
+          - row:
+            - cell: 12:10 am
+            - cell:
+              - strong: Harsh braking
+            - cell: Recorded position
+            - cell:
+              - button:
+                - text: "18"
+      - paragraph: Select an event to locate it on the map. Locations are looked-up addresses or the recorded coordinates.
+    - region:
+      - generic: Act on the evidence
+      - heading [level=3]: Review the overspeed event
+      - paragraph: Keep the trip, sensor event and response together. A fault goes to Control Room for assessment before a Maintenance decision.
+      - button:
+        - text: Create coaching follow-up
+      - paragraph: 1 overspeed episode. 110 km/h peak · 90 sec at or above the 100 km/h fleet threshold, measured between recorded samples. The road speed limit is not checked.
+      - button:
+        - text: Open Alerts & Control Room
+      - generic: Score, coverage and distance
+- region "Notifications alt+T"
+- dialog "Export vehicle trips" [active]:
+  - heading "Export vehicle trips" [level=2]
+  - paragraph: Playwright community van · Branded reports for one day or a date range
+  - group "Report format":
+    - button "PDF report Summary, journey maps & trip pages" [pressed]:
+      - strong: PDF report
+      - generic: Summary, journey maps & trip pages
+    - button "Excel workbook Filterable trips and events":
+      - strong: Excel workbook
+      - generic: Filterable trips and events
+  - group "Dates to export":
+    - generic: Dates to export
+    - text: From
+    - 'button "Export from: 23 Sep 2026"':
+      - strong: 23 Sep 2026
+      - generic: Choose a day on the calendar
+    - text: To
+    - 'button "Export to: 24 Sep 2026"':
+      - strong: 24 Sep 2026
+      - generic: Choose a day on the calendar
+  - checkbox "Include journey maps and recorded positions" [checked]:
+  - text: Include journey maps and recorded positions
+  - checkbox "Include journey events and their details" [checked]:
+  - text: Include journey events and their details
+  - strong: 2 trips · 13.8 km estimated
+  - paragraph: Uses the current trip filters, across all pages. Includes your organisation's logo, name and brand colour, coverage and source notes. Dates are inclusive, in Pacific/Auckland time.
+  - status:
+    - strong: Your report is ready
+    - paragraph: 2 trips included. Download the PDF below.
+  - generic: Reports are generated on this server from the trips you can see. Street maps use locally installed OpenStreetMap data. Areas without map data are labelled as route sketches. Trip locations stay on this server.
+  - button "Close"
+  - link "Download PDF":
+    - /url: blob:http://127.0.0.1:8774/6fc19b98-b127-4277-bf09-8cddbcedb487
+    - text: Download PDF
+  - button "Close":
+    - generic: Close

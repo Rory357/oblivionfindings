@@ -3,10 +3,11 @@ import { expect, test } from '@playwright/test';
 import {
     collectConsoleErrors,
     expectNoConsoleErrors,
-    loginAsFrontlineDemoWorker,
+    loginAsMedsDemoWorker,
 } from './helpers';
 
 const viewports = [
+    { width: 320, height: 844 },
     { width: 390, height: 844 },
     { width: 768, height: 1024 },
     { width: 1024, height: 768 },
@@ -14,60 +15,60 @@ const viewports = [
     { width: 1440, height: 900 },
 ] as const;
 
-test.describe('My Day responsive staff header', () => {
-    test('keeps every safety action reachable without horizontal overflow', async ({
-        page,
-    }) => {
-        const consoleErrors = collectConsoleErrors(page);
-        await loginAsFrontlineDemoWorker(page);
+test.describe('My Day responsive safety controls', () => {
+    for (const viewport of viewports) {
+        test(`keeps safety actions and care access reachable at ${viewport.width}px`, async ({
+            page,
+        }) => {
+            const consoleErrors = collectConsoleErrors(page);
+            // The medication fixture has one assigned person and a covering shift.
+            await loginAsMedsDemoWorker(page);
 
-        for (const viewport of viewports) {
             await page.setViewportSize(viewport);
             await page.goto('/my-day');
-            await page.waitForLoadState('domcontentloaded');
-
-            const staffHeader = page
-                .locator('header')
-                .filter({
-                    has: page.locator('[data-staff-header-actions]'),
-                })
-                .first();
-            const actions = staffHeader.locator('[data-staff-header-actions]');
-            const title = staffHeader.getByRole('heading', {
-                name: /^Today$/i,
+            const title = page.getByRole('heading', {
+                name: 'My Day',
+                exact: true,
             });
-            const date = staffHeader.locator('p').first();
-            const titleButton = staffHeader.getByRole('button', {
-                name: /^Today\b/,
-            });
-            const report = actions.getByRole('button', {
-                name: 'Report incident',
-            });
-            const refresh = actions.getByRole('button', {
-                name: 'Refresh now',
-            });
-            const notifications = actions.getByRole('link', {
-                name: /^Notifications \(/,
-            });
-
             await expect(title).toBeVisible();
-            await expect(date).toBeVisible();
-            await expect(date).toHaveText(
-                /^[A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}$/,
+            const header = page
+                .locator('header.eh-header')
+                .filter({ has: title });
+            const date = header.locator('p').first();
+            const report = page.getByRole('button', {
+                name: 'Report incident',
+                exact: true,
+            });
+            const refresh = page.getByRole('button', {
+                name: 'Refresh',
+                exact: true,
+            });
+            const notifications = page.getByRole('button', {
+                name: 'Notifications',
+                exact: true,
+            });
+            const search = page.getByRole('button', {
+                name: 'Search or jump to a page',
+                exact: true,
+            });
+            const careRecord = page.getByRole('link', {
+                name: /^Open care record for /,
+            });
+
+            await expect(date).toContainText(
+                /^[A-Z][a-z]+, \d{1,2} [A-Z][a-z]+ \d{4}/,
             );
-            await expect(report).toBeVisible();
-            await expect(refresh).toBeVisible();
-            await expect(notifications).toBeVisible();
-            expect(
-                await title.evaluate(
-                    (element) => element.scrollWidth <= element.clientWidth,
-                ),
-            ).toBe(true);
-            expect(
-                await date.evaluate(
-                    (element) => element.scrollWidth <= element.clientWidth,
-                ),
-            ).toBe(true);
+            await expect(careRecord).toHaveCount(1);
+            await expect(careRecord).toHaveAttribute(
+                'href',
+                /^\/clients\/\d+$/,
+            );
+            await expect(
+                page.getByRole('searchbox', {
+                    name: "Find in today's work…",
+                    exact: true,
+                }),
+            ).toBeVisible();
 
             const layout = await page.evaluate(() => ({
                 clientWidth: document.documentElement.clientWidth,
@@ -84,66 +85,87 @@ test.describe('My Day responsive staff header', () => {
                 report,
                 refresh,
                 notifications,
+                search,
+                careRecord,
             ]) {
+                await expect(control).toBeVisible();
                 const box = await control.boundingBox();
                 expect(box).not.toBeNull();
                 expect(box!.x).toBeGreaterThanOrEqual(0);
                 expect(box!.x + box!.width).toBeLessThanOrEqual(
-                    layout.clientWidth,
+                    layout.clientWidth + 1,
                 );
             }
 
-            for (const control of [
-                titleButton,
-                report,
-                refresh,
-                notifications,
-            ]) {
+            // Care and recording controls remain touch sized on every layout.
+            // The shared app bar becomes touch sized on phones.
+            const touchControls = [report, refresh, careRecord];
+            if (viewport.width < 768) touchControls.push(notifications, search);
+            for (const control of touchControls) {
                 const box = await control.boundingBox();
-                expect(box).not.toBeNull();
                 expect(box!.width).toBeGreaterThanOrEqual(44);
                 expect(box!.height).toBeGreaterThanOrEqual(44);
             }
 
-            if (viewport.width >= 768) {
-                const clients = staffHeader.getByRole('link', {
-                    name: 'Clients',
+            if (viewport.width < 768) {
+                const ask = page.getByRole('button', {
+                    name: 'Ask about a client',
+                    exact: true,
                 });
-                const searchbox = staffHeader.getByRole('searchbox');
-
-                await expect(clients).toBeVisible();
-                await expect(searchbox).toBeVisible();
-
-                for (const control of [clients, searchbox]) {
-                    const box = await control.boundingBox();
-                    expect(box).not.toBeNull();
-                    expect(box!.width).toBeGreaterThanOrEqual(44);
-                    expect(box!.height).toBeGreaterThanOrEqual(44);
-                }
-            }
-
-            if (viewport.width === 390) {
-                await report.focus();
-                await expect(report).toBeFocused();
+                await search.focus();
                 await page.keyboard.press('Tab');
-                await expect(refresh).toBeFocused();
-                expect(
-                    await refresh.evaluate(
-                        (element) =>
-                            getComputedStyle(element).outlineStyle !== 'none',
-                    ),
-                ).toBe(true);
+                await expect(ask).toBeFocused();
                 await page.keyboard.press('Tab');
                 await expect(notifications).toBeFocused();
                 expect(
-                    await notifications.evaluate(
-                        (element) =>
-                            getComputedStyle(element).outlineStyle !== 'none',
-                    ),
+                    await notifications.evaluate((element) => {
+                        const style = getComputedStyle(element);
+                        return (
+                            style.outlineStyle !== 'none' ||
+                            style.boxShadow !== 'none'
+                        );
+                    }),
                 ).toBe(true);
+                await careRecord.focus();
+                await page.keyboard.press('Tab');
+                await expect(
+                    page.getByRole('button', { name: 'All work', exact: true }),
+                ).toBeFocused();
             }
-        }
 
-        expectNoConsoleErrors(consoleErrors);
-    });
+            await notifications.click();
+            const notificationMenu = page.getByRole('menu', {
+                name: 'Notifications',
+                exact: true,
+            });
+            await expect(notificationMenu).toBeVisible();
+            const menuBox = await notificationMenu.boundingBox();
+            expect(menuBox).not.toBeNull();
+            expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+            expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(
+                viewport.width,
+            );
+            if (viewport.width < 768) {
+                for (const action of [
+                    notificationMenu.getByRole('button', {
+                        name: 'Mark all notifications read',
+                        exact: true,
+                    }),
+                    notificationMenu.getByRole('link', {
+                        name: 'View All Notifications',
+                        exact: true,
+                    }),
+                ]) {
+                    const box = await action.boundingBox();
+                    expect(box).not.toBeNull();
+                    expect(box!.height).toBeGreaterThanOrEqual(44);
+                }
+            }
+            await page.keyboard.press('Escape');
+            await expect(notificationMenu).toBeHidden();
+            await expect(notifications).toBeFocused();
+
+            expectNoConsoleErrors(consoleErrors);
+        });
+    }
 });

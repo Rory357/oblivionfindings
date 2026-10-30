@@ -1,0 +1,53 @@
+{
+  "source": "Actual calendar-workflows.ts transpiled in memory; evidence parsing stubbed; no browser or external calls",
+  "checks": [
+    {
+      "name": "Clicked date/time prefilled and two-hour end generated",
+      "passed": true
+    },
+    {
+      "name": "Invalid and past appointment windows rejected",
+      "passed": true
+    },
+    {
+      "name": "Existing work selection retains provider and owner",
+      "passed": true
+    },
+    {
+      "name": "Existing work updates in place and keeps source and evidence",
+      "passed": true
+    },
+    {
+      "name": "New appointment creates one canonical work order",
+      "passed": true
+    },
+    {
+      "name": "Unavailable appointment blocks overlap",
+      "passed": true
+    },
+    {
+      "name": "Snooze rejects backward times",
+      "passed": true
+    },
+    {
+      "name": "Snooze moves reminder, preserves recurrence anchor and restriction",
+      "passed": true
+    },
+    {
+      "name": "Restricted pending booking cannot approve but can decline",
+      "passed": true
+    },
+    {
+      "name": "Confirmed booking exposes checkout; checked out exposes return without cancellation",
+      "passed": true
+    },
+    {
+      "name": "Declined requests have no mutation actions",
+      "passed": true
+    },
+    {
+      "name": "View-only and report-only creation actions respect role",
+      "passed": true
+    }
+  ]
+}

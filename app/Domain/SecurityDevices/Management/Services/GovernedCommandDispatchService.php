@@ -4,19 +4,32 @@ namespace App\Domain\SecurityDevices\Management\Services;
 
 use App\Domain\Monitoring\Contracts\CommandDispatchPort;
 use App\Domain\Monitoring\Services\CanonicalDeviceSiteResolver;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartCommands;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointRestartContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointScriptContract;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointServiceCommands;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareAuthority;
+use App\Domain\SecurityDevices\Endpoints\Services\EndpointSoftwareCommands;
 use App\Domain\SecurityDevices\Management\Contracts\CommandExecutionAdapter;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionContext;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionResult;
 use App\Domain\SecurityDevices\Management\Data\CommandExecutionRoute;
 use App\Domain\SecurityDevices\Management\Enums\CommandApprovalDecision;
 use App\Domain\SecurityDevices\Management\Enums\CommandAttemptStatus;
+use App\Domain\SecurityDevices\Management\Enums\CommandConfirmationMode;
 use App\Domain\SecurityDevices\Management\Enums\CommandStatus;
 use App\Domain\SecurityDevices\Management\Enums\ManagementLevel;
 use App\Domain\SecurityDevices\Management\Exceptions\CommandDispatchPreconditionException;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandAttempt;
 use App\Domain\SecurityDevices\Management\Models\DeviceCommandRequest;
+use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use App\Services\AuthorizationEvidenceLockService;
+use App\Services\CurrentAuthorizationReads;
 use App\Services\Tracking\ClientLocationCommandContext;
 use Carbon\CarbonImmutable;
 use DomainException;
@@ -45,6 +58,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         private readonly DeviceCommandContractVerifier $verifier,
         private readonly DeviceCommandAuditService $audit,
         private readonly DeviceCommandBreakGlassService $breakGlass,
+        private readonly ?NetworkDeviceCommandPolicyService $networkPolicy = null,
     ) {}
 
     public function dispatch(DeviceCommandRequest $request, User $triggeredBy): DeviceCommandAttempt
@@ -78,13 +92,23 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 'status' => CommandStatus::Dispatching->value,
             ]);
 
+            if ($route->mode === 'endpoint') {
+                if ($locked->capability === 'endpoint.software.install') {
+                    app(EndpointSoftwareCommands::class)->prepare($locked, $attempt);
+                } elseif ($locked->capability === 'endpoint.computer.restart') {
+                    app(EndpointRestartCommands::class)->prepare($locked, $attempt);
+                } else {
+                    app(EndpointServiceCommands::class)->prepare($locked, $attempt);
+                }
+            }
+
             return [
                 'failure' => null,
                 'request' => $locked,
                 'attempt' => $attempt,
                 'context' => $route->mode === 'central' ? $this->context($locked, $attempt) : null,
                 'adapter' => $route->adapter,
-                'deferred' => $route->mode === 'collector',
+                'deferred' => in_array($route->mode, ['collector', 'endpoint'], true),
             ];
         });
         if ($prepared['failure'] instanceof CommandDispatchPreconditionException) {
@@ -167,7 +191,9 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         DeviceCommandRequest $request,
         User $triggeredBy,
     ): CommandExecutionRoute {
-        return $this->assertCurrentContract($request, $triggeredBy, [CommandStatus::Ready, CommandStatus::Queued]);
+        return in_array($request->capability, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install', EndpointScriptContract::CAPABILITY], true)
+            ? $this->assertEndpointCurrent($request, $triggeredBy, [CommandStatus::Ready, CommandStatus::Queued])
+            : $this->assertCurrentContract($request, $triggeredBy, [CommandStatus::Ready, CommandStatus::Queued]);
     }
 
     /** Reuse the exact command policy at the final client-location delivery claim. */
@@ -178,7 +204,52 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         return $this->assertCurrentContract($request, $requester, [CommandStatus::Accepted, CommandStatus::Running]);
     }
 
-    private function assertCurrentContract(DeviceCommandRequest $request, User $triggeredBy, array $allowedStatuses): CommandExecutionRoute
+    /** Final native claim reuses the signed canonical request and independent approval policy. */
+    public function assertEndpointDelivery(DeviceCommandRequest $request): CommandExecutionRoute
+    {
+        abort_unless(in_array($request->capability, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install'], true) && $request->execution_route === 'endpoint', 404);
+
+        return $this->assertEndpointCurrent($request, null, [CommandStatus::Dispatching, CommandStatus::Accepted], scheduledRestartDelivery: $request->capability === 'endpoint.computer.restart');
+    }
+
+    /** Internal prepared-script transport only. Queue/dispatch remains closed. */
+    public function assertScriptDelivery(DeviceCommandRequest $request): CommandExecutionRoute
+    {
+        abort_unless($request->capability === EndpointScriptContract::CAPABILITY && $request->execution_route === 'endpoint', 404);
+
+        return $this->assertEndpointCurrent($request, null, [CommandStatus::Dispatching, CommandStatus::Accepted], scriptDelivery: true);
+    }
+
+    private function assertEndpointCurrent(DeviceCommandRequest $request, ?User $triggeredBy, array $statuses, bool $scheduledRestartDelivery = false, bool $scriptDelivery = false): CommandExecutionRoute
+    {
+        return CurrentAuthorizationReads::within(function (CurrentAuthorizationReads $reads) use ($request, $triggeredBy, $statuses, $scheduledRestartDelivery, $scriptDelivery): CommandExecutionRoute {
+            // Endpoint identity already owns Device/Agent. All inverse account and
+            // Site evidence reads are NOWAIT; no stale REPEATABLE READ snapshots.
+            $ids = array_values(array_unique(array_filter([$request->requested_by_user_id, $request->approved_by_user_id, $triggeredBy?->id])));
+            sort($ids);
+            $actors = [];
+            foreach ($ids as $id) {
+                $actors[$id] = app(AuthorizationEvidenceLockService::class)->lockForUserWithoutWaiting((int) $id, ['*']);
+            }
+            $requester = $actors[$request->requested_by_user_id];
+            abort_unless($requester->approved_at && $requester->email_verified_at && ! $requester->external_clinical_account, 403);
+            foreach (['client', 'next_of_kin', 'external_clinician'] as $role) {
+                abort_if($requester->role === $role || $requester->hasRole($role), 403);
+            }
+            $request->setRelation('requestedBy', $requester);
+            $request->setRelation('approvedBy', $request->approved_by_user_id ? $actors[$request->approved_by_user_id] : null);
+            $request->setRelation('approvals', $reads->query($request->approvals()->getQuery())->get());
+            $request->setRelation('device', $reads->query(Device::query())->findOrFail($request->device_id));
+            $current = new self($this->access->forCurrentEvidence($reads, (int) $request->device_id),
+                $this->authorization->forCurrentEvidence($reads, (int) $request->device_id), $this->siteResolver->forCurrentEvidence($reads),
+                $this->capabilities, $this->declaredCapabilities, $this->freshness, $this->assignments, $this->parameters, $this->parameterPolicy,
+                $this->executionRoutes, $this->changeEligibility->forCurrentEvidence($reads), $this->verifier, $this->audit, $this->breakGlass);
+
+            return $current->assertCurrentContract($request, $actors[$triggeredBy?->id ?? $requester->id], $statuses, $scheduledRestartDelivery, $scriptDelivery);
+        });
+    }
+
+    private function assertCurrentContract(DeviceCommandRequest $request, User $triggeredBy, array $allowedStatuses, bool $scheduledRestartDelivery = false, bool $scriptDelivery = false): CommandExecutionRoute
     {
         $request->loadMissing(['device', 'requestedBy', 'approvedBy', 'approvals']);
         $requester = $request->requestedBy;
@@ -237,7 +308,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
         if ($request->risk !== $capability->risk
             || $request->management_level !== $capability->level
             || $request->confirmation_mode !== $capability->confirmationMode
-            || ($capability->isHighRisk() && $request->impact_acknowledged_at === null)) {
+            || (($capability->isHighRisk() || $capability->confirmationMode !== CommandConfirmationMode::None) && $request->impact_acknowledged_at === null)) {
             throw new CommandDispatchPreconditionException(
                 'risk_policy_changed',
                 'The risk safeguards changed after this request was approved. The request was blocked without execution.',
@@ -346,7 +417,14 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 'The approved parameter policy changed after the request was signed. The request was blocked without execution.',
             );
         }
-        if ($capability->requiresApproval) {
+        $requiresApproval = $capability->requiresApproval
+            || $request->approved_by_user_id !== null
+            || ($request->capability === 'network.port.bounce'
+                && ($this->networkPolicy ?? app(NetworkDeviceCommandPolicyService::class))->requiresIndependentApproval(
+                    $request->device,
+                    (string) ($parameters['interface'] ?? ''),
+                ));
+        if ($requiresApproval) {
             $approver = $request->approvedBy;
             $approverAuthorization = $approver instanceof User
                 ? $this->authorization->evaluate(
@@ -370,7 +448,7 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 );
             }
         }
-        if ($capability->requiresChange && ! $request->is_break_glass) {
+        if (($capability->requiresChange || (in_array($request->capability, ['endpoint.service.manage', 'endpoint.computer.restart', 'endpoint.software.install', EndpointScriptContract::CAPABILITY], true) && $request->it_change_id !== null)) && ! $request->is_break_glass) {
             if ($request->it_change_id === null) {
                 throw new CommandDispatchPreconditionException(
                     'change_missing',
@@ -394,11 +472,22 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                 );
             }
         }
-        if ($capability->requiresStepUp && ! $this->stepUpIsCurrent($request, $now)) {
+        // Only delivery of an already-dispatched signed absolute restart schedule
+        // retains its historical step-up proof. Queue/dispatch and every other action
+        // continue to require recent confirmation. All current authority checks remain.
+        $historicalRestart = $scheduledRestartDelivery && $request->capability === 'endpoint.computer.restart' && $request->execution_route === 'endpoint' && $request->dispatched_at && $request->step_up_confirmed_at && $request->step_up_confirmed_at->lessThanOrEqualTo($request->dispatched_at) && ! $request->step_up_confirmed_at->isFuture();
+        if ($historicalRestart) {
+            $schedule = EndpointRestartContract::parameters($request->encrypted_parameters);
+            abort_unless($request->expires_at->equalTo(CarbonImmutable::parse($schedule['execute_at'])->addSeconds(5)), 409);
+        }
+        if ($capability->requiresStepUp && ! $historicalRestart && ! $this->stepUpIsCurrent($request, $now)) {
             throw new CommandDispatchPreconditionException(
                 'step_up_stale',
                 'The requester identity confirmation is no longer current. The request was blocked without execution.',
             );
+        }
+        if (in_array($request->capability, ['endpoint.computer.restart', 'endpoint.software.install', EndpointScriptContract::CAPABILITY], true) && (! $request->approvedBy?->approved_at || ! $request->approvedBy?->email_verified_at || $request->approvedBy?->external_clinical_account || ! $request->approvedBy?->two_factor_confirmed_at)) {
+            throw new CommandDispatchPreconditionException('approval_assurance_removed', 'The independent restart approval identity assurance is no longer current.');
         }
         if ($capability->requiresMfa && $requester->two_factor_confirmed_at === null) {
             throw new CommandDispatchPreconditionException(
@@ -427,6 +516,60 @@ final class GovernedCommandDispatchService implements CommandDispatchPort
                     'collector_delivery_unavailable',
                     'The signed remote route no longer matches one current enrolled Site collector with an approved typed adapter. The request was blocked without execution.',
                 );
+            }
+
+            return $route;
+        }
+        if ($request->capability === 'endpoint.computer.restart') {
+            if (! $scheduledRestartDelivery && $now->greaterThan(CarbonImmutable::parse($request->encrypted_parameters['execute_at'])->subSeconds($request->encrypted_parameters['warning_seconds']))) {
+                throw new CommandDispatchPreconditionException('restart_warning_window_missed', 'There is no longer enough time for the approved visible warning. Request a new schedule.');
+            }
+            try {
+                app(EndpointRestartAuthority::class)->assertRequest($request, $requester);
+                if (! $scheduledRestartDelivery) {
+                    app(EndpointRestartAuthority::class)->assertNoOtherSchedule($request);
+                }
+            } catch (ValidationException|HttpExceptionInterface) {
+                throw new CommandDispatchPreconditionException('endpoint_authority_changed', 'The approved restart policy, computer identity or requester authority changed.');
+            }
+            if (! $route->available || $route->mode !== 'endpoint') {
+                throw new CommandDispatchPreconditionException('endpoint_unavailable', 'The governed native restart execution path is unavailable.');
+            }
+
+            return $route;
+        }
+        if ($request->capability === EndpointScriptContract::CAPABILITY) {
+            try {
+                app(EndpointScriptAuthority::class)->assertRequest($request, $requester);
+            } catch (ValidationException|HttpExceptionInterface) {
+                throw new CommandDispatchPreconditionException('endpoint_authority_changed', 'Current script, policy or requester authority could not be confirmed.');
+            }
+            if ($scriptDelivery && $route->available && $route->mode === 'endpoint') {
+                return $route;
+            }
+            // Prepared transport is internal until results/cancellation and the
+            // installed executor are complete. Queue/dispatch stays closed.
+            throw new CommandDispatchPreconditionException('script_executor_unavailable', 'Reviewed script execution is not available in this release. No execution was authorised.');
+        }
+        if ($request->capability === 'endpoint.software.install') {
+            try {
+                app(EndpointSoftwareAuthority::class)->assertRequest($request, $requester);
+            } catch (ValidationException|HttpExceptionInterface) {
+                throw new CommandDispatchPreconditionException('endpoint_authority_changed', 'The approved software, policy or requester authority changed.');
+            } if (! $route->available || $route->mode !== 'endpoint') {
+                throw new CommandDispatchPreconditionException('endpoint_unavailable', 'Approved MSI execution is unavailable.');
+            }
+
+            return $route;
+        }
+        if ($request->capability === 'endpoint.service.manage') {
+            try {
+                app(EndpointServiceAuthority::class)->assertRequest($request, $requester);
+            } catch (ValidationException|HttpExceptionInterface) {
+                throw new CommandDispatchPreconditionException('endpoint_authority_changed', 'The approved native computer, service policy or requester authority changed. No execution was authorised.');
+            }
+            if (! $route->available || $route->mode !== 'endpoint') {
+                throw new CommandDispatchPreconditionException('endpoint_unavailable', 'The governed native service execution path is unavailable.');
             }
 
             return $route;

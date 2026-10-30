@@ -2,6 +2,9 @@
 
 @import 'tw-animate-css';
 @import './maintenance-date-time.css';
+@import './journey-auth.css';
+@import './signature-blocks.css';
+@import './journey-site.css';
 
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
@@ -53,6 +56,14 @@
 
     --color-primary: var(--primary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-band-foreground: var(--band-foreground);
+    /* text-primary reads the mode-aware brand text shade; bg-, border-,
+       fill-, ring- and decoration-primary keep --color-primary (Tailwind
+       resolves text colours via --text-color-* before --color-*). */
+    --text-color-primary: var(--primary-text);
+    --color-primary-strong: var(--primary-strong);
+    --color-primary-fill: var(--primary-fill);
+    --color-primary-fill-foreground: var(--primary-fill-foreground);
 
     --color-secondary: var(--secondary);
     --color-secondary-foreground: var(--secondary-foreground);
@@ -95,6 +106,11 @@
     --color-status-critical-bg: var(--status-critical-bg);
     --color-status-critical-foreground: var(--status-critical-foreground);
     --color-status-info: var(--status-info);
+    /* text-status-info reads the mode-aware brand text shade (like
+       text-primary) — the raw brand is too light for text on the info tint
+       in dark mode and too light on white for some brands. bg-status-info
+       fills keep --color-status-info. */
+    --text-color-status-info: var(--primary-text);
     --color-status-info-bg: var(--status-info-bg);
     --color-status-info-foreground: var(--status-info-foreground);
     --color-status-neutral: var(--status-neutral);
@@ -102,6 +118,7 @@
     --color-live: var(--live);
     --color-live-bg: var(--live-bg);
     --color-tone-teal: var(--tone-teal);
+    --color-tone-teal-foreground: var(--tone-teal-foreground);
     --color-tone-chip-teal: var(--tone-chip-teal);
     --color-tone-chip-success: var(--tone-chip-success);
     --color-tone-chip-warning: var(--tone-chip-warning);
@@ -143,6 +160,15 @@
     --color-brand-deep: var(--brand-deep);
     --color-brand-tint-deep: var(--brand-tint-deep);
     --color-text-faint: var(--text-faint);
+
+    /* Journey brand (sign-in pages; resources/css/journey-auth.css) */
+    --color-journey-ink: var(--journey-ink);
+    --color-journey-ink-muted: var(--journey-ink-muted);
+    --color-journey-paper: var(--journey-paper);
+    --color-journey-lavender: var(--journey-lavender);
+    --color-journey-lilac: var(--journey-lilac);
+    --color-journey-surface: var(--journey-surface);
+    --color-journey-field: var(--journey-field);
 }
 
 :root {
@@ -168,6 +194,40 @@
     --popover-foreground: oklch(0.15 0.015 277);
     --primary: var(--color-purple-600);
     --primary-foreground: oklch(1 0 0);
+    /* Text on the floored dark bands — the .eh-header sky and the PageHero
+       band. Always white: the bands are floored dark whatever the brand, so
+       their text must never follow it. NEVER derived from the brand, and
+       never fed through pickForeground/skyForeground (--primary-foreground
+       turns ink for very light brands, which is right on a light brand fill
+       and unreadable on a dark band). */
+    --band-foreground: oklch(1 0 0);
+    /* Derived only — follow whatever --primary resolves to on <html>
+       (default, org theme, or a personal accent's inline style).
+       --primary-strong: the brand no lighter than L 0.50, for brand text on
+       white (hero white buttons).
+       --primary-fill: solid fills that carry text (default buttons,
+       badges, tooltips). In light, brands light enough for ink text
+       (L ≥ 0.585) keep their exact colour; darker brands carry white text
+       and are never lighter than L 0.50, so white stays ≥ 4.5:1 on the base
+       and the highlight for every hue. .dark clamps every brand to 0.50.
+       --primary-fill-foreground: white or ink by the same 0.585 crossover.
+       Not --primary-foreground: that is also the text on the dark brand
+       sky, which must stay white for mid-light brands. */
+    --primary-strong: oklch(from var(--primary) min(l, 0.5) c h);
+    /* Brand-coloured text (text-primary). One --primary can't be text on
+       both white and dark surfaces, so light clamps it dark and .dark lifts
+       it light. 0.46 (not 0.50) keeps green and teal brands ≥ 4.5:1 on the
+       grey page ground once the browser gamut-maps them (at 0.48 the
+       forest preset measured 4.45:1 there). */
+    --primary-text: oklch(from var(--primary) min(l, 0.46) c h);
+    --primary-fill: oklch(
+        from var(--primary)
+            calc(l - clamp(0, (0.585 - l) * 1000, 1) * max(0, l - 0.5)) c h
+    );
+    --primary-fill-foreground: oklch(
+        from var(--primary-fill)
+            calc(0.15 + 0.85 * clamp(0, (0.585 - l) * 1000, 1)) 0 0
+    );
     --secondary: oklch(0.96 0.008 277);
     --secondary-foreground: oklch(0.2 0.015 277);
     --muted: oklch(0.96 0.006 277);
@@ -228,6 +288,8 @@
        0/2/3/4 reuse --primary / status tokens; teal is the cycle's own hue —
        a different job from --live, which marks in-progress states. */
     --tone-teal: oklch(45% 0.1 200);
+    /* Readable on tier-2's compounded 12% tab + 18% count tints. */
+    --tone-teal-foreground: oklch(28% 0.07 200);
     /* Solid icon-chip fills for the toned strip stay DEEP in both themes: the
        dark-theme tone tokens go light, which would sink the white glyph below
        AA contrast. Values mirror the light-theme tones — keep in sync. (The
@@ -381,6 +443,23 @@
     --src-period-close: oklch(50% 0.13 105);
     --src-period-close-bg: oklch(96% 0.05 105);
     --src-period-close-ln: oklch(86% 0.09 105);
+    /* Referrals → Calendar sources: next actions and follow-ups, calls and
+       meetings (appointments), assessment work and funding assistance. Same
+       fixed, distinct-hue rule; the four are spaced well apart from each other
+       (135 / 245 / 88 / 300) so they read side by side on the referral calendar
+       without borrowing the Sites inspection/compliance keys. */
+    --src-referral-follow-up: oklch(48% 0.13 135);
+    --src-referral-follow-up-bg: oklch(95% 0.05 135);
+    --src-referral-follow-up-ln: oklch(85% 0.08 135);
+    --src-referral-appointment: oklch(50% 0.15 245);
+    --src-referral-appointment-bg: oklch(96% 0.035 245);
+    --src-referral-appointment-ln: oklch(87% 0.06 245);
+    --src-referral-assessment: oklch(50% 0.12 88);
+    --src-referral-assessment-bg: oklch(96% 0.05 90);
+    --src-referral-assessment-ln: oklch(86% 0.09 90);
+    --src-referral-funding: oklch(50% 0.18 300);
+    --src-referral-funding-bg: oklch(96% 0.04 300);
+    --src-referral-funding-ln: oklch(88% 0.07 300);
     /* External busy (two-way sync, pull-only) — deliberately desaturated slate so it
        reads as "not ours / blocked" against the chromatic obligation sources. */
     --src-external: oklch(46% 0.03 265);
@@ -398,6 +477,24 @@
     --brand-deep: oklch(from var(--primary) calc(l - 0.09) c h);
     --brand-tint-deep: oklch(from var(--primary) 0.88 0.07 h);
     --text-faint: oklch(from var(--foreground) 0.46 c h);
+
+    /* Journey brand palette (Oblivion Care "Journey" identity, design proposal
+       3 Oct 2026). Derived from --primary so Settings › Branding recolours the
+       sign-in pages too: with --primary #7040D6 these reproduce the brand's
+       near-black #141019, lavender #D6B9FF and white #FCFAFF exactly. */
+    --journey-ink: oklch(from var(--primary) 0.182 0.019 calc(h + 13));
+    --journey-paper: oklch(from var(--primary) 0.988 0.007 calc(h + 12));
+    --journey-lavender: oklch(
+        from var(--primary) 0.834 calc(c * 0.468) calc(h + 11.5)
+    );
+    /* Text on ink that isn't white: ≥ 7:1 on --journey-ink for every hue. */
+    --journey-ink-muted: oklch(
+        from var(--journey-lavender) 0.8 calc(c * 0.35) h
+    );
+    --journey-lilac: oklch(from var(--journey-lavender) 0.94 calc(c * 0.3) h);
+    /* The form half of the sign-in pages and its input fill. */
+    --journey-surface: var(--journey-paper);
+    --journey-field: oklch(from var(--journey-paper) 0.982 c h);
 
     /* Map tokens — themable. Status colours (online/offline/idle/moving) stay
        semantic and remain hardcoded inside leaflet-map.tsx. */
@@ -418,6 +515,14 @@
     --popover-foreground: oklch(0.95 0.005 277);
     --primary: oklch(0.65 0.2 277);
     --primary-foreground: oklch(1 0 0);
+    /* --primary stays light here because it is also text on dark surfaces;
+       text-bearing fills use the clamped shade instead, so the fill
+       foreground resolves to white (white on L ≤ 0.50 is ≥ 6:1). */
+    --primary-fill: var(--primary-strong);
+    /* Lifted so brand text stays ≥ 4.5:1 on every dark surface, up to
+       --secondary (worst hue 5.75:1); a personal accent's inline --primary
+       overrides .dark, so the lift must be derived, not a fixed value. */
+    --primary-text: oklch(from var(--primary) max(l, 0.7) c h);
     --secondary: oklch(0.2 0.015 277);
     --secondary-foreground: oklch(0.95 0.005 277);
     --muted: oklch(0.18 0.012 277);
@@ -455,7 +560,10 @@
     --status-critical-bg: oklch(24% 0.1 25);
     --status-critical-foreground: oklch(92% 0.06 25);
     --status-info: var(--primary);
-    --status-info-bg: var(--accent);
+    /* A dark brand tint like the other status backgrounds (was --accent, a
+       solid L ~0.40 shade that held info text at 2.9:1). Info text on it is
+       --primary-text (L >= 0.70) via --text-color-status-info. */
+    --status-info-bg: oklch(from var(--primary) 0.24 calc(c * 0.4) h);
     --status-info-foreground: var(--accent-foreground);
     --status-neutral: var(--muted-foreground);
     --status-neutral-bg: var(--muted);
@@ -467,6 +575,7 @@
     /* Tier-2 tone cycle — dark variant. Only the theme-aware tone flips;
        the --tone-chip-* fills intentionally keep their :root (deep) values. */
     --tone-teal: oklch(72% 0.12 200);
+    --tone-teal-foreground: oklch(92% 0.04 200);
 
     /* Category tokens — dark variants (same derivation pattern, different opacity) */
     --category-ops: var(--primary);
@@ -521,9 +630,18 @@
     --brand-deep: oklch(from var(--primary) calc(l + 0.06) c h);
     --brand-tint-deep: oklch(from var(--primary) 0.42 0.1 h);
     --text-faint: oklch(from var(--foreground) 0.5 c h);
+
+    /* Journey sign-in pages in dark mode: the form half turns dark too. */
+    --journey-surface: oklch(from var(--primary) 0.165 0.018 calc(h + 12));
+    --journey-field: oklch(from var(--primary) 0.2 0.022 calc(h + 12));
 }
 
 @layer base {
+    /* Keep page widths stable when switching between short and long views. */
+    html {
+        scrollbar-gutter: stable;
+    }
+
     * {
         @apply border-border;
     }
@@ -570,35 +688,63 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 .btn-soft-secondary {
     border-radius: calc(var(--radius) - 2px);
     font-weight: 550;
-    transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+    transition:
+        background-color 0.16s ease,
+        border-color 0.16s ease,
+        box-shadow 0.16s ease,
+        transform 0.16s ease;
 }
 .btn-soft-primary {
-    background: linear-gradient(180deg, color-mix(in oklch, var(--primary) 82%, var(--primary-foreground)), var(--primary) 55%);
-    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--primary-foreground) 25%, transparent), 0 1px 2px color-mix(in oklch, var(--primary) 50%, transparent), 0 4px 14px -4px color-mix(in oklch, var(--primary) 60%, transparent);
+    /* 90% (was 82%) keeps the highlight ≥ 4.5:1 under white text for every
+       hue on an L ≤ 0.50 fill (worst case: green, 4.57:1); mixed with white
+       (not the foreground) so it stays a highlight when a light brand takes
+       ink text. */
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--primary-fill) 90%, oklch(1 0 0)),
+        var(--primary-fill) 55%
+    );
+    box-shadow:
+        inset 0 1px 0
+            color-mix(in oklch, var(--primary-foreground) 25%, transparent),
+        0 1px 2px color-mix(in oklch, var(--primary) 50%, transparent),
+        0 4px 14px -4px color-mix(in oklch, var(--primary) 60%, transparent);
 }
 .btn-soft-primary:hover:not(:disabled) {
-    box-shadow: inset 0 1px 0 color-mix(in oklch, var(--primary-foreground) 25%, transparent), 0 2px 4px color-mix(in oklch, var(--primary) 50%, transparent), 0 8px 20px -4px color-mix(in oklch, var(--primary) 65%, transparent);
+    box-shadow:
+        inset 0 1px 0
+            color-mix(in oklch, var(--primary-foreground) 25%, transparent),
+        0 2px 4px color-mix(in oklch, var(--primary) 50%, transparent),
+        0 8px 20px -4px color-mix(in oklch, var(--primary) 65%, transparent);
 }
 .btn-soft-secondary {
-    box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent), inset 0 -1px 0 color-mix(in oklch, var(--foreground) 4%, transparent);
+    box-shadow:
+        0 1px 2px color-mix(in oklch, var(--foreground) 5%, transparent),
+        inset 0 -1px 0 color-mix(in oklch, var(--foreground) 4%, transparent);
 }
 .btn-soft-secondary:hover:not(:disabled) {
     border-color: color-mix(in oklch, var(--primary) 35%, var(--border));
     box-shadow: 0 3px 8px color-mix(in oklch, var(--foreground) 8%, transparent);
 }
 @media (prefers-reduced-motion: no-preference) {
-    .btn-soft-primary:hover:not(:disabled), .btn-soft-secondary:hover:not(:disabled) { transform: translateY(-1px); }
-    .btn-soft-primary:active:not(:disabled), .btn-soft-secondary:active:not(:disabled) { transform: translateY(.5px); }
+    .btn-soft-primary:hover:not(:disabled),
+    .btn-soft-secondary:hover:not(:disabled) {
+        transform: translateY(-1px);
+    }
+    .btn-soft-primary:active:not(:disabled),
+    .btn-soft-secondary:active:not(:disabled) {
+        transform: translateY(0.5px);
+    }
 }
 
 /* Frontline actions retain a readable target even when a compact shared size is used. */
-    /* Clip decorative overflow without making the hero a hidden scroll area.
+/* Clip decorative overflow without making the hero a hidden scroll area.
        Focusing a tab must not scroll the title out of its own banner. */
-    .my-day-desktop .eh-header {
-        overflow: clip;
-    }
+.my-day-desktop .eh-header {
+    overflow: clip;
+}
 
-    .my-day-desktop [data-slot='button'],
+.my-day-desktop [data-slot='button'],
 .my-day-desktop [role='tab'] {
     min-height: 44px;
 }
@@ -678,30 +824,39 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
      * lighter dark shades. White header text stays comfortably AA. */
     --eh-ink: oklch(from var(--primary) 0.3 calc(c * 0.6) h);
     --eh-sky-mid: oklch(from var(--primary) 0.42 calc(c * 0.8) h);
+    /* The bottom of the band: the brand, no lighter than L 0.46. The rail's
+       tab labels (80% sky text) sit here, over both corner blooms, and need
+       4.5:1 for every hue (worst measured: green, 4.71:1). The blooms take
+       the same floor and add no white, so they tint rather than lighten. */
+    --eh-floor: oklch(from var(--primary) min(l, 0.46) c h);
+    /* Inside the band, "primary foreground" means band text: page content
+       passed into the header's slots still says text-primary-foreground, so
+       redefine it here (both the raw token and Tailwind's colour variable,
+       which is otherwise resolved once on :root). Portalled popovers render
+       outside the band and keep the normal token. */
+    --primary-foreground: var(--band-foreground);
+    --color-primary-foreground: var(--band-foreground);
     position: relative;
     border-radius: 16px;
-    overflow: hidden;
+    /* Clip the decorative arcs without creating a scroll container. A focused
+       rail control must not scroll the identity out of its own header on resize. */
+    overflow: clip;
     background:
         radial-gradient(
             56% 78% at 80% 108%,
-            color-mix(
-                    in oklch,
-                    color-mix(in oklch, var(--primary) 75%, white) 92%,
-                    transparent
-                )
-                0%,
+            color-mix(in oklch, var(--eh-floor) 92%, transparent) 0%,
             transparent 72%
         ),
         radial-gradient(
             48% 64% at 16% 112%,
-            color-mix(in oklch, var(--primary) 55%, transparent) 0%,
+            color-mix(in oklch, var(--eh-floor) 55%, transparent) 0%,
             transparent 68%
         ),
         linear-gradient(
             to bottom,
             var(--eh-ink) 0%,
             var(--eh-sky-mid) 55%,
-            var(--primary) 100%
+            var(--eh-floor) 100%
         );
 }
 /* Decorative orbit arcs — two giant hairline circles clipped by the band. */
@@ -747,7 +902,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     height: 48px;
     border-radius: 50%;
     border: 3px solid color-mix(in oklch, var(--primary) 75%, white);
-    color: var(--primary-foreground);
+    color: var(--band-foreground);
     box-shadow:
         0 0 18px color-mix(in oklch, var(--primary) 50%, transparent),
         inset 0 0 12px color-mix(in oklch, var(--primary) 35%, transparent);
@@ -787,7 +942,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
         transparent
     );
     border: 1px solid
-        color-mix(in oklch, var(--primary-foreground) 16%, transparent);
+        color-mix(in oklch, var(--band-foreground) 16%, transparent);
     transition:
         transform 0.15s ease,
         background-color 0.15s ease,
@@ -800,11 +955,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
         var(--eh-ink, oklch(0.17 0.01 277)) 62%,
         transparent
     );
-    border-color: color-mix(
-        in oklch,
-        var(--primary-foreground) 34%,
-        transparent
-    );
+    border-color: color-mix(in oklch, var(--band-foreground) 34%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
     .eh-meter,
@@ -813,14 +964,19 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
         transition: none;
     }
 }
+/* Status tones on the dark sky keep their fixed status hue and chroma but
+   never fall below these lightnesses. Light mode's status tokens are dark
+   (they're tuned for white cards), and a plain mix toward white left warning
+   labels at 3.5:1 and critical ones at 4.0:1 on the meter glass. Worst
+   measured with these floors, across brands and both modes: 4.86:1. */
 .eh-meter--critical {
-    --eh-meter-accent: color-mix(in oklch, var(--status-critical) 55%, white);
+    --eh-meter-accent: oklch(from var(--status-critical) max(l, 0.84) c h);
 }
 .eh-meter--warning {
-    --eh-meter-accent: color-mix(in oklch, var(--status-warning) 60%, white);
+    --eh-meter-accent: oklch(from var(--status-warning) max(l, 0.82) c h);
 }
 .eh-meter--success {
-    --eh-meter-accent: color-mix(in oklch, var(--status-success) 55%, white);
+    --eh-meter-accent: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 .eh-meter--critical,
 .eh-meter--warning,
@@ -833,11 +989,11 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     border-color: color-mix(in oklch, var(--eh-meter-accent) 75%, transparent);
 }
 .eh-meter .eh-meter-label {
-    color: color-mix(in oklch, var(--primary-foreground) 62%, transparent);
+    color: color-mix(in oklch, var(--band-foreground) 62%, transparent);
 }
 .eh-meter .eh-meter-value,
 .eh-meter .eh-meter-big {
-    color: var(--primary-foreground);
+    color: var(--band-foreground);
 }
 .eh-meter--critical .eh-meter-label,
 .eh-meter--critical .eh-meter-value,
@@ -870,7 +1026,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     height: 5px;
     border-radius: 3px;
     overflow: hidden;
-    background: color-mix(in oklch, var(--primary-foreground) 16%, transparent);
+    background: color-mix(in oklch, var(--band-foreground) 16%, transparent);
 }
 .eh-meter-bar > i {
     display: block;
@@ -892,16 +1048,335 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
     opacity: 0.85;
 }
 .eh-meter-delta--good {
-    color: color-mix(in oklch, var(--status-success) 55%, white);
+    color: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 .eh-meter-delta--bad {
-    color: color-mix(in oklch, var(--status-critical) 55%, white);
+    color: oklch(from var(--status-critical) max(l, 0.84) c h);
 }
 .eh-meter-donut-arc {
-    stroke: color-mix(in oklch, var(--status-success) 55%, white);
+    stroke: oklch(from var(--status-success) max(l, 0.82) c h);
 }
 .eh-meter-donut-v {
-    color: color-mix(in oklch, var(--status-success) 55%, white);
+    color: oklch(from var(--status-success) max(l, 0.82) c h);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Header facts and the one strip (approved by Stephan 23 Oct 2026 with the
+ * Health & safety drawings, design viewer v35) — page-header-strip.tsx.
+ * Same dark glass and fixed status floors as the meter blocks: facts are
+ * value + label chips; numbers are up to four equal boxes (number first);
+ * stages are a record's stage line with its next step on top.
+ * ────────────────────────────────────────────────────────────────────────── */
+.eh-fact,
+.eh-number,
+.eh-stages {
+    --eh-glass: color-mix(in oklch, var(--eh-ink, oklch(0.17 0.01 277)) 45%, transparent);
+    --eh-edge: color-mix(in oklch, var(--band-foreground) 16%, transparent);
+    --eh-crit: oklch(from var(--status-critical) max(l, 0.84) c h);
+    --eh-warn: oklch(from var(--status-warning) max(l, 0.82) c h);
+    --eh-ok: oklch(from var(--status-success) max(l, 0.82) c h);
+}
+.eh-fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 0 11px;
+    border-radius: 999px;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+    font-size: calc(12.5rem / 14);
+    white-space: nowrap;
+}
+.eh-fact b {
+    font-weight: 650;
+}
+.eh-fact em {
+    font-style: normal;
+    color: color-mix(in oklch, var(--band-foreground) 78%, transparent);
+}
+.eh-fact > i {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--band-foreground);
+}
+.eh-fact--critical {
+    border-color: color-mix(in oklch, var(--eh-crit) 55%, transparent);
+}
+.eh-fact--critical > i {
+    background: var(--eh-crit);
+    box-shadow: 0 0 0 3px color-mix(in oklch, var(--eh-crit) 25%, transparent);
+}
+.eh-fact--warning {
+    border-color: color-mix(in oklch, var(--eh-warn) 55%, transparent);
+}
+.eh-fact--warning > i {
+    background: var(--eh-warn);
+}
+.eh-fact--success > i {
+    background: var(--eh-ok);
+}
+.eh-fact--neutral > i {
+    background: color-mix(in oklch, var(--band-foreground) 55%, transparent);
+}
+
+.eh-numbers {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+@media (max-width: 1023px) {
+    .eh-numbers {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+.eh-number {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    text-align: left;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+    transition:
+        transform 0.15s ease,
+        background-color 0.15s ease,
+        border-color 0.15s ease;
+}
+.eh-number:hover {
+    transform: translateY(-1px);
+    background: color-mix(in oklch, var(--eh-ink, oklch(0.17 0.01 277)) 62%, transparent);
+    border-color: color-mix(in oklch, var(--band-foreground) 34%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+    .eh-number,
+    .eh-number:hover {
+        transform: none;
+        transition: none;
+    }
+}
+.eh-number-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: calc(22rem / 14);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.eh-number-text {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+}
+.eh-number-text em {
+    font-style: normal;
+    font-size: calc(12.5rem / 14);
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.eh-number-text small {
+    font-size: calc(11.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 75%, transparent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.eh-number-go {
+    position: absolute;
+    top: 7px;
+    right: 8px;
+    width: 11px;
+    height: 11px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.eh-number:hover .eh-number-go,
+.eh-number:focus-visible .eh-number-go {
+    opacity: 1;
+}
+.eh-number-ring {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: conic-gradient(
+        currentColor calc(var(--p) * 1%),
+        color-mix(in oklch, var(--band-foreground) 22%, transparent) 0
+    );
+    -webkit-mask: radial-gradient(circle, transparent 0 6px, #000 7px);
+    mask: radial-gradient(circle, transparent 0 6px, #000 7px);
+}
+.eh-number--critical {
+    border-color: color-mix(in oklch, var(--eh-crit) 60%, transparent);
+}
+.eh-number--critical .eh-number-value,
+.eh-number--critical .eh-number-text em {
+    color: var(--eh-crit);
+}
+.eh-number--warning {
+    border-color: color-mix(in oklch, var(--eh-warn) 60%, transparent);
+}
+.eh-number--warning .eh-number-value,
+.eh-number--warning .eh-number-text em {
+    color: var(--eh-warn);
+}
+.eh-number--success .eh-number-value {
+    color: var(--eh-ok);
+}
+
+.eh-stages {
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--eh-glass);
+    border: 1px solid var(--eh-edge);
+}
+.eh-next {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin-bottom: 12px;
+}
+.eh-next > b {
+    font-size: calc(15rem / 14);
+    font-weight: 650;
+}
+.eh-next > small {
+    flex-basis: 100%;
+    font-size: calc(12.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-next-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: calc(11rem / 14);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+}
+.eh-next-kicker > i {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--band-foreground);
+}
+.eh-next-kicker--critical {
+    color: var(--eh-crit);
+}
+.eh-next-kicker--critical > i {
+    background: var(--eh-crit);
+}
+.eh-next-kicker--warning {
+    color: var(--eh-warn);
+}
+.eh-next-kicker--warning > i {
+    background: var(--eh-warn);
+}
+.eh-next-kicker--success > i {
+    background: var(--eh-ok);
+}
+.eh-stage-line {
+    position: relative;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.eh-stage-line::before,
+.eh-stage-line::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 7px;
+    height: 2px;
+    border-radius: 2px;
+}
+.eh-stage-line::before {
+    right: 8px;
+    background: color-mix(in oklch, var(--band-foreground) 24%, transparent);
+}
+.eh-stage-line::after {
+    width: calc((100% - 16px) * var(--done, 0));
+    background: var(--band-foreground);
+}
+.eh-stage {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    justify-items: start;
+    align-content: start;
+    gap: 4px;
+    padding-right: 8px;
+}
+.eh-stage:last-child {
+    justify-items: end;
+    padding-right: 0;
+    text-align: right;
+}
+.eh-stage > i {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--eh-ink, oklch(0.17 0.01 277));
+    box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--band-foreground) 50%, transparent);
+}
+/* A stage line the reader can move along (a full-page form's steps): each label is a button. */
+.eh-stage-pick {
+    all: unset;
+    cursor: pointer;
+    border-radius: 4px;
+}
+.eh-stage-pick:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.eh-stage-pick:focus-visible {
+    outline: 2px solid var(--band-foreground);
+    outline-offset: 2px;
+}
+.eh-stage > b,
+.eh-stage > .eh-stage-pick {
+    font-size: calc(12.5rem / 14);
+    font-weight: 650;
+}
+.eh-stage > small {
+    font-size: calc(11.5rem / 14);
+    color: color-mix(in oklch, var(--band-foreground) 75%, transparent);
+}
+.eh-stage--done > i {
+    background: var(--band-foreground);
+    box-shadow: none;
+}
+.eh-stage--todo > b,
+.eh-stage--todo > .eh-stage-pick {
+    color: color-mix(in oklch, var(--band-foreground) 80%, transparent);
+}
+.eh-stage--now > i {
+    box-shadow:
+        inset 0 0 0 4px var(--band-foreground),
+        0 0 12px color-mix(in oklch, var(--band-foreground) 55%, transparent);
+}
+.eh-stage--warning > i {
+    box-shadow:
+        inset 0 0 0 4px var(--eh-warn),
+        0 0 12px color-mix(in oklch, var(--eh-warn) 55%, transparent);
+}
+.eh-stage--critical > i {
+    box-shadow:
+        inset 0 0 0 4px var(--eh-crit),
+        0 0 12px color-mix(in oklch, var(--eh-crit) 55%, transparent);
 }
 
 /* Hide scrollbars on icon sidebar */
@@ -946,6 +1421,79 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 
 .group\/item:hover .icon-gradient-bg svg {
     color: white;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Legacy PageHero band (components/page/page-hero.tsx) — superseded by the
+ * Event Horizon header, kept until each page migrates.
+ *
+ * Its base is --hero-base: the brand by default, a category hue, or an
+ * admin-chosen Site colour. It used to paint that colour raw at 80–100%
+ * alpha, so white text fell to 2.1–4.4:1 on most brands (3.2:1 on the dark
+ * default, 1.6:1 on a light Site colour). Like the sky, the band is now the
+ * colour floored dark and opaque — no lighter than L 0.36 → 0.32 — so 70%
+ * white text holds ≥ 4.84:1 for every brand and Site colour, over the 5% orbs
+ * too (measured in Chrome, which clips out-of-gamut bands brighter; the
+ * worst is a saturated green Site colour). Faint text on it
+ * is therefore never below 70% (80% on a 10% panel, 90% on a 15% tile).
+ * Its text is --band-foreground (always white), so a very light brand reads
+ * as well as any other (amended 2026-10-03).
+ * ────────────────────────────────────────────────────────────────────────── */
+.page-hero {
+    --hero-base: var(--primary);
+    /* Band text, as on the sky: slot content saying text-primary-foreground
+       reads --band-foreground here (see .eh-header). */
+    --primary-foreground: var(--band-foreground);
+    --color-primary-foreground: var(--band-foreground);
+    --hero-tone-success: oklch(
+        from var(--status-success) max(l, 0.84) min(c, 0.12) h
+    );
+    --hero-tone-warning: oklch(
+        from var(--status-warning) max(l, 0.84) min(c, 0.12) h
+    );
+    --hero-tone-critical: oklch(
+        from var(--status-critical) max(l, 0.84) min(c, 0.1) h
+    );
+    --hero-tone-info: oklch(from var(--status-info) max(l, 0.86) min(c, 0.1) h);
+    background: linear-gradient(
+        to bottom right,
+        oklch(from var(--hero-base) min(l, 0.36) c h),
+        oklch(from var(--hero-base) min(l, 0.34) c h),
+        oklch(from var(--hero-base) min(l, 0.32) c h)
+    );
+}
+/* Status tones on the band keep their hue but are lifted like the meter
+   tones — never darker than L 0.84 (info, the brand itself, 0.86) — with
+   chroma capped so Chrome needn't clip them out of gamut, which otherwise
+   costs up to a whole contrast point. The critical badge is a white pill,
+   so its red is instead held DARK (≤ 0.45), which dark mode's light status
+   red otherwise breaks (2.98:1). */
+.page-hero-tone-success {
+    color: var(--hero-tone-success);
+}
+.page-hero-tone-warning {
+    color: var(--hero-tone-warning);
+}
+.page-hero-tone-critical {
+    color: var(--hero-tone-critical);
+}
+.page-hero-tone-info {
+    color: var(--hero-tone-info);
+}
+.page-hero-dot-success {
+    background-color: var(--hero-tone-success);
+}
+.page-hero-dot-warning {
+    background-color: var(--hero-tone-warning);
+}
+.page-hero-dot-critical {
+    background-color: var(--hero-tone-critical);
+}
+.page-hero-dot-info {
+    background-color: var(--hero-tone-info);
+}
+.page-hero-on-white-critical {
+    color: oklch(from var(--status-critical) min(l, 0.45) c h);
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -1008,7 +1556,7 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 /* ──────────────────────────────────────────────────────────────────────────
  * Frontline accessibility helpers (PR 22)
  *
- * Two small primitives so worker-facing controls share a consistent feel:
+ * Small primitives so worker-facing controls share a consistent feel:
  *
  *   .frontline-focus  — clearer, higher-contrast focus ring than the browser
  *                       default for custom buttons/links/chips that don't go
@@ -1018,6 +1566,21 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
  *   .frontline-tap    — enforces a ≥44×44 px hit area without mandating a
  *                       rigid height, so compact chips/icon buttons meet the
  *                       WCAG 2.5.5 (enhanced) target size when applied.
+ *                       The floor is 44 CSS px, not 2.75rem: the root font
+ *                       is --base-font-size (14px by default, 13/16px by
+ *                       user preference), so 2.75rem alone renders at
+ *                       35.75–44px. max() keeps it at 44px or more and
+ *                       still grows with a larger root font.
+ *
+ *   .frontline-hit    — the same ≥44×44 px target for compact controls that
+ *                       must keep their drawn size (row kebabs, pagination,
+ *                       tier-2 tabs, the dialog ✕). An invisible ::after
+ *                       centred on the control takes the pointer; the control
+ *                       itself does not grow. Keep 44px between neighbouring
+ *                       targets' centres or their areas overlap, and keep the
+ *                       area clear of an ancestor's overflow clip. The host
+ *                       becomes position: relative unless a utility
+ *                       (absolute, fixed…) positions it.
  *
  * Nothing here redefines layout or colour beyond the ring; pages opt in by
  * adding the utility class where an audit showed a real issue.
@@ -1032,8 +1595,109 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
 }
 
 .frontline-tap {
-    min-height: 2.75rem; /* 44px */
-    min-width: 2.75rem;
+    min-height: max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
+}
+
+/* Phone chrome uses fixed icon targets. Text preferences still enlarge labels,
+   while root-font scaling cannot force the navigation off the screen. Browser
+   zoom scales these CSS pixels normally; desktop chrome remains unchanged. */
+@media (max-width: 767px) {
+    .frontline-app-header {
+        gap: 4px;
+        padding-inline: 12px;
+    }
+    .frontline-app-header [data-slot='app-header-actions'],
+    .frontline-app-header [data-slot='app-header-actions'] > div {
+        gap: 4px;
+    }
+    .frontline-app-header button[aria-label],
+    .frontline-app-header a[aria-label^='Messages'] {
+        width: 44px;
+        height: 44px;
+        min-width: 44px;
+        min-height: 44px;
+    }
+    .frontline-app-header [data-slot='avatar'] {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+/* Compact control marks retain their shape. Their separate hit area below
+   supplies touch clearance without stretching a switch into a circle. */
+.frontline-dialog
+    :is(button, [role='combobox']):not(
+        .frontline-hit,
+        [data-slot='switch'],
+        [data-slot='checkbox']
+    ),
+.eh-header-frontline :is(button, [role='combobox']):not(.frontline-hit) {
+    min-height: max(44px, 2.75rem);
+    min-width: max(44px, 2.75rem);
+}
+.frontline-dialog
+    :is(
+        input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+        select
+    ),
+.eh-header-frontline input:not([type='hidden']) {
+    min-height: max(44px, 2.75rem);
+}
+
+/* Compact header tabs use .frontline-hit, retaining their 40/34px drawn
+ * shapes while the pseudo-element supplies the 44px interaction target. */
+.eh-meter.frontline-tap {
+    min-width: max(140px, 2.75rem);
+}
+
+/* In the components layer so an `absolute`/`fixed` utility on the host wins. */
+@layer components {
+    .frontline-hit,
+    .frontline-dialog :is([data-slot='switch'], [data-slot='checkbox']) {
+        position: relative;
+    }
+}
+.frontline-hit::after,
+.frontline-dialog :is([data-slot='switch'], [data-slot='checkbox'])::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: max(100%, 44px, 2.75rem);
+    height: max(100%, 44px, 2.75rem);
+    transform: translate(-50%, -50%);
+}
+
+/* Keep neighbouring compact controls' touch areas separate. */
+.frontline-dialog .emar-on-off,
+.frontline-dialog label:has([data-slot='checkbox']) {
+    min-height: max(44px, 2.75rem);
+}
+
+/* The neutral off track must remain visible against light dialog surfaces. */
+.frontline-dialog [data-slot='switch'][data-state='unchecked'] {
+    background-color: var(--muted-foreground);
+}
+
+/* Keep the handle visible on both the active and inactive dark tracks. */
+.dark .frontline-dialog [data-slot='switch-thumb'] {
+    background-color: var(--foreground);
+}
+
+/* A review card can be narrow even inside a desktop two-column wizard. */
+.frontline-dialog .wizard-review-card {
+    container: modal-review / inline-size;
+}
+@container modal-review (max-width: 400px) {
+    .wizard-review-row {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .wizard-review-row > span {
+        max-width: 100%;
+        text-align: left;
+    }
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -1189,4 +1853,222 @@ html[data-density='comfortable'] [data-slot='sidebar-menu-button'] {
    and geofences live in separate Leaflet panes and keep their true colours. */
 .leaflet-tiles-dark {
     filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9);
+}
+
+/* Fleet overview: mute only raster basemap tiles; markers retain status tones. */
+.grayscale-map .leaflet-tile-pane {
+    filter: grayscale(1);
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * The pop-up kit (components/popup/, DESIGN.md "Pop-up kit"; approved by
+ * Stephan 23 Oct 2026 — Control Room first). Two brand marks, both derived
+ * from --primary so Settings › Branding retints them:
+ *   .popup-lens     the round icon lens in a pop-up header (never a rounded
+ *                   square). Critical/warning lenses use the fixed status
+ *                   pairs — safety tones never follow the brand.
+ *   .popup-horizon  the 2px horizon line on the top edge of anything that
+ *                   floats (dialog, confirm, selection bar).
+ * ────────────────────────────────────────────────────────────────────────── */
+.popup-lens {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    color: var(--primary);
+    background:
+        radial-gradient(
+            110% 110% at 50% 118%,
+            color-mix(in oklch, var(--primary) 22%, transparent) 0%,
+            transparent 62%
+        ),
+        color-mix(in oklch, var(--primary-fill) 9%, var(--card));
+    box-shadow:
+        inset 0 0 0 1.5px color-mix(in oklch, currentColor 36%, transparent),
+        0 0 0 5px color-mix(in oklch, currentColor 7%, transparent);
+}
+.popup-lens--sm {
+    width: 30px;
+    height: 30px;
+    box-shadow: inset 0 0 0 1.5px var(--border);
+    background: transparent;
+    color: var(--muted-foreground);
+}
+.popup-lens--critical {
+    color: var(--status-critical);
+    background: var(--status-critical-bg);
+}
+.popup-lens--warning {
+    color: var(--status-warning);
+    background: var(--status-warning-bg);
+}
+/* No `position` here: this rule is outside Tailwind's layers, so it would
+   beat the dialog's `fixed` and drop the pop-up to the foot of the page.
+   Every frame that uses it is already fixed, sticky or `relative`. */
+.popup-horizon::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            20%,
+        var(--primary) 50%,
+        color-mix(
+                in oklch,
+                oklch(from var(--primary) 0.83 calc(c * 0.47) calc(h + 11.5)) 75%,
+                transparent
+            )
+            80%,
+        transparent 100%
+    );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Control Room's own marks (Stephan, 24 Oct 2026: "light board + Oblivion
+ * details"; components/control-room/live-response/target-lens.tsx).
+ *   .cr-lens  the countdown lens — the pop-up kit's round lens with a ring
+ *             that empties as a response target gets closer. Brand while
+ *             there's time; the fixed warning / critical pairs when it's
+ *             close or missed (safety tones never follow the brand); grey
+ *             when there's no target and it shows how long it has waited.
+ *   .cr-live  the "Live · updated 9:46 am" mark on the header band.
+ * ────────────────────────────────────────────────────────────────────────── */
+.cr-lens {
+    --cr-lens-tone: var(--primary);
+    --cr-lens-left: 100%;
+    display: grid;
+    place-items: center;
+    align-content: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--cr-lens-tone);
+    background:
+        radial-gradient(
+            closest-side,
+            color-mix(in oklch, var(--cr-lens-tone) 7%, var(--card)) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        conic-gradient(
+            var(--cr-lens-tone) var(--cr-lens-left),
+            color-mix(in oklch, var(--cr-lens-tone) 16%, transparent) 0
+        );
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--cr-lens-tone) 7%, transparent);
+    font-variant-numeric: tabular-nums;
+}
+.cr-lens-value {
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.01em;
+}
+.cr-lens-unit {
+    margin-top: 2px;
+    font-size: 9.5px;
+    font-weight: 600;
+    line-height: 1;
+    color: var(--muted-foreground);
+}
+.cr-lens--lg {
+    width: 68px;
+    height: 68px;
+    box-shadow: 0 0 0 6px color-mix(in oklch, var(--cr-lens-tone) 8%, transparent);
+}
+.cr-lens--lg .cr-lens-value {
+    font-size: 18px;
+}
+.cr-lens--warning {
+    --cr-lens-tone: var(--status-warning);
+}
+.cr-lens--critical {
+    --cr-lens-tone: var(--status-critical);
+}
+.cr-lens--neutral {
+    --cr-lens-tone: var(--muted-foreground);
+}
+.cr-lens--late {
+    background:
+        radial-gradient(
+            closest-side,
+            var(--status-critical-bg) calc(100% - 4px),
+            transparent calc(100% - 3.5px)
+        ),
+        var(--status-critical);
+}
+
+.cr-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.cr-live-dot {
+    position: relative;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: oklch(from var(--live) 0.86 calc(c * 1.4) h);
+}
+.cr-live--stale .cr-live-dot {
+    background: oklch(from var(--status-warning) 0.86 c h);
+}
+@media (prefers-reduced-motion: no-preference) {
+    .cr-live:not(.cr-live--stale) .cr-live-dot::after {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        border: 1.5px solid oklch(from var(--live) 0.86 calc(c * 1.4) h);
+        animation: cr-live-pulse 2.4s ease-out infinite;
+    }
+    .cr-lens--late {
+        animation: cr-lens-late 2.4s ease-in-out infinite;
+    }
+}
+@keyframes cr-live-pulse {
+    0% {
+        opacity: 0.7;
+        transform: scale(0.8);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(2.2);
+    }
+}
+@keyframes cr-lens-late {
+    0%,
+    100% {
+        box-shadow: 0 0 0 4px color-mix(in oklch, var(--status-critical) 10%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 7px color-mix(in oklch, var(--status-critical) 18%, transparent);
+    }
+}
+/* A row that arrived since the list first drew glows once (the critical
+   notice above the list says it in words). */
+@media (prefers-reduced-motion: no-preference) {
+    .cr-row-new {
+        animation: cr-row-new 4s ease-out 1;
+    }
+}
+@keyframes cr-row-new {
+    0%,
+    30% {
+        background-color: color-mix(in oklch, var(--live) 16%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
 }

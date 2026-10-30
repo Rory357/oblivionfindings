@@ -8,6 +8,13 @@ use Illuminate\Database\Seeder;
 
 class OperationsPermissionsSeeder extends Seeder
 {
+    /** Read access to the operations dashboard, by role (view only). */
+    public const DASHBOARD_ROLE_GRANTS = [
+        'provider_manager' => ['operations.dashboard.view'],
+        'ceo' => ['operations.dashboard.view', 'operations.dashboard.viewAllSites'],
+        'coo' => ['operations.dashboard.view', 'operations.dashboard.viewAllSites'],
+    ];
+
     public function run(): void
     {
         $permissions = [
@@ -165,11 +172,26 @@ class OperationsPermissionsSeeder extends Seeder
             $created++;
         }
 
-        // Attach all to admin role
+        // Attach all to admin role, except the independent decisions that only
+        // RbacSeeder's explicit product policy assigns.
         $adminRole = Role::where('name', 'admin')->first();
         if ($adminRole) {
-            $allPermissionIds = Permission::pluck('id')->all();
+            $allPermissionIds = Permission::query()
+                ->whereNotIn('key', RbacSeeder::RESTRICTED_INDEPENDENT_AUTHORITY)
+                ->where('key', 'not like', 'securityDevices.endpoints.script%')
+                ->pluck('id')
+                ->all();
             $adminRole->permissions()->sync($allPermissionIds);
+        }
+
+        // The dashboard is for managers too (routes/operations.php). Provider
+        // managers read it for their own sites; the CEO and COO for every site.
+        // Grant migration: 2026_10_20_090000_grant_operations_dashboard_to_managers.
+        foreach (self::DASHBOARD_ROLE_GRANTS as $name => $keys) {
+            $role = Role::where('name', $name)->first();
+            if ($role) {
+                $role->permissions()->syncWithoutDetaching(Permission::whereIn('key', $keys)->pluck('id'));
+            }
         }
 
         $this->command->info("Created/verified {$created} Operations permissions. Admin role synced.");

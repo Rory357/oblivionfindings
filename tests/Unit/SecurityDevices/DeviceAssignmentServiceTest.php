@@ -15,6 +15,7 @@ use App\Services\ConsentValidationService;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
 class DeviceAssignmentServiceTest extends TestCase
@@ -218,16 +219,18 @@ class DeviceAssignmentServiceTest extends TestCase
             $site->id,
             $user->id,
         );
-        $genericConsent = ClientConsent::query()->create([
-            'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create([
+        // Valid tracking evidence reaches the resident-purpose callback under lock.
+        $genericConsent = AuthoritativeConsentFixture::manualSelf(
+            $client,
+            ConsentType::factory()->create([
                 'name' => 'Fleet Tracking',
+                'purpose' => 'Fleet location tracking',
                 'active' => true,
-            ])->id,
-            'status' => 'given',
-            'given_at' => now()->subDay(),
-            'expires_at' => now()->addMonth(),
-        ]);
+            ]),
+            $user,
+        );
+        $this->assertTrue(ConsentValidationService::isValidTrackingConsent($genericConsent, $client));
+        $this->assertFalse(ConsentValidationService::isValidResidentLocationConsent($genericConsent, $client));
 
         try {
             $this->service->transfer(
@@ -301,17 +304,16 @@ class DeviceAssignmentServiceTest extends TestCase
             'status' => 'active',
         ]);
         $user = User::factory()->create();
-        $consent = ClientConsent::create([
-            'client_id' => $client->id,
-            'consent_type_id' => ConsentType::factory()->create([
+        $consent = AuthoritativeConsentFixture::manualSelf(
+            $client,
+            ConsentType::factory()->create([
                 'name' => 'Personal Tracker (Wandering Risk)',
                 'purpose' => 'Client personal safety tracking',
-            ])->id,
-            'status' => 'given',
-            'given_at' => now(),
-            'given_by_user_id' => $user->id,
-            'given_method' => 'verbal',
-        ]);
+                'active' => true,
+            ]),
+            $user,
+        );
+        $this->assertTrue(ConsentValidationService::isValidResidentLocationConsent($consent, $client));
 
         $assignment = $this->service->assign(
             $device,
@@ -323,6 +325,8 @@ class DeviceAssignmentServiceTest extends TestCase
 
         $this->assertNotNull($assignment->id);
         $this->assertEquals($consent->id, $assignment->consent_id);
+        $this->assertEquals($client->site_id, $assignment->custody_site_id);
+        $this->assertSame(1, $device->assignments()->active()->count());
     }
 
     public function test_invalid_target_type_throws(): void

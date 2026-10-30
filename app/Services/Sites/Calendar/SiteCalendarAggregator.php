@@ -12,6 +12,7 @@ use App\Services\Sites\Calendar\Providers\DamageObligationProvider;
 use App\Services\Sites\Calendar\Providers\DrillObligationProvider;
 use App\Services\Sites\Calendar\Providers\EmergencyPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\FleetServiceScheduleObligationProvider;
+use App\Services\Sites\Calendar\Providers\FleetVehicleReminderObligationProvider;
 use App\Services\Sites\Calendar\Providers\HazardObligationProvider;
 use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
@@ -43,6 +44,41 @@ class SiteCalendarAggregator
     /** @var CalendarObligationProvider[] */
     private array $providers;
 
+    private array $participationAccess = ['status' => 'not_requested', 'reason' => null];
+
+    /** PPE dates through the PPE source read: the viewer's PPE access and current Sites. No access means no PPE items. */
+    private function ppeForViewer(array $siteIds, Carbon $start, Carbon $end, mixed $viewer): array
+    {
+        if (! $viewer instanceof \App\Models\User) {
+            return [];
+        }
+        try {
+            return app(\App\Services\HealthSafety\PpeSiteReadService::class)
+                ->obligationsForViewer(array_values(array_map('intval', $siteIds)), $start, $end, $viewer);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $denied) {
+            if (! in_array($denied->getStatusCode(), [403, 404], true)) {
+                throw $denied;
+            }
+
+            return [];
+        }
+    }
+
+    /** A calendar item from its array form (the PPE read adds integrity facts the item doesn't carry). */
+    private static function calendarItem(array $row): CalendarItem
+    {
+        static $params = null;
+        $params ??= array_map(fn (\ReflectionParameter $p) => $p->getName(), (new \ReflectionMethod(CalendarItem::class, '__construct'))->getParameters());
+
+        return new CalendarItem(...array_intersect_key($row, array_flip($params)));
+    }
+
+    /** How the last range read admitted worker-participation obligations (they need a canonical viewer read). */
+    public function participationSourceAccess(): array
+    {
+        return $this->participationAccess;
+    }
+
     /**
      * @param  CalendarObligationProvider[]|null  $providers  Defaults to the full registry.
      */
@@ -72,6 +108,7 @@ class SiteCalendarAggregator
             new AssetMaintenanceObligationProvider(),
             new MaintenanceWindowObligationProvider(),
             new FleetServiceScheduleObligationProvider(),
+            new FleetVehicleReminderObligationProvider(),
             new EmergencyPlanObligationProvider(),
             new DrillObligationProvider(),
             new PpeObligationProvider(),
@@ -90,6 +127,7 @@ class SiteCalendarAggregator
      */
     public function itemsForRange(array $siteIds, Carbon $start, Carbon $end, array $filters = []): array
     {
+        $this->participationAccess = ['status' => 'not_requested', 'reason' => null];
         if ($siteIds === []) {
             return [];
         }
@@ -118,7 +156,22 @@ class SiteCalendarAggregator
                 continue;
             }
 
-            foreach ($provider->obligations($siteIds, $start, $end) as $item) {
+            // Participation, drill and PPE obligations are read for the explicit viewer (their own source access);
+            // without one, the signed-in user (request()->user() is empty outside a web request).
+            $viewer = array_key_exists('viewer', $filters) ? $filters['viewer'] : (request()->user() ?? auth()->user());
+            if ($provider instanceof PpeObligationProvider) {
+                $obligations = array_map(fn (array $row): CalendarItem => self::calendarItem($row), $this->ppeForViewer($siteIds, $start, $end, $viewer));
+            } elseif ($provider instanceof WorkerParticipationObligationProvider) {
+                $read = $provider->readForViewer($siteIds, $start, $end, $viewer,
+                    $filters['health_safety_context'] ?? null, $filters['participation_access'] ?? null);
+                $this->participationAccess = $read['source_access'];
+                $obligations = array_map(fn (array $facts): CalendarItem => new CalendarItem(...$facts), $read['items']);
+            } else {
+                $obligations = $provider instanceof DrillObligationProvider
+                    ? $provider->obligationsForViewer($siteIds, $start, $end, $viewer)
+                    : $provider->obligations($siteIds, $start, $end);
+            }
+            foreach ($obligations as $item) {
                 $items[] = $item;
             }
         }

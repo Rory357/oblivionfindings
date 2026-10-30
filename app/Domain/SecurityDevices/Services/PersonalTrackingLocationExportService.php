@@ -7,8 +7,9 @@ use App\Models\Client;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Integration\IntegrationEventHistoryService;
-use Illuminate\Support\Carbon;
-use Illuminate\Validation\ValidationException;
+use App\Services\Tracking\ClientLocationAccessService;
+use App\Services\Tracking\ClientLocationReportWindow;
+use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class PersonalTrackingLocationExportService
@@ -16,120 +17,68 @@ class PersonalTrackingLocationExportService
     use SanitizesCsvOutput;
 
     public function __construct(
-        private readonly PersonalTrackingPrivacyService $privacy,
+        private readonly ClientLocationAccessService $access,
+        private readonly ClientLocationReportWindow $windows,
         private readonly IntegrationEventHistoryService $history,
     ) {}
 
-    /**
-     * @param  array{reason: string, date_from: string, date_to: string, event_types?: array<int, string>}  $data
-     */
     public function export(Client $client, User $user, array $data): StreamedResponse
     {
-        abort_unless($user->canDo('assets.telemetry.export'), 403);
-
-        $assignment = $this->privacy->authorisedClientAssignment($client);
-        abort_unless($assignment, 403);
-
-        $retentionDays = max(
-            1,
-            (int) ($assignment->retention_days
-                ?? config('fleet.retention.personal_location_days', 90)),
-        );
-        $dateFrom = Carbon::parse($data['date_from'])->startOfDay();
-        $dateTo = Carbon::parse($data['date_to'])->endOfDay();
-        $maximumScopeDays = min(31, $retentionDays);
-        $collectionStart = $assignment->collection_started_at ?? $assignment->assigned_at;
-
-        if (! $collectionStart) {
-            throw ValidationException::withMessages([
-                'date_from' => 'This resident assignment has no authoritative collection start.',
-            ]);
-        }
-        if ($dateFrom->lt($collectionStart)) {
-            $dateFrom = $collectionStart->copy();
-        }
-
-        if ($dateFrom->isBefore(now()->subDays($retentionDays)->startOfDay())) {
-            throw ValidationException::withMessages([
-                'date_from' => "Exports cannot start before the {$retentionDays}-day retention boundary.",
-            ]);
-        }
-
-        if ($dateFrom->diffInDays($dateTo) > $maximumScopeDays) {
-            throw ValidationException::withMessages([
-                'date_to' => "Choose a range of {$maximumScopeDays} days or less.",
-            ]);
-        }
-
-        $filters = [
-            'date_from' => $dateFrom->toDateTimeString(),
-            'date_to' => $dateTo->toDateTimeString(),
-            'event_types' => $data['event_types'] ?? [],
-        ];
-        $locations = $this->history->forDevice(
-            $assignment->device,
-            $filters,
-            true,
-            $retentionDays,
-        );
-
-        // Re-check after the read so a consent withdrawn during export
-        // preparation cannot produce a response from stale in-memory data.
-        $currentAssignment = $this->privacy->authorisedClientAssignment($client);
-        abort_unless(
-            $currentAssignment
-                && (int) $currentAssignment->id === (int) $assignment->id
-                && (int) $currentAssignment->device_id === (int) $assignment->device_id
-                && (int) $currentAssignment->consent_id === (int) $assignment->consent_id,
-            403,
-        );
-
-        AuditLogger::logOrFail('tracking.location_export.authorised', $client, [
-            'actor_id' => $user->id,
-            'assignment_id' => $assignment->id,
-            'device_id' => $assignment->device_id,
-            'consent_id' => $assignment->consent_id,
-            'reason' => trim($data['reason']),
-            'date_from' => $dateFrom->toDateString(),
-            'date_to' => $dateTo->toDateString(),
-            'event_types' => array_values($data['event_types'] ?? []),
-            'row_count' => $locations->count(),
-            'retention_days' => $retentionDays,
-        ]);
-
-        return response()->streamDownload(function () use ($locations): void {
-            $handle = fopen('php://output', 'wb');
-            if ($handle === false) {
-                return;
-            }
-
-            $this->putCsv($handle, [
-                'Timestamp',
-                'Latitude',
-                'Longitude',
-                'Display location',
-                'Speed km/h',
-                'Battery %',
-                'Event type',
-            ]);
-
+        $data = Validator::make($data, [
+            'reason' => ['required', 'string', 'min:3', 'max:500'],
+            'date_from' => ['required', 'date_format:Y-m-d'], 'date_to' => ['required', 'date_format:Y-m-d'],
+            'event_types' => ['sometimes', 'array', 'max:20'], 'event_types.*' => ['string', 'max:100'],
+        ])->validate();
+        abort_unless($user->fresh()?->canDo('assets.telemetry.export'), 403);
+        $assignment = $this->access->resolve($user, $client);
+        $fingerprint = $this->access->fingerprint($assignment);
+        ['from' => $from, 'to' => $to] = $this->windows->resolve($assignment, $data, 31);
+        $watermark = $this->history->reportWatermark();
+        // Private spool: release no bytes until generation and access checks finish.
+        $handle = fopen('php://temp/maxmemory:2097152', 'w+b');
+        abort_unless($handle !== false, 500);
+        $count = 0;
+        try {
+            $this->putCsv($handle, ['Timestamp', 'Latitude', 'Longitude', 'Display location', 'Speed km/h', 'Battery %', 'Event type', 'Received at', 'Accuracy m', 'Source', 'Source ID']);
+            $locations = $from->greaterThan($to) ? [] : $this->history->reportForDevice($assignment->device, [
+                'date_from' => $from->utc()->toDateTimeString(), 'date_to' => $to->utc()->toDateTimeString(),
+                'event_types' => $data['event_types'] ?? [],
+            ], (int) $assignment->retention_days, $watermark);
             foreach ($locations as $location) {
-                $this->putCsv($handle, [
-                    $location['timestamp'] ?? '',
-                    $location['lat'] ?? '',
-                    $location['lng'] ?? '',
-                    $location['display_location'] ?? '',
-                    $location['speed'] ?? '',
-                    $location['battery'] ?? '',
-                    $location['event_type'] ?? '',
-                ]);
+                abort_if(++$count > 100000, 422, 'This export exceeds 100,000 observations. Choose a shorter period. No partial export was created.');
+                if ($count % 500 === 0) {
+                    $this->access->recheck($user, $client, $fingerprint);
+                }
+                $this->putCsv($handle, array_map(fn ($key) => $location[$key] ?? '', [
+                    'timestamp', 'lat', 'lng', 'display_location', 'speed', 'battery', 'event_type', 'received_at', 'accuracy', 'source', 'source_id',
+                ]));
             }
-
+            $this->access->recheck($user, $client, $fingerprint);
+            abort_unless($user->fresh()?->canDo('assets.telemetry.export'), 403);
+            AuditLogger::logOrFail('tracking.location_export.authorised', $client, [
+                'actor_id' => $user->id, 'assignment_id' => $assignment->id, 'device_id' => $assignment->device_id,
+                'consent_id' => $assignment->consent_id, 'reason' => trim($data['reason']),
+                'date_from' => $from->toISOString(), 'date_to' => $to->toISOString(), 'timezone' => 'Pacific/Auckland',
+                'event_types' => $data['event_types'] ?? [], 'row_count' => $count,
+                'retention_days' => $assignment->retention_days, 'watermark' => $watermark,
+            ]);
+        } catch (\Throwable $exception) {
             fclose($handle);
-        }, "client-location-{$client->id}-{$dateFrom->toDateString()}-{$dateTo->toDateString()}.csv", [
-            'Cache-Control' => 'private, no-store, max-age=0',
-            'Pragma' => 'no-cache',
-            'X-Content-Type-Options' => 'nosniff',
+            throw $exception;
+        }
+
+        return response()->streamDownload(function () use ($handle, $user, $client, $fingerprint): void {
+            try {
+                $this->access->recheck($user, $client, $fingerprint);
+                abort_unless($user->fresh()?->canDo('assets.telemetry.export'), 403);
+                rewind($handle);
+                fpassthru($handle);
+            } finally {
+                fclose($handle);
+            }
+        }, "client-location-{$client->id}-{$data['date_from']}-{$data['date_to']}.csv", [
+            ...ClientLocationAccessService::headers(), 'Content-Type' => 'text/csv; charset=UTF-8',
+            'X-Report-Row-Count' => (string) $count, 'X-Report-Coverage' => 'complete-authorised-window',
         ]);
     }
 }

@@ -119,8 +119,7 @@ class HealthClinicalModuleRecordingTest extends TestCase
                 'data' => ['weight_kg' => 78.4],
                 'protocol_schedule_id' => $schedule->id,
             ])
-            ->assertRedirect('/health-clinical')
-            ->assertSessionHasErrors('protocol_schedule_id');
+            ->assertForbidden();
 
         $schedule->refresh();
         $this->assertSame('pending', $schedule->status);

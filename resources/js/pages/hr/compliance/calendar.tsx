@@ -364,7 +364,7 @@ export default function ComplianceRenewals({
                                             recordRenewal(sheet);
                                             setSheet(null);
                                         }}
-                                        className="flex-1 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+                                        className="flex-1 rounded-lg bg-primary-fill px-3 py-2 text-sm font-semibold text-primary-fill-foreground"
                                     >
                                         Record renewal
                                     </GuardrailButton>

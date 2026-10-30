@@ -1,0 +1,62 @@
+{
+  "at": "2026-09-22T00:05:58.635Z",
+  "finalBundle": "index-C8BrNqqs.js",
+  "errors": [],
+  "checks": [
+    {
+      "name": "Add new vehicle category survives refresh",
+      "result": "pass",
+      "value": "Accessible minibus"
+    },
+    {
+      "name": "Case-insensitive duplicate has no Add new option",
+      "result": "pass"
+    },
+    {
+      "name": "Vehicle editor upload reviewed and saved under VH-014",
+      "result": "pass"
+    },
+    {
+      "name": "Dedicated document upload with expiry creates shared reminder and calendar entry",
+      "result": "pass"
+    },
+    {
+      "name": "Finance request reuses saved vehicle document and appears in queue with file",
+      "result": "pass"
+    },
+    {
+      "name": "Archive retains original under All history",
+      "result": "pass"
+    },
+    {
+      "name": "Report-only Finance access blocked and catalogue Add new absent",
+      "result": "pass"
+    },
+    {
+      "name": "Driver search narrows trips to selected driver",
+      "result": "pass"
+    },
+    {
+      "name": "Timeline event updates map location and point; overspeed time is 8:07 am",
+      "result": "pass"
+    },
+    {
+      "name": "Changing recorded point clears stale event label",
+      "result": "pass"
+    },
+    {
+      "name": "1100px layout has no horizontal overflow; map 533x360",
+      "result": "pass"
+    },
+    {
+      "name": "Duplicate trip heading removed",
+      "result": "pass"
+    }
+  ],
+  "scope": "Targeted browser checks of changed paths; source audit covers additional modal definitions. First workflow screenshots precede final label, source-link and date-conflict refinements.",
+  "limitations": [
+    "Records and uploaded files reset on reload; catalogue entries persist in this browser only",
+    "Finance queue and locations are synthetic; no real delivery, transaction or geocoding",
+    "PDF/Excel generator unchanged; v6 limitations still apply"
+  ]
+}

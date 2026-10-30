@@ -1,22 +1,25 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
-use App\Models\FleetGeofenceState;
+use App\Models\BoundaryVersion;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Fleet\FleetGeofenceService;
 use App\Services\Sites\SiteReadinessService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
-function siteGeofenceTestUser(string $roleName = 'admin'): User
+function siteGeofenceTestUser(string $roleName = 'admin', ?Site $site = null): User
 {
     $user = User::factory()->create([
         'role' => $roleName,
@@ -26,6 +29,10 @@ function siteGeofenceTestUser(string $roleName = 'admin'): User
     $role = Role::query()->where('name', $roleName)->first();
     if ($role) {
         $user->roles()->syncWithoutDetaching([$role->id]);
+    }
+    if ($site) {
+        HrEmployeeProfile::factory()->create(['user_id' => $user->id, 'primary_site_id' => $site->id,
+            'secondary_site_ids' => [], 'is_active' => true, 'start_date' => today()->subYear(), 'end_date' => null]);
     }
 
     return $user;
@@ -39,140 +46,57 @@ function siteGeofenceCircleShape(float $lat = -36.8485, float $lng = 174.7633): 
     ];
 }
 
-test('site geofence can be created with assigned assets and completes readiness item', function () {
-    $user = siteGeofenceTestUser();
-    $site = Site::factory()->create([
-        'name' => 'Kauri House',
-        'type' => 'house',
-        'latitude' => -36.8485,
-        'longitude' => 174.7633,
-        'is_active' => true,
-    ]);
-    $assets = Asset::factory()->count(2)->forSite($site)->create();
+function siteBoundaryPayload(Site $site): array
+{
+    return ['name' => 'Shared QA area', 'address' => 'Verified site entrance', 'site_id' => $site->id,
+        'geometry' => ['type' => 'circle', ...siteGeofenceCircleShape()], 'uses' => ['Vehicles', 'Assets'],
+        'verified' => true, 'reason' => 'Reviewed shared area.', 'request_key' => (string) Str::uuid()];
+}
 
-    $this->actingAs($user)
-        ->post("/sites/{$site->id}/geofence", [
-            'name' => 'Kauri House Geofence',
-            'type' => 'circle',
-            'shape' => siteGeofenceCircleShape(),
-            'breach_type' => 'both',
-            'is_active' => true,
-            'asset_ids' => $assets->pluck('id')->all(),
-        ])
-        ->assertRedirect();
-
-    $geofence = AssetGeofence::query()
-        ->where('site_id', $site->id)
-        ->first();
-
-    expect($geofence)->not->toBeNull()
-        ->and($geofence->asset_id)->toBeNull()
-        ->and($geofence->scope)->toBe('house')
-        ->and($geofence->breach_type)->toBe('both');
-
-    foreach ($assets as $asset) {
-        $this->assertDatabaseHas('asset_geofence_assignments', [
-            'asset_geofence_id' => $geofence->id,
-            'asset_id' => $asset->id,
-        ]);
-    }
-
+test('site boundary creation stays inactive and completes geometry readiness', function () {
+    $site = Site::factory()->create(['is_active' => true]);
+    $user = siteGeofenceTestUser('admin', $site);
+    $data = siteBoundaryPayload($site);
+    $this->actingAs($user)->post("/sites/{$site->id}/geofence", $data)->assertRedirect();
+    $boundary = AssetGeofence::where('site_id', $site->id)->firstOrFail();
+    expect($boundary->is_active)->toBeFalse()->and($boundary->scope)->toBe('site');
+    $this->assertDatabaseCount('asset_geofence_assignments', 0);
+    expect(BoundaryVersion::where('boundary_id', $boundary->id)->count())->toBe(1);
     $readiness = app(SiteReadinessService::class)->evaluate($site->fresh());
-    $geofenceItem = collect($readiness['recommended'])->firstWhere('key', 'geofence');
-
-    expect($geofenceItem['done'])->toBeTrue();
+    expect(collect($readiness['recommended'])->firstWhere('key', 'geofence')['done'])->toBeTrue();
 });
 
-test('site geofence update syncs assigned assets', function () {
-    $user = siteGeofenceTestUser();
+test('explicit site boundary edits preserve purpose settings and reject stale writes', function () {
     $site = Site::factory()->create();
-    [$keptAsset, $removedAsset, $addedAsset] = Asset::factory()
-        ->count(3)
-        ->forSite($site)
-        ->create()
-        ->all();
-
-    $this->actingAs($user)
-        ->post("/sites/{$site->id}/geofence", [
-            'name' => 'Original boundary',
-            'type' => 'circle',
-            'shape' => siteGeofenceCircleShape(),
-            'breach_type' => 'enter',
-            'is_active' => true,
-            'asset_ids' => [$keptAsset->id, $removedAsset->id],
-        ])
-        ->assertRedirect();
-
-    $geofence = AssetGeofence::query()->where('site_id', $site->id)->firstOrFail();
-
-    $this->actingAs($user)
-        ->put("/sites/{$site->id}/geofence/{$geofence->id}", [
-            'name' => 'Updated boundary',
-            'type' => 'circle',
-            'shape' => siteGeofenceCircleShape(-36.85, 174.76),
-            'breach_type' => 'exit',
-            'is_active' => true,
-            'asset_ids' => [$keptAsset->id, $addedAsset->id],
-        ])
-        ->assertRedirect();
-
-    $geofence->refresh();
-
-    expect($geofence->name)->toBe('Updated boundary')
-        ->and($geofence->breach_type)->toBe('exit');
-
-    $this->assertDatabaseHas('asset_geofence_assignments', [
-        'asset_geofence_id' => $geofence->id,
-        'asset_id' => $keptAsset->id,
-    ]);
-    $this->assertDatabaseHas('asset_geofence_assignments', [
-        'asset_geofence_id' => $geofence->id,
-        'asset_id' => $addedAsset->id,
-    ]);
-    $this->assertDatabaseMissing('asset_geofence_assignments', [
-        'asset_geofence_id' => $geofence->id,
-        'asset_id' => $removedAsset->id,
-    ]);
-});
-
-test('site geofence delete removes assignments and fleet geofence state', function () {
-    $user = siteGeofenceTestUser();
-    $site = Site::factory()->create();
+    $user = siteGeofenceTestUser('admin', $site);
+    $first = AssetGeofence::create(['site_id' => $site->id, 'name' => 'First area', 'type' => 'circle', 'scope' => 'vehicle', 'shape' => siteGeofenceCircleShape(), 'is_active' => false]);
+    $boundary = AssetGeofence::create(['site_id' => $site->id, 'name' => 'Second area', 'type' => 'circle', 'scope' => 'vehicle', 'shape' => siteGeofenceCircleShape(), 'is_active' => false, 'breach_type' => 'enter', 'alert_config' => ['priority' => 'high'], 'time_rules' => ['weekdays' => [1]]]);
     $asset = Asset::factory()->forSite($site)->create();
+    $boundary->assignedAssets()->attach($asset->id);
+    $data = [...siteBoundaryPayload($site), 'name' => 'Renamed second area', 'expected_revision' => 1];
+    $this->actingAs($user)->put("/sites/{$site->id}/geofence/{$boundary->id}", $data)->assertRedirect();
+    $boundary->refresh();
+    expect($first->fresh()->name)->toBe('First area')->and($boundary->name)->toBe('Renamed second area')
+        ->and($boundary->breach_type)->toBe('enter')->and($boundary->alert_config)->toBe(['priority' => 'high'])
+        ->and($boundary->time_rules)->toBe(['weekdays' => [1]]);
+    $this->assertDatabaseHas('asset_geofence_assignments', ['asset_geofence_id' => $boundary->id, 'asset_id' => $asset->id]);
+    $data['request_key'] = (string) Str::uuid();
+    $this->putJson("/sites/{$site->id}/geofence/{$boundary->id}", $data)->assertConflict();
+});
 
-    $this->actingAs($user)
-        ->post("/sites/{$site->id}/geofence", [
-            'name' => 'Exit boundary',
-            'type' => 'circle',
-            'shape' => siteGeofenceCircleShape(),
-            'breach_type' => 'both',
-            'is_active' => true,
-            'asset_ids' => [$asset->id],
-        ])
-        ->assertRedirect();
-
-    $geofence = AssetGeofence::query()->where('site_id', $site->id)->firstOrFail();
-
-    FleetGeofenceState::create([
-        'asset_id' => $asset->id,
-        'geofence_id' => $geofence->id,
-        'status' => 'inside',
-        'last_changed_at' => now(),
-    ]);
-
-    $this->actingAs($user)
-        ->delete("/sites/{$site->id}/geofence/{$geofence->id}")
-        ->assertRedirect();
-
-    $this->assertDatabaseMissing('asset_geofences', [
-        'id' => $geofence->id,
-    ]);
-    $this->assertDatabaseMissing('asset_geofence_assignments', [
-        'asset_geofence_id' => $geofence->id,
-    ]);
-    $this->assertDatabaseMissing('fleet_geofence_states', [
-        'geofence_id' => $geofence->id,
-    ]);
+test('site retirement retains evidence and blocks linked dependencies without fake crossings', function () {
+    $site = Site::factory()->create();
+    $user = siteGeofenceTestUser('admin', $site);
+    $asset = Asset::factory()->forSite($site)->create();
+    $this->actingAs($user)->post("/sites/{$site->id}/geofence", siteBoundaryPayload($site))->assertRedirect();
+    $boundary = AssetGeofence::where('site_id', $site->id)->firstOrFail();
+    $boundary->assignedAssets()->attach($asset->id);
+    $this->deleteJson("/sites/{$site->id}/geofence/{$boundary->id}", ['expected_revision' => 1, 'reason' => 'Unused area'])->assertConflict();
+    $this->postJson("/fleet-assets/geofences/{$boundary->id}/legacy-links", ['expected_revision' => 1, 'reason' => 'Remove unused legacy links', 'action' => 'unlink'])->assertOk();
+    $this->delete("/sites/{$site->id}/geofence/{$boundary->id}", ['expected_revision' => 2, 'reason' => 'Unused area'])->assertRedirect();
+    expect($boundary->fresh()->retired_at)->not->toBeNull();
+    expect(BoundaryVersion::where('boundary_id', $boundary->id)->count())->toBe(3);
+    $this->assertDatabaseCount('fleet_signals', 0);
 });
 
 test('assigned site geofence is evaluated for assigned fleet assets', function () {

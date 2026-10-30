@@ -1,0 +1,169 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button:
+    - button:
+    - button:
+    - button:
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button
+    - button:
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Checks & inspections" [selected]:
+      - generic: Checks & inspections
+    - button "More views (6)":
+      - generic: More
+    - button "Find a section":
+  - tablist "Vehicle sections":
+    - tab "Recent checks":
+      - text: Recent checks
+    - tab "Templates" [selected]:
+      - text: Templates
+  - tabpanel:
+    - complementary:
+      - generic: NEXT REQUIREMENT
+      - heading "Vehicle condition record" [level=2]
+      - strong: 23 Sept 2026
+      - generic: Scheduled
+      - term: Owner
+      - definition: Shift lead
+      - term: Template
+      - definition: DEMO-3 · latest published demo
+      - button "Manage requirement"
+      - button "Start a retest"
+      - paragraph: Original answers and files stay with the submitted version. A pass does not release a restriction.
+    - generic: CONTROLLED TEMPLATES
+    - heading "Check templates" [level=2]
+    - button "Start check":
+      - text: Start check
+    - textbox "Search checklist library":
+      - /placeholder: Search checklists…
+    - group "Checklist templates layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - button "Create checklist":
+      - text: Create checklist
+    - paragraph: Universal vehicle library · Managed with Maintenance checklists. Changes publish a new version; submitted checks keep their original questions and evidence.
+    - generic "Checklist templates":
+      - generic: Checklist templates
+      - generic: 2 records shown
+      - table:
+        - row "Vehicle condition record Version DEMO-3 When to use Before vehicle use 2 questions Coverage & evidence All vehicles Evidence optional Actions Preview Customise Use checklist Actions for Vehicle condition record":
+          - cell "Vehicle condition record Version DEMO-3":
+            - generic: Vehicle condition record
+            - generic: Version DEMO-3
+          - cell "When to use Before vehicle use 2 questions":
+            - generic: When to use
+            - strong: Before vehicle use
+            - generic: 2 questions
+          - cell "Coverage & evidence All vehicles Evidence optional":
+            - generic: Coverage & evidence
+            - generic: All vehicles
+            - generic: Evidence optional
+          - cell "Actions Preview Customise Use checklist":
+            - generic: Actions
+            - button "Preview"
+            - button "Customise":
+              - text: Customise
+            - button "Use checklist"
+          - cell "Actions for Vehicle condition record":
+            - button "Actions for Vehicle condition record":
+        - row "Return condition record Version DEMO-2 When to use After vehicle use 2 questions Coverage & evidence All vehicles Evidence optional Actions Preview Customise Use checklist Actions for Return condition record":
+          - cell "Return condition record Version DEMO-2":
+            - generic: Return condition record
+            - generic: Version DEMO-2
+          - cell "When to use After vehicle use 2 questions":
+            - generic: When to use
+            - strong: After vehicle use
+            - generic: 2 questions
+          - cell "Coverage & evidence All vehicles Evidence optional":
+            - generic: Coverage & evidence
+            - generic: All vehicles
+            - generic: Evidence optional
+          - cell "Actions Preview Customise Use checklist":
+            - generic: Actions
+            - button "Preview"
+            - button "Customise":
+              - text: Customise
+            - button "Use checklist"
+          - cell "Actions for Return condition record":
+            - button "Actions for Return condition record":
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

@@ -1,73 +1,88 @@
-/* eslint-disable no-restricted-syntax -- Register chrome: the RA lifecycle ribbon, the
- * on-dark "Due for review" toggle and the hero search input are bespoke hero affordances
- * (styled native controls on the primary gradient) using semantic design tokens only,
- * matching the Incidents / Analytics registers. */
-import { RaDetailDialog } from '@/components/health-safety/risk-assessments/ra-detail-dialog';
-import { RIBBON_STAGES } from '@/components/health-safety/risk-assessments/ra-kit';
+/**
+ * Risk assessments (approved H&S drawing pg-hsn-61 — Stephan 23 Oct 2026):
+ * one header with four filter chips, the register views as a tier-two strip,
+ * then the risk map beside the highest risks (before → after controls), and
+ * the register. The map and the highest risks are counted from the register
+ * itself, so they show only when every active assessment is on this page —
+ * never a page-local count dressed as a total.
+ */
+import { boardReportHref } from '@/lib/health-safety/board-reports';
+import { hsLabel } from '@/lib/health-safety/hs-labels';
 import {
-    buildRaCtxItems,
-    RaTable,
+    RaRegisterTable,
+    raMenuItems,
     type RaCtxHandlers,
 } from '@/components/health-safety/risk-assessments/ra-table';
 import { RaWizardDialog } from '@/components/health-safety/risk-assessments/ra-wizard-dialog';
 import type {
-    AttachType,
-    RaDetail,
-    RaModalKind,
     RaPickers,
     RaRow,
 } from '@/components/health-safety/risk-assessments/types';
+import { SafetyWorkspaceRail } from '@/components/health-safety/workspace-header';
 import {
-    EntityFilter,
-    ShiftContextMenu,
-    TabStrip,
-    type RosterTabItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
+    EntityContextMenu,
+    useEntityContextMenu,
+} from '@/components/lists/entity-menu';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderFilterSelect,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageLayout,
+} from '@/components/page';
+import {
+    TierTwoTabs,
+    type GroupedProfileNavTab,
+} from '@/components/page/grouped-profile-nav';
+import {
+    Log,
+    RISK_CONSEQUENCE,
+    RISK_LIKELIHOOD,
+    RiskMap,
+    Ring,
+    SideBySide,
+    type LogItem,
+    type SgTone,
+} from '@/components/signature/blocks';
 import { Button } from '@/components/ui/button';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { SelectInput } from '@/components/wizard/primitives';
+import {
+    SafetyFormDraftContext,
+    useSafetyWorkspaceDrafts,
+} from '@/hooks/use-safety-workspace-drafts';
 import AppLayout from '@/layouts/app-layout';
-import { cn } from '@/lib/utils';
 import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroComplianceBadges,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    ngaPaerewaBadge,
-    useNzsAssurance,
-    type HeroComplianceBadge,
-} from '@/pages/health-safety/components/hs-hero-kit';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
+    RISK_REGISTER,
+    riskHref,
+    riskReturn,
+    type RiskCommand,
+} from '@/lib/health-safety/risk-navigation';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
-    Activity,
-    AlertTriangle,
     Archive,
-    Bell,
-    CheckCircle2,
-    ChevronRight,
-    CircleDot,
     Clock,
-    FileDown,
     FileEdit,
     LayoutGrid,
     Plus,
-    Search,
     ShieldAlert,
+    SlidersHorizontal,
     TriangleAlert,
     X,
 } from 'lucide-react';
-import { useState, type MouseEvent } from 'react';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'Health & Safety', href: '/health-safety' },
-    { title: 'Risk Assessments', href: '/health-safety/risk-assessments' },
-];
-
-const BASE = '/health-safety/risk-assessments';
+import {
+    useEffect,
+    useState,
+    type MouseEvent as ReactMouseEvent,
+    type ReactNode,
+} from 'react';
 
 interface Filters {
     tab: string;
@@ -80,36 +95,16 @@ interface Filters {
     hs_event_id: number | null;
     search: string | null;
 }
-
-interface Hero {
-    total: number;
-    active: number;
-    high_extreme_active: number;
-    drafts: number;
-    under_review: number;
-    due_for_review: number;
-    residual_not_acceptable: number;
-    awaiting_approval: number;
-    compliance: {
-        reviews_overdue: number;
-        high_extreme_without_approval: number;
-        residual_not_acceptable: number;
-        pct_active_scheduled: number;
-    };
-}
-
-interface Paginated<T> {
-    data: T[];
-    links: Array<{ url: string | null; label: string; active: boolean }>;
-    current_page: number;
-    last_page: number;
-    total: number;
-    from: number | null;
-    to: number | null;
-}
-
 interface Props {
-    assessments: Paginated<RaRow>;
+    assessments: {
+        data: RaRow[];
+        links: { url: string | null; label: string; active: boolean }[];
+        current_page: number;
+        last_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
+    };
     tabCounts: {
         all: number;
         active: number;
@@ -118,529 +113,625 @@ interface Props {
         high: number;
         closed: number;
     };
-    hero: Hero;
-    detail: RaDetail | null;
+    hero: {
+        total: number;
+        active: number;
+        high_extreme_active: number;
+        drafts: number;
+        under_review: number;
+        due_for_review: number;
+        residual_not_acceptable: number;
+        awaiting_approval: number;
+        compliance: {
+            reviews_overdue: number;
+            high_extreme_without_approval: number;
+            residual_not_acceptable: number;
+            pct_active_scheduled: number;
+        };
+    };
     pickers: RaPickers;
     can: { manage: boolean; viewReports?: boolean };
     filters: Filters;
 }
 
-const STATUS_ITEMS = [
-    { key: '', label: 'All' },
-    { key: 'active', label: 'Active' },
-    { key: 'under_review', label: 'Under review' },
-    { key: 'draft', label: 'Draft' },
-    { key: 'superseded', label: 'Superseded' },
-    { key: 'archived', label: 'Archived' },
+const VIEWS: {
+    key: keyof Props['tabCounts'];
+    label: string;
+    icon: GroupedProfileNavTab['icon'];
+}[] = [
+    { key: 'all', label: 'All', icon: LayoutGrid },
+    { key: 'active', label: 'Active', icon: ShieldAlert },
+    { key: 'drafts', label: 'Drafts', icon: FileEdit },
+    { key: 'due', label: 'Due for review', icon: Clock },
+    { key: 'high', label: 'High & extreme', icon: TriangleAlert },
+    { key: 'closed', label: 'Historical', icon: Archive },
 ];
-const LEVEL_ITEMS = [
-    { key: '', label: 'All' },
-    { key: 'low', label: 'Low' },
-    { key: 'medium', label: 'Medium' },
-    { key: 'high', label: 'High' },
-    { key: 'extreme', label: 'Extreme' },
+
+const STATUS_OPTIONS = [
+    { value: 'active', label: 'Active' },
+    { value: 'under_review', label: 'Under review' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'superseded', label: 'Replaced' },
+    { value: 'archived', label: 'Archived' },
 ];
+const LEVEL_OPTIONS = ['low', 'medium', 'high', 'extreme'].map((value) => ({
+    value,
+    label: value[0].toUpperCase() + value.slice(1),
+}));
+
+/** The map cell for a likelihood and consequence (each 1–5), most likely first. */
+function riskCell(
+    likelihood: number | null | undefined,
+    consequence: number | null | undefined,
+): [number, number] | null {
+    if (!likelihood || !consequence) return null;
+    const row = RISK_LIKELIHOOD.length - likelihood;
+    const col = consequence - 1;
+    return row >= 0 && row < 5 && col >= 0 && col < 5 ? [row, col] : null;
+}
+
+function levelRing(level: RaRow['risk_level']): SgTone {
+    return level === 'extreme'
+        ? 'critical'
+        : level === 'high'
+          ? 'warning'
+          : level === 'medium'
+            ? 'info'
+            : 'success';
+}
+
+function reviewWords(row: RaRow): string | null {
+    switch (row.review_state.kind) {
+        case 'overdue':
+            return 'review overdue';
+        case 'today':
+            return 'review due today';
+        case 'soon':
+            return row.review_state.days === 1
+                ? 'review due in 1 day'
+                : `review due in ${row.review_state.days} days`;
+        default:
+            return null;
+    }
+}
 
 export default function RiskAssessmentsIndex({
     assessments,
     tabCounts,
     hero,
-    detail,
     pickers,
     can,
     filters,
 }: Props) {
-    const assurance = useNzsAssurance();
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [modal, setModal] = useState<{
-        kind: RaModalKind;
-        detail: RaDetail | null;
-        initialAttach?: { type: AttachType; id: number } | null;
-    } | null>(null);
-
-    /* -------- navigation -------- */
-    const paramsFrom = (
-        f: Partial<Filters>,
-    ): Record<string, string | number> => {
-        const merged = { ...filters, ...f };
-        const out: Record<string, string | number> = {};
-        (Object.keys(merged) as (keyof Filters)[]).forEach((k) => {
-            const v = merged[k];
-            if (v !== null && v !== '' && v !== undefined) out[k] = v;
-        });
-        return out;
-    };
+    const returnTo = riskReturn(usePage().url);
+    const rowMenu = useEntityContextMenu<RaRow>();
+    const [creating, setCreating] = useState(false);
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [mapView, setMapView] = useState(0);
+    const drafts = useSafetyWorkspaceDrafts();
+    useEffect(() => setSearch(filters.search ?? ''), [filters.search]);
+    const params = (next: Partial<Filters> = {}) =>
+        Object.fromEntries(
+            Object.entries({ ...filters, ...next }).filter(
+                ([, v]) => v != null && v !== '',
+            ),
+        ) as Record<string, string | number>;
+    const query = (next: Partial<Filters> = {}) =>
+        new URLSearchParams(
+            Object.entries(params(next)).map(([key, value]) => [
+                key,
+                String(value),
+            ]),
+        );
     const go = (next: Partial<Filters>) =>
-        router.get(BASE, paramsFrom(next), {
+        router.get(RISK_REGISTER, params(next), {
             preserveState: true,
             preserveScroll: true,
             replace: true,
         });
-    const setTab = (id: string) =>
-        router.get(BASE, paramsFrom({ tab: id }), { preserveScroll: true });
-    const clearFilters = () =>
-        router.get(
-            BASE,
-            { tab: filters.tab },
-            { preserveState: true, preserveScroll: true, replace: true },
-        );
-    const hasFilters = !!(
-        filters.status ||
-        filters.risk_level ||
-        filters.site_id ||
-        filters.client_id ||
-        filters.due_for_review ||
-        filters.search
+    const recordHref = (id: number, command?: RiskCommand) =>
+        riskHref(id, { returnTo, command });
+    const openDetail = (id: number, command?: RiskCommand) => {
+        rowMenu.close();
+        router.visit(recordHref(id, command));
+    };
+    const handlers: RaCtxHandlers = {
+        onView: (r) => openDetail(r.id),
+        onEdit: (r) => openDetail(r.id),
+        onApprove: (r) => openDetail(r.id, 'approve'),
+        onReview: (r) => openDetail(r.id, 'review'),
+        onResidual: (r) => openDetail(r.id, 'residual'),
+        onSupersede: (r) => openDetail(r.id),
+        onArchive: (r) => openDetail(r.id, 'archive'),
+        onCopyLink: (r) => {
+            void navigator.clipboard?.writeText(
+                window.location.origin + recordHref(r.id),
+            );
+            rowMenu.close();
+        },
+        onOpenCurrent: openDetail,
+    };
+    const actionsFor = (row: RaRow) => raMenuItems(row, can.manage, handlers);
+
+    const views: GroupedProfileNavTab[] = VIEWS.map((view) => ({
+        key: view.key,
+        label: view.label,
+        icon: view.icon,
+        count: tabCounts[view.key],
+    }));
+    const moreActive = [
+        filters.client_id,
+        filters.hs_event_id,
+        filters.risk_acceptable,
+        filters.due_for_review === 'true' ? 'true' : null,
+    ].filter((value) => value != null && value !== '').length;
+    const selected = Object.entries(filters).some(
+        ([key, value]) => key !== 'tab' && value != null && value !== '',
+    );
+    const select = (
+        label: string,
+        key: keyof Filters,
+        options: { value: string; label: string }[],
+        numeric = false,
+    ) => (
+        <PageHeaderFilterSelect
+            label={label}
+            value={String(filters[key] ?? '')}
+            allValue=""
+            options={[{ value: '', label }, ...options]}
+            onChange={(v) =>
+                go({ [key]: v ? (numeric ? Number(v) : v) : null })
+            }
+        />
     );
 
-    /* -------- detail (deep-linkable via ?assessment=) -------- */
-    const openDetail = (id: number) =>
-        router.get(
-            BASE,
-            { ...paramsFrom({}), assessment: id },
-            { only: ['detail'], preserveState: true, preserveScroll: true },
-        );
-    const closeDetail = () =>
-        router.get(BASE, paramsFrom({}), {
-            only: ['detail'],
-            preserveState: true,
-            preserveScroll: true,
+    /* ----- the map and the highest risks, from a complete register ----- */
+
+    const active = assessments.data.filter((r) => r.status === 'active');
+    const inForce = assessments.data.filter(
+        (r) => r.status === 'active' || r.status === 'under_review',
+    );
+    const complete =
+        active.length > 0 &&
+        active.length === hero.active &&
+        inForce.length === hero.active + hero.under_review;
+    const after = mapView === 1;
+    const scored = active.filter(
+        (r) => !after || r.residual_risk_score != null,
+    );
+    const cells = Array.from({ length: 5 }, () => Array(5).fill(0) as number[]);
+    for (const r of scored) {
+        const cell = after
+            ? riskCell(r.residual_likelihood, r.residual_consequence)
+            : riskCell(r.likelihood, r.consequence);
+        if (cell) cells[cell[0]][cell[1]] += 1;
+    }
+    const top = [...scored].sort(
+        (a, b) =>
+            (after
+                ? (b.residual_risk_score ?? 0) - (a.residual_risk_score ?? 0)
+                : b.risk_score - a.risk_score) || b.id - a.id,
+    )[0];
+    const topCell = top
+        ? after
+            ? riskCell(top.residual_likelihood, top.residual_consequence)
+            : riskCell(top.likelihood, top.consequence)
+        : null;
+    const unscored = active.length - active.filter((r) => r.residual_risk_score != null).length;
+    const highest: LogItem[] = [...inForce]
+        .sort((a, b) => b.risk_score - a.risk_score || b.id - a.id)
+        .slice(0, 5)
+        .map((r) => {
+            const residual = r.residual_risk_score != null && r.residual_risk_level;
+            const named = r.title
+                .toLowerCase()
+                .includes(r.attached_to.name.toLowerCase());
+            return {
+                key: r.id,
+                time: `${r.risk_score} → ${r.residual_risk_score ?? '?'}`,
+                tone: levelRing(r.risk_level),
+                title: (
+                    <Link
+                        href={recordHref(r.id)}
+                        className="rounded-sm underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >
+                        {r.title}
+                    </Link>
+                ),
+                sub: [
+                    r.reference_number,
+                    named || r.attached_to.type === 'standalone'
+                        ? null
+                        : r.attached_to.name,
+                    residual
+                        ? `${hsLabel('risk_level', r.risk_level)} before controls → ${hsLabel('risk_level', r.residual_risk_level)} after`
+                        : 'Not rated after controls yet',
+                    reviewWords(r),
+                ]
+                    .filter(Boolean)
+                    .join(' · '),
+                action: can.manage
+                    ? r.review_state.kind === 'overdue' && r.status === 'active'
+                        ? { label: 'Review', onClick: () => openDetail(r.id, 'review') }
+                        : !residual
+                          ? { label: 'Score', onClick: () => openDetail(r.id, 'residual') }
+                          : null
+                    : null,
+                menu: actionsFor(r),
+                onContextMenu: (event: ReactMouseEvent<HTMLElement>) =>
+                    rowMenu.open(event, r),
+            };
         });
 
-    /* -------- ctx-menu actions need the full record (JSON fetch) -------- */
-    const fetchDetail = async (id: number): Promise<RaDetail | null> => {
-        try {
-            const res = await fetch(`${BASE}/${id}`, {
-                headers: { Accept: 'application/json' },
-                credentials: 'same-origin',
-            });
-            if (!res.ok) return null;
-            return ((await res.json()) as { detail: RaDetail }).detail;
-        } catch {
-            return null;
-        }
-    };
-    const ctxAction = (kind: RaModalKind, id: number) => {
-        setCtx(null);
-        void fetchDetail(id).then((d) => d && setModal({ kind, detail: d }));
-    };
-
-    const copyLink = (r: RaRow) => {
-        void navigator.clipboard?.writeText(
-            `${window.location.origin}${BASE}?assessment=${r.id}`,
-        );
-        setCtx(null);
-    };
-
-    const handlers: RaCtxHandlers = {
-        onView: (r) => {
-            setCtx(null);
-            openDetail(r.id);
-        },
-        onEdit: (r) => ctxAction('edit', r.id),
-        onApprove: (r) => ctxAction('approve', r.id),
-        onReview: (r) => ctxAction('review', r.id),
-        onResidual: (r) => ctxAction('residual', r.id),
-        onSupersede: (r) => ctxAction('supersede', r.id),
-        onArchive: (r) => ctxAction('archive', r.id),
-        onCopyLink: copyLink,
-        onOpenCurrent: (id) => openDetail(id),
-    };
-
-    const onCtx = (e: MouseEvent, row: RaRow) => {
-        e.preventDefault();
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: row.status.replace('_', ' ').toUpperCase(),
-            meta: `${row.reference_number} · ${row.title}`,
-            items: buildRaCtxItems(row, can.manage, handlers),
-        });
-    };
-
-    const openNew = () =>
-        setModal({
-            kind: 'new',
-            detail: null,
-            // Creating from an event-filtered register pre-attaches that event.
-            initialAttach: filters.hs_event_id
-                ? { type: 'event', id: filters.hs_event_id }
-                : null,
-        });
-
-    /* -------- tabs -------- */
-    const TABS: RosterTabItem[] = [
-        {
-            id: 'all',
-            label: 'All',
-            icon: LayoutGrid,
-            tone: 'primary',
-            badge: tabCounts.all || undefined,
-        },
-        {
-            id: 'active',
-            label: 'Active',
-            icon: CircleDot,
-            tone: 'success',
-            badge: tabCounts.active || undefined,
-        },
-        {
-            id: 'drafts',
-            label: 'Drafts',
-            icon: FileEdit,
-            tone: 'warning',
-            badge: tabCounts.drafts || undefined,
-        },
-        {
-            id: 'due',
-            label: 'Due for review',
-            icon: Clock,
-            tone: 'critical',
-            badge: tabCounts.due || undefined,
-        },
-        {
-            id: 'high',
-            label: 'High/Extreme',
-            icon: TriangleAlert,
-            tone: 'critical',
-            badge: tabCounts.high || undefined,
-        },
-        {
-            id: 'closed',
-            label: 'Superseded/Archived',
-            icon: Archive,
-            tone: 'info',
-            badge: tabCounts.closed || undefined,
-        },
-    ];
-
-    /* -------- compliance badges -------- */
-    const c = hero.compliance;
-    const badges: HeroComplianceBadge[] = [
-        {
-            icon: c.reviews_overdue > 0 ? AlertTriangle : CheckCircle2,
-            tone: c.reviews_overdue > 0 ? 'critical' : 'success',
-            label: `Reviews · ${c.reviews_overdue} overdue`,
-        },
-        ngaPaerewaBadge(assurance.certification_status),
-        {
-            icon:
-                c.high_extreme_without_approval > 0
-                    ? AlertTriangle
-                    : CheckCircle2,
-            tone: c.high_extreme_without_approval > 0 ? 'critical' : 'success',
-            label: `High/extreme · ${c.high_extreme_without_approval} without approved plan`,
-        },
-        {
-            icon: c.residual_not_acceptable > 0 ? AlertTriangle : CheckCircle2,
-            tone: c.residual_not_acceptable > 0 ? 'warning' : 'success',
-            label: `Residual · ${c.residual_not_acceptable} not acceptable`,
-        },
-        {
-            icon: c.pct_active_scheduled >= 80 ? CheckCircle2 : AlertTriangle,
-            tone: c.pct_active_scheduled >= 80 ? 'success' : 'warning',
-            label: `Scheduled review · ${c.pct_active_scheduled}% of active`,
-        },
-    ];
+    const pager = (
+        <>
+            <p className="text-subtle">
+                Showing {assessments.data.length} of {assessments.total}
+            </p>
+            {assessments.last_page > 1 ? (
+                <LaravelPagination links={assessments.links} />
+            ) : null}
+        </>
+    );
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Risk Assessments" />
-            <div className="flex flex-col gap-5 p-4 md:p-6">
-                <HeroShell
-                    footer={
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                            <HeroSegmented
-                                label="Status"
-                                variant="pill"
-                                ariaLabel="Status"
-                                items={STATUS_ITEMS}
-                                value={filters.status ?? ''}
-                                onChange={(k) => go({ status: k || null })}
-                            />
-                            <HeroSegmented
-                                label="Level"
-                                variant="pill"
-                                ariaLabel="Risk level"
-                                items={LEVEL_ITEMS}
-                                value={filters.risk_level ?? ''}
-                                onChange={(k) => go({ risk_level: k || null })}
-                            />
-                            {pickers.sites.length ? (
-                                <EntityFilter
-                                    label="Site"
-                                    allLabel="All sites"
-                                    items={pickers.sites}
-                                    value={filters.site_id}
-                                    onChange={(id) => go({ site_id: id })}
-                                    onDark
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
+                { title: 'Health & safety', href: '/health-safety' },
+                { title: 'Risk assessments', href: RISK_REGISTER },
+            ]}
+        >
+            <Head title="Risk assessments" />
+            <SafetyFormDraftContext.Provider value={drafts.register}>
+                <PageLayout
+                    hero={
+                        <PageHeader
+                            wrapTitle
+                            title="Risk assessments"
+                            icon={ShieldAlert}
+                            subline="Assess risks, record the controls and keep reviews up to date"
+                            actions={
+                                <>
+                                    <PageHeaderSearch
+                                        value={search}
+                                        onChange={setSearch}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter')
+                                                go({
+                                                    search:
+                                                        search.trim() || null,
+                                                });
+                                        }}
+                                        placeholder="Search assessments…"
+                                        ariaLabel="Search risk assessments"
+                                    />
+                                    {can.viewReports && (
+                                        <PageHeaderGlassButton asChild>
+                                            <a
+                                                href={
+                                                    boardReportHref('risk-register')
+                                                }
+                                                aria-label="Open the risk assessment report"
+                                            >
+                                                Risk assessment report
+                                            </a>
+                                        </PageHeaderGlassButton>
+                                    )}
+                                    {can.manage && (
+                                        <PageHeaderPrimaryButton
+                                            icon={Plus}
+                                            onClick={() => setCreating(true)}
+                                        >
+                                            Add risk assessment
+                                        </PageHeaderPrimaryButton>
+                                    )}
+                                </>
+                            }
+                            filters={
+                                <>
+                                    {select(
+                                        'All sites',
+                                        'site_id',
+                                        pickers.sites.map((p) => ({
+                                            value: String(p.id),
+                                            label: p.name,
+                                        })),
+                                        true,
+                                    )}
+                                    {select(
+                                        'All statuses',
+                                        'status',
+                                        STATUS_OPTIONS,
+                                    )}
+                                    {select(
+                                        'All risk levels',
+                                        'risk_level',
+                                        LEVEL_OPTIONS,
+                                    )}
+                                    <MoreFilters
+                                        active={moreActive}
+                                        filters={filters}
+                                        pickers={pickers}
+                                        onChange={go}
+                                    />
+                                    {selected && (
+                                        <PageHeaderFilterButton
+                                            icon={X}
+                                            onClick={() =>
+                                                router.get(
+                                                    RISK_REGISTER,
+                                                    { tab: filters.tab },
+                                                    {
+                                                        preserveState: true,
+                                                        preserveScroll: true,
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            Clear filters
+                                        </PageHeaderFilterButton>
+                                    )}
+                                </>
+                            }
+                            rail={
+                                <SafetyWorkspaceRail
+                                    hub="prevention"
+                                    current="risks"
                                 />
-                            ) : null}
-                            {pickers.clients.length ? (
-                                <EntityFilter
-                                    label="Client"
-                                    allLabel="All clients"
-                                    items={pickers.clients}
-                                    value={filters.client_id}
-                                    onChange={(id) => go({ client_id: id })}
-                                    onDark
-                                />
-                            ) : null}
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    go({
-                                        due_for_review:
-                                            filters.due_for_review === 'true'
-                                                ? null
-                                                : 'true',
-                                    })
-                                }
-                                aria-pressed={filters.due_for_review === 'true'}
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                                    filters.due_for_review === 'true'
-                                        ? 'border-primary-foreground bg-primary-foreground text-primary'
-                                        : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
-                                )}
-                            >
-                                <Clock className="h-3.5 w-3.5" /> Due for review
-                            </button>
-                            <div className="relative ml-auto">
-                                <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
-                                <input
-                                    type="search"
-                                    aria-label="Search risk assessments"
-                                    placeholder="Search assessments…"
-                                    defaultValue={filters.search ?? ''}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter')
-                                            go({
-                                                search:
-                                                    (
-                                                        e.target as HTMLInputElement
-                                                    ).value || null,
-                                            });
-                                    }}
-                                    className="w-52 rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pr-2.5 pl-8 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-2 focus-visible:ring-primary-foreground/40 focus-visible:outline-none"
-                                />
-                            </div>
-                            {hasFilters ? (
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                                >
-                                    <X className="h-3 w-3" /> Clear
-                                </button>
-                            ) : null}
-                        </div>
+                            }
+                        />
+                    }
+                    tabs={
+                        <TierTwoTabs
+                            tabs={views}
+                            activeTab={filters.tab}
+                            onTab={(tab) => {
+                                if (tab !== filters.tab) go({ tab });
+                            }}
+                            testIdPrefix="risk-register"
+                            ariaLabel="Risk assessment views"
+                            panelId="risk-register-panel"
+                            // Views carry no href, so the strip renders its own buttons.
+                            renderLink={() => null}
+                        />
                     }
                 >
-                    {/* lifecycle ribbon */}
-                    <nav
-                        aria-label="Risk assessment lifecycle"
-                        className="flex flex-wrap items-center gap-0.5 text-xs"
+                    <div
+                        id="risk-register-panel"
+                        role="tabpanel"
+                        aria-label={
+                            VIEWS.find((view) => view.key === filters.tab)
+                                ?.label ?? 'Risk assessments'
+                        }
+                        className="grid min-w-0 gap-5"
                     >
-                        <Link
-                            href="/health-safety"
-                            className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 font-medium text-primary-foreground/70 transition-colors hover:text-primary-foreground"
-                        >
-                            <LayoutGrid className="h-3.5 w-3.5" /> H&amp;S
-                        </Link>
-                        {RIBBON_STAGES.map((stage, i) => (
-                            <span
-                                key={stage}
-                                className="inline-flex items-center"
-                            >
-                                <ChevronRight className="mx-0.5 h-3.5 w-3.5 text-primary-foreground/40" />
-                                <span
-                                    className={cn(
-                                        'rounded-md px-2 py-1 font-medium',
-                                        i === 1
-                                            ? 'bg-primary-foreground/20 font-semibold text-primary-foreground'
-                                            : 'text-primary-foreground/70',
-                                    )}
-                                >
-                                    {stage}
-                                </span>
-                            </span>
-                        ))}
-                    </nav>
-
-                    {/* title row */}
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={ShieldAlert} />
-                            <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>
-                                    Risk register · synced just now
-                                </HeroStatusPill>
-                                <h1 className="text-2xl font-bold tracking-tight md:text-[28px]">
-                                    Risk Assessments
-                                </h1>
-                                <p className="max-w-xl text-sm leading-relaxed text-primary-foreground/75">
-                                    Identify, score and control hazards across
-                                    sites, clients and the H&amp;S backbone —
-                                    the ISO 31000 / SafePlus 5×5 register, from
-                                    draft through approval, review and
-                                    supersession.
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {can.viewReports ? (
-                                <a
-                                    href="/health-safety/reports/risk-assessment-register"
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary-foreground/25 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
-                                >
-                                    <FileDown className="h-3.5 w-3.5" /> Board
-                                    export
-                                </a>
-                            ) : null}
-                            {can.manage ? (
-                                <Button
-                                    size="sm"
-                                    onClick={openNew}
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                >
-                                    <Plus className="h-4 w-4" /> New risk
-                                    assessment
-                                </Button>
-                            ) : null}
-                        </div>
+                        {complete ? (
+                            <SideBySide cols="minmax(0, 1.15fr) minmax(0, 1fr)">
+                                <RiskMap
+                                    title="Risk map"
+                                    sub={
+                                        hero.active === 1
+                                            ? '1 active risk assessment'
+                                            : `${hero.active} active risk assessments`
+                                    }
+                                    views={['Before controls', 'After controls']}
+                                    view={mapView}
+                                    onView={setMapView}
+                                    cells={cells}
+                                    mark={topCell}
+                                    note={
+                                        top && topCell ? (
+                                            <>
+                                                <b>
+                                                    {RISK_LIKELIHOOD[topCell[0]]}{' '}
+                                                    × {RISK_CONSEQUENCE[topCell[1]]}
+                                                </b>{' '}
+                                                — {top.title}
+                                                {after && unscored > 0
+                                                    ? ` · ${unscored} not scored after controls yet`
+                                                    : ''}
+                                            </>
+                                        ) : after && unscored > 0 ? (
+                                            `${unscored} not scored after controls yet`
+                                        ) : null
+                                    }
+                                />
+                                <Log
+                                    title="Highest risks first"
+                                    sub="Before controls → after controls"
+                                    action={{
+                                        label: 'High & extreme',
+                                        onClick: () => go({ tab: 'high' }),
+                                    }}
+                                    items={highest}
+                                    limit={5}
+                                />
+                            </SideBySide>
+                        ) : null}
+                        <RaRegisterTable
+                            rows={assessments.data}
+                            sub={
+                                assessments.from && assessments.to
+                                    ? `Showing ${assessments.from}–${assessments.to} of ${assessments.total}`
+                                    : `Showing ${assessments.data.length} of ${assessments.total}`
+                            }
+                            footer={pager}
+                            onOpen={openDetail}
+                            actionsFor={actionsFor}
+                            hrefFor={recordHref}
+                            empty={
+                                <div className="grid justify-items-start gap-3 p-4">
+                                    <p className="sg-quiet">
+                                        <Ring tone="none" />
+                                        <span>
+                                            No risk assessments match this view
+                                            and its filters.
+                                        </span>
+                                    </p>
+                                    {can.manage ? (
+                                        <Button
+                                            onClick={() => setCreating(true)}
+                                        >
+                                            Add risk assessment
+                                        </Button>
+                                    ) : null}
+                                </div>
+                            }
+                        />
                     </div>
-
-                    {/* clusters */}
-                    <div className="grid gap-3 md:grid-cols-2">
-                        <HeroCluster title="Live · register" icon={Activity}>
-                            <HeroClusterTile
-                                href={`${BASE}?tab=all`}
-                                label="Total"
-                                value={String(hero.total)}
-                                caption="all assessments"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={`${BASE}?tab=active`}
-                                label="Active"
-                                value={String(hero.active)}
-                                caption="in force"
-                                tone="success"
-                            />
-                            <HeroClusterTile
-                                href={`${BASE}?tab=high`}
-                                label="High/extreme"
-                                value={String(hero.high_extreme_active)}
-                                caption="active register"
-                                tone="critical"
-                            />
-                            <HeroClusterTile
-                                href={`${BASE}?tab=drafts`}
-                                label="Drafts"
-                                value={String(hero.drafts)}
-                                caption="not yet active"
-                                tone="warning"
-                            />
-                        </HeroCluster>
-                        <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile
-                                href={`${BASE}?tab=due`}
-                                label="Due for review"
-                                value={String(hero.due_for_review)}
-                                caption="overdue / soon"
-                                tone="critical"
-                            />
-                            <HeroClusterTile
-                                href={`${BASE}?status=under_review`}
-                                label="Under review"
-                                value={String(hero.under_review)}
-                                caption="being revised"
-                                tone="warning"
-                            />
-                            <HeroClusterTile
-                                href={`${BASE}?risk_acceptable=0`}
-                                label="Residual not OK"
-                                value={String(hero.residual_not_acceptable)}
-                                caption="needs action"
-                                tone="critical"
-                            />
-                            <HeroClusterTile
-                                href={`${BASE}?tab=drafts`}
-                                label="Awaiting approval"
-                                value={String(hero.awaiting_approval)}
-                                caption="drafts to approve"
-                                tone="warning"
-                            />
-                        </HeroCluster>
-                    </div>
-
-                    <HeroComplianceBadges items={badges} />
-                </HeroShell>
-
-                <TabStrip
-                    value={filters.tab}
-                    onChange={setTab}
-                    items={TABS}
-                    ariaLabel="Risk assessment views"
-                />
-
-                <RaTable
-                    rows={assessments.data}
-                    countLabel={`${assessments.from ?? 0}–${assessments.to ?? 0} of ${assessments.total}`}
-                    onOpen={openDetail}
-                    onCtx={onCtx}
-                    emptyCta={
-                        can.manage ? (
-                            <Button onClick={openNew}>
-                                <Plus className="h-4 w-4" /> New risk assessment
-                            </Button>
-                        ) : undefined
-                    }
-                />
-
-                {assessments.last_page > 1 ? (
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                            Showing {assessments.from}–{assessments.to} of{' '}
-                            {assessments.total}
-                        </p>
-                        <LaravelPagination links={assessments.links} />
-                    </div>
+                </PageLayout>
+                {rowMenu.ctx ? (
+                    <EntityContextMenu
+                        x={rowMenu.ctx.x}
+                        y={rowMenu.ctx.y}
+                        icon={ShieldAlert}
+                        title={`${rowMenu.ctx.record.reference_number} · ${rowMenu.ctx.record.title}`}
+                        items={actionsFor(rowMenu.ctx.record)}
+                        onClose={rowMenu.close}
+                    />
                 ) : null}
-            </div>
-
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-
-            {detail ? (
-                <RaDetailDialog
-                    detail={detail}
-                    open
-                    onClose={closeDetail}
-                    onAction={(kind) => {
-                        const d = detail;
-                        setModal({ kind, detail: d });
-                        closeDetail();
-                    }}
-                    onOpenAssessment={openDetail}
-                />
-            ) : null}
-
-            {modal ? (
-                <RaWizardDialog
-                    kind={modal.kind}
-                    detail={modal.detail}
-                    pickers={pickers}
-                    initialAttach={modal.initialAttach}
-                    onClose={() => setModal(null)}
-                    onSuccess={(id) => {
-                        setModal(null);
-                        if (id) openDetail(id);
-                    }}
-                />
-            ) : null}
+                {creating && (
+                    <RaWizardDialog
+                        kind="new"
+                        pickers={pickers}
+                        initialAttach={
+                            filters.hs_event_id
+                                ? { type: 'event', id: filters.hs_event_id }
+                                : null
+                        }
+                        onClose={() => drafts.request(() => setCreating(false))}
+                        onSuccess={(id) => {
+                            setCreating(false);
+                            if (id) openDetail(id);
+                        }}
+                    />
+                )}
+                {drafts.confirmation}
+            </SafetyFormDraftContext.Provider>
         </AppLayout>
+    );
+}
+
+/** The quieter register filters in one place. */
+function MoreFilters({
+    active,
+    filters,
+    pickers,
+    onChange,
+}: {
+    active: number;
+    filters: Filters;
+    pickers: RaPickers;
+    onChange: (next: Partial<Filters>) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <PageHeaderFilterButton
+                    icon={SlidersHorizontal}
+                    active={active > 0}
+                >
+                    {active > 0 ? `More filters · ${active}` : 'More filters'}
+                </PageHeaderFilterButton>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                className="grid w-80 max-w-[calc(100vw-2rem)] gap-3"
+            >
+                <FilterField label="Client">
+                    <SelectInput
+                        ariaLabel="Client"
+                        placeholder="All clients"
+                        value={filters.client_id ? String(filters.client_id) : 'all'}
+                        onChange={(value) =>
+                            onChange({
+                                client_id: value === 'all' ? null : Number(value),
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All clients' },
+                            ...pickers.clients.map((p) => ({
+                                value: String(p.id),
+                                label: p.name,
+                            })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Safety review">
+                    <SelectInput
+                        ariaLabel="Safety review"
+                        placeholder="All safety reviews"
+                        value={
+                            filters.hs_event_id
+                                ? String(filters.hs_event_id)
+                                : 'all'
+                        }
+                        onChange={(value) =>
+                            onChange({
+                                hs_event_id:
+                                    value === 'all' ? null : Number(value),
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All safety reviews' },
+                            ...pickers.events.map((p) => ({
+                                value: String(p.id),
+                                label: p.name,
+                            })),
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Acceptability">
+                    <SelectInput
+                        ariaLabel="Acceptability"
+                        placeholder="All acceptability"
+                        value={filters.risk_acceptable ?? 'all'}
+                        onChange={(value) =>
+                            onChange({
+                                risk_acceptable: value === 'all' ? null : value,
+                            })
+                        }
+                        options={[
+                            { value: 'all', label: 'All acceptability' },
+                            { value: '1', label: 'Acceptable' },
+                            { value: '0', label: 'Not acceptable' },
+                        ]}
+                    />
+                </FilterField>
+                <FilterField label="Review">
+                    <SelectInput
+                        ariaLabel="Review"
+                        placeholder="Any review date"
+                        value={filters.due_for_review === 'true' ? 'true' : 'any'}
+                        onChange={(value) =>
+                            onChange({
+                                due_for_review: value === 'true' ? 'true' : null,
+                            })
+                        }
+                        options={[
+                            { value: 'any', label: 'Any review date' },
+                            { value: 'true', label: 'Due for review' },
+                        ]}
+                    />
+                </FilterField>
+            </PopoverContent>
+        </Popover>
+    );
+}
+
+function FilterField({
+    label,
+    children,
+}: {
+    label: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="grid gap-1.5">
+            <span className="text-caption font-semibold">{label}</span>
+            {children}
+        </div>
     );
 }

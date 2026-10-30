@@ -58,7 +58,7 @@ const BAR_COLORS = [
     'bg-status-info text-white',
     'bg-status-success text-white',
     'bg-status-warning text-white',
-    'bg-primary text-primary-foreground',
+    'bg-primary-fill text-primary-fill-foreground',
     'bg-status-critical text-white',
 ];
 

@@ -10,8 +10,6 @@ use App\Models\Queclink\QueclinkPendingCommand;
 use App\Models\User;
 use App\Services\Integration\IntegrationEventHistoryService;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 
 class ClientLocationHistoryService
 {
@@ -108,28 +106,8 @@ class ClientLocationHistoryService
     {
         $assignment = $this->access->resolve($actor, $client);
         $fingerprint = $this->access->fingerprint($assignment);
-        $data = Validator::make($filters, [
-            'date_from' => ['sometimes', 'required', 'date_format:Y-m-d'],
-            'date_to' => ['sometimes', 'required', 'date_format:Y-m-d'],
-        ])->validate();
-        $today = CarbonImmutable::now('Pacific/Auckland')->toDateString();
-        if (($data['date_from'] ?? '') > $today || ($data['date_to'] ?? '') > $today
-            || (isset($data['date_from'], $data['date_to']) && $data['date_from'] > $data['date_to'])) {
-            throw ValidationException::withMessages(['date_to' => 'Choose a date range ending today or earlier, with To on or after From.']);
-        }
-        $from = collect([
-            CarbonImmutable::now()->subDays((int) $assignment->retention_days),
-            CarbonImmutable::parse($assignment->assigned_at),
-            CarbonImmutable::parse($assignment->collection_started_at),
-            CarbonImmutable::parse($assignment->consent->given_at),
-        ])->max();
-        if (isset($data['date_from'])) {
-            $from = $from->max(CarbonImmutable::parse($data['date_from'], 'Pacific/Auckland')->startOfDay());
-        }
-        $to = CarbonImmutable::now();
-        if (isset($data['date_to'])) {
-            $to = $to->min(CarbonImmutable::parse($data['date_to'], 'Pacific/Auckland')->endOfDay());
-        }
+        $window = app(ClientLocationReportWindow::class)->resolve($assignment, $filters);
+        ['from' => $from, 'to' => $to] = $window;
         $locations = $from->greaterThan($to) ? collect() : $this->history->forDevice(
             $assignment->device,
             ['date_from' => $from->utc()->toDateTimeString(), 'date_to' => $to->utc()->toDateTimeString()],

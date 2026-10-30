@@ -7,9 +7,9 @@ import {
     EmptyValue,
     EntityChip,
     EntityTable,
+    ListCaption,
     type EntityTableColumn,
     type EntityTableFooterRow,
-    ListCaption,
     type MenuItem,
 } from '@/components/lists';
 import {
@@ -101,11 +101,21 @@ interface Journal {
     posted_by: UserRef | null;
     created_by: UserRef | null;
     reversed_by_journal: ReversedByJournal | null;
+    reversal_of_journal?: ReversedByJournal | null;
     lines: JournalLine[];
 }
 
 interface Props {
     journal: Journal;
+    sourceBill?: {
+        id: number;
+        reference: string;
+        status: string;
+        total: string;
+        paid: string;
+        work: { reference: string; title: string; url: string | null } | null;
+    } | null;
+    can?: { post: boolean; reverse: boolean };
 }
 
 const typeLabels: Record<string, string> = {
@@ -115,9 +125,14 @@ const typeLabels: Record<string, string> = {
 };
 
 /** `journal_date` is a date cast — it arrives as an ISO instant. */
-const journalDate = (value: string) => formatDateOnly(value.slice(0, 10), value);
+const journalDate = (value: string) =>
+    formatDateOnly(value.slice(0, 10), value);
 
-export default function JournalsShow({ journal }: Props) {
+export default function JournalsShow({
+    journal,
+    sourceBill = null,
+    can = { post: false, reverse: false },
+}: Props) {
     const [reverseOpen, setReverseOpen] = useState(false);
     const [reverseReason, setReverseReason] = useState('');
     const [posting, setPosting] = useState(false);
@@ -326,7 +341,8 @@ export default function JournalsShow({ journal }: Props) {
                 .join(' · ')}
             actions={
                 <>
-                    {journal.status === 'posted' &&
+                    {can.reverse &&
+                    journal.status === 'posted' &&
                     !journal.reversed_by_journal ? (
                         <PageHeaderGlassButton
                             icon={RotateCcw}
@@ -335,7 +351,7 @@ export default function JournalsShow({ journal }: Props) {
                             Reverse
                         </PageHeaderGlassButton>
                     ) : null}
-                    {journal.status === 'draft' ? (
+                    {can.post && journal.status === 'draft' ? (
                         <PageHeaderPrimaryButton
                             icon={CheckCircle}
                             disabled={posting}
@@ -400,8 +416,8 @@ export default function JournalsShow({ journal }: Props) {
                                 {journal.fiscal_period.name}
                             </PageHeaderMeterBig>
                             <PageHeaderMeterCaption>
-                                {journalDate(journal.fiscal_period.start_date)} –{' '}
-                                {journalDate(journal.fiscal_period.end_date)}
+                                {journalDate(journal.fiscal_period.start_date)}{' '}
+                                – {journalDate(journal.fiscal_period.end_date)}
                             </PageHeaderMeterCaption>
                         </PageHeaderMeterBlock>
                     ) : null}
@@ -417,6 +433,72 @@ export default function JournalsShow({ journal }: Props) {
 
             <PageLayout hero={header}>
                 <div className="flex flex-col gap-5">
+                    {sourceBill && (
+                        <Card className="p-5">
+                            <h2 className="text-section-title">
+                                Source and outcomes
+                            </h2>
+                            <div className="mt-4 grid gap-4 md:grid-cols-3">
+                                <div>
+                                    <p className="text-caption">
+                                        Supplier bill
+                                    </p>
+                                    <Link
+                                        className="font-semibold text-primary underline"
+                                        href={`/finance/bills/${sourceBill.id}`}
+                                    >
+                                        {sourceBill.reference}
+                                    </Link>
+                                    <p className="mt-1 text-sm">
+                                        {sourceBill.status.replaceAll('_', ' ')}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-caption">Work record</p>
+                                    {sourceBill.work?.url ? (
+                                        <Link
+                                            className="font-semibold text-primary underline"
+                                            href={sourceBill.work.url}
+                                        >
+                                            {sourceBill.work.reference} ·{' '}
+                                            {sourceBill.work.title}
+                                        </Link>
+                                    ) : (
+                                        <p className="text-sm">
+                                            {sourceBill.work
+                                                ? 'Work access required'
+                                                : 'No work linked'}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-caption">
+                                        Payment recorded
+                                    </p>
+                                    <p className="font-semibold">
+                                        {formatMoney(sourceBill.paid)} of{' '}
+                                        {formatMoney(sourceBill.total)}
+                                    </p>
+                                    <p className="text-caption mt-1">
+                                        Posting and payment are separate
+                                        outcomes.
+                                    </p>
+                                </div>
+                            </div>
+                        </Card>
+                    )}
+                    {journal.reversal_of_journal && (
+                        <Card className="p-4 text-sm">
+                            This entry reverses{' '}
+                            <Link
+                                className="font-semibold text-primary underline"
+                                href={`/finance/journals/${journal.reversal_of_journal.id}`}
+                            >
+                                {journal.reversal_of_journal.journal_number}
+                            </Link>
+                            . Both entries remain in the ledger.
+                        </Card>
+                    )}
                     {journal.reversed_by_journal ? (
                         <div className="flex items-center gap-2 rounded-[14px] border border-status-critical/30 bg-status-critical-bg px-4 py-3">
                             <StatusBadge status="reversed" />
@@ -426,10 +508,7 @@ export default function JournalsShow({ journal }: Props) {
                                     href={`/finance/journals/${journal.reversed_by_journal.id}`}
                                     className="font-semibold underline underline-offset-4"
                                 >
-                                    {
-                                        journal.reversed_by_journal
-                                            .journal_number
-                                    }
+                                    {journal.reversed_by_journal.journal_number}
                                 </Link>
                             </p>
                         </div>

@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 function calendarCanonicalStaff(string $role, Site $site, array $profile = []): User
@@ -58,7 +59,9 @@ beforeEach(function () {
 
 test('calendar Site options feed and archived worklist use canonical Site access', function () {
     $legacyColumn = 'ten'.'ant_id';
-    $thisWeek = now()->startOfWeek()->addDay()->setTime(10, 0);
+    $thisWeek = today()->setTime(10, 0);
+    $from = now()->startOfMonth()->toDateString();
+    $to = now()->addMonth()->endOfMonth()->toDateString();
     $visible = HrCalendarEvent::query()->create([
         $legacyColumn => 901,
         'created_by' => $this->manager->id,
@@ -79,7 +82,7 @@ test('calendar Site options feed and archived worklist use canonical Site access
         'archived_at' => now(),
         'archived_by' => $this->manager->id,
     ]);
-    HrCalendarEvent::query()->create([
+    $hiddenActive = HrCalendarEvent::query()->create([
         $legacyColumn => 733,
         'created_by' => $this->manager->id,
         'site_id' => $this->hiddenSite->id,
@@ -89,6 +92,16 @@ test('calendar Site options feed and archived worklist use canonical Site access
         'ends_at' => $thisWeek->copy()->addHour(),
     ]);
 
+    $outsideStart = Carbon::parse($from)->subWeeks(2)->setTime(10, 0);
+    $outsideRange = HrCalendarEvent::query()->create([
+        'created_by' => $this->manager->id,
+        'site_id' => $this->visibleSite->id,
+        'title' => 'Visible Site event outside requested range',
+        'event_type' => 'company',
+        'starts_at' => $outsideStart,
+        'ends_at' => $outsideStart->copy()->addHour(),
+    ]);
+
     $index = $this->actingAs($this->manager)->get('/hr/calendar')->assertOk();
     expect(collect($index->inertiaProps('sites'))->pluck('id')->all())
         ->toBe([$this->visibleSite->id])
@@ -96,15 +109,61 @@ test('calendar Site options feed and archived worklist use canonical Site access
         ->not->toContain($hidden->id)
         ->and($index->inertiaProps('stats.eventsThisWeek'))->toBe(1);
 
-    $from = now()->startOfMonth()->toDateString();
-    $to = now()->addMonth()->endOfMonth()->toDateString();
     $events = collect($this->actingAs($this->manager)
         ->getJson("/hr/calendar/feed?from={$from}&to={$to}&layers=event")
         ->assertOk()
         ->json('events'));
 
     expect($events->pluck('id'))->toContain('event-'.$visible->id)
-        ->and($events->pluck('id'))->not->toContain('event-'.$hidden->id);
+        ->and($events->pluck('id'))->not->toContain('event-'.$hidden->id)
+        ->and($events->pluck('id'))->not->toContain('event-'.$hiddenActive->id)
+        ->and($events->pluck('id'))->not->toContain('event-'.$outsideRange->id);
+});
+
+test('weekly calendar counts include late Sunday on a month boundary without widening Site scope', function () {
+    $this->travelTo(Carbon::parse('2026-11-01 10:00:00'));
+    $lateSunday = HrCalendarEvent::query()->create([
+        'created_by' => $this->manager->id,
+        'site_id' => $this->visibleSite->id,
+        'title' => 'Visible late Sunday event',
+        'event_type' => 'company',
+        'starts_at' => '2026-11-01 23:59:00',
+        'ends_at' => '2026-11-02 00:59:00',
+    ]);
+    HrCalendarEvent::query()->create([
+        'created_by' => $this->manager->id,
+        'site_id' => $this->hiddenSite->id,
+        'title' => 'Hidden late Sunday event',
+        'event_type' => 'company',
+        'starts_at' => '2026-11-01 23:59:00',
+        'ends_at' => '2026-11-02 00:59:00',
+    ]);
+    HrCalendarEvent::query()->create([
+        'created_by' => $this->manager->id,
+        'site_id' => $this->visibleSite->id,
+        'title' => 'Visible event before this week',
+        'event_type' => 'company',
+        'starts_at' => '2026-10-25 20:00:00',
+        'ends_at' => '2026-10-25 21:00:00',
+    ]);
+    $nextWeek = HrCalendarEvent::query()->create([
+        'created_by' => $this->manager->id,
+        'site_id' => $this->visibleSite->id,
+        'title' => 'Visible event next week',
+        'event_type' => 'company',
+        'starts_at' => '2026-11-02 00:00:00',
+        'ends_at' => '2026-11-02 01:00:00',
+    ]);
+
+    $index = $this->actingAs($this->manager)->get('/hr/calendar')->assertOk();
+    expect($index->inertiaProps('stats.eventsThisWeek'))->toBe(1)
+        ->and(collect($index->inertiaProps('sites'))->pluck('id')->all())->toBe([$this->visibleSite->id]);
+
+    $events = $this->actingAs($this->manager)
+        ->getJson('/hr/calendar/feed?from=2026-11-01&to=2026-11-30&layers=event')
+        ->assertOk()->json('events');
+    expect(collect($events)->pluck('id')->all())
+        ->toBe(['event-'.$lateSunday->id, 'event-'.$nextWeek->id]);
 });
 
 test('legacy storage values cannot partition application-wide calendar events', function () {

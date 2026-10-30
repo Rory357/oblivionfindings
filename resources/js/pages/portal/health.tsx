@@ -107,7 +107,7 @@ export default function Health({
                                 Medical information is not available for your
                                 access level
                             </p>
-                            <p className="mt-1 text-xs text-muted-foreground/70">
+                            <p className="mt-1 text-xs text-muted-foreground">
                                 Please contact the care team if you need access
                                 to health records.
                             </p>
@@ -144,7 +144,7 @@ export default function Health({
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
                                     <Activity className="h-4 w-4 text-primary" />
-                                    Medical Summary
+                                    Medical summary
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -153,7 +153,7 @@ export default function Health({
                                         <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
                                             Allergies
                                         </p>
-                                        <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical dark:text-status-critical">
+                                        <div className="rounded-md bg-status-critical-bg p-3 text-sm text-status-critical">
                                             <div className="flex items-start gap-2">
                                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                                 <span>
@@ -180,7 +180,7 @@ export default function Health({
                                         <Separator />
                                         <div>
                                             <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                                Medical History
+                                                Medical history
                                             </p>
                                             <p className="text-sm whitespace-pre-line">
                                                 {medicalProfile.medical_history}
@@ -330,7 +330,7 @@ export default function Health({
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <ShieldCheck className="h-4 w-4 text-primary" />
-                                        Care Plan
+                                        Care plan
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
@@ -351,7 +351,7 @@ export default function Health({
                                     {carePlan.important_to_me && (
                                         <div>
                                             <p className="mb-1.5 text-xs font-medium tracking-wider text-muted-foreground uppercase">
-                                                Important to Me
+                                                Important to me
                                             </p>
                                             <p className="text-sm whitespace-pre-line">
                                                 {carePlan.important_to_me}
@@ -372,7 +372,7 @@ export default function Health({
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <Utensils className="h-4 w-4 text-primary" />
-                                        Dietary Requirements
+                                        Dietary requirements
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -387,7 +387,7 @@ export default function Health({
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
                                         <Waypoints className="h-4 w-4 text-primary" />
-                                        Mobility Needs
+                                        Mobility needs
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>

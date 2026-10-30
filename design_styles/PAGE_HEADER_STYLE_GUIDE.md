@@ -18,7 +18,9 @@ ring mark, palette-backed `PageHeaderSearchTrigger`, group rail +
 tier-2 strip). Visual reference: `public/eh-hero-variants.html`.
 
 **Supersedes** (2026-09-05): the `PageHero` banner system
-(`components/page/page-hero.tsx` and its ~559-page rollout), the
+(`components/page/page-hero.tsx` and its ~559-page rollout; until each
+page migrates, its band is floored like the sky — brand/category/Site
+colour at L ≤ 0.36, lifted status tones — amended 2026-10-02), the
 Governance Hero Guide (deleted), `docs/hero-unification-v2-plan.md`
 (deleted), `docs/hero-unification-v3-handoff.md` (kept for a security
 runbook reference only), and the client/site profile heroes — both
@@ -99,31 +101,42 @@ blocks, filters, tabs) do.
 ## 3. The sky surface (branding-derived — non-negotiable)
 
 The band's colours ALWAYS derive from the branding colour set in
-Settings → Branding: **the bottom of the band is the actual branding
-colour, and the top is a darker shade of that same colour, fading down
-into it.** Never a neutral/grey/ink top, never a hand-picked palette —
-whatever colour branding sets, the band is that colour's own
-dark-to-true ramp. Layered, top to bottom:
+Settings → Branding: **the top is a darker shade of the branding colour,
+fading down into the brand, no lighter than L 0.46, at the bottom**
+(amended 2026-10-02 from "the actual branding colour"; on Stephan's
+end-review list). The rail's tab labels sit on that bottom edge and must
+read at 4.5:1 for every hue — on the raw brand they measured 2.4–3.5:1 for
+orange, teal, green and even the default purple. Never a
+neutral/grey/ink top, never a hand-picked palette — whatever colour
+branding sets, the band is that colour's own dark-to-deep ramp. Layered,
+top to bottom:
 
 1. Linear gradient of the brand colour's own ramp:
    `oklch(from var(--primary) 0.3 calc(c * 0.6) h)` (top) →
    `oklch(from var(--primary) 0.42 calc(c * 0.8) h)` (55%) →
-   `var(--primary)` (100%). Relative-colour oklch keeps the brand HUE
-   in the dark shades, so the ramp retints automatically. (Lightened
-   2026-09-07 from the original L 0.22/0.34 ramp — the top stays a
-   *dark* shade, just softer; white header text must stay AA.)
-2. Two radial glows rising from the bottom edge: a bright one
-   (brand lightened ~25% toward white, alpha .92) bottom-right, a
-   supporting one (brand, alpha .55) bottom-left — the "horizon" fade.
+   `--eh-floor` = `oklch(from var(--primary) min(l, 0.46) c h)` (100%).
+   Relative-colour oklch keeps the brand HUE in the dark shades, so the
+   ramp retints automatically. (Lightened 2026-09-07 from the original
+   L 0.22/0.34 ramp — the top stays a *dark* shade, just softer; white
+   header text must stay AA.)
+2. Two radial blooms rising from the bottom edge, both in the
+   `--eh-floor` colour and adding **no white** (amended 2026-10-02 — the
+   old bottom-right glow was brand lightened ~25% toward white and sat
+   under the rail): alpha .92 bottom-right, alpha .55 bottom-left — the
+   "horizon" fade now tints rather than lightens. Worst measured rail
+   label with the floor: green, 4.71:1.
 3. Two hairline decorative **orbit arcs** (giant circles, brand
    lightened ~45%, alpha .2 / .14), one swinging low-left, one
    high-right. `pointer-events: none`.
 
 **Safety colours never retint** (non-negotiable #6): critical/warning
 accents anywhere in the band use the fixed `status-critical` /
-`status-warning` tokens (lightened toward white for AA on the dark
-sky); success uses `status-success`. Only neutral/brand accents derive
-from `--primary`.
+`status-warning` tokens; success uses `status-success`. On the dark
+sky they keep their status hue and chroma but never fall below a
+lightness floor — `oklch(from var(--status-critical) max(l, 0.84) c h)`,
+warning and success `max(l, 0.82)` (amended 2026-10-02: the old mix
+toward white left light mode's dark status tokens at 3.1–3.5:1 on the
+meter glass). Only neutral/brand accents derive from `--primary`.
 
 ## 4. Top row — identity (left) + actions (right)
 
@@ -135,10 +148,13 @@ Identity, left (13px gap to the mark, 3px stack gap):
      (brand .35). Same family as the loader ring
      (LOADER_STYLE_GUIDE.md).
    - Profile: the record's avatar/initials inside the same ring.
-   - Profile only: a 32px glass **back chip** (radius 10, white/8 fill,
-     white/20 border, chevron-left) sits before the mark.
-2. **Title row**: 22px/700 white title + one `<StatusBadge>`-language
-   chip (e.g. "13 active", "Active") using the status token pair.
+   - Records, pages that belong to one record, documents and full-page
+     forms only: a 32px glass **back chip** (radius 10, white/8 fill,
+     white/20 border, chevron-left) sits before the mark (§11, H3).
+2. **Title row**: 22px/700 white title. Records add one
+   `<StatusBadge>`-language chip with the record's state ("Active") using
+   the status token pair; other pages put a count in the subline or a
+   meter, not a chip (§11, H4).
 3. **Fact subline**: 13px muted (`rgba(255,255,255,.65)`):
    - **Index pages — ONE line**: the page description and/or key facts
      joined with middle dots — e.g. "Occupancy, leads and safety ·
@@ -156,11 +172,13 @@ they are clickable.
 
 Actions, right (36px controls, radius 10):
 
-- **Scoped search field** — ALWAYS inside the header, scoped to the
-  section: "Search sites, regions, leads…" on an index, "Search this
-  site…" on a profile. Glass (white/9 fill, white/18 border), leading
-  search icon, trailing `/` kbd hint. The global ⌘K command search
-  stays in the top bar — the two never merge.
+- **Scoped search field** — inside the header on hubs, lists and
+  workspaces, scoped to the section: "Search sites, regions, leads…".
+  Every other page (records, dashboards, calendars, settings) searches
+  through the rail's Find chip instead (§7, §11 H5). Glass (white/9
+  fill, white/18 border), leading search icon, trailing `/` kbd hint.
+  The global ⌘K command search stays in the top bar — the two never
+  merge.
 - Glass secondary buttons (white/10 fill, white/20 border) — e.g.
   "Select", icon-only chat/edit/overflow chips on profiles.
 - Exactly **one white primary button** (white fill, brand-dark text):
@@ -211,6 +229,9 @@ block's full height):
 2. **Visual** (or the big number): one of the five types below.
 3. **Caption**: 10.5px muted context line ("across 3 regions",
    "0% occupied · 41 available") or a toned delta ("▲ 4 this week").
+   Muted means sky text at **70%** — never fainter: at 10.5px it is body
+   text, and the old 50% measured 3.5–4.0:1 on the glass (amended
+   2026-10-02; contact phone numbers and "No info" follow the same 70%).
 
 **The seven block types** — a page composes from these only:
 
@@ -269,6 +290,15 @@ container, white active segment radius 6 with brand-dark text).
 types/regions/status/archived + Cards–Table; a profile gets
 date-range/staff; a dashboard gets whatever it filters by. All fields
 in the row share the same height — no odd one out.
+
+**Comfortable dropdowns — Overview pilot** (approved by Stephan
+2026-10-13): `PageHeaderFilterSelect size="comfortable"` draws a 38px
+glass dropdown (12px text, 14px leading icon, radius 10) for a page
+whose filter row holds only a few scope choices — the role Overview's
+role, site and period. It is opt-in and piloted on the Overview only;
+every field in that row uses it, so heights still match. Don't restyle
+the 23px chip per page to get this look — pass the prop. Whether it
+becomes the default everywhere is Stephan's decision.
 
 **Every rail view carries its own pills** (reinforced 2026-09-08): on
 a page whose rail switches views, EACH tab supplies real filter pills
@@ -388,7 +418,9 @@ No full-capsule (`999px`) pills anywhere in the header or sub nav.
 2. Tokens only: express the sky, glows, ring, borders and tints via
    `--primary` + `color-mix`; safety accents via fixed status tokens.
    Verify AA for white-on-glow text at extreme brand hues (amber is
-   the harshest test).
+   the harshest test). Band text is `--band-foreground` — always white,
+   never derived from the brand, so a very light brand reads like any
+   other (amended 2026-10-03; ESLint `design/band-text-token`).
 3. The sub-nav strip is the existing `TierTwoTabs`
    (`components/page/grouped-profile-nav.tsx`) restyled to §8 — one
    enforcement point, not a new component.
@@ -401,3 +433,36 @@ No full-capsule (`999px`) pills anywhere in the header or sub nav.
 6. Existing rules still bind: lucide icons only, `<StatusBadge>`
    semantics, typography helpers, 20px gutter/gap rule, motion budget,
    reduced-motion, density.
+
+
+## 11. One header per template (approved by Stephan 2026-10-21 / 22)
+
+The header belongs to the page's template (`PAGE_KIT_STYLE_GUIDE.md` §1), not to the
+page, so pages of the same kind look the same in every module.
+
+| | Rule | What it means |
+|---|---|---|
+| H1 | **Size by template** | Full (title row, up to 6 meters, rail) on hubs, lists and records. Compact (title row and rail, no meters) on every other page; a compact page's numbers lead the body as one tally. |
+| H2 | **One mark** | An initials avatar only when the page is about one person: a person's record and their own "my" pages. Every other page shows its module icon. |
+| H3 | **Back chip** | Only on a record, a page that belongs to one record (its child pages), a document and a full-page form. Never on hubs, lists, dashboards, calendars or settings; their breadcrumbs lead back. |
+| H4 | **Status chip** | Only on records: the record's state after its name. On other pages the words join the subline. |
+| H5 | **Search** | The scoped search field only on hubs, lists and workspaces. Elsewhere the rail's Find chip. |
+| H6 | **Buttons** | One white primary named for what it does, up to two glass buttons, the rest under More. |
+| H7 | **Filters** | At most four filter chips in the filter row (the first is the active scope); the rest fold into one "More filters" chip. |
+| H8 | **A number appears once** | A meter whose count a rail tab already shows is dropped; the tab keeps it. |
+| H9 | **One subline on index pages** | The line under the title stays on one line (about 110 characters); the rest opens the first body block. Records keep their two lines. Privacy, safety and legal wording stays even if it wraps. |
+| H10 | **Six meters at most** | Any more lead the body as one tally, so no number is lost. |
+| H11 | **Nine tabs at most** | Eight tabs and a "More" tab holding the rest; the open tab always stays visible. |
+
+What still varies between pages is real content: whether a page has tabs, filters or
+numbers at all.
+
+## 12. Frontline phone summary
+
+The shared header may receive an explicit `mobileSummary` for a task page on
+phones. The short, truthful count stays visible with a 44 px Details & filters
+button; the same meters and filters expand underneath. Desktop keeps all four
+rows. Do not hide the primary task, active view, scope identity or safety alerts.
+The connected rail retains the drawn 40/34 px geometry and 23 px label baseline;
+frontline tabs use the shared `frontline-hit` target rather than enlarging the
+drawn pills. Measure the visual shape and the touch area separately.

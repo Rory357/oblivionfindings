@@ -3,6 +3,8 @@
 namespace Tests\Feature\Emar;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Client;
+use App\Models\ClientMedication;
 use App\Models\MedicationAdminRule;
 use App\Models\Permission;
 use App\Models\Site;
@@ -29,22 +31,24 @@ class MedicationSettingsSiteScopeTest extends TestCase
         $actor = $this->manager(['medications.settings.manage'], $localSite);
         $localRule = $this->rule($localSite, 'LOCAL RULE');
         $this->rule($foreignSite, 'FOREIGN RULE');
-        $this->rule(null, 'GLOBAL RULE');
+        $globalRule = $this->rule(null, 'GLOBAL RULE');
 
         $response = $this->actingAs($actor)
             ->get(route('emar.settings'))
             ->assertOk();
 
-        $this->assertSame(
-            [$localRule->id],
-            collect($response->inertiaProps('rules'))->pluck('id')->all(),
-        );
+        // P11 v5: a house manager reads the rules for every house as well as
+        // their own; another house's rules stay out of sight.
+        $rules = collect($response->inertiaProps('rules'))->keyBy('id');
+        $this->assertEqualsCanonicalizing([$localRule->id, $globalRule->id], $rules->keys()->all());
+        $this->assertTrue($rules[$localRule->id]['can_change']);
+        $this->assertFalse($rules[$globalRule->id]['can_change']);
         $this->assertSame(
             [$localSite->id],
             collect($response->inertiaProps('sites'))->pluck('id')->all(),
         );
-        $this->assertTrue($response->inertiaProps('can.manage'));
-        $this->assertFalse($response->inertiaProps('can.manage_global'));
+        $this->assertTrue($response->inertiaProps('settingsCan.manage'));
+        $this->assertFalse($response->inertiaProps('settingsCan.manage_global'));
 
         $this->actingAs($actor)
             ->post(route('emar.settings.rules.store'), $this->payload($localSite->id, 'LOCAL CREATE'))
@@ -75,16 +79,19 @@ class MedicationSettingsSiteScopeTest extends TestCase
         $foreignRule = $this->rule($foreignSite, 'FOREIGN ORIGINAL');
         $globalRule = $this->rule(null, 'GLOBAL ORIGINAL');
 
-        foreach ([$foreignRule, $globalRule] as $concealedRule) {
+        // Another house's rule is concealed; a rule for every house is visible,
+        // so changing or pausing it is refused outright.
+        foreach ([[$foreignRule, 404], [$globalRule, 403]] as [$otherRule, $status]) {
             $this->actingAs($actor)
                 ->put(
-                    route('emar.settings.rules.update', $concealedRule),
+                    route('emar.settings.rules.update', $otherRule),
                     $this->payload($localSite->id, 'CONCEALED UPDATE'),
                 )
-                ->assertNotFound();
+                ->assertStatus($status);
+            // P11: rules are paused, never deleted; pausing is scoped like editing.
             $this->actingAs($actor)
-                ->delete(route('emar.settings.rules.destroy', $concealedRule))
-                ->assertNotFound();
+                ->post(route('emar.settings.rules.active', $otherRule), ['active' => false])
+                ->assertStatus($status);
         }
         $this->assertDatabaseHas('medication_admin_rules', [
             'id' => $foreignRule->id,
@@ -129,9 +136,9 @@ class MedicationSettingsSiteScopeTest extends TestCase
         ]);
 
         $this->actingAs($actor)
-            ->delete(route('emar.settings.rules.destroy', $localRule))
+            ->post(route('emar.settings.rules.active', $localRule), ['active' => false])
             ->assertRedirect();
-        $this->assertDatabaseMissing('medication_admin_rules', ['id' => $localRule->id]);
+        $this->assertDatabaseHas('medication_admin_rules', ['id' => $localRule->id, 'active' => false]);
     }
 
     public function test_explicit_global_site_authority_can_list_and_manage_site_bound_and_global_rules(): void
@@ -157,7 +164,7 @@ class MedicationSettingsSiteScopeTest extends TestCase
             [$firstSite->id, $secondSite->id],
             collect($response->inertiaProps('sites'))->pluck('id')->all(),
         );
-        $this->assertTrue($response->inertiaProps('can.manage_global'));
+        $this->assertTrue($response->inertiaProps('settingsCan.manage_global'));
 
         $this->actingAs($actor)
             ->post(route('emar.settings.rules.store'), $this->payload(null, 'GLOBAL CREATE'))
@@ -180,9 +187,40 @@ class MedicationSettingsSiteScopeTest extends TestCase
         ]);
 
         $this->actingAs($actor)
-            ->delete(route('emar.settings.rules.destroy', $secondRule))
+            ->post(route('emar.settings.rules.active', $secondRule), ['active' => false])
             ->assertRedirect();
-        $this->assertDatabaseMissing('medication_admin_rules', ['id' => $secondRule->id]);
+        $this->assertDatabaseHas('medication_admin_rules', ['id' => $secondRule->id, 'active' => false]);
+    }
+
+    public function test_an_org_rule_naming_a_controlled_medicine_stays_masked_for_a_house_manager_without_controlled_access(): void
+    {
+        $site = Site::factory()->create(['is_active' => true]);
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        ClientMedication::query()->create([
+            'client_id' => $client->id,
+            'name' => 'CONTROLLED MED',
+            'dosage' => '1 tablet',
+            'frequency' => 'Once daily',
+            'controlled_drug' => true,
+            'active' => true,
+            'state' => 'active',
+            'approval_status' => 'verified',
+        ]);
+        $controlledRule = $this->rule(null, 'CONTROLLED MED');
+        $actor = $this->manager(['medications.settings.manage'], $site);
+
+        $response = $this->actingAs($actor)
+            ->get(route('emar.settings'))
+            ->assertOk()
+            ->assertDontSee('CONTROLLED MED');
+        $row = collect($response->inertiaProps('rules'))->firstWhere('id', $controlledRule->id);
+        $this->assertTrue($row['concealed']);
+        $this->assertFalse($row['can_change']);
+
+        $this->actingAs($actor)
+            ->post(route('emar.settings.rules.active', $controlledRule), ['active' => false])
+            ->assertForbidden();
+        $this->assertTrue($controlledRule->fresh()->active);
     }
 
     /** @param array<int, string> $permissions */

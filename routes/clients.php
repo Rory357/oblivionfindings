@@ -3,6 +3,7 @@
 use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
+use App\Http\Controllers\ClientContactPreferencesController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
@@ -15,8 +16,10 @@ use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
 use App\Http\Controllers\ClientRiskController;
 use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\Emar\ControlledProductController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Sites\SiteGeocodingController;
+use App\Http\Middleware\ClientMarExportGuard;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -48,6 +51,7 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('client')
             ->name('clients.mar.show');
         Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
+            ->middleware(ClientMarExportGuard::class)
             ->whereNumber('client')
             ->name('clients.mar.export_csv');
     });
@@ -104,6 +108,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+        Route::put('/clients/{client}/contact-preferences', [ClientContactPreferencesController::class, 'update'])
+            ->whereNumber('client')->name('clients.contact-preferences.update');
         Route::post('/clients/{client}/photo', [ClientController::class, 'updatePhoto'])
             ->name('clients.photo.update');
         Route::delete('/clients/{client}/photo', [ClientController::class, 'destroyPhoto'])
@@ -204,16 +210,18 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/clients/{client}/break-glass', [BreakGlassController::class, 'store'])
         ->middleware('permission:medications.breakglass')
         ->name('clients.break_glass.store');
+    // Same keys as the canonical /emar copy (EA-196): ending needs breakglass
+    // (your own) or breakglass.end (someone else's), never audit.view alone.
     Route::delete('/clients/{client}/break-glass/{access}', [BreakGlassController::class, 'destroy'])
-        ->middleware('permission:medications.breakglass|medications.audit.view')
+        ->middleware('permission:medications.breakglass|medications.breakglass.end')
         ->name('clients.break_glass.destroy');
 
     // Emergency-access entry point is the canonical emar.emergency_access route
     // (routes/emar.php); bare /emergency-access redirects there (routes/web.php).
 
     // Controlled medication discrepancies
-    Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ClientMedicalController::class, 'closeControlledDiscrepancy'])
-        ->middleware('permission:medications.controlled.record')
+    Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ControlledProductController::class, 'legacy'])
+        ->middleware('permission:medications.view', 'permission:medications.controlled.view', 'permission:medications.controlled.manage')
         ->name('clients.medical.controlled_discrepancies.close');
 
     // Client incidents

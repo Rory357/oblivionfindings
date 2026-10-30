@@ -18,6 +18,7 @@ use App\Models\MedicationScheduledStockCount;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Services\Medication\Controlled\ControlledStockHolding;
 use App\Models\User;
 use App\Services\AuthorizationEvidenceLockService;
 use App\Services\UserSiteAccessService;
@@ -41,6 +42,9 @@ final class MedicationGovernanceScopeService
 
     public const STOCK_CAPABILITY = 'medications.stock.update';
 
+    /** Approved P06 Q5: receive, photograph, count, going out and coming back. */
+    public const STOCK_RECEIVE_CAPABILITY = 'medications.stock.receive';
+
     /**
      * Explicit application-wide Site permissions. They broaden Site visibility
      * only; they never replace the action capability checked by this service.
@@ -60,15 +64,47 @@ final class MedicationGovernanceScopeService
         'medications.controlled.view',
         'medications.controlled.record',
         'medications.controlled.witness',
+        'medications.controlled.manage',
+        'medications.controlled.override',
         'medications.stock.update',
+        'medications.stock.receive',
+        'medications.pharmacy.send',
+        'medications.pharmacy.connect.manage',
         'medications.orders.manage',
+        // Provider transfers re-check authority while creating or signing reconciliation.
+        'medications.transfers.manage',
+        // Reconciliation sign-off and prescriber responses re-check this on the locked actor.
+        'medications.orders.verify',
         'medications.breakglass',
+        'medications.breakglass.end',
+        // Paper reconciliation re-checks the reviewer's downtime authority on
+        // the locked actor (Lane C1, EA-090).
+        'medications.downtime.manage',
         'medications.audit.view',
+        // Per-person medication readers re-check these capabilities on the locked actor.
+        'clients.viewAny',
+        'medications.reports.export',
+        'reports.viewAny',
+        // Error commands also check report-only chart access and linked
+        // Incidents closure from this bounded, current permission snapshot.
+        'medications.reports.view',
+        'incidents.approve',
+        'incidents.manage',
+        'healthSafety.viewAllSites',
         'fleet.manage',
         'fleet.medication.manage',
         'clinical.accessAllSites',
         'sites.viewAll',
     ];
+
+    /**
+     * EA-012 follow-up: a closed (archived or inactive) house whose
+     * controlled stock is being cleared. Set only while a register close-out
+     * command runs for a permitted reader; every other check still applies.
+     *
+     * @var list<int>
+     */
+    private array $closeOutSiteIds = [];
 
     public function __construct(
         private UserSiteAccessService $siteAccess,
@@ -131,7 +167,7 @@ final class MedicationGovernanceScopeService
         bool $controlled = false,
     ): array {
         abort_unless(
-            $actor->canDo('medications.reports.export') || $actor->canDo('reports.viewAny'),
+            $actor->canDo('medications.reports.view'),
             403,
         );
         if ($controlled) {
@@ -145,7 +181,9 @@ final class MedicationGovernanceScopeService
         }
 
         if ($requestedClientId !== null) {
+            // EA-062 (Lane C7): audit readers can still report on an archived person.
             $client = Client::query()
+                ->when($actor->canDo('medications.audit.view'), fn ($query) => $query->withTrashed())
                 ->whereKey($requestedClientId)
                 ->whereIn('site_id', $siteIds)
                 ->first(['id', 'site_id']);
@@ -200,6 +238,9 @@ final class MedicationGovernanceScopeService
         Builder $query,
         ?array $siteIds,
         bool $allowNullMedication = true,
+        // EA-012: the controlled register keeps an archived person's rows
+        // while their controlled stock is still being cleared.
+        bool $includeArchivedClients = false,
     ): Builder {
         $table = $query->getModel()->getTable();
         $medicationMatchesClient = fn (QueryBuilder $medication) => $medication
@@ -210,10 +251,12 @@ final class MedicationGovernanceScopeService
 
         $query->whereHas(
             'client',
-            fn (Builder $client) => $client->when(
-                $siteIds !== null,
-                fn (Builder $query) => $query->whereIn('site_id', $siteIds),
-            ),
+            fn (Builder $client) => $client
+                ->when($includeArchivedClients, fn (Builder $query) => $query->withTrashed())
+                ->when(
+                    $siteIds !== null,
+                    fn (Builder $query) => $query->whereIn('site_id', $siteIds),
+                ),
         );
 
         if (! $allowNullMedication) {
@@ -334,7 +377,7 @@ final class MedicationGovernanceScopeService
             return collect();
         }
 
-        return $this->currentStaff->currentUsersQuery()
+        $rows = $this->currentStaff->currentUsersQuery()
             ->with('hrEmployeeProfile:id,user_id,primary_site_id,secondary_site_ids')
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role', 'approved_at'])
@@ -373,15 +416,26 @@ final class MedicationGovernanceScopeService
                     'site_ids' => $assignedSiteIds,
                 ];
             });
+
+        // PIN-1: the read-back witness confirms with their witness PIN, so people
+        // without a usable PIN are listed but can't be chosen.
+        $pinStatuses = app(WitnessPinService::class)->statuses($rows->pluck('id'));
+
+        return $rows->map(fn (array $row): array => [
+            ...$row,
+            'witness_pin' => $pinStatuses[$row['id']] ?? WitnessPinService::STATUS_NOT_SET,
+        ]);
     }
 
     /** @param array<int, int> $siteIds */
     public function controlledWitnessPicker(array $siteIds, ?int $excludedUserId = null): Collection
     {
-        return $this->controlledWitnesses
-            ->eligibleWitnessesForSites($siteIds, now(), $excludedUserId)
-            ->values()
-            ->map(fn (User $user) => $user->only(['id', 'name']));
+        // PIN-1: people without a usable witness PIN are listed but can't be chosen.
+        return app(WitnessPinService::class)->pickerRows(
+            $this->controlledWitnesses
+                ->eligibleWitnessesForSites($siteIds, now(), $excludedUserId)
+                ->values(),
+        );
     }
 
     public function forClient(
@@ -431,44 +485,69 @@ final class MedicationGovernanceScopeService
         ?int $expectedClientId = null,
         array $authorizationUserIds = [],
         ?CarbonInterface $authorizationEffectiveAt = null,
+        bool $currentOnly = true,
+        // EA-012: only the controlled register opts in, to clear stock an
+        // archived person still holds. Site scope and every check still apply.
+        bool $allowArchivedClient = false,
     ): mixed {
-        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt) {
+        return DB::transaction(function () use ($actor, $medicationId, $capability, $callback, $expectedClientId, $authorizationUserIds, $authorizationEffectiveAt, $currentOnly, $allowArchivedClient) {
             $this->assertCapability($actor, $capability);
 
-            $snapshot = ClientMedication::query()
+            $snapshot = ClientMedication::withTrashed()
                 ->whereKey($medicationId)
-                ->whereNull('deleted_at')
+                ->when($currentOnly, fn ($q) => $q->whereNull('deleted_at'))
                 ->first(['id', 'client_id']);
             $this->notFoundUnless($snapshot !== null);
 
             $clientId = (int) $snapshot->client_id;
             $this->notFoundUnless($expectedClientId === null || $clientId === $expectedClientId);
 
-            $client = Client::query()->whereKey($clientId)->lockForUpdate()->first();
+            $client = Client::query()->when($allowArchivedClient, fn ($query) => $query->withTrashed())
+                ->whereKey($clientId)->lockForUpdate()->first();
             $this->notFoundUnless($client !== null && $this->positiveId($client->site_id) !== null);
 
-            $medication = ClientMedication::query()
+            $medication = ClientMedication::withTrashed()
                 ->whereKey($medicationId)
                 ->where('client_id', $client->id)
-                ->whereNull('deleted_at')
-                ->whereNull('superseded_by')
+                ->when($currentOnly, fn ($q) => $q->whereNull('deleted_at')->whereNull('superseded_by'))
                 ->lockForUpdate()
                 ->first();
             $this->notFoundUnless($medication !== null);
+            // EA-012 follow-up: a house closed before the guard that still
+            // holds controlled stock — register close-out only, for readers
+            // whose current profile names that house or who hold the bypass.
+            $site = Site::query()->whereKey($client->site_id)->first();
+            $closedHouse = $allowArchivedClient && $site !== null && ! ControlledStockHolding::siteIsOpen($site);
             [$lockedActor, $lockedUsers] = $this->lockMutationActor(
                 $actor,
                 (int) $client->site_id,
                 $capability,
                 $authorizationUserIds,
                 $authorizationEffectiveAt,
+                lockSite: ! $closedHouse,
             );
+            if ($closedHouse) {
+                Site::query()->whereKey($site->id)->lockForUpdate()->first(['id']);
+                $this->notFoundUnless(in_array((int) $site->id, app(ControlledStockHolding::class)->closedHeldSiteIdsFor($lockedActor), true));
+                $this->closeOutSiteIds = [(int) $site->id];
+            }
 
-            return $this->invokeWithLockedActorEvidence(
-                $actor,
-                $lockedActor,
-                fn () => $callback($client, $medication, $lockedActor, $lockedUsers),
-            );
+            try {
+                return $this->invokeWithLockedActorEvidence(
+                    $actor,
+                    $lockedActor,
+                    fn () => $callback($client, $medication, $lockedActor, $lockedUsers),
+                );
+            } finally {
+                $this->closeOutSiteIds = [];
+            }
         }, 3);
+    }
+
+    /** Whether the running command is a close-out at this closed house. */
+    public function closingOutSite(int $siteId): bool
+    {
+        return in_array($siteId, $this->closeOutSiteIds, true);
     }
 
     public function forStock(
@@ -1144,12 +1223,14 @@ final class MedicationGovernanceScopeService
         int $siteId,
         CarbonInterface $effectiveAt,
         array $additionalShiftIds = [],
+        bool $historical = false,
     ): Collection {
         return $this->controlledWitnesses->lockPresenceShiftsAtSite(
             $userIds,
             $siteId,
             $effectiveAt,
             $additionalShiftIds,
+            $historical,
         );
     }
 
@@ -1657,6 +1738,9 @@ final class MedicationGovernanceScopeService
 
     private function assertSiteAccess(User $actor, int $siteId): void
     {
+        if ($this->closingOutSite($siteId)) {
+            return;
+        }
         $this->notFoundUnless(
             in_array(
                 $siteId,

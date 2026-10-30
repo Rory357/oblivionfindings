@@ -1,0 +1,51 @@
+{
+  "reviewed_at_utc": "2026-10-12T09:22:00Z",
+  "reviewer": "coordinator",
+  "candidate": "C:/Users/steph/.codex/worktrees/control-room-delivery/oblivionfindings",
+  "receipt": "docs/control-room-audit-2026-10-11/duty-note-source-increment-r31b.json",
+  "receipt_sha256": "AA7C6AB13D8BD399BCB6C153751862F88E8C1C6283E82405B406C72C6AEB474F",
+  "status": "READ_PATH_FINDING_ADDRESSED_IN_SOURCE; COMMAND_BASELINE_HOLD; RUNTIME_UNRUN",
+  "hash_verification": { "product": 17, "evidence": 11, "predecessor": 10, "differences": [] },
+  "source_review": {
+    "shared_verified_method_independently_compared_byte_exact_to_r29": true,
+    "read": [
+      "Complete shared OperatorNoteReadService and AcceptedHandoverNoteService delegate",
+      "Entire prepare/accept service delta, final verifier, both controller deltas",
+      "Both frontend deltas and actual history fixture/provider/test additions",
+      "Installed Inertia AlwaysProp implementation locations and saved held-result summaries"
+    ],
+    "prior_finding": "CR-HANDOVER-NOTES-03 prepared/active/accepted transport paths now use shared original-note admission and mandatory partial-refresh replacement. UI has no raw-copy fallback. Bounded source correction, not runtime closure.",
+    "command_change": "Preparation and acceptance intentionally add original-note admission. Previous whole-command-unchanged claims are historical; current acceptance-body preservation outside new checks is owner proof plus parent delta inspection, not a fresh byte reconstruction by parent."
+  },
+  "findings": [
+    {
+      "id": "CR-HANDOVER-NOTES-04",
+      "priority": 1,
+      "status": "OPEN_ASSIGNED_TO_CONTROL_ROOM",
+      "title": "Final note verification relearns a replacement saved-copy baseline",
+      "file": "app/Services/ControlRoom/ControlRoomShiftHandoverService.php",
+      "line": 382,
+      "evidence": "assertPersistedNotesReadable compares only array_column(id) with the original expected collections, admits a newly read persisted snapshot against current notes, then compares raw snapshot bytes to that same newly read model.",
+      "trigger": "A reached prepare/accept audit callback coherently changes both saved note copies, persisted note content and their origin text digests, retaining IDs/actor/type/time/original Site/person and creation audit. The new content can satisfy every comparison without agreeing with the immutable originally selected copy. Saved metadata-only changes are also unbound by the ID-only comparison.",
+      "impact": "The transition can accept different note content or metadata from the intended reviewed handover. Existing single-side mutation/removal controls do not exercise this coherent replacement.",
+      "required_change": "Bind the complete selected saved-note tuple, origin and saved metadata to the immutable pre-write expected value with only explicitly justified normalisation. Retain that baseline through final raw validation after normal callbacks; do not relearn it from fresh().",
+      "acceptance": "Reached prepare and accept coherent persisted-note/snapshot/digest rewrites and metadata-only mutation must roll back the whole transition; retain unchanged positive cases and all existing role/Site/source/version guards."
+    }
+  ],
+  "runtime_evidence": {
+    "component_result_sha256": "76AF1CFF88EA2021CAB1A38D15E31DF72700EB4397D66F1405AF265A4AD977F3",
+    "component_started": false,
+    "component_exit_and_counts": null,
+    "component_after_reads_complete": true,
+    "syntax_result_sha256": "10E0A862121EED0CB7E0149358A23671DCB796F108E83C0F18D0DB24A99FEE3B",
+    "syntax_children_started": 0,
+    "syntax_files_checked": 0,
+    "syntax_after_reads_complete": true,
+    "native_history_prospective_cases": 65,
+    "native_history_executed": false,
+    "frontend_cases_authored": 33,
+    "runtime_pass_claim": false
+  },
+  "coordination": "One concrete correction sent to CR. H&S canonical source-copy API and same-text source-writer invalidation remain separately owned/pending; no repeated H&S instruction or shared source edit. WF concurrent update recorded as owner-reported, not independently reviewed.",
+  "limitations": "No runtime/parser/test/DB/build/browser/process/provider/live-record/Git/application/schema operation by parent. Existing approval rejection was owner-reported resolved by bounded explicit edits; no unresolved block newly inferred. Full source privacy, Rory, six-destination integration and workflow acceptance remain open."
+}

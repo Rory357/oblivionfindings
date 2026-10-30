@@ -1,0 +1,67 @@
+[
+  {
+    "path": "app/Models/Asset.php",
+    "sha256": "ceb39e404f2d8d43fffa1eed8e60621af1651b679a92296fb1792ed2c297bbb7",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "app/Models/AssetQrTag.php",
+    "sha256": "2227db3002e2291b0c2580bd42dd8da63505c512f65a0f77db9b53f896e078a3",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "app/Http/Controllers/AssetQrController.php",
+    "sha256": "f11767eb4ce6a8f09b67efa24a8bc011059c78432ae17b4fcc47a249528851a4",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "routes/assets.php",
+    "sha256": "f92a7d4e4b945ecc815900cff64d266b8f7360678ae484e369f6bd73940bae99",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/wizard/shell.tsx",
+    "sha256": "a8ea265daa622fa839a6c714188118b6605e4f6a21ed900cf57d71dc7a552c7e",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/ui/dialog.tsx",
+    "sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/ui/command.tsx",
+    "sha256": "ecb3830ccd643fd8871367333cfa2d2b45c057619d0bc47dd972c9c7e873aa14",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "resources/js/components/ui/popover.tsx",
+    "sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652",
+    "access": "Read-only source reference"
+  },
+  {
+    "path": "app/Http/Controllers/Settings/BrandingController.php",
+    "sha256": "973c50081eb912e5501405ca67cd357aa0fffcf4b935874419cb4a5da6e69d53",
+    "access": "Read-only branding source reference"
+  },
+  {
+    "path": "app/Http/Middleware/HandleInertiaRequests.php",
+    "sha256": "e9b7bc03c2ecd058cd9f456fa3bf3cfce8ce4ffc38f437522ef5231c8ecfebd8",
+    "access": "Read-only branding source reference"
+  },
+  {
+    "path": "app/Services/Fleet/VehicleTripReportExporter.php",
+    "sha256": "087c96376888e3c0433c85d47338def5bd4e21829b2ddad3f0a3d1a6a6fa5bc4",
+    "access": "Read-only branding source reference"
+  },
+  {
+    "path": "app/Support/OrgBranding.php",
+    "sha256": "0cb0584ecc66d0a6a2bd74cfba71db70cb895621a69a21fb70fb27918cb8a69f",
+    "access": "Read-only branding source reference"
+  },
+  {
+    "path": "public/logo.svg",
+    "sha256": "c3d202c539280536855ccca158da2c11a8fa58eb1801eb806ca2c52aca55fdfe",
+    "access": "Read-only branding source reference"
+  }
+]

@@ -1,6 +1,14 @@
 import { FLEET_COLORS, HorizontalBarChart } from '@/components/fleet-charts';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,14 +24,7 @@ import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
 import { toDateInput } from '@/lib/datetime';
 import { formatCurrency, formatDate, formatDistance } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-responsive-list';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
@@ -267,82 +268,91 @@ export default function FuelIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Fuel Logs', href: '/fleet-assets/fuel' },
             ]}
         >
             <Head title="Fuel Management" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Fuel} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Fuel register · this month
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Fuel Management
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                Track fuel consumption, costs, and vehicle
-                                efficiency.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href={monthHref}
-                                label="Spend this month"
-                                value={formatCurrency(hero.spend_month)}
-                                caption="fuel purchases (NZD)"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={monthHref}
-                                label="Litres this month"
-                                value={fmt(hero.litres_month, ' L')}
-                                caption="fuel consumed"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href={last30Href}
-                                label="Entries 30d"
-                                value={fmt(hero.entries_30d)}
-                                caption="fill-ups logged"
-                                tone={
-                                    hero.entries_30d > 0 ? 'success' : 'neutral'
+                <PageHeader
+                    wrapTitle
+                    title="Fuel Management"
+                    icon={Fuel}
+                    subline={
+                        <>
+                            Track fuel consumption, costs, and vehicle
+                            efficiency · Avg $
+                            {(hero.avg_cost_per_litre ?? 0).toFixed(3)}/L this
+                            month
+                        </>
+                    }
+                    actions={
+                        <>
+                            {can.log_fuel && (
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
+                                    onClick={() => {
+                                        setFuelStepIndex(0);
+                                        setDialogOpen(true);
+                                    }}
+                                >
+                                    Log fuel
+                                </PageHeaderPrimaryButton>
+                            )}
+                            <PageHeaderGlassButton
+                                icon={Download}
+                                onClick={() =>
+                                    window.location.assign(csvHref())
                                 }
-                            />
-                            <HeroClusterTile
-                                label="Avg $/L"
-                                value={`$${(hero.avg_cost_per_litre ?? 0).toFixed(3)}`}
-                                caption="month to date"
-                                tone="neutral"
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        {can.log_fuel && (
-                            <Button
-                                size="sm"
-                                className="bg-primary-foreground font-extrabold text-primary shadow-sm hover:bg-primary-foreground/90"
-                                onClick={() => {
-                                    setFuelStepIndex(0);
-                                    setDialogOpen(true);
-                                }}
                             >
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Log fuel
-                            </Button>
-                        )}
-                        <FleetHeroAction
-                            href={csvHref()}
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                                Export CSV
+                            </PageHeaderGlassButton>
+                        </>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Spend this month"
+                                href={monthHref}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {formatCurrency(hero.spend_month)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    fuel purchases (NZD)
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Litres this month"
+                                href={monthHref}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(hero.litres_month, ' L')}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    fuel consumed
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Entries 30d"
+                                href={last30Href}
+                                tone={
+                                    hero.entries_30d > 0 ? 'success' : 'brand'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(hero.entries_30d)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    fill-ups logged
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {can.log_fuel && (
                     <WizardShell

@@ -55,6 +55,9 @@ it('stores leave requests with the canonical timeline projection', function () {
     grantPhaseTwoThreePermissions($manager, [
         'clients.viewAny',
         'clients.update',
+        // The client is at another Site: clients.viewAny covers only the
+        // manager's own Sites since a8ffbc6ae (site-scoped PHI).
+        'sites.viewAll',
     ]);
 
     $client = makePhaseTwoThreeClient();
@@ -91,7 +94,7 @@ it('stores leave requests with the canonical timeline projection', function () {
 
 it('updates leave status and stamps approver', function () {
     $manager = User::factory()->create();
-    grantPhaseTwoThreePermissions($manager, ['clients.viewAny', 'clients.update']);
+    grantPhaseTwoThreePermissions($manager, ['clients.viewAny', 'clients.update', 'sites.viewAll']);
     $client = makePhaseTwoThreeClient();
     $leave = ClientLeaveRequest::create([
         'client_id' => $client->id,
@@ -104,7 +107,8 @@ it('updates leave status and stamps approver', function () {
 
     $this->actingAs($manager)
         ->put("/operations/clients/{$client->id}/leave/{$leave->id}", [
-            'status' => 'approved',
+            'action' => 'approve',
+            'version' => 1,
             'approval_notes' => 'Confirmed with on-call manager.',
         ])
         ->assertRedirect();
@@ -119,7 +123,7 @@ it('updates leave status and stamps approver', function () {
 
 it('creates excursions and emits a status_critical-free timeline event by default', function () {
     $manager = User::factory()->create();
-    grantPhaseTwoThreePermissions($manager, ['clients.viewAny', 'clients.update']);
+    grantPhaseTwoThreePermissions($manager, ['clients.viewAny', 'clients.update', 'sites.viewAll']);
     $client = makePhaseTwoThreeClient();
 
     $this->actingAs($manager)
@@ -312,6 +316,7 @@ it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator',
         'clients.viewAny',
         'clients.update',
         'care_plans.viewAny',
+        'sites.viewAll',
     ]);
 
     $client = makePhaseTwoThreeClient();
@@ -359,6 +364,7 @@ it('surfaces purchase requests and financial discrepancies on the client profile
         'clients.viewAny',
         'clients.update',
         'client_funds.manage',
+        'sites.viewAll',
     ]);
 
     $client = makePhaseTwoThreeClient();
@@ -400,6 +406,7 @@ it('exposes a categorised relationship for each next-of-kin via the enum', funct
     grantPhaseTwoThreePermissions($manager, [
         'clients.viewAny',
         'clients.update',
+        'sites.viewAll',
     ]);
 
     $client = makePhaseTwoThreeClient();

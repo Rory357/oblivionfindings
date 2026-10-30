@@ -1,0 +1,34 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/pkg08-settings-implementation/oblivionfindings
+
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts > notification conflict recovery > keeps edited channels and adopts concurrent changes to untouched channels 12ms
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts > notification conflict recovery > preserves an intentional return to inheritance without dropping other concurrent changes 0ms
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts > notification conflict recovery > treats equal effective values with different inheritance as a meaningful change 0ms
+ ✓ resources/js/pages/fleet-assets/settings/settings-draft.test.ts > preserves edited map fields while adopting a concurrent capability change 0ms
+ ✓ resources/js/components/maps/google-sdk.test.ts > optional Google SDK lifecycle > shares one load and reuses the nonce while rejecting key rotation 41ms
+ ✓ resources/js/components/maps/google-sdk.test.ts > optional Google SDK lifecycle > fails closed after authentication rejection without injecting a second SDK 4ms
+ ✓ resources/js/components/maps/google-sdk.test.ts > optional Google SDK lifecycle > tells already-mounted maps about late authentication failure 2ms
+ ✓ resources/js/components/maps/google-map.test.tsx > retains authorised markers and application geometry, forwards viewport and cleans up the provider 104ms
+ ✓ resources/js/components/leaflet-map.test.ts > Leaflet map presentation safety > escapes provider and user supplied marker content before binding HTML 1ms
+ ✓ resources/js/components/leaflet-map.test.ts > Leaflet map presentation safety > escapes every label and value in the hover stats card 1ms
+ ✓ resources/js/components/leaflet-map.test.ts > Leaflet map presentation safety > uses actual Device state before category colour and rejects CSS injection 0ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > opens the exact governed action supplied by a cross-module deep link 163ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > prefills an allowlisted configuration section from a governed handoff 37ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > prefills the exact compatible profile and submits its numeric identity through governed management 91ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > keeps a deep-linked action behind identity confirmation when step-up is not current 16ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > explains the remote collector route before a governed request is created 34ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > uses a non-revealing empty state when no action is available in the current context 12ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > shows exact governance requirements and never enables an unsupported provider action 23ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > posts only the server-declared capability and parameter names with a meaningful reason 83ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > submits only a server-provided current IT Change for a change-governed action 72ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > requires explicit impact acknowledgement and the exact Device name for a critical action 86ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > requires a designated reviewer and emergency declaration before posting break glass 65ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > shows a due break-glass review and submits one permanent reviewer outcome 47ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > keeps approval and execution queue actions explicit in command history 56ms
+ ✓ resources/js/test/device-management-section.test.tsx > Device Management section > shows a terminal blocked request with the safe governance cause and no execution action 8ms
+
+ Test Files  5 passed (5)
+      Tests  25 passed (25)
+   Start at  02:38:43
+   Duration  28.63s (transform 718ms, setup 7.39s, import 23.34s, tests 968ms, environment 55.27s)
+

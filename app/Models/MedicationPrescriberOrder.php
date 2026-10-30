@@ -15,8 +15,13 @@ class MedicationPrescriberOrder extends Model
 
     public const READ_BACK_VERIFICATION_METHOD_PASSWORD = 'password';
 
+    /** PIN-1 (29 Sep 2026): the read-back witness confirms with their personal witness PIN. */
+    public const READ_BACK_VERIFICATION_METHOD_WITNESS_PIN = 'witness_pin';
+
+    /** Both count as verified: 'password' records predate the witness PIN cutover. */
     public const READ_BACK_VERIFICATION_METHODS = [
         self::READ_BACK_VERIFICATION_METHOD_PASSWORD,
+        self::READ_BACK_VERIFICATION_METHOD_WITNESS_PIN,
     ];
 
     protected $fillable = [

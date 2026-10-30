@@ -58,7 +58,8 @@ import {
 interface StaffRow {
     user_id: number;
     user_name: string;
-    user_email: string;
+    /** HR work email; null when HR hasn't recorded one. */
+    user_email: string | null;
     total_requirements: number;
     compliant_count: number;
     expired_count: number;
@@ -524,9 +525,11 @@ export default function ComplianceOverview({
                                                         >
                                                             {r.user_name}
                                                         </Link>
-                                                        <div className="truncate text-[11px] text-muted-foreground">
-                                                            {r.user_email}
-                                                        </div>
+                                                        {r.user_email && (
+                                                            <div className="truncate text-[11px] text-muted-foreground">
+                                                                {r.user_email}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -648,7 +651,7 @@ function Checkbox({
             onClick={onChange}
             aria-checked={checked}
             role="checkbox"
-            className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary bg-primary text-primary-foreground' : 'border-border'}`}
+            className={`grid h-[18px] w-[18px] place-items-center rounded-[5px] border-[1.5px] ${checked ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground' : 'border-border'}`}
         >
             {checked ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
         </GuardrailButton>

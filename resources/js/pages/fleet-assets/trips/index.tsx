@@ -8,6 +8,13 @@ import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap from '@/components/leaflet-map';
 import PageShell from '@/components/page-shell';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+} from '@/components/page/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,14 +34,7 @@ import {
     formatDuration,
     formatTime,
 } from '@/lib/fleet-utils';
-import {
-    FleetHeroAction,
-    fmt,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroShell,
-    HeroStatusPill,
-} from '@/pages/fleet-assets/components/fleet-hero-kit';
+import { fmt } from '@/pages/fleet-assets/components/fleet-hero-kit';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
@@ -301,73 +301,76 @@ export default function TripsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Fleet & Assets', href: '/fleet-assets' },
                 { title: 'Trips', href: '/fleet-assets/trips' },
             ]}
         >
             <Head title="Trip History" />
             <PageShell>
-                <HeroShell>
-                    <div className="flex flex-wrap items-center gap-4">
-                        <HeroMedallion icon={Route} />
-                        <div className="min-w-0">
-                            <HeroStatusPill>
-                                Trip history · live feed
-                            </HeroStatusPill>
-                            <h1 className="mt-1.5 text-2xl font-bold tracking-tight">
-                                Trip History
-                            </h1>
-                            <p className="mt-0.5 text-[13px] text-primary-foreground/75">
-                                View and analyse all vehicle trips across your
-                                fleet.
-                            </p>
-                        </div>
-                        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4 lg:ml-auto lg:max-w-2xl">
-                            <HeroClusterTile
-                                href={todayHref}
+                <PageHeader
+                    wrapTitle
+                    title="Trip History"
+                    icon={Route}
+                    subline={
+                        <>
+                            View and analyse vehicle trips across the fleet ·{' '}
+                            {fmt(hero.active_now)} active now
+                        </>
+                    }
+                    actions={
+                        <PageHeaderGlassButton
+                            icon={Download}
+                            onClick={() => window.location.assign(csvHref())}
+                        >
+                            Export CSV
+                        </PageHeaderGlassButton>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
                                 label="Trips today"
-                                value={fmt(hero.trips_today)}
-                                caption="journeys logged"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
                                 href={todayHref}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(hero.trips_today)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    journeys logged
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="Distance today"
-                                value={fmt(hero.distance_today_km, ' km')}
-                                caption="kilometres driven"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                label="Active now"
-                                value={fmt(hero.active_now)}
-                                caption="open or in progress"
-                                tone={
-                                    hero.active_now > 0 ? 'success' : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                href={weekHref}
+                                href={todayHref}
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(hero.distance_today_km, ' km')}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    kilometres driven
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
                                 label="After-hours 7d"
-                                value={fmt(hero.after_hours_7d)}
-                                caption="before 8am / after 6pm"
+                                href={weekHref}
                                 tone={
                                     hero.after_hours_7d > 0
                                         ? 'warning'
                                         : 'success'
                                 }
-                            />
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <FleetHeroAction
-                            href={csvHref()}
-                            icon={Download}
-                            external
-                        >
-                            Export CSV
-                        </FleetHeroAction>
-                    </div>
-                </HeroShell>
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(hero.after_hours_7d)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    before 8am / after 6pm
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                />
 
                 {/* KPI Row */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
@@ -420,14 +423,14 @@ export default function TripsIndex({
                 </div>
 
                 {/* Charts Row */}
-                <div className="grid gap-4 lg:grid-cols-3">
-                    <Card>
+                <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-3">
+                    <Card className="min-w-0">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium">
                                 Trips by Day
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="min-w-0 overflow-x-auto">
                             <MiniBarChart
                                 data={tripsByDay}
                                 color={FLEET_COLORS.primary}
@@ -435,13 +438,13 @@ export default function TripsIndex({
                             />
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="min-w-0">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium">
                                 Top Vehicles
                             </CardTitle>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="min-w-0 overflow-x-auto">
                             <HorizontalBarChart
                                 items={topVehicles.map((v) => ({
                                     label: v.label,
@@ -451,13 +454,13 @@ export default function TripsIndex({
                             />
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className="min-w-0">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm font-medium">
                                 Distance Trend
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="flex items-center justify-center">
+                        <CardContent className="flex min-w-0 items-center justify-center overflow-x-auto">
                             {distanceTrend.length > 1 ? (
                                 <SparklineChart
                                     data={distanceTrend}

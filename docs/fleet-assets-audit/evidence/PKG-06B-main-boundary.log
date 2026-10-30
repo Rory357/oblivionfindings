@@ -1,0 +1,28 @@
+
+   FAIL  PKG06BMainBoundaryTest
+  ! main ordinary component edit cannot split an active kit → file_get_contents(C:\Users\steph\.codex\worktre… 342.99s  
+  ⨯ main profile withholds reviews outside finance site scope                                                    0.89s  
+  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+   FAILED  PKG06BMainBoundaryTest > main profile withholds reviews outside finance site scope                           
+  Property [workspace.finance_reviews] does not have the expected size.
+Failed asserting that actual size 1 matches expected size 0.
+
+  at C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG06BMainBoundaryTest.php:76
+     72▕         $this->assertTrue(\Illuminate\Support\Facades\Gate::forUser($viewer)->allows('view', $parent));
+     73▕         $queue = app(\App\Services\Fleet\VehicleFinanceReviewQueue::class)->present($viewer, [], $request->json('id'));
+     74▕         $this->assertNull($queue['focus']);
+     75▕         $this->actingAs($viewer)->get('/fleet-assets/assets/'.$parent->id)->assertOk()->assertInertia(
+  ➜  76▕             fn (\Inertia\Testing\AssertableInertia $page) => $page->has('workspace.finance_reviews', 0)
+     77▕         );
+     78▕     }
+     79▕ }
+     80▕
+
+  1   vendor\inertiajs\inertia-laravel\src\Testing\TestResponseMacros.php:26
+  2   vendor\laravel\framework\src\Illuminate\Macroable\Traits\Macroable.php:132
+
+
+  Tests:    1 failed, 1 warning (17 assertions)
+  Duration: 344.22s
+
+

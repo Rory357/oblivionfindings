@@ -1,0 +1,23 @@
+{
+  "at": "2026-09-21T22:25:30.241Z",
+  "typescript": "pass",
+  "vite": "pass",
+  "warnings": [
+    "Large bundle advisory",
+    "Mixed static/dynamic Leaflet import advisory"
+  ],
+  "scoring": "6 assertions passed",
+  "previousPreviewIntegrity": [
+    {
+      "version": "v1",
+      "verified": 12,
+      "mismatches": []
+    },
+    {
+      "version": "v4",
+      "verified": 23,
+      "mismatches": []
+    }
+  ],
+  "productionFilesChanged": false
+}

@@ -1,0 +1,672 @@
+/* Isolated preview adapters for the shared EntityCard / EntityTable shells. */
+.readable-records .speed-evaluation .date-time-field {
+    min-width: 0;
+}
+.readable-records .speed-evaluation .date-time-field .inline-fields {
+    grid-template-columns: minmax(0, 1fr);
+}
+.readable-records .speed-evaluation .date-time-field .field,
+.readable-records .speed-evaluation .date-time-field button,
+.readable-records .speed-evaluation .date-time-field button > span {
+    min-width: 0;
+    max-width: 100%;
+}
+.readable-records .speed-evaluation .date-time-field button {
+    width: 100%;
+    white-space: normal;
+}
+@media (max-width: 760px) {
+    .readable-records .library-toolbar > input {
+        flex: 1 0 100%;
+    }
+}
+.readable-records .collection-toggle {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 10px;
+}
+.readable-records .collection-toggle button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 7px;
+    color: var(--muted-foreground);
+}
+.readable-records .collection-toggle button[aria-pressed='true'] {
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 12%, var(--card));
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+.readable-records .collection-toggle button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+}
+.readable-records .collection-heading-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.readable-records .collection-caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 0 10px;
+    font-size: 12px;
+}
+.readable-records .collection-caption > :first-child {
+    font-weight: 600;
+}
+.readable-records .collection-caption > :last-child {
+    color: var(--muted-foreground);
+}
+.readable-records .record-collection {
+    min-width: 0;
+}
+.readable-records .collection-table [role='row']:not(:first-child) {
+    height: auto;
+    min-height: 76px;
+    padding-block: 12px;
+}
+.readable-records .collection-table .truncate,
+.readable-records .collection-card .truncate {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+}
+.readable-records .collection-table [role='cell'] {
+    min-width: 0;
+    line-height: 1.5;
+}
+.readable-records .collection-field {
+    display: block;
+    width: 100%;
+    min-width: 0;
+}
+.readable-records .collection-field > span:last-child {
+    display: flex;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    overflow-wrap: anywhere;
+}
+.readable-records .collection-field-label {
+    display: none;
+}
+.readable-records .record-collection small,
+.readable-records .collection-card small {
+    display: block;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--muted-foreground);
+}
+.readable-records .collection-cards {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+    gap: 20px;
+    align-items: stretch;
+}
+.readable-records .collection-cards > * {
+    max-width: 100%;
+}
+.readable-records .collection-card.no-alert-meridian > :first-child {
+    background: var(--border);
+}
+.readable-records .collection-facts {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: 100%;
+    margin: 0;
+}
+.readable-records .collection-facts dt {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-foreground);
+}
+.readable-records .collection-facts dd {
+    margin: 3px 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+.readable-records .collection-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 20px;
+    border: 1px dashed var(--border);
+    border-radius: 14px;
+    color: var(--muted-foreground);
+    font-size: 13px;
+}
+.readable-records .collection-empty h3 {
+    color: var(--foreground);
+    font-size: 14px;
+    font-weight: 600;
+}
+.readable-records .record-collection + .record-collection {
+    margin-top: 20px;
+}
+.readable-records .collection-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.readable-records .record-collection progress {
+    width: 100%;
+    height: 5px;
+    accent-color: var(--primary);
+}
+.readable-records .activity-toolbar .collection-toggle {
+    margin-left: auto;
+    margin-right: 0;
+}
+.readable-records .activity-toolbar > input {
+    flex: 1;
+    min-width: 150px;
+}
+.readable-records .library-toolbar {
+    align-items: center;
+    flex-wrap: wrap;
+}
+.readable-records .library-toolbar .collection-toggle {
+    margin-left: auto;
+}
+.readable-records .library-toolbar > input {
+    flex: 1;
+}
+.readable-records .checks-studio {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+.readable-records .checks-studio > section,
+.readable-records .checks-studio > aside {
+    width: 100%;
+}
+.readable-records .check-plan {
+    order: -1;
+    display: grid;
+    grid-template-columns:
+        minmax(180px, 1.5fr) minmax(160px, 1fr) minmax(180px, 1.1fr)
+        auto;
+    align-items: center;
+    gap: 10px 20px;
+    padding: 18px 20px;
+}
+.readable-records .check-plan .studio-section-heading {
+    margin: 0;
+    padding: 0;
+}
+.readable-records .check-plan .check-due-date {
+    margin: 0;
+    gap: 8px;
+}
+.readable-records .check-plan .check-due-date strong {
+    font-size: 18px;
+    white-space: nowrap;
+}
+.readable-records .check-plan > .badge {
+    grid-column: 2;
+}
+.readable-records .check-plan dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 10px;
+    grid-column: 3;
+    grid-row: 1/3;
+    font-size: 12px;
+}
+.readable-records .check-plan dl dt,
+.readable-records .check-plan dl dd {
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+}
+.readable-records .check-plan > button {
+    width: auto;
+    grid-column: 4;
+}
+.readable-records .check-plan > button:first-of-type {
+    grid-row: 1;
+}
+.readable-records .check-plan > button:nth-of-type(2) {
+    grid-row: 2;
+}
+.readable-records .check-plan .studio-footnote {
+    grid-column: 1/-1;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin: 0;
+}
+.readable-records .mileage-layout {
+    grid-template-columns: minmax(0, 1fr) 260px;
+}
+.readable-records .mileage-layout > section.studio-card {
+    padding: 0;
+}
+.readable-records .mileage-layout .record-collection {
+    padding: 16px;
+}
+.readable-records .reading-selected-detail {
+    margin: 0 16px 16px;
+    padding: 16px;
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+.readable-records .reading-selected-detail .studio-section-heading {
+    margin-bottom: 12px;
+}
+.readable-records .record-workspace .studio-empty {
+    min-height: 0;
+    padding: 24px;
+    align-items: flex-start;
+    text-align: left;
+}
+.readable-records .record-workspace .record-filterbar {
+    flex-wrap: wrap;
+}
+.readable-records .record-workspace .record-filterbar input {
+    flex: 1;
+    min-width: 180px;
+}
+.readable-records .document-record-list[data-record-view='cards'] {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+    gap: 20px;
+}
+.readable-records
+    .document-record-list[data-record-view='cards']
+    .document-record {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+.readable-records
+    .document-record-list[data-record-view='cards']
+    .document-record-actions {
+    width: 100%;
+    margin-top: auto;
+}
+.readable-records
+    .document-record-list[data-record-view='cards']
+    .document-thumbnail {
+    width: 100%;
+    height: 100px;
+}
+.readable-records
+    .document-record-list[data-record-view='cards']
+    .document-thumbnail
+    img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.readable-records .record-workspace .document-record-main small,
+.readable-records .record-workspace .document-record-main p {
+    font-size: 12px;
+    line-height: 1.5;
+}
+.readable-records .studio-section-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.readable-records .studio-inline {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.readable-records .studio-card,
+.readable-records .studio-page,
+.readable-records .mileage-layout > *,
+.readable-records .record-workspace > * {
+    min-width: 0;
+}
+@media (max-width: 1100px) {
+    .readable-records .mileage-layout {
+        grid-template-columns: 1fr;
+    }
+    .readable-records .mileage-insight {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: center;
+    }
+    .readable-records .mileage-insight > svg {
+        grid-column: 2;
+        grid-row: 1/4;
+        max-height: 110px;
+    }
+    .readable-records .check-plan {
+        grid-template-columns: 1fr 1fr;
+    }
+    .readable-records .check-plan dl {
+        grid-column: 1;
+        grid-row: auto;
+    }
+    .readable-records .check-plan > .badge {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: start;
+    }
+    .readable-records .check-plan > button,
+    .readable-records .check-plan > button:first-of-type,
+    .readable-records .check-plan > button:nth-of-type(2) {
+        grid-column: auto;
+        grid-row: auto;
+    }
+}
+@media (max-width: 760px) {
+    .readable-records .collection-toggle button {
+        min-height: 40px;
+    }
+    .readable-records .collection-table [role='row']:first-child {
+        display: none;
+    }
+    .readable-records .collection-table [role='row']:not(:first-child) {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px !important;
+        gap: 10px 0;
+        padding: 14px 4px;
+    }
+    .readable-records .collection-table [role='cell']:first-child {
+        grid-column: 1/3;
+    }
+    .readable-records .collection-table [role='cell']:last-child {
+        grid-column: 3;
+        grid-row: 1;
+        align-self: start;
+    }
+    .readable-records
+        .collection-table
+        [role='cell']:not(:first-child):not(:last-child) {
+        grid-column: auto;
+    }
+    .readable-records
+        .collection-table
+        [role='cell']:nth-child(2n + 1):not(:last-child) {
+        grid-column: 2/4;
+    }
+    .readable-records .collection-field-label {
+        display: block;
+        font-size: 11px;
+        color: var(--muted-foreground);
+        font-weight: 600;
+        margin-bottom: 3px;
+    }
+    .readable-records .collection-heading-actions {
+        justify-content: flex-start;
+        width: 100%;
+    }
+    .readable-records .check-plan,
+    .readable-records .mileage-insight {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .readable-records .check-plan {
+        gap: 10px;
+    }
+    .readable-records .check-plan dl {
+        width: 100%;
+    }
+    .readable-records .check-plan > button {
+        width: 100%;
+    }
+    .readable-records .mileage-insight > svg {
+        width: 100%;
+        max-height: 130px;
+    }
+    .readable-records .record-collection button,
+    .readable-records .record-collection a,
+    .readable-records .collection-toggle button {
+        min-height: 44px;
+    }
+    .readable-records .record-collection button[aria-haspopup='menu'] {
+        min-width: 44px;
+    }
+    .readable-records .activity-toolbar {
+        align-items: stretch;
+    }
+    .readable-records .activity-toolbar input {
+        max-width: none;
+        width: 100%;
+    }
+}
+
+.readable-records .check-plan > .check-plan-status {
+    grid-column: 2;
+}
+@media (max-width: 1100px) {
+    .readable-records .check-plan > .check-plan-status {
+        grid-row: 2;
+    }
+}
+.readable-records .reminder-workspace > .record-collection {
+    padding: 16px;
+}
+.readable-records .history-summary {
+    margin-bottom: 20px;
+}
+
+.readable-records .studio-section-heading > .collection-toggle {
+    margin-left: auto;
+}
+.readable-records .collection-cards {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+}
+@media (max-width: 1100px) {
+    .readable-records .collection-cards {
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+    }
+}
+@media (max-width: 760px) {
+    .readable-records .collection-cards {
+        grid-template-columns: 1fr;
+    }
+    .readable-records .studio-section-heading > .collection-toggle {
+        margin-left: 0;
+    }
+}
+
+.readable-records .collection-file-image {
+    display: flex;
+    width: 40px;
+    height: 44px;
+    flex-shrink: 0;
+    background: var(--muted);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.readable-records .collection-file-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.readable-records .activity-studio,
+.readable-records .studio-page {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+}
+.readable-records .activity-title {
+    flex-wrap: wrap;
+}
+.readable-records .activity-title > div {
+    min-width: 0;
+}
+.readable-records .telemetry-two,
+.readable-records .journey-bottom {
+    align-items: start;
+}
+.readable-records .record-collection progress::-webkit-progress-bar {
+    background: var(--muted);
+    border-radius: 8px;
+}
+.readable-records .record-collection progress::-webkit-progress-value {
+    background: var(--primary);
+    border-radius: 8px;
+}
+@media (max-width: 1250px) {
+    .readable-records .mileage-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .readable-records .mileage-insight {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        align-items: center;
+    }
+    .readable-records .mileage-insight > svg {
+        grid-column: 2;
+        grid-row: 1/4;
+        max-height: 110px;
+    }
+}
+@media (max-width: 760px) {
+    .readable-records.main {
+        padding-inline: 12px;
+    }
+    .readable-records .studio-overview,
+    .readable-records .profile-details-studio,
+    .readable-records .studio-work-layout,
+    .readable-records .mileage-overview {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .readable-records .studio-overview > *,
+    .readable-records .profile-details-studio > *,
+    .readable-records .studio-work-layout > * {
+        min-width: 0;
+    }
+    .readable-records .reminder-summary {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+    .readable-records .reminder-summary > div {
+        padding: 10px 14px;
+    }
+    .readable-records .reminder-summary strong {
+        font-size: 22px;
+    }
+    .readable-records .studio-card {
+        padding: 16px;
+    }
+    .readable-records .reminder-workspace {
+        padding: 0;
+    }
+    .readable-records .activity-toolbar {
+        padding: 12px;
+    }
+    .readable-records .activity-toolbar > div {
+        margin-right: 0;
+        max-width: 100%;
+    }
+    .readable-records .mileage-current {
+        flex-wrap: wrap;
+    }
+    .readable-records .mileage-insight {
+        display: flex;
+        align-items: flex-start;
+    }
+    .readable-records .mileage-insight > svg {
+        width: 100%;
+    }
+    .readable-records .readiness-action,
+    .readable-records .readiness-facts,
+    .readable-records .studio-footer-action,
+    .readable-records .work-next-action,
+    .readable-records .booking-card,
+    .readable-records .booking-journey {
+        flex-wrap: wrap;
+    }
+    .readable-records .health-grid,
+    .readable-records .facts-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .readable-records .collection-table [role='row']:not(:first-child) {
+        grid-template-columns: minmax(0, 1fr) 44px !important;
+    }
+    .readable-records .collection-table [role='cell']:first-child {
+        grid-column: 1;
+    }
+    .readable-records
+        .collection-table
+        [role='cell']:not(:first-child):not(:last-child) {
+        grid-column: 1/-1;
+    }
+    .readable-records .collection-table [role='cell']:last-child {
+        grid-column: 2;
+    }
+    .readable-records
+        .collection-table
+        [role='cell']:nth-child(2n + 1):not(:last-child):not(:first-child) {
+        grid-column: 1/-1;
+    }
+    .readable-records .collection-table [role='cell'] {
+        padding-inline: 10px;
+    }
+    .readable-records .record-collection {
+        width: 100%;
+    }
+    .readable-records .collection-cards {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .readable-records .history-summary {
+        flex-wrap: wrap;
+    }
+    .readable-records .studio-inline > input,
+    .readable-records .library-toolbar > input {
+        max-width: 100%;
+        min-width: 0;
+    }
+    .readable-records .check-plan > button {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 760px) {
+    .chrome {
+        flex-wrap: wrap;
+        height: auto;
+        min-height: 60px;
+        padding: 10px 12px;
+    }
+    .chrome .chrome-right {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        margin-left: auto;
+        max-width: 100%;
+    }
+    .readable-records [aria-label='Views'] [role='tab'] {
+        max-width: 130px;
+        padding-inline: 8px;
+    }
+    .readable-records [aria-label='Views'] [role='tab'] > span {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+    }
+    .readable-records button[aria-label='Find a section'] {
+        padding-inline: 8px;
+        width: 32px;
+    }
+    .readable-records button[aria-label^='More views'] {
+        padding-inline: 8px;
+    }
+}

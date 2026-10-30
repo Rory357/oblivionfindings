@@ -66,6 +66,11 @@ class MaintenanceCheckService
 
             $template = FleetChecklistTemplate::query()->whereKey((int) $data['template_id'])
                 ->lockForUpdate()->firstOrFail();
+            // Daily checks are recorded observations (VehicleDailyCheckService),
+            // never Maintenance checks that decide availability.
+            if ($template->type === FleetChecklistTemplate::TYPE_DAILY_CHECK) {
+                throw ValidationException::withMessages(['template_id' => 'Record daily checks from the Daily checks page.']);
+            }
             $policyKind = $data['check_kind'] === 'retest' ? 'retest' : 'check';
             $policy = $this->policy->current((int) $asset->site_id, (string) $asset->category, $policyKind, true);
 

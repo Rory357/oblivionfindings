@@ -41,10 +41,12 @@ class CredentialReferenceController extends Controller
         CredentialReferenceManager $manager,
     ): RedirectResponse {
         try {
+            $material = $request->validated('credential_material');
             $manager->rotate(
                 $request->user(),
                 $credentialReference,
-                (string) $request->validated('secret_manager_reference'),
+                (string) ($request->validated('secret_manager_reference') ?? ''),
+                is_array($material) ? $material : null,
             );
         } catch (QueryException) {
             throw ValidationException::withMessages([

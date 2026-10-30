@@ -70,12 +70,14 @@ export interface EntityTableProps<T> {
     identity: (row: T) => EntityTableIdentity;
     identityLabel?: string;
     identityWidth?: string;
+    /** Keep complete clinical/product identities visible without hover. */
+    wrapIdentity?: boolean;
     columns: EntityTableColumn<T>[];
     /** The one MenuItem[] feeding kebab AND context menu. */
     actionsFor: (row: T) => MenuItem[];
     onOpen?: (row: T) => void;
     /** A real identity link; optional so existing row activation is unchanged. */
-    hrefFor?: (row: T) => string;
+    hrefFor?: (row: T) => string | null | undefined;
     selection?: {
         keys: ReadonlySet<string | number>;
         onToggle: (row: T, checked: boolean) => void;
@@ -88,6 +90,8 @@ export interface EntityTableProps<T> {
     mutedFor?: (row: T) => boolean;
     /** Horizontal scroll threshold for the inner grid. */
     minWidth?: number;
+    /** Let multi-line operational details expand beyond the standard 50px row. */
+    rowHeight?: 'compact' | 'content';
     /** Summary rows pinned under the data rows (opening/closing, totals). */
     footerRows?: EntityTableFooterRow[];
     /* Multi-select support (page-owned state). */
@@ -112,6 +116,7 @@ export function EntityTable<T>({
     identity,
     identityLabel = 'Name',
     identityWidth = '1.9fr',
+    wrapIdentity = false,
     columns,
     actionsFor,
     onOpen,
@@ -120,6 +125,7 @@ export function EntityTable<T>({
     onRowContextMenu,
     mutedFor,
     minWidth = 900,
+    rowHeight = 'compact',
     footerRows,
     selectMode = false,
     selectedKeys,
@@ -163,13 +169,16 @@ export function EntityTable<T>({
                                 {c.label}
                             </span>
                         ))}
-                        <span role="columnheader" aria-label="Actions" />
+                        <span role="columnheader" className="relative">
+                            <span className="sr-only">Actions</span>
+                        </span>
                     </div>
 
                     {/* data rows */}
                     {rows.map((row) => {
                         const key = rowKey(row);
                         const id = identity(row);
+                        const href = hrefFor?.(row);
                         const selected =
                             (selection?.keys ?? selectedKeys)?.has(key) ??
                             false;
@@ -180,7 +189,7 @@ export function EntityTable<T>({
                                 key={key}
                                 role="row"
                                 tabIndex={
-                                    !hrefFor && (onOpen || selectMode)
+                                    !href && (onOpen || selectMode)
                                         ? 0
                                         : undefined
                                 }
@@ -201,7 +210,10 @@ export function EntityTable<T>({
                                     onRowContextMenu?.(e, row)
                                 }
                                 className={cn(
-                                    'grid h-[50px] cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                                    'grid cursor-pointer items-center border-b border-border transition-colors outline-none last:border-b-0 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+                                    rowHeight === 'content'
+                                        ? 'min-h-[50px] py-3'
+                                        : 'h-[50px]',
                                     selected
                                         ? 'bg-primary/[0.11] hover:bg-primary/[0.11]'
                                         : 'hover:bg-primary/5',
@@ -243,7 +255,7 @@ export function EntityTable<T>({
                                             className={cn(
                                                 'flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border transition-colors',
                                                 selected
-                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    ? 'border-primary-fill bg-primary-fill text-primary-fill-foreground'
                                                     : 'border-input bg-card text-transparent',
                                             )}
                                         >
@@ -259,26 +271,45 @@ export function EntityTable<T>({
                                     )}
                                     <span className="min-w-0">
                                         <span className="flex items-center gap-1.5">
-                                            {hrefFor ? (
+                                            {href ? (
                                                 <Link
                                                     aria-label={id.linkLabel}
-                                                    href={hrefFor(row)}
+                                                    href={href}
                                                     onClick={(event) =>
                                                         event.stopPropagation()
                                                     }
-                                                    className="truncate text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                    className={cn(
+                                                        'text-[13px] font-semibold text-foreground underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:ring-ring',
+                                                        wrapIdentity
+                                                            ? 'break-words whitespace-normal'
+                                                            : 'truncate',
+                                                    )}
                                                 >
                                                     {id.name}
                                                 </Link>
                                             ) : (
-                                                <span className="truncate text-[13px] font-semibold text-foreground">
+                                                <span
+                                                    className={cn(
+                                                        'text-[13px] font-semibold text-foreground',
+                                                        wrapIdentity
+                                                            ? 'break-words whitespace-normal'
+                                                            : 'truncate',
+                                                    )}
+                                                >
                                                     {id.name}
                                                 </span>
                                             )}
                                             {id.extra}
                                         </span>
                                         {id.subline ? (
-                                            <span className="block truncate text-[11.5px] text-muted-foreground">
+                                            <span
+                                                className={cn(
+                                                    'block text-[11.5px] text-muted-foreground',
+                                                    wrapIdentity
+                                                        ? 'break-words whitespace-normal'
+                                                        : 'truncate',
+                                                )}
+                                            >
                                                 {id.subline}
                                             </span>
                                         ) : null}
@@ -298,11 +329,13 @@ export function EntityTable<T>({
                                     </span>
                                 ))}
 
-                                {/* kebab cell — always last */}
+                                {/* kebab cell — always last. pr-2.5 keeps the
+                                    kebab's 44 px frontline-hit area inside
+                                    the card's overflow clip. */}
                                 <span
                                     role="cell"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="flex items-center justify-end pr-1.5"
+                                    className="flex items-center justify-end pr-2.5"
                                 >
                                     {!selectMode ? (
                                         <EntityKebab

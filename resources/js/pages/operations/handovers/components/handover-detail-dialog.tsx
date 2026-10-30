@@ -1,4 +1,5 @@
 import HandoverPersonNotes from '@/components/handover-person-notes';
+import { withMedicationReturn } from '@/lib/medication-navigation';
 /* Handover detail pop-up — full record with flow, lists, audit trail + actions. */
 import { WizardShell, WizardStepPane } from '@/components/wizard/shell';
 import { Link } from '@inertiajs/react';
@@ -26,6 +27,7 @@ import { cn } from '@/lib/utils';
 
 import { Button as GuardrailButton } from '@/components/ui/button';
 import { Card as GuardrailCard } from '@/components/ui/card';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
     type Handover,
     HueAvatar,
@@ -56,7 +58,7 @@ function DetailList({
             ? 'bg-status-critical-bg text-status-critical'
             : tone === 'warning'
               ? 'bg-status-warning-bg text-status-warning'
-              : 'bg-accent text-primary';
+              : 'bg-primary-fill/10 text-primary';
     const dotClass =
         tone === 'critical'
             ? 'bg-status-critical'
@@ -77,14 +79,14 @@ function DetailList({
                 >
                     <Icon className="h-3.5 w-3.5" />
                 </span>
-                <span className="text-[13px] font-semibold">{title}</span>
-                <span className="ml-auto rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                <span className="text-sm font-semibold">{title}</span>
+                <span className="ml-auto rounded-full bg-muted px-1.5 text-xs font-semibold text-muted-foreground tabular-nums">
                     {items.length}
                 </span>
             </div>
             <div className="space-y-1.5 px-3.5 py-3">
                 {items.map((it, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[13px]">
+                    <div key={i} className="flex items-start gap-2 text-sm">
                         <span
                             className={cn(
                                 'mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full',
@@ -129,12 +131,12 @@ function TimelineRow({
                 <Icon className="h-3.5 w-3.5" />
             </span>
             <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold">{label}</div>
-                <div className="truncate text-[11.5px] text-muted-foreground">
+                <div className="text-sm font-semibold">{label}</div>
+                <div className="truncate text-sm text-muted-foreground">
                     {who}
                 </div>
             </div>
-            <div className="text-right text-[11.5px] text-muted-foreground">
+            <div className="text-right text-sm text-muted-foreground">
                 {iso ? (
                     <>
                         <div>{formatDate(iso)}</div>
@@ -232,6 +234,13 @@ export function HandoverDetailDialog({
     }, [open, handover?.id]);
     const [snapshot, setSnapshot] = useState<ShiftMedSnapshot | null>(null);
     const [snapLoading, setSnapLoading] = useState(false);
+    const [snapshotRevision, setSnapshotRevision] = useState(0);
+    useEffect(() => {
+        if (!open || !medicationSnapshotUrl) return;
+        const refresh = () => setSnapshotRevision((revision) => revision + 1);
+        window.addEventListener('focus', refresh);
+        return () => window.removeEventListener('focus', refresh);
+    }, [open, medicationSnapshotUrl]);
     const shiftId = handover?.outgoing_shift?.id ?? null;
 
     useEffect(() => {
@@ -255,7 +264,7 @@ export function HandoverDetailDialog({
         return () => {
             cancelled = true;
         };
-    }, [open, medicationSnapshotUrl, shiftId]);
+    }, [open, medicationSnapshotUrl, shiftId, snapshotRevision]);
 
     if (!handover) return null;
     const h = handover;
@@ -320,7 +329,7 @@ export function HandoverDetailDialog({
             footerStart={
                 <GuardrailButton
                     variant="outline"
-                    className="min-h-11"
+                    className="frontline-hit"
                     onClick={() => onOpenChange(false)}
                 >
                     Close
@@ -331,7 +340,7 @@ export function HandoverDetailDialog({
                     {editable && (
                         <GuardrailButton
                             variant={needsIncoming ? 'default' : 'outline'}
-                            className="min-h-11"
+                            className="frontline-hit"
                             onClick={() => onEdit(h)}
                         >
                             <FileText />
@@ -345,7 +354,7 @@ export function HandoverDetailDialog({
                         !needsIncoming &&
                         !h.edit_lock && (
                             <GuardrailButton
-                                className="min-h-11"
+                                className="frontline-hit"
                                 onClick={() => onSubmit(h)}
                             >
                                 <Send />
@@ -354,7 +363,7 @@ export function HandoverDetailDialog({
                         )}
                     {h.status === 'submitted' && h.can_acknowledge && (
                         <GuardrailButton
-                            className="min-h-11"
+                            className="frontline-hit"
                             onClick={() => onAcknowledge(h)}
                         >
                             <Check />
@@ -381,11 +390,11 @@ export function HandoverDetailDialog({
                         <HandoverPersonNotes notes={h.worker_notes} />
                         {!h.worker_notes && (
                             <div>
-                                <div className="mb-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+                                <div className="mb-1.5 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                                     <FileText className="h-3.5 w-3.5" />
                                     Notes for {clientName(h.client)}
                                 </div>
-                                <p className="text-[13.5px] leading-relaxed whitespace-pre-wrap">
+                                <p className="text-base leading-relaxed whitespace-pre-wrap">
                                     {h.handover_notes || 'No notes recorded.'}
                                 </p>
                             </div>
@@ -396,6 +405,11 @@ export function HandoverDetailDialog({
                                 snapshot={snapshot}
                                 loading={snapLoading}
                                 hasShift={!!h.outgoing_shift}
+                                onRetry={() =>
+                                    setSnapshotRevision(
+                                        (revision) => revision + 1,
+                                    )
+                                }
                             />
                         ) : null}
 
@@ -425,21 +439,27 @@ export function HandoverDetailDialog({
                                             <CheckCircle2 className="h-3.5 w-3.5" />
                                         )}
                                     </span>
-                                    <span className="text-[13px] font-semibold">
+                                    <span className="text-sm font-semibold">
                                         Controlled-drug count{' '}
                                         {h.cd_verification.result ===
                                         'discrepancy'
                                             ? '— discrepancy found'
                                             : 'verified'}
                                     </span>
-                                    <Link
-                                        href="/emar/controlled"
-                                        className="ml-auto text-[12px] font-semibold text-primary hover:underline"
-                                    >
-                                        CD register
-                                    </Link>
+                                    {h.cd_register_url && (
+                                        <Link
+                                            href={withMedicationReturn(
+                                                h.cd_register_url,
+                                                window.location.pathname +
+                                                    window.location.search,
+                                            )}
+                                            className="ml-auto text-sm font-semibold text-primary hover:underline"
+                                        >
+                                            CD register
+                                        </Link>
+                                    )}
                                 </div>
-                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11.5px] text-muted-foreground">
+                                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                     {h.cd_verification.witness_name ? (
                                         <span>
                                             Witness:{' '}
@@ -466,7 +486,7 @@ export function HandoverDetailDialog({
                                     ) : null}
                                 </div>
                                 {h.cd_verification.notes ? (
-                                    <p className="mt-1.5 text-[12.5px] leading-snug">
+                                    <p className="mt-1.5 text-sm leading-snug">
                                         {h.cd_verification.notes}
                                     </p>
                                 ) : null}
@@ -509,11 +529,11 @@ export function HandoverDetailDialog({
                                     <div className="leading-tight">
                                         <EntityLink
                                             href={`/staff/${out.id}`}
-                                            className="block text-[13px] font-bold"
+                                            className="block text-sm font-bold"
                                         >
                                             {out.name}
                                         </EntityLink>
-                                        <div className="text-[11px] text-muted-foreground">
+                                        <div className="text-xs text-muted-foreground">
                                             Outgoing
                                             {humanizeRole(out.role)
                                                 ? ` · ${humanizeRole(out.role)}`
@@ -529,11 +549,11 @@ export function HandoverDetailDialog({
                                     <div className="leading-tight">
                                         <EntityLink
                                             href={`/staff/${inc.id}`}
-                                            className="block text-[13px] font-bold"
+                                            className="block text-sm font-bold"
                                         >
                                             {inc.name}
                                         </EntityLink>
-                                        <div className="text-[11px] text-muted-foreground">
+                                        <div className="text-xs text-muted-foreground">
                                             Incoming
                                             {humanizeRole(inc.role)
                                                 ? ` · ${humanizeRole(inc.role)}`
@@ -545,10 +565,13 @@ export function HandoverDetailDialog({
                                     </div>
                                 </div>
                             ) : (
-                                <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-status-warning/50 bg-status-warning-bg px-2.5 py-1 text-[11px] font-semibold text-status-warning">
+                                <StatusBadge
+                                    variant="warning"
+                                    className="border-dashed"
+                                >
                                     <ShieldAlert className="h-3.5 w-3.5" />
                                     Incoming shift open — needs cover
-                                </span>
+                                </StatusBadge>
                             )}
                             <span className="ml-auto">
                                 <MoodChip mood={h.client_mood} />
@@ -556,7 +579,7 @@ export function HandoverDetailDialog({
                         </div>
 
                         {immutableRecipientEvidence ? (
-                            <div className="grid gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-[12px] sm:grid-cols-2">
+                            <div className="grid gap-2 rounded-xl border border-border bg-muted/20 px-4 py-3 text-sm sm:grid-cols-2">
                                 <div>
                                     <div className="font-semibold text-muted-foreground">
                                         Submitted recipient
@@ -579,7 +602,7 @@ export function HandoverDetailDialog({
                         ) : null}
 
                         {emarLens ? (
-                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-[11.5px] text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-dashed border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
                                 <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                                 Same shift-handover record as{' '}
                                 <Link
@@ -594,7 +617,7 @@ export function HandoverDetailDialog({
                         ) : null}
 
                         {h.edit_lock ? (
-                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-warning/30 bg-status-warning-bg/60 px-3 py-2 text-[12px] font-medium text-status-warning">
+                            <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-status-warning/30 bg-status-warning-bg/60 px-3 py-2 text-sm font-medium text-status-warning">
                                 <ShieldAlert className="h-3.5 w-3.5 shrink-0" />
                                 Being edited by {h.edit_lock.held_by_name} —
                                 editing is disabled here to avoid a conflict.
@@ -606,7 +629,7 @@ export function HandoverDetailDialog({
                     <div className="space-y-5">
                         {/* Audit trail */}
                         <div>
-                            <div className="mb-1 flex items-center gap-1.5 text-[12px] font-semibold text-muted-foreground">
+                            <div className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-muted-foreground">
                                 <Activity className="h-3.5 w-3.5" />
                                 Audit trail
                             </div>
@@ -674,11 +697,8 @@ export function HandoverDetailDialog({
                                     {inc.name.split(' ')[0]} · incoming
                                 </OptionLink>
                             ) : null}
-                            {h.client && medicationSnapshotUrl ? (
-                                <OptionLink
-                                    href={`/emar/mar?client_id=${h.client.id}`}
-                                    icon={Pill}
-                                >
+                            {h.mar_url ? (
+                                <OptionLink href={h.mar_url} icon={Pill}>
                                     Open on MAR chart
                                 </OptionLink>
                             ) : null}

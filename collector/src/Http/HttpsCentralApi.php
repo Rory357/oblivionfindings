@@ -21,6 +21,7 @@ final readonly class HttpsCentralApi implements CentralApi
         private ?string $clientPrivateKeyFile = null,
         /** @var null|Closure(string, string, string, list<string>, bool): array{transport_ok: bool, status: int, body: string} */
         private ?Closure $testTransport = null,
+        private ?string $caBundleFile = null,
     ) {
         $parts = parse_url($baseUrl);
         if (! is_array($parts)
@@ -48,6 +49,14 @@ final readonly class HttpsCentralApi implements CentralApi
             throw new CentralApiFailure('Collector mTLS identity is unavailable.');
         }
 
+        // This protected local bundle changes chain trust only. Host validation,
+        // the configured public-key pin and mTLS identity remain mandatory.
+        if ($caBundleFile !== null
+            && (! is_file($caBundleFile) || ! is_readable($caBundleFile)
+                || ! is_int($bytes = filesize($caBundleFile)) || $bytes < 1 || $bytes > 1_048_576)) {
+            throw new CentralApiFailure('Collector CA bundle is unavailable.');
+        }
+
         $this->baseUrl = rtrim($baseUrl, '/');
     }
 
@@ -63,6 +72,20 @@ final readonly class HttpsCentralApi implements CentralApi
         return $this->request('POST', '/api/monitoring/collectors/enrol', [
             'collector_id' => $collectorId,
             'collector_public_key' => base64_encode($collectorPublicKey),
+        ], $oneTimeToken);
+    }
+
+    public function enrolRecoverable(string $oneTimeToken, string $collectorId, string $collectorPublicKey, string $proof): array
+    {
+        if (preg_match('/\\Aofc_enrol_[A-Za-z0-9_-]{64}\\z/', $oneTimeToken) !== 1
+            || strlen($collectorPublicKey) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES || strlen($proof) !== SODIUM_CRYPTO_SIGN_BYTES) {
+            throw new CentralApiFailure('Collector recovery request is invalid.');
+        }
+
+        return $this->request('POST', '/api/monitoring/collectors/enrol/recoverable', [
+            'collector_id' => $collectorId,
+            'collector_public_key' => base64_encode($collectorPublicKey),
+            'proof' => base64_encode($proof),
         ], $oneTimeToken);
     }
 
@@ -173,6 +196,26 @@ final readonly class HttpsCentralApi implements CentralApi
     }
 
     /** @param array<string, mixed> $payload @return array<string, mixed> */
+    public function mediaWork(string $collectorId, string $requestKey, array $capability): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/media/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'media_capability' => $capability]);
+    }
+
+    public function mediaResults(string $collectorId, string $requestKey, array $results): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/media/results', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'results' => $results]);
+    }
+
+    public function discoveryWork(string $collectorId, string $requestKey, array $capability): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/media/discovery/work', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'capability' => $capability]);
+    }
+
+    public function discoveryResults(string $collectorId, string $requestKey, array $results): array
+    {
+        return $this->request('POST', '/api/monitoring/collectors/media/discovery/results', ['collector_id' => $collectorId, 'request_key' => $requestKey, 'results' => $results]);
+    }
+
     private function request(string $method, string $path, array $payload, ?string $oneTimeToken = null): array
     {
         $body = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
@@ -181,6 +224,18 @@ final readonly class HttpsCentralApi implements CentralApi
         }
         $headers = $this->requestHeaders($method, $path, $body, $oneTimeToken);
         $result = $this->send($method, $path, $body, $headers, $oneTimeToken === null);
+        if ($oneTimeToken === null
+            && in_array($path, ['/api/monitoring/collectors/media/work', '/api/monitoring/collectors/media/results', '/api/monitoring/collectors/media/discovery/work', '/api/monitoring/collectors/media/discovery/results'], true)
+            && ! $result['transport_ok']
+            && ($result['status'] === 0 || ($result['status'] >= 200 && $result['status'] < 300))
+            && ($result['transient_failure'] ?? false)) {
+            // One delayed recovery keeps the exact action/request bytes. Fresh
+            // transport nonces prevent replay; original authority still expires.
+            // TLS/pin/HTTP/contract denials never enter this recovery path.
+            usleep(5000000);
+            $headers = $this->requestHeaders($method, $path, $body, null);
+            $result = $this->send($method, $path, $body, $headers, true);
+        }
         if (! $result['transport_ok'] || $result['status'] < 200 || $result['status'] >= 300) {
             throw new CentralApiFailure('Central HTTPS request failed with a bounded transport outcome: '.($result['status'] ?: 'unavailable').'.');
         }
@@ -226,14 +281,15 @@ final readonly class HttpsCentralApi implements CentralApi
         return $headers;
     }
 
-    /** @param list<string> $headers @return array{transport_ok: bool, status: int, body: string} */
+    /** @param list<string> $headers @return array{transport_ok: bool, status: int, body: string, transient_failure?: bool} */
     private function send(string $method, string $path, string $body, array $headers, bool $useMtls): array
     {
         if ($this->testTransport !== null) {
             $result = ($this->testTransport)($method, $path, $body, $headers, $useMtls);
             if (! is_bool($result['transport_ok'] ?? null)
                 || ! is_int($result['status'] ?? null)
-                || ! is_string($result['body'] ?? null)) {
+                || ! is_string($result['body'] ?? null)
+                || (array_key_exists('transient_failure', $result) && ! is_bool($result['transient_failure']))) {
                 throw new CentralApiFailure('Collector test transport returned an invalid bounded outcome.');
             }
 
@@ -253,8 +309,8 @@ final readonly class HttpsCentralApi implements CentralApi
             CURLOPT_HEADER => false,
             CURLOPT_FOLLOWLOCATION => false,
             CURLOPT_MAXREDIRS => 0,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_TIMEOUT => 15,
+            CURLOPT_CONNECTTIMEOUT => str_contains($path, '/collectors/media/') ? 3 : 5,
+            CURLOPT_TIMEOUT => str_contains($path, '/collectors/media/') ? 3 : 15,
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
             CURLOPT_PINNEDPUBLICKEY => $this->tlsPublicKeyPin,
@@ -268,6 +324,9 @@ final readonly class HttpsCentralApi implements CentralApi
                 return strlen($chunk);
             },
         ];
+        if ($this->caBundleFile !== null) {
+            $options[CURLOPT_CAINFO] = $this->caBundleFile;
+        }
         if ($useMtls) {
             $options[CURLOPT_SSLCERT] = $this->clientCertificateFile;
             $options[CURLOPT_SSLKEY] = $this->clientPrivateKeyFile;
@@ -275,16 +334,18 @@ final readonly class HttpsCentralApi implements CentralApi
         curl_setopt_array($handle, $options);
         $success = curl_exec($handle);
         $status = (int) curl_getinfo($handle, CURLINFO_RESPONSE_CODE);
+        $error = curl_errno($handle);
         curl_close($handle);
 
         return [
             'transport_ok' => $success !== false,
+            'transient_failure' => $success === false && in_array($error, [CURLE_COULDNT_CONNECT, CURLE_OPERATION_TIMEDOUT, CURLE_GOT_NOTHING, CURLE_SEND_ERROR, CURLE_RECV_ERROR], true),
             'status' => $status,
             'body' => $response,
         ];
     }
 
-    /** @param array{transport_ok: bool, status: int, body: string} $result */
+    /** @param array{transport_ok: bool, status: int, body: string, transient_failure?: bool} $result */
     private function assertEvidenceResponse(array $result, int $expectedStatus, string $expectedMessage): void
     {
         if (! $result['transport_ok'] || $result['status'] !== $expectedStatus) {

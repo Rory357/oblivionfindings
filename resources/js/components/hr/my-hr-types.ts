@@ -1,4 +1,5 @@
 import type { MyHrActiveClock } from './my-hr-clock-card';
+import type { MyHrAttendance } from './my-hr-attendance';
 
 /** A teammate in the shell-hosted "Give recognition" wizard directory. */
 export type KudosTeammate = {
@@ -54,7 +55,9 @@ export type MyHrShoutoutReply = {
 
 /** The giver / recipient of a shout-out. */
 export type MyHrShoutoutParty = {
-    id: number;
+    id: number | null;
+    type?: 'person' | 'team';
+    department_id?: number | null;
     name: string;
     initials: string;
     role: string | null;
@@ -65,9 +68,13 @@ export type MyHrShoutoutParty = {
  *  thread), as served by `BuildsMyHrOverview::myHrShoutouts`. */
 export type MyHrShoutout = {
     id: number;
+    can_reply?: boolean;
     giver: MyHrShoutoutParty;
     recipient: MyHrShoutoutParty;
-    category: string;
+    category: string | null;
+    category_label?: string | null;
+    impact?: string;
+    impact_label?: string;
     message: string;
     created_at: string | null;
     reactions: {
@@ -114,6 +121,7 @@ export type MyHrShellData = {
         avatar: string | null;
     };
     activeClock: MyHrActiveClock;
+    attendance?: MyHrAttendance;
     todayTotal: number;
     weekly: {
         total_hours: number;
@@ -133,6 +141,9 @@ export type MyHrShellData = {
         policiesDue: number;
         onesToAck: number;
         kudosThisMonth: number;
+        /** Own workplace injuries (any status); the Injuries tab shows only when > 0. */
+        injuries?: number;
+        openInjuries?: number;
     };
     /** Current-month feed for the hero footer calendar. Other months are
      *  fetched on demand from `GET /hr/my/calendar?month=YYYY-MM`. */

@@ -6,14 +6,18 @@ use App\Domain\SecurityDevices\Http\Controllers\Concerns\MapsDevicesForList;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceGroup;
 use App\Domain\SecurityDevices\Services\DeviceGroupAutoRuleService;
+use App\Domain\SecurityDevices\Services\DeviceGroupMaintenancePreview;
 use App\Domain\SecurityDevices\Services\SecurityDevicesAccessService;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator as ValidatorContract;
 use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 class DeviceGroupController extends Controller
 {
@@ -22,6 +26,7 @@ class DeviceGroupController extends Controller
     public function __construct(
         private readonly DeviceGroupAutoRuleService $autoRules,
         private readonly SecurityDevicesAccessService $access,
+        private readonly DeviceGroupMaintenancePreview $maintenancePreview,
     ) {}
 
     public function index(Request $request)
@@ -74,6 +79,7 @@ class DeviceGroupController extends Controller
     public function show(Request $request, DeviceGroup $group)
     {
         $user = $request->user();
+        $asOf = now()->toImmutable();
         $this->assertCanManageGroups($user);
 
         $visibleDevices = $this->access->visibleDevices($user);
@@ -100,6 +106,11 @@ class DeviceGroupController extends Controller
             : 0;
 
         return Inertia::render('security-devices/device-groups/show', [
+            'actor_id' => (int) $user->id,
+            'as_of' => $asOf->toISOString(),
+            // Same actor rule the preview read enforces, so the page never
+            // offers an action that can only return "unavailable".
+            'can_preview_maintenance' => $this->maintenancePreview->actorMayPreview($user),
             'group' => [
                 'id' => $group->id,
                 'name' => $group->name,
@@ -128,6 +139,38 @@ class DeviceGroupController extends Controller
         ]);
     }
 
+    public function previewMaintenancePolicy(Request $request, DeviceGroup $group): JsonResponse
+    {
+        try {
+            abort_if($request->getContent() !== '' || $request->request->count() !== 0, 422, 'invalid_request');
+            $data = $this->maintenancePreview->read(
+                $request->user(), (int) $group->id, $request->query(), (string) $request->server('QUERY_STRING', ''),
+            );
+        } catch (ModelNotFoundException) {
+            // A Site, monitor or member removed part-way through the read
+            // (a firstOrFail() inside Monitoring's owner checks). Answer with
+            // the same private 404 as every other unavailable read rather than
+            // Laravel's default "No query results for model …" body.
+            return self::previewUnavailable(404);
+        } catch (HttpExceptionInterface $error) {
+            $status = $error->getStatusCode();
+            if (! in_array($status, [404, 422, 503], true)) {
+                throw $error;
+            }
+
+            return self::previewUnavailable($status);
+        }
+
+        return response()->json($data)->header('Cache-Control', 'private, no-store');
+    }
+
+    /** The one uniform, uncached error body for the maintenance preview read. */
+    public static function previewUnavailable(int $status = 404): JsonResponse
+    {
+        return response()->json(['message' => $status === 422 ? 'invalid_request' : 'unavailable'], $status)
+            ->header('Cache-Control', 'private, no-store');
+    }
+
     public function create(Request $request)
     {
         $user = $request->user();
@@ -151,6 +194,10 @@ class DeviceGroupController extends Controller
         $validated['type'] = $validated['type'] ?? 'custom';
 
         $group = DeviceGroup::create($validated);
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->wizardSaveReply($request, $group);
+        }
 
         return redirect()->route('security-devices.device-groups.show', $group)
             ->with('success', "Group '{$group->name}' created.");
@@ -185,6 +232,10 @@ class DeviceGroupController extends Controller
         $validated = array_merge($validated, $this->validateAutoRules($request));
 
         $group->update($validated);
+
+        if ($request->wantsJson() && ! $request->header('X-Inertia')) {
+            return $this->wizardSaveReply($request, $group);
+        }
 
         return redirect()->route('security-devices.device-groups.show', $group)
             ->with('success', "Group '{$group->name}' updated.");
@@ -312,6 +363,23 @@ class DeviceGroupController extends Controller
         $group->devices()->detach($device->id);
 
         return back()->with('success', 'Device removed from group.');
+    }
+
+    private function wizardSaveReply(Request $request, DeviceGroup $group): JsonResponse
+    {
+        $group->refresh();
+
+        return response()->json([
+            'saved' => true,
+            'saved_by' => $request->user()->id,
+            'group' => [
+                'id' => $group->id,
+                'name' => $group->name,
+                'type' => $group->type,
+                'description' => $group->description,
+                'auto_rules' => is_array($group->auto_rules) ? $group->auto_rules : null,
+            ],
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     private function assertCanManageGroups(User $user): void

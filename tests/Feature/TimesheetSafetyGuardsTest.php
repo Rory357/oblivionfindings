@@ -189,6 +189,14 @@ class TimesheetSafetyGuardsTest extends TestCase
 
     public function test_timesheet_cannot_be_approved_if_linked_shift_is_cancelled(): void
     {
+        HrEmployeeProfile::factory()->create([
+            'user_id' => $this->admin->id,
+            'primary_site_id' => $this->site->id,
+            'secondary_site_ids' => [],
+            'start_date' => today()->subYear(),
+            'end_date' => null,
+            'is_active' => true,
+        ]);
         $shift = Shift::factory()->create([
             'client_id' => $this->client->id,
             'user_id' => $this->staff->id,
@@ -204,7 +212,7 @@ class TimesheetSafetyGuardsTest extends TestCase
         $shift->update(['status' => 'cancelled']);
 
         $this->actingAs($this->admin)
-            ->post("/operations/timesheets/{$timesheet->id}/approve")
+            ->postJson("/operations/timesheets/{$timesheet->id}/approve")
             ->assertStatus(422);
 
         $this->assertDatabaseHas('timesheets', [

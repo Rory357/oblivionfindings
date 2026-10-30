@@ -184,7 +184,7 @@ const PILL_INACTIVE =
     'bg-primary-foreground/10 text-primary-foreground/80 hover:bg-primary-foreground/20';
 const SEG_BASE =
     'rounded-md px-2.5 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/40';
-const SEG_ACTIVE = 'bg-primary-foreground text-primary';
+const SEG_ACTIVE = 'bg-primary-foreground text-primary-strong';
 const SEG_INACTIVE = 'text-primary-foreground/80 hover:text-primary-foreground';
 
 export type HeroSegItem = {

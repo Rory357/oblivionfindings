@@ -1,0 +1,11 @@
+{
+  "candidate": "322b4ebfdaf4a242d9bd705b5a6f958ca973f8ee",
+  "url": "http://127.0.0.1:8794/fleet-assets/settings/notifications",
+  "method": "Main real browser; read-only UI navigation, preview open and Escape close",
+  "viewport": {"width": 1280, "height": 720},
+  "dialog": {"top": 42.203125, "bottom": 677.796875, "height": 635.59375},
+  "footer": {"top": 619.796875, "bottom": 676.796875, "height": 57},
+  "escape": {"dialogsAfter": 0, "returnedFocus": "Actions for Booking decisions"},
+  "screenshot": "PKG-08-main-notification-preview.png",
+  "limitations": "Ordinary window; actual page zoom was not verified. No preference save, message send or operating record change."
+}

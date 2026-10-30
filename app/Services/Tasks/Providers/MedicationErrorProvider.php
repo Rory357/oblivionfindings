@@ -4,12 +4,14 @@ namespace App\Services\Tasks\Providers;
 
 use App\Models\MedicationError;
 use App\Models\User;
+use App\Services\Medication\MedicationErrorReadScope;
+use App\Services\Medication\MedicationErrorSummary;
+use App\Services\Medication\MedicationGovernanceScopeService;
 use App\Services\Tasks\Contracts\HasModelClass;
 use App\Services\Tasks\Contracts\SiteScopedTaskProvider;
 use App\Services\Tasks\Contracts\TaskProvider;
 use App\Services\Tasks\TaskItem;
 use App\Services\Tasks\TaskProviderAuthorization;
-use App\Services\UserSiteAccessService;
 
 class MedicationErrorProvider implements HasModelClass, SiteScopedTaskProvider, TaskProvider
 {
@@ -36,27 +38,32 @@ class MedicationErrorProvider implements HasModelClass, SiteScopedTaskProvider, 
     public function authorizedTasks(User $user, array $filters = []): array
     {
         $query = MedicationError::query()
-            ->with('client:id,first_name,last_name')
+            ->with(['client:id,first_name,last_name', 'owner:id,name'])
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
             ->orderByDesc('reported_at')
             ->limit(300);
 
         if (empty($filters['include_done'])) {
-            $query->whereIn('status', ['reported', 'investigating']);
+            $query->whereIn('status', ['reported', 'investigating', 'resolved']);
         }
 
+        // Mirror the medication error register exactly: the reader's Sites,
+        // canonical client/medication ownership, and — without the controlled
+        // medicines reader capability — no controlled-drug rows at all. Tasks
+        // list, stats, reports, detail, lookup (global search), CSV and watch
+        // all read through this one query.
         return app(TaskProviderAuthorization::class)->siteScoped(
             $user,
             $this->canView($user),
             $query,
-            fn ($scoped, User $actor) => $scoped->whereHas(
-                'client',
-                fn ($clients) => app(UserSiteAccessService::class)->applyClientScope(
-                    $clients,
-                    $actor,
-                    ['clinical.accessAllSites', 'sites.viewAll'],
-                ),
-            ),
+            function ($scoped, User $actor) {
+                $governance = app(MedicationGovernanceScopeService::class);
+                app(MedicationErrorReadScope::class)->apply(
+                    $scoped, $actor, $governance->readerSiteIds($actor, MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY),
+                );
+
+                return $scoped;
+            },
             function (MedicationError $error) {
                 $client = $error->client;
 
@@ -74,19 +81,20 @@ class MedicationErrorProvider implements HasModelClass, SiteScopedTaskProvider, 
                     title: $title,
                     status: (string) $error->status,
                     bucket: match ($error->status) {
-                        'resolved', 'closed' => TaskItem::BUCKET_DONE,
-                        'investigating' => TaskItem::BUCKET_IN_PROGRESS,
+                        'closed' => TaskItem::BUCKET_DONE,
+                        'investigating', 'resolved' => TaskItem::BUCKET_IN_PROGRESS,
                         default => TaskItem::BUCKET_OPEN,
                     },
                     severity: TaskItem::normaliseSeverity($error->severity),
                     client: $client
                         ? ['id' => $client->id, 'name' => trim($client->first_name.' '.$client->last_name)]
                         : null,
-                    dueAt: null,
+                    dueAt: ($error->stage() === 'triage' ? $error->triage_due_at : $error->investigation_due_at)?->toIso8601String(),
+                    assignee: $error->owner?->only(['id', 'name']),
                     createdAt: optional($error->created_at)->toIso8601String(),
-                    link: '/emar/errors',
+                    link: '/emar/errors?error='.$error->id,
                     type: 'Medication error',
-                    description: $error->description ? str($error->description)->limit(140)->toString() : null,
+                    description: MedicationErrorSummary::for($error),
                 );
             },
         );

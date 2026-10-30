@@ -4,6 +4,23 @@ Applies to the primary/secondary action-button pair (first seen on Site →
 Clients: "Create client" + "Link existing client"). Intended to become the
 app-wide `default` and `outline` button treatments.
 
+## Slate revision (approved by Stephan 2026-10-20) — overrides the colour treatment below
+
+With the Slate look (DESIGN.md) the pair is flatter; anatomy, sizes,
+motion, focus ring and text rules below are unchanged.
+
+- **Primary:** solid `--primary-fill` — no gradient. Shadow
+  `0 1px 2px rgb(15 23 42 / .14)` plus `inset 0 1px 0 rgb(255 255 255 /
+  .14)`; no coloured glow. Hover: 1 px lift, shadow
+  `0 2px 6px rgb(15 23 42 / .16)`; pressed: 0.5 px.
+- **Secondary (outline):** `--card` fill, `--border` (`#E2E8F0`) 1 px,
+  shadow `0 1px 2px rgb(15 23 42 / .05)`; hover border
+  `color-mix(in oklch, var(--primary) 45%, var(--border))`.
+- This drops the fixed hue-277 `--color-purple-700/-400` glow and border
+  below, which never followed the branding colour (GOOD-CATCHES §4).
+- On the brand sky the white primary and glass secondary are unchanged.
+- Reference: canvas page 5 (Controls), every state in light and dark.
+
 ## Shared anatomy (both buttons)
 
 - Height: 44px (`min-h-11`), padding: 0 18px, gap between icon and label: 8px
@@ -15,9 +32,18 @@ app-wide `default` and `outline` button treatments.
 
 ## Primary — "Create client"
 
-- Text: `--primary-foreground` (white)
+- Text: `--primary-fill-foreground` — white on the default brand; ink only
+  for a brand light enough for ink text (amended 2026-10-02).
 - Background (gradient-lit, top-lightened):
-  `linear-gradient(180deg, color-mix(in oklch, var(--primary) 82%, white) 0%, var(--primary) 55%)`
+  `linear-gradient(180deg, color-mix(in oklch, var(--primary-fill) 90%, white) 0%, var(--primary-fill) 55%)`
+  - `--primary-fill` is the brand, except that a fill carrying white text is
+    never lighter than L 0.50 — and in dark mode every brand is clamped to
+    0.50 (`--primary` itself stays light there, because it is also text on
+    dark surfaces). White text then measures ≥ 5.6:1 on the base and
+    ≥ 4.57:1 on the highlight for every hue.
+  - The highlight mix was 82%; 90% (amended 2026-10-02) keeps the lightened
+    top above WCAG AA under white text. It always mixes with white, so it
+    stays a highlight when a light brand takes ink text.
 - Shadow (inner highlight + violet glow):
   - `inset 0 1px 0 rgb(255 255 255 / 0.25)`
   - `0 1px 2px color-mix(in oklch, var(--color-purple-700) 50%, transparent)`
@@ -35,9 +61,12 @@ app-wide `default` and `outline` button treatments.
 
 ## Theming
 
-All colours come from semantic tokens (`--primary`, `--card`, `--border`,
-`--ring`, hue-277 purple scale), so dark mode derives automatically — no
-hard-coded hex anywhere.
+All colours come from semantic tokens (`--primary-fill`,
+`--primary-fill-foreground`, `--primary`, `--card`, `--border`, `--ring`,
+hue-277 purple scale), so dark mode and branding derive automatically — no
+hard-coded hex anywhere. The fill tokens are derived from `--primary` in
+`app.css` (see `DESIGN_TOKENS.md` § "Primary fills and foregrounds"); they
+are not a branding setting.
 
 ---
 

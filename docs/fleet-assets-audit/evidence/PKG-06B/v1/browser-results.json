@@ -1,0 +1,174 @@
+{
+  "browser": "147.0.7727.15",
+  "qa": [
+    {
+      "name": "Receipt missing kit validation",
+      "result": "passed"
+    },
+    {
+      "name": "Receipt fail/retry retains entries",
+      "result": "passed"
+    },
+    {
+      "name": "Receipt retry does not add another event",
+      "result": "passed"
+    },
+    {
+      "name": "Edit discard keeps authoritative identity",
+      "result": "passed"
+    },
+    {
+      "name": "Edit review/back and failed save retain draft",
+      "result": "passed"
+    },
+    {
+      "name": "Original check retains provenance and safe link retry",
+      "result": "passed"
+    },
+    {
+      "name": "Work details: notes draft and failed progress retained",
+      "result": "passed"
+    },
+    {
+      "name": "Terminal progress uses completion guard",
+      "result": "passed"
+    },
+    {
+      "name": "Private library search and unavailable/quarantined evidence",
+      "result": "failed",
+      "error": "TimeoutError: locator.click: Timeout 4500ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Service reportservice-report/ })\u001b[22m\n"
+    },
+    {
+      "name": "Upload validation, failure/retry and truthful simulated result",
+      "result": "passed"
+    },
+    {
+      "name": "Private library search and unavailable/quarantined evidence (corrected locator)",
+      "result": "passed"
+    },
+    {
+      "name": "Document archive requires reason and retains version",
+      "result": "passed"
+    },
+    {
+      "name": "Retirement does not bypass dependencies or Finance decision",
+      "result": "passed"
+    },
+    {
+      "name": "Cross-site recipient denied at submission",
+      "result": "passed"
+    },
+    {
+      "name": "Loan recipient, expected date and dispatch pending receipt",
+      "result": "passed"
+    },
+    {
+      "name": "Direct-object denial conceals identity and source details",
+      "result": "passed"
+    },
+    {
+      "name": "Read-only editing and Maintenance controls disabled",
+      "result": "passed"
+    },
+    {
+      "name": "Empty, unknown, archived, client-owned and vehicle states",
+      "result": "passed"
+    },
+    {
+      "name": "Concurrent assignment keeps draft for explicit reload",
+      "result": "passed"
+    },
+    {
+      "name": "Genuine browser zoom",
+      "result": "unverified",
+      "detail": "Browser shortcut did not change viewport or DPR; browser settings surfaces unavailable in this runtime.",
+      "before": {
+        "width": 1024,
+        "dpr": 1
+      },
+      "after": {
+        "width": 1024,
+        "dpr": 1
+      }
+    },
+    {
+      "name": "FINAL receipt starts unconfirmed and incomplete receipt stays owned",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL complete amendment, retry and hold separation",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL loan dispatch retains destination, recipient and expected date",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL receipt actor must match recipient",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL actual return records a new pending handoff",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL assignment preserves release guard",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL older check keeps its own date, answer and no fabricated attachment",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL replacement requires reason, preserves old version and marks new file unverified",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL searchable picker keyboard, no match and failure recovery",
+      "result": "failed",
+      "error": "Error: Escape closed parent"
+    },
+    {
+      "name": "FINAL picker Escape retains parent after exit transition",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL report links existing Maintenance instead of duplicating",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL upload one file per version and visible simulated progress",
+      "result": "passed"
+    },
+    {
+      "name": "All 16 profile subviews render and fit desktop width",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL all 16 selected subviews with correct URLs and width",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL section and context retained on reload",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL desktop width 1280",
+      "result": "passed"
+    },
+    {
+      "name": "FINAL desktop width 1024",
+      "result": "passed"
+    }
+  ],
+  "pageErrors": [],
+  "requestedUrls": [
+    "http://127.0.0.1:8896/",
+    "http://127.0.0.1:8896/app.css",
+    "http://127.0.0.1:8896/app.js"
+  ],
+  "limits": [
+    "Genuine browser zoom unverified",
+    "UI simulation only; no server permissions, persistence or operational acceptance"
+  ]
+}

@@ -44,9 +44,14 @@ export function CheckInModal({
     const [acknowledged, setAcknowledged] = useState(false);
     const [epipenLocation, setEpipenLocation] = useState('');
     const [escalationNote, setEscalationNote] = useState('');
-    const needsAnaphylaxis = stay?.criticalAlerts.some(
-        (alert) => alert.type === 'allergy' && alert.requiresAcknowledgement,
-    );
+    // The server decides from the canonical allergy record (EA-011); the
+    // allergen itself is only listed for readers of the Medical section.
+    const needsAnaphylaxis =
+        !!stay?.anaphylaxisCheckRequired ||
+        !!stay?.criticalAlerts.some(
+            (alert) =>
+                alert.type === 'allergy' && alert.requiresAcknowledgement,
+        );
 
     useEffect(() => {
         if (!stay) return;

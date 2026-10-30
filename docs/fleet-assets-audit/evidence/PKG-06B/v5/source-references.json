@@ -1,0 +1,285 @@
+{
+  "capturedAtUtc": "2026-09-26T12:09:54.629Z",
+  "references": [
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Models/Asset.php",
+      "sha256": "ceb39e404f2d8d43fffa1eed8e60621af1651b679a92296fb1792ed2c297bbb7",
+      "priorV1Sha256": "ceb39e404f2d8d43fffa1eed8e60621af1651b679a92296fb1792ed2c297bbb7",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Models/AssetAssignment.php",
+      "sha256": "8d7c445ac476a6c63984592ddd2972b0ae4f30806b776f9d7e8431a4795173ff",
+      "priorV1Sha256": "8d7c445ac476a6c63984592ddd2972b0ae4f30806b776f9d7e8431a4795173ff",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Models/AssetDocument.php",
+      "sha256": "bc6c6816ef1d1991b9e3e33dde8b98e489c808543f699742af4378a3a5c2d2a3",
+      "priorV1Sha256": "bc6c6816ef1d1991b9e3e33dde8b98e489c808543f699742af4378a3a5c2d2a3",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Models/AssetDocumentSet.php",
+      "sha256": "b9c3a16f8bd40975d97f1ea93715cce1820aeac5a602e2483965daf1c19d5b8b",
+      "priorV1Sha256": "b9c3a16f8bd40975d97f1ea93715cce1820aeac5a602e2483965daf1c19d5b8b",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Models/AssetScanEvent.php",
+      "sha256": "eac254eaf8d2870f2c4f9d5a516f76712c7bf06ae8bb0db300532a75d35b814c",
+      "priorV1Sha256": "eac254eaf8d2870f2c4f9d5a516f76712c7bf06ae8bb0db300532a75d35b814c",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Services/Assets/AssetAssignmentService.php",
+      "sha256": "07c999b5bb562c6b731d1ad7cc50ec9f1ec1f64f4ee6446ff8e81220aec6217f",
+      "priorV1Sha256": "07c999b5bb562c6b731d1ad7cc50ec9f1ec1f64f4ee6446ff8e81220aec6217f",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Http/Controllers/AssetAssignmentController.php",
+      "sha256": "eeaacad43ee58a7fa1ea0c807fd8641bfbd2056c72f936bae7f929a761323380",
+      "priorV1Sha256": "eeaacad43ee58a7fa1ea0c807fd8641bfbd2056c72f936bae7f929a761323380",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Http/Controllers/FleetAssets/AssetController.php",
+      "sha256": "3ffbbdfb57dfc1046ccb483e4d7f50f41acb9fddcfc7303d5e4c93eea5062dc6",
+      "priorV1Sha256": "3ffbbdfb57dfc1046ccb483e4d7f50f41acb9fddcfc7303d5e4c93eea5062dc6",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Http/Controllers/AssetDocumentController.php",
+      "sha256": "4fc69fac30fe3a62843cf8aa93aaa63e2ce5f72d7a3a7f42aed38f5ed3f7d1fb",
+      "priorV1Sha256": "4fc69fac30fe3a62843cf8aa93aaa63e2ce5f72d7a3a7f42aed38f5ed3f7d1fb",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Services/Fleet/MaintenanceCheckService.php",
+      "sha256": "51daad8ce633c1e52a4613e53c5d95c92b3f918d12ee19be3603e10b4e596193",
+      "priorV1Sha256": "51daad8ce633c1e52a4613e53c5d95c92b3f918d12ee19be3603e10b4e596193",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Services/Fleet/MaintenanceReportService.php",
+      "sha256": "3670d1ee6580718f9355b1e6b354cac389249b3b0490d13c6015f6e23efdca2b",
+      "priorV1Sha256": "3670d1ee6580718f9355b1e6b354cac389249b3b0490d13c6015f6e23efdca2b",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Services/Fleet/MaintenanceRestrictionService.php",
+      "sha256": "716e6a107e2cd910f2de47e015c31a3601d5ce09a98f7178a0736ad2cd18128e",
+      "priorV1Sha256": "716e6a107e2cd910f2de47e015c31a3601d5ce09a98f7178a0736ad2cd18128e",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Services/Fleet/VehicleDocumentService.php",
+      "sha256": "17d6785551194de9b4a56f9020a072425294b5ce5e523cdde3e0d7a2411b2267",
+      "priorV1Sha256": "17d6785551194de9b4a56f9020a072425294b5ce5e523cdde3e0d7a2411b2267",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Domain/SecurityDevices/Models/DeviceAssetLink.php",
+      "sha256": "0b1634241023f671e8d82521670093495b8b8c1cd7687b1668eabefdd7564294",
+      "priorV1Sha256": "0b1634241023f671e8d82521670093495b8b8c1cd7687b1668eabefdd7564294",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Domain/Finance/Models/FinFixedAsset.php",
+      "sha256": "e30457c1214b6bc93316e765fabcb543c578a91eafcbe78f835bfca6336d6b89",
+      "priorV1Sha256": "e30457c1214b6bc93316e765fabcb543c578a91eafcbe78f835bfca6336d6b89",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/app/Domain/Finance/Presenters/AssetFinanceTechnologyProjectionPresenter.php",
+      "sha256": "4e43a66f8546f6016d6e1c59162fc0b17376693f2d8744be72e13fc016c591a2",
+      "priorV1Sha256": "4e43a66f8546f6016d6e1c59162fc0b17376693f2d8744be72e13fc016c591a2",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/pages/fleet-assets/assets/show.tsx",
+      "sha256": "f9f4836d21a3e072fe1ea937e00b37c0bfb9d2b2349582e5d3a0bff0d33e78b4",
+      "priorV1Sha256": "f9f4836d21a3e072fe1ea937e00b37c0bfb9d2b2349582e5d3a0bff0d33e78b4",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/pages/fleet-assets/maintenance/work-orders/show.tsx",
+      "sha256": "60980d87e3087a2076d9ee27b6bf78f7851f4a7028ccbff763843d1e97b61aef",
+      "priorV1Sha256": "60980d87e3087a2076d9ee27b6bf78f7851f4a7028ccbff763843d1e97b61aef",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/page/page-header.tsx",
+      "sha256": "fbd198fe142bf1dc2321878bc924c9a8baa1eed6b0add0cc7e28a40e70f01427",
+      "priorV1Sha256": "fbd198fe142bf1dc2321878bc924c9a8baa1eed6b0add0cc7e28a40e70f01427",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/page/grouped-profile-nav.tsx",
+      "sha256": "bc98ec02b540dbb86db6abe59f5f0956652a1cf9250c3e21da07aebfcd4ad5cd",
+      "priorV1Sha256": "bc98ec02b540dbb86db6abe59f5f0956652a1cf9250c3e21da07aebfcd4ad5cd",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/button.tsx",
+      "sha256": "e8ae39c3616c4aaf689014c4eb9de6235e5e4ff16e581c2be2e970cd36191cc1",
+      "priorV1Sha256": "e8ae39c3616c4aaf689014c4eb9de6235e5e4ff16e581c2be2e970cd36191cc1",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/status-badge.tsx",
+      "sha256": "d1d83d69c9f091a1dea57b7f7312f794097f2a8278dd70d7ba14a288d459c130",
+      "priorV1Sha256": "d1d83d69c9f091a1dea57b7f7312f794097f2a8278dd70d7ba14a288d459c130",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/dialog.tsx",
+      "sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6",
+      "priorV1Sha256": "b0e74ef729fbf4bdbc918f7abc08a19486435013451088b9a6248d1039f55dc6",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/popover.tsx",
+      "sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652",
+      "priorV1Sha256": "00702c92103d2bf0752fac030c9fc6f671c55a5732534a6fc306df618f30e652",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/command.tsx",
+      "sha256": "ecb3830ccd643fd8871367333cfa2d2b45c057619d0bc47dd972c9c7e873aa14",
+      "priorV1Sha256": "ecb3830ccd643fd8871367333cfa2d2b45c057619d0bc47dd972c9c7e873aa14",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/ui/file-dropzone.tsx",
+      "sha256": "f74b8a5e4ffe239c55b736199bc27a35617c2a423217aef1b134065be7284ede",
+      "priorV1Sha256": "f74b8a5e4ffe239c55b736199bc27a35617c2a423217aef1b134065be7284ede",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/wizard/shell.tsx",
+      "sha256": "a8ea265daa622fa839a6c714188118b6605e4f6a21ed900cf57d71dc7a552c7e",
+      "priorV1Sha256": "a8ea265daa622fa839a6c714188118b6605e4f6a21ed900cf57d71dc7a552c7e",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/lib/fleet-navigation.ts",
+      "sha256": "7d8263982e3c066e827fe4545d546677843afeb3564f90b80019d74a3621e038",
+      "priorV1Sha256": "7d8263982e3c066e827fe4545d546677843afeb3564f90b80019d74a3621e038",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/css/app.css",
+      "sha256": "4fe49b94d074dde840d79d0813adeba3759dff243956bbfa404325bd00df149a",
+      "priorV1Sha256": "4fe49b94d074dde840d79d0813adeba3759dff243956bbfa404325bd00df149a",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/package-lock.json",
+      "sha256": "2fdec15606f7d4faff29a5ddfe64707fbb2da2098c334e9fbcbd2d39b85a6140",
+      "priorV1Sha256": "2fdec15606f7d4faff29a5ddfe64707fbb2da2098c334e9fbcbd2d39b85a6140",
+      "unchangedSinceV1": true,
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/vehicle-header.tsx",
+      "sha256": "e202efe32fc2c8e407784b02b459b181c228fda93cf3c05706c63fdc560baece",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/overview-details.tsx",
+      "sha256": "6558d37aac2ebcc64bba7d596f36d4393c8c99b778beef6fc159b7ca89d3cf95",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/overview-documents.tsx",
+      "sha256": "92bf6258553768d6eb48c24f74c459ce81a0c7f4596791f0ee05f384cb5ecb2e",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/record-collection.tsx",
+      "sha256": "f6972e228aed9b0af25b7a2c95782978f8ac4a666d668fd2405ab87720e312df",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/studio.css",
+      "sha256": "14d461e587a6d7b3ff7914344af98d0c8b1228a53196f073d77f2b9cfc32de96",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/mockup-port.css",
+      "sha256": "39d140b06443f0184b730ea6f50981d8ba34582a014a3151a2be447a7eb1eee5",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/vehicle-workspace/workspace.css",
+      "sha256": "fb01289da948e42618381ffd33eec1ec8ce4d5e37399ffec2382880498385d36",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/pages/fleet-assets/vehicles/show.tsx",
+      "sha256": "4f2a200d56e865fb3e655393b364f31b559921bec58ee23cca440631bc1b2889",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/fleet-assets/maintenance/date-picker.tsx",
+      "sha256": "462557d79a15aaf512d6c61d03a53db9d2dc54de633df614a9a13ee76b170b8f",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/components/hr/leave-calendar-range.tsx",
+      "sha256": "cac7e3a14857159ef67f1248ae20cf1b3744dfa270598362ba11ec2bec8c0c08",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/css/maintenance-date-time.css",
+      "sha256": "1eeb18e92ac20a7a2fc0d99d235414b8905307e3372e7cad4a14ac500b8d0bfe",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/.codex/worktrees/8821/oblivionfindings/resources/js/lib/datetime.ts",
+      "sha256": "d558321f11b5e545c6b8e1eff6347e1c088cf725a32d0ee38438a3b219baec60",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/handoffs/PKG-02B-BUILD.md",
+      "sha256": "456f6b94b28a2a20d70534f63d4101cf173ef3e0742e7279c51987bd019eb06c",
+      "access": "read-only"
+    },
+    {
+      "path": "C:/Users/steph/Herd/oblivionfindings/docs/fleet-assets-audit/handoffs/PKG-06B-DESIGNER.md",
+      "sha256": "48b7ec5fbe888b9b4b9578e7aa75aeb04e803448da7e5abcc4bc87e692307acf",
+      "access": "read-only"
+    }
+  ]
+}

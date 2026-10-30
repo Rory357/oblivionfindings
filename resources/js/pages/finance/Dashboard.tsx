@@ -64,9 +64,13 @@ import {
     PageHeaderStatusChip,
     PageHeaderViewToggle,
     PageLayout,
+    type PageHeaderMeterTarget,
 } from '@/components/page';
 import { type DonutSegment } from '@/components/rostering/donut';
-import { DonutCard } from '@/components/rostering/donut-card';
+import {
+    DonutCard,
+    type DonutCardTarget,
+} from '@/components/rostering/donut-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -189,6 +193,7 @@ type FinanceAbilities = {
     finance?: {
         dashboard?: boolean;
         ap?: { view?: boolean };
+        ar?: { view?: boolean };
         bank?: { view?: boolean };
         ledger?: { view?: boolean };
         reports?: { view?: boolean };
@@ -293,15 +298,56 @@ export default function FinanceDashboard({
 
     // A meter links to the list its number came from, but those lists live
     // behind their own permissions — a viewer holding only finance.dashboard
-    // can read this page and would land on a 403. An unreachable destination
-    // is dropped, so the block still shows its number without pretending to
-    // be a way in.
+    // can read this page and would land on a 403. Every block still goes
+    // somewhere: a viewer who can't open the list is taken to the section of
+    // this dashboard that breaks the same number down.
     const can = usePage<{ auth?: { can?: FinanceAbilities } }>().props.auth?.can;
     const canReports = Boolean(can?.finance?.reports?.view);
     const canBills = Boolean(can?.finance?.ap?.view);
-    const canCash = Boolean(can?.finance?.bank?.view || can?.finance?.dashboard);
+    const canReceivables = Boolean(can?.finance?.ar?.view);
     const canLedger = Boolean(can?.finance?.ledger?.view);
-    const linkIf = (allowed: boolean, href: string) => (allowed ? href : undefined);
+    const scrollToSection = (sectionId: string) =>
+        document
+            .getElementById(sectionId)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const meterTarget = (
+        allowed: boolean,
+        href: string,
+        listLabel: string,
+        sectionId: string,
+        sectionLabel: string,
+    ): PageHeaderMeterTarget & { ariaLabel: string } =>
+        allowed
+            ? { href, ariaLabel: listLabel }
+            : {
+                  onClick: () => scrollToSection(sectionId),
+                  ariaLabel: sectionLabel,
+              };
+    // The donut cards follow the same rule: the report when the viewer can
+    // open it, else the dashboard section that breaks the figure down.
+    const donutTarget = (
+        allowed: boolean,
+        href: string,
+        cta: string,
+        sectionId: string,
+        sectionCta: string,
+    ): DonutCardTarget =>
+        allowed
+            ? { cta, onClick: () => router.visit(href) }
+            : { cta: sectionCta, onClick: () => scrollToSection(sectionId) };
+    // No dashboard section breaks the receivables ageing down, so without
+    // the report it falls back to the unpaid invoices list, else a static card.
+    const receivablesDonutTarget: DonutCardTarget = canReports
+        ? {
+              cta: 'View aged receivables',
+              onClick: () => router.visit('/finance/reports/aged-receivables'),
+          }
+        : canReceivables
+          ? {
+                cta: 'View unpaid invoices',
+                onClick: () => router.visit('/finance/invoices?status=unpaid'),
+            }
+          : {};
 
     const billCtx = useEntityContextMenu<UpcomingBill>();
     const claimCtx = useEntityContextMenu<FundingClaim>();
@@ -812,8 +858,13 @@ export default function FinanceDashboard({
                 <>
                     <PageHeaderMeterBlock
                         label="Revenue"
-                        href={linkIf(canReports, '/finance/reports/profit-loss')}
-                        ariaLabel="View the profit and loss report"
+                        {...meterTarget(
+                            canReports,
+                            '/finance/reports/profit-loss',
+                            'View the profit and loss report',
+                            'finance-trends',
+                            'Show the revenue vs expenses chart',
+                        )}
                     >
                         <PageHeaderMeterBig>
                             {formatMoneyCompact(totalRevenue)}
@@ -838,8 +889,13 @@ export default function FinanceDashboard({
                     <PageHeaderMeterBlock
                         label="Net profit"
                         tone={netProfit >= 0 ? 'success' : 'critical'}
-                        href={linkIf(canReports, '/finance/reports/profit-loss')}
-                        ariaLabel="View net profit in the profit and loss report"
+                        {...meterTarget(
+                            canReports,
+                            '/finance/reports/profit-loss',
+                            'View net profit in the profit and loss report',
+                            'finance-trends',
+                            'Show the net profit trend',
+                        )}
                     >
                         <PageHeaderMeterBig>
                             {formatMoneyCompact(netProfit)}
@@ -861,7 +917,7 @@ export default function FinanceDashboard({
 
                     <PageHeaderMeterBlock
                         label="Cash"
-                        href={linkIf(canCash, '/finance/cash-position')}
+                        href="/finance/cash-position"
                         ariaLabel="View the cash position"
                     >
                         <PageHeaderMeterBig>
@@ -879,8 +935,13 @@ export default function FinanceDashboard({
                         tone={
                             arAging && arAging.over60 > 0 ? 'warning' : 'brand'
                         }
-                        href={linkIf(canReports, '/finance/reports/aged-receivables')}
-                        ariaLabel="View aged receivables"
+                        {...meterTarget(
+                            canReports,
+                            '/finance/reports/aged-receivables',
+                            'View aged receivables',
+                            'finance-funding-receivables',
+                            'Show receivables ageing',
+                        )}
                     >
                         <PageHeaderMeterBig>
                             {formatMoneyCompact(accountsReceivable)}
@@ -895,8 +956,13 @@ export default function FinanceDashboard({
                     <PageHeaderMeterBlock
                         label="Bills due ≤ 7 days"
                         tone={billsDueCount > 0 ? 'critical' : 'success'}
-                        href={linkIf(canBills, '/finance/bills')}
-                        ariaLabel="View bills falling due"
+                        {...meterTarget(
+                            canBills,
+                            '/finance/bills',
+                            'View bills falling due',
+                            'finance-bills-due',
+                            'Show upcoming bills due',
+                        )}
                     >
                         <PageHeaderMeterBig>
                             {formatMoneyCompact(billsDueAmount)}
@@ -910,8 +976,13 @@ export default function FinanceDashboard({
                     <PageHeaderMeterBlock
                         label="Funding utilisation"
                         value="target 90%"
-                        href={linkIf(canReports, '/finance/reports/funding-stream-summary')}
-                        ariaLabel="View the funding stream summary"
+                        {...meterTarget(
+                            canReports,
+                            '/finance/reports/funding-stream-summary',
+                            'View the funding stream summary',
+                            'finance-funding-receivables',
+                            'Show funding claim utilisation',
+                        )}
                     >
                         <PageHeaderMeterBig>
                             {utilisationPct}%
@@ -1013,7 +1084,10 @@ export default function FinanceDashboard({
                     ) : null}
 
                     {/* Funding, revenue mix and receivables ageing */}
-                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                    <div
+                        id="finance-funding-receivables"
+                        className="grid grid-cols-1 gap-5 lg:grid-cols-3"
+                    >
                         <DonutCard
                             tone="primary"
                             title="Revenue by funding stream"
@@ -1023,12 +1097,13 @@ export default function FinanceDashboard({
                             centerLabel="revenue"
                             accentKeys={[revenueStreamSegments[0]?.key ?? '']}
                             active={false}
-                            cta="View funding summary"
-                            onClick={() =>
-                                router.visit(
-                                    '/finance/reports/funding-stream-summary',
-                                )
-                            }
+                            {...donutTarget(
+                                canReports,
+                                '/finance/reports/funding-stream-summary',
+                                'View funding summary',
+                                'finance-trends',
+                                'Show revenue vs expenses',
+                            )}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
@@ -1041,12 +1116,13 @@ export default function FinanceDashboard({
                             centerLabel="utilised"
                             accentKeys={['paid']}
                             active={false}
-                            cta="View funding summary"
-                            onClick={() =>
-                                router.visit(
-                                    '/finance/reports/funding-stream-summary',
-                                )
-                            }
+                            {...donutTarget(
+                                canReports,
+                                '/finance/reports/funding-stream-summary',
+                                'View funding summary',
+                                'finance-funding-claims',
+                                'Show funding claims',
+                            )}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
@@ -1061,19 +1137,17 @@ export default function FinanceDashboard({
                             centerLabel="receivables"
                             accentKeys={['current']}
                             active={false}
-                            cta="View aged receivables"
-                            onClick={() =>
-                                router.visit(
-                                    '/finance/reports/aged-receivables',
-                                )
-                            }
+                            {...receivablesDonutTarget}
                             formatValue={(v) => formatMoneyCompact(v)}
                             showPercent
                         />
                     </div>
 
                     {/* Trend charts */}
-                    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]">
+                    <div
+                        id="finance-trends"
+                        className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_1fr]"
+                    >
                         <Card>
                             <CardHeader className="flex flex-row items-start justify-between">
                                 <div>
@@ -1279,7 +1353,7 @@ export default function FinanceDashboard({
 
                     {/* Upcoming bills + funding claims */}
                     <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                        <div className="flex flex-col gap-5">
+                        <div id="finance-bills-due" className="flex flex-col gap-5">
                             <ListCaption
                                 title="Upcoming bills due · next 7 days"
                                 caption={`${bills.length} of ${upcomingBillsDue.length} shown`}
@@ -1333,7 +1407,10 @@ export default function FinanceDashboard({
                             )}
                         </div>
 
-                        <div className="flex flex-col gap-5">
+                        <div
+                            id="finance-funding-claims"
+                            className="flex flex-col gap-5"
+                        >
                             <ListCaption
                                 title="Funding claims"
                                 caption={`${claims.length} of ${fundingClaims.length} shown`}

@@ -1022,7 +1022,7 @@ export function CarePlanWizardDialog({
                                         className={cn(
                                             'grid h-7 w-7 shrink-0 place-items-center rounded-full',
                                             active
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'bg-primary-fill text-primary-fill-foreground'
                                                 : 'bg-muted text-muted-foreground',
                                         )}
                                     >

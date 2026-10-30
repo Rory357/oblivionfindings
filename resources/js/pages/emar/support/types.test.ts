@@ -1,0 +1,90 @@
+import { describe, expect, it } from 'vitest';
+import { supportTimeCandidates } from './time';
+import { allowedModes, assessmentCap } from './types';
+import { firstAgreementError, firstAssessmentError } from './validation';
+
+describe('approved medication support rules', () => {
+    it('preserves the existing five-score boundaries and consent-first outcome', () => {
+        expect(
+            [10, 11, 15, 16, 20, 21, 25].map((n) =>
+                assessmentCap(true, true, n),
+            ),
+        ).toEqual([
+            'staff_given',
+            'assisted',
+            'assisted',
+            'prompted',
+            'prompted',
+            'self_managed',
+            'self_managed',
+        ]);
+        expect(assessmentCap(false, true, 25)).toBe('staff_given');
+        expect(assessmentCap(true, false, 25)).toBe('staff_given');
+    });
+    it('limits choices by the assessment and controlled medicine ceiling', () => {
+        expect(allowedModes('self_managed', true)).toEqual([
+            'assisted',
+            'staff_given',
+        ]);
+        expect(allowedModes('prompted', false)).toEqual([
+            'prompted',
+            'assisted',
+            'staff_given',
+        ]);
+        expect(allowedModes('staff_given', false)).toEqual(['staff_given']);
+    });
+    it('preserves exact NZ minutes and requires a choice in the repeated hour', () => {
+        expect(supportTimeCandidates('2026-09-27T02:30')).toEqual([]);
+        expect(supportTimeCandidates('2026-04-05T02:37')).toEqual([
+            '2026-04-05T02:37+13:00',
+            '2026-04-05T02:37+12:00',
+        ]);
+        expect(supportTimeCandidates('2026-10-03T07:19')).toEqual([
+            '2026-10-03T07:19+13:00',
+        ]);
+    });
+});
+
+describe('assessment field routing', () => {
+    it('opens the earliest invalid step including nested server errors', () => {
+        expect(
+            firstAssessmentError({
+                storage_location: 'Choose',
+                confirmed_with_person: 'Confirm',
+            }),
+        ).toEqual({ step: 3, field: 'storage_location' });
+        expect(
+            firstAssessmentError({ reassessment_interval_months: 'Choose' })
+                .step,
+        ).toBe(3);
+        expect(
+            firstAssessmentError({ confirmed_with_person: 'Confirm' }).step,
+        ).toBe(4);
+        expect(
+            firstAssessmentError({
+                'med_scope.0.scope': 'Not allowed',
+                storage_location: 'Choose',
+            }),
+        ).toEqual({ step: 2, field: 'med_scope' });
+    });
+});
+
+describe('agreement field routing', () => {
+    it('reveals the terms step and maps its storage field before focusing', () => {
+        expect(
+            firstAgreementError({
+                confirm_loosening: 'Confirm',
+                storage_notes: 'Too long',
+            }),
+        ).toEqual({ step: 1, field: 'agreement-storage' });
+        expect(
+            firstAgreementError({
+                person_responsibilities: 'Required',
+                witness_id: 'Choose',
+            }),
+        ).toEqual({ step: 0, field: 'witness_id' });
+        expect(
+            firstAgreementError({ client_request_uuid: 'Retry conflict' }),
+        ).toEqual({ step: 2, field: 'client_request_uuid' });
+    });
+});

@@ -35,6 +35,7 @@ export type AroundWhosOut = {
 };
 
 export type AroundAnnouncement = {
+    read_url: string;
     id: number;
     title: string;
     priority: string;
@@ -136,7 +137,6 @@ export function MyHrAroundModal({
     whosOut,
     announcements,
     congrats,
-    acked,
     canViewFeed = false,
     onCongratulate,
     onAcknowledge,
@@ -149,7 +149,6 @@ export function MyHrAroundModal({
     whosOut: AroundWhosOut[];
     announcements: AroundAnnouncement[];
     congrats: Set<number>;
-    acked: Set<number>;
     /** Whether the viewer may open the full HR announcements feed. */
     canViewFeed?: boolean;
     onCongratulate: (c: AroundCelebration) => void;
@@ -311,7 +310,7 @@ export function MyHrAroundModal({
                         <button
                             type="button"
                             onClick={primary.onClick}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-[13px] font-bold text-primary-foreground"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-4 py-2 text-[13px] font-bold text-primary-fill-foreground"
                         >
                             {v === 'celebrations' ? (
                                 <Send className="h-3.5 w-3.5" />
@@ -414,7 +413,7 @@ export function MyHrAroundModal({
                 <div className="flex flex-col gap-2.5">
                     {announcements.map((a) => {
                         const b = announcementBadge(a.priority);
-                        const seen = acked.has(a.id) || a.acknowledged;
+                        const seen = a.acknowledged;
                         return (
                             <div
                                 key={a.id}
@@ -458,7 +457,7 @@ export function MyHrAroundModal({
                                             : 'border-border bg-card hover:bg-muted',
                                     )}
                                 >
-                                    {seen ? 'Seen ✓' : 'Acknowledge'}
+                                    {seen ? 'Seen ✓' : 'Read notice'}
                                 </button>
                             </div>
                         );

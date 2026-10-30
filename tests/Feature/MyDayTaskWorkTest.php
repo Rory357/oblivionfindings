@@ -59,9 +59,13 @@ it('shows medication occurrences across the whole current shift', function () {
         $permission = Permission::firstOrCreate(['key' => $key], ['description' => $key]);
         $this->worker->permissionOverrides()->attach($permission->id, ['allowed' => true]);
     }
+    // Entered at the start of the day: a dose due before an order's entry is not owed.
+    $now = Carbon::getTestNow();
+    Carbon::setTestNow(Carbon::now('Pacific/Auckland')->startOfDay()->utc());
     $medication = ClientMedication::factory()->create(['client_id' => $this->client->id, 'name' => 'Synthetic scheduled medication',
         'is_prn' => false, 'controlled_drug' => false, 'active' => true, 'state' => 'active', 'start_date' => '2026-09-01', 'end_date' => null,
         'dose_times' => ['07:15', '14:45']]);
+    Carbon::setTestNow($now);
     $this->actingAs($this->worker->fresh())->get('/my-day')->assertOk()->assertInertia(fn ($page) => $page
         ->has('medications_due', 2)->where('medications_due.0.medication_id', $medication->id)
         ->where('medications_due.0.scheduled_for', '2026-09-12T07:15:00+12:00')

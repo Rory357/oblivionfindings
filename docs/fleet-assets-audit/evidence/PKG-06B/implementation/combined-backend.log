@@ -1,0 +1,133 @@
+
+  [30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg06bAssetProfileTest[39m
+  [33;1m![39;22m[90m [39m[90mdispatch does not move asset and receipt requires every kit item[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m [90m672.57s[39m  
+  [33;1m![39;22m[90m [39m[90msame command replays once but changed and stale submissions are rejected[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m [90m1.09s[39m  
+  [33;1m![39;22m[90m [39m[90mprofile uses canonical assignment receipts and requires explicit attestation[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m [90m1.44s[39m  
+  [33;1m![39;22m[90m [39m[90mlinked components move only with an acknowledged kit receipt[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\work[39m[90m…[39m [90m0.95s[39m  
+  [33;1m![39;22m[90m [39m[90mpermissions and foreign asset file ids are enforced[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\882[39m[90m…[39m [90m1.22s[39m  
+  [33;1m![39;22m[90m [39m[90mfiles are scanned versioned and archived without losing bytes[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wor[39m[90m…[39m [90m6.03s[39m  
+  [33;1m![39;22m[90m [39m[90mprofile and printable qr return real authorised content[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m [90m3.46s[39m  
+  [33;1m![39;22m[90m [39m[90masset finance requests reuse the finance queue and duplicate boundary[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.c[39m[90m…[39m [90m0.93s[39m  
+  [33;1m![39;22m[90m [39m[90mschema probe stays in the configured application schema[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m [90m0.76s[39m  
+  [33;1m![39;22m[90m [39m[90msource costs exclude estimates drafts reversals old and foreign allocations[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m [90m0.95s[39m  
+  [33;1m![39;22m[90m [39m[90moriginal check evidence uses source permissions and submitted template[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m [90m1.07s[39m  
+  [33;1m![39;22m[90m [39m[90mscan identity is server owned and foreign observations are withheld[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m [90m0.94s[39m  
+  [33;1m![39;22m[90m [39m[90mbulk labels support both media replay protection and access revocation[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m [90m2.36s[39m  
+  [33;1m![39;22m[90m [39m[90mviewers cannot create missing qr identity and expired batches cannot download[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m2.82s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel workspace filters canonical lifecycle without leaking other sites[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.82s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpublished label history replays its original layout but new batches use the shared minimum[39m[90m [39m[33m→ file_get_conte[39m[90m…[39m[90m [39m[90m1.19s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpending receipt blocks register room edits and rechecks the destination room[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m1.03s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mownership requires its permission and preserves canonical placement[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.95s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreplacement review records a request without retiring or posting[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.80s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\AssetRegisterWorkflowTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlocation directory and checklist use only permitted assets[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m0.33s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcoverage excludes selected item counts and followups recheck access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.48s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcount is durable versioned immutable and does not change assignment[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.34s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mscan resolves existing identity rejects foreign urls and requires extra confirmation[39m[90m [39m[33m→ file_get_contents(C:[39m[90m…[39m[90m [39m[90m0.37s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mduplicate command is idempotent and undo keeps evidence[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m[90m [39m[90m0.29s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mmissing and changed items require review and owner[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821[39m[90m…[39m[90m [39m[90m0.37s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mhidden site and asset records are denied and permission revocation blocks writes[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m0.28s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcompleted report is real pdf and typed xlsx[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivi[39m[90m…[39m[90m [39m[90m0.59s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcsv validation partial import and retry do not duplicate assets[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.25s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mnewly conflicting import row can be retried without repeating successes[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.24s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mempty count requires attestation and records it[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\ob[39m[90m…[39m[90m [39m[90m0.22s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mread access does not grant counting or import permission[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktree[39m[90m…[39m[90m [39m[90m0.30s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcanonical room filter and registration cannot cross sites[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktre[39m[90m…[39m[90m [39m[90m0.23s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel exports preserve tokens and revalidate download scope[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.71s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlabel replay requires the original selection and layout[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m[90m [39m[90m0.28s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mprint permission does not grant permission to create a missing qr identity[39m[90m [39m[33m→ file_get_contents(C:\Users\ste[39m[90m…[39m[90m [39m[90m0.24s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mundone extra history remains access scoped in lists resume and exports[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m0.62s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlegacy history references are backfilled without rewriting evidence[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.46s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mrevoked extra site access also hides retained count history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.38s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreport time matches the worker zone regression in the register[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m0.28s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mordinary edit preserves same site room and reconciles destination room[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m0.33s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mimported room is cleared on a client derived site move[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees</>…[39m[90m [39m[90m0.36s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\AssetMutationBoundaryTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset register create update and picker data are canonical site scoped[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m1.18s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90massigned only asset register rows exports and counts follow the asset policy[39m[90m [39m[33m→ file_get_contents(C:\Users\s[39m[90m…[39m[90m [39m[90m1.82s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset access uses direct then home then client site provenance and denies conflicts[39m[90m [39m[33m→ file_get_contents(C:</>…[39m[90m [39m[90m0.82s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mevery asset object ability reuses the canonical visibility boundary[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.cod[39m[90m…[39m[90m [39m[90m0.86s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet write routes conceal hidden vehicles and bulk work is atomic[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m0.95s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mordinary edits cannot retire assets or move live assignment and device provenance[39m[90m [39m[33m→ file_get_contents(C:\Us[39m[90m…[39m[90m [39m[90m0.84s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mbulk offline state and mutation audits are durable per vehicle[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m0.72s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset assignment requires one site valid active holder and explicit release[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m[90m [39m[90m0.97s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcompeting custody transfers are serialized and preserve assignment history[39m[90m [39m[33m→ file_get_contents(C:\Users\st[39m[90m…[39m[90m [39m[90m31.53s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset ownership transition validates target and retains history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.83s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset delete route retires and preserves lifecycle history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m0.89s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bVehicleFinanceTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe finance view is concealed without finance access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\88[39m[90m…[39m[90m [39m[90m0.79s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked records combine finance and vehicle links without double counting[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m0.64s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinking needs fleet management finance access a reason and the vehicles scope[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m1.00s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90munlinking keeps the finance record and needs a reason[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8[39m[90m…[39m[90m [39m[90m0.82s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinkable search is scoped to the vehicle and finance access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreview requests are idempotent scoped and refuse open duplicates[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex</>…[39m[90m [39m[90m0.89s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreview request files are private and open only for finance viewers[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m1.66s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90monly finance decides a review request[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivionfind[39m[90m…[39m[90m [39m[90m1.07s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe person who asked for a review cannot decide it[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821[39m[90m…[39m[90m [39m[90m0.85s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfinance decides review requests in finance without fleet access[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m1.29s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mopen review requests reach finance in all tasks[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\ob[39m[90m…[39m[90m [39m[90m0.83s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bLegacyAssetDocumentRoutesTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register download refuses vehicle files that have not passed their virus check[39m[90m [39m[33m→ file_get_contents(C:\U[39m[90m…[39m[90m [39m[90m9.69s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mclean vehicle files open from the register through the vehicle profile download[39m[90m [39m[33m→ file_get_contents(C:\User[39m[90m…[39m[90m [39m[90m1.57s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfinance review evidence opens from the register only for finance viewers[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m3.62s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register cannot delete files the vehicle profile keeps[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\workt[39m[90m…[39m[90m [39m[90m11.43s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register refuses new vehicle uploads[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivionf[39m[90m…[39m[90m [39m[90m0.76s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mother assets keep scanned register upload download and retained archive[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m2.52s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register lists vehicle documents without source owned evidence[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m1.29s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\FleetOverviewContractTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90moverview projects only authorised site records and no resident or finance payload[39m[90m [39m[33m→ file_get_contents(C:\Us[39m[90m…[39m[90m [39m[90m0.90s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mall site vehicle read does not open foreign booking or position[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.72s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90massigned asset permission does not open wider fleet[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\882[39m[90m…[39m[90m [39m[90m0.67s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mbooking windows use utc bounds and count a 23 hour auckland day[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\w[39m[90m…[39m[90m [39m[90m0.80s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mavailability accounts for current reservations hidden bookings and unavailable periods[39m[90m [39m[33m→ file_get_contents([39m[90m…[39m[90m [39m[90m1.05s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma failed booking feed does not clear a known hold or claim availability[39m[90m [39m[33m→ file_get_contents(C:\Users\steph</>…[39m[90m [39m[90m0.76s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90moverview positions withhold consent and personal trips[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees</>…[39m[90m [39m[90m0.71s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreceipts are pending only for manageable active assignments and confirmation is audited[39m[90m [39m[33m→ file_get_contents[39m[90m…[39m[90m [39m[90m0.98s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreceipt queue pages and tracks approved site and search[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees[39m[90m…[39m[90m [39m[90m1.18s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfuture assignment cannot be receipt confirmed or enter pending queue[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.co[39m[90m…[39m[90m [39m[90m0.80s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreleased assignment cannot be confirmed and viewer without permission gets no receipt count[39m[90m [39m[33m→ file_get_cont[39m[90m…[39m[90m [39m[90m0.92s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90masset read without assignment authority hides other recipient details[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.c[39m[90m…[39m[90m [39m[90m0.84s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90massignment manager cannot read moved recipient or private receipt fields[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m0.89s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90msaved views persist on the account and reject foreign site or duplicate names[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m1.01s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\TransportWorkspaceTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mrequest assessment retry and stale edit preserve history[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktree[39m[90m…[39m[90m [39m[90m1.36s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mall views and search conceal foreign requests and direct ids[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\work[39m[90m…[39m[90m [39m[90m1.37s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mallocation is atomic and changes keep the booking identity[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m1.16s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90massigned driver can see linked journey when requester is different and completion requires passenger accoun[39m[90m…[39m[90m [39m[90m0.74s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mreturn receipts and key storage are independent replay safe observations[39m[90m [39m[33m→ file_get_contents(C:\Users\steph[39m[90m…[39m[90m [39m[90m1.16s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90ma changed fleet window moves the transport between date scopes[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m0.81s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mescort capacity is validated before request creation[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\88[39m[90m…[39m[90m [39m[90m0.73s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90msite filter values are parsed and scoped[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\oblivionf[39m[90m…[39m[90m [39m[90m1.31s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mcalendar scope matches all visible days for direct links[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktree[39m[90m…[39m[90m [39m[90m1.01s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mpassenger journey completion preserves the separate vehicle return[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m1.18s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mbooking linked shift handover retries do not create duplicate custody records[39m[90m [39m[33m→ file_get_contents(C:\Users</>…[39m[90m [39m[90m0.88s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked booking source page hands actions to current transport record[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.co[39m[90m…[39m[90m [39m[90m1.13s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mtime only move and reviewed undo preserve canonical booking fields[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.code[39m[90m…[39m[90m [39m[90m0.95s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mlinked source commands keep retry version and key requirements[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\wo[39m[90m…[39m[90m [39m[90m1.00s[39m[90m  [39m
+[90m
+  [39m[30;43;1m WARN [39;49;22m[39m Tests\Feature\FleetAssets\Pkg02bFleetVehiclesAllSitesTest[39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe seeder and the grant migration give admin and the fleet manager role central oversight[39m[90m [39m[33m→ file_get_conte[39m[90m…[39m[90m [39m[90m0.78s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe register daily check and profile show every vehicle to central oversight only[39m[90m [39m[33m→ file_get_contents(C:\Us[39m[90m…[39m[90m [39m[90m1.05s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet map includes every permitted vehicle and keeps restricted positions server side[39m[90m [39m[33m→ file_get_contents(C[39m[90m…[39m[90m [39m[90m1.05s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet calendar projects foreign bookings only as busy and denies source identity[39m[90m [39m[33m→ file_get_contents(C:\Use[39m[90m…[39m[90m [39m[90m0.77s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet calendar due entries have unique stable ids across vehicles[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex[39m[90m…[39m[90m [39m[90m0.83s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe vehicles own records can be kept across sites[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821</>…[39m[90m [39m[90m0.91s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mbookings trips locations drivers and finance keep their own site rules[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.[39m[90m…[39m[90m [39m[90m1.03s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mmaintenance work stays with the vehicles site[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\obli[39m[90m…[39m[90m [39m[90m0.98s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe compliance page follows the register scope[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktrees\8821\obl[39m[90m…[39m[90m [39m[90m0.73s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mthe fleet settings grant migration gives admin and the fleet manager role the permission[39m[90m [39m[33m→ file_get_content[39m[90m…[39m[90m [39m[90m0.60s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet calendar accepts six local weeks across autumn daylight saving[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.co[39m[90m…[39m[90m [39m[90m0.76s[39m[90m  [39m
+[90m  [39m[33;1m![39;22m[90m [39m[90mfleet calendar keeps auckland midnight and record versions[39m[90m [39m[33m→ file_get_contents(C:\Users\steph\.codex\worktr[39m[90m…[39m[90m [39m[90m0.73s[39m[90m  [39m
+[90m
+  [39m[30;42;1m PASS [39;49;22m[39m Tests\Unit\Support\SchemaCacheScopeTest[39m
+[90m  [39m[32;1m✓[39;22m[90m [39m[90mit only lists the current database when discovering application tables[39m[90m                                      [39m[90m [39m[90m0.01s[39m[90m  [39m
+
+[90m  [39m[90mTests:[39m[90m    [39m[33;1m110 warnings[39;22m[90m,[39m[39m [39m[32;1m1 passed[39;22m[90m (2170 assertions)[39m
+[90m  [39m[90mDuration:[39m[90m [39m[39m830.91s[39m
+

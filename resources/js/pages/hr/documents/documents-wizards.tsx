@@ -256,7 +256,7 @@ export function UploadWizard({
                         onClick={() =>
                             last ? submit() : setStep((s) => s + 1)
                         }
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary-fill px-4 py-2 text-[13px] font-semibold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {last ? 'File document' : 'Continue'}
                     </button>
@@ -534,7 +534,7 @@ export function GenerateWizard({
                         type="button"
                         disabled={!canContinue || processing}
                         onClick={() => (last ? submit() : goNext())}
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary-fill px-4 py-2 text-[13px] font-semibold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {last ? 'Generate PDF' : 'Continue'}
                     </button>
@@ -779,7 +779,7 @@ export function SendWizard({
                         onClick={() =>
                             last ? submit() : setStep((s) => s + 1)
                         }
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary-fill px-4 py-2 text-[13px] font-semibold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {last ? 'Send request' : 'Continue'}
                     </button>
@@ -1044,7 +1044,7 @@ export function TemplateWizard({
                         onClick={() =>
                             last ? submit() : setStep((s) => s + 1)
                         }
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-primary-fill px-4 py-2 text-[13px] font-semibold text-primary-fill-foreground disabled:opacity-50"
                     >
                         {last ? 'Create template' : 'Continue'}
                     </button>

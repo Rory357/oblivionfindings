@@ -30,7 +30,9 @@ final class SchemaCache
     {
         self::$tables ??= array_fill_keys(array_map('strtolower', Cache::rememberForever(
             'schema-cache:'.self::stamp().':tables',
-            fn (): array => Schema::getTableListing(schemaQualified: false),
+            // Listing every database can block this request behind unrelated DDL
+            // and report tables that do not belong to this application.
+            fn (): array => Schema::getTableListing(Schema::getCurrentSchemaName(), schemaQualified: false),
         )), true);
 
         return isset(self::$tables[strtolower($table)]);

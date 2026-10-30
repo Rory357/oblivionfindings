@@ -1,0 +1,10 @@
+Selected verbatim diagnostic lines from Main's independent test output.
+The tool output truncated the repeated full framework trace; this is an excerpt, not the complete log.
+  ⨯ existing vehicle selection can remove a retained assignment without its source boundary                    776.29s
+  Expected response status code [200] but received 500.
+PDOException: SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'boundary_id' cannot be null in C:\Users\steph\Herd\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\MySqlConnection.php:53
+#5 C:\Users\steph\.codex\worktrees\806c\oblivionfindings\app\Services\Fleet\BoundaryRuleService.php(160): Illuminate\Database\Query\Builder->insert(Array)
+#6 C:\Users\steph\.codex\worktrees\806c\oblivionfindings\app\Services\Fleet\VehicleGeofenceService.php(217): App\Services\Fleet\BoundaryRuleService->record(Object(App\Models\FleetVehicleGeofenceAssignment), Object(App\Models\User), 'Removed from th...')
+SQLSTATE[23000]: Integrity constraint violation: 1048 Column 'boundary_id' cannot be null (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: of_main07_legacy_20260927_45940, SQL: insert into `boundary_rule_versions` (`assignment_id`, `boundary_id`, `revision`, `snapshot`, `actor_id`, `reason`, `recorded_at`) values (1, ?, 2, {"id":1,"geofence_id":null,"label":"Retained former boundary","purpose":null,"response_proposal":null,"schedule":null,"policy_proposal":null,"geometry_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","geometry_snapshot":{"type":"circle","center":{"lat":-41.29,"lng":174.77},"radius_m":180},"monitoring":"inactive","state":"removed","lock_version":2}, 1, Removed from the vehicle’s geofence selection., 2026-09-27 05:51:56))
+FAILURES!
+Tests: 1, Assertions: 2, Failures: 1.

@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import { cn, isSameUrl } from '@/lib/utils';
 import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
@@ -15,13 +16,16 @@ import {
     FileText,
     Inbox,
     Key,
+    KeyRound,
     Lock,
     Mail,
     MailCheck,
     Menu,
+    MessageSquareText,
     Paintbrush,
     Palette,
     Plug,
+    Server,
     Shield,
     ShieldCheck,
     User,
@@ -47,10 +51,41 @@ interface NavSection {
         title: string;
         href: NonNullable<InertiaLinkProps['href']>;
         permission?: string;
+        /** Small pill after the title, e.g. "New" for a recently added page. */
+        badge?: string;
     }[];
 }
 
 const navSections: NavSection[] = [
+    {
+        label: 'Referrals',
+        permission: 'referrals.settings.view',
+        items: [
+            {
+                icon: Inbox,
+                title: 'Referral settings',
+                href: '/settings/referrals',
+            },
+        ],
+    },
+    {
+        label: 'Chat',
+        permission: 'settings.manageAccess',
+        items: [
+            {
+                icon: MessageSquareText,
+                title: 'Chat settings',
+                href: '/settings/chat',
+            },
+            // Restricted investigators only; settings access alone does not show it.
+            {
+                icon: ShieldCheck,
+                title: 'Chat investigations',
+                href: '/settings/chat/investigations',
+                permission: 'settings.chatInvestigate',
+            },
+        ],
+    },
     {
         label: 'General',
         items: [
@@ -61,6 +96,14 @@ const navSections: NavSection[] = [
                 icon: ShieldCheck,
                 title: 'Two-Factor Authentication',
                 href: show(),
+            },
+            {
+                // PIN-1: personal witness PIN for medication second-person checks.
+                icon: KeyRound,
+                title: 'Witness PIN',
+                href: '/settings/witness-pin',
+                permission: 'medications.witnessPin',
+                badge: 'New',
             },
         ],
     },
@@ -144,6 +187,12 @@ const navSections: NavSection[] = [
         label: 'Integrations',
         items: [
             {
+                icon: KeyRound,
+                title: 'Obli',
+                href: '/settings/obli',
+                permission: 'integrations.manageObli',
+            },
+            {
                 icon: CalendarSync,
                 title: 'Calendar Sync',
                 href: '/settings/calendar-sync',
@@ -194,6 +243,11 @@ const navSections: NavSection[] = [
                 icon: Boxes,
                 title: 'Modules & Features',
                 href: '/settings/modules',
+            },
+            {
+                icon: Server,
+                title: 'Server readiness',
+                href: '/settings/server-readiness',
             },
         ],
     },
@@ -260,6 +314,14 @@ function NavContent({
                                         )}
                                     />
                                     {item.title}
+                                    {item.badge ? (
+                                        <Badge
+                                            variant="secondary"
+                                            className="ml-auto px-1.5 py-0 text-[10px]"
+                                        >
+                                            {item.badge}
+                                        </Badge>
+                                    ) : null}
                                 </Link>
                             );
                         })}
@@ -289,6 +351,26 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         return 'Settings';
     }, [currentPath]);
 
+    if (auth?.user?.role === 'external_clinician') {
+        return (
+            <div className="space-y-5">
+                <nav
+                    aria-label="Clinical account security"
+                    className="flex gap-3"
+                >
+                    <Button variant="outline" asChild>
+                        <Link href="/settings/password">Password</Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                        <Link href="/settings/two-factor">
+                            Two-factor authentication
+                        </Link>
+                    </Button>
+                </nav>
+                {children}
+            </div>
+        );
+    }
     if (typeof window === 'undefined') {
         return null;
     }

@@ -1,0 +1,41 @@
+Request vehicle booking
+
+Kōwhai van · VH-014 · Synthetic walkthrough
+
+Request vehicle booking
+KWH014 · Kōwhai House
+Vehicle & times
+Kōwhai van · VH-014 · Kōwhai House · Pacific/Auckland
+People & purpose
+Only operational journey details; no passenger health information
+Approval & evidence
+Example approval routing
+Review
+Confirm the resulting record
+Completeness
+86%
+Step 1 of 4 · Vehicle & times
+Kōwhai van
+VH-014 · KWH014 · Kōwhai House
+Vehicle & times
+
+Kōwhai van · VH-014 · Kōwhai House · Pacific/Auckland
+
+Pickup / block start Pacific/Auckland
+Pickup / block start date
+22 Sep 2026
+Choose a day on the calendar
+Pickup / block start time
+10:00 AM
+Choose on the clock or type a time
+Clear date and time
+Return / block end Pacific/Auckland
+Return / block end date
+22 Sep 2026
+Choose a day on the calendar
+Return / block end time
+11:00 AM
+Choose on the clock or type a time
+Clear date and time
+Cancel
+Continue

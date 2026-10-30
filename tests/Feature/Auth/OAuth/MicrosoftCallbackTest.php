@@ -49,8 +49,14 @@ class MicrosoftCallbackTest extends TestCase
             'email' => 'user@external.test',
         ]);
 
+        // Not a staff account (typically a family member's own address):
+        // back to staff sign-in with an explanation, never an account.
         $this->get('/auth/microsoft/callback')
-            ->assertForbidden();
+            ->assertRedirect(route('login', absolute: false))
+            ->assertSessionHas('ssoNotStaffEmail', 'user@external.test');
+
+        $this->assertGuest();
+        $this->assertDatabaseMissing('users', ['email' => 'user@external.test']);
     }
 
     public function test_microsoft_callback_creates_pending_user_and_identity_without_logging_in(): void

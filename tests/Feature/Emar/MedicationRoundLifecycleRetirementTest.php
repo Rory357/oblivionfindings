@@ -42,7 +42,7 @@ class MedicationRoundLifecycleRetirementTest extends TestCase
     {
         parent::setUp();
 
-        Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        Carbon::setTestNow(Carbon::parse('2026-08-28 10:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $this->seed(RbacSeeder::class);
         $this->site = Site::factory()->create([
             'is_active' => true,
@@ -335,6 +335,8 @@ class MedicationRoundLifecycleRetirementTest extends TestCase
             'held' => 0,
             'next_index' => null,
             'percent' => 100,
+            'waiting' => 0,
+            'away' => 0,
         ], app(GuidedRoundService::class)->summarise($items));
     }
 
@@ -374,12 +376,15 @@ class MedicationRoundLifecycleRetirementTest extends TestCase
         $this->actingAs($starter)
             ->get(route('emar.rounds', ['date' => $this->workerToday()->toDateString(), 'guided' => $round->id]))
             ->assertNotFound();
+        // EA-151 (Lane C10): the round dose writer is retired for everyone, so
+        // the previous starter is refused with nothing written.
         $this->actingAs($starter)
-            ->post(route('meds.round.administer', [$round, $medication]), [
+            ->postJson(route('meds.round.administer', [$round, $medication]), [
                 'status' => 'given',
                 'scheduled_for' => now()->setTime(10, 0)->toIso8601String(),
             ])
-            ->assertNotFound();
+            ->assertStatus(409)
+            ->assertJsonPath('success', false);
         $this->actingAs($starter)
             ->post(route('meds.round.complete', $round))
             ->assertNotFound();
@@ -423,7 +428,7 @@ class MedicationRoundLifecycleRetirementTest extends TestCase
         $this->actingAs($this->actor)
             ->post(route('emar.rounds.templates.retire', $template))
             ->assertRedirect()
-            ->assertSessionHas('success', 'Round template retired. Existing rounds were retained.');
+            ->assertSessionHas('medication_settings_saved', 'Template retired. No new rounds are created from it; past rounds keep it on their record.');
 
         $retired = $template->fresh();
         $this->assertNotNull($retired);

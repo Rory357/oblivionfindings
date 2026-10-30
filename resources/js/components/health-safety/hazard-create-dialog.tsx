@@ -368,7 +368,7 @@ export function HazardCreateDialog({
                                                 className={`flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ${on ? 'border-primary/50 bg-primary/5' : 'border-border hover:bg-muted'}`}
                                             >
                                                 <span
-                                                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${on ? 'bg-primary text-primary-foreground' : 'border border-muted-foreground/40'}`}
+                                                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${on ? 'bg-primary-fill text-primary-fill-foreground' : 'border border-muted-foreground/40'}`}
                                                 >
                                                     {on ? (
                                                         <CheckCircle2 className="h-3 w-3" />
@@ -403,7 +403,7 @@ export function HazardCreateDialog({
                                                 className={`flex items-start gap-2 rounded-lg border p-2.5 text-left transition-colors ${on ? 'border-primary/50 bg-primary/5' : 'border-border hover:bg-muted'}`}
                                             >
                                                 <span
-                                                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${on ? 'bg-primary text-primary-foreground' : 'border border-muted-foreground/40'}`}
+                                                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${on ? 'bg-primary-fill text-primary-fill-foreground' : 'border border-muted-foreground/40'}`}
                                                 >
                                                     {on ? (
                                                         <CheckCircle2 className="h-3 w-3" />

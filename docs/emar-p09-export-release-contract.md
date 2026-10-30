@@ -1,0 +1,11 @@
+# Buffered medication export release
+
+`MedicationExportReleaseGuard::run(User $actor, array $siteIds, array $includedClientIds, callable $authorise, callable $recheck, callable $record): void` is the shared final release gate. Call it **after rendering into a local buffer, before returning any bytes**. It retries the complete release transaction five times and locks current user/role/permission evidence, the real Sites, original included people plus the current Site population, and medicine ownership/classification. It writes no event itself and grants no permission.
+
+Callbacks run in this order:
+
+1. `authorise(User $current, CurrentAuthorizationReads $reads)` must recheck the caller's exact existing export capability and every selected Site using uncached/current authorization reads. Use `UserSiteAccessService::accessibleSiteIds($current, MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS, $reads)` for approved Site scope; reject any requested Site outside it. P10 retains `medications.reports.export` and its existing pack/person policy, with no added grants.
+2. `recheck(User $current, CurrentAuthorizationReads $reads)` must rebuild the **complete** dataset using the locked current actor and compare its canonical fingerprint to the buffered dataset. Recheck every included person's current canonical ownership/readability, controlled classification and concealed fields. Use a stable digest that excludes render-time timestamps. A changed digest fails with 409 and releases no bytes.
+3. `record(User $current)` runs last and must append the caller's existing event once. P10 calls its existing `DowntimeEvents::packMade` here with purpose **Downtime**, retaining controlled-page evidence; do not also call `MedicationExportAudit::record` or emit a second export event. Domain/evidence writes must precede chain-head locking.
+
+Supply the original pack's actual person IDs in `includedClientIds` so a person who moved out during rendering still has ownership locked for the final comparison. No callback may release/stream data or perform an external side effect. Any failed authorization, changed data, or recorder failure rolls back the release transaction and suppresses the buffered file.

@@ -1,0 +1,11 @@
+{
+  "unique_cases": 47,
+  "passing_cases": 43,
+  "passing_assertions": 796.0,
+  "known_baseline_failures": [
+    "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity",
+    "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity",
+    "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows",
+    "Tests.Feature.SecurityDevices.CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+    "permitted": 1,
+    "foreignSiteExcluded": true,
+    "fields": [
+        "id",
+        "name",
+        "model",
+        "firmware",
+        "lastContact",
+        "href"
+    ],
+    "syntheticOnly": true
+}

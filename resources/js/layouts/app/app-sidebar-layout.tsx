@@ -4,6 +4,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { Sheet } from '@/components/ui/sheet';
 import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { fleetWorkspaceForUrl } from '@/lib/fleet-navigation';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
@@ -58,7 +59,15 @@ export default function AppSidebarLayout({
     header,
     contentClassName,
 }: PropsWithChildren<AppSidebarLayoutProps>) {
-    const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
+    const page = usePage<SharedData>();
+    const defaultSidebarOpen = page.props.sidebarOpen ?? true;
+    const pageBreadcrumbs =
+        fleetWorkspaceForUrl(page.url) &&
+        breadcrumbs.length > 0 &&
+        breadcrumbs[0].href !== '/dashboard'
+            ? [{ title: 'Home', href: '/dashboard' }, ...breadcrumbs]
+            : breadcrumbs;
+    const hasBreadcrumbStrip = pageBreadcrumbs.length > 1;
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const isMobile = useIsMobile();
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -75,7 +84,7 @@ export default function AppSidebarLayout({
             <div className="min-h-svh w-full bg-background">
                 <a
                     href="#main-content"
-                    className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground"
+                    className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-primary-fill focus:px-4 focus:py-2 focus:text-primary-fill-foreground"
                 >
                     Skip to main content
                 </a>
@@ -96,26 +105,32 @@ export default function AppSidebarLayout({
                             }
                         />
                     )}
+                    {/* Radix preserves live regions while hiding siblings;
+                        keep their page controls inactive behind the menu too. */}
                     <main
                         id="main-content"
+                        inert={isMobile && mobileOpen}
                         className="relative flex min-h-[calc(100svh-58px)] w-full min-w-0 flex-col bg-background"
                     >
                         {header === undefined
-                            ? breadcrumbs.length > 1 && (
+                            ? hasBreadcrumbStrip && (
                                   /* 10px above AND below the crumbs (approved
                                    * 2026-09-06 — the strip's one exception to
                                    * the 20px rhythm); the content wrapper
                                    * drops its top padding beneath it. */
                                   <div className="flex items-center px-5 py-2.5 text-muted-foreground">
-                                      <Breadcrumbs breadcrumbs={breadcrumbs} />
+                                      <Breadcrumbs
+                                          breadcrumbs={pageBreadcrumbs}
+                                      />
                                   </div>
                               )
                             : header}
                         <div
+                            data-chat-workspace
                             className={cn(
                                 contentClassName ?? DEFAULT_CONTENT_CLASS,
                                 header === undefined &&
-                                    breadcrumbs.length > 1 &&
+                                    hasBreadcrumbStrip &&
                                     'pt-0',
                             )}
                         >

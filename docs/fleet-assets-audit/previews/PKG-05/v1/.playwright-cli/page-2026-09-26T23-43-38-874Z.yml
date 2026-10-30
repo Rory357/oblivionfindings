@@ -1,0 +1,240 @@
+- generic [active] [ref=f74e1]:
+  - generic [ref=f74e2]:
+    - generic [ref=f74e3]:
+      - strong [ref=f74e4]: DESIGN PREVIEW · PKG-05 v6
+      - generic [ref=f74e5]: Synthetic records · changes stay in this browser until reload
+      - generic [ref=f74e6]:
+        - generic [ref=f74e7]:
+          - text: View as
+          - combobox "Preview role" [ref=f74e8]:
+            - option "Ava Thompson · Requester"
+            - option "Mia Chen · Transport allocator" [selected]
+            - option "Rory Williams · Booking approver"
+            - option "Nia Patel · Assigned driver"
+            - option "Sara Wilson · Assigned escort"
+            - option "Ben Carter · Receiving worker"
+        - button "Preview scenarios" [ref=f74e9] [cursor=pointer]
+    - generic [ref=f74e10]:
+      - generic [ref=f74e11]:
+        - text: oblivion
+        - generic [ref=f74e13]: findings
+      - generic [ref=f74e14]: Fleet & Assets
+      - generic [ref=f74e15]:
+        - generic [ref=f74e19]: Mia Chen
+        - generic [ref=f74e20]: MC
+    - generic [ref=f74e21]:
+      - complementary [ref=f74e22]:
+        - button "My Day" [ref=f74e23] [cursor=pointer]
+        - button "Sites" [ref=f74e28] [cursor=pointer]
+        - button "Clients" [ref=f74e34] [cursor=pointer]
+        - generic [ref=f74e42]: Fleet & Assets
+        - button "Overview" [ref=f74e43] [cursor=pointer]
+        - button "Fleet" [ref=f74e50] [cursor=pointer]
+        - button "Transport" [ref=f74e56] [cursor=pointer]
+        - button "Assets" [ref=f74e62] [cursor=pointer]
+        - button "Maintenance" [ref=f74e67] [cursor=pointer]
+        - button "Maps & boundaries" [ref=f74e71] [cursor=pointer]
+        - button "Reports" [ref=f74e76] [cursor=pointer]
+        - button "Settings" [ref=f74e81] [cursor=pointer]
+      - main [ref=f74e86]:
+        - generic [ref=f74e87]:
+          - button "Home" [ref=f74e88] [cursor=pointer]
+          - generic [ref=f74e89]: /
+          - button "Fleet & Assets" [ref=f74e90] [cursor=pointer]
+          - generic [ref=f74e91]: /
+          - button "Transport" [ref=f74e92] [cursor=pointer]
+        - generic [ref=f74e93]:
+          - generic "Page summary and actions" [ref=f74e94]:
+            - generic [ref=f74e96]:
+              - generic [ref=f74e97]:
+                - generic [ref=f74e98]:
+                  - generic [ref=f74e105]:
+                    - heading "Overview" [level=1] [ref=f74e107]
+                    - paragraph [ref=f74e108]: Plan transport, follow journeys and resolve returns
+                  - generic [ref=f74e109]:
+                    - generic [ref=f74e110]:
+                      - searchbox "Search overview" [ref=f74e111]
+                      - generic [aria-hidden]: /
+                    - button "Request transport" [ref=f74e112] [cursor=pointer]
+                    - button "Workspace actions" [ref=f74e115] [cursor=pointer]
+                - generic [ref=f74e121]:
+                  - button "View upcoming departures" [ref=f74e122] [cursor=pointer]:
+                    - generic [ref=f74e126]: Upcoming departures
+                    - generic [ref=f74e128]: "1"
+                    - generic [ref=f74e129]: Confirmed, preparing to leave
+                  - button "View unallocated requests" [ref=f74e130] [cursor=pointer]:
+                    - generic [ref=f74e134]: Unallocated requests
+                    - generic [ref=f74e136]: "3"
+                    - generic [ref=f74e137]: Assessment or resources needed
+                  - button "View pending decisions" [ref=f74e138] [cursor=pointer]:
+                    - generic [ref=f74e142]: Pending decisions
+                    - generic [ref=f74e144]: "1"
+                    - generic [ref=f74e145]: Fleet booking approval
+                  - button "View active journeys" [ref=f74e146] [cursor=pointer]:
+                    - generic [ref=f74e150]: Active journeys
+                    - generic [ref=f74e152]: "1"
+                    - generic [ref=f74e153]: Actual travel underway
+                  - button "View overdue returns" [ref=f74e154] [cursor=pointer]:
+                    - generic [ref=f74e158]: Overdue returns
+                    - generic [ref=f74e160]: "1"
+                    - generic [ref=f74e161]: Expected return has passed
+                  - button "View returns with exceptions" [ref=f74e162] [cursor=pointer]:
+                    - generic [ref=f74e166]: Returns with exceptions
+                    - generic [ref=f74e168]: "1"
+                    - generic [ref=f74e169]: Named owner required
+                - generic [ref=f74e171]:
+                  - generic [ref=f74e172]:
+                    - text: Site
+                    - combobox "Site filter" [ref=f74e173]:
+                      - option "All permitted sites" [selected]
+                      - option "Aurora House"
+                      - option "Kōwhai House"
+                  - generic [ref=f74e174]:
+                    - text: Date
+                    - combobox "Date filter" [ref=f74e175]:
+                      - option "Mon 28 September" [selected]
+                      - option "Tue 29 September"
+                      - option "All dates"
+                  - generic [ref=f74e176]: Pacific/Auckland · Example time 10:35 am
+              - tablist "Views" [ref=f74e178]:
+                - tab "Overview" [selected] [ref=f74e179] [cursor=pointer]
+                - tab "Requests & approvals" [ref=f74e186] [cursor=pointer]
+                - tab "Planner" [ref=f74e191] [cursor=pointer]
+                - tab "Calendar" [ref=f74e195] [cursor=pointer]
+                - tab "Journeys" [ref=f74e199] [cursor=pointer]
+                - tab "Returns & handovers" [ref=f74e205] [cursor=pointer]
+                - button "Find a view" [ref=f74e210] [cursor=pointer]:
+                  - generic [ref=f74e214]: Find
+          - generic [ref=f74e215]:
+            - generic [ref=f74e216]:
+              - generic [ref=f74e217]:
+                - heading "Transport at a glance" [level=2] [ref=f74e218]
+                - paragraph [ref=f74e219]: 28 Sep 2026 · 9 matching requests · all permitted sites
+              - generic [ref=f74e220]:
+                - button "Outings" [ref=f74e221] [cursor=pointer]
+                - button "Export summary PDF" [ref=f74e222] [cursor=pointer]
+            - tablist "Overview sections" [ref=f74e223]:
+              - tab [selected] [ref=f74e224] [cursor=pointer]
+              - tab "Needs attention 7" [ref=f74e232] [cursor=pointer]:
+                - text: Needs attention
+                - generic [ref=f74e236]: "7"
+              - tab "Departure board 5" [ref=f74e237] [cursor=pointer]:
+                - text: Departure board
+                - generic [ref=f74e243]: "5"
+            - generic "Priority summary" [ref=f74e244]:
+              - button "1 overdue return Confirm where the trip stands" [ref=f74e245] [cursor=pointer]:
+                - generic [ref=f74e249]:
+                  - strong [ref=f74e250]: 1 overdue return
+                  - generic [ref=f74e251]: Confirm where the trip stands
+              - button "1 booking decisions Review proposed vehicle and team" [ref=f74e254] [cursor=pointer]:
+                - generic [ref=f74e257]:
+                  - strong [ref=f74e258]: 1 booking decisions
+                  - generic [ref=f74e259]: Review proposed vehicle and team
+              - button "1 journey to finish Returned · final passenger steps due" [ref=f74e262] [cursor=pointer]:
+                - generic [ref=f74e266]:
+                  - strong [ref=f74e267]: 1 journey to finish
+                  - generic [ref=f74e268]: Returned · final passenger steps due
+            - generic [ref=f74e271]:
+              - generic [ref=f74e272]:
+                - heading "Where each request stands" [level=2] [ref=f74e274]
+                - paragraph [ref=f74e279]: Every request appears once. Select a stage to open its queue.
+                - generic [ref=f74e280]:
+                  - 'img "Needs a plan: 3. Awaiting decision: 1. Preparing to leave: 1. On the road: 1. Returned · finish due: 1. Journey completed: 1. Cancelled / not fulfilled: 1" [ref=f74e281]':
+                    - application [ref=f74e284]
+                    - generic:
+                      - strong: "9"
+                      - generic: requests
+                  - generic [ref=f74e302]:
+                    - 'button "Needs a plan: 3 requests" [ref=f74e303] [cursor=pointer]':
+                      - generic [ref=f74e305]: Needs a plan
+                      - strong [ref=f74e306]: "3"
+                    - 'button "Awaiting decision: 1 requests" [ref=f74e309] [cursor=pointer]':
+                      - generic [ref=f74e311]: Awaiting decision
+                      - strong [ref=f74e312]: "1"
+                    - 'button "Preparing to leave: 1 requests" [ref=f74e315] [cursor=pointer]':
+                      - generic [ref=f74e317]: Preparing to leave
+                      - strong [ref=f74e318]: "1"
+                    - 'button "On the road: 1 requests" [ref=f74e321] [cursor=pointer]':
+                      - generic [ref=f74e323]: On the road
+                      - strong [ref=f74e324]: "1"
+                    - 'button "Returned · finish due: 1 requests" [ref=f74e327] [cursor=pointer]':
+                      - generic [ref=f74e329]: Returned · finish due
+                      - strong [ref=f74e330]: "1"
+                    - 'button "Journey completed: 1 requests" [ref=f74e333] [cursor=pointer]':
+                      - generic [ref=f74e335]: Journey completed
+                      - strong [ref=f74e336]: "1"
+                    - 'button "Cancelled / not fulfilled: 1 requests" [ref=f74e339] [cursor=pointer]':
+                      - generic [ref=f74e341]: Cancelled / not fulfilled
+                      - strong [ref=f74e342]: "1"
+                - paragraph [ref=f74e345]: A completed journey can still have a vehicle return or item to resolve.
+              - generic [ref=f74e349]:
+                - generic [ref=f74e350]:
+                  - heading "Departures & returns by time" [level=2] [ref=f74e351]
+                  - button "Calendar" [ref=f74e354] [cursor=pointer]
+                - paragraph [ref=f74e357]: 28 Sep 2026 · Pacific/Auckland
+                - generic [ref=f74e358]:
+                  - generic [ref=f74e359]: Scheduled departures
+                  - generic [ref=f74e361]: Expected returns
+                - img "Scheduled departures and expected returns by hour. Exact values and records are available under View the numbers." [ref=f74e363]:
+                  - application [ref=f74e366]:
+                    - generic [ref=f74e405]:
+                      - generic [ref=f74e406]:
+                        - generic [ref=f74e407]: 06:00
+                        - generic [ref=f74e409]: 07:00
+                        - generic [ref=f74e411]: 08:00
+                        - generic [ref=f74e413]: 09:00
+                        - generic [ref=f74e415]: 10:00
+                        - generic [ref=f74e417]: 11:00
+                        - generic [ref=f74e419]: 12:00
+                        - generic [ref=f74e421]: 13:00
+                        - generic [ref=f74e423]: 14:00
+                        - generic [ref=f74e425]: 15:00
+                        - generic [ref=f74e427]: 16:00
+                        - generic [ref=f74e429]: 17:00
+                        - generic [ref=f74e431]: 18:00
+                      - generic [ref=f74e433]:
+                        - generic [ref=f74e434]: "0"
+                        - generic [ref=f74e436]: "1"
+                        - generic [ref=f74e438]: "2"
+                        - generic [ref=f74e440]: "3"
+                        - generic [ref=f74e442]: "4"
+                - paragraph [ref=f74e444]: Planned times include unallocated requests. Cancelled requests are excluded.
+                - group [ref=f74e445]:
+                  - generic "View the numbers and matching trips" [ref=f74e446] [cursor=pointer]
+            - generic [ref=f74e447]:
+              - generic [ref=f74e448]:
+                - heading "Act next" [level=2] [ref=f74e449]
+                - button "All 7 actions" [ref=f74e452] [cursor=pointer]
+              - paragraph [ref=f74e455]: Outstanding return work first, then decisions and planning. One request may need more than one action.
+              - generic [ref=f74e456]:
+                - button "Overdue return Sam Wilson · Expected 10:00 · confirm the actual return Next person Nia Patel" [ref=f74e457] [cursor=pointer]:
+                  - generic [ref=f74e463]:
+                    - strong [ref=f74e464]: Overdue return
+                    - generic [ref=f74e465]: Sam Wilson · Expected 10:00 · confirm the actual return
+                  - generic [ref=f74e466]:
+                    - generic [ref=f74e467]: Next person
+                    - strong [ref=f74e468]: Nia Patel
+                - button "Equipment still to receive Casey Jones · Return receipt is incomplete Next person Ben Carter" [ref=f74e471] [cursor=pointer]:
+                  - generic [ref=f74e477]:
+                    - strong [ref=f74e478]: Equipment still to receive
+                    - generic [ref=f74e479]: Casey Jones · Return receipt is incomplete
+                  - generic [ref=f74e480]:
+                    - generic [ref=f74e481]: Next person
+                    - strong [ref=f74e482]: Ben Carter
+                - button "Finish passenger journey Charlie Brown · Check remaining passenger and source handoffs Next person Sara Wilson" [ref=f74e485] [cursor=pointer]:
+                  - generic [ref=f74e492]:
+                    - strong [ref=f74e493]: Finish passenger journey
+                    - generic [ref=f74e494]: Charlie Brown · Check remaining passenger and source handoffs
+                  - generic [ref=f74e495]:
+                    - generic [ref=f74e496]: Next person
+                    - strong [ref=f74e497]: Sara Wilson
+                - button "Booking decision needed Taylor Green · Plan proposed · not yet confirmed Next person Authorised booking approver" [ref=f74e500] [cursor=pointer]:
+                  - generic [ref=f74e505]:
+                    - strong [ref=f74e506]: Booking decision needed
+                    - generic [ref=f74e507]: Taylor Green · Plan proposed · not yet confirmed
+                  - generic [ref=f74e508]:
+                    - generic [ref=f74e509]: Next person
+                    - strong [ref=f74e510]: Authorised booking approver
+            - paragraph [ref=f74e513]: Example snapshot · 28 Sep 2026, 10:35 AM · Charts follow your site, date and search. Source records stay separate.
+          - generic [ref=f74e514]: PKG-05 v6 · desktop design candidate · example date 28 September 2026 · no operational changes
+  - generic [aria-hidden] [ref=f74e515]: "0"

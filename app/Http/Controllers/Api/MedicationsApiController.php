@@ -5,13 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Enums\Medication\SafetyOverrideReason;
 use App\Http\Controllers\Concerns\HandlesMedicationSync;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\ControlledDrugLossReport;
-use App\Models\MedicationAllergy;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationError;
 use App\Models\MedicationInteraction;
@@ -23,9 +23,14 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MarScheduleService;
+use App\Services\Medication\ClientAllergyRecordCommands;
+use App\Services\Medication\ClientAllergyRecordService;
 use App\Services\Medication\MedicationGovernanceScopeService;
+use App\Services\Medication\MedicationRecordAccess;
 use App\Services\Medication\MedicationScopeDecision;
 use App\Services\Medication\MedicationScopeDecisionService;
+use App\Services\Medication\Recording\RecordingContract;
+use App\Services\Medication\ShiftMedicationCardAccess;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationReportingService;
@@ -43,8 +48,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\ValidationException;
 
@@ -90,7 +97,7 @@ class MedicationsApiController extends Controller
     private function reportSiteIds(User $user, ?int $requestedSiteId, ?int $requestedClientId): array
     {
         abort_unless(
-            $user->canDo('reports.viewAny') || $user->canDo('medications.reports.export'),
+            $user->canDo('medications.reports.view'),
             403,
         );
 
@@ -182,12 +189,28 @@ class MedicationsApiController extends Controller
         );
     }
 
+    /**
+     * The people at $siteIds whose medicines $user may open (the P02 person
+     * rule): leads keep the house, support workers their own residents.
+     *
+     * @param  array<int, int>  $siteIds
+     * @return array<int, int>
+     */
+    private function readableClientIdsAt(User $user, array $siteIds): array
+    {
+        return app(MedicationRecordAccess::class)->readableClientIds(
+            $user,
+            Client::query()->whereIn('site_id', $siteIds === [] ? [0] : $siteIds)->pluck('id'),
+        );
+    }
+
     private function authorizeReadableMedication(
         Request $request,
         Client $client,
         ClientMedication $medication,
     ): void {
-        $this->authorize('viewMedications', $client);
+        // EA-203: out-of-scope people are "not found", like every eMAR read.
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client);
         abort_unless((int) $medication->client_id === (int) $client->id, 404);
         abort_unless(
             ! (bool) $medication->controlled_drug
@@ -549,7 +572,7 @@ class MedicationsApiController extends Controller
      */
     public function getMar(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
 
         $date = $this->scheduleService->dateFromInput($request->input('date'));
 
@@ -722,7 +745,7 @@ class MedicationsApiController extends Controller
         Client $client,
         ClientMedicationAdministration $administration
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($administration->client_id === $client->id, 404);
         $this->assertCanAccessAttachmentTarget($request, $administration, true);
 
@@ -772,7 +795,7 @@ class MedicationsApiController extends Controller
 
     public function uploadSupportingAttachment(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
 
         $locator = $request->validate([
             'target_type' => ['required', 'string', 'in:administration,correction,discrepancy,loss_report,error'],
@@ -835,7 +858,7 @@ class MedicationsApiController extends Controller
         ClientMedicationAdministration $administration,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($administration->client_id === $client->id, 404);
         $this->assertAdministrationAttachmentNested($attachment, $administration);
         $this->assertCanAccessAttachmentTarget($request, $administration, false);
@@ -848,7 +871,7 @@ class MedicationsApiController extends Controller
         Client $client,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($attachment->client_id === $client->id, 404);
 
         $attachment->loadMissing('attachable');
@@ -865,7 +888,7 @@ class MedicationsApiController extends Controller
         ClientMedicationAdministration $administration,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($administration->client_id === $client->id, 404);
         $this->assertAdministrationAttachmentNested($attachment, $administration);
         $this->assertCanAccessAttachmentTarget($request, $administration, true);
@@ -888,7 +911,7 @@ class MedicationsApiController extends Controller
         Client $client,
         MedicationMarAttachment $attachment
     ) {
-        $this->authorize('viewMedications', $client);
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
         abort_unless($attachment->client_id === $client->id, 404);
 
         $attachment->loadMissing('attachable');
@@ -928,7 +951,8 @@ class MedicationsApiController extends Controller
         $this->preflightMedicationRecordingTarget($request, $user, $client, $medication);
 
         $data = $request->validate([
-            'status' => ['required', 'in:given,refused,missed,withheld'],
+            // EA-106 (Lane C10): the retired "missed" outcome is no longer accepted here.
+            'status' => ['required', 'in:given,refused,withheld'],
             'reason' => ['nullable', 'string', 'max:500'],
             'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
@@ -951,13 +975,26 @@ class MedicationsApiController extends Controller
             'safety_override' => ['sometimes', 'array:reason_code,reason', 'required_array_keys:reason_code,reason'],
             'safety_override.reason_code' => ['required_with:safety_override', new Enum(SafetyOverrideReason::class)],
             'safety_override.reason' => ['required_with:safety_override', 'string', 'min:10', 'max:1000'],
-            'override_window' => ['nullable', 'boolean'],
+            // EA-106 (Lane C10): a late dose needs its reason, as on Meds today;
+            // a client can't switch the window check off.
+            'override_window' => ['prohibited'],
+            // P01: the same recording contract as the web dialog.
+            ...RecordingContract::rules(),
             ...$this->medicationOfflineSubmissionRules($request),
             'scan_code' => ['nullable', 'string', 'max:255'],
             'scan_source' => ['nullable', 'string', 'in:manual,scanner'],
             'scan_verified' => ['nullable', 'boolean'],
             'scan_match_source' => ['nullable', 'string', 'max:50'],
         ]);
+
+        // A scheduled order's dose is identified by its scheduled time: without
+        // it the record can't be matched to the dose (no duplicate check, no
+        // slot outcome), so say which field is missing instead of "not found".
+        if (! $medication->is_prn && blank($data['scheduled_for'] ?? null)) {
+            throw ValidationException::withMessages([
+                'scheduled_for' => 'Send the scheduled time of the dose you are recording (scheduled_for). Scheduled medicines are recorded against their dose.',
+            ]);
+        }
 
         $scheduledFor = filled($data['scheduled_for'] ?? null)
             ? $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for'])
@@ -975,9 +1012,16 @@ class MedicationsApiController extends Controller
             $scheduledFor,
             isset($data['shift_id']) ? (int) $data['shift_id'] : null,
             null,
-            function (MedicationScopeDecision $scope) use ($data, $user, $submittedAdministrationAt) {
+            function (MedicationScopeDecision $scope) use ($request, $data, $user, $submittedAdministrationAt) {
                 $client = $scope->client;
                 $medication = $scope->medication;
+                // EA-131 (review P1): the same age limit for queued and replayed doses.
+                if ($tooOld = app(\App\Services\Medication\Recording\OfflineReplayReview::class)->refuseIfTooOld($request, $client, $medication, $user, $data)) {
+                    return response()->json($this->withMedicationSync(
+                        ['success' => false, 'message' => $tooOld, 'error' => $tooOld, 'error_field' => 'queued_offline', 'errors' => ['queued_offline' => [$tooOld]]],
+                        $data, 'rejected', false, $tooOld,
+                    ), 422);
+                }
                 $data['administered_at'] = $submittedAdministrationAt;
                 $data['shift_id'] = $scope->shiftId();
                 $data['scope_authorized'] = true;
@@ -1008,7 +1052,13 @@ class MedicationsApiController extends Controller
                     ], 422);
                 }
 
-                if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
+                // A queued re-offer follows the refusal already in the slot:
+                // the record path decides whether it may (P1-1), not this
+                // "already recorded" pre-check.
+                if (($data['queued_offline'] ?? false)
+                    && ! $medication->is_prn
+                    && ! empty($data['scheduled_for'])
+                    && blank($data['reoffer_of_id'] ?? null)) {
                     $isDurableReplay = filled($data['client_request_uuid'] ?? null)
                         && ClientMedicationAdministration::withTrashed()
                             ->where('client_id', $client->id)
@@ -1028,11 +1078,31 @@ class MedicationsApiController extends Controller
                             ->first();
 
                         if ($conflictingAdministration) {
+                            // P01: say who recorded it and when, so the worker
+                            // knows nothing new was saved and why.
+                            $recordedBy = User::query()
+                                ->whereKey((int) $conflictingAdministration->administered_by)
+                                ->value('name');
+                            $recordedAt = $conflictingAdministration->administered_at
+                                ?->copy()
+                                ->timezone($this->scheduleService->workerTimezone())
+                                ->format('g:i a');
+
                             return response()->json(
-                                $this->buildConflictPayload(
-                                    $data,
-                                    'Medication state changed before this offline administration could sync. Supervisor review is required.',
-                                ),
+                                [
+                                    ...$this->buildConflictPayload(
+                                        $data,
+                                        'Already recorded — nothing new was saved. '
+                                            .($recordedBy ?? 'Someone').' recorded this dose as '
+                                            .$conflictingAdministration->status
+                                            .($recordedAt ? ' at '.$recordedAt : '').'.',
+                                    ),
+                                    'duplicate_of' => [
+                                        'status' => (string) $conflictingAdministration->status,
+                                        'administered_at' => $conflictingAdministration->administered_at?->toIso8601String(),
+                                        'by' => $recordedBy,
+                                    ],
+                                ],
                                 409
                             );
                         }
@@ -1088,6 +1158,7 @@ class MedicationsApiController extends Controller
                             'administered_at' => $administration->administered_at?->toIso8601String(),
                         ],
                         'safety_check' => $result['safety_check'] ?? null,
+                        'duplicate_of' => ($result['replayed'] ?? false) ? null : ($result['duplicate_of'] ?? null),
                     ], $data, 'duplicate', true, 'This medication request was already processed.');
 
                     return response()->json(
@@ -1166,7 +1237,15 @@ class MedicationsApiController extends Controller
     }
 
     /**
-     * Correct an administration
+     * Correct an administration.
+     *
+     * EA-106: the person record's correction path. The person rule first
+     * (ClientPolicy::correctMedications: the record's own rule, with the
+     * correction right in place of read access), then the canonical
+     * correction writer with its P09 event and its notice to approvers. A
+     * person the actor can't reach answers exactly like a missing or forged
+     * dose. This API keeps its contract: the correction reason is required, a
+     * second pending correction is a conflict, and the JSON is unchanged.
      */
     public function correctAdministration(
         Request $request,
@@ -1180,274 +1259,54 @@ class MedicationsApiController extends Controller
             403,
             'You do not have permission to correct medication administrations.'
         );
+        abort_unless(
+            (int) $administration->client_id === (int) $client->getKey()
+            && Gate::forUser($user)->allows('correctMedications', $client),
+            404,
+        );
+        $request->validate([
+            'status' => ['required', 'in:given,refused,missed,withheld'],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'dose_given' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'administered_at' => ['nullable', 'date'],
+            'correction_reason' => ['required', 'string', 'max:255'],
+        ]);
 
-        return DB::transaction(function () use ($request, $client, $administration, $user) {
-            // Read only the submitted child identity first, then lock the
-            // canonical aggregate in parent-first order. A forged nested owner,
-            // cross-client medication, foreign Site, and a missing row all
-            // collapse to the same concealed response before validation/writes.
-            $snapshot = ClientMedicationAdministration::query()
-                ->whereKey($administration->getKey())
-                ->first([
-                    'id',
-                    'client_id',
-                    'client_medication_id',
-                    'is_correction',
-                    'corrected_of_id',
-                ]);
-            abort_unless(
-                $snapshot !== null
-                && (int) $snapshot->client_id === (int) $client->getKey()
-                && is_numeric($snapshot->client_medication_id)
-                && (int) $snapshot->client_medication_id > 0,
-                404,
-            );
-
-            $canonicalClient = Client::query()
-                ->whereKey($snapshot->client_id)
-                ->lockForUpdate()
-                ->first();
-            abort_unless(
-                $canonicalClient !== null
-                && is_numeric($canonicalClient->site_id)
-                && (int) $canonicalClient->site_id > 0
-                && in_array(
-                    (int) $canonicalClient->site_id,
-                    $this->siteAccess->accessibleSiteIds(
-                        $user,
-                        MedicationGovernanceScopeService::SITE_BYPASS_PERMISSIONS,
-                    ),
-                    true,
-                ),
-                404,
-            );
-
-            $canonicalMedication = ClientMedication::withTrashed()
-                ->whereKey($snapshot->client_medication_id)
-                ->where('client_id', $canonicalClient->id)
-                ->lockForUpdate()
-                ->first();
-            abort_unless($canonicalMedication !== null, 404);
-            abort_unless(
-                ! (bool) $canonicalMedication->controlled_drug
-                || $user->canDo(MedicationGovernanceScopeService::CONTROLLED_CAPABILITY),
-                404,
-            );
-
-            $rootId = $snapshot->is_correction
-                ? (int) $snapshot->corrected_of_id
-                : (int) $snapshot->id;
-            abort_unless($rootId > 0, 404);
-
-            $rootAdministration = ClientMedicationAdministration::query()
-                ->whereKey($rootId)
-                ->where('client_id', $canonicalClient->id)
-                ->where('client_medication_id', $canonicalMedication->id)
-                ->where(function ($query): void {
-                    $query->where('is_correction', false)
-                        ->orWhereNull('is_correction');
-                })
-                ->lockForUpdate()
-                ->first();
-            abort_unless($rootAdministration !== null, 404);
-
-            $corrections = ClientMedicationAdministration::query()
-                ->where('corrected_of_id', $rootAdministration->id)
-                ->where('client_id', $canonicalClient->id)
-                ->where('client_medication_id', $canonicalMedication->id)
-                ->where('is_correction', true)
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
-
-            $submittedAdministration = $snapshot->is($rootAdministration)
-                ? $rootAdministration
-                : $corrections->first(
-                    fn (ClientMedicationAdministration $candidate): bool => $candidate->is($snapshot),
-                );
-            abort_unless($submittedAdministration instanceof ClientMedicationAdministration, 404);
-
-            $approvedWinner = $corrections
-                ->filter(
-                    fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'approved',
-                )
-                ->sort(function (
-                    ClientMedicationAdministration $left,
-                    ClientMedicationAdministration $right,
-                ): int {
-                    $leftApprovedAt = $left->correction_approved_at?->getTimestamp() ?? PHP_INT_MIN;
-                    $rightApprovedAt = $right->correction_approved_at?->getTimestamp() ?? PHP_INT_MIN;
-
-                    return $leftApprovedAt === $rightApprovedAt
-                        ? (int) $right->id <=> (int) $left->id
-                        : $rightApprovedAt <=> $leftApprovedAt;
-                })
-                ->first();
-            $effectiveAdministration = $approvedWinner ?? $rootAdministration;
-
-            abort_unless(
-                $submittedAdministration->is($rootAdministration)
-                || $submittedAdministration->is($effectiveAdministration),
-                404,
-            );
-
-            $pendingSibling = $corrections->first(
-                fn (ClientMedicationAdministration $candidate): bool => $candidate->correction_status === 'pending',
-            );
-            if ($pendingSibling !== null) {
+        try {
+            app(MedicationAdministrationCorrectionController::class)->store($request, $client, $administration);
+        } catch (ValidationException $exception) {
+            if (array_key_exists('correction', $exception->errors())) {
                 return response()->json([
                     'success' => false,
                     'error' => 'A correction for this administration is already awaiting approval.',
                 ], 409);
             }
 
-            $data = $request->validate([
-                'status' => ['required', 'in:given,refused,missed,withheld'],
-                'reason' => ['nullable', 'string', 'max:500'],
-                'dose_given' => ['nullable', 'string', 'max:255'],
-                'notes' => ['nullable', 'string', 'max:2000'],
-                'administered_at' => ['nullable', 'date'],
-                'correction_reason' => ['required', 'string', 'max:500'],
-            ]);
-
-            if (
-                (bool) $canonicalMedication->controlled_drug
-                && (($effectiveAdministration->status === 'given') !== ($data['status'] === 'given'))
-            ) {
-                throw ValidationException::withMessages([
-                    'status' => 'A controlled medication correction cannot change whether stock was administered without a separate witnessed register reconciliation.',
-                ]);
-            }
-            $this->assertCorrectionClinicalIntegrity($canonicalMedication, $effectiveAdministration, $data);
-            if (
-                (bool) $canonicalMedication->controlled_drug
-                && $effectiveAdministration->witnessed_by !== null
-                && (int) $effectiveAdministration->administered_by === (int) $effectiveAdministration->witnessed_by
-            ) {
-                throw ValidationException::withMessages([
-                    'administration' => 'Controlled medication evidence must retain an administering worker distinct from its witness.',
-                ]);
-            }
-
-            // Check correction time window
-            $windowAnchor = $rootAdministration->administered_at
-                ?? $rootAdministration->updated_at
-                ?? $rootAdministration->created_at;
-            $minutesSince = $windowAnchor?->diffInMinutes(now()) ?? 999999;
-            if ($minutesSince > 30 && empty($data['correction_reason'])) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Correction reason is required when correcting after 30 minutes.',
-                ], 422);
-            }
-
-            // Create correction record
-            $correction = $effectiveAdministration->replicate([
-                'id',
-                'client_request_uuid',
-                'correction_requested_by',
-                'correction_status',
-                'correction_approved_by',
-                'correction_approved_at',
-                'correction_rejection_reason',
-                'deleted_at',
-                'created_at',
-                'updated_at',
-            ]);
-            $correction->is_correction = true;
-            $correction->corrected_of_id = $rootAdministration->id;
-            $correction->correction_reason = $data['correction_reason'];
-            $correction->status = $data['status'];
-            $correction->reason = $data['reason'] ?? $effectiveAdministration->reason;
-            $correction->dose_given = $data['dose_given'] ?? $effectiveAdministration->dose_given;
-            $correction->notes = $data['notes'] ?? $effectiveAdministration->notes;
-            $correction->administered_at = $data['administered_at'] ?? $effectiveAdministration->administered_at;
-            if ($correction->status !== 'given') {
-                foreach (ClientMedicationAdministration::ADMINISTRATION_ONLY_EVIDENCE_FIELDS as $field) {
-                    $correction->{$field} = null;
-                }
-            }
-            $correction->correction_requested_by = $user->id;
-            $correction->correction_status = 'pending';
-            $correction->save();
-
-            // Timeline event
-            app(TimelineEmitter::class)->record([
-                'source_type' => ClientMedicationAdministration::class,
-                'source_id' => $correction->id,
-                'occurred_at' => now(),
-                'type' => 'medication_correction',
-                'actor_user_id' => $user->id,
-                'client_id' => $canonicalClient->id,
-                'shift_id' => $effectiveAdministration->shift_id,
-                'site_id' => $canonicalClient->site_id,
-                'subject' => 'Medication corrected: '.$canonicalMedication->name,
-                'body' => $data['correction_reason'],
-                'meta' => array_filter([
-                    'corrected_from' => $effectiveAdministration->status,
-                    'corrected_to' => $data['status'],
-                    'original_administration_id' => $rootAdministration->id,
-                ]),
-                'visibility' => 'internal',
-                'is_pinned' => false,
-                'created_by' => $user->id,
-            ]);
-
-            // Handle incident for significant corrections
-            if ($minutesSince > 240) { // 4 hours
-                $this->incidentService->handleUnsafeCorrection($rootAdministration, $data, $user->id, $correction);
-            }
-
-            return response()->json([
-                'success' => true,
-                'correction' => [
-                    'id' => $correction->id,
-                    'status' => $correction->status,
-                    'is_correction' => true,
-                    'correction_status' => $correction->correction_status,
-                ],
-            ]);
-        }, 3);
-    }
-
-    /** @param array<string, mixed> $data */
-    private function assertCorrectionClinicalIntegrity(
-        ClientMedication $medication,
-        ClientMedicationAdministration $effectiveAdministration,
-        array $data,
-    ): void {
-        $currentStatus = (string) $effectiveAdministration->status;
-        $correctedStatus = (string) $data['status'];
-
-        if ($currentStatus !== 'given' && $correctedStatus === 'given') {
-            throw ValidationException::withMessages([
-                'status' => 'A correction cannot create a given administration without the governed administration workflow and its required clinical evidence.',
-            ]);
-        }
-        if (! $medication->controlled_drug || $currentStatus !== 'given' || $correctedStatus !== 'given') {
-            return;
+            throw $exception;
         }
 
-        if (array_key_exists('dose_given', $data)) {
-            $submittedDose = $data['dose_given'] === null ? null : trim((string) $data['dose_given']);
-            $recordedDose = $effectiveAdministration->dose_given === null
-                ? null
-                : trim((string) $effectiveAdministration->dose_given);
-            if ($submittedDose !== $recordedDose) {
-                throw ValidationException::withMessages([
-                    'dose_given' => 'A controlled medication correction cannot change the recorded dose without witnessed register reconciliation.',
-                ]);
-            }
-        }
+        $rootId = $administration->is_correction
+            ? (int) $administration->corrected_of_id
+            : (int) $administration->id;
+        $correction = ClientMedicationAdministration::query()
+            ->where('client_id', $client->getKey())
+            ->where('corrected_of_id', $rootId)
+            ->where('is_correction', true)
+            ->where('correction_status', 'pending')
+            ->where('correction_requested_by', $user->id)
+            ->latest('id')
+            ->firstOrFail();
 
-        if (array_key_exists('administered_at', $data) && $data['administered_at'] !== null) {
-            $recordedAt = $effectiveAdministration->administered_at;
-            if ($recordedAt === null || ! Carbon::parse($data['administered_at'])->utc()->equalTo($recordedAt->copy()->utc())) {
-                throw ValidationException::withMessages([
-                    'administered_at' => 'A controlled medication correction cannot change the administration time without witnessed register reconciliation.',
-                ]);
-            }
-        }
+        return response()->json([
+            'success' => true,
+            'correction' => [
+                'id' => $correction->id,
+                'status' => $correction->status,
+                'is_correction' => true,
+                'correction_status' => $correction->correction_status,
+            ],
+        ]);
     }
 
     /**
@@ -1464,8 +1323,15 @@ class MedicationsApiController extends Controller
             requestedClientId: $clientId,
         );
 
+        // EA-107: the P02 person rule, not just the house; one person asked
+        // for and not readable is "not found" (EA-203).
+        if ($client !== null) {
+            app(MedicationRecordAccess::class)->assertReadable($user, $client);
+        }
+        $readable = $this->readableClientIdsAt($user, $siteIds);
         $alertsQuery = MedicationDashboardAlert::query()
             ->active()
+            ->whereIn('client_id', $readable === [] ? [0] : $readable)
             ->when($clientId, fn ($query) => $query->where('client_id', $clientId));
         $alertsQuery = $this->governanceScope
             ->scopeCanonicalClientMedicationRows($alertsQuery, $siteIds)
@@ -1581,10 +1447,14 @@ class MedicationsApiController extends Controller
             requestedClientId: $clientId,
         );
 
+        if ($clientId !== null) {
+            app(MedicationRecordAccess::class)->assertReadable($user, Client::query()->find($clientId));
+        }
         $widgets = $this->alertService->getGlobalDashboardWidgets(
             $clientId,
             $siteIds,
             $user->canDo('medications.controlled.view'),
+            $this->readableClientIdsAt($user, $siteIds),
         );
 
         return response()->json($widgets);
@@ -1599,7 +1469,7 @@ class MedicationsApiController extends Controller
 
         abort_unless(
             $user
-            && ($user->canDo('reports.viewAny') || $user->canDo('medications.reports.export')),
+            && $user->canDo('medications.reports.view'),
             403,
         );
 
@@ -1668,7 +1538,7 @@ class MedicationsApiController extends Controller
 
         abort_unless(
             $user
-            && ($user->canDo('reports.viewAny') || $user->canDo('medications.reports.export')),
+            && $user->canDo('medications.reports.view') && $user->canDo('medications.reports.export'),
             403,
         );
 
@@ -1730,6 +1600,9 @@ class MedicationsApiController extends Controller
         if (! $user->canDo('shifts.viewAny') && (int) $shift->user_id !== (int) $user->id) {
             abort(404);
         }
+        // EA-166: the shift's person, under the same per-person rule as the
+        // shift page's medication card; anything else is "not found".
+        abort_unless(app(ShiftMedicationCardAccess::class)->canRead($user, $shift->client), 404);
 
         $summary = $this->marService->getShiftSummary(
             $shiftId,
@@ -1737,6 +1610,7 @@ class MedicationsApiController extends Controller
             (int) $shift->client_id,
             (int) $shift->site_id,
             is_numeric($shift->user_id) ? (int) $shift->user_id : null,
+            $user,
         );
 
         return response()->json($summary);
@@ -1747,61 +1621,56 @@ class MedicationsApiController extends Controller
      */
     public function getAllergies(Request $request, Client $client)
     {
-        $this->authorize('viewMedications', $client);
-
-        $allergies = MedicationAllergy::where('client_id', $client->id)
-            ->whereNull('deleted_at')
-            ->with('recordedBy:id,name')
-            ->orderByDesc('created_at')
-            ->get();
+        app(MedicationRecordAccess::class)->assertReadable($request->user(), $client); // EA-203: 404 when out of scope
+        $service = app(ClientAllergyRecordService::class);
+        $records = $service->forClient($client);
+        $summary = $service->summary($client, $records);
+        $recorderIds = collect($records)->mapWithKeys(fn ($entry) => [$entry['key'] => $entry['added_by'] ?? $entry['source_recorded_by'] ?? $entry['allergy']->recorded_by]);
+        $recorderNames = User::query()->whereIn('id', $recorderIds->filter()->unique()->values())->pluck('name', 'id');
 
         return response()->json([
-            'allergies' => $allergies->map(fn ($a) => [
-                'id' => $a->id,
-                'allergen' => $a->allergen,
-                'reaction' => $a->reaction,
-                'severity' => $a->severity,
-                'is_severe' => $a->isSevere(),
-                'notes' => $a->notes,
-                'identified_date' => $a->identified_date?->toDateString(),
-                'recorded_by' => $a->recordedBy?->name,
-            ]),
-        ]);
+            // Both compatibility lists describe the same current record. Copied
+            // register rows remain evidence, never a second current allergy list.
+            'allergies' => array_map(fn (array $entry): array => [
+                ...$entry,
+                'id' => preg_match('/^register-(\d+)$/D', $entry['key'], $match) ? (int) $match[1] : $entry['key'],
+                'is_severe' => in_array($entry['severity'] ?? null, ['severe', 'life_threatening'], true),
+                'recorded_by' => $recorderNames[$recorderIds[$entry['key']] ?? null] ?? null,
+            ], $summary['entries']),
+            'recorded_allergies' => array_map(fn (array $entry): array => [
+                'allergen' => $entry['allergen'], 'severity' => $entry['severity'] ?? null,
+                'reaction' => $entry['reaction'] ?? null, 'source' => $entry['source'],
+            ], $summary['entries']),
+            'allergy_record' => $summary,
+            'allergy_management_url' => $service->managementUrl($client, $request->user()),
+        ])->header('Cache-Control', 'private, no-store');
     }
 
-    /**
-     * Create allergy
-     */
+    /** Add an allergy through the same audited canonical commands as the profile editor. */
     public function createAllergy(Request $request, Client $client)
     {
         $this->authorize('update', $client);
-
         $data = $request->validate([
             'allergen' => ['required', 'string', 'max:255'],
-            'reaction' => ['nullable', 'string', 'max:500'],
+            'reaction' => ['nullable', 'string', 'max:2000'],
             'severity' => ['nullable', 'in:mild,moderate,severe,life_threatening'],
-            'notes' => ['nullable', 'string'],
-            'identified_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+            'identified_date' => ['nullable', 'date_format:Y-m-d'],
+            'identified_by' => ['nullable', 'string', 'max:255'],
+            // Older callers can append without these. Current callers get a
+            // digest conflict check and exactly-once retry with their UUID.
+            'request_uuid' => ['sometimes', 'uuid'], 'digest' => ['sometimes', 'string', 'size:64'],
         ]);
-
-        $allergy = MedicationAllergy::create([
-            'client_id' => $client->id,
-            'allergen' => $data['allergen'],
-            'reaction' => $data['reaction'] ?? null,
-            'severity' => $data['severity'] ?? null,
-            'notes' => $data['notes'] ?? null,
-            'identified_date' => $data['identified_date'] ?? null,
-            'recorded_by' => $request->user()->id,
-        ]);
+        $data['request_uuid'] ??= (string) Str::uuid();
+        $result = app(ClientAllergyRecordCommands::class)->append($request->user(), (int) $client->id, $data);
+        $entry = collect($result['entries'])->firstWhere('key', $data['request_uuid'])
+            ?? collect($result['entries'])->first(fn ($record) => app(ClientAllergyRecordService::class)->entryKey($record) === app(ClientAllergyRecordService::class)->entryKey($data));
 
         return response()->json([
             'success' => true,
-            'allergy' => [
-                'id' => $allergy->id,
-                'allergen' => $allergy->allergen,
-                'severity' => $allergy->severity,
-            ],
-        ]);
+            'allergy' => [...$entry, 'id' => preg_match('/^register-(\d+)$/D', $entry['key'], $match) ? (int) $match[1] : $entry['key']],
+            'allergy_record' => $result,
+        ])->header('Cache-Control', 'private, no-store');
     }
 
     /**
@@ -1898,9 +1767,10 @@ class MedicationsApiController extends Controller
             'medication' => [
                 'id' => $medication->id,
                 'name' => $medication->name,
-                'on_hand' => $medication->stock?->on_hand !== null
-                    ? MedicationStockQuantity::toFloat($medication->stock->on_hand)
+                'on_hand' => $medication->stock?->availableQuantity() !== null
+                    ? MedicationStockQuantity::toFloat($medication->stock->availableQuantity())
                     : null,
+                'pack_workflow_url' => ! $medication->controlled_drug ? $medication->stock?->pack_workflow_url : null,
                 'scan_verification' => $this->buildMedicationScanPayload($client, $medication),
             ],
             'counts' => $counts,
@@ -1987,7 +1857,7 @@ class MedicationsApiController extends Controller
                     ->lockForUpdate()
                     ->first();
                 $expectedQuantity = $data['expected_quantity']
-                    ?? ($stock?->on_hand !== null ? MedicationStockQuantity::normalize($stock->on_hand) : null);
+                    ?? $stock?->availableQuantity();
 
                 $count = MedicationScheduledStockCount::create([
                     'client_id' => $canonicalClient->id,
@@ -2129,6 +1999,7 @@ class MedicationsApiController extends Controller
                     ]);
                 }
 
+                $stock?->rejectScalarWrite('actual_quantity');
                 $scanAudit = $this->verifyMedicationScanOrFail($canonicalClient, $medication, $data);
                 $beforeOnHand = $stock?->on_hand !== null
                     ? MedicationStockQuantity::normalize($stock->on_hand)
@@ -2223,12 +2094,14 @@ class MedicationsApiController extends Controller
     }
 
     /**
-     * Create drug interaction
+     * Create a drug interaction rule. Rules feed every resident's safety
+     * checks, so authoring one is clinical governance (NF-09): it needs the
+     * medication settings capability, records its author and is audited.
      */
     public function createDrugInteraction(Request $request)
     {
         $user = $request->user();
-        abort_unless($user?->canDo('medications.administer.correct'), 403);
+        abort_unless($user?->canDo('medications.settings.manage'), 403);
 
         $data = $request->validate([
             'medication_a' => ['required', 'string', 'max:255'],
@@ -2239,15 +2112,26 @@ class MedicationsApiController extends Controller
             'management' => ['nullable', 'string'],
         ]);
 
-        $interaction = MedicationInteraction::create([
-            'medication_a' => $data['medication_a'],
-            'medication_b' => $data['medication_b'],
-            'severity' => $data['severity'],
-            'description' => $data['description'],
-            'clinical_effects' => $data['clinical_effects'] ?? null,
-            'management' => $data['management'] ?? null,
-            'active' => true,
-        ]);
+        $interaction = DB::transaction(function () use ($data, $user): MedicationInteraction {
+            $interaction = MedicationInteraction::create([
+                'medication_a' => $data['medication_a'],
+                'medication_b' => $data['medication_b'],
+                'severity' => $data['severity'],
+                'description' => $data['description'],
+                'clinical_effects' => $data['clinical_effects'] ?? null,
+                'management' => $data['management'] ?? null,
+                'active' => true,
+                'created_by' => $user->id,
+            ]);
+
+            AuditLogger::logOrFail('medications.interaction.created', $interaction, [
+                'medication_a' => $interaction->medication_a,
+                'medication_b' => $interaction->medication_b,
+                'severity' => $interaction->severity,
+            ]);
+
+            return $interaction;
+        });
 
         return response()->json([
             'success' => true,

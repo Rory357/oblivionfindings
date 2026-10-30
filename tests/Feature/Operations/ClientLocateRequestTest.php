@@ -67,6 +67,7 @@ class ClientLocateRequestTest extends TestCase
     public function test_removing_the_signed_context_cannot_downgrade_to_a_generic_request(): void
     {
         $fixture = ClientLocateFixture::make();
+        Queue::fake(); // Observe contract denial after the staff, Site and client fixtures.
         $command = app(DeviceCommandRequestService::class)->request($fixture['device'], $fixture['actor'],
             new CommandRequestInput('tracking.location_refresh', [], 'Request the location for an agreed check.', 'client-location:'.Str::uuid(),
                 stepUpConfirmedAt: CarbonImmutable::now(), originContext: $fixture['origin']));
@@ -92,6 +93,7 @@ class ClientLocateRequestTest extends TestCase
     public function test_withdrawn_resident_consent_blocks_an_existing_ready_request(): void
     {
         $fixture = ClientLocateFixture::make();
+        Queue::fake(); // Observe consent denial after the staff, Site and client fixtures.
         $command = app(DeviceCommandRequestService::class)->request($fixture['device'], $fixture['actor'],
             new CommandRequestInput('tracking.location_refresh', [], 'Request the location for an agreed check.', 'client-location:'.Str::uuid(),
                 stepUpConfirmedAt: CarbonImmutable::now(), originContext: $fixture['origin']));
@@ -154,6 +156,7 @@ class ClientLocateRequestTest extends TestCase
     public function test_http_rejects_forged_inputs_and_stale_or_future_session_confirmation(): void
     {
         $f = ClientLocateFixture::make();
+        Queue::fake(); // Observe input and confirmation checks after the canonical fixtures.
         $url = '/operations/clients/'.$f['client']->id.'/location/locate-requests';
         $data = ['reason' => 'Check the agreed pickup location.', 'idempotency_key' => (string) Str::uuid(), 'access_fingerprint' => $f['fingerprint']];
         $this->actingAs($f['actor'])->postJson($url, [...$data, 'step_up_confirmed_at' => now()->toISOString()])->assertUnprocessable();
@@ -170,6 +173,7 @@ class ClientLocateRequestTest extends TestCase
     {
         $f = ClientLocateFixture::make();
         $other = ClientLocateFixture::make();
+        Queue::fake(); // Observe access checks after both canonical fixture sets.
         $url = '/operations/clients/'.$f['client']->id.'/location/locate-requests';
         $this->actingAs($f['actor']);
         $response = $this->postJson($url, ['reason' => 'Check the agreed pickup location.', 'idempotency_key' => (string) Str::uuid(), 'access_fingerprint' => $f['fingerprint']])->assertCreated();
@@ -187,6 +191,7 @@ class ClientLocateRequestTest extends TestCase
     public function test_unavailable_tracker_does_not_create_a_command_and_legacy_html_redirect_is_preserved(): void
     {
         $f = ClientLocateFixture::make();
+        Queue::fake(); // Observe unavailable-tracker requests after the canonical fixtures.
         $f['device']->update(['config' => ['management' => ['capabilities' => []]]]);
         $url = '/operations/clients/'.$f['client']->id.'/location/locate-requests';
         $this->actingAs($f['actor'])->getJson($url.'?access_fingerprint='.$f['fingerprint'])->assertOk()->assertJsonPath('available', false);

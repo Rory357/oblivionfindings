@@ -20,6 +20,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 
 /**
  * Donor-fund applications recognise each accounting source once: a receipt is
@@ -573,6 +574,7 @@ it('conceals a foreign-organisation donor fund before validating a direct mutati
 });
 
 it('serializes concurrent exact receipt replay into one application and one journal on MySQL', function (): void {
+    $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
     $connection = DB::connection();
     expect($connection->getDriverName())->toBe('mysql');
     seedDonorFundAccounts();

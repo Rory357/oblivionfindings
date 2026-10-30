@@ -1,0 +1,33 @@
+{
+  "at": "2026-09-21T22:39:16.556Z",
+  "checks": [
+    {
+      "name": "Dismissal recalculates without altering original",
+      "result": "pass"
+    },
+    {
+      "name": "Disputed event withholds score",
+      "result": "pass"
+    },
+    {
+      "name": "Driver handover applies from point and excludes whole-trip attribution",
+      "result": "pass"
+    },
+    {
+      "name": "Fresh mapped limit is limited to known segment direction and day",
+      "result": "pass"
+    },
+    {
+      "name": "Manual limit needs approval and expires exclusively",
+      "result": "pass"
+    },
+    {
+      "name": "Conflicting manual sources do not invent a road limit",
+      "result": "pass"
+    },
+    {
+      "name": "Deadline escalation occurs once and respects acknowledgement",
+      "result": "pass"
+    }
+  ]
+}

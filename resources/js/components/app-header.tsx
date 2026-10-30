@@ -3,8 +3,10 @@ import {
     resolveWordmarkName,
 } from '@/components/event-horizon-wordmark';
 import GlobalNavSearch from '@/components/global-nav-search';
+import { useChatCalling } from '@/components/chat/chat-calling';
 import GlobalQueryBar from '@/components/global-query-bar';
 import InboxMenus from '@/components/inbox-menus';
+import { PageHeaderPrimaryButton } from '@/components/page/page-header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,6 +24,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Clock,
+    HeartHandshake,
     Menu,
     MessageSquareText,
     ShieldAlert,
@@ -36,8 +39,8 @@ import {
  * truly-centred command search (grid 1fr/auto/1fr — flex spacers drift
  * off-centre), then Report incident / Clock in-out / Ask / Messages /
  * inbox bells / user avatar. No "Live"/sync chip — removed by design.
- * The centred search never yields to the date: full date ≥1320px, short
- * form 1140–1320px, hidden below 1140px.
+ * The centred search never yields to the date: full date ≥1440px, short
+ * form 1320–1440px, hidden below 1320px.
  *
  * Badge semantics (never swap them): violet count = conversations waiting;
  * red count/dot = alerts needing attention.
@@ -57,7 +60,8 @@ export function AppHeader({
     const branding = (page.props as any)?.branding as
         | { name?: string; logoUrl?: string | null }
         | undefined;
-    const unreadMessages = Number((auth as any)?.unreadMessageCount ?? 0);
+    const chatUnread = useChatCalling()?.unreadCount;
+    const unreadMessages = Number(chatUnread ?? (auth as any)?.unreadMessageCount ?? 0);
     const getInitials = useInitials();
 
     const canReportIncident = !!can?.incidents?.create;
@@ -67,7 +71,7 @@ export function AppHeader({
         can?.shifts?.viewAssigned ||
         can?.shifts?.manageAny
     );
-    const canMessages = !!(can?.messages?.viewAny || can?.shifts?.viewAny);
+    const canMessages = !!(can?.chat?.use || can?.messages?.viewAny || can?.shifts?.viewAny);
 
     const handleStopImpersonating = () => {
         router.post('/system/users/stop-impersonating');
@@ -97,7 +101,7 @@ export function AppHeader({
     return (
         <>
             {auth.impersonating && (
-                <div className="flex items-center justify-between gap-2 bg-primary px-6 py-2 text-sm font-medium text-primary-foreground md:px-4">
+                <div className="flex items-center justify-between gap-2 bg-primary-fill px-6 py-2 text-sm font-medium text-primary-fill-foreground md:px-4">
                     <div className="flex items-center gap-2">
                         <ShieldAlert className="h-4 w-4 shrink-0" />
                         <span>
@@ -108,30 +112,29 @@ export function AppHeader({
                             )}
                         </span>
                     </div>
-                    <Button
-                        size="sm"
-                        className="shrink-0 border border-primary-foreground/30 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                    <PageHeaderPrimaryButton
+                        className="shrink-0"
                         onClick={handleStopImpersonating}
                     >
                         Stop Impersonating
-                    </Button>
+                    </PageHeaderPrimaryButton>
                 </div>
             )}
 
-            <header className="sticky top-0 z-50 grid h-[58px] w-full grid-cols-[1fr_auto_1fr] items-center gap-2 bg-sidebar px-3 text-sidebar-foreground md:px-4">
+            <header className="frontline-app-header sticky top-0 z-50 grid h-[58px] w-full grid-cols-[minmax(44px,1fr)_auto_auto] items-center gap-1 bg-sidebar px-3 text-sidebar-foreground md:grid-cols-[1fr_auto_1fr] md:gap-2 md:px-4">
                 {/* Day + date, flush to the sidebar seam. Stays put when the
                     sidebar collapses; the centred search always wins the
                     space fight (tiers documented in the file docblock). */}
-                <div className="pointer-events-none absolute top-1/2 left-[256px] hidden -translate-y-1/2 items-baseline gap-1.5 text-sm whitespace-nowrap min-[1140px]:flex">
+                <div className="pointer-events-none absolute top-1/2 left-[256px] hidden -translate-y-1/2 items-baseline gap-1.5 text-sm whitespace-nowrap min-[1320px]:flex">
                     <span className="font-semibold text-sidebar-accent-foreground">
-                        <span className="min-[1320px]:hidden">{shortDay}</span>
-                        <span className="hidden min-[1320px]:inline">
+                        <span className="min-[1440px]:hidden">{shortDay}</span>
+                        <span className="hidden min-[1440px]:inline">
                             {longDay}
                         </span>
                     </span>
                     <span>
-                        <span className="min-[1320px]:hidden">{shortDate}</span>
-                        <span className="hidden min-[1320px]:inline">
+                        <span className="min-[1440px]:hidden">{shortDate}</span>
+                        <span className="hidden min-[1440px]:inline">
                             {longDate}
                         </span>
                     </span>
@@ -143,7 +146,10 @@ export function AppHeader({
                         <SheetTrigger asChild>
                             <button
                                 type="button"
-                                className={cn(INK_ICON_BUTTON, 'md:hidden')}
+                                className={cn(
+                                    INK_ICON_BUTTON,
+                                    'frontline-tap md:hidden',
+                                )}
                             >
                                 <Menu className="size-5" />
                                 <span className="sr-only">Toggle menu</span>
@@ -154,7 +160,10 @@ export function AppHeader({
                         href="/dashboard"
                         prefetch
                         aria-label={`${resolveWordmarkName(branding?.name)} — home`}
-                        className="flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                        className={cn(
+                            'flex min-w-0 items-center rounded-lg px-1.5 py-1.5 transition-colors outline-none hover:bg-sidebar-accent/50 focus-visible:ring-2 focus-visible:ring-sidebar-ring min-[1320px]:max-w-[228px]',
+                            showMobileMenuTrigger && 'hidden min-[480px]:flex',
+                        )}
                     >
                         <EventHorizonWordmark
                             name={branding?.name}
@@ -169,7 +178,10 @@ export function AppHeader({
                 </div>
 
                 {/* Right cluster */}
-                <div className="flex items-center justify-end gap-1.5">
+                <div
+                    data-slot="app-header-actions"
+                    className="flex items-center justify-end gap-1 md:gap-1.5"
+                >
                     {canReportIncident && (
                         <Button
                             asChild
@@ -193,20 +205,34 @@ export function AppHeader({
                         </Link>
                     )}
                     <GlobalQueryBar variant="icon" />
+                    {can?.companyHub?.view && (
+                        <Link
+                            href="/company-hub"
+                            prefetch
+                            aria-label="Company Hub"
+                            title="Company Hub"
+                            className={cn(INK_ICON_BUTTON, 'frontline-hit')}
+                        >
+                            <HeartHandshake className="size-5" />
+                        </Link>
+                    )}
                     {canMessages && (
                         <Link
                             href="/operations/messages"
                             prefetch
                             aria-label={
                                 unreadMessages > 0
-                                    ? `Messages — ${unreadMessages} unread`
-                                    : 'Messages'
+                                    ? `Chat — ${unreadMessages} unread`
+                                    : 'Chat'
                             }
-                            className={INK_ICON_BUTTON}
+                            className={cn(
+                                INK_ICON_BUTTON,
+                                'hidden min-[360px]:flex',
+                            )}
                         >
                             <MessageSquareText className="size-5" />
                             {unreadMessages > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-bold text-primary-foreground shadow-sm">
+                                <span className="absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary-fill px-1 text-[10px] leading-none font-bold text-primary-fill-foreground shadow-sm">
                                     {unreadMessages > 99
                                         ? '99+'
                                         : unreadMessages}

@@ -44,6 +44,10 @@ class MedicationDestruction extends Model
         'voided_at',
         'void_reason',
         'voided_by',
+        'register_entry_id',
+        'pharmacy_received_at',
+        'pharmacist_name',
+        'pharmacist_registration',
     ];
 
     protected $casts = [
@@ -52,6 +56,7 @@ class MedicationDestruction extends Model
         'voided_at' => 'datetime',
         'is_controlled_drug' => 'boolean',
         'quantity' => 'decimal:2',
+        'pharmacy_received_at' => 'datetime',
     ];
 
     public function client()

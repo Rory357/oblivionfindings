@@ -199,9 +199,11 @@ it('requires an explicit selection to use a revised canonical geometry', async (
     fireEvent.click(
         screen.getByRole('button', { name: 'Review current site boundary' }),
     );
+    // 5b7e82866 replaced the "Linked: <name>" popover button with the shared
+    // boundary RemotePicker, which shows the linked boundary as its value.
     expect(
-        screen.getByRole('button', { name: 'Linked: Changed site boundary' }),
-    ).toBeVisible();
+        screen.getByRole('combobox', { name: 'Find an eligible site boundary' }),
+    ).toHaveTextContent('Changed site boundary');
     fireEvent.click(screen.getByRole('button', { name: /Review & save/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Save draft' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());

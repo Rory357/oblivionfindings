@@ -24,7 +24,8 @@ class BillOverdueNotification extends Notification
     {
         $amountDue = number_format($this->bill->getAmountDue(), 2);
         $vendorName = $this->bill->vendor->name ?? 'Unknown vendor';
-        $daysOverdue = $this->bill->due_date->diffInDays(now());
+        // Whole days: Carbon 3's diffInDays() is a float ("3.58 days past due").
+        $daysOverdue = (int) $this->bill->due_date->diffInDays(now());
 
         return (new MailMessage)
             ->subject("OVERDUE: Bill {$this->bill->bill_number} — {$daysOverdue} days past due")
@@ -44,7 +45,7 @@ class BillOverdueNotification extends Notification
             'bill_number' => $this->bill->bill_number,
             'amount_due' => $this->bill->getAmountDue(),
             'due_date' => $this->bill->due_date->toDateString(),
-            'days_overdue' => $this->bill->due_date->diffInDays(now()),
+            'days_overdue' => (int) $this->bill->due_date->diffInDays(now()),
         ];
     }
 }

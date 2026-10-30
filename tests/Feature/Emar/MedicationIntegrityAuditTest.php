@@ -15,6 +15,7 @@ use App\Models\Shift;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\EnhancedMarService;
+use Database\Factories\UserFactory;
 use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -94,7 +95,7 @@ class MedicationIntegrityAuditTest extends TestCase
             'reason' => 'Breakthrough pain',
             'quantity_administered' => 2,
             'witnessed_by' => $witness->id,
-            'witness_credential' => 'password',
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'client_request_uuid' => (string) Str::uuid(),
         ], $user->id);
 
@@ -113,6 +114,7 @@ class MedicationIntegrityAuditTest extends TestCase
         ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupClinic();
         $medication = $this->makeControlledMedication($client, 10);
         $witness2 = $this->controlledWitness($client, $user);
+        $this->recordControlledRecorderPresence($user, $client);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -123,7 +125,7 @@ class MedicationIntegrityAuditTest extends TestCase
                 $witness2,
                 4,
             ))
-            ->assertRedirect()
+            ->assertRedirect('/emar/destructions')
             ->assertSessionHasNoErrors();
 
         $this->assertSame(6.0, (float) $medication->stock->fresh()->on_hand);
@@ -141,6 +143,7 @@ class MedicationIntegrityAuditTest extends TestCase
         ['user' => $user, 'witness' => $witness, 'client' => $client] = $this->setupClinic();
         $medication = $this->makeControlledMedication($client, 3);
         $witness2 = $this->controlledWitness($client, $user);
+        $this->recordControlledRecorderPresence($user, $client);
 
         $this->actingAs($user)
             ->from('/emar/destructions')
@@ -367,6 +370,17 @@ class MedicationIntegrityAuditTest extends TestCase
         ]);
     }
 
+    private function recordControlledRecorderPresence(User $user, Client $client): void
+    {
+        $client->supportWorkers()->syncWithoutDetaching([$user->id]);
+        Shift::factory()->create([
+            'user_id' => $user->id, 'client_id' => $client->id, 'site_id' => $client->site_id,
+            'service_context_id' => $client->service_context_id, 'status' => 'in_progress',
+            'starts_at' => now()->utc()->subHour(), 'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(), 'started_by' => $user->id,
+        ]);
+    }
+
     private function controlledWitness(Client $client, User $assessor): User
     {
         $witness = User::factory()->create([
@@ -381,9 +395,9 @@ class MedicationIntegrityAuditTest extends TestCase
             'site_id' => $client->site_id,
             'service_context_id' => $client->service_context_id,
             'user_id' => $witness->id,
-            'starts_at' => now()->subHour(),
-            'ends_at' => now()->addHour(),
-            'actual_starts_at' => now()->subHour(),
+            'starts_at' => now()->utc()->subHour(),
+            'ends_at' => now()->utc()->addHour(),
+            'actual_starts_at' => now()->utc()->subHour(),
             'status' => 'in_progress',
             'created_by' => $assessor->id,
         ]);
@@ -407,6 +421,8 @@ class MedicationIntegrityAuditTest extends TestCase
             'staff_acknowledged_at' => now()->subMonth()->addMinute(),
             'can_administer_unsupervised' => true,
             'can_witness_controlled' => $canWitnessControlled,
+            'controlled_drugs' => $canWitnessControlled,
+            'restricted' => false,
         ]);
     }
 
@@ -426,12 +442,14 @@ class MedicationIntegrityAuditTest extends TestCase
             'quantity' => $quantity,
             'unit' => 'tablets',
             'reason' => 'expired',
-            'disposal_method' => 'denaturing',
+            'method' => 'pharmacy_return',
+            'expected_balance' => $medication->stock->fresh()->on_hand,
+            'expected_entry_id' => ClientControlledDrugEntry::query()->where('client_medication_id', $medication->id)->latest('id')->value('id'),
             'is_controlled_drug' => true,
-            'witness_1_id' => $firstWitness->id,
-            'witness_1_credential' => 'password',
-            'witness_2_id' => $secondWitness->id,
-            'witness_2_credential' => 'password',
+            'witnessed_by' => $firstWitness->id,
+            'witness_credential' => UserFactory::TEST_WITNESS_PIN,
+            'second_witness_id' => $secondWitness->id,
+            'second_witness_credential' => UserFactory::TEST_WITNESS_PIN,
             'authorised_by_name' => 'Pharmacist Pat',
             'denaturing_confirmed' => true,
             'client_request_uuid' => (string) Str::uuid(),

@@ -30,6 +30,16 @@ class MedicationPharmacyOrder extends Model
         'batch_number',
         'batch_expiry',
         'delivery_notes',
+        'needed_by',
+        'expected_delivery',
+        'communication_method',
+        'communication_reference',
+        'communication_recorded_by',
+        'communication_recorded_at',
+        'closed_at',
+        'closed_by',
+        'closure_reason',
+        'quantity_dispensed',
     ];
 
     protected $casts = [
@@ -38,6 +48,11 @@ class MedicationPharmacyOrder extends Model
         'dispensed_at' => 'datetime',
         'delivered_at' => 'datetime',
         'batch_expiry' => 'date',
+        'needed_by' => 'date:Y-m-d',
+        'expected_delivery' => 'date:Y-m-d',
+        'communication_recorded_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'quantity_dispensed' => 'decimal:2',
         'quantity_ordered' => 'integer',
         'quantity_received' => 'decimal:2',
     ];

@@ -12,6 +12,7 @@ use App\Domain\Monitoring\Models\MonitoringProfile;
 use App\Domain\Monitoring\Presenters\MonitoringIncidentEvidencePresenter;
 use App\Domain\Monitoring\Services\MonitoringIssueEpisode;
 use App\Domain\Monitoring\Services\MonitoringObservationIngestor;
+use App\Domain\Monitoring\Services\MonitoringPolicyAuthoringService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Domain\SecurityDevices\Models\DeviceEvent;
@@ -35,6 +36,7 @@ use App\Models\User;
 use App\Services\ControlRoom\AlertWorkspaceService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\SecurityDevicesSignalSeeder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -222,7 +224,7 @@ test('maintenance suppression retains the episode and a confirmed healthy observ
     $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
     deliverEpisodeSource($failure);
     $originalKey = MonitoringIssueEpisode::fromEvent($failure)['key'];
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated maintenance',
         'reason' => 'Isolated episode recovery verification',
         'starts_at' => now()->addSeconds(2), 'ends_at' => now()->addHour(),
@@ -242,7 +244,7 @@ test('resuming a still-failed monitor after maintenance reuses its episode beyon
     [$monitor, $site] = episodeMonitor();
     $failure = episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent;
     deliverEpisodeSource($failure);
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated long maintenance',
         'reason' => 'Isolated episode continuity verification',
         'starts_at' => now()->addSeconds(2), 'ends_at' => now()->addHours(2),
@@ -471,7 +473,7 @@ test('technical checks retain confirmation and maintenance suppression before au
     expect(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent)->toBeNull();
     $failure = episodeObservation($monitor, $site, MonitorState::Failed, 2)->deviceEvent;
     deliverEpisodeSource($failure);
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated check maintenance',
         'reason' => 'Confirm suppression', 'starts_at' => now()->addSeconds(3), 'ends_at' => now()->addSeconds(6),
         'timezone' => 'UTC', 'policy' => 'suppress_notifications_and_ticketing', 'status' => 'active',
@@ -814,7 +816,7 @@ test('resumed evidence for a settled episode does not create or reopen technical
     deliverEpisodeSource(episodeObservation($monitor, $site, MonitorState::Failed, 1)->deviceEvent);
     $ticket = ItTicket::query()->sole();
     $ticket->update(['status' => 'closed', 'status_reason' => null, 'closed_at' => now()]);
-    MonitoringMaintenanceWindow::query()->create([
+    episodeMaintenance([
         'site_id' => $site->id, 'monitor_id' => $monitor->id, 'name' => 'Isolated settled-episode maintenance',
         'reason' => 'Verify retained settled work', 'starts_at' => now()->addSeconds(2), 'ends_at' => now()->addSeconds(5),
         'timezone' => 'UTC', 'policy' => 'suppress_notifications_and_ticketing', 'status' => 'active',
@@ -861,3 +863,13 @@ test('conflicting rule type identifiers cannot authorize bypassing operational c
     expect(ControlRoomAlert::query()->count())->toBe(1)->and($outbox->it_scope['work_routing']['destination'])->toBe('control_room')
         ->and($outbox->it_scope['work_routing']['rule_id'])->toBeNull();
 });
+
+/** Author actual versioned maintenance; direct rows are explicitly unverified legacy history. */
+function episodeMaintenance(array $values): MonitoringMaintenanceWindow
+{
+    DB::table('monitoring_policy_history_epochs')->where('owner', 'maintenance')->update(['started_at' => now()->subDay()]);
+
+    return app(MonitoringPolicyAuthoringService::class)->createMaintenanceWindow(
+        User::factory()->create(), Arr::except($values, ['policy', 'status']),
+    );
+}

@@ -1,5 +1,5 @@
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
-    PageHeader,
     PageHeaderFilterButton,
     PageHeaderGlassButton,
     PageHeaderMeterBig,
@@ -7,13 +7,13 @@ import {
     PageHeaderMeterCaption,
     PageHeaderMeterDonut,
     PageHeaderPrimaryButton,
-    PageHeaderRail,
     type PageHeaderRailItem,
     PageHeaderSearch,
     PageHeaderStatusChip,
     PageLayout,
 } from '@/components/page';
 import {
+    addDaysWP,
     AnalyticsPane,
     type AnalyticsTrendPoint,
     type AvailabilityLeaveRequest,
@@ -25,12 +25,11 @@ import {
     CapacityHeatmapPane,
     CopyToDayDialog,
     type CopyToDayShift,
-    type CoverageCellState,
     CoveragePane,
-    type CoverageRow,
     EntityFilter,
     type EntityFilterOption,
     type FillBySite,
+    formatWeekRange,
     type GridConflictPeer,
     type GridShift,
     type GridShiftStatus,
@@ -58,27 +57,36 @@ import {
     type Signal,
     SignalRail,
     SiteFilter,
-    TemplateDetailDialog,
-    TemplateWizardDialog,
-    TemplatesPane,
+    startOfWeek,
     TimeOffPane,
     type TimeOffRequest,
     UnassignMakeOpenDialog,
     type UnassignMakeOpenShift,
     WeekGridPane,
-    WeekPicker,
-    addDaysWP,
-    formatWeekRange,
-    startOfWeek,
     weekLabel,
+    WeekPicker,
 } from '@/components/rostering';
+import {
+    type EligibilityObservation,
+    EligibilityRefreshPanel,
+} from '@/components/rostering/eligibility-refresh-panel';
+import { rosterShiftListUrl } from '@/components/rostering/roster-shift-list-url';
+import {
+    type RosterView,
+    RosterWorkspaceRail,
+    RosterWorkspaceViewSelect,
+} from '@/components/rostering/roster-workspace-navigation';
+import { TemplateLibrary } from '@/components/rostering/template-library';
+import { TEMPLATE_READ_KEYS } from '@/components/rostering/use-template-command';
 import ViewTimesheetDialog, {
     type ViewTimesheetRow,
 } from '@/components/timesheets/view-timesheet-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { WorkforcePageHeader } from '@/components/workforce/workforce-page-header';
 import AppLayout from '@/layouts/app-layout';
+import { formatDateTime, formatTime, WORKER_TIMEZONE } from '@/lib/datetime';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -100,7 +108,7 @@ import {
     Wand2,
 } from 'lucide-react';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
     CreateShiftDialog,
     type EditableShift,
@@ -279,7 +287,19 @@ type ComplianceBadge = {
 };
 
 type Props = {
+    eligibilityFreshness?: Record<string, EligibilityObservation>;
+    workforcePreferences?: {
+        default_tab: 'shifts' | 'calendar';
+        roster_view: 'grid' | 'list';
+        revision: string;
+    };
     canManageAny: boolean;
+    workerTimezone?: string;
+    availabilityCapabilities?: {
+        view_any: boolean;
+        update_any: boolean;
+        update_self: boolean;
+    };
     canApproveLeave: boolean;
     canPublishRoster: boolean;
     canAutoScheduleRoster: boolean;
@@ -412,17 +432,7 @@ type Props = {
     >;
 };
 
-type RosterTab =
-    | 'shifts'
-    | 'calendar'
-    | 'open'
-    | 'coverage'
-    | 'timeoff'
-    | 'availability'
-    | 'capacity'
-    | 'analytics'
-    | 'templates'
-    | 'recurring';
+type RosterTab = RosterView;
 
 const ROSTER_TABS: RosterTab[] = [
     'shifts',
@@ -443,23 +453,26 @@ function isRosterTab(value: unknown): value is RosterTab {
     );
 }
 
-function initialRosterTab(): RosterTab {
+function initialRosterTab(
+    defaultTab: 'shifts' | 'calendar' = 'shifts',
+): RosterTab {
     if (typeof window === 'undefined') {
-        return 'shifts';
+        return defaultTab;
     }
 
     const requested = new URLSearchParams(window.location.search).get('tab');
-    return isRosterTab(requested) ? requested : 'shifts';
+    return isRosterTab(requested) ? requested : defaultTab;
 }
 
+// Shift types are categories, not severities: use the chart palette, never
+// the status (safety) colours or fixed hex values.
 const SHIFT_TYPE_COLORS = [
-    'var(--primary)',
-    'var(--status-info)',
-    'var(--status-success)',
-    'var(--status-warning)',
-    'var(--status-critical)',
-    '#06b6d4',
-    '#94a3b8',
+    'var(--chart-1)',
+    'var(--chart-2)',
+    'var(--chart-3)',
+    'var(--chart-4)',
+    'var(--chart-5)',
+    'var(--muted-foreground)',
 ];
 
 function ymd(d: Date) {
@@ -540,8 +553,102 @@ function rangesOverlap(aS: string, aE: string, bS: string, bE: string) {
     return new Date(aS) < new Date(bE) && new Date(bS) < new Date(aE);
 }
 
+// Grid/calendar shift actions that ask first. Each kind has its own copy,
+// checked against ShiftController (cancelOccurrence → ShiftCancellationService,
+// duplicate, autoFill, publishShift, reopenOccurrence → ShiftLifecycleService).
+type PendingShiftAction = {
+    kind: 'cancel' | 'duplicate' | 'autoFill' | 'publish' | 'reopen';
+    shift: GridShift;
+};
+
+function shiftConfirmCopy({ kind, shift }: PendingShiftAction): {
+    title: string;
+    description: ReactNode;
+    confirmText: string;
+    cancelText?: string;
+    variant: 'destructive' | 'default';
+} {
+    const staff = shift.staff?.trim() || null;
+    const summary = [
+        `${formatDateTime(shift.starts_at)} – ${formatTime(shift.ends_at)}`,
+        shift.client,
+        staff,
+    ]
+        .filter(Boolean)
+        .join(' · ');
+    const body = (...lines: string[]) => (
+        <div className="space-y-2">
+            <p className="font-medium text-foreground">{summary}</p>
+            {lines.map((line) => (
+                <p key={line}>{line}</p>
+            ))}
+        </div>
+    );
+
+    switch (kind) {
+        case 'cancel':
+            return {
+                title: 'Cancel this shift?',
+                description: body(
+                    'The shift comes off the roster. Any cover request for it is closed, a timesheet that isn’t approved yet is sent back, and linked medication and transport records are flagged for review.',
+                    `${staff ? `${staff} isn’t sent a notification, so let them know. ` : ''}Anyone due to take a handover from this shift is told. You can reopen the shift later.`,
+                ),
+                confirmText: 'Cancel shift',
+                cancelText: 'Keep shift',
+                variant: 'destructive',
+            };
+        case 'duplicate':
+            return {
+                title: 'Duplicate this shift?',
+                description: body(
+                    'A copy is added at the same time as an unassigned draft, with the same tasks. Nobody is notified.',
+                ),
+                confirmText: 'Duplicate shift',
+                variant: 'default',
+            };
+        case 'autoFill':
+            return {
+                title: 'Auto-fill this open shift?',
+                description: body(
+                    'The first staff member, in name order, who can work this shift with no eligibility warnings is assigned to it. They aren’t sent a notification.',
+                    'If only staff with warnings are available, nobody is assigned and you can choose someone yourself.',
+                ),
+                confirmText: 'Auto-fill shift',
+                variant: 'default',
+            };
+        case 'publish':
+            return {
+                title: 'Publish this shift?',
+                description: staff
+                    ? body(
+                          `${staff} will see it in their roster. Nobody is sent a notification.`,
+                          'If they have eligibility warnings for this shift, publishing records that you accepted those warnings.',
+                      )
+                    : body(
+                          'It’s published as an open shift, ready for someone to be assigned. Nobody is sent a notification.',
+                      ),
+                confirmText: 'Publish shift',
+                variant: 'default',
+            };
+        case 'reopen':
+            return {
+                title: 'Reopen this shift?',
+                description: body(
+                    staff
+                        ? `It goes back on the roster with ${staff} still assigned, so check they can still work it. Nobody is notified.`
+                        : 'It goes back on the roster as an unassigned draft. Nobody is notified.',
+                    'Anything changed when it was cancelled, such as a returned timesheet or a closed cover request, stays as it is.',
+                ),
+                confirmText: 'Reopen shift',
+                variant: 'default',
+            };
+    }
+}
+
 export default function RosteringIndex(props: Props) {
-    const { auth } = usePage().props as {
+    const conflictQueueHref = `/operations/rostering/conflicts?week=${encodeURIComponent(props.weekStart)}`;
+    const rosterPage = usePage();
+    const { auth } = rosterPage.props as {
         auth?: { user?: { name?: string }; can?: any };
     };
     const canViewOperationsReports = Boolean(
@@ -564,7 +671,22 @@ export default function RosteringIndex(props: Props) {
         [weekStartDate],
     );
 
-    const [tab, setTab] = useState<RosterTab>(() => initialRosterTab());
+    const [tab, setTab] = useState<RosterTab>(() =>
+        initialRosterTab(props.workforcePreferences?.default_tab),
+    );
+    const tabRequest = useRef<{ cancel: () => void } | null>(null);
+    useEffect(() => () => tabRequest.current?.cancel(), []);
+    useEffect(() => {
+        const requested = new URL(
+            rosterPage.url,
+            'http://local',
+        ).searchParams.get('tab');
+        setTab(
+            isRosterTab(requested)
+                ? requested
+                : (props.workforcePreferences?.default_tab ?? 'shifts'),
+        );
+    }, [rosterPage.url, props.workforcePreferences?.default_tab]);
     const [pickerOpen, setPickerOpen] = useState(false);
     // Header scoped search — narrows the week grid's staff/site rows.
     const [gridSearch, setGridSearch] = useState('');
@@ -589,6 +711,12 @@ export default function RosteringIndex(props: Props) {
     const [reassignShift, setReassignShift] = useState<ReassignShift | null>(
         null,
     );
+    // The action stays set after the dialog closes so its copy doesn't blank
+    // out while the dialog fades away; `shiftConfirmOpen` drives visibility.
+    const [pendingShiftAction, setPendingShiftAction] =
+        useState<PendingShiftAction | null>(null);
+    const [shiftConfirmOpen, setShiftConfirmOpen] = useState(false);
+    const [shiftActionBusy, setShiftActionBusy] = useState(false);
     const [requestReplacementShift, setRequestReplacementShift] =
         useState<RequestReplacementShift | null>(null);
     const [unassignMakeOpenShift, setUnassignMakeOpenShift] =
@@ -607,18 +735,6 @@ export default function RosteringIndex(props: Props) {
     }>({});
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const [loadingTemplates, setLoadingTemplates] = useState(false);
-    // Template pop-ups: the wizard (create/edit) and the detail/apply dialog.
-    const [templateWizard, setTemplateWizard] = useState<{
-        mode: 'create' | 'edit';
-        template: RosterTemplateRow | null;
-    } | null>(null);
-    const [detailTemplate, setDetailTemplate] =
-        useState<RosterTemplateRow | null>(null);
-    // rosterTemplates is a lazy Inertia prop — week/filter navigations drop it.
-    // Cache the last loaded list so the tab doesn't blank on those visits.
-    const [cachedTemplates, setCachedTemplates] = useState<
-        RosterTemplateRow[] | null
-    >(props.rosterTemplates ?? null);
     // Recurring series tab — same lazy-prop caching as templates.
     const [loadingSeries, setLoadingSeries] = useState(false);
     const [detailSeriesId, setDetailSeriesId] = useState<number | null>(() => {
@@ -634,9 +750,6 @@ export default function RosteringIndex(props: Props) {
         useState<SeriesDetail | null>(props.seriesDetail ?? null);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
-    useEffect(() => {
-        if (props.rosterTemplates) setCachedTemplates(props.rosterTemplates);
-    }, [props.rosterTemplates]);
     useEffect(() => {
         if (props.rosterSeries) setCachedSeries(props.rosterSeries);
     }, [props.rosterSeries]);
@@ -733,7 +846,7 @@ export default function RosteringIndex(props: Props) {
             // Keep the active tab in the URL across filter/week navigations so
             // a refresh (or share) after filtering doesn't bounce to Shifts.
             // Callers that switch tabs (handleTabChange) override this key.
-            ...(tab !== 'shifts' ? { tab } : {}),
+            tab,
         };
     };
 
@@ -742,6 +855,30 @@ export default function RosteringIndex(props: Props) {
             return;
         }
 
+        // A late lazy-tab response must not restore a view the user has left.
+        tabRequest.current?.cancel();
+        tabRequest.current = null;
+        // Availability has different staff/site pickers and deliberately omits
+        // historical trends and candidate eligibility. A complete read on either
+        // boundary restores the destination's authoritative data before showing
+        // it; an empty skipped map must never mean an eligible candidate.
+        if (next === 'availability' || tab === 'availability') {
+            if (next === 'availability') setLoadingAvailability(true);
+            router.get(
+                rosteringIndex.url(),
+                { ...filterPayload(), tab: next },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onCancelToken: (token) => {
+                        tabRequest.current = token;
+                    },
+                    onFinish: () => setLoadingAvailability(false),
+                },
+            );
+            return;
+        }
         setTab(next);
 
         if (next === 'templates' && !props.rosterTemplates) {
@@ -750,10 +887,13 @@ export default function RosteringIndex(props: Props) {
                 rosteringIndex.url(),
                 { ...filterPayload(), tab: 'templates' },
                 {
-                    only: ['rosterTemplates'],
+                    only: TEMPLATE_READ_KEYS,
                     preserveState: true,
                     preserveScroll: true,
                     replace: true,
+                    onCancelToken: (token) => {
+                        tabRequest.current = token;
+                    },
                     onFinish: () => setLoadingTemplates(false),
                 },
             );
@@ -770,28 +910,24 @@ export default function RosteringIndex(props: Props) {
                     preserveState: true,
                     preserveScroll: true,
                     replace: true,
+                    onCancelToken: (token) => {
+                        tabRequest.current = token;
+                    },
                     onFinish: () => setLoadingSeries(false),
                 },
             );
             return;
         }
 
-        if (next !== 'availability' || props.staffAvailabilitySummary) {
-            return;
-        }
-
-        setLoadingAvailability(true);
-        router.get(
-            rosteringIndex.url(),
-            { ...filterPayload(), tab: 'availability' },
-            {
-                only: ['staffAvailabilitySummary'],
-                preserveState: true,
-                preserveScroll: true,
-                replace: true,
-                onFinish: () => setLoadingAvailability(false),
-            },
-        );
+        const destination = new URL(rosterPage.url, window.location.origin);
+        destination.searchParams.set('tab', next);
+        // Explicitly retain Shifts too: removing it would reapply the user's
+        // saved starting view on refresh instead of their current choice.
+        router.replace({
+            url: destination.pathname + destination.search,
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     // Open a recurring series in the detail pop-up; lazy-loads its full payload.
@@ -1031,6 +1167,7 @@ export default function RosteringIndex(props: Props) {
 
     // -------- Top-level stats / breakdowns for hero + donut cards --------
     const total = props.stats.total;
+    const activeShiftCount = Math.max(0, total - props.stats.cancelled);
     const openCount = props.stats.open;
     const coverageRate = Math.max(0, Math.round(props.analytics.coverageRate));
     const staffRostered = props.analytics.staffRostered;
@@ -1105,11 +1242,10 @@ export default function RosteringIndex(props: Props) {
         },
     ].filter((s) => s.value > 0);
 
-    const totalWindows =
-        (props.coverageSites ?? []).reduce(
-            (acc, s) => acc + s.total_windows,
-            0,
-        ) || 1;
+    const totalWindows = (props.coverageSites ?? []).reduce(
+        (acc, s) => acc + s.total_windows,
+        0,
+    );
     const underWindows = (props.coverageSites ?? []).reduce(
         (acc, s) => acc + s.under_covered_windows,
         0,
@@ -1293,76 +1429,25 @@ export default function RosteringIndex(props: Props) {
         },
     ];
 
-    // -------- Coverage pane --------
-    const coverageWindowLabels = ['AM 07–15', 'PM 15–23', 'Night 23–07'];
-    const coverageRows: CoverageRow[] = useMemo(() => {
-        return (props.coverageSites ?? []).map((site) => {
-            const buckets: Array<{
-                label: 'AM 07–15' | 'PM 15–23' | 'Night 23–07';
-                cells: CoverageAlert[];
-            }> = [
-                { label: 'AM 07–15', cells: [] },
-                { label: 'PM 15–23', cells: [] },
-                { label: 'Night 23–07', cells: [] },
-            ];
-            for (const a of site.alerts ?? []) {
-                if (!a.starts_at) continue;
-                const h = new Date(a.starts_at).getHours();
-                if (h >= 7 && h < 15) buckets[0].cells.push(a);
-                else if (h >= 15 && h < 23) buckets[1].cells.push(a);
-                else buckets[2].cells.push(a);
-            }
-            const windows = buckets.map((b) => {
-                if (b.cells.length === 0) {
-                    return {
-                        state: 'ok' as CoverageCellState,
-                        label: '—',
-                        sub: 'No alerts',
-                    };
-                }
-                const worst = b.cells.reduce(
-                    (max, a) => (a.missing_staff > max.missing_staff ? a : max),
-                    b.cells[0],
-                );
-                const state: CoverageCellState =
-                    worst.missing_staff <= 0
-                        ? 'ok'
-                        : worst.coverage_state === 'gap'
-                          ? 'gap'
-                          : 'partial';
-                return {
-                    state,
-                    label: `${worst.assigned_staff}/${worst.required_staff}`,
-                    sub: worst.window_label,
-                };
-            });
-            return {
-                site: site.site_name,
-                windows,
-            };
-        });
-    }, [props.coverageSites]);
-
+    // -------- Coverage pane: exact configured-window totals --------
     const coverageStats: MicroStat[] = [
+        { label: 'Windows assessed', value: totalWindows, tone: 'info' },
         {
-            label: 'Coverage rate',
-            value: coverageRate,
-            suffix: '%',
+            label: 'Under-covered windows',
+            value: underWindows,
+            tone: underWindows > 0 ? 'warn' : 'info',
+        },
+        {
+            label: 'At required staff number',
+            value: exactWindows,
             tone: 'info',
         },
-        { label: 'Windows tracked', value: totalWindows, tone: 'info' },
         {
-            label: 'Partial windows',
-            value: Math.max(0, underWindows - (props.stats.coverage_gaps ?? 0)),
-            tone: 'warn',
-        },
-        {
-            label: 'Hard gaps',
-            value: props.stats.coverage_gaps ?? 0,
-            tone: 'crit',
+            label: 'Above required staff number',
+            value: overWindows,
+            tone: 'info',
         },
     ];
-
     // -------- Time off pane --------
     // Two streams combined:
     //   1. StaffTimeOff blocks (props.timeOffs) — self-managed one-off unavailability,
@@ -1568,48 +1653,53 @@ export default function RosteringIndex(props: Props) {
     ];
 
     // -------- Analytics pane --------
-    const trendPoints: AnalyticsTrendPoint[] = (
-        props.analytics?.historicalTrend ?? []
-    ).map((p) => ({
-        week: p.week,
-        coverage: p.total
-            ? Math.max(80, Math.round((p.completed / p.total) * 100))
-            : 95,
+    const history = props.analytics?.historicalTrend ?? [];
+    const historicalTotal = history.reduce(
+        (sum, point) => sum + point.total,
+        0,
+    );
+    const historicalCompleted = history.reduce(
+        (sum, point) => sum + point.completed,
+        0,
+    );
+    const trendPoints: AnalyticsTrendPoint[] = history.map((point) => ({
+        week: point.week,
+        completion:
+            point.total > 0
+                ? Math.round((point.completed / point.total) * 100)
+                : null,
     }));
     const shiftTypeSlices: ShiftTypeSlice[] = (
         props.analytics?.shiftTypeDistribution ?? []
     )
-        .filter((t) => t.value > 0)
-        .map((t, i) => ({
-            key: t.type,
-            label: t.type.replace(/_/g, ' '),
-            value: t.value,
-            color: SHIFT_TYPE_COLORS[i % SHIFT_TYPE_COLORS.length],
+        .filter((type) => type.value > 0)
+        .map((type, index) => ({
+            key: type.type,
+            label: type.type.replace(/_/g, ' '),
+            value: type.value,
+            color: SHIFT_TYPE_COLORS[index % SHIFT_TYPE_COLORS.length],
         }));
-    const fillBySite: FillBySite[] = (props.coverageSites ?? []).map((s) => {
-        const rate = s.total_windows
-            ? Math.round(
-                  ((s.exact_windows + s.overstaffed_windows) /
-                      s.total_windows) *
-                      100,
-              )
-            : 100;
-        return { site: s.site_name, rate };
-    });
-    const overtimeTrend: number[] = (
-        props.analytics?.historicalTrend ?? []
-    ).map((p) => Math.max(0, Math.round(p.total * 0.05 + (p.cancelled ?? 0))));
+    const fillBySite: FillBySite[] = (props.coverageSites ?? [])
+        .filter((site) => site.total_windows > 0)
+        .map((site) => ({
+            site: site.site_name,
+            rate: Math.round(
+                ((site.exact_windows + site.overstaffed_windows) /
+                    site.total_windows) *
+                    100,
+            ),
+        }));
+    // No recorded-hours overtime series is supplied by this endpoint.
+    const overtimeTrend: number[] = [];
     const analyticsStats: MicroStat[] = [
         {
-            label: 'Avg coverage · 8w',
-            value: trendPoints.length
-                ? Math.round(
-                      trendPoints.reduce((s, p) => s + p.coverage, 0) /
-                          trendPoints.length,
-                  )
-                : coverageRate,
-            suffix: '%',
-            tone: 'ok',
+            label: `Completed · ${trendPoints.length} weeks`,
+            value:
+                historicalTotal > 0
+                    ? Math.round((historicalCompleted / historicalTotal) * 100)
+                    : '—',
+            suffix: historicalTotal > 0 ? '%' : undefined,
+            tone: 'info',
         },
         {
             label: 'Staff rostered',
@@ -1641,7 +1731,7 @@ export default function RosteringIndex(props: Props) {
         [props.capacity],
     );
 
-    const signals: Signal[] = useMemo(() => {
+    const signals: Signal[] = (() => {
         const list: Signal[] = [];
         if (openCount > 0) {
             list.push({
@@ -1649,16 +1739,16 @@ export default function RosteringIndex(props: Props) {
                 title: `${openCount} open shift${openCount === 1 ? '' : 's'}`,
                 body: 'Need cover this week — assign from eligible staff.',
                 cta: 'Review open shifts',
-                onClick: () => setTab('open'),
+                onClick: () => handleTabChange('open'),
             });
         }
         if ((props.stats.coverage_gaps ?? 0) > 0) {
             list.push({
                 tone: 'critical',
-                title: `${props.stats.coverage_gaps} coverage gap${(props.stats.coverage_gaps ?? 0) === 1 ? '' : 's'}`,
-                body: 'Hard gaps where demand exceeds supply.',
+                title: `${props.stats.coverage_gaps} coverage alert${(props.stats.coverage_gaps ?? 0) === 1 ? '' : 's'}`,
+                body: 'Returned coverage windows need review.',
                 cta: 'View coverage',
-                onClick: () => setTab('coverage'),
+                onClick: () => handleTabChange('coverage'),
             });
         }
         if (props.stats.staff_overlaps > 0) {
@@ -1667,7 +1757,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${props.stats.staff_overlaps} staff overlap${props.stats.staff_overlaps === 1 ? '' : 's'}`,
                 body: 'Resolve double-bookings in the Conflict queue.',
                 cta: 'Open conflicts',
-                href: '/operations/rostering/conflicts',
+                href: conflictQueueHref,
             });
         }
         if (props.stats.client_overlaps > 0) {
@@ -1676,7 +1766,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${props.stats.client_overlaps} client overlap${props.stats.client_overlaps === 1 ? '' : 's'}`,
                 body: 'Client double-booked — adjust times or staff.',
                 cta: 'Open conflicts',
-                href: '/operations/rostering/conflicts',
+                href: conflictQueueHref,
             });
         }
         if (props.stats.incidents > 0) {
@@ -1703,7 +1793,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${eligibleCounts.blocked} blocked candidate${eligibleCounts.blocked === 1 ? '' : 's'}`,
                 body: 'Eligibility rules blocking auto-assignment.',
                 cta: 'View open shifts',
-                onClick: () => setTab('open'),
+                onClick: () => handleTabChange('open'),
             });
         }
         const driftCount =
@@ -1715,7 +1805,7 @@ export default function RosteringIndex(props: Props) {
                 title: `${driftCount} recurring pattern${driftCount === 1 ? '' : 's'} drifting`,
                 body: 'Coverage rules and recurring series are out of sync.',
                 cta: 'View coverage',
-                onClick: () => setTab('coverage'),
+                onClick: () => handleTabChange('coverage'),
             });
         }
         const recurringCount = props.recurringPatterns?.length ?? 0;
@@ -1732,7 +1822,7 @@ export default function RosteringIndex(props: Props) {
                         ? `${recurringOpen} recurring occurrence${recurringOpen === 1 ? '' : 's'} still need cover.`
                         : 'Recurring patterns are generating this week.',
                 cta: 'Open recurring series',
-                href: '/operations/rostering?tab=recurring',
+                onClick: () => handleTabChange('recurring'),
             });
         }
         const expired = props.analytics?.complianceExpired ?? 0;
@@ -1746,14 +1836,7 @@ export default function RosteringIndex(props: Props) {
             });
         }
         return list;
-    }, [
-        openCount,
-        props.stats,
-        eligibleCounts,
-        props.recurringCoverageAlignment,
-        props.recurringPatterns,
-        props.analytics?.complianceExpired,
-    ]);
+    })();
 
     // -------- Publish ---------
     const publishBlockCount =
@@ -1858,25 +1941,76 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
-    const cancelShift = (shiftId: number) => {
-        if (!window.confirm('Cancel this shift?')) return;
-        // Route is PATCH /operations/shifts/{shift}/cancel — operations.shifts.cancel.
-        router.patch(
-            `/operations/shifts/${shiftId}/cancel`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
-        );
+    // Cancel, duplicate, auto-fill, publish and reopen each only open the
+    // shared confirmation below; the request is sent from its confirm button.
+    const askShiftAction = (
+        kind: PendingShiftAction['kind'],
+        shift: GridShift,
+    ) => {
+        setPendingShiftAction({ kind, shift });
+        setShiftConfirmOpen(true);
     };
+    const cancelShift = (shift: GridShift) => askShiftAction('cancel', shift);
+    const duplicateShift = (shift: GridShift) =>
+        askShiftAction('duplicate', shift);
+    const autoFillShift = (shift: GridShift) =>
+        askShiftAction('autoFill', shift);
+    const publishShift = (shift: GridShift) => askShiftAction('publish', shift);
+    const reopenShift = (shift: GridShift) => askShiftAction('reopen', shift);
 
-    const duplicateShift = (shiftId: number) => {
-        if (!window.confirm('Duplicate this shift as an unassigned draft?'))
-            return;
-        router.post(
-            `/operations/shifts/${shiftId}/duplicate`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
-        );
+    const runPendingShiftAction = () => {
+        if (pendingShiftAction === null) return;
+        const { kind, shift } = pendingShiftAction;
+        const options = {
+            preserveScroll: true,
+            onStart: () => setShiftActionBusy(true),
+            onFinish: () => {
+                setShiftActionBusy(false);
+                setShiftConfirmOpen(false);
+            },
+        };
+        switch (kind) {
+            case 'cancel':
+                // Route is PATCH /operations/shifts/{shift}/cancel — operations.shifts.cancel.
+                router.patch(
+                    `/operations/shifts/${shift.id}/cancel`,
+                    { return_to: '/operations/rostering' },
+                    options,
+                );
+                return;
+            case 'duplicate':
+                router.post(
+                    `/operations/shifts/${shift.id}/duplicate`,
+                    { return_to: '/operations/rostering' },
+                    options,
+                );
+                return;
+            case 'autoFill':
+                router.post(
+                    `/operations/shifts/${shift.id}/auto-fill`,
+                    { return_to: '/operations/rostering' },
+                    options,
+                );
+                return;
+            case 'publish':
+                router.patch(
+                    `/operations/shifts/${shift.id}/publish`,
+                    {},
+                    options,
+                );
+                return;
+            case 'reopen':
+                router.patch(
+                    `/operations/shifts/${shift.id}/reopen`,
+                    {},
+                    options,
+                );
+                return;
+        }
     };
+    const shiftConfirm = pendingShiftAction
+        ? shiftConfirmCopy(pendingShiftAction)
+        : null;
 
     const openEditShift = async (shift: GridShift) => {
         setEditShiftError(null);
@@ -1977,33 +2111,10 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
-    const autoFillShift = (shiftId: number) => {
-        if (
-            !window.confirm(
-                'Auto-fill this open shift with the best-match eligible staff?',
-            )
-        )
-            return;
-        router.post(
-            `/operations/shifts/${shiftId}/auto-fill`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
-        );
-    };
-
     const reopenCompletedShift = (shiftId: number, reason: string) => {
         router.patch(
             `/operations/shifts/${shiftId}/reopen`,
             { reason },
-            { preserveScroll: true },
-        );
-    };
-
-    const publishShift = (shiftId: number) => {
-        if (!window.confirm('Publish this draft shift?')) return;
-        router.patch(
-            `/operations/shifts/${shiftId}/publish`,
-            {},
             { preserveScroll: true },
         );
     };
@@ -2043,20 +2154,6 @@ export default function RosteringIndex(props: Props) {
                 preserveScroll: true,
                 onSuccess: () => setRequestReplacementShift(null),
             },
-        );
-    };
-
-    const reopenShift = (shiftId: number) => {
-        if (
-            !window.confirm(
-                'Reopen this cancelled shift and restore it to planning?',
-            )
-        )
-            return;
-        router.patch(
-            `/operations/shifts/${shiftId}/reopen`,
-            {},
-            { preserveScroll: true },
         );
     };
 
@@ -2135,7 +2232,7 @@ export default function RosteringIndex(props: Props) {
             label: 'Templates',
             icon: LayoutTemplate,
             tone: 'violet' as const,
-            badge: cachedTemplates?.length,
+            badge: props.rosterTemplates?.length,
         },
         {
             id: 'recurring',
@@ -2174,7 +2271,12 @@ export default function RosteringIndex(props: Props) {
 
     const railItems: PageHeaderRailItem<RosterTab>[] = tabItems.map((item) => ({
         key: item.id as RosterTab,
-        label: item.label,
+        label:
+            item.id === 'coverage'
+                ? activeShiftCount > 0
+                    ? `${item.label} · ${coverageRate}% of shifts assigned`
+                    : `${item.label} · No active shifts`
+                : item.label,
         icon: item.icon,
         count:
             typeof (item as { badge?: unknown }).badge === 'number'
@@ -2202,13 +2304,73 @@ export default function RosteringIndex(props: Props) {
                 {curLab} {props.rosterPeriod.status.replace(/_/g, ' ')}
             </PageHeaderStatusChip>
         ) : (
-            <PageHeaderStatusChip variant="success">
-                On track
+            <PageHeaderStatusChip variant="neutral">
+                Week overview
             </PageHeaderStatusChip>
         );
 
+    const headerPrimaryAction =
+        props.rosteringFeatures.publish && props.canPublishRoster ? (
+            <PageHeaderPrimaryButton
+                icon={CheckCircle2}
+                disabled={
+                    !props.rosterPeriod ||
+                    publishBlockCount > 0 ||
+                    props.rosterPeriod.status === 'archived'
+                }
+                title={
+                    !props.rosterPeriod
+                        ? 'Pick a site to publish its week'
+                        : publishBlockCount > 0
+                          ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
+                          : undefined
+                }
+                className="disabled:pointer-events-none disabled:opacity-50"
+                onClick={() =>
+                    postPeriodAction(canRepublish ? 'republish' : 'publish')
+                }
+                data-test="rostering-confirm-publish"
+                data-testid="rostering-confirm-publish"
+            >
+                {canRepublish ? 'Re-publish' : 'Publish week'}
+            </PageHeaderPrimaryButton>
+        ) : null;
+    const headerSecondaryActions = (
+        <>
+            <PageHeaderSearch
+                value={gridSearch}
+                onChange={setGridSearch}
+                placeholder="Search staff and sites…"
+            />
+            <PageHeaderGlassButton
+                icon={AlertTriangle}
+                aria-label="Conflict queue"
+                title="Conflict queue for this week"
+                onClick={() => router.visit(conflictQueueHref)}
+            />
+            {props.rosteringFeatures.auto_schedule &&
+            props.canAutoScheduleRoster ? (
+                <PageHeaderGlassButton
+                    icon={Wand2}
+                    disabled={!props.filters.site_id}
+                    title={
+                        !props.filters.site_id
+                            ? 'Pick a site before generating suggestions'
+                            : undefined
+                    }
+                    className="disabled:pointer-events-none disabled:opacity-50"
+                    onClick={generateSuggestions}
+                    data-test="rostering-suggest-assignments"
+                    data-testid="rostering-suggest-assignments"
+                >
+                    Auto-schedule
+                </PageHeaderGlassButton>
+            ) : null}
+        </>
+    );
+
     const header = (
-        <PageHeader
+        <WorkforcePageHeader
             icon={CalendarDays}
             title="Rostering"
             titleChip={titleChip}
@@ -2219,84 +2381,33 @@ export default function RosteringIndex(props: Props) {
             } on leave`}
             actions={
                 <>
-                    <PageHeaderSearch
-                        value={gridSearch}
-                        onChange={setGridSearch}
-                        placeholder="Search staff and sites…"
-                    />
-                    <PageHeaderGlassButton
-                        icon={AlertTriangle}
-                        aria-label="Conflict queue"
-                        title="Conflict queue"
-                        onClick={() =>
-                            router.visit('/operations/rostering/conflicts')
-                        }
-                    />
-                    {props.rosteringFeatures.auto_schedule &&
-                    props.canAutoScheduleRoster ? (
-                        <PageHeaderGlassButton
-                            icon={Wand2}
-                            disabled={!props.filters.site_id}
-                            title={
-                                !props.filters.site_id
-                                    ? 'Pick a site before generating suggestions'
-                                    : undefined
-                            }
-                            className="disabled:pointer-events-none disabled:opacity-50"
-                            onClick={generateSuggestions}
-                            data-test="rostering-suggest-assignments"
-                            data-testid="rostering-suggest-assignments"
-                        >
-                            Auto-schedule
-                        </PageHeaderGlassButton>
-                    ) : null}
-                    {props.rosteringFeatures.publish &&
-                    props.canPublishRoster ? (
-                        <PageHeaderPrimaryButton
-                            icon={CheckCircle2}
-                            disabled={
-                                !props.rosterPeriod ||
-                                publishBlockCount > 0 ||
-                                props.rosterPeriod.status === 'archived'
-                            }
-                            title={
-                                !props.rosterPeriod
-                                    ? 'Pick a site to publish its week'
-                                    : publishBlockCount > 0
-                                      ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
-                                      : undefined
-                            }
-                            className="disabled:pointer-events-none disabled:opacity-50"
-                            onClick={() =>
-                                postPeriodAction(
-                                    canRepublish ? 'republish' : 'publish',
-                                )
-                            }
-                            data-test="rostering-confirm-publish"
-                            data-testid="rostering-confirm-publish"
-                        >
-                            {canRepublish ? 'Re-publish' : 'Publish week'}
-                        </PageHeaderPrimaryButton>
-                    ) : null}
+                    {headerSecondaryActions}
+                    {headerPrimaryAction}
                 </>
             }
+            mobilePrimaryAction={headerPrimaryAction}
+            mobileSecondaryActions={headerSecondaryActions}
+            mobileSummary={`${range.startLabel} → ${range.endLabel}`}
             meters={
                 <>
                     <PageHeaderMeterBlock
-                        label="Coverage"
-                        ariaLabel="View coverage"
-                        onClick={() => handleTabChange('coverage')}
+                        label="Shifts assigned"
+                        ariaLabel="View assigned shifts"
+                        onClick={() => handleTabChange('shifts')}
                     >
-                        <PageHeaderMeterDonut
-                            percent={coverageRate}
-                            caption={
-                                <>
-                                    filled vs
-                                    <br />
-                                    demand
-                                </>
-                            }
-                        />
+                        {activeShiftCount > 0 ? (
+                            <PageHeaderMeterDonut
+                                percent={coverageRate}
+                                caption="of active shifts"
+                            />
+                        ) : (
+                            <>
+                                <PageHeaderMeterBig>—</PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    No active shifts
+                                </PageHeaderMeterCaption>
+                            </>
+                        )}
                     </PageHeaderMeterBlock>
                     <PageHeaderMeterBlock
                         label="Shifts"
@@ -2329,7 +2440,7 @@ export default function RosteringIndex(props: Props) {
                                 : 'success'
                         }
                         ariaLabel="Open the conflict queue"
-                        href="/operations/rostering/conflicts"
+                        href={conflictQueueHref}
                     >
                         <PageHeaderMeterBig>
                             {props.stats.staff_overlaps}
@@ -2359,6 +2470,43 @@ export default function RosteringIndex(props: Props) {
             }
             filters={
                 <>
+                    <RosterWorkspaceViewSelect
+                        views={railItems}
+                        value={tab}
+                        onSelect={handleTabChange}
+                        onOpenConflicts={() => router.visit(conflictQueueHref)}
+                        onOpenShiftList={
+                            auth?.can?.shifts?.viewAny === true
+                                ? () =>
+                                      router.visit(
+                                          rosterShiftListUrl({
+                                              from: ymd(weekStartDate),
+                                              to: ymd(
+                                                  addDaysWP(weekStartDate, 6),
+                                              ),
+                                              siteIds: props.filters.site_ids
+                                                  ?.length
+                                                  ? props.filters.site_ids
+                                                  : props.filters.site_id
+                                                    ? [props.filters.site_id]
+                                                    : [],
+                                              staffId:
+                                                  props.filters.staff_id ??
+                                                  null,
+                                              clientId:
+                                                  props.filters.client_id ??
+                                                  null,
+                                          }),
+                                      )
+                                : undefined
+                        }
+                        onOpenQualifications={
+                            auth?.can?.rostering?.viewAny === true
+                                ? () =>
+                                      router.visit('/operations/qualifications')
+                                : undefined
+                        }
+                    />
                     <PageHeaderFilterButton
                         icon={ChevronLeft}
                         aria-label={`Previous week (${prevLab})`}
@@ -2380,6 +2528,7 @@ export default function RosteringIndex(props: Props) {
                         onClick={() => goWeek(7)}
                     />
                     <EntityFilter
+                        compact
                         onDark
                         label="Staff"
                         pluralLabel="staff"
@@ -2387,32 +2536,32 @@ export default function RosteringIndex(props: Props) {
                         items={staffFilterItems}
                         value={props.filters.staff_id}
                         onChange={(next) => updateFilter({ staff_id: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <EntityFilter
+                        compact
                         onDark
                         label="Client"
                         allLabel="All clients"
                         items={clientFilterItems}
                         value={props.filters.client_id}
                         onChange={(next) => updateFilter({ client_id: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                     <SiteFilter
                         onDark
                         sites={props.sites ?? []}
                         value={props.filters.site_ids ?? []}
                         onChange={(next) => updateFilter({ site_ids: next })}
-                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-[11.5px]"
+                        className="box-border h-[23px] rounded-[8px] px-2 py-0 text-sm"
                     />
                 </>
             }
             rail={
-                <PageHeaderRail
-                    items={railItems}
+                <RosterWorkspaceRail
+                    views={railItems}
                     value={tab}
-                    onSelect={(key) => handleTabChange(key)}
-                    ariaLabel="Roster views"
+                    onSelect={handleTabChange}
                 />
             }
         />
@@ -2422,24 +2571,45 @@ export default function RosteringIndex(props: Props) {
         <AppLayout
             breadcrumbs={[
                 { title: 'Home', href: '/dashboard' },
-                { title: 'Operations', href: '/operations' },
+                { title: 'Workforce', href: rosteringIndex.url() },
                 { title: 'Rostering', href: rosteringIndex.url() },
             ]}
         >
             <Head title="Rostering" />
 
             <PageLayout hero={header}>
-                <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-                    <main className="min-w-0">
+                {tab === 'shifts' &&
+                    props.eligibilityFreshness &&
+                    Object.keys(props.eligibilityFreshness).length > 0 && (
+                        <div className="mb-4">
+                            <EligibilityRefreshPanel
+                                duties={Object.values(
+                                    props.eligibilityFreshness,
+                                ).map((result) => ({
+                                    id: result.shift_id,
+                                    label: `Shift #${result.shift_id}${result.starts_at ? ` · ${new Intl.DateTimeFormat('en-NZ', { timeZone: props.workerTimezone || WORKER_TIMEZONE, day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(result.starts_at))}` : ''}`,
+                                }))}
+                                workerTimezone={props.workerTimezone}
+                            />
+                        </div>
+                    )}
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <div className="min-w-0">
                         {tab === 'shifts' ? (
                             <WeekGridPane
+                                initialView={
+                                    props.workforcePreferences?.roster_view ===
+                                    'list'
+                                        ? 'list'
+                                        : 'week'
+                                }
                                 days={days}
                                 rows={filteredStaffRows}
                                 siteRows={filteredSiteRows}
                                 todayKey={todayKey}
                                 canManage={props.canManageAny}
                                 onUnassign={openUnassignMakeOpenDialog}
-                                onCancelShift={(s) => cancelShift(s.id)}
+                                onCancelShift={(s) => cancelShift(s)}
                                 onCreateShift={openCreateShift}
                                 onAssignOpen={(s) =>
                                     setReassignShift({
@@ -2466,7 +2636,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onDuplicateShift={
                                     props.canManageAny
-                                        ? (s) => duplicateShift(s.id)
+                                        ? (s) => duplicateShift(s)
                                         : undefined
                                 }
                                 onEditShift={
@@ -2497,7 +2667,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onAutoFillShift={
                                     props.canManageAny
-                                        ? (s) => autoFillShift(s.id)
+                                        ? (s) => autoFillShift(s)
                                         : undefined
                                 }
                                 onReopenCompletedForCorrection={
@@ -2513,7 +2683,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onPublishShift={
                                     props.canManageAny
-                                        ? (s) => publishShift(s.id)
+                                        ? (s) => publishShift(s)
                                         : undefined
                                 }
                                 onMakeRecurring={
@@ -2550,7 +2720,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onReopenShift={
                                     props.canManageAny
-                                        ? (s) => reopenShift(s.id)
+                                        ? (s) => reopenShift(s)
                                         : undefined
                                 }
                                 onReportIncident={(s) =>
@@ -2566,7 +2736,7 @@ export default function RosteringIndex(props: Props) {
                                 canManageAny={props.canManageAny}
                                 filters={props.filters}
                                 onUnassign={openUnassignMakeOpenDialog}
-                                onCancelShift={(s) => cancelShift(s.id)}
+                                onCancelShift={(s) => cancelShift(s)}
                                 onCreateShift={openCreateShift}
                                 onAssignOpen={(s) =>
                                     setReassignShift({
@@ -2593,7 +2763,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onDuplicateShift={
                                     props.canManageAny
-                                        ? (s) => duplicateShift(s.id)
+                                        ? (s) => duplicateShift(s)
                                         : undefined
                                 }
                                 onEditShift={
@@ -2624,7 +2794,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onAutoFillShift={
                                     props.canManageAny
-                                        ? (s) => autoFillShift(s.id)
+                                        ? (s) => autoFillShift(s)
                                         : undefined
                                 }
                                 onReopenCompletedForCorrection={
@@ -2640,7 +2810,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onPublishShift={
                                     props.canManageAny
-                                        ? (s) => publishShift(s.id)
+                                        ? (s) => publishShift(s)
                                         : undefined
                                 }
                                 onMakeRecurring={
@@ -2677,7 +2847,7 @@ export default function RosteringIndex(props: Props) {
                                 }
                                 onReopenShift={
                                     props.canManageAny
-                                        ? (s) => reopenShift(s.id)
+                                        ? (s) => reopenShift(s)
                                         : undefined
                                 }
                                 onReportIncident={(s) =>
@@ -2713,8 +2883,7 @@ export default function RosteringIndex(props: Props) {
                         {tab === 'coverage' ? (
                             <CoveragePane
                                 stats={coverageStats}
-                                windowLabels={coverageWindowLabels}
-                                rows={coverageRows}
+                                sites={props.coverageSites ?? []}
                                 alerts={props.coverageAlerts}
                             />
                         ) : null}
@@ -2740,7 +2909,11 @@ export default function RosteringIndex(props: Props) {
                                     upcomingLeave={
                                         availabilitySummary.upcomingLeave
                                     }
-                                    canManage={props.canManageAny}
+                                    canManage={
+                                        props.availabilityCapabilities
+                                            ?.update_any ?? false
+                                    }
+                                    workerTimezone={props.workerTimezone}
                                 />
                             ) : (
                                 <Card>
@@ -2761,7 +2934,7 @@ export default function RosteringIndex(props: Props) {
                         {tab === 'analytics' ? (
                             <AnalyticsPane
                                 stats={analyticsStats}
-                                coverageTrend={trendPoints}
+                                completionTrend={trendPoints}
                                 dailyCoverage={
                                     props.analytics?.dailyCoverage ?? []
                                 }
@@ -2771,38 +2944,7 @@ export default function RosteringIndex(props: Props) {
                             />
                         ) : null}
                         {tab === 'templates' ? (
-                            <TemplatesPane
-                                templates={cachedTemplates}
-                                loading={loadingTemplates && !cachedTemplates}
-                                canManage={Boolean(props.canManageTemplates)}
-                                canDelete={Boolean(props.canDeleteTemplates)}
-                                onCreate={() =>
-                                    setTemplateWizard({
-                                        mode: 'create',
-                                        template: null,
-                                    })
-                                }
-                                onView={(t) => setDetailTemplate(t)}
-                                onEdit={(t) =>
-                                    setTemplateWizard({
-                                        mode: 'edit',
-                                        template: t,
-                                    })
-                                }
-                                onDelete={(t) =>
-                                    router.delete(
-                                        `/operations/rostering/templates/${t.id}`,
-                                        { preserveScroll: true },
-                                    )
-                                }
-                                onDuplicate={(t) =>
-                                    router.post(
-                                        `/operations/rostering/templates/${t.id}/duplicate`,
-                                        {},
-                                        { preserveScroll: true },
-                                    )
-                                }
-                            />
+                            <TemplateLibrary loading={loadingTemplates} />
                         ) : null}
                         {tab === 'recurring' ? (
                             <SeriesPane
@@ -2813,7 +2955,7 @@ export default function RosteringIndex(props: Props) {
                                 onNewRecurring={newRecurringShift}
                             />
                         ) : null}
-                    </main>
+                    </div>
                     <SignalRail signals={signals} capacity={capacityRailRows} />
                 </div>
 
@@ -2842,7 +2984,7 @@ export default function RosteringIndex(props: Props) {
                         });
                     }}
                     onOpenQueue={() => {
-                        router.visit('/operations/rostering/conflicts');
+                        router.visit(conflictQueueHref);
                     }}
                 />
 
@@ -2961,9 +3103,9 @@ export default function RosteringIndex(props: Props) {
                 <ReassignDialog
                     open={Boolean(reassignShift)}
                     shift={reassignShift}
-                    canOverride={Boolean(
-                        auth?.can?.shifts?.overrideEligibility ?? true,
-                    )}
+                    canOverride={
+                        auth?.can?.shifts?.overrideEligibility === true
+                    }
                     onOpenChange={(open) => {
                         if (!open) setReassignShift(null);
                     }}
@@ -2990,6 +3132,20 @@ export default function RosteringIndex(props: Props) {
                     onConfirm={(shift, reason) =>
                         unassignShift(shift.id, reason)
                     }
+                />
+
+                <ConfirmDialog
+                    open={shiftConfirmOpen && shiftConfirm !== null}
+                    onClose={() => {
+                        if (!shiftActionBusy) setShiftConfirmOpen(false);
+                    }}
+                    onConfirm={runPendingShiftAction}
+                    title={shiftConfirm?.title ?? ''}
+                    description={shiftConfirm?.description ?? null}
+                    confirmText={shiftConfirm?.confirmText}
+                    cancelText={shiftConfirm?.cancelText}
+                    variant={shiftConfirm?.variant ?? 'default'}
+                    processing={shiftActionBusy}
                 />
 
                 <ViewTimesheetDialog
@@ -3116,40 +3272,13 @@ export default function RosteringIndex(props: Props) {
                                 View Operations Reports
                             </Button>
                         </Link>
-                        <Link href="/operations/rostering/conflicts">
+                        <Link href={conflictQueueHref}>
                             <Button size="sm" variant="outline">
                                 Conflict queue
                             </Button>
                         </Link>
                     </div>
                 ) : null}
-
-                <TemplateWizardDialog
-                    open={templateWizard !== null}
-                    onOpenChange={(open) => !open && setTemplateWizard(null)}
-                    template={templateWizard?.template}
-                    clients={props.clients ?? []}
-                    staff={props.staff ?? []}
-                    serviceContexts={props.serviceContexts ?? []}
-                />
-
-                <TemplateDetailDialog
-                    template={detailTemplate}
-                    open={detailTemplate !== null}
-                    onOpenChange={(open) => !open && setDetailTemplate(null)}
-                    canManage={Boolean(props.canManageTemplates)}
-                    canDelete={Boolean(props.canDeleteTemplates)}
-                    onEdit={(t) => {
-                        setDetailTemplate(null);
-                        setTemplateWizard({ mode: 'edit', template: t });
-                    }}
-                    onDelete={(t) =>
-                        router.delete(
-                            `/operations/rostering/templates/${t.id}`,
-                            { preserveScroll: true },
-                        )
-                    }
-                />
 
                 <SeriesDetailDialog
                     seriesId={detailSeriesId}

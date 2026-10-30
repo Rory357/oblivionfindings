@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 
 final class AssetLifecycleService
@@ -21,6 +22,13 @@ final class AssetLifecycleService
         return DB::transaction(function () use ($actor, $asset): Asset {
             $asset = $this->access->assignableAsset($actor, (int) $asset->getKey(), true) ?? abort(404);
             Gate::forUser($actor)->authorize('delete', $asset);
+
+            if (Schema::hasTable('asset_profile_events') && ! Asset::vehicles()->whereKey($asset->id)->exists()) {
+                $blockers = app(AssetProfileService::class)->retirementBlockers($asset);
+                if ($blockers !== []) {
+                    throw ValidationException::withMessages(['asset' => $blockers]);
+                }
+            }
 
             if ($asset->assignments()->whereNull('released_at')->lockForUpdate()->first(['id'])) {
                 throw ValidationException::withMessages([

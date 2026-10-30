@@ -1,0 +1,246 @@
+{
+  "checkedAt": "2026-09-27T14:11:39.915Z",
+  "method": "CUA real browser, actual shared renderer, synthetic Google SDK replacement in test-only server; no provider credentials or Google requests",
+  "cases": [
+    {
+      "pass": true,
+      "phase": "real Leaflet renderer",
+      "rows": [
+        {
+          "id": "percentage",
+          "target": 480,
+          "frameHeight": 480,
+          "mapHeight": 480,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "0px",
+          "statusReachable": true
+        },
+        {
+          "id": "fixed",
+          "target": 280,
+          "frameHeight": 280,
+          "mapHeight": 278,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        },
+        {
+          "id": "default",
+          "target": 400,
+          "frameHeight": 400,
+          "mapHeight": 398,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        }
+      ],
+      "selected": "none",
+      "viewport": {
+        "center": {
+          "lat": -41.285,
+          "lng": 174.775
+        },
+        "zoom": 13
+      },
+      "viewportPass": true,
+      "resizeEvents": 0,
+      "providerMarkersRemaining": 0,
+      "leafletContainers": 3
+    },
+    {
+      "pass": true,
+      "phase": "real Leaflet renderer",
+      "rows": [
+        {
+          "id": "percentage",
+          "target": 340,
+          "frameHeight": 340,
+          "mapHeight": 340,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "0px",
+          "statusReachable": true
+        },
+        {
+          "id": "fixed",
+          "target": 280,
+          "frameHeight": 280,
+          "mapHeight": 278,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        },
+        {
+          "id": "default",
+          "target": 400,
+          "frameHeight": 400,
+          "mapHeight": 398,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        }
+      ],
+      "selected": "none",
+      "viewport": {
+        "center": {
+          "lat": -41.28503045460192,
+          "lng": 174.77514266967773
+        },
+        "zoom": 13
+      },
+      "viewportPass": true,
+      "resizeEvents": 0,
+      "providerMarkersRemaining": 0,
+      "leafletContainers": 3
+    },
+    {
+      "pass": true,
+      "phase": "synthetic Google renderer",
+      "rows": [
+        {
+          "id": "percentage",
+          "target": 480,
+          "frameHeight": 480,
+          "mapHeight": 480,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "0px",
+          "statusReachable": true
+        },
+        {
+          "id": "fixed",
+          "target": 280,
+          "frameHeight": 280,
+          "mapHeight": 278,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        },
+        {
+          "id": "default",
+          "target": 400,
+          "frameHeight": 400,
+          "mapHeight": 398,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        }
+      ],
+      "selected": "application",
+      "viewport": {
+        "center": {
+          "lat": -41.29,
+          "lng": 174.78
+        },
+        "zoom": 15
+      },
+      "viewportPass": true,
+      "resizeEvents": 3,
+      "providerMarkersRemaining": 3,
+      "leafletContainers": 0
+    },
+    {
+      "pass": true,
+      "phase": "synthetic Google renderer",
+      "rows": [
+        {
+          "id": "percentage",
+          "target": 340,
+          "frameHeight": 340,
+          "mapHeight": 340,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "0px",
+          "statusReachable": true
+        },
+        {
+          "id": "fixed",
+          "target": 280,
+          "frameHeight": 280,
+          "mapHeight": 278,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        },
+        {
+          "id": "default",
+          "target": 400,
+          "frameHeight": 400,
+          "mapHeight": 398,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        }
+      ],
+      "selected": "application",
+      "viewport": {
+        "center": {
+          "lat": -41.29,
+          "lng": 174.78
+        },
+        "zoom": 15
+      },
+      "viewportPass": true,
+      "resizeEvents": 4,
+      "providerMarkersRemaining": 3,
+      "leafletContainers": 0
+    },
+    {
+      "pass": true,
+      "phase": "synthetic fallback to real Leaflet",
+      "rows": [
+        {
+          "id": "percentage",
+          "target": 340,
+          "frameHeight": 340,
+          "mapHeight": 297,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "0px",
+          "statusReachable": true
+        },
+        {
+          "id": "fixed",
+          "target": 280,
+          "frameHeight": 280,
+          "mapHeight": 235,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        },
+        {
+          "id": "default",
+          "target": 400,
+          "frameHeight": 400,
+          "mapHeight": 355,
+          "heightPass": true,
+          "contentInsideFrame": true,
+          "callerBorder": "1px",
+          "statusReachable": true
+        }
+      ],
+      "selected": "application",
+      "viewport": {
+        "center": {
+          "lat": -41.29,
+          "lng": 174.78
+        },
+        "zoom": 15
+      },
+      "viewportPass": true,
+      "resizeEvents": 4,
+      "providerMarkersRemaining": 0,
+      "leafletContainers": 3
+    }
+  ]
+}

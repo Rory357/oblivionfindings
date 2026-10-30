@@ -1090,7 +1090,7 @@ function ZeroResidentOnboarding({
                 <X className="h-4 w-4" />
             </Button>
             <div className="flex items-start gap-3">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-fill text-primary-fill-foreground">
                     <Info className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">

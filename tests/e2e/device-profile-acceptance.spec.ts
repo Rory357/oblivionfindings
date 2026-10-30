@@ -165,8 +165,8 @@ test.describe('Capability-driven device profile', () => {
             }),
         ).toBeVisible();
         await expect(
-            page.getByRole('tab', { name: 'Vehicle technology' }),
-        ).toHaveAttribute('data-state', 'active');
+            page.getByRole('tab', { name: 'Vehicle telemetry' }),
+        ).toHaveAttribute('aria-selected', 'true');
         const vehicleDevice = page.locator(
             `a[href="/security-devices/devices/${fixture.vehicleDeviceId}"]`,
             { hasText: fixture.vehicleDeviceName },
@@ -204,13 +204,16 @@ test.describe('Capability-driven device profile', () => {
                 .first(),
         ).toBeVisible();
         await expect(
-            page.getByRole('tab', { name: /technology & finance/i }),
-        ).toHaveAttribute('data-state', 'active');
-        const assetDevice = page.locator(
-            `a[href="/security-devices/devices/${fixture.assetDeviceId}"]`,
-            { hasText: fixture.assetDeviceName },
-        );
+            page.getByRole('tab', { name: 'Location & observations' }),
+        ).toHaveAttribute('aria-selected', 'true');
+        const assetDevice = page.getByRole('link', {
+            name: `Open source for ${fixture.assetDeviceName}`,
+        });
         await expect(assetDevice).toBeVisible();
+        await expect(assetDevice).toHaveAttribute(
+            'href',
+            `/security-devices/devices/${fixture.assetDeviceId}`,
+        );
         await assetDevice.click();
         await expect(
             page.getByRole('heading', {
@@ -255,6 +258,8 @@ test.describe('Capability-driven device profile', () => {
         await expect(page).toHaveURL(
             new RegExp(`/it/tickets/${fixture.ticketId}$`),
         );
+        await page.getByTestId('it-ticket-group-details').click();
+        await page.getByTestId('it-ticket-tab-links').click();
 
         const deviceFromTicket = page.locator(
             `a[href$="/security-devices/devices/${fixture.deviceId}"]`,

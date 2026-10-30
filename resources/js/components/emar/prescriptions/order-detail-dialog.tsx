@@ -119,6 +119,7 @@ export function OrderDetailDialog({
 
     return (
         <WizardShell
+            frontline
             open
             onClose={onClose}
             title="Prescriber order detail"

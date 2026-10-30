@@ -1,0 +1,74 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\phpunit.xml
+
+.....................[31;1mE[0m....................[41;37mF[0m[41;37mF[0m[41;37mF[0m[41;37mF[0m                    46 / 46 (100%)
+
+Time: 05:14.827, Memory: 178.00 MB
+
+There was 1 error:
+
+1) Tests\Feature\Reporting\OperationalReportPrivacyTest::test_canonical_history_legacy_payload_alias_remains_part_of_current_evidence
+Illuminate\Database\QueryException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'payload' in 'field list' (Connection: mysql, Host: 127.0.0.1, Port: 3306, Database: oblivion_reports_final_test_35472, SQL: update `integration_events` set `payload` = {"lat":-37,"lng":175} where `id` = 2)
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:841
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:797
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:600
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:552
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php:4315
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\Reporting\OperationalReportPrivacyTest.php:377
+
+Caused by
+PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'payload' in 'field list'
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:612
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:830
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:797
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:600
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Connection.php:552
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Database\Query\Builder.php:4315
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\Reporting\OperationalReportPrivacyTest.php:377
+
+--
+
+There were 4 failures:
+
+1) Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest::test_client_location_history_reads_canonical_integration_event_identity
+Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:103
+
+2) Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest::test_resident_tracking_history_reads_canonical_integration_event_identity
+Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:130
+
+3) Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest::test_portal_location_history_reads_canonical_integration_event_identity
+Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:161
+
+4) Tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest::test_client_location_history_keeps_narrow_fallback_for_unbackfilled_legacy_rows
+Expected response status code [200] but received 403.
+Failed asserting that 403 is identical to 200.
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:16
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\tests\Feature\SecurityDevices\CanonicalIntegrationEventHistoryTest.php:198
+
+[37;41mERRORS![0m
+[37;41mTests: 46[0m[37;41m, Assertions: 755[0m[37;41m, Errors: 1[0m[37;41m, Failures: 4[0m[37;41m.[0m

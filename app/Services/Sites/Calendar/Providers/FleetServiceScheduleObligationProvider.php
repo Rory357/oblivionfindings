@@ -63,7 +63,7 @@ class FleetServiceScheduleObligationProvider extends ObligationProvider
                 status: $this->dueStatus($due, false),
                 ref: $schedule->asset?->asset_tag,
                 site: $this->siteArray($schedule->asset?->site),
-                link: '/fleet-assets/maintenance/schedules',
+                link: "/fleet-assets/vehicles/{$schedule->asset_id}?tab=service&view=schedules",
             );
         }
 

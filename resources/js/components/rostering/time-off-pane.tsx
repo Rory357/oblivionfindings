@@ -70,17 +70,17 @@ export function TimeOffPane({
     });
 
     return (
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-5">
             <MicroStats stats={stats} />
 
-            <div className="grid gap-4 xl:grid-cols-[1fr_1.1fr]">
-                <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
+            <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+                <section className="min-w-0 rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3 flex items-center justify-between">
                         <div>
                             <h3 className="text-sm font-bold tracking-tight">
                                 Pending requests
                             </h3>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="text-xs text-muted-foreground">
                                 {pendingSubtitle}
                             </div>
                         </div>
@@ -112,7 +112,7 @@ export function TimeOffPane({
                                         <div className="truncate text-sm font-semibold">
                                             {req.staff}
                                         </div>
-                                        <div className="truncate text-[11px] text-muted-foreground">
+                                        <div className="truncate text-xs text-muted-foreground">
                                             {req.reason}
                                         </div>
                                     </div>
@@ -121,7 +121,7 @@ export function TimeOffPane({
                                     <div className="text-sm tabular-nums">
                                         {fmtRange(req.starts_at, req.ends_at)}
                                     </div>
-                                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                                    <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                         <span className="rounded bg-muted px-1.5 py-0.5 font-semibold uppercase">
                                             {req.type}
                                         </span>
@@ -158,16 +158,21 @@ export function TimeOffPane({
                     </div>
                 </section>
 
-                <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
+                <section className="min-w-0 rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3">
                         <h3 className="text-sm font-bold tracking-tight">
                             On leave · next 14 days
                         </h3>
-                        <div className="text-[11px] text-muted-foreground">
-                            Approved leave overlay
+                        <div className="text-xs text-muted-foreground">
+                            Approved leave and pending requests
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div
+                        role="region"
+                        aria-label="Leave calendar for the next 14 days"
+                        tabIndex={0}
+                        className="frontline-focus max-w-full overflow-x-auto rounded-sm"
+                    >
                         <div
                             className="grid border-b border-border"
                             style={{
@@ -179,7 +184,7 @@ export function TimeOffPane({
                                 <div
                                     key={i}
                                     className={cn(
-                                        'text-center text-[10px]',
+                                        'text-center text-xs',
                                         (d.getDay() === 0 ||
                                             d.getDay() === 6) &&
                                             'text-muted-foreground/60',
@@ -214,7 +219,7 @@ export function TimeOffPane({
                             >
                                 <div className="flex items-center gap-2 pr-2">
                                     <div
-                                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold uppercase"
+                                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
                                         style={avatarHueStyle(req.hue)}
                                     >
                                         {req.initials}
@@ -244,7 +249,7 @@ export function TimeOffPane({
                             </div>
                         ))}
                     </div>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                         <LegendDot
                             color="var(--status-success)"
                             label="Approved"

@@ -1,0 +1,33 @@
+PHPUnit 12.5.23 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.4.16
+Configuration: C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\phpunit.xml
+
+[41;37mF[0m[41;37mF[0m                                                                  2 / 2 (100%)
+
+Time: 06:00.740, Memory: 112.00 MB
+
+There were 2 failures:
+
+1) PKG09BMainPrivacyReviewTest::test_cached_journey_report_is_denied_after_trip_becomes_personal
+Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:141
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php:66
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php:71
+
+2) PKG09BMainPrivacyReviewTest::test_cached_journey_report_is_denied_after_trip_consent_is_blocked
+Expected response status code [403] but received 200.
+Failed asserting that 200 is identical to 403.
+
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponseAssert.php:45
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\TestResponse.php:176
+C:\Users\steph\.codex\worktrees\fleet-personal-reports\oblivionfindings\vendor\laravel\framework\src\Illuminate\Testing\Concerns\AssertsStatusCodes.php:141
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php:66
+C:\Users\steph\Herd\oblivionfindings\docs\fleet-assets-audit\evidence\PKG09BMainPrivacyReviewTest.php:76
+
+[37;41mFAILURES![0m
+[37;41mTests: 2[0m[37;41m, Assertions: 8[0m[37;41m, Failures: 2[0m[37;41m.[0m

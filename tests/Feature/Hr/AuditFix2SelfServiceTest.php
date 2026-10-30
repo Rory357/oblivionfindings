@@ -18,6 +18,7 @@ use App\Models\User;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SeedHrPermissionsSeeder;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -202,8 +203,15 @@ test('cancelling an IT request annotates the still-pending onboarding task and n
     ]);
 
     $this->actingAs($this->hr)
-        ->post("/it/provisioning/{$request->id}/cancel", ['reason' => 'Duplicate request'])
-        ->assertRedirect();
+        ->post("/it/provisioning/{$request->id}/cancel", [
+            'reason' => 'Duplicate request',
+            'actor_user_id' => $this->hr->id,
+            'request_uuid' => (string) Str::uuid(),
+            'expected_version' => (int) $request->fresh()->lock_version,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors()
+        ->assertSessionHas('success', 'Request cancelled.');
 
     expect($request->fresh()->status)->toBe('cancelled');
 
@@ -396,7 +404,7 @@ test('removing a kudos also removes its feed post, reactions and replies', funct
         $this->worker,
         $this->teammate->id,
         'teamwork',
-        'Nice one!',
+        'Thoughtful work!',
     );
     app(FeedService::class)->toggleReaction($kudos, $this->teammate->id, 'heart');
     app(FeedService::class)->addReply($kudos, $this->teammate->id, 'Thanks!');

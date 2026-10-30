@@ -17,10 +17,13 @@ use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Domain\Hr\Services\TrainingService;
+use App\Models\Permission;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function () {
     $this->seed(RbacSeeder::class);
@@ -135,10 +138,36 @@ test('declining a leave request sends the real mail notification class with the 
         'hours_requested' => 8,
     ]);
 
+    $snapshot = fn (): array => [
+        'request' => $request->fresh()->getRawOriginal(),
+        'balances' => DB::table('hr_leave_balances')->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all(),
+        'ledger' => DB::table('hr_leave_balance_ledgers')->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all(),
+        'time_off' => DB::table('staff_time_offs')->orderBy('id')->get()->map(fn ($row): array => (array) $row)->all(),
+    ];
+    $before = $snapshot();
+    expect($this->manager->canDo('hr.leave.approve'))->toBeFalse()
+        ->and($this->manager->canDo('hr.leave.manage'))->toBeFalse();
+
+    try {
+        app(LeaveService::class)->declineRequest($request, $this->manager, 'Roster is short-staffed that week.');
+        $this->fail('A current same-Site employee still needs the exact leave review capability.');
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403);
+    }
+    expect($snapshot())->toBe($before);
+    Notification::assertNothingSent();
+
+    $approve = Permission::query()->where('key', 'hr.leave.approve')->firstOrFail();
+    $this->manager->permissionOverrides()->syncWithoutDetaching([$approve->id => ['allowed' => true]]);
+    $this->manager = $this->manager->fresh();
+    expect($this->manager->canDo('hr.leave.approve'))->toBeTrue()
+        ->and($this->manager->canDo('hr.leave.manage'))->toBeFalse();
+
     app(LeaveService::class)->declineRequest($request, $this->manager, 'Roster is short-staffed that week.');
 
     expect($request->fresh()->status)->toBe('declined');
     expect($request->fresh()->review_notes)->toBe('Roster is short-staffed that week.');
+    expect($request->fresh()->reviewed_by)->toBe($this->manager->id);
 
     Notification::assertSentTo(
         $this->worker,

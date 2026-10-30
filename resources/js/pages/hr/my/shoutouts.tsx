@@ -65,7 +65,7 @@ export default function MyHrShoutouts({ myHr, received, given }: Props) {
                     <button
                         type="button"
                         onClick={openKudos}
-                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary px-4 py-2.5 text-[13px] font-bold text-primary-foreground transition-colors hover:opacity-90"
+                        className="inline-flex shrink-0 items-center gap-1.5 rounded-[10px] bg-primary-fill px-4 py-2.5 text-[13px] font-bold text-primary-fill-foreground transition-colors hover:opacity-90"
                     >
                         <Send className="h-4 w-4" /> Give a shout-out
                     </button>
@@ -95,7 +95,7 @@ export default function MyHrShoutouts({ myHr, received, given }: Props) {
                                 className={cn(
                                     'inline-grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10px] font-bold',
                                     box === key
-                                        ? 'bg-primary text-primary-foreground'
+                                        ? 'bg-primary-fill text-primary-fill-foreground'
                                         : 'bg-muted text-muted-foreground',
                                 )}
                             >

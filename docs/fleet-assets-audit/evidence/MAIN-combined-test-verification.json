@@ -1,0 +1,8 @@
+{
+  "method": "Independent JUnit class/row reconciliation of owner evidence",
+  "classes": 35,
+  "tests": 494,
+  "assertions": 5905,
+  "failures": [],
+  "singleMonolithicRun": false
+}

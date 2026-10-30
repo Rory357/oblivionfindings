@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-28",
+  "preview": "http://127.0.0.1:8974/fleet-assets/reports/builder",
+  "result": {
+    "sourceRows": 20,
+    "recordedDistanceKm": 570
+  },
+  "screenshot": "report-builder-final.png",
+  "viewportOverrideReset": true,
+  "tabMarkedDeliverable": true,
+  "browserErrors": [],
+  "zoom125": "UNVERIFIED; acceptance amendment pending Main/user; no repeat or substitute."
+}

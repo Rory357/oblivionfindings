@@ -1,176 +1,145 @@
+import { BrandLockup } from '@/components/brand/brand-lockup';
+import {
+    navKeyForUrl,
+    siteLinks,
+    usePublicSite,
+    type SiteNavKey,
+} from '@/components/public-site/site';
 import { Button } from '@/components/ui/button';
-import { useAppearance } from '@/hooks/use-appearance';
 import { Link, usePage } from '@inertiajs/react';
-import { Menu, Moon, Sun, X } from 'lucide-react';
-import React, { useState } from 'react';
+import { ArrowRight, LogIn, Menu, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
-const Header: React.FC = () => {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+const nav: { key: SiteNavKey; label: string; href: string }[] = [
+    { key: 'support', label: 'Our support', href: siteLinks.support },
+    { key: 'funding', label: 'Funding help', href: siteLinks.funding },
+    { key: 'about', label: 'About us', href: siteLinks.about },
+    { key: 'careers', label: 'Careers', href: siteLinks.careers },
+    { key: 'contact', label: 'Contact us', href: siteLinks.contact },
+];
+
+/** The brand slot as the home link (Settings › Branding) — never a hard-coded logo. */
+export function SiteLockup() {
+    const { name } = usePublicSite();
+    return (
+        <Link
+            href={siteLinks.home}
+            className="flex min-h-[44px] min-w-0 items-center rounded-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label={name ? `${name} home` : 'Home'}
+        >
+            <BrandLockup surface="dark" name={name} />
+        </Link>
+    );
+}
+
+/**
+ * The public website header (mockup v2): on the ink band, the brand slot,
+ * Our support · Funding help · About us · Careers · Contact us, then
+ * "Sign in" and the primary "Make a referral". The full nav shows from
+ * 1280 px (xl); below that a menu button opens the nav under a horizon line.
+ */
+export default function Header({ current }: { current?: SiteNavKey | null }) {
+    const [open, setOpen] = useState(false);
+    const toggle = useRef<HTMLButtonElement>(null);
     const { url } = usePage();
-    const { appearance, updateAppearance } = useAppearance();
-
-    const isActive = (path: string) => {
-        if (path === '/') return url === '/';
-        return url.startsWith(path);
-    };
-
-    const navItems = [
-        { href: '/', label: 'Home' },
-        { href: '/features', label: 'Features' },
-        { href: '/smart-monitoring', label: 'Smart Monitoring' },
-        { href: '/pricing', label: 'Pricing' },
-    ];
-
-    const toggleTheme = () => {
-        const newAppearance = appearance === 'dark' ? 'light' : 'dark';
-        updateAppearance(newAppearance);
-    };
-
-    const isDark =
-        appearance === 'dark' ||
-        (appearance === 'system' &&
-            typeof window !== 'undefined' &&
-            window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const active = current ?? navKeyForUrl(url);
+    useEffect(() => setOpen(false), [url]);
+    const close = () => setOpen(false);
+    const ariaCurrent = (key: SiteNavKey) =>
+        active === key ? ('page' as const) : undefined;
 
     return (
-        <header className="flex items-center justify-between gap-4">
-            <Link href="/" className="group flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
-                    OF
-                </div>
-                <div>
-                    <span className="text-sm font-semibold tracking-tight">
-                        Oblivion Findings
-                    </span>
-                    <p className="text-[11px] text-muted-foreground italic">
-                        Preserving stories. Powered by code.
-                    </p>
-                </div>
-            </Link>
-
-            {/* Desktop nav */}
-            <nav className="hidden items-center gap-1 text-sm text-muted-foreground sm:flex">
-                {navItems.map((item) => (
+        <header className="journey-site-container flex min-h-[76px] items-center justify-between gap-4 py-3">
+            <SiteLockup />
+            <nav
+                aria-label="Main"
+                className="hidden items-center gap-0.5 xl:flex"
+            >
+                {nav.map((item) => (
                     <Link
-                        key={item.href}
+                        key={item.key}
                         href={item.href}
-                        className={`rounded-full px-4 py-2 transition-colors ${
-                            isActive(item.href)
-                                ? 'bg-muted font-medium text-foreground'
-                                : 'hover:bg-muted/50 hover:text-foreground'
-                        }`}
+                        className="journey-site-navlink"
+                        aria-current={ariaCurrent(item.key)}
                     >
                         {item.label}
                     </Link>
                 ))}
-                <Link
-                    href="/contact"
-                    className={`rounded-full px-4 py-2 transition-colors ${
-                        isActive('/contact')
-                            ? 'bg-muted font-medium text-foreground'
-                            : 'hover:bg-muted/50 hover:text-foreground'
-                    }`}
-                >
-                    Contact
-                </Link>
             </nav>
-
-            <div className="flex items-center gap-2">
-                {/* Theme toggle */}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={toggleTheme}
-                    className="hidden h-10 w-10 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground sm:inline-flex"
-                    aria-label="Toggle theme"
-                >
-                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                </Button>
-
+            <div className="hidden items-center gap-2 xl:flex">
                 <Link
-                    href="/login"
-                    className="hidden rounded-full border border-border bg-background px-4 py-2 text-sm text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted sm:inline-flex"
+                    href={siteLinks.signIn}
+                    className="journey-site-navlink gap-2"
                 >
-                    Log in
+                    <LogIn className="size-4" aria-hidden />
+                    Sign in
                 </Link>
-
-                <Link
-                    href="/contact"
-                    className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-primary/30"
-                >
-                    Book a demo
-                </Link>
-
-                {/* Mobile menu button */}
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className="h-10 w-10 rounded-xl text-muted-foreground sm:hidden"
-                    aria-label="Toggle menu"
-                >
-                    {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+                <Button asChild className="frontline-tap">
+                    <Link
+                        href={siteLinks.referral}
+                        aria-current={ariaCurrent('referral')}
+                    >
+                        Make a referral
+                        <ArrowRight className="size-4" aria-hidden />
+                    </Link>
                 </Button>
             </div>
-
-            {/* Mobile nav */}
-            {mobileMenuOpen && (
-                <div className="absolute top-20 right-4 left-4 z-50 rounded-2xl border border-border bg-popover/95 p-4 shadow-2xl backdrop-blur-xl sm:hidden">
-                    <nav className="flex flex-col gap-1">
-                        {navItems.map((item) => (
+            <Button
+                ref={toggle}
+                variant="outline"
+                size="icon"
+                className="size-[44px] xl:hidden"
+                aria-expanded={open}
+                aria-controls="site-menu"
+                aria-label={open ? 'Close menu' : 'Open menu'}
+                onClick={() => setOpen((value) => !value)}
+            >
+                {open ? (
+                    <X className="size-5" aria-hidden />
+                ) : (
+                    <Menu className="size-5" aria-hidden />
+                )}
+            </Button>
+            {open && (
+                <div
+                    id="site-menu"
+                    className="journey-site-horizon absolute inset-x-0 top-[76px] z-50 bg-journey-ink px-5 pt-1 pb-6 shadow-lg xl:hidden"
+                    onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                            close();
+                            toggle.current?.focus();
+                        }
+                    }}
+                >
+                    <nav aria-label="Main" className="flex flex-col py-2">
+                        {nav.map((item) => (
                             <Link
-                                key={item.href}
+                                key={item.key}
                                 href={item.href}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className={`rounded-xl px-4 py-3 text-sm transition-colors ${
-                                    isActive(item.href)
-                                        ? 'bg-primary/10 font-medium text-primary'
-                                        : 'text-muted-foreground hover:bg-muted'
-                                }`}
+                                className="journey-site-navlink"
+                                aria-current={ariaCurrent(item.key)}
+                                onClick={close}
                             >
                                 {item.label}
                             </Link>
                         ))}
                         <Link
-                            href="/contact"
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={`rounded-xl px-4 py-3 text-sm transition-colors ${
-                                isActive('/contact')
-                                    ? 'bg-primary/10 font-medium text-primary'
-                                    : 'text-muted-foreground hover:bg-muted'
-                            }`}
+                            href={siteLinks.signIn}
+                            className="journey-site-navlink gap-2"
+                            onClick={close}
                         >
-                            Contact
-                        </Link>
-                        <div className="my-2 h-px bg-border" />
-                        <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => {
-                                toggleTheme();
-                                setMobileMenuOpen(false);
-                            }}
-                            className="h-auto justify-start gap-3 rounded-xl px-4 py-3 text-sm font-normal text-muted-foreground hover:bg-muted"
-                        >
-                            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                            <span>
-                                Switch to {isDark ? 'light' : 'dark'} mode
-                            </span>
-                        </Button>
-                        <Link
-                            href="/login"
-                            onClick={() => setMobileMenuOpen(false)}
-                            className="rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
-                        >
-                            Log in
+                            <LogIn className="size-4" aria-hidden />
+                            Sign in
                         </Link>
                     </nav>
+                    <Button asChild className="frontline-tap w-full">
+                        <Link href={siteLinks.referral} onClick={close}>
+                            Make a referral
+                            <ArrowRight className="size-4" aria-hidden />
+                        </Link>
+                    </Button>
                 </div>
             )}
         </header>
     );
-};
-
-export default Header;
+}

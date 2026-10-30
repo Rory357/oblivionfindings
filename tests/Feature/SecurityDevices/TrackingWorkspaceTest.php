@@ -6,6 +6,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Domain\SecurityDevices\Services\PersonalTrackingPrivacyService;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\AssetTracker;
@@ -15,12 +16,15 @@ use App\Models\ConsentType;
 use App\Models\FleetTelemetryEvent;
 use App\Models\LoneWorkerSession;
 use App\Models\Permission;
+use App\Models\Queclink\QueclinkDevice;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\ConsentValidationService;
 use Database\Seeders\RbacSeeder;
 use Database\Seeders\SecurityDevicesPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\AuthoritativeConsentFixture;
 use Tests\TestCase;
 
@@ -44,8 +48,8 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Kauri House');
         $client = Client::factory()->create([
-
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Mere',
         ]);
         $consent = $this->trackingConsent($client);
@@ -142,8 +146,8 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Miro House');
         $client = Client::factory()->create([
-
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Ani',
             'first_name' => 'Anahera',
             'last_name' => 'Private-Surname-Sentinel',
@@ -248,10 +252,12 @@ class TrackingWorkspaceTest extends TestCase
         $site = $this->site('Rimu House');
         $withdrawnClient = Client::factory()->create([
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Hana',
         ]);
         $inactiveClient = Client::factory()->create([
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Matiu',
         ]);
         $withdrawnConsent = $this->trackingConsent($withdrawnClient, [
@@ -314,10 +320,12 @@ class TrackingWorkspaceTest extends TestCase
     {
         $site = $this->site('Totara House');
         $worker = User::factory()->create([
-
             'approved_at' => now(),
             'name' => 'Aroha Worker',
         ]);
+        // Custody is captured when the tracker is assigned, so the worker must
+        // already be current staff at the Site.
+        $this->assignViewerToSite($worker, $site);
         $device = $this->trackingDevice('Aroha lone-worker tracker', [
             'category' => 'personal_tracker',
             'subcategory' => 'lone_worker',
@@ -346,7 +354,6 @@ class TrackingWorkspaceTest extends TestCase
             'hr.employees.viewAny',
             'assets.telemetry.view',
         ]);
-        $this->assignViewerToSite($worker, $site);
         $this->assignViewerToSite($viewer, $site);
 
         $technicalViewer = $this->viewerWithPermissions([
@@ -512,8 +519,8 @@ class TrackingWorkspaceTest extends TestCase
         $site = $this->site('Pohutukawa Base');
         $vehicle = Asset::factory()->vehicle()->forSite($site)->create(['name' => 'Pohutukawa van']);
         $client = Client::factory()->create([
-
             'site_id' => $site->id,
+            'status' => 'active',
             'preferred_name' => 'Ria',
         ]);
         $clientAsset = Asset::factory()->forSite($site)->forClient($client->id)->create([
@@ -656,10 +663,69 @@ class TrackingWorkspaceTest extends TestCase
         ]);
     }
 
+    public function test_generic_tracking_consent_preserves_specialist_access_without_advertising_resident_location_authority(): void
+    {
+        $site = $this->site('Generic tracking purpose boundary');
+        $client = Client::factory()->create(['site_id' => $site->id, 'status' => 'active']);
+        $type = ConsentType::factory()->create([
+            'name' => 'Asset Location Tracking (Safety)', 'purpose' => 'Personal safety location tracking',
+            'legal_basis' => 'consent', 'active' => true,
+        ]);
+        $consent = AuthoritativeConsentFixture::manualSelf($client, $type, $this->admin);
+        $device = $this->trackingDevice('Generic safety pendant', [
+            'category' => 'personal_tracker', 'latitude' => -36.8485, 'longitude' => 174.7633,
+            'meta' => ['private_location_envelope' => 'GENERIC-PRIVATE-PROVIDER-EVIDENCE'],
+        ]);
+        $this->assign($device, DeviceAssignment::TARGET_CLIENT, $client->id, $consent->id);
+        $assignment = DeviceAssignment::query()->where('device_id', $device->id)->sole();
+        $privacy = app(PersonalTrackingPrivacyService::class);
+        $this->assertTrue(ConsentValidationService::isValidTrackingConsent($consent, $client));
+        $this->assertFalse(ConsentValidationService::isValidResidentLocationConsent($consent, $client));
+        $this->assertTrue($privacy->assignmentAuthorisesClient($assignment, $client));
+        $this->assertFalse($privacy->assignmentAuthorisesResidentLocation($assignment, $client));
+        $records = collect([$site, $client, $type, $consent, $device, $assignment, $consent->consentTypeVersion]);
+        $before = $records->map(fn ($record) => $record->refresh()->getRawOriginal())->all();
+        $counts = collect(['client_consents', 'consent_type_versions', 'device_assignments', 'permission_user', 'role_user'])
+            ->mapWithKeys(fn (string $table): array => [$table => DB::table($table)->count()])->all();
+
+        $this->actingAs($this->admin)->get('/security-devices/tracking?tab=personal-safety')
+            ->assertOk()->assertInertia(function ($page) use ($device): void {
+                $props = $page->toArray()['props'];
+                $rows = collect($props['trackingWorkspace']['activeTab']['devices']);
+                $this->assertCount(1, $rows);
+                $row = $rows->sole();
+                $this->assertSame($device->id, $row['id']);
+                $this->assertSame('active', $row['privacy']['state']);
+                $this->assertTrue($row['privacy']['locationAllowed']);
+                $this->assertSame(-36.8485, $row['location']['latitude']);
+                $this->assertSame(174.7633, $row['location']['longitude']);
+                $this->assertNull($row['canonicalHref']);
+                $this->assertNull($row['historyHref']);
+                $this->assertSame(
+                    'Consent is active for this tracking purpose. Client location requires personal tracker consent.',
+                    $row['privacy']['reason'],
+                );
+                $this->assertStringNotContainsString('GENERIC-PRIVATE-PROVIDER-EVIDENCE', json_encode($props, JSON_THROW_ON_ERROR));
+            });
+        $this->get("/operations/clients/{$client->id}?tab=location")
+            ->assertOk()->assertInertia(fn ($page) => $page
+            ->where('location.trackingRestricted', true)
+            ->where('location.tracker', null)
+            ->where('location.currentLocation', null)
+            ->where('location.trackingConsent', null)
+            ->where('location.canManage', false));
+        $this->getJson("/operations/clients/{$client->id}/location/privacy-status")
+            ->assertOk()->assertJsonPath('active', false)->assertJsonPath('access_fingerprint', null);
+        $this->assertSame($before, $records->map(fn ($record) => $record->fresh()->getRawOriginal())->all());
+        foreach ($counts as $table => $count) {
+            $this->assertDatabaseCount($table, $count);
+        }
+    }
+
     private function trackingConsent(Client $client, array $attributes = []): ClientConsent
     {
         $type = ConsentType::factory()->create([
-            'name' => 'Asset Location Tracking (Safety)',
+            'name' => 'Personal Tracker (Wandering Risk)',
             'category' => 'privacy',
             'purpose' => 'Personal safety location tracking',
             'legal_basis' => 'consent',
@@ -731,5 +797,56 @@ class TrackingWorkspaceTest extends TestCase
             'raw_payload' => ['private' => 'RAW-HISTORY-PAYLOAD-SENTINEL'],
             'consent_blocked' => $blocked,
         ]);
+    }
+
+    public function test_queclink_hub_link_uses_masked_last4_for_authorised_integration_managers_without_leaking_full_imei(): void
+    {
+        $site = Site::factory()->create(['name' => 'Harbour Fleet Base']);
+        $vehicle = Asset::factory()->vehicle()->create([
+            'site_id' => $site->id,
+            'name' => 'Harbour Community Van',
+        ]);
+        $tracker = Device::factory()->tracking()->create([
+            'name' => 'Queclink Van Tracker',
+            'subcategory' => 'vehicle_tracker',
+        ]);
+        $this->link($tracker, $vehicle);
+        QueclinkDevice::query()->create([
+            'imei' => '8675309111126789',
+            'device_id' => $tracker->id,
+            'status' => QueclinkDevice::STATUS_PAIRED,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/security-devices/tracking?tab=fleet')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($tracker): void {
+                $workspace = $page->toArray()['props']['trackingWorkspace'];
+                $json = json_encode($workspace, JSON_THROW_ON_ERROR);
+                $row = collect($workspace['activeTab']['devices'])->firstWhere('id', $tracker->id);
+
+                $this->assertNotNull($row);
+                $this->assertSame(
+                    '/security-devices/integrations/queclink?device_search=6789',
+                    $row['queclinkHref'],
+                );
+                $this->assertStringNotContainsString('8675309111126789', $json);
+            });
+
+        $restrictedViewer = $this->viewerWithRole('admin');
+        $restrictedViewer->permissionOverrides()->syncWithoutDetaching([
+            Permission::query()->where('key', 'securityDevices.integrations.manage')->value('id') => ['allowed' => false],
+        ]);
+
+        $this->actingAs($restrictedViewer)
+            ->get('/security-devices/tracking?tab=fleet')
+            ->assertOk()
+            ->assertInertia(function ($page) use ($tracker): void {
+                $row = collect($page->toArray()['props']['trackingWorkspace']['activeTab']['devices'])
+                    ->firstWhere('id', $tracker->id);
+
+                $this->assertNotNull($row);
+                $this->assertNull($row['queclinkHref']);
+            });
     }
 }

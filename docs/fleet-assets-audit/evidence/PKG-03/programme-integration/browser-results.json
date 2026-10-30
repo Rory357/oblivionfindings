@@ -1,0 +1,51 @@
+{
+  "url": "http://127.0.0.1:8773",
+  "applicationSource": "e693f4269591c6db3ab29a94e466db9bc86ae266",
+  "compiledProduction": true,
+  "syntheticInertia": true,
+  "realAuthentication": false,
+  "writesDisabled": true,
+  "assetReviewPdfRendered": true,
+  "assetResolveDeclineOnly": true,
+  "sourceProfileLinkPresent": true,
+  "billGeometry": {
+    "dialog": [
+      {
+        "bottom": 830.8000411987305,
+        "left": 150,
+        "right": 1130
+      }
+    ],
+    "height": 900,
+    "pageWidth": 1280,
+    "pdf": true,
+    "width": 1280
+  },
+  "workGeometry": {
+    "heading": "Brake service and inspection",
+    "height": 900,
+    "pageWidth": 1268,
+    "width": 1280
+  },
+  "pointerOpenedEscapeRestoresFocus": true,
+  "browserLogs": [],
+  "actualBrowserZoom": {
+    "verified": false,
+    "method": "Two ctrl+plus shortcuts",
+    "before": {
+      "width": 2752,
+      "height": 1044,
+      "devicePixelRatio": 1.25,
+      "cssZoom": "1",
+      "visualScale": 1
+    },
+    "after": {
+      "width": 2752,
+      "height": 1044,
+      "devicePixelRatio": 1.25,
+      "cssZoom": "1",
+      "visualScale": 1
+    },
+    "note": "No observable change. Viewport resizing is separate and is not browser zoom."
+  }
+}

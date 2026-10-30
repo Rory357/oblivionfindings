@@ -18,23 +18,24 @@ export type PageHeroStat = {
     sub?: ReactNode;
     icon?: LucideIcon;
     href?: string;
+    /** Opens something in the page (e.g. a dialog) instead of following a link. */
+    onClick?: () => void;
     /** Hide this stat below md. Default true to match the Site Detail reference. */
     hideOnMobile?: boolean;
     tone?: PageHeroStatTone;
 };
 
-// Heroes use a brand-tinted (purple) gradient background, so the dark
-// `*-foreground` variants of the status tokens (designed for on-light
-// backgrounds in light mode) read as black-on-purple. Use the base
-// `text-status-*` tokens instead — they sit at ~45% L in light mode and
-// ~70% L in dark mode, which gives a saturated tinted-white that's
-// visible on the brand gradient without needing a tile background.
+// The hero band is a dark brand shade, and the plain status tokens are tuned
+// for cards: light mode's are dark (~L 0.45) and info IS the brand, so on the
+// band they measured 1.0–2.4:1. The page-hero-tone-* classes (app.css) keep
+// each tone's hue but lift it to L ≥ 0.84 (info 0.86): ≥ 4.7:1 on every
+// brand and Site colour.
 const TONE_VALUE_CLASS: Record<PageHeroStatTone, string> = {
     neutral: '',
-    success: 'text-status-success',
-    warning: 'text-status-warning',
-    critical: 'text-status-critical',
-    info: 'text-status-info',
+    success: 'page-hero-tone-success',
+    warning: 'page-hero-tone-warning',
+    critical: 'page-hero-tone-critical',
+    info: 'page-hero-tone-info',
 };
 
 interface PageHeroStatsProps {
@@ -58,16 +59,16 @@ export function PageHeroStats({
                 {stats.map((stat) => {
                     const Icon = stat.icon;
                     const content = (
-                        <div className="rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 px-4 py-2 text-center backdrop-blur-sm transition-colors hover:bg-primary-foreground/15">
+                        <div className="rounded-xl border border-band-foreground/15 bg-band-foreground/10 px-4 py-2 text-center backdrop-blur-sm transition-colors hover:bg-band-foreground/15">
                             <div className="flex items-center justify-center gap-2">
                                 {Icon ? (
-                                    <Icon className="h-4 w-4 text-primary-foreground/70" />
+                                    <Icon className="h-4 w-4 text-band-foreground/70" />
                                 ) : null}
                                 <div className="text-lg font-bold tabular-nums">
                                     {stat.value}
                                 </div>
                             </div>
-                            <div className="mt-0.5 text-[10px] font-medium tracking-wider text-primary-foreground/60 uppercase">
+                            <div className="mt-0.5 text-[10px] font-medium tracking-wider text-band-foreground/90 uppercase">
                                 {stat.label}
                             </div>
                         </div>
@@ -102,7 +103,7 @@ export function PageHeroStats({
                                 : 'hidden md:block',
                         )}
                     >
-                        <p className="text-[10px] font-semibold tracking-wider text-primary-foreground/70 uppercase">
+                        <p className="text-[10px] font-semibold tracking-wider text-band-foreground/70 uppercase">
                             {stat.label}
                         </p>
                         <p
@@ -116,14 +117,23 @@ export function PageHeroStats({
                             {stat.value}
                         </p>
                         {stat.sub ? (
-                            <p className="text-[11px] text-primary-foreground/70">
+                            <p className="text-[11px] text-band-foreground/70">
                                 {stat.sub}
                             </p>
                         ) : null}
                     </div>
                 );
 
-                return stat.href ? (
+                return stat.onClick ? (
+                    <button
+                        key={String(stat.label)}
+                        type="button"
+                        onClick={stat.onClick}
+                        className="rounded-md transition-opacity outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-band-foreground/70"
+                    >
+                        {inner}
+                    </button>
+                ) : stat.href ? (
                     <Link
                         key={String(stat.label)}
                         href={stat.href}

@@ -1,0 +1,4 @@
+PASS scoped TypeScript/TSX syntax: resources/js/pages/emar/StaffEligibility.tsx
+PASS scoped TypeScript/TSX syntax: resources/js/pages/emar/eligibility/_my-eligibility.tsx
+PASS scoped TypeScript/TSX syntax: resources/js/pages/emar/eligibility/eligibility.test.tsx
+No Vitest, build, backend suite or browser run was launched for this copy patch. Main owns consolidated execution.

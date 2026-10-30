@@ -1,6 +1,7 @@
 /* eslint-disable no-restricted-syntax -- The hub hero, segmented cycle selector,
  * objective rows and right-click menu mirror the Goals & OKR design prototype and
  * use styled native controls. Every colour is a semantic design token. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { PerformanceTabs } from '@/components/hr';
 import { CheckinWizard } from '@/components/hr/goals/checkin-wizard';
 import { DevelopmentWizard } from '@/components/hr/goals/development-wizard';
@@ -214,6 +215,14 @@ export default function GoalsHub({
     }>({ open: false, obj: null });
     const [devWizard, setDevWizard] = useState(false);
     const [reparent, setReparent] = useState<Objective | null>(null);
+    const [objectiveToDelete, setObjectiveToDelete] =
+        useState<Objective | null>(null);
+    const [deletingObjective, setDeletingObjective] = useState(false);
+    const [objectiveToArchive, setObjectiveToArchive] =
+        useState<Objective | null>(null);
+    // The selection is captured when the bulk confirmation opens.
+    const [bulkArchiveIds, setBulkArchiveIds] = useState<number[] | null>(null);
+    const [archiving, setArchiving] = useState(false);
 
     /* ---- context menu + toast ---- */
     const [ctx, setCtx] = useState<{
@@ -323,9 +332,45 @@ export default function GoalsHub({
                     show(
                         status === 'completed'
                             ? 'Objective completed 🎉'
-                            : 'Objective archived',
-                        status === 'cancelled' ? 'warn' : 'ok',
+                            : 'Objective updated',
                     ),
+            },
+        );
+    };
+    // Archive (row menu and bulk bar) only opens a confirmation; the request
+    // is sent from its confirm button.
+    const confirmArchive = () => {
+        if (objectiveToArchive === null) return;
+        router.put(
+            `/hr/goals/${objectiveToArchive.id}`,
+            { status: 'cancelled' },
+            {
+                preserveScroll: true,
+                onStart: () => setArchiving(true),
+                onSuccess: () => show('Objective archived', 'warn'),
+                onFinish: () => {
+                    setArchiving(false);
+                    setObjectiveToArchive(null);
+                },
+            },
+        );
+    };
+    const confirmBulkArchive = () => {
+        if (bulkArchiveIds === null) return;
+        router.post(
+            '/hr/goals/bulk',
+            { action: 'archive', ids: bulkArchiveIds },
+            {
+                preserveScroll: true,
+                onStart: () => setArchiving(true),
+                onSuccess: () => {
+                    setSelected({});
+                    show('Bulk action applied');
+                },
+                onFinish: () => {
+                    setArchiving(false);
+                    setBulkArchiveIds(null);
+                },
             },
         );
     };
@@ -338,13 +383,19 @@ export default function GoalsHub({
                 onSuccess: () => show('Objective duplicated'),
             },
         );
-    const destroy = (o: Objective) => {
-        if (confirm(`Delete “${o.title}”? This cannot be undone.`)) {
-            router.delete(`/hr/goals/${o.id}`, {
-                preserveScroll: true,
-                onSuccess: () => show('Objective deleted', 'warn'),
-            });
-        }
+    // The menu item only opens the confirmation; the request is sent from it.
+    const destroy = (o: Objective) => setObjectiveToDelete(o);
+    const confirmDestroy = () => {
+        if (objectiveToDelete === null) return;
+        router.delete(`/hr/goals/${objectiveToDelete.id}`, {
+            preserveScroll: true,
+            onStart: () => setDeletingObjective(true),
+            onSuccess: () => show('Objective deleted', 'warn'),
+            onFinish: () => {
+                setDeletingObjective(false);
+                setObjectiveToDelete(null);
+            },
+        });
     };
     const bulk = (action: string, extra: Record<string, unknown> = {}) => {
         router.post(
@@ -433,7 +484,7 @@ export default function GoalsHub({
                       label: 'Archive',
                       icon: Trash2,
                       danger: true,
-                      onClick: () => markStatus(o, 'cancelled'),
+                      onClick: () => setObjectiveToArchive(o),
                   },
                   {
                       label: 'Delete',
@@ -585,7 +636,7 @@ export default function GoalsHub({
                                                 parentId: null,
                                             })
                                         }
-                                        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[13px] font-semibold text-primary hover:bg-white/90"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[13px] font-semibold text-primary-strong hover:bg-white/90"
                                     >
                                         <Plus className="h-4 w-4" /> New
                                         objective
@@ -694,7 +745,7 @@ export default function GoalsHub({
                                         className={cn(
                                             'grid h-[22px] w-[22px] place-items-center rounded-md',
                                             active
-                                                ? 'bg-primary text-primary-foreground'
+                                                ? 'bg-primary-fill text-primary-fill-foreground'
                                                 : 'bg-muted text-muted-foreground',
                                         )}
                                     >
@@ -755,6 +806,7 @@ export default function GoalsHub({
                         onMenu={(e, o) => openCtx(e, o.title, objMenu(o))}
                         onAddKr={(o) => openObjective(o.id)}
                         onBulk={bulk}
+                        onBulkArchive={() => setBulkArchiveIds(selectedIds)}
                         onNew={() =>
                             setObjWizard({
                                 open: true,
@@ -983,6 +1035,71 @@ export default function GoalsHub({
                     }
                 />
             )}
+            <ConfirmDialog
+                open={objectiveToDelete !== null}
+                onClose={() => {
+                    if (!deletingObjective) setObjectiveToDelete(null);
+                }}
+                onConfirm={confirmDestroy}
+                title="Delete this objective?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            “{objectiveToDelete?.title}”
+                        </span>{' '}
+                        and its key results come off Goals for everyone. This
+                        can&apos;t be undone.
+                    </>
+                }
+                confirmText="Delete objective"
+                variant="destructive"
+                processing={deletingObjective}
+            />
+            <ConfirmDialog
+                open={objectiveToArchive !== null}
+                onClose={() => {
+                    if (!archiving) setObjectiveToArchive(null);
+                }}
+                onConfirm={confirmArchive}
+                title="Archive this objective?"
+                description={
+                    <>
+                        <span className="font-medium text-foreground">
+                            “{objectiveToArchive?.title}”
+                        </span>{' '}
+                        is marked cancelled. Its key results and check-in
+                        history are kept. To make it active again, edit the
+                        objective and save it.
+                    </>
+                }
+                confirmText="Archive objective"
+                variant="destructive"
+                processing={archiving}
+            />
+            <ConfirmDialog
+                open={bulkArchiveIds !== null}
+                onClose={() => {
+                    if (!archiving) setBulkArchiveIds(null);
+                }}
+                onConfirm={confirmBulkArchive}
+                title={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive 1 objective?'
+                        : `Archive ${bulkArchiveIds?.length ?? 0} objectives?`
+                }
+                description={
+                    bulkArchiveIds?.length === 1
+                        ? 'The selected objective is marked cancelled. Its key results and check-in history are kept. To make it active again, edit the objective and save it.'
+                        : `The ${bulkArchiveIds?.length ?? 0} selected objectives are marked cancelled. Their key results and check-in history are kept. To make one active again, edit it and save it.`
+                }
+                confirmText={
+                    bulkArchiveIds?.length === 1
+                        ? 'Archive objective'
+                        : 'Archive objectives'
+                }
+                variant="destructive"
+                processing={archiving}
+            />
         </AppLayout>
     );
 }
@@ -1025,6 +1142,7 @@ function ObjectivesTab(props: {
     onMenu: (e: React.MouseEvent, o: Objective) => void;
     onAddKr: (o: Objective) => void;
     onBulk: (action: string, extra?: Record<string, unknown>) => void;
+    onBulkArchive: () => void;
     onNew: () => void;
 }) {
     const {
@@ -1152,7 +1270,7 @@ function ObjectivesTab(props: {
                             className={cn(
                                 'grid h-7 w-8 place-items-center rounded-md',
                                 view === k
-                                    ? 'bg-primary text-primary-foreground'
+                                    ? 'bg-primary-fill text-primary-fill-foreground'
                                     : 'text-muted-foreground hover:bg-muted',
                             )}
                         >
@@ -1175,9 +1293,7 @@ function ObjectivesTab(props: {
                     <BulkBtn onClick={() => props.onBulk('request_checkin')}>
                         Request check-in
                     </BulkBtn>
-                    <BulkBtn onClick={() => props.onBulk('archive')}>
-                        Archive
-                    </BulkBtn>
+                    <BulkBtn onClick={props.onBulkArchive}>Archive</BulkBtn>
                     <div className="flex-1" />
                     <button
                         type="button"
@@ -1197,7 +1313,7 @@ function ObjectivesTab(props: {
                 />
             ) : (
                 <div className="mt-3.5 overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                    <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                    <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                         {can.manage ? (
                             <button
                                 type="button"
@@ -1560,7 +1676,7 @@ function BoardView({
                 return (
                     <div
                         key={c.key}
-                        className="overflow-hidden rounded-xl border border-border bg-sidebar"
+                        className="overflow-hidden rounded-xl border border-border bg-muted/30"
                     >
                         <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
                             <span className="inline-flex items-center gap-2 text-[12.5px] font-bold">
@@ -1845,14 +1961,14 @@ function DevelopmentTab({
                     <button
                         type="button"
                         onClick={onNew}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-[12.5px] font-semibold text-primary-foreground shadow-sm"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary-fill px-3.5 py-2 text-[12.5px] font-semibold text-primary-fill-foreground shadow-sm"
                     >
                         <Plus className="h-4 w-4" /> New development plan
                     </button>
                 )}
             </div>
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                <div className="flex items-center gap-3 border-b border-border bg-sidebar px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
+                <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-4 py-2.5 text-[10.5px] font-bold tracking-wide text-muted-foreground uppercase">
                     <span className="flex-1">Person &amp; competency</span>
                     <span className="hidden w-[150px] lg:block">Level</span>
                     <span className="w-[120px]">Status</span>
@@ -2273,7 +2389,7 @@ function ReparentDialog({
                                     : Number(parentId),
                             )
                         }
-                        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                        className="rounded-lg bg-primary-fill px-4 py-2 text-sm font-semibold text-primary-fill-foreground"
                     >
                         Move
                     </button>

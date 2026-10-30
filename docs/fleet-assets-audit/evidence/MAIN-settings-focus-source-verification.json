@@ -1,0 +1,20 @@
+[
+  {
+    "path": "resources/js/pages/fleet-assets/settings/_maps.tsx",
+    "expected": "a8ee1445b2ac57e4d16ae86848c4682ae9142624e39aa2cd0670185e25dff244",
+    "actual": "a8ee1445b2ac57e4d16ae86848c4682ae9142624e39aa2cd0670185e25dff244",
+    "match": true
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/settings/_ui.tsx",
+    "expected": "6a2282273398f26ce4e4017cd5ad112d7550780d7dce51567e6529ace8d166bf",
+    "actual": "6a2282273398f26ce4e4017cd5ad112d7550780d7dce51567e6529ace8d166bf",
+    "match": true
+  },
+  {
+    "path": "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx",
+    "expected": "0c29332aafe9423f8a6319cc9a4650469803cb25dce7c752770a9427989565ae",
+    "actual": "0c29332aafe9423f8a6319cc9a4650469803cb25dce7c752770a9427989565ae",
+    "match": true
+  }
+]

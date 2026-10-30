@@ -22,7 +22,7 @@ export function PipelineStepper({
                         <div
                             className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
                                 isActive
-                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    ? 'bg-primary-fill text-primary-fill-foreground shadow-sm'
                                     : isPast
                                       ? 'bg-primary/20 text-primary'
                                       : 'bg-muted text-muted-foreground'

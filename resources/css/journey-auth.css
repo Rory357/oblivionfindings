@@ -1,0 +1,499 @@
+/* ──────────────────────────────────────────────────────────────────────────
+ * Journey sign-in pages (approved half-and-half design, 13 Oct 2026).
+ * Staff: ink brand half + paper form half. Family: lilac brand half (ink in
+ * dark mode) + paper form half. Tokens only: --journey-* in app.css derive
+ * from --primary, so Settings › Branding recolours everything here.
+ * Components: layouts/auth/auth-journey-layout.tsx, components/brand/*.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+/* The brand's variable Instrument Sans (SIL OFL 1.1, public/fonts/instrument-sans/OFL.txt):
+   the app loads 400–600 only, but the Journey wordmark and headlines need
+   700 and 420. Scoped to these pages under its own family name. */
+@font-face {
+    font-family: 'Instrument Sans Journey';
+    src: url('/fonts/instrument-sans/InstrumentSans-variable.ttf')
+        format('truetype');
+    font-weight: 400 700;
+    font-stretch: 75% 100%;
+    font-display: swap;
+}
+
+.journey-auth {
+    font-family:
+        'Instrument Sans Journey', 'Instrument Sans', ui-sans-serif, system-ui,
+        sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--journey-surface);
+    color: var(--foreground);
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+}
+.journey-auth[data-audience='family'] {
+    font-size: 16px;
+}
+
+/* ── Brand half ─────────────────────────────────────────────────────────── */
+.journey-brand {
+    position: relative;
+    overflow: clip;
+    flex: 1 1 560px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 40px 56px 36px;
+    display: flex;
+    flex-direction: column;
+}
+.journey-brand--staff {
+    color: var(--journey-paper);
+    background:
+        radial-gradient(
+            70% 55% at 100% 100%,
+            color-mix(in oklch, var(--primary) 42%, transparent) 0%,
+            transparent 70%
+        ),
+        radial-gradient(
+            50% 40% at 0% 0%,
+            color-mix(in oklch, var(--primary) 16%, transparent) 0%,
+            transparent 70%
+        ),
+        var(--journey-ink);
+}
+.journey-brand--family {
+    color: var(--foreground);
+    background:
+        radial-gradient(
+            70% 55% at 100% 100%,
+            color-mix(in oklch, var(--journey-lavender) 85%, transparent) 0%,
+            transparent 72%
+        ),
+        radial-gradient(
+            60% 45% at 0% 0%,
+            color-mix(in oklch, var(--journey-paper) 70%, transparent) 0%,
+            transparent 70%
+        ),
+        var(--journey-lilac);
+}
+/* In dark mode the family half turns ink, like the staff half. */
+.dark .journey-brand--family {
+    color: var(--journey-paper);
+    background:
+        radial-gradient(
+            70% 55% at 100% 100%,
+            color-mix(in oklch, var(--primary) 42%, transparent) 0%,
+            transparent 70%
+        ),
+        var(--journey-ink);
+}
+
+.journey-display {
+    margin: 0;
+    font-size: 54px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+}
+.journey-display__accent {
+    color: var(--journey-lavender);
+}
+.journey-brand--family .journey-display__accent {
+    color: var(--primary-text);
+}
+.dark .journey-brand--family .journey-display__accent {
+    color: var(--journey-lavender);
+}
+.journey-lede {
+    margin: 0;
+    max-width: 380px;
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--journey-ink-muted);
+}
+.journey-brand--family .journey-lede {
+    max-width: 360px;
+    color: var(--muted-foreground);
+}
+.dark .journey-brand--family .journey-lede {
+    color: var(--journey-ink-muted);
+}
+
+/* Privacy / Terms / "Powered by" at the foot of the brand half. */
+.journey-brand-links {
+    color: var(--journey-ink-muted);
+}
+.journey-brand--family .journey-brand-links {
+    color: var(--muted-foreground);
+}
+.dark .journey-brand--family .journey-brand-links {
+    color: var(--journey-ink-muted);
+}
+
+/* The NZ islands mark, sized to the room left under the headline. */
+.journey-hero-mark {
+    position: absolute;
+    right: 44px;
+    bottom: 34px;
+    height: clamp(280px, calc(100vh - 380px), 520px);
+    width: auto;
+    aspect-ratio: 280 / 372;
+    overflow: visible;
+    pointer-events: none;
+}
+
+/* Family half in dark mode: lavender islands on ink, like staff. */
+.dark .journey-brand--family .fill-primary {
+    fill: var(--journey-lavender);
+}
+/* On the light family half the travelling light is ink, not paper. */
+.journey-brand--family .journey-traveller {
+    stroke: var(--journey-ink);
+}
+.journey-brand--family .journey-arrive {
+    fill: var(--journey-ink);
+}
+.dark .journey-brand--family .journey-traveller {
+    stroke: var(--journey-paper);
+}
+.dark .journey-brand--family .journey-arrive {
+    fill: var(--journey-paper);
+}
+
+/* Brand-half chips (family: what the portal offers). */
+.journey-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 14px 0 11px;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--journey-paper) 75%, transparent);
+    border: 1px solid
+        color-mix(in oklch, var(--journey-lavender) 70%, transparent);
+    font-size: 15px;
+    font-weight: 550;
+}
+.journey-chip svg {
+    color: var(--primary-text);
+}
+.dark .journey-chip {
+    background: color-mix(in oklch, var(--journey-paper) 6%, transparent);
+    border-color: color-mix(in oklch, var(--journey-lavender) 30%, transparent);
+}
+.dark .journey-chip svg {
+    color: var(--journey-lavender);
+}
+
+/* ── Brand half over the client's own photo or brand colour ──────────────
+ * Stephan, 21 Oct 2026 (mockup v2): with client branding, the brand half
+ * shows the client's hero photo from Settings › Branding, or a plain
+ * brand-colour panel when there is no photo. The islands art is only
+ * Oblivion's own default (no client branding at all).
+ * Two scrims keep AA on any photo: a top band behind "Back to website" and
+ * the logo (≥ 72 % ink), and one that travels with the welcome block
+ * (≥ 90 % ink behind every line of text), so taller content (the family
+ * chips) never slides onto bare photo. */
+.journey-brand--photo,
+.journey-brand--panel {
+    color: var(--journey-paper);
+    background: var(--journey-ink); /* while the photo loads */
+}
+/* Floored like the page hero band (L ≤ 0.38 → 0.30): paper text stays AA. */
+.journey-brand--panel {
+    background: linear-gradient(
+        160deg,
+        oklch(from var(--primary) min(l, 0.38) c h),
+        oklch(from var(--primary) min(l, 0.3) c h)
+    );
+}
+.journey-brand-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.journey-brand-scrim {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        180deg,
+        color-mix(in oklab, var(--journey-ink) 86%, transparent) 0,
+        color-mix(in oklab, var(--journey-ink) 72%, transparent) 160px,
+        /* Holds to the bottom. Don't repeat this stop at 100 %: the
+           minifier merges identical stops into an invalid "300px100%". */
+        color-mix(in oklab, var(--journey-ink) 25%, transparent) 300px
+    );
+}
+.journey-brand-welcome {
+    position: relative;
+    z-index: 0;
+}
+.journey-brand--photo .journey-brand-welcome::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: -140px;
+    right: -56px;
+    bottom: -36px;
+    left: -56px;
+    background: linear-gradient(
+        180deg,
+        transparent 0,
+        color-mix(in oklab, var(--journey-ink) 90%, transparent) 140px,
+        color-mix(in oklab, var(--journey-ink) 95%, transparent) 100%
+    );
+}
+/* Over a photo or panel the family chips wrap in a row, so the welcome
+   block (and its scrim) stays short and more of the photo shows. */
+:is(.journey-brand--photo, .journey-brand--panel) .journey-brand-welcome > ul {
+    flex-direction: row;
+    flex-wrap: wrap;
+    max-width: 520px;
+}
+/* Family chips on the photo or panel take their dark-mode look in both modes. */
+:is(.journey-brand--photo, .journey-brand--panel) .journey-chip {
+    background: color-mix(in oklab, var(--journey-paper) 8%, transparent);
+    border-color: color-mix(in oklab, var(--journey-lavender) 35%, transparent);
+}
+:is(.journey-brand--photo, .journey-brand--panel) .journey-chip svg {
+    color: var(--journey-lavender);
+}
+
+/* ── Form half ──────────────────────────────────────────────────────────── */
+.journey-form-half {
+    flex: 1 1 520px;
+    min-height: 100vh;
+    box-sizing: border-box;
+    padding: 28px 44px;
+    display: flex;
+    flex-direction: column;
+    background: var(--journey-surface);
+}
+.journey-form {
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+.journey-auth[data-audience='family'] .journey-form {
+    max-width: 420px;
+}
+.journey-title {
+    margin: 0;
+    font-size: 34px;
+    line-height: 1.1;
+    font-weight: 700;
+    letter-spacing: -0.035em;
+}
+.journey-subtitle {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+}
+.journey-auth[data-audience='family'] .journey-subtitle {
+    font-size: 16px;
+}
+.journey-label {
+    font-size: 14px;
+    font-weight: 600;
+}
+.journey-auth[data-audience='family'] .journey-label {
+    font-size: 15px;
+}
+.journey-hint {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+}
+.journey-auth[data-audience='family'] .journey-hint {
+    font-size: 14px;
+}
+
+/* Inputs and buttons on the sign-in pages: 48 px (family 50 px), 12 px radius. */
+.journey-auth .journey-control {
+    min-height: 48px;
+    border-radius: 12px;
+    font-size: 15px;
+}
+.journey-auth[data-audience='family'] .journey-control {
+    min-height: 50px;
+    font-size: 16px;
+}
+.journey-auth input.journey-control {
+    background: var(--journey-field);
+    padding-inline: 15px;
+}
+.journey-auth input.journey-control:focus-visible {
+    background: var(--journey-surface);
+}
+
+/* The signed-in-as row of the email-first flow ("you@… · Change"). */
+.journey-who {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px 10px 14px;
+    border-radius: 12px;
+    background: var(--journey-field);
+    border: 1px solid var(--border);
+    font-weight: 600;
+}
+
+/* A quiet lavender note box ("First time here? …"). */
+.journey-note {
+    margin: 0;
+    padding: 14px 16px;
+    border-radius: 14px;
+    background: color-mix(
+        in oklch,
+        var(--journey-lavender) 16%,
+        var(--journey-surface)
+    );
+    border: 1px solid
+        color-mix(in oklch, var(--journey-lavender) 55%, var(--border));
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--muted-foreground);
+}
+
+.journey-badge {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: color-mix(
+        in oklch,
+        var(--journey-lavender) 40%,
+        var(--journey-surface)
+    );
+    color: var(--primary-text);
+}
+
+.journey-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted-foreground);
+    font-size: 13.5px;
+}
+.journey-divider::before,
+.journey-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+/* ── Journey step line (invitation, two-step verification) ─────────────── */
+.journey-steps__done {
+    fill: none;
+    stroke: var(--primary);
+    stroke-width: 3;
+    stroke-linecap: round;
+}
+.journey-steps__next {
+    fill: none;
+    stroke: var(--journey-lavender);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 1 7;
+}
+.journey-steps__off {
+    fill: none;
+    stroke: var(--input);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 1 7;
+}
+.journey-steps__dot-done {
+    fill: var(--primary);
+}
+.journey-steps__dot-now {
+    fill: var(--journey-surface);
+    stroke: var(--primary);
+    stroke-width: 3.5;
+}
+.journey-steps__dot-next {
+    fill: var(--journey-surface);
+    stroke: var(--journey-lavender);
+    stroke-width: 3;
+}
+.journey-steps__dot-off {
+    fill: var(--journey-surface);
+    stroke: var(--input);
+    stroke-width: 3;
+}
+.journey-steps__halo {
+    fill: color-mix(in oklch, var(--primary) 18%, transparent);
+}
+
+/* ── The journey animation ─────────────────────────────────────────────────
+ * A light travels the pathway once, from Southland to East Cape, while the
+ * sign-in is sent, and the destination dot lights up. Never loops (DESIGN.md
+ * reserves looping motion for the loader); off under reduced motion. */
+.journey-traveller {
+    fill: none;
+    stroke: var(--journey-paper);
+    stroke-width: 5.8;
+    stroke-linecap: round;
+    stroke-dasharray: 7 140;
+    stroke-dashoffset: 7;
+    opacity: 0;
+}
+.journey-arrive {
+    fill: var(--journey-paper);
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+    .journey-auth.is-signing .journey-traveller {
+        opacity: 1;
+        animation: journey-travel 2.2s cubic-bezier(0.5, 0, 0.3, 1) forwards;
+        filter: drop-shadow(0 0 5px var(--journey-lavender));
+    }
+    .journey-auth.is-signing .journey-arrive {
+        animation: journey-arrive 2.2s ease forwards;
+        filter: drop-shadow(0 0 6px var(--journey-lavender));
+    }
+}
+html.reduce-motion .journey-traveller,
+html.reduce-motion .journey-arrive {
+    animation: none !important;
+    opacity: 0 !important;
+}
+@keyframes journey-travel {
+    0% {
+        stroke-dashoffset: 7;
+    }
+    100% {
+        stroke-dashoffset: -100;
+    }
+}
+@keyframes journey-arrive {
+    0%,
+    82% {
+        opacity: 0;
+        transform: scale(0.4);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Narrow windows: the form alone (the app is desktop-first, but invitation
+   emails get opened on phones). */
+@media (max-width: 960px) {
+    .journey-brand {
+        display: none;
+    }
+    .journey-form-half {
+        padding: 20px 16px;
+    }
+}

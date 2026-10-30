@@ -1,0 +1,42 @@
+[
+  {
+    "Source": "storage/logs/assets-publication-main-dependencies.txt",
+    "Evidence": "main-dependencies.log",
+    "SourceCommit": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+    "ExecutedIn": "actual main checkout",
+    "SourceSHA256": "b700bb44300ad090399b38b1900a7142b73a760f869bf7136ccfcfdc3697706f",
+    "EvidenceSHA256": "e23f6caa732595cf445cb725b8871918cd8f0b88c3d5db25ba16d82c132641be"
+  },
+  {
+    "Source": "storage/logs/assets-publication-main-eslint.txt",
+    "Evidence": "main-eslint.log",
+    "SourceCommit": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+    "ExecutedIn": "actual main checkout",
+    "SourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "EvidenceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "Source": "storage/logs/assets-publication-main-php-syntax.txt",
+    "Evidence": "main-php-syntax.log",
+    "SourceCommit": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+    "ExecutedIn": "actual main checkout",
+    "SourceSHA256": "7594078ebe332ee0c95153293cfb0e5cba245b18e28d23f3e59d426adaa83b4b",
+    "EvidenceSHA256": "ede00971fa1304a25a95c34079db96d5d73e0a74d8c89c5a085c9c9849d2346a"
+  },
+  {
+    "Source": "storage/logs/assets-publication-main-types.txt",
+    "Evidence": "main-types.log",
+    "SourceCommit": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+    "ExecutedIn": "actual main checkout",
+    "SourceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "EvidenceSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "Source": "storage/logs/assets-publication-main-ui.txt",
+    "Evidence": "main-ui.log",
+    "SourceCommit": "b05702d7208c88d9cffb9c092df23d3b02300b1e",
+    "ExecutedIn": "actual main checkout",
+    "SourceSHA256": "cb2f5d712e124e3e6a970e0db733eaab9b3bb09ff40042b3f8f9bfc07391386b",
+    "EvidenceSHA256": "181c66aacec4d9d1bccf1631df37cd7673c4ec285c5c1c9c95cec57ff48a693d"
+  }
+]

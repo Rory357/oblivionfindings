@@ -81,7 +81,7 @@ test('IT pages share the approved grouped navigation while preserving existing d
         ->get('/it/provisioning?status=pending')
         ->assertOk()
         ->assertInertia(fn ($page) => $page
-            ->component('it/index')
+            ->component('it/provisioning/index')
             ->has('itNavigation', 4)
             ->where('itNavigation.0.label', 'Service Desk')
             ->where('itNavigation.1.label', 'Service Delivery')

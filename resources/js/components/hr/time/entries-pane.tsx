@@ -212,7 +212,7 @@ export function EntriesPane({
                     <button
                         type="button"
                         onClick={onAdd}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary px-3.5 text-[13px] font-semibold text-primary-foreground hover:brightness-95"
+                        className="inline-flex h-9 items-center gap-1.5 rounded-[9px] bg-primary-fill px-3.5 text-[13px] font-semibold text-primary-fill-foreground hover:brightness-95"
                     >
                         <Plus className="h-[15px] w-[15px]" />
                         Add entry

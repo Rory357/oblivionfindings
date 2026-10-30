@@ -2,14 +2,17 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Exceptions\StaleBillApprovalException;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinBillApprovalReceipt;
 use App\Domain\Finance\Models\FinCostAllocation;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Governance\Models\SpendApproval;
 use App\Domain\Governance\Models\SpendApprovalDecision;
 use App\Domain\Governance\Services\SpendApprovalCommandService;
+use App\Models\Asset;
 use App\Models\User;
 use App\Services\UserSiteAccessService;
 use App\Support\JsonEvidence;
@@ -43,7 +46,7 @@ class AccountsPayableService
             return collect();
         }
 
-        $siteIds = $this->accessibleSpendSiteIds($actor);
+        $siteIds = array_values(array_intersect($this->accessibleSpendSiteIds($actor), app(BillSiteScope::class)->siteIds($actor, true)));
         if ($siteIds === []) {
             return collect();
         }
@@ -117,6 +120,11 @@ class AccountsPayableService
     public function createBill(?int $orgId, array $data, ?User $actor = null): FinBill
     {
         return DB::transaction(function () use ($orgId, $data, $actor) {
+            if ($actor) {
+                $actor = $this->lockUser($actor->id);
+                Gate::forUser($actor)->authorize('create', FinBill::class);
+                app(BillSiteScope::class)->assertSite($actor, isset($data['site_id']) ? (int) $data['site_id'] : null);
+            }
             $approvalId = filled($data['spend_approval_id'] ?? null)
                 ? (int) $data['spend_approval_id']
                 : null;
@@ -292,6 +300,7 @@ class AccountsPayableService
     public function updateBill(FinBill $bill, array $data, ?User $actor = null): FinBill
     {
         return DB::transaction(function () use ($bill, $data, $actor) {
+            $lockedActor = $actor ? $this->lockUser($actor->id) : null;
             $approvalId = filled($data['spend_approval_id'] ?? null)
                 ? (int) $data['spend_approval_id']
                 : null;
@@ -310,11 +319,13 @@ class AccountsPayableService
             if ($lockedBill->status !== 'draft') {
                 throw new InvalidArgumentException('Only draft bills can be updated.');
             }
-            if ($approval) {
+            if ($lockedActor) {
                 Gate::forUser($lockedActor)->authorize('update', $lockedBill);
+                app(BillSiteScope::class)->assertSite($lockedActor, (int) ($data['site_id'] ?? $lockedBill->site_id));
             }
 
             $lockedBill->update([
+                'site_id' => $data['site_id'] ?? $lockedBill->site_id,
                 'vendor_id' => $data['vendor_id'],
                 'vendor_reference' => $data['vendor_reference'] ?? null,
                 'bill_date' => $data['bill_date'],
@@ -385,14 +396,18 @@ class AccountsPayableService
      * Approve a bill and create the GL journal entry.
      * DR expense accounts (per line), CR Accounts Payable (code '2000').
      */
-    public function approveBill(FinBill $bill, int $userId): FinBill
+    public function approveBill(FinBill $bill, int $userId, ?string $expectedSnapshot = null): FinBill
     {
         $preflight = FinBill::query()
             ->whereKey($bill->id)
-            ->firstOrFail(['id', 'spend_approval_id', 'total_amount']);
+            ->firstOrFail(['id', 'asset_id', 'spend_approval_id', 'total_amount']);
         $threshold = (float) config('finance.spend_approval.threshold', 10000);
         $preflightRequiresSpendApproval = config('finance.spend_approval.enforce', false)
             && (float) $preflight->total_amount >= $threshold;
+        // A completed command can be recovered after its Governance evidence expires.
+        // Fresh bill/action/site authorisation still runs under the bill lock below.
+        $completedCommand = $expectedSnapshot !== null && FinBillApprovalReceipt::query()
+            ->where('bill_id', $bill->id)->where('actor_id', $userId)->where('snapshot', $expectedSnapshot)->exists();
 
         return DB::transaction(function () use (
             $bill,
@@ -400,19 +415,51 @@ class AccountsPayableService
             $preflight,
             $preflightRequiresSpendApproval,
             $threshold,
+            $expectedSnapshot,
+            $completedCommand,
         ) {
             $lockedActor = $this->lockUser($userId);
             $approval = null;
-            if ($preflightRequiresSpendApproval && $preflight->spend_approval_id) {
+            if (! $completedCommand && $preflightRequiresSpendApproval && $preflight->spend_approval_id) {
                 $approval = $this->lockVisibleSpendApproval(
                     $lockedActor,
                     (int) $preflight->spend_approval_id,
                 );
             }
 
+            // Match maintenance's asset → work → bill order so a quote/link cannot
+            // change between the reviewed evidence check and posting.
+            if (! $completedCommand && $preflight->asset_id) {
+                Asset::query()->whereKey($preflight->asset_id)->lockForUpdate()->firstOrFail();
+            }
             $lockedBill = FinBill::query()
                 ->lockForUpdate()
                 ->findOrFail($bill->id);
+            if ((int) $lockedBill->asset_id !== (int) $preflight->asset_id) {
+                throw new StaleBillApprovalException;
+            }
+            if ($expectedSnapshot !== null) {
+                Gate::forUser($lockedActor)->authorize('approve', $lockedBill);
+                $receipt = FinBillApprovalReceipt::query()->where('bill_id', $lockedBill->id)
+                    ->where('actor_id', $lockedActor->id)->where('snapshot', $expectedSnapshot)->first();
+                if ($receipt) {
+                    return $lockedBill->setAttribute('approval_receipt', $receipt->result);
+                }
+                app(BillSiteScope::class)->assertSite($lockedActor, $lockedBill->site_id);
+                $lockedBill->setRelation('lines', $lockedBill->lines()->orderBy('id')->lockForUpdate()->get());
+                $lockedBill->setRelation('documents', $lockedBill->documents()->orderBy('id')->lockForUpdate()->get());
+                if ($lockedBill->documents->contains(fn ($document) => ! in_array($document->state, ['available', 'withdrawn'], true))) {
+                    throw new InvalidArgumentException('Finish uploading and scanning supporting documents before approving.');
+                }
+                if (! hash_equals(BillApprovalSnapshot::token($lockedBill, true), $expectedSnapshot)) {
+                    throw new StaleBillApprovalException;
+                }
+                $workEvidence = app(BillWorkContext::class)->snapshot($lockedBill, true);
+                $quoteIds = $workEvidence['quote'] ? (json_decode($workEvidence['quote']->payload_json, true)['document_ids'] ?? []) : [];
+                if (count($quoteIds) !== count($workEvidence['documents']) || collect($workEvidence['documents'])->contains(fn ($file) => $file['state'] !== 'available' || $file['scan_disposition'] !== 'clean' || $file['archived_at'] !== null)) {
+                    throw new InvalidArgumentException('Finish checking the linked quote evidence or record its replacement before approving.');
+                }
+            }
             if (! in_array($lockedBill->status, ['draft', 'awaiting_approval'])) {
                 throw new InvalidArgumentException('Only draft or awaiting approval bills can be approved.');
             }
@@ -494,6 +541,18 @@ class AccountsPayableService
             ]);
 
             $this->allocateCapturedBill($lockedBill, $journal);
+
+            if ($expectedSnapshot !== null) {
+                $receipt = FinBillApprovalReceipt::create([
+                    'bill_id' => $lockedBill->id, 'actor_id' => $lockedActor->id,
+                    'snapshot' => $expectedSnapshot, 'journal_id' => $journal->id,
+                    'result' => ['bill_id' => $lockedBill->id, 'bill_number' => $lockedBill->bill_number,
+                        'total' => $lockedBill->total_amount, 'journal_id' => $journal->id,
+                        'journal_number' => $journal->journal_number, 'approved_at' => $lockedBill->approved_at->toIso8601String()],
+                ]);
+
+                return $lockedBill->refresh()->setAttribute('approval_receipt', $receipt->result);
+            }
 
             return $lockedBill->refresh();
         });
@@ -665,15 +724,21 @@ class AccountsPayableService
     /**
      * Cancel a bill. Only allowed if draft or awaiting_approval.
      */
-    public function cancelBill(FinBill $bill): FinBill
+    public function cancelBill(FinBill $bill, ?User $actor = null): FinBill
     {
-        if (! in_array($bill->status, ['draft', 'awaiting_approval'])) {
-            throw new InvalidArgumentException('Only draft or awaiting approval bills can be cancelled.');
-        }
+        return DB::transaction(function () use ($bill, $actor): FinBill {
+            $current = $actor ? $this->lockUser($actor->id) : null;
+            $locked = FinBill::query()->whereKey($bill->id)->lockForUpdate()->firstOrFail();
+            if ($current) {
+                Gate::forUser($current)->authorize('update', $locked);
+            }
+            if (! in_array($locked->status, ['draft', 'awaiting_approval'], true) || $locked->journal_id) {
+                throw new InvalidArgumentException('Only unposted draft or awaiting approval bills can be cancelled.');
+            }
+            $locked->update(['status' => 'cancelled']);
 
-        $bill->update(['status' => 'cancelled']);
-
-        return $bill->refresh();
+            return $locked->refresh();
+        }, 3);
     }
 
     /**

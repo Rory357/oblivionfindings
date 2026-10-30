@@ -1,0 +1,425 @@
+{
+  "version": "PKG-02B-v11",
+  "finalBuildObservedAt": "2026-09-22T01:23:19.408Z",
+  "observations": [
+    {
+      "label": "02-templates",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/checks/templates",
+      "collections": [
+        {
+          "label": "Checklist templates",
+          "mode": "list",
+          "width": 847
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Vehicle condition record",
+        "Check templates"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "03-readiness",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/overview",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Restricted for use",
+        "Next service",
+        "Compliance at a glance",
+        "What happens next"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "04-vehicle-details",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/overview/details",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Toyota Hiace",
+        "Vehicle details",
+        "Vehicle documents 0",
+        "Lifecycle history"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "05-documents-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/overview/documents",
+      "collections": [
+        {
+          "label": "Required documents",
+          "mode": "list",
+          "width": 889
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Documents & renewal evidence",
+        "Add the evidence behind this record"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "06-finance-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/overview/finance",
+      "collections": [
+        {
+          "label": "Linked Finance records",
+          "mode": "list",
+          "width": 847
+        },
+        {
+          "label": "Finance review requests",
+          "mode": "list",
+          "width": 847
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Ownership, purchasing & costs",
+        "Linked Finance records",
+        "Finance review requests"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "07-compliance-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/compliance",
+      "collections": [
+        {
+          "label": "Compliance requirements",
+          "mode": "list",
+          "width": 847
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Service & compliance"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "08-service-schedules-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/compliance/schedules",
+      "collections": [
+        {
+          "label": "Service schedules",
+          "mode": "list",
+          "width": 889
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Service schedules"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "09-reminders-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/compliance/reminders",
+      "collections": [
+        {
+          "label": "Vehicle follow-ups",
+          "mode": "list",
+          "width": 847
+        },
+        {
+          "label": "Obligation reminders",
+          "mode": "list",
+          "width": 847
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Reminders",
+        "Vehicle follow-ups",
+        "No follow-ups yet",
+        "Obligation reminders"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "10-service-history-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/compliance/history",
+      "collections": [
+        {
+          "label": "Service & work records",
+          "mode": "list",
+          "width": 847
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Service & work history"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "11-mileage-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/compliance/mileage",
+      "collections": [
+        {
+          "label": "Mileage readings",
+          "mode": "list",
+          "width": 609
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Mileage history",
+        "Connect mileage to service planning",
+        "Routine service",
+        "Recorded distance"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "12-maintenance-list",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/maintenance",
+      "collections": [
+        {
+          "label": "Open maintenance work",
+          "mode": "list",
+          "width": 847
+        }
+      ],
+      "documentWidth": 1115,
+      "headings": [
+        "Open work"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "13-work-overview",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/maintenance/work-orders/WO-0268?return=vehicle-14",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Work summary",
+        "Restriction active"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "13-work-appointment",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/maintenance/work-orders/WO-0268?return=vehicle-14",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Provider appointment",
+        "Restriction active"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "13-work-evidence",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/maintenance/work-orders/WO-0268?return=vehicle-14",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Work evidence 0",
+        "Restriction active"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "13-work-costs",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/maintenance/work-orders/WO-0268?return=vehicle-14",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Costs & Finance context",
+        "Restriction active"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "14-map",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/map",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Vehicle location",
+        "KWH014",
+        "Linked geofences"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "15-telemetry",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/map/telemetry",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "GV500CG · vehicle telemetry",
+        "Connect mileage to service planning",
+        "What this unit can contribute",
+        "VIN stays with the vehicle record"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "16-driving-insights",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/map/driving",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Driving analytics",
+        "Know what shaped the score",
+        "See change over time",
+        "Review the threshold event",
+        "Insights by trip",
+        "Events to review",
+        "Evidence before attribution"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "17-alerts",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/map/alerts",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Vehicle alerts → Control Room",
+        "Response queue 0",
+        "No matching alerts",
+        "Try an event",
+        "Shift lead → Operations Manager"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "18-trip-history",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/trips",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Recorded journey",
+        "Review driving events",
+        "Speed through the trip",
+        "Journey timeline 5",
+        "Review the overspeed event"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "19-calendar-month",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/calendar",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Bookings & custody",
+        "No booking requests yet"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "19-calendar-week",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/calendar",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Bookings & custody",
+        "No booking requests yet"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "19-calendar-day",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/calendar",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "22 September 2026",
+        "Bookings & custody",
+        "No booking requests yet"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "19-calendar-agenda",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/calendar",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Bookings & custody",
+        "No booking requests yet"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "19-calendar-timeline",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/calendar",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Bookings & custody",
+        "No booking requests yet"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "19-calendar-month",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/calendar",
+      "collections": [],
+      "documentWidth": 1115,
+      "headings": [
+        "Bookings & custody",
+        "No booking requests yet"
+      ],
+      "width": 1130
+    },
+    {
+      "label": "20-mobile-reminders-final",
+      "url": "http://127.0.0.1:4346/PKG-02B/v11/#/fleet-assets/vehicles/14/compliance/reminders",
+      "collections": [
+        {
+          "label": "Vehicle follow-ups",
+          "mode": "list",
+          "width": 283
+        },
+        {
+          "label": "Obligation reminders",
+          "mode": "list",
+          "width": 251
+        }
+      ],
+      "documentWidth": 375,
+      "headings": [
+        "Reminders",
+        "Vehicle follow-ups",
+        "No follow-ups yet",
+        "Obligation reminders"
+      ],
+      "width": 390
+    }
+  ],
+  "resolvedFindings": [
+    "Replaced inconsistent record presentations with shared List/Card shells",
+    "Fixed narrow summary grids and header overflow",
+    "Fixed speed-limit date/time fields escaping the panel",
+    "Removed stretched check requirement sidebar",
+    "Added actionable document empty state"
+  ],
+  "workflowChecks": [
+    "Checklist filter survives view switch; selected template customisation opens",
+    "Mileage filter and selected detail survive view switch; correction retains ODO-DEMO-03",
+    "Compliance shared context actions; synthetic evidence saves to owning record",
+    "Document library both modes shows evidence and returns to source",
+    "Maintenance card opens correct work and all record sections",
+    "Reminder creation from calendar preserves date/time; both layouts and calendar return verified",
+    "View-only menus omit mutations; primary mutation buttons remain disabled",
+    "First-use service schedules display honest empty state",
+    "Layout preferences persist across navigation/reload; restored List defaults",
+    "390px layouts verified for compliance, checks, templates, documents, mileage, schedules, Finance, reminders, readiness"
+  ],
+  "limitations": [
+    "Native file chooser automation timed out; existing synthetic evidence path used instead",
+    "Unchanged PDF/Excel exports and backend integrations not rerun",
+    "Readability review is not production acceptance"
+  ],
+  "consoleErrors": []
+}

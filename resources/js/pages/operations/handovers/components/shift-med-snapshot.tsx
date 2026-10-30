@@ -3,11 +3,14 @@
  * lens). Fed by GET /emar/handovers/shift-medications?shift_id=… — see
  * app/Services/Emar/ShiftMedicationSnapshotService. Operations never wires the
  * snapshot URL, so this is eMAR-only in practice. Semantic tokens throughout. */
+import { OutstandingMedicationWork } from '@/components/emar/followups/outstanding-work';
+import type { OutstandingMedicationWorkData } from '@/components/emar/followups/types';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle, Loader2, Pill } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-export type ShiftMedSnapshot = {
+export type ShiftMedSnapshot = OutstandingMedicationWorkData & {
     window: { start: string; end: string };
     counts: {
         due: number;
@@ -42,12 +45,10 @@ function ShiftMedStat({
     return (
         // eslint-disable-next-line no-restricted-syntax -- compact stat tile (number + label), not a Card surface
         <div className="rounded-lg border border-border bg-background px-2.5 py-2 text-center">
-            <div
-                className={cn('text-[17px] font-bold tabular-nums', toneClass)}
-            >
+            <div className={cn('text-xl font-bold tabular-nums', toneClass)}>
                 {value}
             </div>
-            <div className="text-[10.5px] font-medium text-muted-foreground">
+            <div className="text-xs font-medium text-muted-foreground">
                 {label}
             </div>
         </div>
@@ -62,40 +63,57 @@ export function ShiftMedSummary({
     loading,
     hasShift,
     note,
+    onRetry,
+    showControlled = true,
     noShiftHint = 'No outgoing shift linked — nothing to chart.',
 }: {
     snapshot: ShiftMedSnapshot | null;
     loading: boolean;
     hasShift: boolean;
     note?: string;
+    onRetry?: () => void;
+    showControlled?: boolean;
     noShiftHint?: string;
 }) {
     return (
         <div className="rounded-xl border border-primary/20 bg-accent/40 p-3">
-            <div className="mb-2 flex items-center gap-2 text-[13px] font-semibold">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
                 <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/15 text-primary">
                     <Pill className="h-3.5 w-3.5" />
                 </span>
                 Medications this shift
-                <span className="ml-auto text-[11px] font-normal text-muted-foreground">
+                <span className="ml-auto text-xs font-normal text-muted-foreground">
                     auto-surfaced from the MAR
                 </span>
             </div>
             {!hasShift ? (
-                <div className="text-[12.5px] text-muted-foreground">
+                <div className="text-sm text-muted-foreground">
                     {noShiftHint}
                 </div>
             ) : loading ? (
-                <div className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Loading the shift's medication state…
                 </div>
             ) : !snapshot ? (
-                <div className="text-[12.5px] text-muted-foreground">
-                    No medication data for this shift's window.
+                <div role="alert" className="space-y-2 text-sm">
+                    <p className="text-status-warning">
+                        Medication information is unavailable. Check the MAR
+                        before relying on this handover.
+                    </p>
+                    {onRetry && (
+                        <Button
+                            variant="outline"
+                            className="frontline-tap"
+                            onClick={onRetry}
+                        >
+                            Retry medication information
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-2.5">
+                    <OutstandingMedicationWork work={snapshot} handover />
                     <div className="grid grid-cols-4 gap-1.5">
                         <ShiftMedStat label="Due" value={snapshot.counts.due} />
                         <ShiftMedStat
@@ -117,7 +135,7 @@ export function ShiftMedSummary({
                             value={snapshot.counts.prn_given}
                         />
                         <ShiftMedStat
-                            label="Reviews due"
+                            label="Effect checks from shift"
                             value={snapshot.counts.reviews_outstanding}
                             tone="warning"
                         />
@@ -126,14 +144,16 @@ export function ShiftMedSummary({
                             value={snapshot.counts.omissions}
                             tone="critical"
                         />
-                        <ShiftMedStat
-                            label="CD due"
-                            value={snapshot.counts.cd_due}
-                            tone="warning"
-                        />
+                        {showControlled && (
+                            <ShiftMedStat
+                                label="CD due"
+                                value={snapshot.counts.cd_due}
+                                tone="warning"
+                            />
+                        )}
                     </div>
                     {note ? (
-                        <div className="text-[11.5px] text-muted-foreground">
+                        <div className="text-sm text-muted-foreground">
                             {note}
                         </div>
                     ) : null}
@@ -143,7 +163,7 @@ export function ShiftMedSummary({
                                 <div
                                     key={i}
                                     className={cn(
-                                        'flex items-center gap-1.5 rounded-md px-2 py-1 text-[11.5px]',
+                                        'flex items-center gap-1.5 rounded-md px-2 py-1 text-sm',
                                         a.tone === 'critical'
                                             ? 'bg-status-critical-bg text-status-critical'
                                             : 'bg-status-warning-bg text-status-warning',

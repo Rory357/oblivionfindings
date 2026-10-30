@@ -6,6 +6,7 @@ final class PortableSchemaUnsupportedObjectInventory
 {
     /**
      * Audited against every migration path used by Laravel's Migrator.
+     * Counts are the CREATE statements in each migration's source.
      *
      * @var array<string, array{trigger?: int, view?: int, procedure?: int, function?: int}>
      */
@@ -15,6 +16,20 @@ final class PortableSchemaUnsupportedObjectInventory
         ],
         '2026_08_06_000047_enforce_monitoring_evidence_lifecycle' => [
             'trigger' => 13,
+        ],
+        // Three statements create five triggers: the two immutability
+        // statements run once for each closure exception table.
+        '2026_08_14_000061_create_hs_closure_exception_authority' => [
+            'trigger' => 3,
+        ],
+        '2026_08_14_000063_create_incident_lifecycle_signal_outbox' => [
+            'trigger' => 2,
+        ],
+        '2026_08_23_000250_govern_safeguarding_declassification' => [
+            'trigger' => 4,
+        ],
+        '2026_08_30_000100_govern_monitoring_metric_projection_replays' => [
+            'trigger' => 6,
         ],
     ];
 

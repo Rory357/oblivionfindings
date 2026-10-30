@@ -7,16 +7,14 @@ import {
     ApplicableProceduresPanel,
     type ApplicableProcedure,
 } from '@/components/health-safety/applicable-procedures-panel';
-import { router } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
-    CalendarPlus,
     CheckCircle2,
     ChevronRight,
     Clock,
     Leaf,
-    MapPin,
     Megaphone,
     MessagesSquare,
     PartyPopper,
@@ -26,7 +24,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -43,13 +41,21 @@ import {
     type MyHrShoutout,
 } from '@/components/hr';
 import { LeaveRequestDialog } from '@/components/hr/leave-request-dialog';
+import { readMyHrAttendance } from '@/components/hr/my-hr-attendance';
+import {
+    MyHrNextShiftCard,
+    type MyHrScheduledShift as TodayShift,
+    type MyHrScheduledColleague as Colleague,
+} from '@/components/hr/my-hr-next-shift-card';
 import {
     ShiftContextMenu,
     type ShiftCtxState,
 } from '@/components/rostering/shift-context-menu';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { fireConfetti } from '@/lib/confetti';
+import { WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
+import type { SharedData } from '@/types';
 
 type LeaveBalanceLite = {
     leave_type: string;
@@ -85,21 +91,6 @@ interface LeaveBalanceItem {
     token: string;
 }
 
-interface Colleague {
-    id: number;
-    name: string;
-    first_name: string;
-    initials: string;
-}
-
-interface TodayShift {
-    id: number;
-    starts_at: string | null;
-    ends_at: string | null;
-    site: string;
-    shift_type: string;
-}
-
 interface OnboardingTaskItem {
     id: number;
     title: string;
@@ -132,6 +123,7 @@ interface Props {
         whosOut: AroundWhosOut[];
         todayShift: TodayShift | null;
         shiftColleagues: Colleague[];
+        shiftColleaguesShiftId?: number | null;
         streak: number;
     };
     announcements: AroundAnnouncement[];
@@ -183,25 +175,6 @@ function tint(token: string, bgPct: number, borderPct: number) {
         background: `color-mix(in oklch, var(${token}) ${bgPct}%, var(--card))`,
         borderColor: `color-mix(in oklch, var(${token}) ${borderPct}%, var(--border))`,
     };
-}
-
-/** 12-hour clock label, e.g. "7:00a". */
-function fmt12(iso: string | null | undefined): string {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
-    let h = d.getHours();
-    const m = d.getMinutes();
-    const ap = h < 12 ? 'a' : 'p';
-    h = h % 12 === 0 ? 12 : h % 12;
-    return `${h}:${String(m).padStart(2, '0')}${ap}`;
-}
-
-function shiftTypeLabel(shift: TodayShift): string {
-    if (shift.shift_type === 'sleepover') return 'Sleepover';
-    if (shift.shift_type === 'on_call') return 'On-call';
-    const start = shift.starts_at ? new Date(shift.starts_at).getHours() : 9;
-    return start < 12 ? 'Day support' : 'Evening support';
 }
 
 /* ------------------------------------------------------------------ */
@@ -368,228 +341,7 @@ function GettingStartedCard({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Next-shift feature card                                            */
-/* ------------------------------------------------------------------ */
-
-function NextShiftCard({
-    shift,
-    onToday,
-    clockedIn,
-    colleagues,
-}: {
-    shift: TodayShift | null;
-    onToday: boolean;
-    clockedIn: boolean;
-    colleagues: Colleague[];
-}) {
-    const [now, setNow] = useState(() => Date.now());
-    useEffect(() => {
-        const id = setInterval(() => setNow(Date.now()), 30_000);
-        return () => clearInterval(id);
-    }, []);
-
-    const start = shift?.starts_at ? new Date(shift.starts_at).getTime() : null;
-    const end = shift?.ends_at ? new Date(shift.ends_at).getTime() : null;
-    const hasWindow = start != null && end != null && end > start;
-    const inWindow = hasWindow && now >= start! && now <= end!;
-    const live = clockedIn || (onToday && inWindow);
-    const showTimeline = onToday && hasWindow;
-    const nowPct = hasWindow
-        ? Math.max(0, Math.min(100, ((now - start!) / (end! - start!)) * 100))
-        : 0;
-    const midIso = hasWindow
-        ? new Date(start! + (end! - start!) / 2).toISOString()
-        : null;
-
-    const durationH = hasWindow
-        ? Math.round(((end! - start!) / 3_600_000) * 10) / 10
-        : null;
-
-    return (
-        <div
-            className="relative overflow-hidden rounded-[20px] border px-6 py-[22px]"
-            style={{
-                background:
-                    'linear-gradient(140deg, color-mix(in oklch, var(--primary) 8%, var(--card)), var(--card) 58%)',
-                borderColor:
-                    'color-mix(in oklch, var(--primary) 20%, var(--border))',
-                boxShadow:
-                    '0 4px 20px -10px color-mix(in oklch, var(--primary) 45%, transparent)',
-            }}
-        >
-            <div className="flex items-center gap-2.5">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-primary/15 text-primary">
-                    <MapPin className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                    <div className="text-[10px] font-bold tracking-[0.08em] text-muted-foreground uppercase">
-                        Your day
-                    </div>
-                    <h2 className="mt-px truncate text-[16px] font-bold">
-                        {shift
-                            ? onToday
-                                ? `On shift today · ${shift.site}`
-                                : `Next shift · ${shift.site}`
-                            : 'No upcoming shifts'}
-                    </h2>
-                </div>
-                {live ? (
-                    <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-live-bg px-2.5 py-1 text-[11px] font-bold text-live">
-                        <span className="h-1.5 w-1.5 rounded-full bg-live" /> In
-                        progress
-                    </span>
-                ) : null}
-            </div>
-
-            {shift && hasWindow ? (
-                <>
-                    <div className="mt-4 flex items-baseline gap-3">
-                        <div className="text-[30px] font-bold tracking-tight tabular-nums">
-                            {fmt12(shift.starts_at)} – {fmt12(shift.ends_at)}
-                        </div>
-                        <div className="text-[13px] font-semibold text-muted-foreground">
-                            {durationH}h · {shiftTypeLabel(shift)}
-                        </div>
-                    </div>
-
-                    {showTimeline ? (
-                        <div className="relative mt-4 pt-[22px]">
-                            <div
-                                className="absolute top-0 -translate-x-1/2 whitespace-nowrap"
-                                style={{ left: `${nowPct}%` }}
-                            >
-                                <span className="inline-block rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
-                                    Now {fmt12(new Date(now).toISOString())}
-                                </span>
-                            </div>
-                            <div className="relative h-2 rounded-full bg-muted">
-                                <div
-                                    className="absolute inset-y-0 left-0 rounded-full"
-                                    style={{
-                                        width: `${nowPct}%`,
-                                        background:
-                                            'linear-gradient(90deg, color-mix(in oklch, var(--primary) 70%, var(--card)), var(--primary))',
-                                    }}
-                                />
-                                <div
-                                    className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-primary bg-card shadow"
-                                    style={{ left: `${nowPct}%` }}
-                                />
-                            </div>
-                            <div className="relative mt-2.5 h-8">
-                                <div className="absolute left-0 text-left">
-                                    <div className="text-[12px] font-bold">
-                                        {fmt12(shift.starts_at)}
-                                    </div>
-                                    <div className="text-[10.5px] text-muted-foreground">
-                                        Clock in{' '}
-                                        {clockedIn || now >= start! ? '✓' : ''}
-                                    </div>
-                                </div>
-                                <div className="absolute left-1/2 -translate-x-1/2 text-center">
-                                    <div className="text-[12px] font-bold">
-                                        {fmt12(midIso)}
-                                    </div>
-                                    <div className="text-[10.5px] text-muted-foreground">
-                                        Break
-                                    </div>
-                                </div>
-                                <div className="absolute right-0 text-right">
-                                    <div className="text-[12px] font-bold">
-                                        {fmt12(shift.ends_at)}
-                                    </div>
-                                    <div className="text-[10.5px] text-muted-foreground">
-                                        Clock out
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <p className="mt-3 text-[12.5px] text-muted-foreground">
-                            Starts{' '}
-                            {shift.starts_at
-                                ? new Date(shift.starts_at).toLocaleDateString(
-                                      'en-NZ',
-                                      {
-                                          weekday: 'long',
-                                      },
-                                  )
-                                : 'soon'}
-                            .
-                        </p>
-                    )}
-
-                    <div className="mt-5 flex flex-wrap items-center gap-3">
-                        {colleagues.length > 0 ? (
-                            <div className="flex items-center gap-2">
-                                <div className="flex">
-                                    {colleagues.slice(0, 3).map((c, i) => (
-                                        <span
-                                            key={c.id}
-                                            className="grid h-[30px] w-[30px] place-items-center rounded-full border-2 border-card text-[11px] font-bold text-white"
-                                            style={{
-                                                marginLeft: i === 0 ? 0 : -9,
-                                                background: `oklch(0.62 0.17 ${hueFromId(c.id)})`,
-                                            }}
-                                        >
-                                            {c.initials}
-                                        </span>
-                                    ))}
-                                </div>
-                                <span className="text-[12.5px] text-muted-foreground">
-                                    On with{' '}
-                                    {colleagues
-                                        .slice(0, 2)
-                                        .map((c) => c.first_name)
-                                        .join(' & ')}
-                                    {colleagues.length > 2
-                                        ? ` +${colleagues.length - 2}`
-                                        : ''}
-                                </span>
-                            </div>
-                        ) : (
-                            <span className="text-[12.5px] text-muted-foreground">
-                                You’re on solo today.
-                            </span>
-                        )}
-                        <div className="ml-auto flex gap-2">
-                            <a
-                                href={`/hr/my/time/shifts/${shift.id}/calendar`}
-                                className="inline-flex items-center gap-1.5 rounded-[10px] border border-border bg-card px-3 py-2 text-[12.5px] font-semibold transition-colors hover:bg-muted"
-                            >
-                                <CalendarPlus className="h-3.5 w-3.5" /> Add to
-                                calendar
-                            </a>
-                            <button
-                                type="button"
-                                onClick={() => router.visit('/hr/my/time')}
-                                className="rounded-[10px] bg-primary px-4 py-2 text-[12.5px] font-bold text-primary-foreground transition-colors hover:opacity-90"
-                            >
-                                View roster
-                            </button>
-                        </div>
-                    </div>
-                </>
-            ) : (
-                <div className="mt-4 flex flex-col items-start gap-3">
-                    <p className="text-[13px] text-muted-foreground">
-                        Nothing rostered right now — enjoy the breather. 🌿
-                    </p>
-                    <button
-                        type="button"
-                        onClick={() => router.visit('/hr/my/time')}
-                        className="rounded-[10px] border border-border bg-card px-3 py-2 text-[12.5px] font-semibold transition-colors hover:bg-muted"
-                    >
-                        View roster
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
+/*  Overview                                                          */
 /* ------------------------------------------------------------------ */
 
 export default function MyHrIndex({
@@ -603,6 +355,8 @@ export default function MyHrIndex({
     safeWorkProcedures = [],
     onboarding = null,
 }: Props) {
+    const { auth } = usePage<SharedData>().props;
+    const workTimezone = readMyHrAttendance(myHr.attendance, auth?.user?.id)?.timezone ?? WORKER_TIMEZONE;
     const leaveTypeOptions = leaveTypes.map((t) => ({
         value: t,
         label: t.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()),
@@ -613,7 +367,6 @@ export default function MyHrIndex({
     const [cleared, setCleared] = useState<Set<string>>(new Set());
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [congrats, setCongrats] = useState<Set<number>>(new Set());
-    const [acked, setAcked] = useState<Set<number>>(new Set());
     const [aroundView, setAroundView] = useState<AroundView | null>(null);
     const [leaveOpen, setLeaveOpen] = useState(false);
 
@@ -699,30 +452,9 @@ export default function MyHrIndex({
     }
 
     function acknowledge(id: number) {
-        router.post(
-            `/hr/announcements/${id}/acknowledge`,
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onSuccess: () => {
-                    setAcked((p) => new Set(p).add(id));
-                    toast.info('Acknowledged ✓', {
-                        description: "Thanks — noted that you've seen it.",
-                    });
-                },
-                onError: () => toast.error('Could not acknowledge'),
-            },
-        );
+        const notice = announcements.find((item) => item.id === id);
+        if (notice) router.visit(notice.read_url);
     }
-
-    const workedPct = Math.min(
-        100,
-        weekly.target_hours > 0
-            ? (weekly.total_hours / weekly.target_hours) * 100
-            : 0,
-    );
-    const ringCirc = 2 * Math.PI * 40;
 
     const today = overview.todayShift;
     const shiftForCard: TodayShift | null = today
@@ -736,7 +468,7 @@ export default function MyHrIndex({
                     myHr.nextShift.location ??
                     myHr.nextShift.service_context_name ??
                     'Shift',
-                shift_type: 'standard',
+                shift_type: '',
             }
           : null;
 
@@ -759,14 +491,14 @@ export default function MyHrIndex({
 
                 {/* ── Row 1 · Your day ── */}
                 <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
-                    <NextShiftCard
+                    <MyHrNextShiftCard
                         shift={shiftForCard}
-                        onToday={!!today}
-                        clockedIn={!!myHr.activeClock}
                         colleagues={overview.shiftColleagues}
+                        colleaguesShiftId={overview.shiftColleaguesShiftId}
+                        timezone={workTimezone}
                     />
 
-                    {/* This week ring */}
+                    {/* Recorded closed-entry total; no assumed contract target */}
                     <div
                         className="rounded-[20px] border p-[22px]"
                         style={tint('--primary', 4, 14)}
@@ -775,64 +507,16 @@ export default function MyHrIndex({
                             <span className="grid h-[30px] w-[30px] place-items-center rounded-[9px] bg-primary/15 text-primary">
                                 <Clock className="h-4 w-4" />
                             </span>
-                            <h2 className="text-[15px] font-bold">This week</h2>
-                            <span className="ml-auto text-[11px] text-muted-foreground">
-                                Mon–Sun
-                            </span>
+                            <h2 className="text-section-title">Recorded hours</h2>
                         </div>
-                        <div className="mt-3.5 flex items-center gap-[18px]">
-                            <div className="relative h-24 w-24 shrink-0">
-                                <svg
-                                    viewBox="0 0 96 96"
-                                    className="h-24 w-24 -rotate-90"
-                                >
-                                    <circle
-                                        cx="48"
-                                        cy="48"
-                                        r="40"
-                                        fill="none"
-                                        stroke="var(--muted)"
-                                        strokeWidth="9"
-                                    />
-                                    <circle
-                                        cx="48"
-                                        cy="48"
-                                        r="40"
-                                        fill="none"
-                                        stroke="var(--primary)"
-                                        strokeWidth="9"
-                                        strokeLinecap="round"
-                                        strokeDasharray={ringCirc}
-                                        strokeDashoffset={
-                                            ringCirc * (1 - workedPct / 100)
-                                        }
-                                        className="transition-[stroke-dashoffset] duration-700"
-                                    />
-                                </svg>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-xl leading-none font-bold">
-                                        {weekly.total_hours.toFixed(1)}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground">
-                                        of {weekly.target_hours}h
-                                    </span>
-                                </div>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2 text-[12.5px]">
-                                    <span className="h-2 w-2 rounded-full bg-primary" />
-                                    {weekly.total_hours.toFixed(1)}h worked
-                                </div>
-                                <div className="mt-1.5 flex items-center gap-2 text-[12.5px] text-muted-foreground">
-                                    <span className="h-2 w-2 rounded-full bg-muted" />
-                                    {Math.max(
-                                        0,
-                                        weekly.target_hours -
-                                            weekly.total_hours,
-                                    ).toFixed(1)}
-                                    h remaining
-                                </div>
-                            </div>
+                        <div className="mt-4 space-y-2">
+                            <p className="text-page-title tabular-nums">
+                                {weekly.total_hours.toFixed(1)} hr
+                            </p>
+                            <p className="text-subtle text-muted-foreground">
+                                Weekly time entries with a recorded finish.
+                                Ongoing sessions are excluded.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -1149,8 +833,7 @@ export default function MyHrIndex({
                                 <Empty>All caught up.</Empty>
                             ) : (
                                 announcements.slice(0, 2).map((a) => {
-                                    const seen =
-                                        acked.has(a.id) || a.acknowledged;
+                                    const seen = a.acknowledged;
                                     return (
                                         <div
                                             key={a.id}
@@ -1180,7 +863,7 @@ export default function MyHrIndex({
                                             >
                                                 {seen
                                                     ? 'Seen ✓'
-                                                    : 'Acknowledge'}
+                                                    : 'Read notice'}
                                             </button>
                                         </div>
                                     );
@@ -1210,7 +893,6 @@ export default function MyHrIndex({
                 whosOut={overview.whosOut}
                 announcements={announcements}
                 congrats={congrats}
-                acked={acked}
                 canViewFeed={canViewFeed}
                 onCongratulate={congratulate}
                 onAcknowledge={acknowledge}

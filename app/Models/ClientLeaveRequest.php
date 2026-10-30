@@ -5,8 +5,11 @@ namespace App\Models;
 use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Services\Medication\DoseSlots\DoseAwaySources;
+use App\Services\Medication\OverdueDoseAlerts;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientLeaveRequest extends Model implements EmitsToTimeline
@@ -26,13 +29,31 @@ class ClientLeaveRequest extends Model implements EmitsToTimeline
         'approved_by',
         'approved_at',
         'approval_notes',
+        'departed_at', 'departed_by', 'returned_at', 'returned_by',
+        'withdrawn_at', 'withdrawn_by', 'withdrawal_reason', 'version',
     ];
 
     protected $casts = [
         'starts_on' => 'date',
         'ends_on' => 'date',
         'approved_at' => 'datetime',
+        'departed_at' => 'datetime',
+        'returned_at' => 'datetime',
+        'withdrawn_at' => 'datetime',
+        'version' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        // Actual absence changes are read live; recorded dose outcomes still win.
+        $resync = static function (self $leave): void {
+            if (DoseAwaySources::leaveCounts()) {
+                OverdueDoseAlerts::queueAfterCommit((int) $leave->client_id);
+            }
+        };
+        static::saved($resync);
+        static::deleted($resync);
+    }
 
     public function client(): BelongsTo
     {
@@ -47,6 +68,32 @@ class ClientLeaveRequest extends Model implements EmitsToTimeline
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function transitions(): MorphMany
+    {
+        return $this->morphMany(TimelineEvent::class, 'source')->whereIn('type', [
+            'leave_transition_created', 'leave_transition_approve', 'leave_transition_decline',
+            'leave_transition_depart', 'leave_transition_return', 'leave_transition_withdraw',
+        ])->orderBy('id');
+    }
+
+    /** State possibilities only; the reader also gates the actor's Client update authority. */
+    public function allowedActions(bool $canUpdate = true): array
+    {
+        if (! $canUpdate || $this->withdrawn_at !== null || in_array($this->status, ['completed', 'cancelled', 'declined'], true)) {
+            return [];
+        }
+        if ($this->departed_at !== null) {
+            return $this->returned_at === null ? ['return'] : [];
+        }
+        if ($this->status === 'requested') {
+            return ['approve', 'decline', 'withdraw'];
+        }
+
+        return $this->status === 'approved'
+            ? ($this->approved_at !== null && $this->approved_by !== null ? ['depart', 'withdraw'] : ['approve', 'withdraw'])
+            : [];
     }
 
     public function toTimelineEvent(): ?array

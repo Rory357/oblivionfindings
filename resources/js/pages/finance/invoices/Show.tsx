@@ -266,10 +266,9 @@ export default function InvoiceShow({
                                     : 'warning'
                                 : 'success'
                         }
-                        href={canReceipt ? undefined : '/finance/receivables'}
-                        onClick={
-                            canReceipt ? () => setReceiptOpen(true) : undefined
-                        }
+                        {...(canReceipt
+                            ? { onClick: () => setReceiptOpen(true) }
+                            : { href: '/finance/receivables' })}
                         ariaLabel={
                             canReceipt
                                 ? 'Record a receipt for the outstanding balance'

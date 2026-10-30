@@ -21,6 +21,8 @@ class EnsureUserIsApproved
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();
+            // The sign-in page shows the "waiting for approval" screen.
+            $request->session()->flash('awaitingApproval', true);
 
             throw ValidationException::withMessages([
                 Fortify::username() => 'Your account is awaiting approval.',

@@ -1,0 +1,8 @@
+
+ RUN  v4.1.5 C:/Users/steph/.codex/worktrees/1eb2/oblivionfindings
+
+
+ Test Files  15 passed (15)
+      Tests  79 passed (79)
+   Start at  16:43:38
+   Duration  52.42s (transform 7.25s, setup 35.42s, import 167.78s, tests 2.53s, environment 282.97s)

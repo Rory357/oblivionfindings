@@ -432,7 +432,7 @@ function PhoneMockup({ message }: { message: string }) {
                     <p className="mb-2 text-center text-[10px] text-muted-foreground">
                         Today 09:00
                     </p>
-                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary px-3 py-2 text-xs text-primary-foreground">
+                    <div className="ml-auto max-w-[85%] rounded-2xl rounded-tr-sm bg-primary-fill px-3 py-2 text-xs text-primary-fill-foreground">
                         {message}
                     </div>
                 </div>

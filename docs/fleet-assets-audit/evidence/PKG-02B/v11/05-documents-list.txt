@@ -1,0 +1,195 @@
+- strong: PKG-02B · v11
+- text: Scenario
+- combobox "Preview scenario":
+  - option "Active restriction" [selected]
+  - option "Ready · current example evidence"
+  - option "Unknown applicability & missing evidence"
+  - option "Overdue service & check"
+  - option "Work completed · awaiting release"
+  - option "Stale evidence · no tracker"
+  - option "First use · empty history"
+  - option "View-only role"
+  - option "Report-only staff"
+  - option "Role/site access denied"
+- text: Recovery
+- combobox "Preview recovery":
+  - option "Normal" [selected]
+  - option "First save interrupted"
+  - option "Search failure"
+  - option "Partial upload failure"
+  - option "Map imagery unavailable"
+- button "Dark theme"
+- banner:
+  - generic: Oblivion Care
+  - generic: blivionCare
+  - text: Search Oblivion Care
+  - generic: Ctrl K
+  - button "Report incident"
+  - button "Messages":
+  - button "Notifications":
+  - generic: AM
+- complementary:
+  - navigation "Main navigation":
+    - button "Home":
+      - generic: Home
+    - button "My day":
+      - generic: My day
+    - button "Clients":
+      - generic: Clients
+    - button "Sites":
+      - generic: Sites
+    - generic: Fleet & assets
+    - button "Overview":
+      - generic: Overview
+    - button "Vehicles":
+      - generic: Vehicles
+    - button "Bookings":
+      - generic: Bookings
+    - button "Maintenance":
+      - generic: Maintenance
+    - button "Assets":
+      - generic: Assets
+    - button "Reports":
+      - generic: Reports
+    - button "Settings":
+      - generic: Settings
+  - button "Collapse sidebar":
+- main:
+  - navigation "Breadcrumb":
+    - button "Home"
+    - generic: ›
+    - button "Fleet & assets"
+    - generic: ›
+    - button "Vehicles"
+    - generic: ›
+    - generic: Kōwhai van
+  - button "Back to vehicles":
+  - button "Upload vehicle profile photo":
+  - heading "Kōwhai van" [level=1]
+  - generic: Not ready
+  - paragraph:
+    - text: KWH014 · VH-014 · Kōwhai House
+    - text: Toyota Hiace · Diesel · Community transport
+  - button "Find in this vehicle…":
+    - generic: Find in this vehicle…
+    - generic: /
+  - button "Calendar":
+    - text: Calendar
+  - button "Start check":
+    - text: Start check
+  - button "Report a problem"
+  - button "View odometer":
+    - generic: Odometer
+    - generic: 82,460 km
+    - generic: 21 Sept 2026 · CHK-0182 · manual reading
+  - button "View next service":
+    - generic: Next service
+    - generic: 24 Sept 2026
+    - generic: 85,000 km · Routine service
+  - button "View last check":
+    - generic: Last check
+    - generic: Failed
+    - generic: CHK-0182 · DEMO-3
+  - button "View maintenance":
+    - generic: Maintenance
+    - generic: Hold active
+    - generic: Original issues and work
+  - generic: As at 22 Sep 2026 · 9:30 am · Pacific/Auckland
+  - button "Reminders & follow-up":
+    - text: Reminders & follow-up
+  - tablist "Views":
+    - tab "Overview" [selected]:
+      - generic: Overview
+    - tab "Service & compliance":
+      - generic: Service & compliance
+    - tab "Checks & inspections":
+      - generic: Checks & inspections
+    - tab "Maintenance":
+      - generic: Maintenance
+    - tab "Map":
+      - generic: Map
+    - button "More views (2)":
+      - generic: More
+    - button "Find a section":
+      - generic: Find
+      - generic: /
+  - tablist "Vehicle sections":
+    - tab "Readiness":
+      - text: Readiness
+    - tab "Vehicle details":
+      - text: Vehicle details
+    - tab "Documents" [active] [selected]:
+      - text: Documents
+    - tab "Finance":
+      - text: Finance
+  - tabpanel:
+    - generic: VEHICLE RECORD · VH-014
+    - heading "Documents & renewal evidence" [level=2]
+    - paragraph: Find the original, replace a version, or follow its source.
+    - group "Documents layout":
+      - button "List" [pressed]:
+        - text: List
+      - button "Cards":
+        - text: Cards
+    - button "Upload documents":
+      - text: Upload documents
+    - generic "Required documents":
+      - generic: Required documents
+      - generic: 3 records shown
+      - table:
+        - row "Record File status Renewal / expiry Evidence Actions":
+          - columnheader "Record"
+          - columnheader "File status"
+          - columnheader "Renewal / expiry"
+          - columnheader "Evidence"
+          - columnheader "Actions"
+        - row "Insurance policy File missing Profile renewal 31 Dec 2026 Find files Upload Actions for Insurance policy":
+          - cell "Insurance policy":
+            - generic: Insurance policy
+          - cell "File missing":
+            - generic: File missing
+          - cell "Profile renewal 31 Dec 2026":
+            - generic: Profile renewal 31 Dec 2026
+          - cell "Find files Upload":
+            - button "Find files"
+            - button "Upload"
+          - cell "Actions for Insurance policy":
+            - button "Actions for Insurance policy":
+        - row "Warranty File missing No expiry recorded Find files Upload Actions for Warranty":
+          - cell "Warranty":
+            - generic: Warranty
+          - cell "File missing":
+            - generic: File missing
+          - cell "No expiry recorded":
+            - generic: No expiry recorded
+          - cell "Find files Upload":
+            - button "Find files"
+            - button "Upload"
+          - cell "Actions for Warranty":
+            - button "Actions for Warranty":
+        - row "Ownership agreement File missing No expiry recorded Find files Upload Actions for Ownership agreement":
+          - cell "Ownership agreement":
+            - generic: Ownership agreement
+          - cell "File missing":
+            - generic: File missing
+          - cell "No expiry recorded":
+            - generic: No expiry recorded
+          - cell "Find files Upload":
+            - button "Find files"
+            - button "Upload"
+          - cell "Actions for Ownership agreement":
+            - button "Actions for Ownership agreement":
+    - textbox "Search vehicle documents":
+      - /placeholder: Search file, type, reference or source…
+    - combobox "Document versions":
+      - option "Current" [selected]
+      - option "All history"
+    - button "Renewal reminders":
+      - text: Renewal reminders
+    - heading "Add the evidence behind this record" [level=3]
+    - paragraph: Upload policy, purchase, lease, warranty and vehicle documents. Existing references are not uploaded files.
+    - button "Upload first document":
+      - text: Upload first document
+    - paragraph: Uploaded files stay in this preview session. New catalogue choices remain available after refresh. Archived and superseded files remain in All history.
+  - generic: PKG-02B v11 · All people, records, dates and outcomes are synthetic.
+  - generic: Design review · Application unchanged

@@ -34,6 +34,9 @@ class MedicationRefusalFollowup extends Model
         'escalated_to_manager',
         'escalated_at',
         'created_by',
+        // P01 C1: the person who owns the follow-up (the recorder, until the
+        // P08a handover can hand it on).
+        'owner_id',
     ];
 
     protected $casts = [
@@ -63,6 +66,12 @@ class MedicationRefusalFollowup extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** Who follows it up (P01: whoever recorded the refusal). */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'owner_id');
     }
 
     public function gpNotifiedBy(): BelongsTo

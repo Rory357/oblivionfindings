@@ -1,0 +1,15 @@
+{
+  "candidate": "322b4ebfdaf4a242d9bd705b5a6f958ca973f8ee",
+  "url": "http://127.0.0.1:8794/fleet-assets/vehicles?view=map",
+  "fixture": "Existing isolated synthetic Settings preview; Settings test coordinator; no vehicle records required to reproduce",
+  "method": "Main real browser through supported CUA, visible Fleet navigation and Map tab; read-only DOM rectangles and screenshot",
+  "provider": "OSM; Google disabled",
+  "viteScripts": ["http://127.0.0.1:5194/@vite/client", "http://127.0.0.1:5194/resources/js/app.tsx"],
+  "outerCanvas": {"height": 688, "width": 639.5},
+  "newProviderWrapper": {"className": "relative", "height": 2, "width": 639.5},
+  "openStreetMapWrapper": {"height": 2, "width": 639.5},
+  "leafletContainer": {"height": 0, "width": 637.5},
+  "observed": "Fleet map area is blank; Leaflet initialises but its map container has zero height.",
+  "cause": "The new outer provider div has no defined height. Existing height=100% callers now resolve against an auto-height wrapper.",
+  "sideEffects": "No settings save, record mutation, provider request, fixture creation or source edit. Existing page navigation only."
+}

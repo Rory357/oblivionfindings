@@ -27,6 +27,11 @@ class MaintenanceAttachmentController extends Controller
             $data['parent_type'], (int) $data['parent_id'], $data['request_key'], $data['file'],
             $data['category'] ?? null, $data['description'] ?? null);
 
+        // The vehicle workspace uploads through fetch and needs a JSON answer.
+        if ($request->expectsJson() && ! $request->header('X-Inertia')) {
+            return response()->json(['attachment' => ['id' => $attachment->id], 'message' => 'Evidence saved.']);
+        }
+
         return back()->with('success', 'Evidence saved.')
             ->with('maintenance_attachment_id', $attachment->id);
     }

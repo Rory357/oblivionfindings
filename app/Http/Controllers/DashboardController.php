@@ -2,579 +2,100 @@
 
 namespace App\Http\Controllers;
 
-use App\Domain\Hr\Models\HrDepartment;
-use App\Domain\Hr\Models\HrDocumentSignature;
-use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrFeedPost;
-use App\Domain\Hr\Models\HrLeaveRequest;
-use App\Domain\Hr\Models\HrPolicy;
-use App\Domain\Hr\Models\HrPosition;
-use App\Domain\Hr\Models\HrStaffComplianceStatus;
-use App\Models\Client;
-use App\Models\ClientIncident;
-use App\Models\ClientMedicationAdministration;
-use App\Models\ClientMedicationStock;
-use App\Models\IncidentFollowup;
-use App\Models\MedicationDashboardAlert;
-use App\Models\MedicationReview;
-use App\Models\Shift;
-use App\Models\TimelineEvent;
-use App\Models\Timesheet;
+use App\Http\Requests\OverviewLayoutRequest;
 use App\Models\User;
-use App\Services\Medication\MedicationGovernanceScopeService;
-use App\Services\Medication\MedicationTimelineVisibilityService;
-use App\Services\WorkstreamService;
+use App\Services\Overview\OverviewAccess;
+use App\Services\Overview\OverviewData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
-class DashboardController extends Controller
+final class DashboardController extends Controller
 {
+    public function __construct(private readonly OverviewAccess $access) {}
+
     public function __invoke(Request $request)
     {
         $user = $request->user();
-        abort_unless($user, 403);
-
-        // Client/next-of-kin portal users → family dashboard
         if ($user->hasRole('client', 'next_of_kin')) {
-            $portalClients = $user->portalClients();
-            $count = (clone $portalClients)->count();
+            $clients = $user->portalClients();
 
-            if ($count === 1) {
-                $first = (clone $portalClients)->first();
-                if ($first) {
-                    return redirect()->route('portal.clients.dashboard', ['client' => $first->id]);
-                }
-            }
-
-            // Multiple clients → show picker
-            return redirect()->route('portal.index');
+            return (clone $clients)->count() === 1
+                ? redirect()->route('portal.clients.dashboard', ['client' => $clients->first()->id])
+                : redirect()->route('portal.index');
         }
-
-        // Frontline/staff users → `/my-day` is the single canonical home.
-        // Managers (`shifts.manageAny` / `timesheets.manageAny`) and HR admins
-        // (`hr.analytics.view`) keep the existing dashboard. This mirrors the
-        // `$mode` resolution further down so the redirect never fires for a
-        // non-staff user — no redirect loops possible.
-        $isManager = $user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny');
-        $isHrAdmin = $user->canDo('hr.analytics.view') && ! $user->canDo('shifts.manageAny');
-        if (! $isManager && ! $isHrAdmin) {
-            return redirect()->route('my-day');
+        if ($user->isExternalClinicianAccount()) {
+            return redirect()->route('clinical-portal.index');
         }
-
-        $today = now()->startOfDay();
-        $tomorrow = (clone $today)->addDay();
-        $weekEnd = (clone $today)->addDays(config('dashboard.short_range_days', 7));
-
-        // Dashboard filters (used mainly for staff workflow)
-        $range = (string) ($request->query('range') ?? 'week'); // today|week
-        if (! in_array($range, ['today', 'week'], true)) {
-            $range = 'week';
-        }
-        $status = $request->query('status'); // scheduled|in_progress|completed|cancelled|all
-        if ($status && ! in_array($status, ['scheduled', 'in_progress', 'completed', 'cancelled', 'all'], true)) {
-            $status = null;
-        }
-        $clientId = $request->query('client_id');
-        $clientId = $clientId ? (int) $clientId : null;
-
-        // Legacy: if there's a Client linked directly to this user (older installs)
-        $client = Client::query()->where('user_id', $user->id)->first();
-
-        if ($client) {
-            $client->load(['supportWorkers:id,name,email']);
-            $todayShifts = Shift::query()
-                ->where('client_id', $client->id)
-                ->visibleToFrontline()
-                ->whereBetween('starts_at', [$today, $tomorrow])
-                ->orderBy('starts_at')
-                ->with('staff:id,name,email')
-                ->get();
-
-            $upcomingShifts = Shift::query()
-                ->where('client_id', $client->id)
-                ->visibleToFrontline()
-                ->whereBetween('starts_at', [$today, $weekEnd])
-                ->orderBy('starts_at')
-                ->with('staff:id,name,email')
-                ->get();
-
-            return inertia('dashboard', [
-                'mode' => 'client',
-                'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
-                'assignedStaff' => $client->supportWorkers,
-                'todayShifts' => $todayShifts,
-                'upcomingShifts' => $upcomingShifts,
-            ]);
-        }
-
-        // Staff/admin
-        $assignedClients = $user->assignedClients()->get(['clients.id', 'first_name', 'last_name', 'status']);
-
-        $upcomingEventsQuery = TimelineEvent::query()
-            ->where('actor_user_id', $user->id)
-            ->whereBetween('occurred_at', [$today, $weekEnd])
-            ->orderBy('occurred_at')
-            ->with(['client:id,first_name,last_name', 'site:id,name'])
-            ->limit(config('dashboard.max_upcoming_events', 200));
-        app(MedicationTimelineVisibilityService::class)
-            ->applyVisibleScope($upcomingEventsQuery, $user);
-        $upcomingEvents = $upcomingEventsQuery->get();
-
-        $todayShifts = Shift::query()
-            ->when(! $user->canDo('shifts.manageAny'), fn ($q) => $q
-                ->where('user_id', $user->id)
-                ->visibleToFrontline())
-            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
-            ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
-            ->whereBetween('starts_at', [$today, $tomorrow])
-            ->orderBy('starts_at')
-            ->with('client:id,first_name,last_name')
-            ->get();
-
-        $upcomingShifts = collect();
-        if ($range === 'week') {
-            $upcomingShifts = Shift::query()
-                ->when(! $user->canDo('shifts.manageAny'), fn ($q) => $q
-                    ->where('user_id', $user->id)
-                    ->visibleToFrontline())
-                ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
-                ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
-                ->whereBetween('starts_at', [$today, $weekEnd])
-                ->orderBy('starts_at')
-                ->with('client:id,first_name,last_name')
-                ->limit(config('dashboard.max_upcoming_shifts', 75))
-                ->get();
-        }
-
-        $todayTimesheets = Timesheet::query()
-            ->when(! $user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id))
-            ->whereDate('work_date', $today->toDateString())
-            ->orderByDesc('created_at')
-            ->with('client:id,first_name,last_name')
-            ->get();
-
-        // Manager summary
-        $managerSummary = null;
-        if ($user->canDo('timesheets.manageAny') || $user->canDo('shifts.manageAny')) {
-            $managerSummary = [
-                'shiftsTodayCount' => Shift::query()->whereBetween('starts_at', [$today, $tomorrow])->count(),
-                'staffWorkingTodayCount' => Shift::query()->whereBetween('starts_at', [$today, $tomorrow])->distinct('user_id')->count('user_id'),
-                'timesheetsPendingCount' => Timesheet::query()->where('status', 'submitted')->count(),
-            ];
-        }
-
-        // Dashboard analytics (used for graphs). Only include what the user is allowed to see.
-        $canSeeIncidents = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
-
-        // We expose both short-range (next 7 days) and rolling history (last 30 days)
-        // so the dashboard can render richer graphs without extra API calls.
-        $range7Start = (clone $today);
-        $range7End = (clone $weekEnd);
-        $range30Start = (clone $today)->subDays(config('dashboard.history_days', 30));
-        $range30End = (clone $tomorrow);
-        $driver = DB::connection()->getDriverName();
-        $shiftHoursExpr = $driver === 'sqlite'
-            ? "SUM((strftime('%s', ends_at) - strftime('%s', starts_at)) / 3600.0)"
-            : 'SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60';
-        $timesheetHoursExpr = $driver === 'sqlite'
-            ? "SUM(((strftime('%s', ends_at) - strftime('%s', starts_at)) / 60.0 - COALESCE(break_minutes, 0)) / 60.0)"
-            : 'SUM((TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0)))/60';
-
-        $shiftScope = Shift::query()
-            ->when(! $user->canDo('shifts.manageAny'), fn ($q) => $q
-                ->where('user_id', $user->id)
-                ->visibleToFrontline());
-
-        $shiftSeries = (clone $shiftScope)
-            ->whereBetween('starts_at', [$range7Start, $range7End])
-            ->selectRaw('DATE(starts_at) as d')
-            ->selectRaw('COUNT(*) as c')
-            ->selectRaw("{$shiftHoursExpr} as h")
-            ->selectRaw("SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled")
-            ->selectRaw("SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress")
-            ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
-            ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->map(fn ($r) => [
-                'date' => (string) $r->d,
-                'count' => (int) ($r->c ?? 0),
-                'hours' => (float) ($r->h ?? 0),
-                'status' => [
-                    'scheduled' => (int) ($r->scheduled ?? 0),
-                    'in_progress' => (int) ($r->in_progress ?? 0),
-                    'completed' => (int) ($r->completed ?? 0),
-                    'cancelled' => (int) ($r->cancelled ?? 0),
-                ],
-            ])
-            ->values();
-
-        $shiftSeries30 = (clone $shiftScope)
-            ->whereBetween('starts_at', [$range30Start, $range30End])
-            ->selectRaw('DATE(starts_at) as d')
-            ->selectRaw('COUNT(*) as c')
-            ->selectRaw("{$shiftHoursExpr} as h")
-            ->selectRaw("SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled")
-            ->selectRaw("SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress")
-            ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
-            ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->map(fn ($r) => [
-                'date' => (string) $r->d,
-                'count' => (int) ($r->c ?? 0),
-                'hours' => (float) ($r->h ?? 0),
-                'status' => [
-                    'scheduled' => (int) ($r->scheduled ?? 0),
-                    'in_progress' => (int) ($r->in_progress ?? 0),
-                    'completed' => (int) ($r->completed ?? 0),
-                    'cancelled' => (int) ($r->cancelled ?? 0),
-                ],
-            ])
-            ->values();
-
-        $timesheetScope = Timesheet::query()
-            ->when(! $user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id));
-
-        $timesheetByStatus = (clone $timesheetScope)
-            ->select('status', DB::raw('COUNT(*) as c'))
-            ->groupBy('status')
-            ->get()
-            ->map(fn ($r) => ['status' => (string) $r->status, 'count' => (int) $r->c])
-            ->values();
-
-        $timesheetSeries30 = (clone $timesheetScope)
-            ->whereBetween('work_date', [$range30Start->toDateString(), $today->toDateString()])
-            ->selectRaw('DATE(work_date) as d')
-            ->selectRaw('COUNT(*) as c')
-            ->selectRaw("{$timesheetHoursExpr} as h")
-            ->groupBy('d')
-            ->orderBy('d')
-            ->get()
-            ->map(fn ($r) => [
-                'date' => (string) $r->d,
-                'count' => (int) ($r->c ?? 0),
-                'hours' => (float) ($r->h ?? 0),
-            ])
-            ->values();
-
-        $incidentSeries = collect();
-        $incidentSeries30 = collect();
-        $incidentBySeverity30 = collect();
-        $incidentKpis = null;
-        if ($canSeeIncidents) {
-            $incidentStart = (clone $today)->subDays(config('dashboard.incident_short_days', 14));
-            $incidentStart30 = (clone $today)->subDays(config('dashboard.incident_history_days', 30));
-
-            // $assignedClients is already loaded above — reuse its ids
-            // instead of re-querying the pivot twice.
-            $assignedIds = $assignedClients->pluck('id')->values();
-
-            $incidentQuery = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart, $tomorrow]);
-            if ($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny')) {
-                $incidentQuery->whereIn('client_id', $assignedIds);
-            }
-
-            $incidentSeries = $incidentQuery
-                ->selectRaw('DATE(occurred_at) as d')
-                ->selectRaw('COUNT(*) as c')
-                ->groupBy('d')
-                ->orderBy('d')
-                ->get()
-                ->map(fn ($r) => ['date' => (string) $r->d, 'count' => (int) ($r->c ?? 0)])
-                ->values();
-
-            $incidentQuery30 = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart30, $tomorrow]);
-            if ($user->canDo('incidents.viewAssigned') && ! $user->canDo('incidents.viewAny')) {
-                $incidentQuery30->whereIn('client_id', $assignedIds);
-            }
-
-            $incidentSeries30 = (clone $incidentQuery30)
-                ->selectRaw('DATE(occurred_at) as d')
-                ->selectRaw('COUNT(*) as c')
-                ->groupBy('d')
-                ->orderBy('d')
-                ->get()
-                ->map(fn ($r) => ['date' => (string) $r->d, 'count' => (int) ($r->c ?? 0)])
-                ->values();
-
-            $incidentBySeverity30 = (clone $incidentQuery30)
-                ->select('severity', DB::raw('COUNT(*) as c'))
-                ->groupBy('severity')
-                ->orderByDesc('c')
-                ->get()
-                ->map(fn ($r) => ['severity' => (string) ($r->severity ?? 'unspecified'), 'count' => (int) ($r->c ?? 0)])
-                ->values();
-
-            // KPI-style metrics used for manager/admin cards.
-            // Scoped to the incidents the current user is allowed to see.
-            // One conditional-aggregate query instead of four COUNT round-trips.
-            $kpiRow = (clone $incidentQuery30)
-                ->selectRaw('COUNT(*) as total')
-                ->selectRaw("COUNT(CASE WHEN severity = 'high' THEN 1 END) as high_count")
-                ->selectRaw('COUNT(reviewed_at) as reviewed_count')
-                ->first();
-
-            $incidentKpis = [
-                'incidentsLast30' => (int) ($kpiRow->total ?? 0),
-                'incidentsHighLast30' => (int) ($kpiRow->high_count ?? 0),
-                'reviewedLast30' => (int) ($kpiRow->reviewed_count ?? 0),
-                'unreviewedLast30' => (int) ($kpiRow->total ?? 0) - (int) ($kpiRow->reviewed_count ?? 0),
-            ];
-
-            // Follow-up KPIs: open + overdue (also scoped).
-            $followupQuery = IncidentFollowup::query()->whereHas('incident', function ($q) use ($incidentQuery30) {
-                // Mirror the same scope as $incidentQuery30, without re-running the full builder logic.
-                // We do this by constraining to the incident IDs from the scoped query.
-                $q->whereIn('id', (clone $incidentQuery30)->select('id'));
-            });
-
-            $followupRow = (clone $followupQuery)
-                ->selectRaw('COUNT(CASE WHEN completed_at IS NULL THEN 1 END) as open_count')
-                ->selectRaw('COUNT(CASE WHEN completed_at IS NULL AND due_at IS NOT NULL AND due_at < ? THEN 1 END) as overdue_count', [now()])
-                ->first();
-
-            $incidentKpis['followupsOpen'] = (int) ($followupRow->open_count ?? 0);
-            $incidentKpis['followupsOverdue'] = (int) ($followupRow->overdue_count ?? 0);
-        }
-
-        // Unified workstream (My Day) for staff workflow
-        $workstreamTo = $range === 'today' ? (clone $tomorrow) : (clone $weekEnd);
-        $myDayItems = app(WorkstreamService::class)
-            ->forStaff($user, (clone $today), $workstreamTo)
-            ->take(200)
-            ->values();
-
-        // Determine dashboard mode
-        $mode = 'staff';
-        if ($user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny')) {
-            $mode = 'manager';
-        }
-        // HR Admin override - if user primarily has HR permissions
-        if ($user->canDo('hr.analytics.view') && ! $user->canDo('shifts.manageAny')) {
-            $mode = 'hr_admin';
-        }
-
-        // HR quick stats for dashboard — only for manager/HR-admin surfaces.
-        // PR 10 removed these from the staff-facing dashboard so the frontline
-        // home stays operational; staff see their HR items on `/hr/my` instead.
-        $hrWidgets = null;
-        if ($mode !== 'staff' && ($user->canDo('hr.leave.viewAny') || $user->canDo('hr.performance.view') || $user->canDo('hr.compliance.view'))) {
-            $hrWidgets = [
-                'pending_leave' => HrLeaveRequest::where('status', 'pending')->count(),
-                'expiring_compliance' => HrStaffComplianceStatus::where('status', 'expiring_soon')->count(),
-                'pending_signatures' => HrDocumentSignature::where('signer_user_id', $user->id)->where('status', 'pending')->count(),
-                'due_attestations' => HrPolicy::where('is_active', true)
-                    ->where('requires_attestation', true)
-                    ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
-                    ->count(),
-            ];
-        }
-
-        // HR Admin dashboard data
-        $hrAdmin = null;
-        if ($mode === 'hr_admin') {
-            // One fetch of active profiles' dates; the 12 monthly figures are
-            // overlap tests computed in PHP instead of 12 COUNT queries.
-            $activeProfiles = HrEmployeeProfile::where('is_active', true)
-                ->get(['start_date', 'end_date']);
-
-            $headcount = $activeProfiles->count();
-
-            // Headcount trend sparkline (last 12 months of start_date counts)
-            $headcountTrend = [];
-            $headcountSeries = [];
-            for ($m = 11; $m >= 0; $m--) {
-                $monthStart = now()->subMonths($m)->startOfMonth();
-                $monthEnd = (clone $monthStart)->endOfMonth();
-                $monthLabel = $monthStart->format('M Y');
-                $activeAtMonth = $activeProfiles
-                    ->filter(fn ($p) => $p->start_date !== null
-                        && $p->start_date->lte($monthEnd)
-                        && ($p->end_date === null || $p->end_date->gte($monthStart)))
-                    ->count();
-                $headcountTrend[] = $activeAtMonth;
-                $headcountSeries[] = ['month' => $monthLabel, 'count' => $activeAtMonth];
-            }
-
-            $vacancies = HrPosition::where('is_active', true)
-                ->whereColumn('current_headcount', '<', 'headcount_budget')
-                ->count();
-
-            $pendingLeave = HrLeaveRequest::where('status', 'pending')->count();
-
-            // Compliance score: % of compliance statuses that are 'compliant'
-            $totalCompliance = HrStaffComplianceStatus::count();
-            $compliantCount = HrStaffComplianceStatus::where('status', 'compliant')->count();
-            $complianceScore = $totalCompliance > 0
-                ? (int) round(($compliantCount / $totalCompliance) * 100)
-                : 100;
-
-            // Department breakdown
-            $departmentBreakdown = HrDepartment::query()
-                ->where('is_active', true)
-                ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
-                ->orderByDesc('employees_count')
-                ->get()
-                ->map(fn ($dept) => [
-                    'department' => $dept->name,
-                    'count' => (int) $dept->employees_count,
-                ])
-                ->values();
-
-            // Recent feed posts
-            $recentFeedPosts = HrFeedPost::with('user:id,name')
-                ->orderByDesc('created_at')
-                ->limit(10)
-                ->get()
-                ->map(fn ($p) => [
-                    'id' => $p->id,
-                    'post_type' => $p->post_type,
-                    'content' => $p->content,
-                    'created_at' => $p->created_at?->toISOString(),
-                    'user' => $p->user ? ['id' => $p->user->id, 'name' => $p->user->name] : null,
-                ])
-                ->values();
-
-            // Expiring compliance items
-            $expiringCompliance = HrStaffComplianceStatus::where('status', 'expiring_soon')
-                ->with(['user:id,name', 'requirement:id,name'])
-                ->orderBy('expires_at')
-                ->limit(10)
-                ->get()
-                ->map(fn ($s) => [
-                    'user_id' => $s->user_id,
-                    'user_name' => $s->user?->name ?? 'Unknown',
-                    'requirement_name' => $s->requirement?->name ?? 'Unknown',
-                    'expires_at' => $s->expires_at?->toISOString(),
-                ])
-                ->values();
-
-            $hrAdmin = [
-                'headcount' => $headcount,
-                'headcountTrend' => $headcountTrend,
-                'vacancies' => $vacancies,
-                'pendingLeave' => $pendingLeave,
-                'complianceScore' => $complianceScore,
-                'headcountSeries' => $headcountSeries,
-                'departmentBreakdown' => $departmentBreakdown,
-                'recentFeedPosts' => $recentFeedPosts,
-                'expiringCompliance' => $expiringCompliance,
-            ];
-        }
-
-        // Staff-specific KPIs — operational only.
-        // PR 10 removed the `leaveBalance` and `compliancePercent` values that
-        // previously surfaced on the staff dashboard. Staff now see those on
-        // `/hr/my`, and in practice they are redirected to `/my-day` before
-        // ever reaching the dashboard fallback.
-        $staffKpis = null;
-        if ($mode === 'staff') {
-            $myShiftsToday = Shift::where('user_id', $user->id)
-                ->visibleToFrontline()
-                ->whereBetween('starts_at', [$today, $tomorrow])
-                ->count();
-
-            $staffKpis = [
-                'myShiftsToday' => $myShiftsToday,
-                'pendingTasks' => $myDayItems->count(),
-            ];
-        }
-
-        // eMAR widget
-        $emarWidgets = null;
-        if ($user->canDo('medications.view')) {
-            $medicationScope = app(MedicationGovernanceScopeService::class);
-            $canViewControlled = $user->canDo('medications.controlled.view');
-            $siteIds = $medicationScope->readerSiteIds(
-                $user,
-                MedicationGovernanceScopeService::MODULE_VIEW_CAPABILITY,
-            );
-            $todayAdminQuery = ClientMedicationAdministration::query()
-                ->effectiveClinicalEvidence()
-                ->where(function ($query) use ($today): void {
-                    $query->whereDate('scheduled_for', $today)
-                        ->orWhereDate('administered_at', $today);
-                });
-            $todayAdminQuery = $medicationScope
-                ->scopeCanonicalClientMedicationRows($todayAdminQuery, $siteIds, false);
-            if (! $canViewControlled) {
-                $medicationScope->scopeWithoutControlledMedicationRows($todayAdminQuery);
-            }
-            $todayAdmins = $todayAdminQuery
-                ->selectRaw("COUNT(*) as total, SUM(CASE WHEN status='given' THEN 1 ELSE 0 END) as given")
-                ->first();
-            $alertQuery = $medicationScope->scopeCanonicalClientMedicationRows(
-                MedicationDashboardAlert::query()->where('status', 'active'),
-                $siteIds,
-            );
-            if (! $canViewControlled) {
-                $alertQuery->whereNotIn('alert_type', [
-                    'controlled_discrepancy',
-                    'controlled_overdue_check',
-                    'controlled_loss',
-                ]);
-                $medicationScope->scopeWithoutControlledMedicationRows($alertQuery);
-            }
-            $emarTotal = (int) ($todayAdmins->total ?? 0);
-            $emarGiven = (int) ($todayAdmins->given ?? 0);
-            $emarWidgets = [
-                'adminRate' => $emarTotal > 0 ? round(($emarGiven / $emarTotal) * 100, 1) : 0,
-                'pending' => $emarTotal - $emarGiven,
-                'activeAlerts' => $alertQuery->count(),
-                'overdueReviews' => MedicationReview::where('status', 'scheduled')
-                    ->whereHas('client', fn ($query) => $query->whereIn('site_id', $siteIds))
-                    ->where('scheduled_date', '<', $today->toDateString())
-                    ->count(),
-                'lowStock' => ClientMedicationStock::whereHas('medication', fn ($query) => $query
-                    ->whereHas('client', fn ($client) => $client->whereIn('site_id', $siteIds))
-                    ->active()
-                    ->when(! $canViewControlled, fn ($medication) => $medication->where('controlled_drug', false)))
-                    ->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level')->count(),
-            ];
-        }
+        [$role, $range, $site] = $this->filters($request);
+        $preference = $this->access->preference($user, $role);
+        // Only the blocks on this person's layout are worked out on page load;
+        // the editor fetches the rest of the library when it opens.
+        $defaultLayout = $this->access->defaultBlockIds($user, $role);
+        $layout = $preference['value']['blocks'] !== null ? array_column($preference['value']['blocks'], 'id') : $defaultLayout;
 
         return inertia('dashboard', [
-            'mode' => $mode,
-            'emarWidgets' => $emarWidgets,
-            'hrWidgets' => $hrWidgets,
-            'hrAdmin' => $hrAdmin,
-            'staffKpis' => $staffKpis,
-            'filters' => [
-                'range' => $range,
-                'status' => $status ?? 'all',
-                'client_id' => $clientId,
-            ],
-            'assignedClients' => $assignedClients,
-            'myDayItems' => $myDayItems,
-            'todayShifts' => $todayShifts,
-            'upcomingShifts' => $upcomingShifts,
-            'upcomingEvents' => $upcomingEvents->map(function ($e) {
-                return [
-                    'id' => $e->id,
-                    'type' => $e->type,
-                    'occurred_at' => optional($e->occurred_at)->toISOString(),
-                    'subject' => $e->subject,
-                    'body' => $e->body,
-                    'meta' => $e->meta ?? [],
-                    'client' => $e->client ? ['id' => $e->client->id, 'first_name' => $e->client->first_name, 'last_name' => $e->client->last_name] : null,
-                    'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
-                ];
-            })->values(),
-            'todayTimesheets' => $todayTimesheets,
-            'managerSummary' => $managerSummary,
-            'incidentKpis' => $incidentKpis,
-            'analytics' => [
-                'shiftSeries' => $shiftSeries,
-                'shiftSeries30' => $shiftSeries30,
-                'incidentSeries' => $incidentSeries,
-                'incidentSeries30' => $incidentSeries30,
-                'incidentBySeverity30' => $incidentBySeverity30,
-                'timesheetByStatus' => $timesheetByStatus,
-                'timesheetSeries30' => $timesheetSeries30,
-            ],
+            'overview' => app(OverviewData::class)->build($user, $role, $range, $site, $layout),
+            'role' => $role, 'roles' => $this->access->roles($user), 'defaultRole' => $this->access->defaultRole($user),
+            'sites' => $this->access->sites($user, $role), 'filters' => ['range' => $range, 'site' => $site],
+            'preference' => $preference, 'defaultLayout' => $defaultLayout,
         ]);
+    }
+
+    public function data(Request $request)
+    {
+        [$role, $range, $site] = $this->filters($request);
+        // blocks=all (or no value) works out every library block; a list limits
+        // the optional blocks to those named (e.g. the ones pinned to a site).
+        $blocks = $request->validate(['blocks' => ['sometimes', 'string', 'max:2000', 'regex:/^(all|[a-z0-9-]+(,[a-z0-9-]+)*)$/']])['blocks'] ?? 'all';
+        $only = $blocks === 'all' ? null : array_values(array_intersect(explode(',', $blocks), array_column($this->access->catalog($role)['blocks'], 'id')));
+
+        return response()->json(app(OverviewData::class)->build($request->user(), $role, $range, $site, $only))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    private function filters(Request $request): array
+    {
+        $data = $request->validate(['role' => ['sometimes', Rule::in(OverviewAccess::ROLES)], 'range' => ['sometimes', Rule::in(['today', 'week', 'month', 'quarter'])], 'site' => ['sometimes', 'string', 'regex:/^(all|[1-9][0-9]*)$/']]);
+        $role = $data['role'] ?? $this->access->defaultRole($request->user());
+        $this->access->authorize($request->user(), $role);
+        $range = $data['range'] ?? $this->access->preference($request->user(), $role)['value']['range'];
+
+        return [$role, $range, $data['site'] ?? 'all'];
+    }
+
+    public function saveLayout(OverviewLayoutRequest $request, string $role)
+    {
+        return DB::transaction(function () use ($request, $role) {
+            // A user-row lock covers both first save and concurrent saves in other tabs.
+            User::query()->whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            $previous = $request->user()->uiPreferences()->where('key', 'overview.workspace.'.$role)->first();
+            $revision = $previous ? hash('sha256', json_encode($previous->value)) : null;
+            if ($request->validated('revision') !== $revision) {
+                // Send the newer layout so the editor can offer to keep the
+                // draft (save over it) or use the other tab's layout.
+                $latest = $this->access->preference($request->user(), $role);
+
+                return response()->json([
+                    'message' => 'This layout was changed in another tab. Your changes are still here.',
+                    'revision' => $latest['revision'],
+                    'value' => $latest['value'],
+                ], 409);
+            }
+            $value = $request->validated('value');
+            $stored = $request->user()->uiPreferences()->updateOrCreate(['key' => 'overview.workspace.'.$role], ['value' => $value]);
+
+            // MySQL JSON normalises object-key order. Hash the persisted form,
+            // exactly as the next read will, rather than the request's key order.
+            return response()->json(['value' => $value, 'revision' => hash('sha256', json_encode($stored->fresh()->value))]);
+        });
+    }
+
+    public function defaultRole(Request $request)
+    {
+        $role = $request->validate(['role' => ['required', Rule::in($this->access->roles($request->user()))]])['role'];
+        $request->user()->uiPreferences()->updateOrCreate(['key' => 'overview.default-role'], ['value' => ['role' => $role]]);
+
+        return response()->json(['role' => $role]);
     }
 }

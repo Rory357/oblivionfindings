@@ -1,17 +1,50 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import {
+    IntegrationRecords,
+    integrationForViewer,
+} from '@/components/security-devices/integration-records';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { integrationsFixture } from './integrations-test-fixtures';
 
 import { CredentialReferenceManagement } from '@/components/security-devices/credential-reference-management';
-import {
-    CredentialRotationStatus,
-    ProviderCard,
-    type Provider,
-} from './integrations';
+import { formatDateTime } from '@/lib/datetime';
+import { CredentialRotationStatus, type Provider } from './integrations';
 import {
     SiteCredentialsCard,
     type SiteCredentialRow,
 } from './integrations/site-credentials';
 import { AuditEvidence, type AuditEntry } from './settings';
+
+function ProviderForTest({
+    provider,
+    canManage,
+}: {
+    provider: Provider;
+    canManage: boolean;
+}) {
+    const permissions = { manage: canManage, devices: true };
+    const safe = integrationForViewer(provider, permissions);
+    return (
+        <IntegrationRecords
+            rows={[safe]}
+            data={{ ...integrationsFixture(), providers: [safe] }}
+            permission={permissions}
+            scope="runtime"
+            layout="cards"
+            searching={false}
+        />
+    );
+}
+async function openProviderEvidence(name: string) {
+    fireEvent.keyDown(
+        screen.getByRole('button', { name: 'Actions for ' + name }),
+        { key: 'Enter', code: 'Enter' },
+    );
+    fireEvent.click(
+        await screen.findByRole('menuitem', { name: 'View evidence' }),
+    );
+    return screen.findByRole('dialog');
+}
 
 describe('Security & Devices integrations and settings', () => {
     it('shows safe credential reference status and never renders an external secret path', () => {
@@ -60,6 +93,9 @@ describe('Security & Devices integrations and settings', () => {
         ).toBeInTheDocument();
         expect(screen.getByText('No revocations pending')).toBeInTheDocument();
         expect(
+            screen.getByText(formatDateTime('2026-07-24T01:00:00Z')),
+        ).toBeInTheDocument();
+        expect(
             screen.queryByText('secret/data/sites/42/core-switch'),
         ).not.toBeInTheDocument();
 
@@ -90,7 +126,7 @@ describe('Security & Devices integrations and settings', () => {
         );
     });
 
-    it('shows explicit provider exceptions and a reachable manager drill-down', () => {
+    it('shows explicit provider exceptions and a reachable manager drill-down', async () => {
         const provider: Provider = {
             slug: 'unifi',
             name: 'UniFi',
@@ -183,34 +219,47 @@ describe('Security & Devices integrations and settings', () => {
             exception_count: 1,
         };
         const { rerender } = render(
-            <ProviderCard provider={provider} canManage />,
+            <ProviderForTest provider={provider} canManage />,
         );
-        const capabilitySummary = screen.getByText(
-            'Inventory, sync, topology and events',
-        );
-        expect(capabilitySummary).toBeInTheDocument();
-        expect(capabilitySummary).toHaveClass(
-            'max-w-full',
-            'whitespace-normal',
-        );
+        const reader = await openProviderEvidence('UniFi');
         expect(
-            screen.getByText('Typed topology contract is available.'),
+            within(reader).getByText('Inventory, sync, topology and events'),
         ).toBeInTheDocument();
         expect(
-            screen.getByText('1 site mapping requires attention.'),
+            within(reader).getByText('Typed topology contract is available.'),
         ).toBeInTheDocument();
-        expect(screen.getByText('Health feed')).toBeInTheDocument();
-        expect(screen.getByText('Stale')).toBeInTheDocument();
+        fireEvent.click(
+            within(reader).getByRole('button', {
+                name: /Collected healthRetained evidence/,
+            }),
+        );
+        expect(within(reader).getByText('Old collection')).toBeInTheDocument();
         expect(
-            screen.getByRole('link', { name: 'Review sync schedule' }),
+            within(reader).getByRole('link', { name: 'Review sync schedule' }),
         ).toHaveAttribute('href', '/security-devices/integrations/unifi');
+        fireEvent.click(
+            within(reader).getByRole('button', {
+                name: /Required actionRetained evidence/,
+            }),
+        );
         expect(
-            screen.getByRole('link', { name: 'Review site mappings' }),
+            within(reader).getByText('1 site mapping requires attention.'),
+        ).toBeInTheDocument();
+        expect(
+            within(reader).getByRole('link', { name: 'Review site mappings' }),
         ).toHaveAttribute('href', '/security-devices/integrations/unifi');
-        expect(screen.getByText(/Rotation due/)).toBeInTheDocument();
+        fireEvent.click(
+            within(reader).getByRole('button', {
+                name: /Connection & credentialsRetained evidence/,
+            }),
+        );
+        expect(within(reader).getByText(/Rotation due/)).toBeInTheDocument();
+        fireEvent.click(
+            within(reader).getAllByRole('button', { name: 'Close' })[0],
+        );
 
         rerender(
-            <ProviderCard
+            <ProviderForTest
                 provider={{
                     ...provider,
                     slug: 'queclink',
@@ -239,16 +288,27 @@ describe('Security & Devices integrations and settings', () => {
             />,
         );
         expect(screen.getByText('Native operations only')).toBeInTheDocument();
-        expect(screen.getByText('Cloud API unavailable')).toBeInTheDocument();
+        const nativeReader = await openProviderEvidence('Queclink');
         expect(
-            screen.getByText(
+            within(nativeReader).getByText(
                 /Direct TCP intake, canonical tracking, and governed Device Management remain available/i,
             ),
         ).toBeInTheDocument();
+        fireEvent.click(
+            within(nativeReader).getByRole('button', {
+                name: /Connection & credentialsRetained evidence/,
+            }),
+        );
+        expect(
+            within(nativeReader).getByText('Cloud API unavailable'),
+        ).toBeInTheDocument();
+        fireEvent.click(
+            within(nativeReader).getAllByRole('button', { name: 'Close' })[0],
+        );
         expect(screen.queryByText('Adapter scaffold')).not.toBeInTheDocument();
     });
 
-    it('labels site-only credentials truthfully without inventing rotation evidence', () => {
+    it('labels site-only credentials truthfully without inventing rotation evidence', async () => {
         const provider = {
             slug: 'milesight',
             name: 'Milesight',
@@ -338,16 +398,26 @@ describe('Security & Devices integrations and settings', () => {
             exception_count: 0,
         } satisfies Provider;
 
-        render(<ProviderCard provider={provider} canManage />);
-        expect(screen.getByText('Not tested')).toBeInTheDocument();
-        expect(screen.queryByText('Adapter scaffold')).not.toBeInTheDocument();
+        render(<ProviderForTest provider={provider} canManage />);
+        const reader = await openProviderEvidence('Milesight');
+        fireEvent.click(
+            within(reader).getByRole('button', {
+                name: /Connection & credentialsRetained evidence/,
+            }),
+        );
+        expect(within(reader).getByText('Untested')).toBeInTheDocument();
         expect(
-            screen.getByText('Site credentials configured'),
+            within(reader).getByText('Site credentials configured'),
         ).toBeInTheDocument();
-        expect(screen.getByText('Rotation status unknown')).toBeInTheDocument();
         expect(
-            screen.queryByText('Credential not configured'),
+            within(reader).getByText('Rotation status unknown'),
+        ).toBeInTheDocument();
+        expect(
+            within(reader).queryByText('Credential not configured'),
         ).not.toBeInTheDocument();
+        fireEvent.click(
+            within(reader).getAllByRole('button', { name: 'Close' })[0],
+        );
     });
 
     it('renders only bounded site credential state', () => {
@@ -405,9 +475,29 @@ describe('Security & Devices integrations and settings', () => {
                 created_at: '2026-07-20T00:00:00Z',
             },
         ];
+        entries.push({
+            id: 2,
+            action: 'integration.site_secret.updated',
+            actor: 'Alex',
+            record_type: 'IntegrationSiteSecret',
+            record_reference: '#9',
+            fields: ['site_id', 'health_status'],
+            created_at: '2026-07-20T00:00:00Z',
+        });
         render(<AuditEvidence visible entries={entries} />);
-        expect(screen.getByText('device.update')).toBeInTheDocument();
+        expect(screen.getByText('Device updated')).toBeInTheDocument();
+        expect(screen.queryByText('device.update')).not.toBeInTheDocument();
         expect(screen.getByText('Changed: name')).toBeInTheDocument();
+        // Record types and fields read as plain words, never class names or keys.
+        expect(
+            screen.getByText('Site integration credential'),
+        ).toBeInTheDocument();
+        expect(
+            screen.getByText('Changed: Site, health status'),
+        ).toBeInTheDocument();
+        expect(
+            screen.queryByText('IntegrationSiteSecret'),
+        ).not.toBeInTheDocument();
         expect(
             screen.queryByText(/IP address|user agent|before|after/i),
         ).not.toBeInTheDocument();

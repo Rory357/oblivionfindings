@@ -13,6 +13,7 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Concerns\WritesLegacyOrganizationStorageContext;
+use App\Notifications\MedicationAlertNotification;
 use App\Services\CurrentAuthorizationReads;
 use Database\Factories\UserFactory;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -86,6 +87,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'two_factor_secret',
         'two_factor_recovery_codes',
         'remember_token',
+        'on_call_cellphone_consented_at',
     ];
 
     protected $appends = ['profile_photo_url', 'avatar'];
@@ -99,10 +101,12 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'external_clinical_account' => 'boolean',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
             'last_seen_at' => 'datetime',
+            'on_call_cellphone_consented_at' => 'datetime',
             'reduce_motion' => 'boolean',
             'font_size' => 'integer',
             'dnd_enabled' => 'boolean',
@@ -145,8 +149,9 @@ class User extends Authenticatable implements MustVerifyEmail
     public function scopeStaff($query)
     {
         return $query
-            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
-            ->whereNotIn('role', ['client', 'next_of_kin']);
+            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin', 'external_clinician']))
+            ->whereNotIn('role', ['client', 'next_of_kin', 'external_clinician'])
+            ->where('external_clinical_account', false);
     }
 
     public function getProfilePhotoUrlAttribute(): ?string
@@ -199,6 +204,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         if (
             ! $this->exists
+            || $this->isExternalClinicianAccount()
             || ! $client->exists
             || ! $this->hasRole('client', 'next_of_kin')
             || ($reads ? $reads->query($this->hrEmployeeProfile()->withTrashed()->getQuery()) : $this->hrEmployeeProfile()->withTrashed())->exists()
@@ -276,6 +282,45 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasOne(HrEmployeeProfile::class);
     }
 
+    /**
+     * Where email goes. A medication alert goes only to the person's work
+     * email — never their sign-in address (P11 B2 chunk 2); without one,
+     * nothing is emailed and they show as a gap. Everything else keeps
+     * Laravel's default, the account email.
+     */
+    public function routeNotificationForMail(mixed $notification = null): ?string
+    {
+        if ($notification instanceof MedicationAlertNotification) {
+            return $this->medicationAlertWorkEmail();
+        }
+
+        return $this->email;
+    }
+
+    /** The work email on their current HR profile, or null. */
+    public function medicationAlertWorkEmail(): ?string
+    {
+        $profile = $this->relationLoaded('hrEmployeeProfile')
+            ? $this->getRelation('hrEmployeeProfile')
+            : $this->hrEmployeeProfile()->first();
+        if (! $profile instanceof HrEmployeeProfile || ! $profile->is_active) {
+            return null;
+        }
+        $today = now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString();
+        if ($profile->end_date !== null && $profile->end_date->toDateString() < $today) {
+            return null;
+        }
+        $email = trim((string) $profile->work_email);
+
+        return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false ? $email : null;
+    }
+
+    /** Personal witness PIN (hash only) — see WitnessPinService. */
+    public function witnessPin()
+    {
+        return $this->hasOne(UserWitnessPin::class);
+    }
+
     public function hrLeaveRequests()
     {
         return $this->hasMany(HrLeaveRequest::class);
@@ -322,7 +367,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function roles()
     {
-        return $this->belongsToMany(Role::class, 'role_user');
+        return $this->belongsToMany(Role::class, 'role_user')->using(RoleUser::class);
     }
 
     public function permissionOverrides()
@@ -359,8 +404,37 @@ class User extends Authenticatable implements MustVerifyEmail
             ->exists();
     }
 
+    /** Family portal accounts: the person supported (client) and their family (next_of_kin). */
+    public function isPortalAccount(): bool
+    {
+        return in_array($this->role, ['client', 'next_of_kin'], true)
+            || $this->hasRole('client', 'next_of_kin');
+    }
+
+    /** Revoked accounts keep their dedicated external identity. */
+    public function isExternalClinicianAccount(): bool
+    {
+        return (bool) $this->external_clinical_account
+            || $this->role === 'external_clinician'
+            || ($this->relationLoaded('roles')
+                ? $this->roles->contains('name', 'external_clinician')
+                : ($this->exists && $this->roles()->where('name', 'external_clinician')->exists()));
+    }
+
+    protected static function booted(): void
+    {
+        static::updating(function (self $user): void {
+            if ((bool) $user->getOriginal('external_clinical_account') && ! $user->external_clinical_account) {
+                throw new \LogicException('An external clinical account cannot become an internal account.');
+            }
+        });
+    }
+
     public function canDo(string $permissionKey): bool
     {
+        if ($this->isExternalClinicianAccount()) {
+            return false;
+        }
         $permissionKeys = $this->permissionLookupKeys($permissionKey);
 
         if ($this->relationLoaded('permissionOverrides')
@@ -492,6 +566,6 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public function canBeImpersonated(): bool
     {
-        return ! $this->hasRole('admin');
+        return ! $this->isExternalClinicianAccount() && ! $this->hasRole('admin');
     }
 }

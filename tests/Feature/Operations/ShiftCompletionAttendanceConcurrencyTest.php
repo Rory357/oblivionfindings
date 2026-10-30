@@ -26,6 +26,7 @@ use LogicException;
 use PHPUnit\Framework\Attributes\Group;
 use RuntimeException;
 use Symfony\Component\Process\Process;
+use Tests\Support\CommittedFixtureCleanup;
 use Tests\TestCase;
 
 #[Group('mysql-serial')]
@@ -35,7 +36,8 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_mysql_completion_and_clock_in_cannot_leave_a_completed_shift_with_an_open_session(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -195,7 +197,8 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_mysql_completion_and_clock_out_share_client_shift_attendance_lock_order(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -355,7 +358,8 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_clock_out_handover_prelock_serializes_a_competing_save_and_rolls_back_every_partial_write(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -522,7 +526,8 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_completion_permission_revoked_while_waiting_on_client_aggregate_writes_nothing(): void
     {
-        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
+        Carbon::setTestNow(Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))->utc());
         $connection = DB::connection();
         $this->assertSame('mysql', $connection->getDriverName());
 
@@ -648,6 +653,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 
     public function test_mysql_attendance_correction_and_timesheet_approval_serialize_on_the_payroll_mutex(): void
     {
+        $this->beforeApplicationDestroyed(CommittedFixtureCleanup::capture()->restore(...));
         Carbon::setTestNow(
             Carbon::parse('2026-08-28 12:00:00', config('app.worker_timezone', 'Pacific/Auckland'))
                 ->setTimezone(config('app.timezone', 'UTC')),
@@ -888,7 +894,7 @@ class ShiftCompletionAttendanceConcurrencyTest extends TestCase
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $shift = App\Models\Shift::query()->findOrFail((int) $argv[2]);
 $worker = App\Models\User::query()->findOrFail((int) $argv[3]);
 file_put_contents($argv[4], 'ready');
@@ -947,7 +953,7 @@ PHP;
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $shift = App\Models\Shift::query()->findOrFail((int) $argv[2]);
 $worker = App\Models\User::query()->findOrFail((int) $argv[3]);
 file_put_contents($argv[4], 'ready');
@@ -1000,7 +1006,7 @@ PHP;
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $shift = App\Models\Shift::query()->findOrFail((int) $argv[2]);
 $worker = App\Models\User::query()->findOrFail((int) $argv[3]);
 $session = App\Domain\Hr\Models\HrAttendanceSession::query()
@@ -1065,7 +1071,7 @@ PHP;
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[8], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[8], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $app->singleton(App\Services\ShiftHandoverService::class, function ($app) use ($argv) {
     return new class(
         $app->make(App\Services\ShiftTimelineService::class),
@@ -1183,7 +1189,7 @@ PHP;
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[7], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[7], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $shift = App\Models\Shift::query()->findOrFail((int) $argv[2]);
 $worker = App\Models\User::query()->findOrFail((int) $argv[3]);
 file_put_contents($argv[4], 'ready');
@@ -1257,7 +1263,7 @@ PHP;
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[7], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[7], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $session = App\Domain\Hr\Models\HrAttendanceSession::query()->findOrFail((int) $argv[2]);
 $manager = App\Models\User::query()->findOrFail((int) $argv[3]);
 file_put_contents($argv[4], 'ready');
@@ -1346,7 +1352,7 @@ PHP;
 require $argv[1].'/vendor/autoload.php';
 $app = require $argv[1].'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland')));
+Carbon\Carbon::setTestNow(Carbon\Carbon::parse($argv[6], config('app.worker_timezone', 'Pacific/Auckland'))->utc());
 $timesheet = App\Models\Timesheet::query()->findOrFail((int) $argv[2]);
 $manager = App\Models\User::query()->findOrFail((int) $argv[3]);
 file_put_contents($argv[4], 'ready');

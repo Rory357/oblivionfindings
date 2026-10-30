@@ -1,6 +1,9 @@
 /* eslint-disable no-restricted-syntax -- the tab cards/tables are custom-layout
    bordered surfaces (not Card/Button), and the hero carries the white pill search
    on the dark band (native input/button); all colours are semantic tokens. */
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import { EmarHubRail } from '@/components/emar/emar-hub-rail';
+import { MedicationJourneyReturn } from '@/components/emar/medication-journey-return';
 import { OrderDetailDialog } from '@/components/emar/prescriptions/order-detail-dialog';
 import {
     countersignHoursLeft,
@@ -10,16 +13,26 @@ import {
     type MedOption,
     type PrescriptionOrder,
 } from '@/components/emar/prescriptions/types';
-import { PageHero, type PageHeroStat } from '@/components/page';
+import {
+    EmarMeters,
+    EmarViewFilter,
+} from '@/components/emar/workspace-navigation';
+import {
+    PageHeader,
+    PageHeaderGlassButton,
+    PageHeaderPrimaryButton,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+} from '@/components/page/page-header';
 import {
     EntityFilter,
     ShiftContextMenu,
-    TabStrip,
     type RosterTabItem,
     type ShiftCtxItem,
     type ShiftCtxState,
 } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { useEmarBreadcrumbs } from '@/hooks/use-emar-breadcrumbs';
 import AppLayout from '@/layouts/app-layout';
 import {
     CancelOrderDialog,
@@ -45,12 +58,12 @@ import {
     PenTool,
     Pill,
     Plus,
-    Search,
     ShieldCheck,
     User,
     X,
 } from 'lucide-react';
 import {
+    useEffect,
     useMemo,
     useState,
     type KeyboardEvent as ReactKeyboardEvent,
@@ -82,7 +95,13 @@ type Modal =
     | { type: 'order' }
     | { type: 'covert' }
     | {
-          type: 'detail' | 'countersign' | 'dispense' | 'link' | 'cancel';
+          type:
+              | 'detail'
+              | 'confirm'
+              | 'countersign'
+              | 'dispense'
+              | 'link'
+              | 'cancel';
           order: GovernedPrescriptionOrder;
       }
     | { type: 'revoke'; authorisation: GovernedCovertAuth }
@@ -90,6 +109,7 @@ type Modal =
 
 type Props = {
     orders: GovernedPrescriptionOrder[];
+    selected_prescriber_order?: GovernedPrescriptionOrder | null;
     covert: GovernedCovertAuth[];
     clients: SiteBoundClientOption[];
     staff: SiteBoundStaffOption[];
@@ -238,6 +258,7 @@ function EmptyState({
 }
 
 export default function Prescriptions(props: Props) {
+    const breadcrumbs = useEmarBreadcrumbs();
     const {
         orders,
         covert,
@@ -261,6 +282,14 @@ export default function Prescriptions(props: Props) {
     );
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [modal, setModal] = useState<Modal>(null);
+    const [confirmingOrder, setConfirmingOrder] = useState(false);
+    useEffect(() => {
+        if (props.selected_prescriber_order)
+            setModal({
+                type: 'detail',
+                order: props.selected_prescriber_order,
+            });
+    }, [props.selected_prescriber_order]);
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
@@ -433,33 +462,26 @@ export default function Prescriptions(props: Props) {
         { id: 'activity', label: 'Activity', icon: LineChart, tone: 'info' },
     ];
 
-    const heroStats: PageHeroStat[] = [
-        {
-            label: 'Awaiting countersign',
-            value: counts.awaiting,
-            tone:
-                counts.overdue > 0
-                    ? 'critical'
-                    : counts.awaiting > 0
-                      ? 'warning'
-                      : 'neutral',
-        },
-        { label: 'Active orders', value: counts.active },
-        { label: 'To dispense', value: counts.toDispense },
-        {
-            label: 'Covert active',
-            value: counts.covert,
-            tone: counts.covert > 0 ? 'warning' : 'neutral',
-        },
-    ];
-
+    // Confirming moves the order on to dispensing, so it asks first.
     const confirm = (o: GovernedPrescriptionOrder) => {
+        if (!canConfirmOrder(o)) return;
+
+        setModal({ type: 'confirm', order: o });
+    };
+    const submitConfirm = (o: GovernedPrescriptionOrder) => {
         if (!canConfirmOrder(o)) return;
 
         router.post(
             `/emar/prescriptions/${o.id}/confirm`,
             {},
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onStart: () => setConfirmingOrder(true),
+                onFinish: () => {
+                    setConfirmingOrder(false);
+                    setModal(null);
+                },
+            },
         );
     };
     const openRevoke = (c: GovernedCovertAuth) => {
@@ -643,89 +665,100 @@ export default function Prescriptions(props: Props) {
     const visibleAlerts = alerts.filter((a) => !dismissed.has(a.key));
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'eMAR', href: '/emar' },
-                { title: 'Prescriptions', href: '/emar/prescriptions' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Prescriptions & Orders" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    variant="hero"
-                    category="ops"
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    wrapTitle
+                    rail={<EmarHubRail />}
                     brandColour={brandColour}
                     icon={FileText}
-                    title={
-                        <span>
-                            <span className="flex items-center gap-2 text-[10.5px] font-semibold tracking-wide text-primary-foreground/80 uppercase">
-                                <span
-                                    aria-hidden
-                                    className="relative inline-flex h-2 w-2"
-                                >
-                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
-                                </span>
-                                Prescriptions &amp; orders · live
-                            </span>
-                            <span className="mt-1 block text-[26px] leading-tight font-bold">
-                                Prescriber orders for{' '}
-                                <span className="border-b-2 border-primary-foreground/40">
-                                    {activeSite?.name ?? 'your services'}
-                                </span>
-                            </span>
-                        </span>
+                    title="Prescriptions & dispensing"
+                    titleChip={
+                        <PageHeaderStatusChip variant="neutral">
+                            {activeSite?.name ?? 'All permitted houses'}
+                        </PageHeaderStatusChip>
                     }
-                    description="Prescriber orders, verbal/telephone countersignatures, dispensing, and covert administration authorisations."
-                    stats={heroStats}
+                    subline="Old prescriber-order records (read only) and covert authorisations. Enter new orders, changes and stops in Orders."
+                    meters={
+                        <EmarMeters
+                            items={[
+                                {
+                                    label: 'Awaiting countersign',
+                                    value: counts.awaiting,
+                                    caption: `${counts.overdue} overdue`,
+                                    tone: counts.overdue
+                                        ? 'critical'
+                                        : counts.awaiting
+                                          ? 'warning'
+                                          : 'brand',
+                                    onClick: () => setActiveTab('countersign'),
+                                },
+                                {
+                                    label: 'Active orders',
+                                    value: counts.active,
+                                    caption: 'Active prescriber orders',
+                                    onClick: () => setActiveTab('orders'),
+                                },
+                                {
+                                    label: 'To dispense',
+                                    value: counts.toDispense,
+                                    caption:
+                                        'Confirmed orders ready to dispense',
+                                    onClick: () => setActiveTab('dispensing'),
+                                },
+                                {
+                                    label: 'Covert active',
+                                    value: counts.covert,
+                                    caption: 'Current authorisations',
+                                    onClick: () => setActiveTab('covert'),
+                                },
+                            ]}
+                        />
+                    }
                     actions={
                         <>
+                            <MedicationJourneyReturn />
+                            <PageHeaderSearch
+                                value={search}
+                                onChange={setSearch}
+                                placeholder="Search person, medication or prescriber…"
+                                ariaLabel="Search prescriber orders"
+                            />
                             {can.manage_orders && canCreateManualOrder && (
-                                <Button
-                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                <PageHeaderPrimaryButton
+                                    icon={Plus}
                                     onClick={() => setModal({ type: 'order' })}
                                 >
-                                    <Plus className="h-4 w-4" />
                                     New prescriber order
-                                </Button>
+                                </PageHeaderPrimaryButton>
                             )}
                             {can.manage_orders && canCreateCovert && (
-                                <Button
-                                    variant="outline"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                <PageHeaderGlassButton
+                                    icon={ShieldCheck}
                                     onClick={() => setModal({ type: 'covert' })}
                                 >
-                                    <ShieldCheck className="h-4 w-4" />
                                     New covert authorisation
-                                </Button>
+                                </PageHeaderGlassButton>
                             )}
                         </>
                     }
-                    footer={
-                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-end">
+                    filters={
+                        <div className="flex flex-wrap items-center justify-end gap-2">
                             <div className="flex flex-wrap items-center gap-2 md:ml-auto md:justify-end">
-                                <div className="relative w-full max-w-xs md:w-[280px]">
-                                    <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <input
-                                        value={search}
-                                        onChange={(e) =>
-                                            setSearch(e.target.value)
-                                        }
-                                        placeholder="Search client, medication or prescriber…"
-                                        aria-label="Search prescriber orders"
-                                        className="h-8 w-full rounded-full border-0 bg-primary-foreground pr-3 pl-9 text-[13px] text-foreground shadow-sm outline-none placeholder:text-muted-foreground/80 focus:ring-2 focus:ring-primary-foreground/50"
-                                    />
-                                    {search ? (
-                                        <button
-                                            type="button"
-                                            aria-label="Clear search"
-                                            onClick={() => setSearch('')}
-                                            className="absolute top-1/2 right-2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
-                                    ) : null}
-                                </div>
+                                <EmarViewFilter
+                                    value={activeTab}
+                                    onChange={setActiveTab}
+                                    items={TABS}
+                                    label="Prescription view"
+                                />
+                                {search && (
+                                    <PageHeaderGlassButton
+                                        onClick={() => setSearch('')}
+                                    >
+                                        Clear search
+                                    </PageHeaderGlassButton>
+                                )}
                                 {sites.length > 0 ? (
                                     <EntityFilter
                                         label="Site"
@@ -785,13 +818,6 @@ export default function Prescriptions(props: Props) {
                         ))}
                     </div>
                 )}
-
-                <TabStrip
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    items={TABS}
-                    ariaLabel="Prescription views"
-                />
 
                 {activeTab === 'orders' && (
                     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -1478,6 +1504,35 @@ export default function Prescriptions(props: Props) {
                     onLink={() =>
                         setModal({ type: 'link', order: modal.order })
                     }
+                />
+            )}
+            {modal?.type === 'confirm' && canConfirmOrder(modal.order) && (
+                <ConfirmDialog
+                    open
+                    frontline
+                    onClose={() => {
+                        if (!confirmingOrder) setModal(null);
+                    }}
+                    onConfirm={() => submitConfirm(modal.order)}
+                    title="Confirm this order?"
+                    description={
+                        <>
+                            The order for{' '}
+                            <span className="font-medium text-foreground">
+                                {modal.order.medication_name ?? 'this medicine'}
+                            </span>{' '}
+                            for{' '}
+                            <span className="font-medium text-foreground">
+                                {modal.order.client_name}
+                            </span>{' '}
+                            is recorded as checked by you and moves to
+                            Dispensing, ready for the pharmacy supply to be
+                            recorded.
+                        </>
+                    }
+                    confirmText="Confirm order"
+                    variant="default"
+                    processing={confirmingOrder}
                 />
             )}
             {modal?.type === 'countersign' &&

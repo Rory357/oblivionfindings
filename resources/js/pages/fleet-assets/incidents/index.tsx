@@ -8,6 +8,13 @@ import {
 } from '@/components/fleet/fleet-incident-report-dialog';
 import { FleetTelematicsStoryboard } from '@/components/fleet/fleet-telematics-storyboard';
 import {
+    PageHeader,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderPrimaryButton,
+} from '@/components/page/page-header';
+import {
     EntityFilter,
     ShiftContextMenu,
     TabStrip,
@@ -29,9 +36,7 @@ import { FleetResponsiveTable } from '@/pages/fleet-assets/components/fleet-resp
 import { WorkflowRibbon } from '@/pages/health-safety/components/workflow-ribbon';
 import { Head, router } from '@inertiajs/react';
 import {
-    Activity,
     AlertTriangle,
-    Bell,
     Box,
     Briefcase,
     Calendar,
@@ -61,16 +66,7 @@ import {
     type MouseEvent as ReactMouseEvent,
     type ReactNode,
 } from 'react';
-import {
-    HeroCluster,
-    HeroClusterTile,
-    HeroMedallion,
-    HeroSegmented,
-    HeroShell,
-    HeroStatusPill,
-    fmt,
-    type Tone,
-} from '../components/fleet-hero-kit';
+import { HeroSegmented, fmt, type Tone } from '../components/fleet-hero-kit';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -577,6 +573,7 @@ export default function FleetIncidentsIndex({
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Health & Safety', href: '/health-safety' },
                 { title: 'Fleet Incidents', href: '/fleet-assets/incidents' },
             ]}
@@ -585,8 +582,192 @@ export default function FleetIncidentsIndex({
 
             <div className="flex flex-col gap-6 p-6">
                 {/* ---- Hero ---- */}
-                <HeroShell
-                    footer={
+                <PageHeader
+                    wrapTitle
+                    title="Fleet & Asset Incidents"
+                    icon={Truck}
+                    subline="Report, triage and investigate fleet incidents · Police-report duty tracked within 24 hours"
+                    actions={
+                        <div className="flex flex-col items-end gap-2">
+                            {can.manage ? (
+                                <Popover
+                                    open={launcherOpen}
+                                    onOpenChange={setLauncherOpen}
+                                >
+                                    <PopoverTrigger asChild>
+                                        <PageHeaderPrimaryButton icon={Plus}>
+                                            Report incident
+                                        </PageHeaderPrimaryButton>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="end"
+                                        className="w-72 p-1.5"
+                                    >
+                                        <Button
+                                            unstyled
+                                            type="button"
+                                            onClick={() =>
+                                                openReport('vehicle')
+                                            }
+                                            className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
+                                        >
+                                            <Truck className="mt-0.5 h-4 w-4 shrink-0 text-status-critical" />
+                                            <span>
+                                                <span className="block text-sm font-medium">
+                                                    Vehicle incident
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    Collision, damage, theft or
+                                                    breakdown.
+                                                </span>
+                                            </span>
+                                        </Button>
+                                        <Button
+                                            unstyled
+                                            type="button"
+                                            onClick={() => openReport('asset')}
+                                            className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
+                                        >
+                                            <Box className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
+                                            <span>
+                                                <span className="block text-sm font-medium">
+                                                    Asset / equipment incident
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    Damage, theft or fault — no
+                                                    vehicle questions.
+                                                </span>
+                                            </span>
+                                        </Button>
+                                        <Button
+                                            unstyled
+                                            type="button"
+                                            onClick={() =>
+                                                openReport('near_miss')
+                                            }
+                                            className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
+                                        >
+                                            <Eye className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
+                                            <span>
+                                                <span className="block text-sm font-medium">
+                                                    A near miss
+                                                </span>
+                                                <span className="block text-xs text-muted-foreground">
+                                                    No harm done — blame-free,
+                                                    under a minute.
+                                                </span>
+                                            </span>
+                                        </Button>
+                                    </PopoverContent>
+                                </Popover>
+                            ) : null}
+                            {/* eslint-disable-next-line no-restricted-syntax -- onDark dashed PREP-LATER affordance */}
+                            <button
+                                type="button"
+                                onClick={() => setTelematicsOpen(true)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary-foreground/30 px-3 py-1.5 text-xs font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10"
+                            >
+                                <RadioTower className="h-3.5 w-3.5" />{' '}
+                                Telematics preview
+                                <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase">
+                                    Prep
+                                </span>
+                            </button>
+                        </div>
+                    }
+                    meters={
+                        <>
+                            <PageHeaderMeterBlock
+                                label="Reported"
+                                href="/fleet-assets/incidents?tab=all"
+                                tone={'brand'}
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(stats.reported)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    this period
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Investigating"
+                                href="/fleet-assets/incidents?tab=under_investigation"
+                                tone={
+                                    stats.investigating > 0
+                                        ? 'warning'
+                                        : 'success'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(stats.investigating)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    under investigation
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Police report due"
+                                href="/fleet-assets/incidents?tab=police_report_due"
+                                tone={
+                                    stats.police_due > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(stats.police_due)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    24h s22 duty
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Off-road (VOR)"
+                                href="/fleet-assets/incidents?tab=off_road"
+                                tone={
+                                    stats.off_road > 0 ? 'warning' : 'success'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(stats.off_road)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    out of service
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Open claims"
+                                href="/fleet-assets/incidents?tab=insurance_claims"
+                                tone={
+                                    stats.open_claims > 0 ? 'warning' : 'brand'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(stats.open_claims)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    insurance
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                            <PageHeaderMeterBlock
+                                label="Injury / ACC"
+                                href="/fleet-assets/incidents?tab=injury_acc"
+                                tone={
+                                    stats.injury_acc > 0
+                                        ? 'critical'
+                                        : 'success'
+                                }
+                            >
+                                <PageHeaderMeterBig>
+                                    {fmt(stats.injury_acc)}
+                                </PageHeaderMeterBig>
+                                <PageHeaderMeterCaption>
+                                    {`${stats.worksafe_notifiable} WorkSafe`}
+                                </PageHeaderMeterCaption>
+                            </PageHeaderMeterBlock>
+                        </>
+                    }
+                    filters={
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                             <HeroSegmented
                                 label="Period"
@@ -683,210 +864,14 @@ export default function FleetIncidentsIndex({
                             ) : null}
                         </div>
                     }
-                >
-                    <WorkflowRibbon current="report" />
-
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <HeroMedallion icon={Truck} />
-                            <div className="flex flex-col gap-1.5">
-                                <HeroStatusPill>
-                                    Fleet incident register · operational
-                                    worklist
-                                </HeroStatusPill>
-                                <h1 className="text-2xl font-bold tracking-tight text-primary-foreground md:text-[28px]">
-                                    Fleet &amp; Asset Incidents
-                                </h1>
-                                <p className="max-w-xl text-sm text-primary-foreground/70">
-                                    The system of record for everything that
-                                    happens to a vehicle or asset — captured
-                                    with photos in seconds, triaged in the
-                                    Control Room, and investigated in Health
-                                    &amp; Safety. The 24-hour Police-report duty
-                                    is impossible to miss.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col items-end gap-2">
-                            {can.manage ? (
-                                <Popover
-                                    open={launcherOpen}
-                                    onOpenChange={setLauncherOpen}
-                                >
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            size="sm"
-                                            className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />{' '}
-                                            Report incident
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent
-                                        align="end"
-                                        className="w-72 p-1.5"
-                                    >
-                                        <Button
-                                            unstyled
-                                            type="button"
-                                            onClick={() =>
-                                                openReport('vehicle')
-                                            }
-                                            className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                        >
-                                            <Truck className="mt-0.5 h-4 w-4 shrink-0 text-status-critical" />
-                                            <span>
-                                                <span className="block text-sm font-medium">
-                                                    Vehicle incident
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    Collision, damage, theft or
-                                                    breakdown.
-                                                </span>
-                                            </span>
-                                        </Button>
-                                        <Button
-                                            unstyled
-                                            type="button"
-                                            onClick={() => openReport('asset')}
-                                            className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                        >
-                                            <Box className="mt-0.5 h-4 w-4 shrink-0 text-status-warning" />
-                                            <span>
-                                                <span className="block text-sm font-medium">
-                                                    Asset / equipment incident
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    Damage, theft or fault — no
-                                                    vehicle questions.
-                                                </span>
-                                            </span>
-                                        </Button>
-                                        <Button
-                                            unstyled
-                                            type="button"
-                                            onClick={() =>
-                                                openReport('near_miss')
-                                            }
-                                            className="flex w-full items-start gap-2.5 rounded-md p-2.5 text-left transition-colors hover:bg-muted"
-                                        >
-                                            <Eye className="mt-0.5 h-4 w-4 shrink-0 text-status-success" />
-                                            <span>
-                                                <span className="block text-sm font-medium">
-                                                    A near miss
-                                                </span>
-                                                <span className="block text-xs text-muted-foreground">
-                                                    No harm done — blame-free,
-                                                    under a minute.
-                                                </span>
-                                            </span>
-                                        </Button>
-                                    </PopoverContent>
-                                </Popover>
-                            ) : null}
-                            {/* eslint-disable-next-line no-restricted-syntax -- onDark dashed PREP-LATER affordance */}
-                            <button
-                                type="button"
-                                onClick={() => setTelematicsOpen(true)}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-primary-foreground/30 px-3 py-1.5 text-xs font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10"
-                            >
-                                <RadioTower className="h-3.5 w-3.5" />{' '}
-                                Telematics preview
-                                <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-semibold tracking-wide uppercase">
-                                    Prep
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* stat clusters */}
-                    <div className="grid gap-3 lg:grid-cols-2">
-                        <HeroCluster
-                            title="This period · last 30 days"
-                            icon={Activity}
-                        >
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=all"
-                                label="Reported"
-                                value={fmt(stats.reported)}
-                                caption="reported"
-                                tone="neutral"
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=under_investigation"
-                                label="Investigating"
-                                value={fmt(stats.investigating)}
-                                caption="under investigation"
-                                tone={
-                                    stats.investigating > 0
-                                        ? 'warning'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=all"
-                                label="Resolved"
-                                value={fmt(stats.resolved)}
-                                caption="back in service"
-                                tone={
-                                    stats.resolved > 0 ? 'success' : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=closed"
-                                label="Closed"
-                                value={fmt(stats.closed)}
-                                caption="finalised"
-                                tone="neutral"
-                            />
-                        </HeroCluster>
-                        <HeroCluster title="Needs attention" icon={Bell}>
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=police_report_due"
-                                label="Police report due"
-                                value={fmt(stats.police_due)}
-                                caption="24h s22 duty"
-                                tone={
-                                    stats.police_due > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=off_road"
-                                label="Off-road (VOR)"
-                                value={fmt(stats.off_road)}
-                                caption="out of service"
-                                tone={
-                                    stats.off_road > 0 ? 'warning' : 'success'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=insurance_claims"
-                                label="Open claims"
-                                value={fmt(stats.open_claims)}
-                                caption="insurance"
-                                tone={
-                                    stats.open_claims > 0
-                                        ? 'warning'
-                                        : 'neutral'
-                                }
-                            />
-                            <HeroClusterTile
-                                href="/fleet-assets/incidents?tab=injury_acc"
-                                label="Injury / ACC"
-                                value={fmt(stats.injury_acc)}
-                                caption={`${stats.worksafe_notifiable} WorkSafe`}
-                                tone={
-                                    stats.injury_acc > 0
-                                        ? 'critical'
-                                        : 'success'
-                                }
-                            />
-                        </HeroCluster>
-                    </div>
-                </HeroShell>
+                    rail={<WorkflowRibbon current="report" />}
+                />
+                <Card>
+                    <CardContent className="flex flex-wrap gap-3 p-3 text-sm">
+                        <span>{stats.resolved} resolved this period</span>
+                        <span>{stats.closed} closed this period</span>
+                    </CardContent>
+                </Card>
 
                 {/* ---- Tabs ---- */}
                 <TabStrip

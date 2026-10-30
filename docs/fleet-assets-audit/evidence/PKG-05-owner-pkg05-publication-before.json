@@ -1,0 +1,319 @@
+{
+  "main": "C:/Users/steph/Herd/oblivionfindings",
+  "base": "ba5bff2e8b6c22796369443f1cdac918039950dd",
+  "candidate": "49e0be5b1c1716aeb4e681529bb71fdce2a7abc0",
+  "remoteBefore": "ba5bff2e8b6c22796369443f1cdac918039950dd\trefs/heads/main",
+  "captured": "2026-09-27T17:21:54.3812243+13:00",
+  "files": [
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/00-project-rules.md",
+      "sha256": "ea10d798381f459ad64a3a0abdb08fd2b890fdd765dc4be0234bab71f620a616"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/01-domain-ownership.md",
+      "sha256": "315123740bae45d61b173a9a6c53953d7077765ecb9778aaddc8b11426c34e0b"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/02-approved-workflows.md",
+      "sha256": "1e8f9b6c9cb53ae62963570a8c4c3dab5ea379dbac793f25e8745594a8eb81e1"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/03-dependency-map.md",
+      "sha256": "e316db977b6bbca31ecf3e54e59350db600961e45b7b78bb80f772fb67c1a8b0"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/05-page-register.md",
+      "sha256": "d96abe70fa95ff44cd118ae55807ee502d199c129ebc9a582098cc1081f5102e"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/06-model-selection.md",
+      "sha256": "4aa6bf3ecdd59931f1f9d5ed48e27d67091a942bb3edfda13cddb37e894b28eb"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/07-model-results.md",
+      "sha256": "1a44ed9f1d1a31af7adf87ff7f258d7e9cc9f8bb49f980bedd78bfef325ec75d"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/09-amendments.md",
+      "sha256": "e7daaddd988c2673aafb689bdd486d7d1255454196f5070aebff9e135a13a2ea"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/12-navigation-page-inventory.md",
+      "sha256": "1389adc814c16bfc46468947af993d7009cbd4999a9d7e19469ca1ec08b20154"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-02A-DESIGNER.md",
+      "sha256": "5ee67081aa09a58af752e0f0fc02a258e606d65972f65389b8c30963ae4abb90"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-02B-DESIGNER.md",
+      "sha256": "6ab0b054bbd2faa20202330743c07db04836d4bc2ff7ea59dc11a953fda48d21"
+    },
+    {
+      "status": " M",
+      "path": "docs/fleet-assets-audit/pages/PKG-02A.md",
+      "sha256": "f3c6b2030018b42b5c02af7c10b4a43a0ee38564ed6b14bf6ec6ee841aa8931d"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-design-start.md",
+      "sha256": "f983a6939e105a105652e9ed4fb942c3e5d490ff5399a963546c46a825f4b00f"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/OPS-PL01-fleet-reference.png",
+      "sha256": "bbdee7708b2417510acd484d98f226a9db98f4e22b068daf881862e05048688c"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02A-main-publication-verification.md",
+      "sha256": "5c5fdf9664627a1cf0e36ffa37c025504d49ee7abec35869c880f3620b9f6720"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-build-start.md",
+      "sha256": "55faf04a7658e72b0b98af51cb0198b5703b9d2fbc807bc7d643a02ee149800d"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-designer-completion-20260927.md",
+      "sha256": "fd1b85f2a2d1488dac6a286d95b7de8e2b021b472ab5753d941748ef731dadaa"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-contract-review.md",
+      "sha256": "2fc450b72746d4ba25120a3758869d7992623b1d26c5a8cde1f27eec17e932d7"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-final-hosted-checks.json",
+      "sha256": "8cfe2b2ffdc4269938a73face4c3e4fef07e578f69b0c5dfca39f8194116d780"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-final-review.md",
+      "sha256": "61bec8acadf2f62fa242ae486e6b9ac1aa13fa1ce2fe8a7b67fc35d7f1b6b0c2"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-final01-review.md",
+      "sha256": "dfc7bbdaca7882e1024c8cff7bdb8978fa12a489c78a37dfb6aaa75eade8631d"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-publication-verification.md",
+      "sha256": "473ec318930de3174c9a794dcab68e654eab39bde7d40762129f99726b9d2b26"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-setup-release.md",
+      "sha256": "bb81b4c25a1192cf10e5e5526b462cc82385c03db8763aec4ffe14d84f9edbd7"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-v12-review.md",
+      "sha256": "15f3a2036272f995276f69a7a7d31919134384d68465061c25a92f073cdc4504"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-v13-review.md",
+      "sha256": "90c5f8701305b68fd312aca9e397467e3f5f3660f4666b39a9e12fc63dffd8fb"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-02B-main-xlsx-rounding-probe.php",
+      "sha256": "aff7b843e7ca69f964342e58512d65bfb500dd2747f8d09b7e6160be2b670792"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-03-design-start.md",
+      "sha256": "71541fdcf93769614069ec07f0378bb33677d5ff942ea74acb847dd888387f59"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-03-main-local-integration-intake.md",
+      "sha256": "2f3cb6264043345d13b377c7521b90cd2560cef962819699d0daf92d6b625e4f"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-05-design-start.md",
+      "sha256": "c31f612cd7bac9bbc28f057bc3302a251022dc9c95796a29a73696ad2f0b87cc"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-audited-source-hashes.json",
+      "sha256": "58f875a6afcfd7419c3dfa2a1b1860d81e394c51f186a59aab45d2e100fb6130"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-designer-completion-20260927.md",
+      "sha256": "633450ed30d501783864b7f9f3224b22046706e89a4cfebf2792b5bca55cf545"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-main-calendar-probe.json",
+      "sha256": "27db3ae17189750504f0459f32fba5d65820a075f0f30b4d2ffd1fae54ede03b"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-main-calendar-probe.mjs",
+      "sha256": "52a772043d51a4a218bceb0115c64c01af11b5361c269270aa6d11b9d73ba8d7"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-main-completion-handoff.md",
+      "sha256": "aeb14d24b2e7146da3ffbd905bf11322b2c1886b230132b9b2a848c6f5565e6a"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-04-main-technical-review.md",
+      "sha256": "29791b575804705e64a67ee6b948599480f29a2526e15018ae4e577dafab8a4d"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-05-main-approved-source-hashes.json",
+      "sha256": "10fe26e0b82cf03832d53c7d42372e7fc99023d44a166acaafd68fbadc2441f8"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-05-main-calendar-duration-probe.mjs",
+      "sha256": "e2243d6b4b9cab83563548ccaff0a58208c78601a7679410ac5a4e2543da4419"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-05-main-calendar-duration-result.json",
+      "sha256": "de6b3d76e8f3783111551903f7f907a31530ae0026f78dad59f0c82760326e3b"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-05-main-correction-handoff.md",
+      "sha256": "29cf0624aad9775925b36c2d74b46b385c29f301b879c4c602e746bbe7a2ecd8"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-05-main-technical-review.md",
+      "sha256": "c5762e14d3c220db03871024317d5c709e6734376a1b6f8845ceff1dd50b944f"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-05-transport-correction-dispatch.md",
+      "sha256": "974183107488b0fe4dbfb6c323c5c7611b17997eda31cb6306df52cdad65e89a"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-06A-06B-design-start.md",
+      "sha256": "4f76523164645e60668fe5820df1fae02470ef25f63c6465030c91838baabc36"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-06A-main-integration-intake.md",
+      "sha256": "969aa88fc26b2b42862986f2747d11047708a792895b6be478424998da1920a2"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-06A-main-technical-review.md",
+      "sha256": "c507b1314c24e707e0d8e796ab07b8aafe0dc2b71738ba2c6af9b7ebbd42eec0"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-06A-main-time-display-probe.json",
+      "sha256": "8304d7b53f988fa424ec2932e9c070d2df0297d75f138f7e3165b3738bc7e7f5"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-06B-main-integration-intake.md",
+      "sha256": "8c90e76b7f472242e82148c2fabaf3b89f4d20386eb44b003604d9bd2b456da7"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-07-design-start.md",
+      "sha256": "6a621aa58a437e666aa7f5f923cc7553d10648007827c2943c8decd2080703d8"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-NAV-main-publication.md",
+      "sha256": "5ed7c2b4b4c7ae7b03f69f7deeb10038e29f71b285f845b8ac4429f1288b3a85"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG-NAV-main-review.md",
+      "sha256": "eda37c70a39239586e738961814440a0aca3e2f69d46fed183181c58576f6fcc"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/PKG06AMainReviewTest.php",
+      "sha256": "f1c29e2043d97b3d578781c283a1bcdf9ad053d953541413426edf9b74435499"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/evidence/navigation-overview-start.md",
+      "sha256": "78a734a43b91660b57572e87011d7837764b3a04bcdf17fe037572011e9fd6d8"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/OPS-PL01-DESIGNER.md",
+      "sha256": "ccecac6bf7b7f9daee235a7168f5ce1ad785e7b49a7f60b150d863994d1d8e2c"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-02B-BUILD.md",
+      "sha256": "456f6b94b28a2a20d70534f63d4101cf173ef3e0742e7279c51987bd019eb06c"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-03-DESIGNER.md",
+      "sha256": "ea9cd90c5136497ddbe2b8cf12b8828944d7c89a81ced0854a81bfca162331f5"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-04-DESIGNER.md",
+      "sha256": "be8c6e256eedc713ed6c888248ae22154fe6be1835a41d70ea30745501685168"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-05-DESIGNER.md",
+      "sha256": "7bb79ce21e2d823b94d2ee103e47ef6490f1116f2369b736cccfe75060e58b51"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-06A-DESIGNER.md",
+      "sha256": "dcd7975ad4a2a2d820d0ca6be64060886963d33f414c49f506c96b965058c9a0"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-06B-DESIGNER.md",
+      "sha256": "48b7ec5fbe888b9b4b9578e7aa75aeb04e803448da7e5abcc4bc87e692307acf"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-07-DESIGNER.md",
+      "sha256": "0bcbba0ebbb46c14687389eaeda619303fbe0d9e4e4b0978f2cab2990caf34f1"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-09A-OVERVIEW-DESIGNER.md",
+      "sha256": "19ffc7f4587a14a12614f301b9933a739e8fd043026e2ddfa5d615f12b02cbcf"
+    },
+    {
+      "status": "??",
+      "path": "docs/fleet-assets-audit/handoffs/PKG-NAV-IMPLEMENTATION.md",
+      "sha256": "9e17013845268b319e3471ec9f90b91e444d4bf59ba9eeb95af162383f238123"
+    },
+    {
+      "status": "??",
+      "path": "public/.user.ini",
+      "sha256": "5b89b33882c30a9b7882c456bda8503f7bd0341187cf7ac0873c5ec512f5c82a"
+    }
+  ]
+}

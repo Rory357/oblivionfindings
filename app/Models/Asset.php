@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\SecurityDevices\Models\DeviceAssetLink;
 use App\Models\Concerns\AuditableChanges;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,9 +71,22 @@ class Asset extends Model
         'has_medical_storage',
         'seating_capacity',
         'accessibility_notes',
+        // PKG-02B vehicle details. The profile photo and profile version are
+        // set only through their guarded commands, never mass-assigned.
+        'body_type',
+        'use_purpose',
+        'ownership_arrangement',
+        'fleet_responsible_user_id',
+        'insurance_provider',
+        'insurance_policy_reference',
+        'insurance_expires_at',
+        'warranty_reference',
     ];
 
     protected $casts = [
+        'asset_profile_version' => 'integer',
+        'insurance_expires_at' => 'date',
+        'vehicle_profile_version' => 'integer',
         'purchase_date' => 'date',
         'warranty_expires_at' => 'date',
         'registration_expires_at' => 'date',
@@ -281,6 +295,36 @@ class Asset extends Model
         return $this->hasMany(FleetServiceSchedule::class);
     }
 
+    public function complianceRecords(): HasMany
+    {
+        return $this->hasMany(FleetVehicleComplianceRecord::class);
+    }
+
+    public function odometerObservations(): HasMany
+    {
+        return $this->hasMany(FleetVehicleOdometerObservation::class);
+    }
+
+    public function documentSets(): HasMany
+    {
+        return $this->hasMany(AssetDocumentSet::class);
+    }
+
+    public function vehicleReminders(): HasMany
+    {
+        return $this->hasMany(FleetVehicleReminder::class);
+    }
+
+    public function fleetResponsible(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'fleet_responsible_user_id');
+    }
+
+    public function profilePhoto(): BelongsTo
+    {
+        return $this->belongsTo(AssetDocument::class, 'profile_photo_document_id');
+    }
+
     public function fleetIncidents(): HasMany
     {
         return $this->hasMany(FleetIncident::class);
@@ -312,16 +356,20 @@ class Asset extends Model
 
     public function scopeWofExpiring($query, int $days = 30)
     {
+        $today = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'));
+
         return $query->whereNotNull('wof_expires_at')
-            ->where('wof_expires_at', '<=', now()->addDays($days))
-            ->where('wof_expires_at', '>=', now());
+            ->where('wof_expires_at', '<=', $today->addDays($days)->toDateString())
+            ->where('wof_expires_at', '>=', $today->toDateString());
     }
 
     public function scopeRegistrationExpiring($query, int $days = 30)
     {
+        $today = CarbonImmutable::now((string) config('app.worker_timezone', 'Pacific/Auckland'));
+
         return $query->whereNotNull('registration_expires_at')
-            ->where('registration_expires_at', '<=', now()->addDays($days))
-            ->where('registration_expires_at', '>=', now());
+            ->where('registration_expires_at', '<=', $today->addDays($days)->toDateString())
+            ->where('registration_expires_at', '>=', $today->toDateString());
     }
 
     public function scopeVehicles($query)

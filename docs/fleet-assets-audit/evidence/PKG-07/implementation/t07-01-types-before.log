@@ -1,0 +1,16 @@
+resources/js/pages/fleet-assets/geofences/workspace/boundaries.test.ts(131,32): error TS2345: Argument of type '{ timezone: string; weekdays: number[]; start: string; end: string; following_day: boolean; first_date: string; last_date: string; exception_dates: never[]; }' is not assignable to parameter of type 'ZoneSchedule'.
+  Types of property 'timezone' are incompatible.
+    Type 'string' is not assignable to type '"Pacific/Auckland"'.
+resources/js/pages/fleet-assets/geofences/workspace/boundaries.test.ts(137,32): error TS2345: Argument of type '{ timezone: string; weekdays: number[]; start: string; end: string; following_day: boolean; first_date: string; last_date: string; exception_dates: never[]; }' is not assignable to parameter of type 'ZoneSchedule'.
+  Types of property 'timezone' are incompatible.
+    Type 'string' is not assignable to type '"Pacific/Auckland"'.
+resources/js/pages/fleet-assets/geofences/workspace/operational-map.test.tsx(104,59): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+resources/js/pages/fleet-assets/geofences/workspace/operational-map.test.tsx(148,59): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.
+  Overload 2 of 2, '(role: ByRoleMatcher, options?: ByRoleOptions | undefined): HTMLElement', gave the following error.
+    Object literal may only specify known properties, and 'exact' does not exist in type 'ByRoleOptions'.

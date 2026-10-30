@@ -21,6 +21,7 @@ test.describe('roster templates — apply preflight', () => {
     test('blocks template rows that would create staff conflicts', async ({
         page,
     }) => {
+        test.setTimeout(60_000);
         resetRosteringReadinessFixtures();
 
         const consoleErrors = collectConsoleErrors(page);
@@ -33,7 +34,14 @@ test.describe('roster templates — apply preflight', () => {
 
         await expect(page.getByTestId('template-apply-card')).toBeVisible();
         await page.locator('#week-start').fill('2026-05-25');
+        const applyResponse = page.waitForResponse(
+            (response) =>
+                new URL(response.url()).pathname ===
+                    '/operations/rostering/templates/9001/apply' &&
+                response.request().method() === 'POST',
+        );
         await page.getByTestId('template-apply-submit').click();
+        expect((await applyResponse).status()).toBe(302);
 
         await expect(page.getByTestId('template-apply-blocks')).toBeVisible();
         await expect(

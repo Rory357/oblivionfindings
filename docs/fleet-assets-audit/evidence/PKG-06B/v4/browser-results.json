@@ -1,0 +1,26 @@
+{
+  "checks": [
+    {
+      "name": "Replacement failure/retry preserves source DS-104-1 with v2,v3,v4 and reason",
+      "status": "passed"
+    },
+    {
+      "name": "Archive failure retains reason/current record; retry retains archived original",
+      "status": "passed"
+    },
+    {
+      "name": "Empty library has zero sources and first local upload becomes visible",
+      "status": "passed"
+    },
+    {
+      "name": "Profile photo rejects non-image without changing identity photo",
+      "status": "passed"
+    },
+    {
+      "name": "Profile photo renders from a local blob only after simulated confirmation",
+      "status": "passed"
+    }
+  ],
+  "errors": [],
+  "harnessNote": "A first retry lookup used the initial Simulate upload label; the actual recovery control is Retry simulated upload. Corrected and passed."
+}

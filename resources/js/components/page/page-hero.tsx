@@ -117,6 +117,13 @@ export interface PageHeroProps {
      */
     footer?: ReactNode;
 
+    /**
+     * Connected view tabs (a `PageHeaderRail`) as the banner's last row,
+     * under the footer — PageHeader's `rail` row, active tab flush with the
+     * page ground. Hero variant only.
+     */
+    rail?: ReactNode;
+
     className?: string;
 }
 
@@ -152,14 +159,17 @@ function HeroVariant(props: PageHeroProps) {
         quickActionsHeading,
         children,
         footer,
+        rail,
         className,
     } = props;
     const supportingText = description ?? subtitle;
 
     // Resolve the hero's base colour: an explicit site brand colour wins, then
-    // the category token, else the --primary default gradient. The site colour
-    // is injected as a CSS variable *value* (runtime string) so the gradient
-    // utility stays token-based and the raw-colour ESLint guard stays green.
+    // the category token, else --primary (the .page-hero default). The site
+    // colour is injected as a CSS variable *value* (runtime string) so the
+    // band stays token-based and the raw-colour ESLint guard stays green.
+    // .page-hero (app.css) floors whichever colour it is dark enough for the
+    // band's white text, so admin-chosen light Site colours stay readable.
     const heroBase =
         brandColour && brandColour.trim() !== ''
             ? brandColour.trim()
@@ -171,16 +181,12 @@ function HeroVariant(props: PageHeroProps) {
         ? ({ ['--hero-base' as string]: heroBase } as CSSProperties)
         : undefined;
 
-    const gradientClass = heroBase
-        ? 'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]'
-        : 'bg-gradient-to-br from-primary/90 via-primary to-primary/80';
-
     const renderedIcon =
         avatar || avatarStack
             ? null
             : renderIcon(
                   icon,
-                  'h-12 w-12 text-primary-foreground md:h-14 md:w-14',
+                  'h-12 w-12 text-band-foreground md:h-14 md:w-14',
               );
 
     return (
@@ -193,24 +199,23 @@ function HeroVariant(props: PageHeroProps) {
             data-page-hero-variant="hero"
             style={style}
             className={cn(
-                '@container relative rounded-2xl text-primary-foreground',
-                gradientClass,
+                'page-hero @container relative rounded-2xl text-band-foreground',
                 className,
             )}
         >
             {/* INNER ORB CLIP — purely visual; clipped to the rounded shape so the
                 three decorative circles don't bleed past the banner. */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                <div className="absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                <div className="absolute -top-16 -right-16 h-64 w-64 rounded-full bg-band-foreground/5" />
+                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-band-foreground/5" />
+                <div className="absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-band-foreground/5" />
             </div>
 
             <div className="relative p-6 md:p-8">
                 {backHref ? (
                     <Link
                         href={backHref}
-                        className="frontline-focus frontline-tap mb-1 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 text-xs text-primary-foreground/60 transition-colors hover:text-primary-foreground/90"
+                        className="frontline-focus frontline-tap mb-1 -ml-2 inline-flex items-center gap-1.5 rounded-md px-2 text-xs text-band-foreground/70 transition-colors hover:text-band-foreground/90"
                     >
                         <ArrowLeft className="h-3.5 w-3.5" />
                         {backLabel}
@@ -223,7 +228,7 @@ function HeroVariant(props: PageHeroProps) {
                     ) : avatar ? (
                         <HeroSingleAvatar avatar={avatar} />
                     ) : renderedIcon ? (
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-band-foreground/20 bg-band-foreground/10 shadow-xl md:h-28 md:w-28">
                             {renderedIcon}
                         </div>
                     ) : null}
@@ -233,7 +238,7 @@ function HeroVariant(props: PageHeroProps) {
                             {title}
                         </h1>
                         {supportingText ? (
-                            <p className="mt-1 text-sm text-primary-foreground/70">
+                            <p className="mt-1 text-sm text-band-foreground/70">
                                 {supportingText}
                             </p>
                         ) : null}
@@ -271,9 +276,19 @@ function HeroVariant(props: PageHeroProps) {
                 </div>
             </div>
 
-            {footer ? (
-                <div className="relative overflow-hidden rounded-b-2xl border-t border-primary-foreground/20 px-4">
+            {footer || rail ? (
+                <div
+                    className={cn(
+                        'relative overflow-hidden rounded-b-2xl px-4',
+                        footer && 'border-t border-band-foreground/20',
+                    )}
+                >
                     {footer}
+                    {rail ? (
+                        <div className="flex min-h-[46px] items-end">
+                            {rail}
+                        </div>
+                    ) : null}
                 </div>
             ) : null}
         </div>
@@ -293,18 +308,18 @@ function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
     const avatarEl = (
         <Avatar
             className={cn(
-                'h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28',
+                'h-24 w-24 shrink-0 border-4 border-band-foreground/20 shadow-xl md:h-28 md:w-28',
                 avatar.popover &&
                     'cursor-pointer transition-shadow duration-200',
                 avatar.popover &&
                     hover &&
-                    'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--primary-foreground)]',
+                    'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--band-foreground)]',
             )}
         >
             {avatar.src ? (
                 <AvatarImage src={avatar.src} alt={avatar.fallback} />
             ) : null}
-            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
+            <AvatarFallback className="bg-band-foreground/10 text-2xl font-semibold text-band-foreground">
                 {avatar.fallback}
             </AvatarFallback>
         </Avatar>

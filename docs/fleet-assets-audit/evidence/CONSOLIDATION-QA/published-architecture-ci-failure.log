@@ -1,0 +1,207 @@
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	﻿2026-09-27T23:56:36.4218884Z ##[group]Run php scripts/ci/run-pest-shard.php --suite=foundation --shard-index=0 --shard-count=1 --batch-size=30
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4219539Z ^[[36;1mphp scripts/ci/run-pest-shard.php --suite=foundation --shard-index=0 --shard-count=1 --batch-size=30^[[0m
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4275604Z shell: /usr/bin/bash -e {0}
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4275824Z env:
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4275992Z   COMPOSER_PROCESS_TIMEOUT: 0
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4276203Z   COMPOSER_NO_INTERACTION: 1
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4276397Z   COMPOSER_NO_AUDIT: 1
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4276576Z   DB_CONNECTION: mysql
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4276746Z   DB_HOST: 127.0.0.1
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4276918Z   DB_PORT: 3306
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4277129Z   DB_DATABASE: oblivion_findings_codex_test
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4277357Z   DB_USERNAME: testUser
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4277539Z   DB_PASSWORD: test101
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4277711Z ##[endgroup]
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4995162Z CI Pest suite=foundation shard=1/1 files=242 batches=9 roster_sha256=bec0c3b52bc8145bf68e56c8ceeb396b506f4f4b190d6b8996819452d387b215
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.4995881Z Starting fresh Pest process 1/9 with 30 files.
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9021421Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9022262Z    PASS  Tests\Architecture\AttendanceTimeEntryMigrationIntegrityTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9111868Z   ✓ attendance time-entry uniqueness migration fails closed instead of…  0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9112706Z   ✓ attendance backfill has a post-payroll-mutex replay migration
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9113041Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9113343Z    PASS  Tests\Architecture\BankReconciliationMutationBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9128206Z   ✓ it keeps every HTTP reconciliation mutation behind the canonical ag… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9130892Z   ✓ it guards reconciliation records and match history from alternate eloquent mutation paths
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9138609Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9138972Z    PASS  Tests\Architecture\CateringMealServiceAtomicityContractTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9142271Z   ✓ meal service remains one transactional domain owner with immutable exact reversal identity
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9151153Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9151499Z    PASS  Tests\Architecture\CiCrashSafeExecutionBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9154412Z   ✓ it keeps PHP and browser CI in bounded crash safe shards
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9734403Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9735111Z    PASS  Tests\Architecture\ClientFundCanonicalMutationBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9758584Z   ✓ it keeps client-money balance and transaction writes inside the can… 0.06s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9760581Z   ✓ it keeps Client Trust GL dimensions owned by the canonical journal bridge
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9786327Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9786917Z    PASS  Tests\Architecture\ControlRoomAlertViewScopeBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9790059Z   ✓ the alert index delegates adjacent datasets to the canonical scoped worklist query
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:36.9792426Z   ✓ the canonical worklist query scopes rows aggregates queue counts and creation options
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0543348Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0544206Z    PASS  Tests\Architecture\ControlRoomSignalAlertOwnershipBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0566854Z   ✓ normalized signal alert provenance is owned only by the canonical p… 0.07s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0568889Z   ✓ signal provenance schema carries native uniqueness and durable ambiguity review
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0644626Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0644970Z    PASS  Tests\Architecture\CredentialSurfaceBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0664632Z   ✓ it keeps reusable credential material out of queue notification exp… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0691434Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0691827Z    PASS  Tests\Architecture\DatabaseBootstrapTriggerBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0695641Z   ✓ it provisions trusted trigger creation before the unprivileged database bootstrap migration
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0698395Z   ✓ it keeps every fail-closed lifecycle trigger installed by the adjacent goal migrations
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0700891Z   ✓ it gates production migration with value-free rootless preflight isolation and exact postflight
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0708701Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0709439Z    PASS  Tests\Architecture\DeviceAssignmentPrivacyMigrationBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0712091Z   ✓ it keeps device assignment privacy governance migrations resumable and non-truncating
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0747207Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0747558Z    PASS  Tests\Architecture\DeviceCommandOperationalBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0750660Z   ✓ it keeps every required Device command recovery runbook executable and evidence-led
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0753179Z   ✓ it keeps individual command evidence permission checked and free of unsafe source fields
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0755575Z   ✓ it keeps legacy Queclink command history read only and removes the raw command retry shortcut
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0772355Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0772701Z    PASS  Tests\Architecture\ExternalMonitoringHeartbeatBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0775399Z   ✓ it keeps every UDP listener alive while idle and separately supervised
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0777987Z   ✓ it withholds an external dead-man heartbeat unless the central runtime is genuinely ready
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0780590Z   ✓ it requires independently signed release-bound watchdog outage evidence
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0835993Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0836382Z    PASS  Tests\Architecture\FinancialInsightsObjectScopeBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0839353Z   ✓ it keeps every Financial Insights JSON endpoint behind the one object scope resolver
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0841907Z   ✓ it keeps matching Financial Insights pages on the same resolver boundary
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0844263Z   ✓ it accounts for all fifteen routes in the Financial Insights API group
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0846972Z   ✓ it requires aggregate services to consume resolved IDs instead of legacy organisation scope
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0854231Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0854552Z    PASS  Tests\Architecture\FleetRealtimePrivacyBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0857151Z   ✓ it keeps fleet realtime channels record private and raw signal payloads off the wire
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0904744Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0905162Z    PASS  Tests\Architecture\HrComplianceExportPermissionBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0908190Z   ✓ it keeps route admission and response authorization on the dataset policy
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0910731Z   ✓ it binds every mixed renewals model to its action and minimum Site scoped output
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0913298Z   ✓ it keeps every export affordance on the same server dataset decision
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0922084Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0922422Z    PASS  Tests\Architecture\HrComplianceRenewalsDisclosureBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0925160Z   ✓ it binds every renewals model family to its action permission before stream metadata
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.0927465Z   ✓ it keeps renewals on canonical Site and requirement scope with minimal driver output
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3419126Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3419939Z    PASS  Tests\Architecture\HrSiteSingleTenantBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3442628Z   ✓ it keeps active HR and Site partition behavior at absolute zero      0.23s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3444812Z   ✓ it detects legacy storage values laundered back into an HR or Site query
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3447156Z   ✓ it allows only the fingerprinted model write compatibility helper
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3465736Z   ✓ it allows the exact HR Site and Calendar storage contracts only wit… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3467960Z   ✓ it detects injected HR partition laundering and tenant shaped contracts
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3486200Z   ✓ it covers HR trees Site access dependencies Site UI integration sea… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3488602Z   ✓ it allows only the exact Site storage declaration and still rejects active Site partition behavior
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3507152Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3507408Z    PASS  Tests\Architecture\HrStaffCreationWorkflowBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3527300Z   ✓ staff creation stays owned by HR People with one source payload and… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3535079Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3535298Z    PASS  Tests\Architecture\HrWebhookEgressBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.3538517Z   ✓ it keeps HR webhook delivery behind canonical public destination authorization and pinned transport
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4122104Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4122728Z    PASS  Tests\Architecture\HsEventClosureBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4145262Z   ✓ H&S terminal mutation has one canonical aggregate owner              0.05s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4147334Z   ✓ H&S close routes and schema enforce explicit authority and immutable provenance
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4149795Z   ✓ historical cross-module lifecycle integrations cannot close H&S events
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4170169Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4170430Z    PASS  Tests\Architecture\IdentityPublicationMutexBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4173429Z   ✓ email-first identity publication rechecks the locked current email before binding or login
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4175884Z   ✓ identity publication rechecks the requested role name after the shared role lock
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4178483Z   ✓ board membership mutates only the semantic roles in the complete locked role graph
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4180864Z   ✓ system portal and employee intake replay semantic role names on exact prelocked ids
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4191819Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4192113Z    PASS  Tests\Architecture\IncidentAlertLifecycleOwnershipBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4194898Z   ✓ incident routes emit lifecycle signals while Control Room owns alert transitions
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4201888Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4202129Z    PASS  Tests\Architecture\InertiaSsrReleaseBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4205268Z   ✓ it cannot report a normal production release before the configured Inertia SSR runtime is built and proven healthy
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4247575Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4247878Z    PASS  Tests\Architecture\IntegrationProviderSecretBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4251029Z   ✓ it keeps UniFi and Milesight adapters and controllers behind the governed secret boundary
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4287623Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4287928Z    PASS  Tests\Architecture\ItSecurityDesktopReleaseAcceptanceBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4291051Z   ✓ it keeps the final IT and Security release matrix deployed desktop role Site privacy and restore complete
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4299094Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4299361Z    PASS  Tests\Architecture\ItSecurityReleasePackagingBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:37.4302471Z   ✓ it keeps IT Security and Monitoring release packaging source-only exact and separate from publication
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2768475Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2769272Z    FAIL  Tests\Architecture\ItSecuritySingleTenantBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2793006Z   ✓ it keeps active IT Security Devices and Monitoring partition behavi… 0.59s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2795549Z   ⨯ it keeps the Fleet dashboard on canonical Site and Security Devices projections
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2798013Z   ✓ it keeps native monitoring to IT independent of the Control Room Device projection
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2800571Z   ✓ it keeps IT report Device metrics behind canonical Security and Devices visibility
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2802935Z   ✓ it keeps Device health monitoring out of the retained Control Room projection
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2805462Z   ✓ it keeps Control Room Device pages focused on signal activity instead of duplicate Device health
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2807836Z   ✓ it keeps Security and Devices command batch navigation free of inert hash targets
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2810303Z   ✓ it keeps Device assignment history in the canonical Device profile payload only
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2829111Z   ✓ it keeps active IT and Security Devices surfaces free of known iner… 0.06s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2831427Z   ✓ it keeps the interaction audit bound to the exact release cross-module source inventory
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2833763Z   ✓ it keeps the Site Profile technology tab bound to its canonical optional projection
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2836016Z   ✓ it keeps Queclink governed actions safe when no tracker is paired
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2838601Z   ✓ it keeps IT provisioning lifecycle mutations serialized and centrally audited
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2840915Z   ✓ it keeps ticket approvals serialized and centrally audited
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2843352Z   ✓ it keeps ticket merges private serialized and centrally audited
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2845570Z   ✓ it keeps ticket triage serialized approval safe and reasoned
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2847938Z   ✓ it keeps ticket conversations feedback and watchers serialized and centrally audited
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2850572Z   ✓ it keeps ticket intake resolution and lifecycle evidence centrally governed
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2852837Z   ✓ it keeps ordinary ticket intake linked to canonical Security and Devices records
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2855122Z   ✓ it keeps ticket work tasks visible and governed from the canonical workspace
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2857440Z   ✓ it keeps specialised IT work auditable and requester activity minimum necessary
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2859816Z   ✓ it keeps waiting ownership explicit governed and requester safe
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2862225Z   ✓ it keeps canonical routed ownership visible to technicians and private from requesters
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2864547Z   ✓ it keeps ordinary ticket classification connected to service routing and the working UI
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2866787Z   ✓ it keeps every server-backed ticket queue filter visible in the desktop queue
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2869156Z   ✓ it keeps knowledge lifecycle deletion and feedback serialized and centrally owned
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2871546Z   ✓ it keeps catalogue authoring publishing and entity choices governed end to end
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2873845Z   ✓ it keeps provisioning creation cancellation and HR handover centrally governed
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2876305Z   ✓ it detects an injected tenant authorization shortcut in a new file
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2878833Z   ✓ it detects legacy storage values laundered back into an active query
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2881334Z   ✓ it rejects direct compatibility helpers and record derived compatibility writes
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2883605Z   ✓ it allows only the fingerprinted model write compatibility helper
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2903299Z   ✓ it pins the exact compatibility evidence files excluded from active… 0.07s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2905917Z   ✓ it detects plain product terminology and tenant shaped runtime contracts
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2908220Z   ✓ it distinguishes the canonical Microsoft OAuth authority setting from application tenancy
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2910923Z   ✓ it changes the debt fingerprint when equal-count tenant shortcut semantics change
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2913256Z   ✓ it keeps legacy storage compatibility narrow and rejects the same field in a new model
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2915743Z   ✓ it protects every converted IT Security Devices and integration storage writer model
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2934670Z   ✓ it includes Security and Devices compatibility support that lives o… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2953227Z   ✓ it covers active IT Security Devices integration Site UI and browse… 0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2955471Z   ✓ it keeps Security and Devices navigation inside the original application sidebar
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2974442Z   ✓ it does not retain the obsolete HR organisation context concern      0.01s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2977175Z   ✓ it keeps visible IT and Security Devices copy on application and Site language
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2996048Z   ✓ it uses an application shaped integration management permission acr… 0.04s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.2998248Z   ✓ it rejects a new tenant partition migration while excluding exact historical migrations
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3045400Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3045813Z    PASS  Tests\Architecture\MedicationExactCapabilityUiBoundaryTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3066456Z   ✓ it keeps medication UI flags and authoring routes on their exact ca… 0.03s  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3069172Z   ✓ it keeps the worker witness picker exact, current, and bounded to canonical board Sites
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3074673Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3074988Z    PASS  Tests\Architecture\MedicationIdempotencyPruneScheduleTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3077915Z   ✓ it registers bounded medication idempotency pruning with distributed schedule guards
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3089325Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3089938Z    PASS  Tests\Architecture\MedicationRulePublicationLockOrderTest
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3092753Z   ✓ administration rule readers and writers share a stable rule-set mutex before people and site evidence
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3104099Z   ────────────────────────────────────────────────────────────────────────────  
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3122383Z    FAILED  Tests\Architecture\ItSecuritySingleTenantBoundaryTest > it keeps…    
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3135180Z   Expected: <?php\n
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3135454Z   \n
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3135775Z   namespace App\Http\Controllers\FleetAssets;\n
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3136130Z   ... (27 more lines)
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3136239Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3136386Z   To contain: SecurityDevicesAccessService
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3140767Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3141117Z   at tests/Architecture/ItSecuritySingleTenantBoundaryTest.php:16
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3214046Z      12▕     $root = str_replace('\\', '/', dirname(__DIR__, 2));
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3214932Z      13▕     $contents = file_get_contents($root.'/app/Http/Controllers/FleetAssets/DashboardController.php');
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3215377Z      14▕ 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3215624Z      15▕     expect($contents)->toBeString()
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3216252Z   ➜  16▕         ->and($contents)->toContain('SecurityDevicesAccessService')
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3216686Z      17▕         ->and($contents)->toContain('visibleDevices($user)')
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3217177Z      18▕         ->and($contents)->not->toMatch('/\b(?:tenant_id|organization_id|organisation_id)\b/u')
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3217666Z      19▕         ->and($contents)->not->toContain("'payload' => \$s->payload")
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3218068Z      20▕         ->and($contents)->not->toContain("'trackers' =>");
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3218732Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3218924Z   1   tests/Architecture/ItSecuritySingleTenantBoundaryTest.php:16
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3219142Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3219618Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3219823Z   Tests:    1 failed, 102 passed (2688 assertions)
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3220211Z   Duration: 1.48s
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3220366Z 
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3423356Z CI Pest batch 1 failed.
+ci (foundation, 0, 1, 30)	Crash-safe tests (foundation 0/1)	2026-09-27T23:56:38.3512426Z ##[error]Process completed with exit code 1.

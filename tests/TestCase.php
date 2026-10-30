@@ -3,12 +3,15 @@
 namespace Tests;
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Support\SecurityPolicy;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use PDO;
 use Symfony\Component\Process\Process;
+use Tests\Support\FrozenClockTimezone;
+use Tests\Support\IsolatedDatabaseCleanup;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -18,7 +21,7 @@ abstract class TestCase extends BaseTestCase
 
     protected static bool $isolatedMysqlPrepared = false;
 
-    protected static bool $isolatedMysqlCleanupRegistered = false;
+    protected static ?IsolatedDatabaseCleanup $isolatedDatabaseCleanup = null;
 
     protected static bool $mysqlClientPathConfigured = false;
 
@@ -38,6 +41,9 @@ abstract class TestCase extends BaseTestCase
 
         $app->make(Kernel::class)->bootstrap();
 
+        // The shutdown drop closes this application's connections first.
+        static::$isolatedDatabaseCleanup?->track($app['db']);
+
         if (static::$isolatedMysqlSchemaLoaded && ! static::$pendingMigrationsApplied) {
             $this->runPendingMigrationsAfterSchemaLoad($app);
             RefreshDatabaseState::$migrated = true;
@@ -50,7 +56,42 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // SecurityPolicy keeps a static copy of its settings. A session timeout one test
+        // sets must not sign the next test's requests out once its rows are rolled back.
+        SecurityPolicy::flushCache();
+
         $this->withoutVite();
+    }
+
+    /**
+     * Runs after setUp and Pest's beforeEach, so a clock frozen there fails
+     * before the test body can pass or fail because of the skew.
+     */
+    protected function assertPreConditions(): void
+    {
+        parent::assertPreConditions();
+
+        $this->assertFrozenClockUsesDefaultTimezone();
+    }
+
+    /**
+     * Runs before tearDown and Pest's afterEach reset the clock, so a clock
+     * frozen in the test body is still visible here.
+     */
+    protected function assertPostConditions(): void
+    {
+        $this->assertFrozenClockUsesDefaultTimezone();
+
+        parent::assertPostConditions();
+    }
+
+    private function assertFrozenClockUsesDefaultTimezone(): void
+    {
+        $violation = FrozenClockTimezone::violation();
+
+        if ($violation !== null) {
+            $this->fail($violation);
+        }
     }
 
     /**
@@ -182,6 +223,10 @@ abstract class TestCase extends BaseTestCase
      * The database name is per-process (suffixed with the PID / test token) and
      * is recreated from scratch on the next run, so dropping it at exit costs
      * nothing and stops hundreds of orphaned schemas piling up on the server.
+     *
+     * The handler first closes every connection of the test applications this
+     * process created, then drops on a fresh server connection with a bounded
+     * lock wait, so a leftover metadata lock can't hang the run at exit.
      */
     protected function registerIsolatedDatabaseCleanup(
         string $host,
@@ -190,26 +235,13 @@ abstract class TestCase extends BaseTestCase
         string $password,
         string $database,
     ): void {
-        if (static::$isolatedMysqlCleanupRegistered) {
+        if (static::$isolatedDatabaseCleanup !== null) {
             return;
         }
 
-        static::$isolatedMysqlCleanupRegistered = true;
+        static::$isolatedDatabaseCleanup = IsolatedDatabaseCleanup::forServer($host, $port, $username, $password, $database);
 
-        register_shutdown_function(static function () use ($host, $port, $username, $password, $database): void {
-            try {
-                $pdo = new PDO(
-                    sprintf('mysql:host=%s;port=%s', $host, $port),
-                    $username,
-                    $password,
-                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
-                );
-
-                $pdo->exec(sprintf('DROP DATABASE IF EXISTS `%s`', $database));
-            } catch (\Throwable) {
-                // Best-effort teardown — never surface cleanup failures.
-            }
-        });
+        register_shutdown_function(static::$isolatedDatabaseCleanup->run(...));
     }
 
     /**
@@ -222,7 +254,8 @@ abstract class TestCase extends BaseTestCase
      * backlog drains gradually across successive runs instead of stalling any
      * single bootstrap — each of these schemas is expensive to drop (hundreds
      * of tables). The per-process shutdown handler is the primary cleanup; this
-     * is only a slow-drip backstop for processes that never got to run it.
+     * is only a slow-drip backstop for processes that never got to run it, or
+     * whose shutdown drop gave up waiting for a lock.
      */
     protected function pruneStaleIsolatedDatabases(PDO $pdo, string $baseName, string $currentDatabase): void
     {
@@ -442,17 +475,26 @@ abstract class TestCase extends BaseTestCase
                 sprintf('--host=%s', $host),
                 sprintf('--port=%s', $port),
                 sprintf('--user=%s', $username),
-                sprintf('--password=%s', $password),
                 $database,
-            ]);
+            ], env: ['MYSQL_PWD' => $password]);
 
             $process->setInput(file_get_contents($schemaPath));
-            $process->setTimeout(300);
+            // The shared local MySQL server may be importing other isolated
+            // schemas at the same time. Keep the normal five-minute limit,
+            // with an explicit opt-in for suites running under that load.
+            $timeout = (int) ($this->environmentValue('MYSQL_TEST_SCHEMA_TIMEOUT') ?? 300);
+            $process->setTimeout(max(300, min(1800, $timeout)));
             $process->run();
 
             if ($process->isSuccessful()) {
                 return true;
             }
+        }
+
+        // Full native dumps can contain delimiters, triggers and routines that
+        // the table-only PDO parser cannot preserve. Explicit callers fail closed.
+        if (filter_var($this->environmentValue('MYSQL_TEST_SCHEMA_REQUIRE_NATIVE') ?? false, FILTER_VALIDATE_BOOL)) {
+            throw new \RuntimeException('The required native MySQL schema import did not succeed; PDO fallback is disabled.');
         }
 
         // Fallback path: pure-PHP PDO loader. Slightly slower but works on

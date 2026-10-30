@@ -1,822 +1,734 @@
-import { PageHero } from '@/components/page';
-import PageShell from '@/components/page-shell';
+import { EntityChip } from '@/components/lists';
+import {
+    PageHeader,
+    PageHeaderFilterButton,
+    PageHeaderGlassButton,
+    PageHeaderMeterBig,
+    PageHeaderMeterBlock,
+    PageHeaderMeterCaption,
+    PageHeaderRail,
+    PageHeaderSearch,
+    PageHeaderStatusChip,
+    PageHeaderViewToggle,
+    PageLayout,
+} from '@/components/page';
+import { AddHubWizard } from '@/components/security-devices/add-hub-wizard';
+import {
+    EditHubDialog,
+    type EditHubTarget,
+} from '@/components/security-devices/edit-hub-dialog';
 import {
     CoverageIndicator,
-    OperationalStateBadge,
+    formatCoverage,
 } from '@/components/security-devices/estate-operations';
+import { SiteProfileAccessRequired } from '@/components/security-devices/permission-destinations';
 import {
-    ControlRoomAlertAccessRequired,
-    SiteProfileDestination,
-    type ControlRoomAlertAccess,
-} from '@/components/security-devices/permission-destinations';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyState } from '@/components/ui/empty-state';
+    SiteAlerts,
+    SiteChanges,
+    SiteCollectors,
+    SiteContacts,
+    SiteDevices,
+    SiteEdges,
+    SiteEvidenceFields,
+    SiteEvidenceTime,
+    SiteGroups,
+    SiteItWork,
+    SiteMaintenance,
+    SiteMonitors,
+    technologyLabel,
+} from '@/components/security-devices/site-technology-records';
+import { SiteTopologyTreeCard } from '@/components/security-devices/site-topology-tree';
+import { Button } from '@/components/ui/button';
+import { ReviewCard, ReviewRow } from '@/components/wizard/shell';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime, formatRelative } from '@/lib/datetime';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Activity,
     BellRing,
     Building2,
-    Cable,
     Clock3,
-    Contact,
     Cpu,
-    FolderTree,
-    MapPin,
+    LayoutGrid,
+    List,
     Network,
+    Plus,
     RadioTower,
-    TicketCheck,
-    Wrench,
 } from 'lucide-react';
-
-import { DeviceCard, StatCard, type DeviceListItem } from '../devices/shared';
-
-interface SiteTechnology {
-    id: number;
-    name: string;
-    type: string | null;
-    city: string | null;
-    address: string;
-    is_active: boolean;
-}
-
-interface SiteSummary {
-    health: string;
-    devices: number;
-    attention_devices: number;
-    offline_devices: number;
-    monitored_devices: number;
-    unmonitored_devices: number;
-    coverage_percent: number | null;
-    failed_monitors: number;
-    active_findings: number;
-    active_control_room_alerts: number | null;
-    open_it_work: number | null;
-    overdue_maintenance: number;
-    collector: {
-        state: string;
-        label: string;
-        count: number;
-        last_seen_at: string | null;
-    };
-    last_change_at: string | null;
-}
-
-type DeviceGroup = {
-    id: number;
-    name: string;
-    type: string;
-    device_count: number;
-    href: string;
-};
-
-type Monitor = {
-    id: number;
-    device_id: number;
-    device_name: string;
-    name: string;
-    kind: string;
-    state: string;
-    last_observation_at: string | null;
-};
-
-type Alert = {
-    id: number;
-    reference: string | null;
-    title: string | null;
-    severity: string | null;
-    status: string | null;
-    triggered_at: string | null;
-    href: string | null;
-    access: ControlRoomAlertAccess;
-};
-
-type ItWork = {
-    id: number;
-    reference: string | null;
-    title: string;
-    work_type: string;
-    status: string;
-    priority: string;
-    next_action: string | null;
-    updated_at: string | null;
-    href: string;
-};
-
-type Maintenance = {
-    id: number;
-    device_id: number;
-    device_name: string | null;
-    type: string;
-    status: string;
-    description: string;
-    scheduled_for: string | null;
-    is_overdue: boolean;
-};
-
-type Collector = {
-    id: number;
-    uuid: string;
-    name: string;
-    status: string;
-    state: string;
-    last_seen_at: string | null;
-};
-
-type ContactItem = {
-    id: number;
-    type: string;
-    name: string;
-    role: string | null;
-    phone: string | null;
-    email: string | null;
-    is_primary: boolean;
-};
-
-type Props = {
-    site: SiteTechnology;
-    devices: DeviceListItem[];
-    summary: SiteSummary;
-    wan: {
-        known: boolean;
-        label: string;
-        devices: DeviceListItem[];
-    };
-    topology: {
-        device_count: number;
-        edge_count: number;
-        is_complete: boolean;
-        edges: Array<{
-            id: number;
-            parent_name: string | null;
-            child_name: string | null;
-            type: string;
-            port: string | null;
-        }>;
-    };
-    deviceGroups: DeviceGroup[];
-    monitoring: {
-        total_devices: number;
-        monitored_devices: number;
-        unmonitored_devices: number;
-        failed_monitors: number;
-        uncertain_monitors: number;
-        monitors: Monitor[];
-    };
-    alerts: Alert[];
-    itWork: ItWork[];
-    maintenance: Maintenance[];
-    collectors: Collector[];
-    changes: Array<{
-        key: string;
-        device_name: string | null;
-        summary: string;
-        at: string;
-        href: string;
-    }>;
-    contacts: ContactItem[];
-    can: {
-        view_control_room: boolean;
-        view_it_work: boolean;
-        view_site_profile: boolean;
-        export: boolean;
-    };
-};
-
-const localLinks = [
-    ['Overview', '#site-overview'],
-    ['Monitoring', '#site-monitoring'],
-    ['Alerts & work', '#site-work'],
-    ['Devices', '#site-devices'],
+import { useEffect, useState } from 'react';
+import type { Collector, SiteTechnologyProps } from './_types';
+export type { SiteTechnologyProps } from './_types';
+type ProfileView =
+    | 'overview'
+    | 'network'
+    | 'monitoring'
+    | 'work'
+    | 'changes'
+    | 'devices';
+const views = [
+    { key: 'overview' as const, label: 'Overview', icon: Building2 },
+    { key: 'network' as const, label: 'WAN & topology', icon: Network },
+    { key: 'monitoring' as const, label: 'Monitoring', icon: Activity },
+    { key: 'work' as const, label: 'Alerts & work', icon: BellRing },
+    { key: 'changes' as const, label: 'Recent changes', icon: Clock3 },
+    { key: 'devices' as const, label: 'Devices', icon: Cpu },
 ];
-
-export default function SiteTechnologyShow({
-    site,
-    devices,
-    summary,
-    wan,
-    topology,
-    deviceGroups,
-    monitoring,
-    alerts,
-    itWork,
-    maintenance,
-    collectors,
-    changes,
-    contacts,
-    can,
-}: Props) {
+function hashView(): ProfileView {
+    if (typeof window === 'undefined') return 'overview';
+    const key = window.location.hash.replace(/^#site-/, '');
+    return key === 'monitoring-failed'
+        ? 'monitoring'
+        : views.some((view) => view.key === key)
+          ? (key as ProfileView)
+          : 'overview';
+}
+function healthLabel(value: string) {
+    return value === 'healthy'
+        ? 'Healthy'
+        : value === 'critical'
+          ? 'Critical'
+          : value === 'warning'
+            ? 'Needs attention'
+            : 'Unknown health';
+}
+export default function SiteTechnologyShow(props: SiteTechnologyProps) {
+    const { auth } = usePage<{
+        auth?: { user?: { id: number } | null; can?: Record<string, unknown> };
+    }>().props;
+    const identity = JSON.stringify([auth?.user?.id, auth?.can, props]);
+    return <SiteTechnologyProfile key={identity} {...props} />;
+}
+function SiteTechnologyProfile(props: SiteTechnologyProps) {
+    const {
+        site,
+        devices,
+        summary,
+        wan,
+        topology,
+        deviceGroups,
+        monitoring,
+        alerts,
+        itWork,
+        maintenance,
+        collectors,
+        hub_wizard: hubWizard,
+        changes,
+        contacts,
+        can,
+    } = props;
+    const [view, setView] = useState<ProfileView>(hashView);
+    const [layout, setLayout] = useState<'cards' | 'table'>('cards');
+    const [search, setSearch] = useState('');
+    const [hubWizardOpen, setHubWizardOpen] = useState(false);
+    const [editingHub, setEditingHub] = useState<EditHubTarget | null>(null);
+    const canManageCollectors = Boolean(can.manage_collectors && hubWizard);
+    const refreshSite = () => router.reload({ preserveScroll: true });
+    const openEditHub = (collector: Collector) => {
+        if (!collector.update_url) return;
+        setEditingHub({
+            id: collector.id,
+            name: collector.name,
+            site: collector.home_site
+                ? {
+                      id: collector.home_site.id,
+                      name: collector.home_site.name,
+                  }
+                : { id: site.id, name: site.name },
+            covered_site_ids: collector.covered_site_ids ?? [],
+            update_url: collector.update_url,
+        });
+    };
+    const [failedOnly, setFailedOnly] = useState(
+        () =>
+            typeof window !== 'undefined' &&
+            window.location.hash === '#site-monitoring-failed',
+    );
+    useEffect(() => {
+        const update = () => {
+            setView(hashView());
+            setFailedOnly(window.location.hash === '#site-monitoring-failed');
+        };
+        window.addEventListener('hashchange', update);
+        return () => window.removeEventListener('hashchange', update);
+    }, []);
+    const selectView = (next: ProfileView, onlyFailed = false) => {
+        setView(next);
+        setFailedOnly(onlyFailed);
+        const hash =
+            '#site-' +
+            (next === 'monitoring' && onlyFailed ? 'monitoring-failed' : next);
+        if (window.location.hash !== hash) window.location.hash = hash;
+    };
+    const monitoringReadable = monitoring.monitored_devices !== null;
+    const filteredDevices = devices.filter((device) =>
+        [
+            device.name,
+            device.device_uid,
+            device.category,
+            device.subcategory,
+            device.manufacturer,
+            device.model,
+            device.provider,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(search.trim().toLowerCase()),
+    );
+    const monitorRows = failedOnly
+        ? monitoring.monitors.filter((monitor) =>
+              ['failed', 'degraded'].includes(monitor.state),
+          )
+        : monitoring.monitors;
+    const permission = (label: string) => (
+        <p
+            role="note"
+            className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground"
+        >
+            {label}
+        </p>
+    );
     return (
         <AppLayout
             breadcrumbs={[
+                { title: 'Home', href: '/dashboard' },
                 { title: 'Security & Devices', href: '/security-devices' },
                 { title: 'Sites', href: '/security-devices/sites' },
                 {
                     title: site.name,
-                    href: `/security-devices/sites/${site.id}`,
+                    href: '/security-devices/sites/' + site.id,
                 },
             ]}
         >
-            <Head title={`${site.name} - Security & Devices`} />
-            <PageShell>
-                <PageHero
-                    variant="compact"
-                    icon={Building2}
-                    title={site.name}
-                    description="One technology view for WAN context, monitoring, topology, devices, operational alerts, IT work, maintenance and local contacts."
-                    stats={[
-                        { label: 'Devices', value: summary.devices },
-                        {
-                            label: 'Monitored',
-                            value: summary.monitored_devices,
-                        },
-                        {
-                            label: 'Failed monitors',
-                            value: summary.failed_monitors,
-                        },
-                        {
-                            label: 'Open IT work',
-                            value: summary.open_it_work ?? 'Restricted',
-                        },
-                    ]}
-                    actions={
-                        <div className="flex flex-wrap items-center gap-2">
-                            <SiteProfileDestination
-                                siteId={site.id}
-                                canView={can.view_site_profile}
-                                tab="technology"
-                            />
-                            <OperationalStateBadge state={summary.health} />
-                            {site.type ? (
-                                <Badge variant="outline">
-                                    {site.type.replace(/_/g, ' ')}
-                                </Badge>
-                            ) : null}
-                        </div>
-                    }
-                />
-
-                <nav
-                    aria-label="Site technology sections"
-                    className="flex flex-wrap gap-2 rounded-2xl border bg-card p-2"
-                >
-                    {localLinks.map(([label, href]) => (
-                        <a
-                            key={href}
-                            href={href}
-                            className="frontline-focus frontline-tap inline-flex items-center rounded-xl px-3 text-sm font-medium hover:bg-muted"
-                        >
-                            {label}
-                        </a>
-                    ))}
-                </nav>
-
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <StatCard
-                        label="Devices"
-                        value={summary.devices}
-                        icon={Cpu}
-                    />
-                    <StatCard
-                        label="Need attention"
-                        value={summary.attention_devices}
-                        icon={Activity}
-                        variant={
-                            summary.attention_devices > 0
-                                ? 'warning'
-                                : 'default'
+            <Head title={site.name + ' - Security & Devices'} />
+            <PageLayout
+                width="wide"
+                hero={
+                    <PageHeader
+                        variant="profile"
+                        backHref="/security-devices/sites"
+                        icon={Building2}
+                        title={site.name}
+                        titleChip={
+                            <PageHeaderStatusChip
+                                variant={
+                                    summary.health === 'critical'
+                                        ? 'critical'
+                                        : summary.health === 'warning'
+                                          ? 'warning'
+                                          : summary.health === 'healthy'
+                                            ? 'success'
+                                            : 'neutral'
+                                }
+                            >
+                                {healthLabel(summary.health)}
+                            </PageHeaderStatusChip>
                         }
-                    />
-                    <StatCard
-                        label="Unmonitored"
-                        value={summary.unmonitored_devices}
-                        icon={RadioTower}
-                        variant={
-                            summary.unmonitored_devices > 0
-                                ? 'warning'
-                                : 'default'
+                        subline={
+                            <>
+                                <span className="block">
+                                    {site.address ||
+                                        site.city ||
+                                        'No Site address recorded'}
+                                </span>
+                                <span className="block">
+                                    {technologyLabel(site.type)} ·{' '}
+                                    {site.is_active
+                                        ? 'Active Site'
+                                        : 'Inactive Site'}{' '}
+                                    · Technology
+                                </span>
+                            </>
                         }
-                    />
-                    <StatCard
-                        label="Overdue maintenance"
-                        value={summary.overdue_maintenance}
-                        icon={Wrench}
-                        variant={
-                            summary.overdue_maintenance > 0
-                                ? 'warning'
-                                : 'default'
+                        mobileSummary={
+                            summary.devices +
+                            ' devices · ' +
+                            summary.attention_devices +
+                            ' need attention'
                         }
-                    />
-                </div>
-
-                <section
-                    id="site-overview"
-                    aria-labelledby="site-overview-heading"
-                    className="scroll-mt-6"
-                >
-                    <h2
-                        id="site-overview-heading"
-                        className="mb-3 text-lg font-semibold"
-                    >
-                        Site technology overview
-                    </h2>
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Network
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
-                                    WAN and topology
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <div className="flex items-start gap-3 rounded-xl border p-3">
-                                    <MapPin
-                                        className="mt-0.5 h-4 w-4 text-muted-foreground"
-                                        aria-hidden="true"
-                                    />
-                                    <span>
-                                        {site.address ||
-                                            site.city ||
-                                            'No site address recorded'}
-                                    </span>
-                                </div>
-                                <div className="rounded-xl border p-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="font-medium">
-                                            {wan.label}
-                                        </p>
-                                        <OperationalStateBadge
-                                            state={
-                                                wan.known
-                                                    ? 'healthy'
-                                                    : 'unknown'
-                                            }
-                                        />
-                                    </div>
-                                    {wan.devices.length > 0 ? (
-                                        <ul className="mt-3 space-y-2">
-                                            {wan.devices.map((device) => (
-                                                <li key={device.id}>
-                                                    <Link
-                                                        href={`/security-devices/devices/${device.id}`}
-                                                        className="frontline-focus inline-flex min-h-11 items-center rounded-lg text-sm font-medium hover:text-primary hover:underline"
-                                                    >
-                                                        {device.name}
-                                                    </Link>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <p className="mt-2 text-xs text-muted-foreground">
-                                            No router, gateway, firewall or
-                                            SD-WAN device has been classified
-                                            for this site.
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="rounded-xl border p-3">
-                                        <Cable
-                                            className="h-4 w-4 text-muted-foreground"
-                                            aria-hidden="true"
-                                        />
-                                        <p className="mt-2 text-lg font-semibold">
-                                            {topology.edge_count}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Known links
-                                        </p>
-                                    </div>
-                                    <div className="rounded-xl border p-3">
-                                        <FolderTree
-                                            className="h-4 w-4 text-muted-foreground"
-                                            aria-hidden="true"
-                                        />
-                                        <p className="mt-2 text-lg font-semibold">
-                                            {deviceGroups.length}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Device groups
-                                        </p>
-                                    </div>
-                                </div>
-                                {!topology.is_complete && devices.length > 1 ? (
-                                    <p className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">
-                                        Topology is incomplete. Unknown links
-                                        are not treated as healthy paths.
-                                    </p>
+                        actions={
+                            <>
+                                <PageHeaderSearch
+                                    value={search}
+                                    onChange={(value) => {
+                                        setSearch(value);
+                                        selectView('devices');
+                                    }}
+                                    ariaLabel="Search devices at this Site"
+                                    placeholder="Search Site devices…"
+                                />
+                                {canManageCollectors ? (
+                                    <PageHeaderGlassButton
+                                        icon={Plus}
+                                        onClick={() => setHubWizardOpen(true)}
+                                    >
+                                        Add a hub
+                                    </PageHeaderGlassButton>
                                 ) : null}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Contact
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
-                                    />
-                                    Site context and contacts
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <div className="flex min-h-11 items-center gap-2 rounded-xl border px-3">
-                                    <RadioTower
-                                        className="h-4 w-4 text-muted-foreground"
-                                        aria-hidden="true"
-                                    />
-                                    <span>{summary.collector.label}</span>
-                                    <OperationalStateBadge
-                                        state={summary.collector.state}
-                                        className="ml-auto"
-                                    />
-                                </div>
-                                {collectors.length === 0 ? (
-                                    <p className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">
-                                        A local collector is optional. SD-WAN
-                                        reachable sites can be polled centrally;
-                                        the Monitoring section shows actual
-                                        coverage.
-                                    </p>
+                                {can.view_site_profile ? (
+                                    <PageHeaderGlassButton asChild>
+                                        <Link
+                                            href={
+                                                '/sites/' +
+                                                site.id +
+                                                '?tab=technology'
+                                            }
+                                        >
+                                            Open Site profile
+                                        </Link>
+                                    </PageHeaderGlassButton>
                                 ) : (
-                                    <ul className="space-y-2">
-                                        {collectors.map((collector) => (
-                                            <li
-                                                key={collector.id}
-                                                className="flex min-h-11 items-center gap-3 rounded-xl border px-3"
-                                            >
-                                                <span className="min-w-0 flex-1 font-medium">
-                                                    {collector.name}
-                                                </span>
-                                                <OperationalStateBadge
-                                                    state={collector.state}
-                                                />
-                                            </li>
-                                        ))}
-                                    </ul>
+                                    <SiteProfileAccessRequired className="text-band-foreground/80" />
                                 )}
-                                {contacts.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No technology contact recorded.
-                                    </p>
-                                ) : (
-                                    <ul className="space-y-2">
-                                        {contacts.map((contact) => (
-                                            <li
-                                                key={contact.id}
-                                                className="rounded-xl border p-3"
-                                            >
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <p className="font-medium">
-                                                        {contact.name}
-                                                    </p>
-                                                    {contact.is_primary ? (
-                                                        <Badge variant="secondary">
-                                                            Primary
-                                                        </Badge>
-                                                    ) : null}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {contact.role ||
-                                                        contact.type.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
-                                                </p>
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    {[
-                                                        contact.phone,
-                                                        contact.email,
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(' · ') ||
-                                                        'No contact details recorded'}
-                                                </p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </section>
-
-                <section
-                    id="site-monitoring"
-                    aria-labelledby="site-monitoring-heading"
-                    className="scroll-mt-6"
-                >
-                    <h2
-                        id="site-monitoring-heading"
-                        className="mb-3 text-lg font-semibold"
-                    >
-                        Monitoring coverage
-                    </h2>
-                    <Card>
-                        <CardContent className="space-y-4 p-5">
-                            <CoverageIndicator
-                                percent={summary.coverage_percent}
-                                monitored={monitoring.monitored_devices}
-                                total={monitoring.total_devices}
+                            </>
+                        }
+                        meters={
+                            <>
+                                <PageHeaderMeterBlock
+                                    label="Devices"
+                                    ariaLabel="View Site devices"
+                                    onClick={() => {
+                                        setSearch('');
+                                        selectView('devices');
+                                    }}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {summary.devices}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Within this approved Site
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Monitored devices"
+                                    ariaLabel="View Site monitoring"
+                                    onClick={() => selectView('monitoring')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {monitoring.monitored_devices ??
+                                            'Restricted'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {monitoringReadable
+                                            ? formatCoverage(
+                                                  summary.coverage_percent,
+                                              )
+                                            : 'Monitoring permission required'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Failed checks"
+                                    ariaLabel="View failed Site checks"
+                                    onClick={() =>
+                                        selectView('monitoring', true)
+                                    }
+                                >
+                                    <PageHeaderMeterBig>
+                                        {monitoring.failed_monitors ??
+                                            'Restricted'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        Failed or degraded results
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                                <PageHeaderMeterBlock
+                                    label="Open IT work"
+                                    ariaLabel="View Site IT work"
+                                    onClick={() => selectView('work')}
+                                >
+                                    <PageHeaderMeterBig>
+                                        {can.view_it_work
+                                            ? (summary.open_it_work ??
+                                              'Restricted')
+                                            : 'Restricted'}
+                                    </PageHeaderMeterBig>
+                                    <PageHeaderMeterCaption>
+                                        {can.view_it_work
+                                            ? 'Owned by IT & Support'
+                                            : 'IT & Support permission required'}
+                                    </PageHeaderMeterCaption>
+                                </PageHeaderMeterBlock>
+                            </>
+                        }
+                        filters={
+                            <>
+                                {search ? (
+                                    <PageHeaderFilterButton
+                                        onClick={() => setSearch('')}
+                                    >
+                                        Clear device search
+                                    </PageHeaderFilterButton>
+                                ) : null}
+                                <PageHeaderViewToggle
+                                    value={layout}
+                                    onChange={(value) =>
+                                        setLayout(value as 'cards' | 'table')
+                                    }
+                                    options={[
+                                        {
+                                            value: 'cards',
+                                            label: 'Cards',
+                                            icon: LayoutGrid,
+                                        },
+                                        {
+                                            value: 'table',
+                                            label: 'Table',
+                                            icon: List,
+                                        },
+                                    ]}
+                                />
+                            </>
+                        }
+                        rail={
+                            <PageHeaderRail<ProfileView>
+                                items={views}
+                                value={view}
+                                onSelect={(next) => selectView(next)}
+                                ariaLabel="Site technology sections"
                             />
-                            {monitoring.monitors.length === 0 ? (
-                                <EmptyState
+                        }
+                    />
+                }
+            >
+                <section
+                    id={'site-' + view}
+                    aria-label={views.find((item) => item.key === view)?.label}
+                    className="space-y-5"
+                >
+                    {view === 'overview' ? (
+                        <>
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                <ReviewCard
+                                    icon={Building2}
+                                    title="Technology at this Site"
+                                >
+                                    <SiteEvidenceFields
+                                        items={[
+                                            ['Devices', summary.devices],
+                                            [
+                                                'Need attention',
+                                                summary.attention_devices,
+                                            ],
+                                            [
+                                                'Offline devices',
+                                                summary.offline_devices,
+                                            ],
+                                            [
+                                                'Without monitoring',
+                                                summary.unmonitored_devices,
+                                            ],
+                                            [
+                                                'Active findings',
+                                                summary.active_findings,
+                                            ],
+                                            [
+                                                'Control Room alerts',
+                                                can.view_control_room
+                                                    ? summary.active_control_room_alerts
+                                                    : null,
+                                            ],
+                                            [
+                                                'Overdue maintenance',
+                                                summary.overdue_maintenance,
+                                            ],
+                                        ]}
+                                    />
+                                </ReviewCard>
+                                <ReviewCard
                                     icon={RadioTower}
-                                    title="No monitors configured"
-                                    description="These devices are unmonitored. Unknown coverage is not presented as healthy."
+                                    title="Collection and observations"
+                                >
+                                    <ReviewRow
+                                        label="Monitoring coverage"
+                                        value={
+                                            monitoringReadable
+                                                ? formatCoverage(
+                                                      summary.coverage_percent,
+                                                  )
+                                                : 'Restricted'
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Collector state"
+                                        value={
+                                            monitoringReadable
+                                                ? summary.collector.label
+                                                : 'Monitoring permission required'
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Local collectors"
+                                        value={
+                                            monitoringReadable
+                                                ? summary.collector.count
+                                                : 'Restricted'
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Collector contact"
+                                        value={
+                                            monitoringReadable ? (
+                                                <SiteEvidenceTime
+                                                    value={
+                                                        summary.collector
+                                                            .last_seen_at
+                                                    }
+                                                    empty="No contact recorded"
+                                                />
+                                            ) : (
+                                                'Restricted'
+                                            )
+                                        }
+                                    />
+                                    <ReviewRow
+                                        label="Latest technology change"
+                                        value={
+                                            <SiteEvidenceTime
+                                                value={summary.last_change_at}
+                                                empty="No change recorded"
+                                            />
+                                        }
+                                    />
+                                </ReviewCard>
+                            </div>
+                            {topology.tree &&
+                            (topology.tree.roots.length > 0 ||
+                                topology.tree.unplaced.length > 0) ? (
+                                <ReviewCard
+                                    icon={Network}
+                                    title="Site network map"
+                                >
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <p className="text-sm text-muted-foreground">
+                                            {topology.tree.tier_counts.gateways}{' '}
+                                            gateways ·{' '}
+                                            {topology.tree.tier_counts.switches}{' '}
+                                            switches ·{' '}
+                                            {
+                                                topology.tree.tier_counts
+                                                    .access_points
+                                            }{' '}
+                                            access points ·{' '}
+                                            {topology.tree.tier_counts.devices}{' '}
+                                            connected devices
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() =>
+                                                selectView('network')
+                                            }
+                                        >
+                                            Open Site network map
+                                        </Button>
+                                    </div>
+                                </ReviewCard>
+                            ) : null}
+                            {monitoringReadable ? (
+                                <SiteCollectors
+                                    rows={collectors}
+                                    view={layout}
+                                    onEditHub={
+                                        canManageCollectors
+                                            ? openEditHub
+                                            : undefined
+                                    }
                                 />
                             ) : (
-                                <ul className="grid gap-3 lg:grid-cols-2">
-                                    {monitoring.monitors.map((monitor) => (
-                                        <li
-                                            key={monitor.id}
-                                            className="rounded-xl border p-3"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <p className="font-medium">
-                                                        {monitor.name}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {monitor.device_name} ·{' '}
-                                                        {monitor.kind.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <OperationalStateBadge
-                                                    state={monitor.state}
-                                                />
-                                            </div>
-                                            <p className="mt-2 text-xs text-muted-foreground">
-                                                {monitor.last_observation_at
-                                                    ? `Observed ${formatRelative(monitor.last_observation_at)}`
-                                                    : 'No observation received'}
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ul>
+                                permission(
+                                    'Monitoring permission is required to view collector details.',
+                                )
                             )}
-                        </CardContent>
-                    </Card>
-                </section>
-
-                <section
-                    id="site-work"
-                    aria-labelledby="site-work-heading"
-                    className="scroll-mt-6"
-                >
-                    <h2
-                        id="site-work-heading"
-                        className="mb-3 text-lg font-semibold"
-                    >
-                        Alerts, IT work and maintenance
-                    </h2>
-                    <div className="grid gap-4 xl:grid-cols-3">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <BellRing
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
+                            <SiteContacts rows={contacts} view={layout} />
+                        </>
+                    ) : null}
+                    {view === 'network' ? (
+                        <>
+                            <SiteTopologyTreeCard
+                                tree={topology.tree}
+                                siteName={site.name}
+                            />
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                <ReviewCard icon={Network} title="WAN context">
+                                    <ReviewRow
+                                        label="Context"
+                                        value={wan.label}
                                     />
-                                    Control Room alerts
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {!can.view_control_room ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        Control Room permission is required.
-                                    </p>
-                                ) : alerts.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No active alerts for this site.
-                                    </p>
-                                ) : (
-                                    <ul className="space-y-2">
-                                        {alerts.map((alert) => (
-                                            <li key={alert.id}>
-                                                {alert.href &&
-                                                alert.access.state ===
-                                                    'available' ? (
-                                                    <Link
-                                                        href={alert.href}
-                                                        className="frontline-focus block rounded-xl border p-3 hover:bg-muted"
-                                                    >
-                                                        <div className="flex items-start justify-between gap-2">
-                                                            <p className="font-medium">
-                                                                {alert.title}
-                                                            </p>
-                                                            {alert.severity ? (
-                                                                <OperationalStateBadge
-                                                                    state={
-                                                                        alert.severity ===
-                                                                        'critical'
-                                                                            ? 'critical'
-                                                                            : 'warning'
-                                                                    }
-                                                                />
-                                                            ) : null}
-                                                        </div>
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            {alert.reference ||
-                                                                'Alert'}{' '}
-                                                            · {alert.status}
-                                                        </p>
-                                                    </Link>
-                                                ) : (
-                                                    <div className="rounded-xl border px-3">
-                                                        <ControlRoomAlertAccessRequired
-                                                            label={
-                                                                alert.access
-                                                                    .label
-                                                            }
-                                                        />
-                                                    </div>
-                                                )}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <TicketCheck
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
+                                    <ReviewRow
+                                        label="WAN device classification"
+                                        value={
+                                            wan.known
+                                                ? 'Recorded'
+                                                : 'Not recorded'
+                                        }
                                     />
-                                    Open IT work
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {!can.view_it_work ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        IT & Support permission is required.
-                                    </p>
-                                ) : itWork.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No open IT work for this site.
-                                    </p>
-                                ) : (
-                                    <ul className="space-y-2">
-                                        {itWork.map((ticket) => (
-                                            <li key={ticket.id}>
-                                                <Link
-                                                    href={ticket.href}
-                                                    className="frontline-focus block rounded-xl border p-3 hover:bg-muted"
-                                                >
-                                                    <p className="font-medium">
-                                                        {ticket.title}
-                                                    </p>
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {ticket.reference ||
-                                                            'IT work'}{' '}
-                                                        ·{' '}
-                                                        {ticket.status.replace(
-                                                            /_/g,
-                                                            ' ',
-                                                        )}
-                                                    </p>
-                                                    <p className="mt-2 text-xs">
-                                                        {ticket.next_action ||
-                                                            'Open the work item for the next action.'}
-                                                    </p>
-                                                </Link>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Wrench
-                                        className="h-4 w-4"
-                                        aria-hidden="true"
+                                    <ReviewRow
+                                        label="Address"
+                                        value={
+                                            site.address ||
+                                            site.city ||
+                                            'No Site address recorded'
+                                        }
                                     />
-                                    Maintenance
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {maintenance.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">
-                                        No open maintenance for this site.
-                                    </p>
-                                ) : (
-                                    <ul className="space-y-2">
-                                        {maintenance.map((record) => (
-                                            <li
-                                                key={record.id}
-                                                className="rounded-xl border p-3"
-                                            >
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <p className="font-medium">
-                                                        {record.description}
-                                                    </p>
-                                                    <OperationalStateBadge
-                                                        state={
-                                                            record.is_overdue
-                                                                ? 'warning'
-                                                                : 'pending'
-                                                        }
-                                                    />
-                                                </div>
-                                                <p className="mt-1 text-xs text-muted-foreground">
-                                                    {record.device_name ||
-                                                        'Device'}
-                                                    {record.scheduled_for
-                                                        ? ` · ${formatDateTime(record.scheduled_for)}`
-                                                        : ' · Not scheduled'}
-                                                </p>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-                </section>
-
-                <section aria-labelledby="site-changes-heading">
-                    <h2
-                        id="site-changes-heading"
-                        className="mb-3 flex items-center gap-2 text-lg font-semibold"
-                    >
-                        <Clock3 className="h-5 w-5" aria-hidden="true" />
-                        Recent changes
-                    </h2>
-                    <Card>
-                        <CardContent className="p-5">
-                            {changes.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">
-                                    No recent technology changes recorded.
+                                </ReviewCard>
+                                <ReviewCard
+                                    icon={Network}
+                                    title="Topology evidence"
+                                >
+                                    <ReviewRow
+                                        label="Known links"
+                                        value={topology.edge_count}
+                                    />
+                                    <ReviewRow
+                                        label="Devices"
+                                        value={topology.device_count}
+                                    />
+                                    <ReviewRow
+                                        label="Device groups"
+                                        value={deviceGroups.length}
+                                    />
+                                    <ReviewRow
+                                        label="Relationship coverage"
+                                        value={
+                                            topology.is_complete
+                                                ? 'Recorded'
+                                                : 'Incomplete'
+                                        }
+                                    />
+                                </ReviewCard>
+                            </div>
+                            {!topology.is_complete && devices.length > 1 ? (
+                                <p className="rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
+                                    Topology is incomplete. Unknown links are
+                                    not treated as healthy paths.
                                 </p>
+                            ) : null}
+                            <SiteDevices
+                                rows={wan.devices}
+                                view={layout}
+                                title="WAN devices"
+                            />
+                            <SiteEdges rows={topology.edges} view={layout} />
+                            <SiteGroups rows={deviceGroups} view={layout} />
+                        </>
+                    ) : null}
+                    {view === 'monitoring' ? (
+                        monitoringReadable ? (
+                            <>
+                                <ReviewCard
+                                    icon={Activity}
+                                    title="Monitoring coverage"
+                                >
+                                    <CoverageIndicator
+                                        percent={summary.coverage_percent}
+                                        monitored={
+                                            monitoring.monitored_devices!
+                                        }
+                                        total={monitoring.total_devices}
+                                    />
+                                    <SiteEvidenceFields
+                                        items={[
+                                            [
+                                                'Without monitoring',
+                                                monitoring.unmonitored_devices,
+                                            ],
+                                            [
+                                                'Failed or degraded checks',
+                                                monitoring.failed_monitors,
+                                            ],
+                                            [
+                                                'Uncertain checks',
+                                                monitoring.uncertain_monitors,
+                                            ],
+                                        ]}
+                                    />
+                                </ReviewCard>
+                                {failedOnly ? (
+                                    <div className="flex items-center gap-2">
+                                        <EntityChip>
+                                            Failed or degraded checks
+                                        </EntityChip>
+                                        <PageHeaderFilterButton
+                                            onClick={() =>
+                                                selectView('monitoring')
+                                            }
+                                        >
+                                            Show all checks
+                                        </PageHeaderFilterButton>
+                                    </div>
+                                ) : null}
+                                <SiteMonitors
+                                    rows={monitorRows}
+                                    view={layout}
+                                />
+                            </>
+                        ) : (
+                            permission(
+                                'Monitoring permission is required. No restricted readings or collector details are shown.',
+                            )
+                        )
+                    ) : null}
+                    {view === 'work' ? (
+                        <>
+                            {can.view_control_room ? (
+                                <SiteAlerts rows={alerts} view={layout} />
                             ) : (
-                                <ul className="grid gap-2 md:grid-cols-2">
-                                    {changes.map((change) => (
-                                        <li key={change.key}>
-                                            <Link
-                                                href={change.href}
-                                                className="frontline-focus flex min-h-11 items-center justify-between gap-3 rounded-xl border px-3 hover:bg-muted"
-                                            >
-                                                <span className="min-w-0">
-                                                    <span className="block truncate font-medium">
-                                                        {change.device_name ||
-                                                            'Device'}
-                                                    </span>
-                                                    <span className="block text-xs text-muted-foreground">
-                                                        {change.summary}
-                                                    </span>
-                                                </span>
-                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                    {formatRelative(change.at)}
-                                                </span>
-                                            </Link>
-                                        </li>
-                                    ))}
-                                </ul>
+                                permission(
+                                    'Control Room permission is required.',
+                                )
                             )}
-                        </CardContent>
-                    </Card>
-                </section>
-
-                <section
-                    id="site-devices"
-                    aria-labelledby="site-devices-heading"
-                    className="scroll-mt-6"
-                >
-                    <h2
-                        id="site-devices-heading"
-                        className="mb-3 text-lg font-semibold"
-                    >
-                        Devices at this site
-                    </h2>
-                    {devices.length === 0 ? (
-                        <EmptyState
-                            icon={Cpu}
-                            title="No devices assigned"
-                            description="No canonical devices are currently assigned to this site or one of its rooms."
+                            {can.view_it_work ? (
+                                <SiteItWork rows={itWork} view={layout} />
+                            ) : (
+                                permission(
+                                    'IT & Support permission is required.',
+                                )
+                            )}
+                            {summary.overdue_maintenance !== null ? (
+                                <SiteMaintenance
+                                    rows={maintenance}
+                                    view={layout}
+                                />
+                            ) : (
+                                permission(
+                                    'Maintenance permission is required.',
+                                )
+                            )}
+                        </>
+                    ) : null}
+                    {view === 'changes' ? (
+                        <SiteChanges rows={changes} view={layout} />
+                    ) : null}
+                    {view === 'devices' ? (
+                        <SiteDevices
+                            rows={filteredDevices}
+                            view={layout}
+                            total={summary.devices}
                         />
-                    ) : (
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            {devices.map((device) => (
-                                <DeviceCard key={device.id} device={device} />
-                            ))}
-                        </div>
-                    )}
+                    ) : null}
                 </section>
-            </PageShell>
+            </PageLayout>
+            {canManageCollectors && hubWizard ? (
+                <>
+                    <AddHubWizard
+                        open={hubWizardOpen}
+                        onClose={() => setHubWizardOpen(false)}
+                        onConnected={refreshSite}
+                        defaultSiteId={site.id}
+                        optionsUrl={hubWizard.options_url}
+                        issueUrl={hubWizard.issue_url}
+                    />
+                    <EditHubDialog
+                        open={editingHub !== null}
+                        onOpenChange={(open) => {
+                            if (!open) setEditingHub(null);
+                        }}
+                        hub={editingHub}
+                        sites={hubWizard.sites}
+                        onSaved={refreshSite}
+                    />
+                </>
+            ) : null}
         </AppLayout>
     );
 }

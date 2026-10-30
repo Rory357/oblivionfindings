@@ -107,7 +107,7 @@ test('meal planning lists relationships and copy actions honour canonical Site a
     ] as $path) {
         $this->actingAs($this->mealViewer)
             ->getJson("/sites/{$this->hiddenMealSite->id}/{$path}")
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     $this->actingAs($this->mealViewer)
@@ -177,7 +177,7 @@ test('meal planning lists relationships and copy actions honour canonical Site a
             'from_week' => '2026-05-18',
             'to_week' => '2026-05-25',
         ])
-        ->assertForbidden();
+        ->assertNotFound();
 });
 
 test('inventory and week templates preserve Site ownership and global starter reuse', function (): void {
@@ -218,7 +218,7 @@ test('inventory and week templates preserve Site ownership and global starter re
             'unit' => 'each',
             'reason' => 'delivery',
         ])
-        ->assertForbidden();
+        ->assertNotFound();
     expect(SiteMealInventoryMovement::query()->count())->toBe($movementCount);
 
     $sharedRecipe = MealRecipe::query()->create([

@@ -1,0 +1,28 @@
+{
+  "base": "a3cb72895ce6682bcf39fe6276ce38955987bd7d",
+  "reviewedFocusCommit": "2f788b0b880e9b838c0b89b3c8eba2ecd57bf097",
+  "pendingTreeBeforeIntegrationEvidence": "331d6224085a6cbc6aac120bc55a62df11f459b3",
+  "files": {
+    "resources/js/pages/fleet-assets/settings/_maps.tsx": {
+      "sha256": "a8ee1445b2ac57e4d16ae86848c4682ae9142624e39aa2cd0670185e25dff244",
+      "gitEntry": "100644 blob ad98941fb7d8d22157e569059505a237d133e8be",
+      "bytes": 32576
+    },
+    "resources/js/pages/fleet-assets/settings/_ui.tsx": {
+      "sha256": "6a2282273398f26ce4e4017cd5ad112d7550780d7dce51567e6529ace8d166bf",
+      "gitEntry": "100644 blob ffff005ccbd0bdd2f673a52f1195faf7ff186bef",
+      "bytes": 4276
+    },
+    "resources/js/pages/fleet-assets/settings/maps-focus.test.tsx": {
+      "sha256": "0c29332aafe9423f8a6319cc9a4650469803cb25dce7c752770a9427989565ae",
+      "gitEntry": "100644 blob f795147376e8133ed463cf563570a0298c3c888e",
+      "bytes": 4247
+    }
+  },
+  "sourceObjects": {
+    "count": 9889,
+    "sha256": "90fa4344dbd697880b301b2a65aa7c7efa62e2d22b1c6810e4596549bad19abe",
+    "definition": "Sorted recursive Git tree path/entry pairs excluding docs/ and storage/; entries contain mode, object type and Git object id."
+  },
+  "scope": "Only these three source paths differ from the frozen consolidation; their bytes exactly match the reviewed focus commit."
+}

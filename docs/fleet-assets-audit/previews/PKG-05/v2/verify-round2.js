@@ -1,0 +1,44 @@
+async (page) => {
+ const results=[],root='C:/Users/steph/.codex/worktrees/b9b9/oblivionfindings/docs/fleet-assets-audit/previews/PKG-05/v2/iterations/02-recovery/';
+ const check=(name,pass,detail='')=>{results.push({name,pass:!!pass,detail});if(!pass)throw Error(name)};
+ const main=()=>page.locator('main').innerText(),role=async v=>page.getByRole('combobox',{name:'Preview role'}).selectOption(v);
+ const go=async(path)=>{await page.evaluate(p=>location.hash='/fleet-assets/transports/'+p,path);await page.waitForTimeout(80)};
+ const choose=async(label,name)=>{await page.getByRole('combobox',{name:label,exact:true}).click();await page.getByRole('option').filter({hasText:name}).click()};
+ const closeSource=async()=>page.getByRole('dialog').getByRole('button',{name:/Return to/}).click();
+ page.setDefaultTimeout(7000);await page.goto('http://127.0.0.1:4396/#/fleet-assets/transports/overview');await page.reload();
+ await role('driver');await go('journeys/J-608');await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByLabel('Simulate a lost return response').check();await page.getByRole('button',{name:'Return to preview'}).click();
+ await page.getByRole('button',{name:'Record return',exact:true}).click();await choose('Actual receiver','Ben Carter');await page.getByLabel('Keys received by named worker').check();await page.getByLabel('All expected equipment received').check();await page.getByLabel('Return condition',{exact:true}).fill('New scrape observed on rear door.');await page.getByLabel('Report new damage or a post-use defect').check();await page.getByRole('button',{name:'Save return receipt',exact:true}).click();
+ check('R2-01 Lost response retains a recoverable operation',(await page.getByRole('dialog').innerText()).includes('Response not confirmed'));
+ await page.getByLabel('Return odometer (km)',{exact:true}).fill('48999');await page.getByRole('button',{name:'Retry this operation'}).click();
+ check('R2-02 Changed-payload retry is rejected',(await page.getByRole('dialog').innerText()).includes('This retry has changed observations'));
+ await page.getByRole('button',{name:'Recover original receipt'}).click();const recovered=await page.getByRole('dialog').innerText();
+ check('R2-03 Original receipt remains 48248 km',recovered.includes('48248 km')&&!recovered.includes('48999')&&!recovered.includes('This retry has changed observations'));
+ await page.screenshot({path:root+'original-receipt-recovered.png'});await page.getByRole('button',{name:'Return to journey'}).click();
+ check('R2-04 Recovery removes stale return error',!(await main()).includes('Response not confirmed'));
+ await page.getByRole('button',{name:'Confirm passenger return',exact:true}).click();await page.getByLabel('Passenger has returned and is accounted for').check();await page.getByRole('dialog').getByRole('button',{name:'Confirm passenger return',exact:true}).click();await page.getByRole('button',{name:'Complete journey',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Complete journey',exact:true}).click();
+ check('R2-05 Passenger completion retains vehicle restriction',(await main()).includes('Completed')&&(await main()).includes('Vehicle restriction remains open'));
+ await go('returns/TR-1048');await role('allocator');await page.getByRole('button',{name:'Assign exception',exact:true}).click();await page.getByLabel('What needs resolving?',{exact:true}).fill('Confirm kit holder with outgoing team.');await page.getByRole('dialog').getByRole('button',{name:'Assign exception',exact:true}).click();
+ check('R2-06 Exception never changes the original dispute',(await main()).includes('Disputed')&&(await main()).includes('Kit not received. Keys accepted separately.'));
+ await page.getByRole('button',{name:'Record reconciliation',exact:true}).click();await page.getByLabel('Reconciliation evidence',{exact:true}).fill('Attempt before actual receipt.');await page.getByRole('button',{name:'Save reconciliation',exact:true}).click();
+ check('R2-07 Cannot reconcile missing equipment without receipt',(await page.getByRole('dialog').innerText()).includes('receiving worker must record the outstanding'));
+ await page.getByRole('button',{name:'Cancel',exact:true}).click();await page.getByRole('button',{name:'Discard changes',exact:true}).click();
+ await role('receiver');await page.getByRole('button',{name:'Receive outstanding items',exact:true}).click();await choose('Actual giver','Nia Patel');await page.getByLabel('Outstanding equipment received',{exact:true}).check();await page.getByLabel('Later receipt observation',{exact:true}).fill('Kit physically received from Nia; checked against original handover.');await page.getByRole('button',{name:'Record later receipt',exact:true}).click();
+ check('R2-08 Later receipt retains original partial receipt',(await main()).includes('later item receipt')&&(await main()).includes('Equipment outstanding')&&(await main()).includes('Disputed'));
+ await role('allocator');for(let i=0;i<2;i++){await page.getByRole('button',{name:'Record reconciliation',exact:true}).click();await page.getByLabel('Reconciliation evidence',{exact:true}).fill('Ben’s later item receipt confirms kit received. Original dispute retained.');await page.getByRole('button',{name:'Save reconciliation',exact:true}).click()}
+ check('R2-09 Reconciled dispute remains historical, no new acknowledgement',(await main()).includes('Reconciliation recorded. Original dispute retained')&&await page.getByRole('button',{name:'Acknowledge receipt',exact:true}).count()===0);
+ await page.screenshot({path:root+'reconciled-dispute.png',fullPage:true});
+ await go('journeys/J-609');await role('driver');check('R2-10 Outstanding medication blocks journey completion',await page.getByRole('button',{name:'Complete journey',exact:true}).count()===0&&(await main()).includes('authorised medication worker'));
+ await role('escort');await page.getByRole('button',{name:'Open medication handoff',exact:true}).click();await page.getByLabel('Simulate a resolved result from the authorised source').check();await page.getByRole('button',{name:'Refresh resolved source result'}).click();await role('driver');check('R2-11 Resolved source enables driver completion',await page.getByRole('button',{name:'Complete journey',exact:true}).count()===1);
+ await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByRole('combobox',{name:'Source state'}).selectOption('denied');await page.getByRole('button',{name:'Return to preview'}).click();
+ check('R2-12 Denied detail conceals passenger and record reference',!(await main()).includes('Charlie Brown')&&!(await main()).includes('J-609'));
+ for(const source of ['Maintenance','Fleet','My Day']){await page.locator('aside.sidebar').getByRole('button',{name:source,exact:true}).click();const text=await page.getByRole('dialog').innerText();check('R2-13 Denied '+source+' link conceals source objects',text.includes('unavailable in this scope')&&!text.includes('M-')&&!text.includes('Sam Wilson')&&!text.includes('Charlie Brown'));await closeSource()}
+ await page.screenshot({path:root+'denied-linked-access.png'});
+ await page.getByRole('button',{name:'Preview scenarios'}).click();await page.getByRole('combobox',{name:'Source state'}).selectOption('ready');await page.getByRole('button',{name:'Return to preview'}).click();
+ await go('journeys/J-608');await page.getByText('Notes & supporting evidence',{exact:false}).click();await page.getByRole('button',{name:'Add evidence',exact:true}).click();await page.getByRole('button',{name:'Use synthetic sample file'}).click();await page.getByRole('button',{name:'Simulate submission',exact:true}).click();await page.getByText('Simulated failure · file retained',{exact:true}).waitFor();await page.getByRole('button',{name:'Retry file',exact:true}).click();await page.getByText('Synthetic evidence receipt saved',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Use synthetic sample file'}).click();await page.getByRole('button',{name:'Simulate submission',exact:true}).last().click();await page.getByText('Simulated failure · file retained',{exact:true}).waitFor();
+ check('R2-14 Second file failure does not change saved file',await page.getByText('Synthetic evidence receipt saved',{exact:true}).count()===1);
+ await page.getByRole('button',{name:'Retry file',exact:true}).click();await page.waitForTimeout(550);const evidence=await page.getByRole('dialog').innerText();
+ check('R2-15 New version retains earlier evidence',evidence.includes('version 1')&&evidence.includes('version 2'));
+ await page.screenshot({path:root+'evidence-versions.png'});await page.getByRole('button',{name:'Return to record',exact:true}).click();
+ return {round:2,results};
+}

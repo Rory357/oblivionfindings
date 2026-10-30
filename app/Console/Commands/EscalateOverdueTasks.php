@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Referrals\Services\ReferralFollowUpPolicy;
 use App\Models\User;
 use App\Services\NotificationService;
 use App\Services\Tasks\TaskAggregator;
@@ -68,7 +69,15 @@ class EscalateOverdueTasks extends Command
                     );
 
                     foreach ($overdue as $item) {
+                        // Source-owned private delivery must prove its current audience/tuple/version.
+                        // Generic task notifications cannot retain privately governed deadlines or fan to managers.
+                        if ($item->identitySource() === 'chemical_exposure_followup') {
+                            continue;
+                        }
                         if ($item->bucket === TaskItem::BUCKET_DONE) {
+                            continue;
+                        }
+                        if ($item->source === 'referrals' && ! app(ReferralFollowUpPolicy::class)->allowsNotification($item)) {
                             continue;
                         }
 
@@ -116,6 +125,25 @@ class EscalateOverdueTasks extends Command
                             ], (int) $watcherId) ? 1 : 0;
                         }
 
+                        if ($item->source === 'referrals') {
+                            if (app(ReferralFollowUpPolicy::class)->managerDue($item)) {
+                                $escalated += $this->escalateScopedItemToManagers($aggregator, $notifications, $seen, $item);
+                            }
+
+                            continue;
+                        }
+
+                        // Medication work: only managers
+                        // who can open the item themselves, each told with
+                        // their own projection of it, once per manager.
+                        if ($item->dueAt !== null
+                            && Carbon::parse($item->dueAt)->lte($managerCutoff)
+                            && $this->isMedicationItem($aggregator, $item)) {
+                            $escalated += $this->escalateScopedItemToManagers($aggregator, $notifications, $seen, $item);
+
+                            continue;
+                        }
+
                         // Level 2 — 3+ days overdue: escalate to the managers
                         // group, assignee or not.
                         if ($item->dueAt !== null && Carbon::parse($item->dueAt)->lte($managerCutoff)) {
@@ -136,6 +164,62 @@ class EscalateOverdueTasks extends Command
         $this->info("Overdue task escalations sent — assignee nudges: {$nudged}, manager escalations: {$escalated}, watcher FYIs: {$watchersPinged}.");
 
         return self::SUCCESS;
+    }
+
+    private function isMedicationItem(TaskAggregator $aggregator, TaskItem $item): bool
+    {
+        $provider = $aggregator->providerFor($item->source);
+
+        return $provider !== null && str_contains(class_basename($provider), 'Medication');
+    }
+
+    /**
+     * A protected item's 3-day escalation goes to the manager roles, but only
+     * to managers whose own task feed contains it (the provider's permission,
+     * Site and person rules), titled from their own projection. An item
+     * already escalated the old way (to the whole group) is not repeated.
+     *
+     * @param  array<string, bool>  $seen
+     */
+    private function escalateScopedItemToManagers(
+        TaskAggregator $aggregator,
+        NotificationService $notifications,
+        array &$seen,
+        TaskItem $item,
+    ): int {
+        $source = $item->identitySource();
+        $itemId = $item->numericId();
+        if (isset($seen[$source.'|'.$itemId.'|2|0'])) {
+            return 0;
+        }
+
+        $sent = 0;
+        $managers = User::query()
+            ->whereNotNull('approved_at')
+            ->whereHas('roles', fn ($roles) => $roles->whereIn('name', NotificationService::MANAGER_ROLES))
+            ->orderBy('id')
+            ->get();
+        foreach ($managers as $manager) {
+            if (isset($seen[$source.'|'.$itemId.'|2|'.$manager->id])) {
+                continue;
+            }
+            $managerItem = $aggregator->findItemFor($manager, $source, $itemId);
+            if ($managerItem === null) {
+                continue;
+            }
+            $sent += $this->escalate($notifications, $seen, $managerItem, 2, [
+                'event_key' => 'tasks.overdue_escalation',
+                'body' => sprintf(
+                    'A work item has been overdue for %d+ days%s and needs management attention.',
+                    self::MANAGER_ESCALATION_DAYS,
+                    $managerItem->assignee ? ' (assigned to '.($managerItem->assignee['name'] ?? 'a staff member').')' : ' (unassigned)',
+                ),
+                'target_user_ids' => [(int) $manager->id],
+                'include_managers' => false,
+            ], (int) $manager->id) ? 1 : 0;
+        }
+
+        return $sent;
     }
 
     /**
@@ -193,7 +277,7 @@ class EscalateOverdueTasks extends Command
                 // channel, so the notification row and unique delivery claim
                 // commit or roll back together. Claim-first prevents two
                 // overlapping command runs from both notifying the same user.
-                $notifications->notifyCrud(null, 'overdue', 'task', null, null, array_merge([
+                $payload = array_merge([
                     'title' => 'Overdue: '.trim(($item->ref ? $item->ref.' ' : '').$item->title),
                     'url' => $item->link ? url($item->link) : url('/tasks'),
                     'severity' => $item->severity,
@@ -206,7 +290,20 @@ class EscalateOverdueTasks extends Command
                         'Due' => $item->dueAt ? Carbon::parse($item->dueAt)->format('Y-m-d H:i') : null,
                         'Assigned to' => $item->assignee['name'] ?? null,
                     ]),
-                ], $extra));
+                ], $extra);
+                if ($item->source === 'referrals') {
+                    // Task titles can contain assessment/funding details. Keep all
+                    // notification surfaces generic, including watcher overrides.
+                    $payload['title'] = 'Referral follow-up needs attention';
+                    $payload['body'] = 'Open the referral to review the overdue work and agree the next action.';
+                    $payload['context'] = ['Module' => 'Referrals'];
+                    $payload['data'] = [
+                        'recipient_scope' => 'referral_task',
+                        'task_source' => $source,
+                        'task_id' => $itemId,
+                    ];
+                }
+                $notifications->notifyCrud(null, 'overdue', 'task', null, null, $payload);
 
                 return true;
             }, 3);

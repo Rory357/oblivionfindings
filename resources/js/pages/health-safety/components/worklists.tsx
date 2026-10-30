@@ -1,22 +1,17 @@
-/* Health & Safety worklists (WS4): actionable rows for overdue corrective actions, open
- * investigations, WorkSafe-notifiable events and the unified expiring feed (all from the WS1
- * payload). Each row: status pill (tone+icon+label) + title/sub + owner + due. Left-click →
- * HsDetailDialog; right-click → ShiftContextMenu (View detail · View client · View staff ·
- * View register · Print) with the client/staff deep-link ids the builders emit. Tokens only. */
+/* H&S previews open the canonical record or register. Optional summaries are
+ * read-only; shared card actions work with touch, keyboard and right-click. */
 import { worksafeLabel } from '@/components/health-safety/event-detail-dialog';
-import {
-    ShiftContextMenu,
-    type ShiftCtxItem,
-    type ShiftCtxState,
-} from '@/components/rostering';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatDateOnly } from '@/lib/datetime';
+import { boardReportHref } from '@/lib/health-safety/board-reports';
+import { hsLabel, humaniseHsValue } from '@/lib/health-safety/hs-labels';
+import { EntityContextMenu, useEntityContextMenu, type MenuItem } from '@/components/lists/entity-menu';
+import { Log, QuietLine, RowList } from '@/components/signature/blocks';
+import { StatusBadge } from '@/components/ui/status-badge';
+import { formatDateOnly, formatDateTimeLong } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { type SharedData } from '@/types';
-import { Link, router, usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowRight,
     CalendarClock,
     Check,
     ClipboardCheck,
@@ -32,7 +27,7 @@ import {
     User,
     UserCog,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 
 import { type HsDetail, HsDetailDialog } from './hs-detail-dialog';
 
@@ -56,6 +51,7 @@ export type CorrectiveActionRow = {
 
 export type InvestigationRow = {
     id: number;
+    event_id?: number | null;
     reference: string | null;
     type: string | null;
     status: string | null;
@@ -117,6 +113,17 @@ export type WorklistsPayload = {
     open_investigations: InvestigationRow[];
     notifiable_events: NotifiableRow[];
     expiring: ExpiringRow[];
+    ppe_expiring_state?: PpeExpiringState;
+};
+
+export type PpeExpiringState = {
+    confirmed_count: number | null;
+    total: number | null;
+    repair_count: number | null;
+    physical_record_count: number | null;
+    displayed_count: number;
+    truncated: boolean;
+    source_integrity: 'intact' | 'legacy_unknown' | 'repair_required' | 'restricted';
 };
 
 export type WorklistKey =
@@ -132,69 +139,6 @@ export type WorklistKey =
 
 type PillTone = 'success' | 'warning' | 'critical' | 'info' | 'neutral';
 
-const PILL_CLASS: Record<PillTone, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    info: 'bg-status-info-bg text-status-info',
-    neutral: 'bg-muted text-muted-foreground',
-};
-
-const TAG_TONE_BG: Record<PillTone, string> = {
-    success: 'var(--status-success-bg)',
-    warning: 'var(--status-warning-bg)',
-    critical: 'var(--status-critical-bg)',
-    info: 'var(--status-info-bg)',
-    neutral: 'var(--muted)',
-};
-
-/* Tinted rounded-square badge behind each card-header icon (prototype: 30px, --x-bg / --x). */
-const BADGE_TONE: Record<PillTone, string> = {
-    success: 'bg-status-success-bg text-status-success',
-    warning: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-    info: 'bg-status-info-bg text-status-info',
-    neutral: 'bg-accent text-primary',
-};
-
-function fmtDate(value?: string | null): string {
-    if (!value) return '—';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return value;
-    return d.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-    });
-}
-
-function titleCase(value?: string | null): string {
-    if (!value) return '—';
-    return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-const AVATAR_TONES = [
-    'bg-primary text-primary-foreground',
-    'bg-status-info text-white',
-    'bg-status-success text-white',
-    'bg-status-warning text-white',
-];
-
-function avatarTone(name: string): string {
-    let h = 0;
-    for (let i = 0; i < name.length; i++)
-        h = (h * 31 + name.charCodeAt(i)) >>> 0;
-    return AVATAR_TONES[h % AVATAR_TONES.length];
-}
-
-function initials(name: string): string {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return '?';
-    return (
-        (parts[0][0] ?? '') +
-        (parts.length > 1 ? parts[parts.length - 1][0] : '')
-    ).toUpperCase();
-}
 
 type NormRow = {
     key: string;
@@ -222,6 +166,8 @@ type NormRow = {
 function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
     return rows.map((r) => ({
         key: `ca-${r.id}`,
+        actionUrl: `/health-safety/corrective-actions/${r.id}`,
+        actionLabel: `Open corrective action: ${r.title ?? r.reference ?? r.id}`,
         pill: {
             label:
                 r.days_overdue != null
@@ -239,7 +185,7 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
                 : undefined,
         },
         title: r.title ?? r.reference ?? `Corrective action #${r.id}`,
-        sub: [r.reference, titleCase(r.priority)].filter(Boolean).join(' · '),
+        sub: [r.reference, hsLabel('action_priority', r.priority)].filter(Boolean).join(' · '),
         owner: r.owner,
         due: formatDateOnly(r.due_date),
         clientId: r.client_id,
@@ -264,8 +210,8 @@ function correctiveActionRows(rows: CorrectiveActionRow[]): NormRow[] {
             rows: [
                 { label: 'Reference', value: r.reference },
                 { label: 'Title', value: r.title },
-                { label: 'Priority', value: titleCase(r.priority) },
-                { label: 'Status', value: titleCase(r.status) },
+                { label: 'Priority', value: hsLabel('action_priority', r.priority) },
+                { label: 'Status', value: hsLabel('action_status', r.status) },
                 { label: 'Due date', value: formatDateOnly(r.due_date) },
                 {
                     label: 'Days overdue',
@@ -317,7 +263,7 @@ function acceptanceRows(rows: AcceptanceRow[]): NormRow[] {
             rows: [
                 { label: 'Reference', value: row.event_reference },
                 { label: 'Title', value: row.title },
-                { label: 'Severity', value: titleCase(row.severity) },
+                { label: 'Severity', value: hsLabel('severity', row.severity) },
                 { label: 'Client', value: row.client },
                 { label: 'Site', value: row.site },
                 { label: 'Proposed owner', value: row.owner },
@@ -329,11 +275,13 @@ function acceptanceRows(rows: AcceptanceRow[]): NormRow[] {
 function investigationRows(rows: InvestigationRow[]): NormRow[] {
     return rows.map((r) => ({
         key: `inv-${r.id}`,
+        actionUrl: r.event_id ? `/health-safety/events/${r.event_id}` : '/health-safety/events',
+        actionLabel: r.event_id ? `Open investigation: ${r.reference ?? r.id}` : `Find investigation: ${r.reference ?? r.id}`,
         pill: r.is_overdue
             ? { label: 'Overdue', tone: 'critical', icon: Clock }
-            : { label: titleCase(r.status), tone: 'info', icon: Search },
+            : { label: hsLabel('investigation_status', r.status), tone: 'info', icon: Search },
         title: `Investigation ${r.reference ?? `#${r.id}`}`,
-        sub: titleCase(r.type),
+        sub: hsLabel('investigation_type', r.type),
         owner: r.owner,
         due: formatDateOnly(r.target_completion_date),
         clientId: r.client_id,
@@ -348,7 +296,7 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
             description: 'Read-only detail of an open H&S investigation.',
             railIcon: Search,
             railTitle: r.reference ?? `Investigation #${r.id}`,
-            railSub: titleCase(r.type),
+            railSub: hsLabel('investigation_type', r.type),
             cardTitle: 'Investigation',
             cardIcon: Search,
             registerUrl: '/health-safety/events',
@@ -357,8 +305,8 @@ function investigationRows(rows: InvestigationRow[]): NormRow[] {
             staffId: r.staff_id,
             rows: [
                 { label: 'Reference', value: r.reference },
-                { label: 'Type', value: titleCase(r.type) },
-                { label: 'Status', value: titleCase(r.status) },
+                { label: 'Type', value: hsLabel('investigation_type', r.type) },
+                { label: 'Status', value: hsLabel('investigation_status', r.status) },
                 {
                     label: 'Target completion',
                     value: formatDateOnly(r.target_completion_date),
@@ -381,12 +329,14 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
         });
         const notifiedSub = [
             r.worksafe_ref ? `Ref ${r.worksafe_ref}` : null,
-            r.notified_at ? fmtDate(r.notified_at) : null,
+            r.notified_at ? formatDateTimeLong(r.notified_at) : null,
         ]
             .filter(Boolean)
             .join(' · ');
         return {
             key: `ntf-${r.id}`,
+            actionUrl: `/health-safety/events/${r.id}`,
+            actionLabel: `Open notifiable event: ${r.event_reference}`,
             pill: {
                 label: statusLabel,
                 tone: awaiting
@@ -400,37 +350,37 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
                 r.title ?? `${r.event_reference} · WorkSafe notifiable event`,
             sub: awaiting
                 ? 'Notify WorkSafe — action required'
-                : notifiedSub || titleCase(r.incident_type),
+                : notifiedSub || humaniseHsValue(r.incident_type),
             owner: null,
             due: null,
             clientId: null,
             staffId: null,
             registerUrl,
-            registerLabel: 'WorkSafe register',
+            registerLabel: 'WorkSafe notifications',
             tag: 'WS',
             tagTone: awaiting ? 'warning' : 'success',
-            meta: titleCase(r.incident_type),
+            meta: humaniseHsValue(r.incident_type),
             detail: {
                 title: 'WorkSafe notifiable event',
                 description:
-                    'HSWA 2015 notifiable event — records kept ≥ 5 years.',
+                    'Recorded notification details. Open the event to manage notification and follow-up.',
                 railIcon: ShieldAlert,
                 railTitle: r.title ?? r.event_reference,
-                railSub: titleCase(r.incident_type),
+                railSub: humaniseHsValue(r.incident_type),
                 cardTitle: 'Notifiable event',
                 cardIcon: ShieldAlert,
                 registerUrl,
-                registerLabel: 'WorkSafe register',
+                registerLabel: 'WorkSafe notifications',
                 rows: [
                     { label: 'Title', value: r.title },
                     { label: 'H&S reference', value: r.event_reference },
-                    { label: 'Type', value: titleCase(r.incident_type) },
+                    { label: 'Type', value: humaniseHsValue(r.incident_type) },
                     { label: 'Status', value: statusLabel },
-                    { label: 'Occurred', value: fmtDate(r.occurred_at) },
-                    { label: 'Notified', value: fmtDate(r.notified_at) },
+                    { label: 'Occurred', value: formatDateTimeLong(r.occurred_at) },
+                    { label: 'Notified', value: formatDateTimeLong(r.notified_at) },
                     {
                         label: 'Deadline',
-                        value: fmtDate(r.notification_deadline),
+                        value: formatDateTimeLong(r.notification_deadline),
                     },
                     {
                         label: 'Site preserved',
@@ -445,50 +395,58 @@ function notifiableRows(rows: NotifiableRow[], registerUrl: string): NormRow[] {
 
 function expiringRows(rows: ExpiringRow[]): NormRow[] {
     return rows.map((r, i) => {
+        const ppe = r.type.startsWith('ppe_');
+        const repair = r.type === 'ppe_repair';
         const overdue = r.days_until != null && r.days_until < 0;
         return {
             key: `exp-${r.type}-${i}`,
-            pill: overdue
+            actionUrl: r.register_url,
+            actionLabel: ppe ? `Open equipment: ${repair ? 'source needs review' : r.label ?? r.type_label}` : `Open register: ${r.label ?? r.type_label}`,
+            pill: repair ? { label: 'Source needs review', tone: 'warning' } : overdue
                 ? {
                       label:
                           r.days_until != null
-                              ? `Expired ${Math.abs(r.days_until)}d`
+                              ? `Expired ${Math.abs(r.days_until)} day${Math.abs(r.days_until) === 1 ? '' : 's'} ago`
                               : 'Overdue',
                       tone: 'critical',
                   }
                 : {
                       label:
-                          r.days_until != null ? `${r.days_until} days` : 'Due',
+                          r.days_until == null
+                              ? 'Due'
+                              : r.days_until === 0
+                                ? 'Due today'
+                                : `In ${r.days_until} day${r.days_until === 1 ? '' : 's'}`,
                       tone: 'warning',
                   },
-            title: r.label ?? r.type_label,
-            sub: r.type_label,
+            title: repair ? 'Equipment facts need review' : r.label ?? r.type_label,
+            sub: [r.type_label, r.site].filter(Boolean).join(' · '),
             owner: null,
-            due: null,
+            due: repair ? null : formatDateOnly(r.due_date, 'Due date not recorded'),
             clientId: null,
             staffId: null,
             registerUrl: r.register_url,
-            registerLabel: 'Register',
+            registerLabel: ppe ? 'Open equipment' : 'Register',
             tag: 'EXP',
             tagTone: overdue ? 'critical' : 'warning',
             meta: r.type_label,
             detail: {
-                title: 'Expiring register item',
-                description: 'An item due for review or renewal.',
+                title: repair ? 'Equipment source needs review' : 'Expiring register item',
+                description: repair ? 'Recorded equipment facts are unconfirmed. Open the source record to review its status.' : 'An item due for review or renewal.',
                 railIcon: CalendarClock,
-                railTitle: r.label ?? r.type_label,
+                railTitle: repair ? 'Equipment facts need review' : r.label ?? r.type_label,
                 railSub: r.type_label,
                 cardTitle: 'Expiring item',
                 cardIcon: CalendarClock,
                 registerUrl: r.register_url,
-                registerLabel: 'Register',
+                registerLabel: ppe ? 'Open equipment' : 'Register',
                 rows: [
-                    { label: 'Item', value: r.label },
+                    { label: 'Item', value: repair ? 'Not confirmed' : r.label },
                     { label: 'Type', value: r.type_label },
-                    { label: 'Due date', value: fmtDate(r.due_date) },
+                    { label: 'Due date', value: repair ? 'Not confirmed' : formatDateOnly(r.due_date) },
                     {
                         label: 'Days until due',
-                        value: r.days_until != null ? `${r.days_until}` : '—',
+                        value: !repair && r.days_until != null ? `${r.days_until}` : 'Not confirmed',
                     },
                     { label: 'Site', value: r.site },
                 ],
@@ -522,83 +480,42 @@ export function HsWorklists({
     worklists: WorklistsPayload;
     show: WorklistKey[];
 }) {
-    const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
-    const [detail, setDetail] = useState<HsDetail | null>(null);
+    const context = useEntityContextMenu<NormRow>();
+    const [detailKey, setDetailKey] = useState<string | null>(null);
 
-    // The WorkSafe register report is governance.view-gated; for register-only
+    // The WorkSafe notifications report is governance.view-gated; for register-only
     // roles (hazards.view) fall back to the non-gated events WorkSafe tab so the
     // worklist's register links (card, context menu, detail dialog) don't 403.
     const canViewGovReports =
         usePage<SharedData>().props.auth.can?.governance?.view ?? false;
     const worksafeRegisterUrl = canViewGovReports
-        ? '/health-safety/reports/worksafe-register'
+        ? boardReportHref('notifications')
         : '/health-safety/events?tab=worksafe';
 
-    const openCtx = (e: React.MouseEvent, row: NormRow) => {
-        e.preventDefault();
-        const items: ShiftCtxItem[] = [
-            {
-                icon: row.actionUrl ? (
-                    <ExternalLink className="h-3.5 w-3.5" />
-                ) : (
-                    <Eye className="h-3.5 w-3.5" />
-                ),
-                label: row.actionUrl ? 'Open action' : 'View detail',
-                onClick: () =>
-                    row.actionUrl
-                        ? router.visit(row.actionUrl)
-                        : setDetail(row.detail),
-            },
-        ];
-        if (row.clientId) {
-            items.push({
-                icon: <User className="h-3.5 w-3.5" />,
-                label: 'View client',
-                onClick: () => router.visit(`/clients/${row.clientId}`),
-            });
-        }
-        if (row.staffId) {
-            items.push({
-                icon: <UserCog className="h-3.5 w-3.5" />,
-                label: 'View staff',
-                onClick: () => router.visit(`/staff/${row.staffId}`),
-            });
-        }
-        items.push({ sep: true });
-        items.push({
-            icon: <ExternalLink className="h-3.5 w-3.5" />,
-            label: row.registerLabel,
-            onClick: () => router.visit(row.registerUrl),
-        });
-        items.push({
-            icon: <Printer className="h-3.5 w-3.5" />,
-            label: 'Print',
-            onClick: () => window.print(),
-        });
-
-        setCtx({
-            x: e.clientX,
-            y: e.clientY,
-            tag: row.tag,
-            tagBg: TAG_TONE_BG[row.tagTone],
-            meta: row.meta,
-            items,
-        });
-    };
+    const visit = (href: string) => { context.close(); router.visit(href); };
+    const actions = (row: NormRow): MenuItem[] => [
+        { label: 'Open record or register', icon: ExternalLink, onClick: () => visit(row.actionUrl ?? row.registerUrl) },
+        { label: 'View recorded summary', icon: Eye, onClick: () => { context.close(); setDetailKey(row.key); } },
+        ...(row.clientId ? [{ label: 'View client', icon: User, onClick: () => visit(`/clients/${row.clientId}`) }] : []),
+        ...(row.staffId ? [{ label: 'View staff', icon: UserCog, onClick: () => visit(`/staff/${row.staffId}`) }] : []),
+        { separator: true },
+        { label: row.registerLabel, icon: ExternalLink, onClick: () => visit(row.registerUrl) },
+        { label: 'Print', icon: Printer, onClick: () => { context.close(); window.print(); } },
+    ];
 
     const allConfigs: Record<WorklistKey, CardConfig> = {
         acceptance: {
             key: 'acceptance',
             icon: ShieldAlert,
             iconTone: 'warning',
-            title: worklists.attention[0]?.label ?? 'Awaiting H&S acceptance',
+            title: 'Waiting for Health & safety to accept',
             subtitle:
                 worklists.attention[0]?.help ??
-                'A named H&S owner must accept governance responsibility.',
+                'A named Health & safety owner must accept responsibility for each one',
             registerUrl: null,
             registerLabel: 'Open action',
             rows: acceptanceRows(worklists.attention[0]?.items ?? []),
-            emptyText: 'No H&S handovers are awaiting acceptance.',
+            emptyText: 'No matching H&S handovers in this preview.',
             count: worklists.attention[0]?.count ?? 0,
             countLabel: `${worklists.attention[0]?.count ?? 0} H&S handover${(worklists.attention[0]?.count ?? 0) === 1 ? '' : 's'} awaiting acceptance`,
         },
@@ -607,211 +524,151 @@ export function HsWorklists({
             icon: Clock,
             iconTone: 'critical',
             title: 'Overdue corrective actions',
-            subtitle: `${worklists.overdue_corrective_actions.length} past due · right-click a row for actions`,
+            subtitle: 'Past their due date · right-click a row for options',
             registerUrl: '/health-safety/corrective-actions',
             registerLabel: 'View register',
             rows: correctiveActionRows(worklists.overdue_corrective_actions),
-            emptyText: 'No overdue corrective actions.',
+            emptyText: 'No matching overdue actions in this preview.',
         },
         investigations: {
             key: 'investigations',
             icon: Search,
             iconTone: 'info',
             title: 'Open investigations',
-            subtitle: 'Active H&S investigations',
+            subtitle: 'Investigations under way',
             registerUrl: '/health-safety/events',
             registerLabel: 'View all',
             rows: investigationRows(worklists.open_investigations),
-            emptyText: 'No open investigations.',
+            emptyText: 'No matching investigations in this preview.',
         },
         notifiable: {
             key: 'notifiable',
             icon: FileText,
             iconTone: 'critical',
-            title: 'WorkSafe-notifiable events',
-            subtitle: 'HSWA 2015 · notified / awaiting',
+            title: 'WorkSafe notifiable events',
+            subtitle: 'Notified, or still to notify',
             registerUrl: worksafeRegisterUrl,
             registerLabel: 'Register',
             rows: notifiableRows(
                 worklists.notifiable_events,
                 worksafeRegisterUrl,
             ),
-            emptyText: 'No notifiable events on record.',
+            emptyText: 'No matching notifiable events in this preview.',
         },
         expiring: {
             key: 'expiring',
             icon: CalendarClock,
             iconTone: 'warning',
-            title: 'Expiring soon',
-            subtitle: 'Risk assessments · SDS · drills · competencies',
+            title: 'Reviews and equipment due',
+            subtitle: 'Risk assessments, safety data sheets, drills and equipment. A due list only — it doesn’t confirm equipment is fit to use.',
             registerUrl: null,
             registerLabel: 'View registers',
-            rows: expiringRows(worklists.expiring),
-            emptyText: 'Nothing expiring soon.',
+            rows: expiringRows(worklists.expiring.filter((row) => worklists.ppe_expiring_state?.source_integrity !== 'restricted' || !row.type.startsWith('ppe_'))),
+            emptyText: 'No matching due items in this preview.',
         },
     };
 
     const configs = show.map((k) => allConfigs[k]);
+    const currentRows = configs.flatMap((config) => config.rows);
+    // Menu/summary facts always come from the current preview. A withdrawn
+    // source must disappear even if its context menu or summary was open.
+    const contextRow = currentRows.find((row) => row.key === context.ctx?.record.key);
+    const detail = currentRows.find((row) => row.key === detailKey)?.detail;
+    const closeContext = context.close;
+    useEffect(() => {
+        if (detailKey !== null && !detail) setDetailKey(null);
+        if (context.ctx !== null && !contextRow) closeContext();
+    }, [detailKey, detail, context.ctx, contextRow, closeContext]);
+
+    // Drawn as the approved H&S drawings' lists (23 Oct): time-first logs for dated work, plain
+    // rows with one status for the rest. Every row keeps its link, its kebab and the same menu on
+    // right-click, and "View recorded summary" still opens the detail pop-up.
+    const PILL_RING = { critical: 'critical', warning: 'warning', success: 'success', info: 'info', neutral: 'none' } as const;
+    const rowMenu = (row: NormRow) => ({
+        href: row.actionUrl ?? row.registerUrl,
+        menu: actions(row),
+        onContextMenu: (event: MouseEvent<HTMLElement>) => context.open(event, row),
+    });
+    const pill = (row: NormRow) => (
+        <StatusBadge variant={row.pill.tone} size="sm">
+            {row.pill.icon && <row.pill.icon aria-hidden="true" className="size-3" />}
+            {row.pill.label}
+        </StatusBadge>
+    );
+    const head = (cfg: CardConfig) => ({
+        title: cfg.title,
+        sub: cfg.subtitle,
+        action: cfg.registerUrl ? { label: cfg.registerLabel, href: cfg.registerUrl } : null,
+    });
+    const block = (cfg: CardConfig) => {
+        if (cfg.key === 'corrective_actions' || cfg.key === 'investigations') {
+            return cfg.rows.length ? (
+                <Log
+                    key={cfg.key}
+                    {...head(cfg)}
+                    limit={50}
+                    items={cfg.rows.map((row) => ({
+                        key: row.key,
+                        time: row.due ?? '',
+                        tone: PILL_RING[row.pill.tone],
+                        title: row.title,
+                        sub: [row.pill.label, row.sub, row.owner].filter(Boolean).join(' · '),
+                        menu: actions(row),
+                        onContextMenu: (event: MouseEvent<HTMLElement>) => context.open(event, row),
+                        action: { label: 'Open', ariaLabel: row.actionLabel, href: row.actionUrl ?? row.registerUrl },
+                    }))}
+                />
+            ) : (
+                <QuietLine key={cfg.key} title={cfg.title} text={cfg.emptyText} />
+            );
+        }
+        const status =
+            cfg.key === 'expiring'
+                ? worklists.ppe_expiring_state?.source_integrity === 'restricted'
+                    ? 'Equipment attention requires current safety and Site access.'
+                    : worklists.ppe_expiring_state?.source_integrity === 'repair_required'
+                      ? 'Some equipment facts are unconfirmed. Open the equipment record to review its source status.'
+                      : !worklists.ppe_expiring_state
+                        ? 'Equipment attention is not confirmed.'
+                        : null
+                : null;
+        return (
+            <RowList
+                key={cfg.key}
+                {...head(cfg)}
+                sub={
+                    <>
+                        {status ?? cfg.subtitle}
+                        {cfg.key === 'expiring' && worklists.ppe_expiring_state?.truncated
+                            ? ' Some equipment items are outside this preview. Open the PPE register for the remaining records.'
+                            : ''}
+                        {cfg.count !== undefined ? <span aria-label={cfg.countLabel}>{` · ${cfg.count} waiting`}</span> : null}
+                    </>
+                }
+                empty={cfg.emptyText}
+                items={cfg.rows.map((row) => ({
+                    key: row.key,
+                    title: row.title,
+                    sub: row.sub,
+                    badge: pill(row),
+                    leading: cfg.key === 'notifiable' ? <ShieldAlert aria-hidden="true" className="size-4" /> : undefined,
+                    ...rowMenu(row),
+                }))}
+            />
+        );
+    };
 
     return (
         <>
-            <div
-                className={cn(
-                    'grid gap-4',
-                    configs.length > 1 && 'lg:grid-cols-2',
-                )}
-            >
-                {configs.map((cfg) => (
-                    <Card key={cfg.key}>
-                        <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <span
-                                    className={cn(
-                                        'inline-flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[9px]',
-                                        BADGE_TONE[cfg.iconTone],
-                                    )}
-                                >
-                                    <cfg.icon className="h-4 w-4" />
-                                </span>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <CardTitle className="text-sm leading-tight font-bold">
-                                            {cfg.title}
-                                        </CardTitle>
-                                        {cfg.count !== undefined ? (
-                                            <span
-                                                aria-label={cfg.countLabel}
-                                                className="inline-flex min-w-5 items-center justify-center rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning"
-                                            >
-                                                {cfg.count}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                    <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                                        {cfg.subtitle}
-                                    </p>
-                                </div>
-                            </div>
-                            {cfg.registerUrl ? (
-                                <Link
-                                    href={cfg.registerUrl}
-                                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                                >
-                                    {cfg.registerLabel}
-                                    <ArrowRight className="h-3 w-3" />
-                                </Link>
-                            ) : null}
-                        </CardHeader>
-                        <CardContent className="space-y-1.5">
-                            {cfg.rows.length === 0 ? (
-                                <p className="py-6 text-center text-xs text-muted-foreground">
-                                    {cfg.emptyText}
-                                </p>
-                            ) : (
-                                cfg.rows.map((row) => (
-                                    <WorklistRow
-                                        key={row.key}
-                                        row={row}
-                                        onOpen={() => setDetail(row.detail)}
-                                        onContextMenu={(event) =>
-                                            openCtx(event, row)
-                                        }
-                                    />
-                                ))
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
+            <div className={cn('grid items-start gap-5', configs.length > 1 && 'lg:grid-cols-2')}>
+                {configs.map(block)}
             </div>
 
-            {ctx ? (
-                <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
-            ) : null}
-            {detail ? (
-                <HsDetailDialog
-                    detail={detail}
-                    onClose={() => setDetail(null)}
-                />
-            ) : null}
+            {context.ctx && contextRow && <EntityContextMenu x={context.ctx.x} y={context.ctx.y} title={contextRow.title} items={actions(contextRow)} onClose={context.close} />}
+            {detail && <HsDetailDialog detail={detail} onClose={() => setDetailKey(null)} />}
         </>
-    );
-}
-
-function WorklistRow({
-    row,
-    onOpen,
-    onContextMenu,
-}: {
-    row: NormRow;
-    onOpen: () => void;
-    onContextMenu: (event: React.MouseEvent) => void;
-}) {
-    const content = (
-        <>
-            <span
-                className={cn(
-                    'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
-                    PILL_CLASS[row.pill.tone],
-                )}
-            >
-                {row.pill.icon ? <row.pill.icon className="h-3 w-3" /> : null}
-                {row.pill.label}
-            </span>
-            <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px] font-medium text-foreground">
-                    {row.title}
-                </span>
-                <span className="block truncate text-[11px] text-muted-foreground">
-                    {row.sub}
-                </span>
-            </span>
-            <span className="flex shrink-0 items-center gap-2">
-                {row.owner ? (
-                    <span
-                        title={row.owner}
-                        className={cn(
-                            'flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold',
-                            avatarTone(row.owner),
-                        )}
-                    >
-                        {initials(row.owner)}
-                    </span>
-                ) : null}
-                {row.due ? (
-                    <span className="w-12 text-right text-[11px] text-muted-foreground tabular-nums">
-                        {row.due}
-                    </span>
-                ) : null}
-            </span>
-        </>
-    );
-    const className =
-        'flex w-full items-center gap-3 rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none';
-
-    if (row.actionUrl) {
-        return (
-            <Link
-                href={row.actionUrl}
-                aria-label={row.actionLabel}
-                onContextMenu={onContextMenu}
-                className={className}
-            >
-                {content}
-            </Link>
-        );
-    }
-
-    return (
-        // eslint-disable-next-line no-restricted-syntax -- worklist row is a custom full-width selector card, not a shadcn Button.
-        <button
-            type="button"
-            onClick={onOpen}
-            onContextMenu={onContextMenu}
-            className={className}
-        >
-            {content}
-        </button>
     );
 }
 
 export default HsWorklists;
+

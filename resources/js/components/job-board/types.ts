@@ -43,10 +43,11 @@ export type JobPostClient = {
     is_redacted: boolean;
 };
 
+/** Cover for an existing assignment. Deliberately carries no reason: why
+ * the rostered person is away is private HR information. */
 export type JobPostReplacement = {
     id: number;
     status: string;
-    reason: string | null;
     requested_at?: string | null;
     current_staff?: { id: number; name: string } | null;
     requested_by?: { id: number; name: string } | null;
@@ -110,8 +111,14 @@ export type JobBoardScope =
     | 'replacements'
     | 'approvals';
 
+/**
+ * What the signed-in person may do. Action controls are shown only when the
+ * matching flag is exactly `true` — a missing flag means no. Eligibility for
+ * a shift is not permission to act on it.
+ */
 export type JobBoardViewer = {
     first_name: string;
+    can_claim?: boolean;
     can_approve?: boolean;
     can_post_position?: boolean;
     alerts_enabled?: boolean;

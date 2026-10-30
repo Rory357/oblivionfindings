@@ -432,7 +432,7 @@ export default function Holidays({ holidays, year, hero, can }: Props) {
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={confirmDelete}
-                            className="bg-status-critical text-primary-foreground hover:bg-status-critical/90"
+                            variant="destructive"
                         >
                             Remove holiday
                         </AlertDialogAction>

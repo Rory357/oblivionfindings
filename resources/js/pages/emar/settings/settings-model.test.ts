@@ -1,0 +1,328 @@
+import { describe, expect, it } from 'vitest';
+import {
+    accepts,
+    canRestore,
+    changes,
+    format,
+    loosens,
+    numberError,
+    stillToDecide,
+    validateView,
+    withDraft,
+    withoutDrafts,
+    type HistoryEntry,
+    type SettingDefinition,
+    type SettingsPayload,
+} from './_model';
+
+const restricted: SettingDefinition = {
+    group: 'safety',
+    key: 'restricted_competency',
+    scope: 'organisation',
+    section: 'safety',
+    label: 'A worker’s medication competency is marked restricted',
+    options: [
+        { value: 'off', label: 'Off — no extra check' },
+        { value: 'block', label: 'Block' },
+        { value: 'cosigner', label: 'Co-signer with witness PIN' },
+    ],
+    default: 'off',
+    rank: ['off', 'cosigner', 'block'],
+    numeric: null,
+    range: null,
+    unit: null,
+    paired_with: null,
+};
+const renewal: SettingDefinition = {
+    group: 'pin',
+    key: 'renewal_months',
+    scope: 'organisation',
+    section: 'pins',
+    label: 'PIN renewal (optional)',
+    // P11 Q-F: a whole number of months, or off.
+    options: [],
+    default: 'none',
+    rank: null,
+    numeric: {
+        direction: 'higher_is_looser',
+        off: 'none',
+        off_is_loosest: true,
+    },
+    range: [1, 24],
+    unit: 'months',
+    paired_with: null,
+    off_label: 'No renewal',
+};
+const observed: SettingDefinition = {
+    group: 'elig',
+    key: 'observed_minimum',
+    scope: 'organisation',
+    section: 'competency',
+    label: 'Minimum observed administrations',
+    options: [],
+    default: 'off',
+    rank: null,
+    numeric: {
+        direction: 'higher_is_stricter',
+        off: 'off',
+        off_is_loosest: true,
+    },
+    range: [1, 100],
+    unit: 'observed administrations',
+    paired_with: null,
+    off_label: 'Off — no minimum',
+    when_not_configured: 'No minimum is asked for',
+};
+
+const payload = (over: Partial<SettingsPayload> = {}): SettingsPayload => ({
+    groups: {
+        safety: {
+            key: 'safety',
+            view: 'rules',
+            effect: 'From the next dose signed, at every house',
+            audit_event: 'medications.safety_policy.updated',
+            keys: ['restricted_competency'],
+        },
+        pin: {
+            key: 'pin',
+            view: 'staff',
+            effect: 'From the next dose signed or witnessed, at every house',
+            audit_event: 'medications.witness_pin_rules.updated',
+            keys: ['renewal_months'],
+        },
+    },
+    definitions: {
+        safety: { restricted_competency: restricted },
+        pin: { renewal_months: renewal },
+    },
+    values: {
+        safety: { restricted_competency: 'block' },
+        pin: { renewal_months: 'none' },
+    },
+    reviewed: {
+        safety: { restricted_competency: { by: 'Hana Kereama', at: null } },
+        pin: { renewal_months: null },
+    },
+    site_values: {},
+    site_reviewed: {},
+    history: [],
+    can_manage_organisation: true,
+    ...over,
+});
+
+describe('loosens — the same rule as the server', () => {
+    it('ranks options from loosest to strictest', () => {
+        expect(loosens(restricted, 'block', 'cosigner')).toBe(true);
+        expect(loosens(restricted, 'block', 'off')).toBe(true);
+        expect(loosens(restricted, 'off', 'block')).toBe(false);
+        expect(loosens(restricted, 'block', 'block')).toBe(false);
+    });
+    it('treats switching a number off as loosest, and switching on as never looser', () => {
+        expect(loosens(renewal, '6', 'none')).toBe(true);
+        expect(loosens(renewal, '6', '12')).toBe(true);
+        expect(loosens(renewal, 'none', '12')).toBe(false);
+        expect(loosens(renewal, '12', '6')).toBe(false);
+    });
+});
+
+describe('drafts', () => {
+    it('lists only real changes, per view, with words and the loosening flag', () => {
+        const s = payload();
+        let draft = withDraft({}, 'safety', 'restricted_competency', 'off');
+        draft = withDraft(draft, 'pin', 'renewal_months', 'none'); // same as saved
+        const rules = changes(s, draft, 'rules');
+        expect(rules).toHaveLength(1);
+        expect(rules[0]).toMatchObject({
+            label: 'A worker’s medication competency is marked restricted',
+            fromText: 'Block',
+            toText: 'Off — no extra check',
+            loosens: true,
+        });
+        expect(changes(s, draft, 'staff')).toHaveLength(0);
+        expect(changes(s, withoutDrafts(s, draft, 'rules'))).toHaveLength(0);
+    });
+});
+
+describe('a number that can be switched off (P11 Q-F)', () => {
+    it('accepts off or a whole number in range, and words each', () => {
+        expect(accepts(renewal, 'none')).toBe(true);
+        expect(accepts(renewal, '1')).toBe(true);
+        expect(accepts(renewal, '24')).toBe(true);
+        expect(accepts(renewal, '25')).toBe(false);
+        expect(accepts(renewal, '')).toBe(false);
+        expect(format(renewal, 'none')).toBe('No renewal');
+        expect(format(renewal, '18')).toBe('18 months');
+        expect(numberError(renewal)).toBe(
+            'Enter a whole number from 1 to 24, or switch it off.',
+        );
+    });
+    it('asks for a number when switched on with an empty box', () => {
+        const s = payload();
+        expect(
+            validateView(
+                s,
+                withDraft({}, 'pin', 'renewal_months', ''),
+                'staff',
+            ),
+        ).toEqual({
+            'pin.renewal_months':
+                'Enter a whole number from 1 to 24, or switch it off.',
+        });
+    });
+});
+
+describe('still to decide', () => {
+    it('lists a setting that is still off where off means not configured, even once saved', () => {
+        const s = payload({
+            groups: {
+                ...payload().groups,
+                elig: {
+                    key: 'elig',
+                    view: 'staff',
+                    effect: 'From the next assessment',
+                    audit_event: 'medications.competency_policy.updated',
+                    keys: ['observed_minimum'],
+                },
+            },
+            definitions: {
+                ...payload().definitions,
+                elig: { observed_minimum: observed },
+            },
+            values: { ...payload().values, elig: { observed_minimum: 'off' } },
+            reviewed: {
+                ...payload().reviewed,
+                elig: { observed_minimum: { by: 'Hana Kereama', at: null } },
+            },
+        });
+        expect(stillToDecide(s)).toContainEqual(
+            expect.objectContaining({
+                key: 'observed_minimum',
+                state: 'nc',
+                until: 'No minimum is asked for',
+            }),
+        );
+        expect(
+            stillToDecide({
+                ...s,
+                values: { ...s.values, elig: { observed_minimum: '12' } },
+            }).some((p) => p.key === 'observed_minimum'),
+        ).toBe(false);
+    });
+
+    it('lists organisation settings nobody has saved or kept, with how they behave meanwhile', () => {
+        const pending = stillToDecide(payload());
+        expect(pending).toEqual([
+            expect.objectContaining({
+                group: 'pin',
+                key: 'renewal_months',
+                view: 'staff',
+                state: 'default',
+                until: 'Behaves as: No renewal',
+            }),
+        ]);
+    });
+});
+
+describe('put the earlier value back', () => {
+    const entry = (over: Partial<HistoryEntry> = {}): HistoryEntry => ({
+        id: 1,
+        at: null,
+        who: 'Hana Kereama',
+        action: 'changed',
+        group: 'safety',
+        key: 'restricted_competency',
+        site_id: null,
+        site_name: null,
+        view: 'rules',
+        section: 'safety',
+        label: restricted.label,
+        before_text: 'Off — no extra check',
+        after_text: 'Block',
+        before_value: 'off',
+        loosens: false,
+        note: null,
+        event: 'medications.safety_policy.updated',
+        ...over,
+    });
+    const can = () => true;
+
+    it('offers a saved change whose earlier value differs from the draft', () => {
+        expect(canRestore(payload(), {}, entry(), can)).toBe(true);
+    });
+    it('never offers a kept default, an unknown value, or a value already in the draft', () => {
+        expect(
+            canRestore(
+                payload(),
+                {},
+                entry({ action: 'kept', before_value: null }),
+                can,
+            ),
+        ).toBe(false);
+        expect(
+            canRestore(payload(), {}, entry({ before_value: 'always' }), can),
+        ).toBe(false);
+        expect(
+            canRestore(
+                payload(),
+                withDraft({}, 'safety', 'restricted_competency', 'off'),
+                entry(),
+                can,
+            ),
+        ).toBe(false);
+        expect(canRestore(payload(), {}, entry(), () => false)).toBe(false);
+    });
+});
+
+describe('emergency-access draft review', () => {
+    const number = (key: string, value: string): SettingDefinition => ({
+        ...renewal,
+        group: 'ea',
+        key,
+        section: 'emergency',
+        default: value,
+        numeric: {
+            direction: 'higher_is_looser',
+            off: null,
+            off_is_loosest: false,
+        },
+        range: [5, 1440],
+        unit: 'minutes',
+        off_label: null,
+    });
+    const s = payload({
+        groups: {
+            ea: {
+                key: 'ea',
+                view: 'alerts',
+                effect: 'From the next grant',
+                audit_event: 'medications.emergency_policy.updated',
+                keys: ['default_minutes', 'max_minutes'],
+            },
+        },
+        definitions: {
+            ea: {
+                default_minutes: number('default_minutes', '60'),
+                max_minutes: number('max_minutes', '240'),
+            },
+        },
+        values: { ea: { default_minutes: '60', max_minutes: '240' } },
+        reviewed: { ea: { default_minutes: null, max_minutes: null } },
+    });
+    it('does not offer save when the grant would exceed the saved longest time', () => {
+        expect(
+            validateView(
+                s,
+                withDraft({}, 'ea', 'default_minutes', '300'),
+                'alerts',
+            ),
+        ).toHaveProperty('ea.default_minutes');
+    });
+    it('reviews simultaneous grant and longest-time changes together, in the Alerts view', () => {
+        let draft = withDraft({}, 'ea', 'default_minutes', '300');
+        draft = withDraft(draft, 'ea', 'max_minutes', '600');
+        expect(validateView(s, draft, 'alerts')).toEqual({});
+        expect(changes(s, draft, 'alerts')).toHaveLength(2);
+        expect(changes(s, draft, 'alerts').every((c) => c.loosens)).toBe(true);
+        expect(changes(s, draft, 'rules')).toHaveLength(0);
+    });
+});
