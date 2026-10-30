@@ -6,6 +6,7 @@ use App\Domain\Hr\Services\HrCurrentStaffService;
 use App\Models\OpsConversation;
 use App\Models\OpsMessage;
 use App\Models\User;
+use App\Services\Chat\ChatMembershipGaps;
 use App\Services\Clients\ClientFamilyCommunicationAccess;
 use App\Services\UserSiteAccessService;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,6 +20,7 @@ class OpsMessageVisibilityService
         private readonly HrCurrentStaffService $currentStaff,
         private readonly UserSiteAccessService $siteAccess,
         private readonly ClientFamilyCommunicationAccess $familyCommunicationAccess,
+        private readonly ChatMembershipGaps $gaps,
     ) {}
 
     /** @return Builder<User> */
@@ -34,7 +36,8 @@ class OpsMessageVisibilityService
 
     public function canViewConversation(User $user, OpsConversation $conversation): bool
     {
-        if (! config('chat.shared_experience') && $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id !== null) {
+        // These pages can't apply a history boundary or a re-hire gap, so they refuse the conversation.
+        if (! config('chat.shared_experience') && $this->limitedHistory($conversation, $user)) {
             return false;
         }
         if ($conversation->channel_site_id && ! in_array((int) $conversation->channel_site_id, $this->siteAccess->accessibleSiteIds($user), true)) {
@@ -89,6 +92,17 @@ class OpsMessageVisibilityService
             ->count() === $participantIds->count();
     }
 
+    /** Whether the viewer's membership has a history boundary or a re-hire gap, in one query. */
+    private function limitedHistory(OpsConversation $conversation, User $user): bool
+    {
+        $member = $conversation->participants()->where('user_id', $user->id)
+            ->addSelect(['has_gap' => DB::table('chat_membership_gaps')->selectRaw('1')
+                ->whereColumn('participant_id', 'ops_conversation_participants.id')->limit(1)])
+            ->first();
+
+        return $member && ($member->history_after_id !== null || $member->has_gap);
+    }
+
     /**
      * Short-lived per-user badge copy for every-request callers (Inertia
      * share, call status polling). Busted after the user's own writes
@@ -128,7 +142,7 @@ class OpsMessageVisibilityService
             ->get(config('chat.shared_experience') ? ['id', 'conversation_type', 'client_id', 'channel_site_id', 'is_managed_channel'] : ['id', 'conversation_type', 'client_id']);
 
         if (! config('chat.shared_experience')) {
-            $conversations = $conversations->filter(fn ($conversation) => $conversation->participants()->where('user_id', $user->id)->first()?->history_after_id === null);
+            $conversations = $conversations->filter(fn ($conversation) => ! $this->limitedHistory($conversation, $user));
         }
         $conversationIds = $this->visibleConversationIds($user, $conversations);
 
@@ -150,6 +164,8 @@ class OpsMessageVisibilityService
                 ->orWhereColumn('ops_messages.id', '>', 'unread_participant.history_after_id')
                 ->orWhereExists(fn ($grant) => $grant->selectRaw('1')->from('chat_history_grants')
                     ->whereColumn('message_id', 'ops_messages.id')->whereColumn('participant_id', 'unread_participant.id'))))
+            // Nothing sent while a re-hired member was away counts as unread for them.
+            ->tap(fn (Builder $query) => $this->gaps->hide($query, 'unread_participant.id', (int) $user->id))
             ->where('ops_messages.sender_id', '!=', $user->id)
             ->where(function (Builder $unread): void {
                 if (config('chat.shared_experience')) {

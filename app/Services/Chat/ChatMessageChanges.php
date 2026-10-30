@@ -30,14 +30,18 @@ final class ChatMessageChanges
 
     private function scope(OpsConversation $conversation, User $viewer): string
     {
-        $member = $conversation->participants()->where('user_id', $viewer->id)->first();
+        // A re-hire gap opening or closing changes the history too.
+        $gaps = fn (bool $open) => DB::table('chat_membership_gaps')->selectRaw('count(*)')
+            ->whereColumn('participant_id', 'ops_conversation_participants.id')->when($open, fn ($rows) => $rows->whereNull('returned_at'));
+        $member = $conversation->participants()->where('user_id', $viewer->id)
+            ->addSelect(['gaps' => $gaps(false), 'open_gaps' => $gaps(true)])->first();
         $grants = $member ? DB::table('chat_history_grants')->where('participant_id', $member->id)->orderBy('message_id')->pluck('message_id')->all() : [];
 
         // chat_version also changes on ordinary sends; only history/authority changes
         // invalidate the recovery window. Current access is checked separately per page.
         return hash('sha256', json_encode([$conversation->client_id, $conversation->conversation_type, $conversation->channel_site_id,
             $conversation->client ? $viewer->canAccessClientPortal($conversation->client) : false,
-            $member?->id, $member?->history_after_id, $grants], JSON_THROW_ON_ERROR));
+            $member?->id, $member?->history_after_id, $grants, (int) $member?->gaps, (int) $member?->open_gaps], JSON_THROW_ON_ERROR));
     }
 
     /** Read under the same conversation lock as the initial message snapshot. */
