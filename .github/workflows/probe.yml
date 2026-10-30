@@ -1,0 +1,24 @@
+name: probe-test-db
+
+# Throwaway measurement (branch probe/test-speed-db only; never merged).
+on:
+  push:
+    branches:
+      - probe/test-speed-db
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/php-test-machine
+      - name: Old snapshot from main
+        run: git show origin/main:database/schema/mysql-schema.sql > old-schema.sql
+      - name: Probe
+        run: php .github/probe/db-probe.php
