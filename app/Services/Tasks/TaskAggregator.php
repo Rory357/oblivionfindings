@@ -772,6 +772,12 @@ class TaskAggregator
             return $provider->authorizedTasks($user, $filters);
         }
 
+        // "Assigned to me" is applied to every module's rows afterwards (filterItems()), and no plain module reads
+        // it, so it is left out here: My Day's card and the sidebar count then share one read per module in a
+        // request instead of two (31 Oct 2026; the medication modules ran twice on /my-day since c59d5ca28).
+        // If a plain module ever narrows by assignee itself, stop removing it here.
+        unset($filters['assigned']);
+
         // Keyed by instance (not class): registries and tests may hold
         // several providers of one class. Instances live in $this->providers
         // for the aggregator's lifetime, so the object id cannot be reused.
