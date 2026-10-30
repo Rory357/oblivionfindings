@@ -1837,12 +1837,40 @@ function SafetyReviewPage({
     );
 }
 
+/** Closure checks that can only be met once the WorkSafe decision is recorded. */
+const WORKSAFE_DECISION_DEPENDENTS = [
+    'worksafe_notification',
+    'worksafe_acknowledgement',
+    'site_preservation',
+];
+
 /** The closure checks as a ring: done of total, every blocker in the server's words (an open one links to its step). */
 function ClosureRing({ d }: { d: EventDetail }) {
     const requirements = d.close_gate.requirements;
     const done = requirements.filter((requirement) => requirement.complete)
         .length;
-    const checks: CheckItem[] = requirements.map((requirement) => ({
+    // While the WorkSafe decision is missing, its three dependent steps say the same thing, so they show as one
+    // plain line (MASTER for Stephan, 30 Oct). Every check still counts and still blocks closing exactly as before.
+    const decision = requirements.find(
+        (requirement) => requirement.key === 'worksafe_decision',
+    );
+    const waitingOnDecision = !!decision && !decision.complete;
+    const shown = waitingOnDecision
+        ? requirements
+              .filter(
+                  (requirement) =>
+                      !WORKSAFE_DECISION_DEPENDENTS.includes(requirement.key),
+              )
+              .map((requirement) =>
+                  requirement.key === 'worksafe_decision'
+                      ? {
+                            ...requirement,
+                            label: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
+                        }
+                      : requirement,
+              )
+        : requirements;
+    const checks: CheckItem[] = shown.map((requirement) => ({
         state: requirement.complete ? 'success' : 'critical',
         label:
             !requirement.complete && requirement.href ? (

@@ -278,7 +278,9 @@ export default function HealthSafetyDashboard({
                           procedures.review_due > 0
                               ? String(procedures.review_due) + ' due for review'
                               : procedures.coverage_gap_categories > 0
-                                ? String(procedures.coverage_gap_categories) + ' coverage gaps'
+                                ? procedures.coverage_gap_categories === 1
+                                    ? '1 area still needs a procedure'
+                                    : String(procedures.coverage_gap_categories) + ' areas still need a procedure'
                                 : 'Approved',
                       tone:
                           procedures.coverage_gap_categories > 0

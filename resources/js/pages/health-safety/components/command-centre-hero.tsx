@@ -48,6 +48,8 @@ export type HeroLeadingLagging = {
     };
     leading: {
         near_miss_ratio: number | null;
+        /** Why the ratio is empty: no recordable injuries yet, or not shown to this role. */
+        near_miss_ratio_reason?: 'none' | 'restricted' | null;
         actions_on_time_pct: number | null;
         training_pct: number | null;
         open_hazards: number;
@@ -224,13 +226,22 @@ export function CommandCentreHero({
                   {
                       label: 'Near misses per injury',
                       value: fmt(leading.near_miss_ratio, '×'),
-                      caption: 'This year',
+                      // An empty tile says why (30 Oct user test).
+                      caption:
+                          leading.near_miss_ratio !== null
+                              ? 'This year'
+                              : leading.near_miss_ratio_reason === 'restricted'
+                                ? 'Injury figures not shown for your role'
+                                : 'No recordable injuries yet this year',
                       href: analytics,
                   },
                   {
                       label: 'Actions on time',
                       value: fmt(leading.actions_on_time_pct, '%'),
-                      caption: 'Due this period',
+                      caption:
+                          leading.actions_on_time_pct === null
+                              ? 'No actions due this period'
+                              : 'Due this period',
                       href: destination('/health-safety/corrective-actions', {
                           ...selectedPeriod,
                           tab: 'all',
@@ -239,7 +250,10 @@ export function CommandCentreHero({
                   {
                       label: 'Training',
                       value: fmt(leading.training_pct, '%'),
-                      caption: 'Up to date',
+                      caption:
+                          leading.training_pct === null
+                              ? 'No training records yet'
+                              : 'Up to date',
                       href: analytics,
                   },
                   {
