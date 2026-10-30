@@ -311,6 +311,8 @@ class HsKpiService
             $incidentTo = $incidentFilters !== null ? Carbon::parse($incidentFilters['to']) : $to;
             $incidentSite = $incidentFilters !== null ? $incidentFilters['site_id'] : $siteId;
 
+            $nearMissRatio = $this->nearMissToIncidentRatio($from, $to, $siteId, $viewer, $context);
+
             return [
                 'lagging' => [
                     'incidents' => $this->incidentsInPeriod($incidentFrom, $incidentTo, $incidentSite, $viewer, $context, $incidentFilters !== null),
@@ -320,7 +322,11 @@ class HsKpiService
                     'days_since_lti' => $this->daysSinceLostTimeInjury($siteId, $viewer, $context),
                 ],
                 'leading' => [
-                    'near_miss_ratio' => $this->nearMissToIncidentRatio($from, $to, $siteId, $viewer, $context),
+                    'near_miss_ratio' => $nearMissRatio,
+                    // Why the ratio is empty, so the tile can say so (30 Oct user test): recordable-injury counts need
+                    // wellbeing access (they include medical treatment); otherwise there is nothing to compare yet.
+                    'near_miss_ratio_reason' => $nearMissRatio !== null ? null
+                        : ($viewer !== null && ! $viewer->canDo('hr.wellbeing.view') ? 'restricted' : 'none'),
                     'actions_on_time_pct' => $this->actionsClosedOnTimePct($from, $to, $siteId, $viewer, $context),
                     'training_pct' => $this->trainingAuditCompliancePct($siteId),
                     'open_hazards' => $this->openHazards($siteId),

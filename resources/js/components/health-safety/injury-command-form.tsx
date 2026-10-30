@@ -1,4 +1,4 @@
-import { DrillTimeField } from '@/components/health-safety/drills/drill-time-field';
+import { ActualEventTimeField } from '@/components/clinical/actual-event-time-field';
 import { INJURY_TYPES, SEVERITY_OPTIONS, statusLabel, TREATMENT_OPTIONS } from '@/components/health-safety/injury-constants';
 import { SourceCommandStatus } from '@/components/health-safety/restraints/command-status';
 import { Button } from '@/components/ui/button';
@@ -120,7 +120,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
         {correctingSite && <p className="text-subtle">You’ve changed the site. Choose the injured worker, the injury owner and any linked incident again. The old details stay in the history.</p>}
         {person('user_id', 'Injured worker', 'workers')}
         {correctingSite && <>{person('coordinator_user_id', 'Injury owner at the new site', 'coordinators')}{field('next_review_date', 'Next check-in date', 'date', true)}{area('reason', 'Why are you changing the site?', 2000, true)}</>}
-        <DrillTimeField label="Injury occurred" value={f.injury_date} offset={f.injury_offset} onChange={(value, offset) => { change('injury_date', value); change('injury_offset', offset); }} />
+        <ActualEventTimeField id="injury-occurred" label="Injury occurred" value={f.injury_date} offset={f.injury_offset} onChange={(value, offset) => { change('injury_date', value); change('injury_offset', offset); }} />
         {select('injury_type', 'Injury type', INJURY_TYPES.map((item) => ({ value: item.key, label: item.label })), true)}
         {select('severity', 'Severity', SEVERITY_OPTIONS, true)}
         {field('body_part_affected', 'Body part affected', 'text', true, 255)}
@@ -158,7 +158,7 @@ export function InjuryCommandForm({ detail: d, command, actorId, capture, select
         {select('kind', 'Evidence type', [{ value: 'medical_cert', label: 'Medical certificate' }, { value: 'acc_form', label: 'ACC form' }, { value: 'rtw_clearance', label: 'Return-to-work clearance' }, { value: 'photo', label: 'Photo' }, { value: 'document', label: 'Document' }])}{area('notes', 'Evidence notes')}{field('alt_text', 'Image description', 'text', false, 255)}
     </> : null;
     const simple = command === 'assign' ? <>{person('coordinator_user_id', 'Injury owner', 'coordinators')}{field('next_review_date', 'Next check-in date', 'date', true)}{area('reason', 'Why this owner?', 2000, true)}</> : command === 'review' ? <>
-        <DrillTimeField label="Review occurred" value={f.reviewed_at} offset={f.review_offset} onChange={(value, offset) => { change('reviewed_at', value); change('review_offset', offset); }} />{field('next_review_date', 'Next review date', 'date', true)}{area('notes', 'Review findings and next steps', 5000, true)}
+        <ActualEventTimeField id="injury-review-occurred" label="Review occurred" value={f.reviewed_at} offset={f.review_offset} onChange={(value, offset) => { change('reviewed_at', value); change('review_offset', offset); }} />{field('next_review_date', 'Next review date', 'date', true)}{area('notes', 'Review findings and next steps', 5000, true)}
     </> : command === 'acc' ? <>{check('acc_claim_lodged', 'ACC claim lodged')}{field('acc_claim_number', 'ACC claim number', 'text', false, 50)}<p className="text-subtle">This only notes the claim here. It doesn’t send anything to ACC.</p></> : <>
         {command === 'remove_evidence' && <p className="text-subtle">Remove {d?.attachments?.find((item) => item.id === selected?.attachment)?.original_name ?? 'this file'} from this injury. A note that it was removed stays in the history.</p>}
         {area('reason', command === 'remove_evidence' ? 'Removal reason' : 'Reason and outcome', 2000, true)}

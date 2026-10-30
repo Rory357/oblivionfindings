@@ -186,6 +186,8 @@ class HsSignalService
                 'description' => $message,
                 'source_module' => 'health_safety',
                 'signal_type' => $signalType,
+                // One open alert per item: the next check refreshes it (see SignalProcessingService::openConditionAlert).
+                SignalProcessingService::CONDITION_KEY => $entityKey === null ? null : SignalProcessingService::conditionKey($signalType, 'entity', $entityKey),
             ], $context),
         ];
 

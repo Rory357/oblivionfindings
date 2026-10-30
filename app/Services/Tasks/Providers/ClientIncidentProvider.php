@@ -125,6 +125,10 @@ class ClientIncidentProvider implements ContextualHealthSafetyTaskProvider, HasM
                 fn ($q) => TaskSearch::applyIncidentJourneyPredicate($q, $filters),
             )
             ->when(isset($filters['id']), fn ($q) => $q->whereKey((int) $filters['id']))
+            // "Assigned to me" keeps only items whose assignee is the viewer, and an incident's assignee is its owner
+            // (incident_owner_user_id). Narrowing here, before the per-incident proofs, drops only rows the final
+            // filter would drop anyway (speed, 30 Oct: My Day's card proved every open incident then threw them away).
+            ->when(($filters['assigned'] ?? null) === 'me', fn ($q) => $q->where('client_incidents.incident_owner_user_id', $user->id))
             ->orderByDesc('occurred_at')
             ->when(! $includeSearchContext, fn ($q) => $q->limit(300));
 

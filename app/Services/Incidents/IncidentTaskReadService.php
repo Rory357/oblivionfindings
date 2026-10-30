@@ -45,14 +45,39 @@ final class IncidentTaskReadService
         return $reads->query($query);
     }
 
+    private const STILL_INCIDENT_COLUMNS = ['client_id', 'site_id', 'shift_id', 'reported_by', 'submitted_at', 'type', 'is_hr_confidential',
+        'status', 'incident_owner_user_id', 'owner_revision', 'reference_number', 'title', 'description', 'severity', 'source',
+        'occurred_at', 'created_at', 'hs_event_id', 'control_room_alert_id', 'investigation_assigned_to',
+        'immediate_action_taken', 'immediate_action', 'witnesses', 'potential_consequence'];
+
+    /** @var \WeakMap<CurrentAuthorizationReads, \WeakMap<Builder, array<string, bool>>>|null */
+    private static ?\WeakMap $stillIncident = null;
+
     public function isStillIncident(ClientIncident $incident, Builder $parents, CurrentAuthorizationReads $reads): bool
     {
+        $reads->assertActive();
+        // One answer per read lifetime, parent scope and exact snapshot (speed, 30 Oct: the same check ran 2–3 times per
+        // incident in one request). The read holds share locks on what it read, so within its lifetime the answer for
+        // the same scope and the same facts cannot change; a different snapshot is a different key.
+        $facts = [];
+        foreach (self::STILL_INCIDENT_COLUMNS as $column) {
+            if (array_key_exists($column, $incident->getAttributes())) { $facts[$column] = $incident->getRawOriginal($column); }
+        }
+        $key = (int) $incident->id.'|'.hash('sha256', serialize($facts));
+        self::$stillIncident ??= new \WeakMap;
+        $byParents = self::$stillIncident[$reads] ?? new \WeakMap;
+        $known = $byParents[$parents] ?? [];
+        if (array_key_exists($key, $known)) { return $known[$key]; }
+
         $query = IncidentIndependenceIntakeService::narrowedToIncident($parents, (int) $incident->id, $reads) ?? (clone $parents)->whereKey($incident->id);
-        $this->exactSnapshot($query, $incident, ['client_id', 'site_id', 'shift_id', 'reported_by', 'submitted_at', 'type', 'is_hr_confidential',
-            'status', 'incident_owner_user_id', 'owner_revision', 'reference_number', 'title', 'description', 'severity', 'source',
-            'occurred_at', 'created_at', 'hs_event_id', 'control_room_alert_id', 'investigation_assigned_to',
-            'immediate_action_taken', 'immediate_action', 'witnesses', 'potential_consequence']);
-        return $reads->query($query)->exists();
+        $this->exactSnapshot($query, $incident, self::STILL_INCIDENT_COLUMNS);
+        $answer = $reads->query($query)->exists();
+
+        $known[$key] = $answer;
+        $byParents[$parents] = $known;
+        self::$stillIncident[$reads] = $byParents;
+
+        return $answer;
     }
 
     public function isStillFollowup(IncidentFollowup $followup, Builder $parents, CurrentAuthorizationReads $reads): bool

@@ -574,6 +574,50 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('Permanent safety review workspace', () => {
+    it('shows one plain WorkSafe line while the decision is missing, keeping every check in the count', () => {
+        const blocked = (key: string, label: string) => ({
+            key,
+            complete: false,
+            label,
+            href: '/health-safety/events/17?action=worksafe-decision',
+            classification: 'hard' as const,
+        });
+        render(
+            <EventRecordWorkspace
+                detail={eventDetail({
+                    close_gate: {
+                        allowed: false,
+                        requirements: [
+                            {
+                                key: 'hs_acceptance',
+                                complete: true,
+                                label: 'H&S handover accepted where required',
+                                href: '/health-safety/events/17?action=accept-handover',
+                                classification: 'exceptional',
+                            },
+                            blocked('worksafe_decision', 'Record the WorkSafe notifiability decision before closing this event.'),
+                            blocked('worksafe_notification', 'Record the signed WorkSafe decision before confirming notification requirements.'),
+                            blocked('worksafe_acknowledgement', 'Record the signed WorkSafe decision before confirming acknowledgement requirements.'),
+                            blocked('site_preservation', 'Record the signed WorkSafe decision before confirming Site-preservation requirements.'),
+                        ],
+                    },
+                })}
+                returnHref="/health-safety/events"
+            />,
+        );
+        // All five checks still count …
+        expect(
+            screen.getByRole('heading', { name: 'To close: 1 of 5 done' }),
+        ).toBeInTheDocument();
+        // … but the three that depend on the decision show as one plain line.
+        expect(
+            screen.getByRole('link', {
+                name: 'Record the WorkSafe decision first. The other WorkSafe steps depend on it.',
+            }),
+        ).toHaveAttribute('href', '/health-safety/events/17?action=worksafe-decision');
+        expect(screen.queryByText(/before confirming/)).toBeNull();
+    });
+
     it('renders a real record page with linked summaries and section navigation', () => {
         const onSectionChange = vi.fn();
         render(

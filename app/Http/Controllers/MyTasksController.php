@@ -23,6 +23,7 @@ use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Notifications\ControlRoom\BroadcastRecipientNotice;
 use App\Services\ControlRoom\BroadcastRecipientReadContext;
 use App\Services\ControlRoom\BroadcastRecipientReadService;
 use App\Services\GuidedRoundService;
@@ -47,6 +48,7 @@ use App\Support\HealthSafety\LoneWorkerSessionPresenter;
 use App\Support\ResidentHue;
 use App\Support\RunDetailPresenter;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -1698,18 +1700,21 @@ class MyTasksController extends Controller
 
     private function getUnreadNotificationCount(User $user, BroadcastRecipientReadContext $broadcastContext): int
     {
-        $count = 0;
-        $this->boardPackAccess
+        $visible = $this->boardPackAccess
             ->visibleNotificationQuery($user, true, null, $broadcastContext)
-            ->reorder()
-            ->chunkById(200, function (Collection $notifications) use ($broadcastContext, &$count): void {
-                foreach ($notifications as $notification) {
-                    // Counted typed rows also reveal their existence, including rows beyond the five previews.
-                    // Register each with the same final proof, then discard the projected message body.
-                    $broadcastContext->project($notification);
-                    $count++;
-                }
-            }, 'notifications.id', 'id');
+            ->reorder();
+
+        // One count over the same visible set (the header bell counts the same
+        // way) — never page through every unread row just to count it.
+        $count = (clone $visible)->count();
+
+        // Counted typed rows also reveal their existence, including rows beyond the five previews.
+        // Register each with the same final proof, then discard the projected message body. Only an
+        // admitted staff-message notice can be typed in this set; ordinary rows project to nothing.
+        (clone $visible)
+            ->where('notifications.type', BroadcastRecipientNotice::class)
+            ->get()
+            ->each(fn (DatabaseNotification $notification) => $broadcastContext->project($notification));
 
         return $count;
     }
