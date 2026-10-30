@@ -4,6 +4,7 @@
 use Symfony\Component\Process\Process;
 
 require_once dirname(__DIR__, 2).'/vendor/autoload.php';
+require_once __DIR__.'/test-results.php';
 
 /** @return list<string> */
 function oblivionCiPestFiles(string $root, string $suite): array
@@ -65,12 +66,77 @@ function oblivionCiPestBatches(array $files, int $batchSize): array
     return array_values(array_chunk($files, $batchSize));
 }
 
+/**
+ * Run every batch as its own fresh Pest process, up to $workers at once. Each
+ * process gets its own test database (Tests\TestCase), so batches never share one.
+ *
+ * @param  list<list<string>>  $batches
+ * @return array<int, array{exit: int, seconds: float, junit: string, output: string}>
+ */
+function oblivionCiRunBatches(string $root, array $batches, int $workers, string $junitDirectory, string $label): array
+{
+    $queue = array_keys($batches);
+    $running = [];
+    $finished = [];
+
+    while ($queue !== [] || $running !== []) {
+        while (count($running) < $workers && $queue !== []) {
+            $batchIndex = array_shift($queue);
+            $junit = sprintf('%s/%s-batch-%03d.xml', $junitDirectory, $label, $batchIndex + 1);
+            @unlink($junit);
+            $process = new Process([
+                PHP_BINARY,
+                'artisan',
+                'test',
+                ...$batches[$batchIndex],
+                '--colors=never',
+                '--log-junit='.$junit,
+            ], $root);
+            $process->setTimeout(null);
+            $process->start();
+            $running[$batchIndex] = [$process, microtime(true), $junit];
+        }
+
+        foreach ($running as $batchIndex => [$process, $started, $junit]) {
+            if ($process->isRunning()) {
+                continue;
+            }
+
+            unset($running[$batchIndex]);
+            $seconds = microtime(true) - $started;
+            $output = $process->getOutput().$process->getErrorOutput();
+            $exit = $process->getExitCode() ?? 1;
+            file_put_contents(sprintf('%s/%s-batch-%03d.log', $junitDirectory, $label, $batchIndex + 1), $output);
+            $finished[$batchIndex] = ['exit' => $exit, 'seconds' => $seconds, 'junit' => $junit, 'output' => $output];
+
+            // GitHub folds each batch's complete output into one group.
+            fwrite(STDOUT, sprintf(
+                "::group::Batch %d/%d (%d files) exit %d in %ds\n%s\n::endgroup::\n",
+                $batchIndex + 1,
+                count($batches),
+                count($batches[$batchIndex]),
+                $exit,
+                (int) round($seconds),
+                rtrim($output),
+            ));
+        }
+
+        if ($running !== []) {
+            usleep(200_000);
+        }
+    }
+
+    ksort($finished);
+
+    return $finished;
+}
+
 /** @param list<string> $arguments */
 function oblivionCiPestMain(array $arguments): int
 {
     $options = [];
     foreach (array_slice($arguments, 1) as $argument) {
-        if (preg_match('/\A--(suite|shard-index|shard-count|batch-size)=([A-Za-z0-9_-]+)\z/', $argument, $match) !== 1
+        if (preg_match('/\A--(suite|shard-index|shard-count|batch-size|workers)=([A-Za-z0-9_-]+)\z/', $argument, $match) !== 1
             || array_key_exists($match[1], $options)) {
             fwrite(STDERR, "Invalid CI test-shard argument.\n");
 
@@ -79,7 +145,8 @@ function oblivionCiPestMain(array $arguments): int
         $options[$match[1]] = $match[2];
     }
 
-    if (array_keys($options) !== ['suite', 'shard-index', 'shard-count', 'batch-size']) {
+    $required = ['suite', 'shard-index', 'shard-count', 'batch-size'];
+    if (array_slice(array_keys($options), 0, 4) !== $required || array_diff(array_keys($options), [...$required, 'workers']) !== []) {
         fwrite(STDERR, "All CI test-shard arguments are required in canonical order.\n");
 
         return 2;
@@ -89,7 +156,8 @@ function oblivionCiPestMain(array $arguments): int
     $index = filter_var($options['shard-index'], FILTER_VALIDATE_INT);
     $count = filter_var($options['shard-count'], FILTER_VALIDATE_INT);
     $batchSize = filter_var($options['batch-size'], FILTER_VALIDATE_INT);
-    if (! is_int($index) || ! is_int($count) || ! is_int($batchSize)) {
+    $workers = filter_var($options['workers'] ?? '1', FILTER_VALIDATE_INT);
+    if (! is_int($index) || ! is_int($count) || ! is_int($batchSize) || ! is_int($workers) || $workers < 1 || $workers > 32) {
         fwrite(STDERR, "CI test-shard coordinates must be integers.\n");
 
         return 2;
@@ -114,56 +182,96 @@ function oblivionCiPestMain(array $arguments): int
 
     $rosterHash = hash('sha256', implode("\n", $files));
     fwrite(STDOUT, sprintf(
-        "CI Pest suite=%s shard=%d/%d files=%d batches=%d roster_sha256=%s\n",
+        "CI Pest suite=%s shard=%d/%d files=%d batches=%d workers=%d roster_sha256=%s\n",
         $suite,
         $index + 1,
         $count,
         count($files),
         count($batches),
+        $workers,
         $rosterHash,
     ));
 
+    $junitDirectory = $root.'/storage/logs/ci';
+    if (! is_dir($junitDirectory) && ! mkdir($junitDirectory, 0777, true) && ! is_dir($junitDirectory)) {
+        fwrite(STDERR, "Cannot create storage/logs/ci.\n");
+
+        return 2;
+    }
+
     // A failing batch must not hide the rest of the shard: run every batch,
-    // then fail with the list of batches that failed.
-    $failed = [];
-    foreach ($batches as $batchIndex => $batch) {
-        fwrite(STDOUT, sprintf(
-            "Starting fresh Pest process %d/%d with %d files.\n",
-            $batchIndex + 1,
-            count($batches),
-            count($batch),
-        ));
+    // then judge the shard on what failed.
+    $label = sprintf('%s-%02d-of-%02d', $suite, $index + 1, $count);
+    $started = microtime(true);
+    $batchResults = oblivionCiRunBatches($root, $batches, $workers, $junitDirectory, $label);
 
-        $process = new Process([
-            PHP_BINARY,
-            'artisan',
-            'test',
-            ...$batch,
-            '--colors=never',
-        ], $root);
-        $process->setTimeout(null);
-        $process->run(static function (string $type, string $buffer): void {
-            fwrite($type === Process::ERR ? STDERR : STDOUT, $buffer);
-        });
-
-        if (! $process->isSuccessful()) {
-            fwrite(STDERR, sprintf("CI Pest batch %d failed.\n", $batchIndex + 1));
-            $failed[$batchIndex + 1] = $process->getExitCode() ?: 1;
+    $results = [];
+    $crashed = [];
+    foreach ($batchResults as $batchIndex => $batch) {
+        $batchTests = [];
+        if (is_file($batch['junit'])) {
+            try {
+                $batchTests = oblivionCiReadJunit($batch['junit'], $root);
+            } catch (Throwable) {
+                $batchTests = [];
+            }
         }
+
+        $failed = array_filter($batchTests, static fn (array $test): bool => $test['status'] === 'failed');
+        // A process that ended badly without reporting a failing test crashed (fatal error, memory, signal).
+        if ($batchTests === [] || ($batch['exit'] !== 0 && $failed === [])) {
+            $crashed[$batchIndex + 1] = $batches[$batchIndex];
+        }
+
+        $results += $batchTests;
     }
 
-    if ($failed !== []) {
-        fwrite(STDERR, sprintf(
-            "CI Pest shard failed: %d of %d batches failed (batches %s).\n",
-            count($failed),
-            count($batches),
-            implode(', ', array_keys($failed)),
-        ));
-
-        return reset($failed);
+    $known = oblivionCiKnownFailures($root.'/tests/ci/known-failures.php');
+    $comparison = oblivionCiCompare($results, $known);
+    $databaseBuilds = 0;
+    $databaseReuses = 0;
+    foreach ($batchResults as $batch) {
+        $databaseBuilds += substr_count($batch['output'], '[test-db] building pool slot');
+        $databaseReuses += substr_count($batch['output'], '[test-db] reused pool slot');
     }
 
-    return 0;
+    file_put_contents($junitDirectory.'/'.$label.'-summary.json', json_encode([
+        'suite' => $suite,
+        'shard' => $index + 1,
+        'shards' => $count,
+        'workers' => $workers,
+        'files' => count($files),
+        'batches' => count($batches),
+        'seconds' => round(microtime(true) - $started, 1),
+        'tests' => count($results),
+        'failed' => count($comparison['new']) + count($comparison['known']),
+        'new' => $comparison['new'],
+        'known' => $comparison['known'],
+        'crashed' => $crashed,
+        'database_builds' => $databaseBuilds,
+        'database_reuses' => $databaseReuses,
+        'batch_seconds' => array_map(static fn (array $batch): float => round($batch['seconds'], 1), $batchResults),
+    ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+    fwrite(STDOUT, sprintf(
+        "\nCI Pest shard done in %ds: %d tests, %d known failures, %d new failures, %d crashed batches; test databases built %d, reused %d.\n",
+        (int) round(microtime(true) - $started),
+        count($results),
+        count($comparison['known']),
+        count($comparison['new']),
+        count($crashed),
+        $databaseBuilds,
+        $databaseReuses,
+    ));
+
+    foreach ($comparison['new'] as $id) {
+        fwrite(STDOUT, sprintf("::error title=New test failure::%s — %s\n", $id, $results[$id]['message']));
+    }
+    foreach ($crashed as $batchNumber => $batchFiles) {
+        fwrite(STDOUT, sprintf("::error title=Crashed Pest batch %d::%s\n", $batchNumber, implode(' ', $batchFiles)));
+    }
+
+    return $comparison['new'] === [] && $crashed === [] ? 0 : 1;
 }
 
 if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {

@@ -5,56 +5,74 @@ use Symfony\Component\Yaml\Yaml;
 it('keeps PHP and browser CI in bounded crash safe shards', function () {
     $root = dirname(__DIR__, 2);
     $testsWorkflow = (string) file_get_contents($root.'/.github/workflows/tests.yml');
+    $machineAction = (string) file_get_contents($root.'/.github/actions/php-test-machine/action.yml');
     $visualWorkflow = (string) file_get_contents($root.'/.github/workflows/visual.yml');
     $runner = (string) file_get_contents($root.'/scripts/ci/run-pest-shard.php');
 
     expect($testsWorkflow)
-        ->toContain('cancel-in-progress: true')
-        ->toContain('coverage: none')
+        ->toContain('cancel-in-progress: ${{ github.ref != \'refs/heads/main\' }}')
         ->toContain('fail-fast: false')
-        ->toContain('suite: foundation')
-        ->toContain('shard_count: 8')
-        ->toContain('batch_size: 12')
         ->toContain('php scripts/ci/run-pest-shard.php')
-        ->not->toContain('run: ./vendor/bin/pest', 'coverage: xdebug');
+        ->toContain('--suite=foundation')
+        ->toContain('--suite=feature')
+        ->toContain('--batch-size=12')
+        ->not->toContain('run: ./vendor/bin/pest', 'coverage: xdebug', '--parallel', 'npm run build');
 
-    expect(substr_count($testsWorkflow, 'suite: feature'))->toBe(8)
-        ->and(substr_count($testsWorkflow, 'shard_index:'))->toBe(10);
+    expect($machineAction)
+        ->toContain('coverage: none')
+        ->toContain('--tmpfs /var/lib/mysql')
+        ->not->toContain('coverage: xdebug');
 
     $tests = Yaml::parse($testsWorkflow);
-    $phpJob = $tests['jobs']['ci'] ?? [];
-    $phpSteps = collect($phpJob['steps'] ?? []);
-    $shards = $phpSteps->firstWhere('name', 'Crash-safe tests (${{ matrix.suite }} ${{ matrix.shard_index }}/${{ matrix.shard_count }})');
-    $release = $phpSteps->firstWhere('name', 'Medication and connected-care release gates');
-    $expectedMatrix = [
-        ['suite' => 'foundation', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 30],
-        ['suite' => 'emar-release', 'shard_index' => 0, 'shard_count' => 1, 'batch_size' => 1],
-    ];
-    foreach (range(0, 7) as $index) {
-        $expectedMatrix[] = ['suite' => 'feature', 'shard_index' => $index, 'shard_count' => 8, 'batch_size' => 12];
+    $jobs = $tests['jobs'] ?? [];
+    $stepNamed = fn (string $job, string $name): array => collect($jobs[$job]['steps'] ?? [])->firstWhere('name', $name) ?? [];
+
+    $foundation = $stepNamed('foundation', 'Crash-safe tests (foundation)');
+    $feature = $stepNamed('feature', 'Crash-safe tests (feature ${{ matrix.shard }}/${{ strategy.job-total }})');
+    $release = $stepNamed('emar-release', 'Medication and connected-care release gates');
+    $verdict = $stepNamed('verdict', 'Verdict');
+
+    // Every PHP test job is bounded, keeps going past a failing shard, and runs on the
+    // shared machine setup (PHP without coverage, MySQL with its data in RAM).
+    foreach (['foundation', 'emar-release', 'feature'] as $job) {
+        expect($jobs[$job]['timeout-minutes'] ?? null)->toBe(90)
+            ->and(collect($jobs[$job]['steps'] ?? [])->pluck('uses')->filter()->values()->all())
+            ->toContain('./.github/actions/php-test-machine');
+    }
+
+    // Fork pull requests never reach a self-hosted runner: the repository is public.
+    foreach (['foundation', 'emar-release', 'feature'] as $job) {
+        expect($jobs[$job]['runs-on'] ?? '')->toStartWith('${{ github.event.pull_request.head.repo.fork && \'ubuntu-latest\' || ');
     }
 
     $phpunit = simplexml_load_file($root.'/phpunit.xml');
-    expect($phpJob['timeout-minutes'] ?? null)->toBe(180)
-        ->and($phpJob['strategy']['fail-fast'] ?? null)->toBeFalse()
-        ->and($phpJob['strategy']['matrix']['include'] ?? null)->toBe($expectedMatrix)
-        ->and($shards['if'] ?? null)->toBe("matrix.suite != 'emar-release'")
-        ->and($release['if'] ?? null)->toBe("matrix.suite == 'emar-release'")
+    expect($jobs['feature']['strategy']['fail-fast'] ?? null)->toBeFalse()
+        ->and($jobs['feature']['strategy']['matrix']['shard'] ?? null)
+        ->toBe('${{ fromJSON(vars.TESTS_FEATURE_SHARDS || \'[1,2,3,4,5,6,7,8,9,10,11,12]\') }}')
+        ->and($foundation['run'] ?? '')->toContain('--shard-index=0')->toContain('--shard-count=1')->toContain('--batch-size=30')
+        ->and($feature['run'] ?? '')->toContain('--shard-index=${{ strategy.job-index }}')
+        ->toContain('--shard-count=${{ strategy.job-total }}')
         ->and($release['run'] ?? '')->toStartWith('php vendor/bin/pest ')
         ->toContain('tests/Feature/Emar/PackLedgerIntegrationTest.php')
         ->toContain('tests/Feature/Emar/MedicationHistoricalRecoveryTest.php')
         ->toContain('tests/Feature/Emar/ConnectedMedicationPermissionSeedingTest.php')
         ->toContain('tests/Feature/Auth/EmailVerificationTest.php')
         ->toContain('--log-junit storage/logs/emar-release-gates.xml')
+        ->and($jobs['verdict']['needs'] ?? null)->toBe(['foundation', 'emar-release', 'feature'])
+        ->and($jobs['verdict']['if'] ?? null)->toBe('always()')
+        ->and($verdict['run'] ?? '')->toStartWith('php scripts/ci/test-verdict.php ')
         ->and((string) $phpunit->xpath('/phpunit/php/ini[@name="memory_limit"]')[0]['value'])->toBe('1024M');
 
+    // Each batch is a fresh Pest process with no time limit of its own; workers run
+    // separate processes (each with its own test database), never Pest's --parallel.
     expect($runner)
         ->toContain("'tests/Unit', 'tests/Integration', 'tests/Architecture'")
         ->toContain("'feature' => ['tests/Feature']")
         ->toContain('$position % $count === $index')
         ->toContain('array_chunk($files, $batchSize)')
-        ->toContain("'artisan',\n            'test'")
+        ->toContain("'artisan',\n                'test'")
         ->toContain('$process->setTimeout(null)')
+        ->toContain("oblivionCiKnownFailures(\$root.'/tests/ci/known-failures.php')")
         ->not->toContain('--parallel');
 
     $visual = Yaml::parse($visualWorkflow);
